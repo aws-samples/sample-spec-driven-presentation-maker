@@ -275,3 +275,49 @@ def test_api_init_rejects_unknown_output_format(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="output_format"):
         init("deck", output_dir=tmp_path / "bad", output_format="pdf")
     assert not (tmp_path / "bad").exists()
+
+
+_PPTX_DECK_JSON_BYTES = (
+    b'{\n  "template": "",\n  "fonts": {\n    "fullwidth": "",\n    "halfwidth": ""\n  },\n'
+    b'  "defaultTextColor": "",\n  "slideSize": {}\n}\n'
+)
+
+
+def test_api_init_pptx_deck_json_is_byte_identical(tmp_path: Path) -> None:
+    result = init("deck", output_dir=tmp_path / "pptx")
+    assert Path(result["deck_json"]).read_bytes() == _PPTX_DECK_JSON_BYTES
+
+
+def test_new_deck_json() -> None:
+    from sdpm.engine.schema import new_deck_json
+
+    assert new_deck_json() == complete_deck_skeleton(DECK_JSON_SKELETON)
+    assert new_deck_json("pptx") == new_deck_json()
+    assert "outputFormat" not in new_deck_json("pptx")
+    assert new_deck_json("html") == {**complete_deck_skeleton(DECK_JSON_SKELETON), "outputFormat": "html"}
+    new_deck_json()["fonts"]["fullwidth"] = "changed"  # a fresh copy each call
+    assert DECK_JSON_SKELETON["fonts"]["fullwidth"] == ""
+    with pytest.raises(ValueError, match="output_format"):
+        new_deck_json("pdf")
+
+
+@pytest.mark.parametrize("rel, expected", [
+    ("deck.json", True),
+    ("specs/outline.md", True),
+    ("specs/art-direction.html", True),
+    ("deck.css", True),
+    ("slides/intro.html", True),
+    ("./slides/intro.html", True),
+    ("slides\\intro.html", True),
+    ("slides/intro.json", False),
+    ("slides/sub/intro.html", False),
+    ("specs/brief.md", False),
+    ("output.html", False),
+    ("preview/intro.html", False),
+    ("images/a.png", False),
+    ("", False),
+])
+def test_is_html_build_input(rel: str, expected: bool) -> None:
+    from sdpm.engine.schema import is_html_build_input
+
+    assert is_html_build_input(rel) is expected

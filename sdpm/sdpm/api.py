@@ -527,11 +527,10 @@ def init(
     Returns:
         Dict with output_dir, deck_json, workspace.
     """
-    from sdpm.engine.schema import OUTPUT_FORMATS
+    from sdpm.engine.schema import new_deck_json
     from sdpm.utils.io import write_json
 
-    if output_format not in OUTPUT_FORMATS:
-        raise ValueError(f'output_format must be "pptx" or "html", got {output_format!r}')
+    deck_data: dict[str, Any] = new_deck_json(output_format)
 
     if output_dir:
         out_dir = Path(output_dir).expanduser()
@@ -540,12 +539,6 @@ def init(
         dir_name = f"{ts}-{name}" if name else ts
         out_dir = _get_output_base_dir() / dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    from sdpm.engine.schema import DECK_JSON_SKELETON, complete_deck_skeleton
-
-    deck_data: dict[str, Any] = complete_deck_skeleton(DECK_JSON_SKELETON)
-    if output_format == "html":
-        deck_data["outputFormat"] = "html"
 
     deck_json = out_dir / "deck.json"
     write_json(deck_json, deck_data, suffix="\n")
@@ -936,7 +929,11 @@ def _outline_title(outline_path: Path) -> str | None:
     return None
 
 
-def _generate_html(deck_dir: Path, output_path: Path) -> tuple[dict[str, Any], list[tuple[str | None, str]]]:
+def _generate_html(
+    deck_dir: Path,
+    output_path: Path,
+    template_cache: str | Path | None = None,
+) -> tuple[dict[str, Any], list[tuple[str | None, str]]]:
     """generate_html body; also returns ``(slug or None, warning)`` pairs for filtering."""
     from sdpm.engine.html.assemble import assemble_deck
     from sdpm.engine.html.check import (
@@ -959,7 +956,7 @@ def _generate_html(deck_dir: Path, output_path: Path) -> tuple[dict[str, Any], l
             "build it with generate_pptx")
 
     template_path, _ = _resolve_template(deck_meta, deck_dir, get_templates_dirs())
-    template = load_template_html(template_path)
+    template = load_template_html(template_path, cache_root=template_cache)
     layouts = {layout["name"] for layout in template.info.get("layouts", [])}
     chrome_keys = _chrome_placeholder_keys(template_path, template.info)
 
@@ -1000,6 +997,7 @@ def _generate_html(deck_dir: Path, output_path: Path) -> tuple[dict[str, Any], l
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(assembled.html, encoding="utf-8", newline="\n")
+    previews = _write_html_previews(deck_dir, assembled.previews)
 
     for d in diagnostics:
         label = "deck.css" if d["slug"] == DECK_CSS_SLUG else d["slug"]
@@ -1017,23 +1015,49 @@ def _generate_html(deck_dir: Path, output_path: Path) -> tuple[dict[str, Any], l
         "layouts_used": assembled.layouts_used,
         "warnings": [text for _, text in tagged],
         "diagnostics": diagnostics,
+        "previews": previews,
     }
     if template.decorations_status is not None:
         result["decorations"] = template.decorations_status
     return result, tagged
 
 
-def generate_html(deck_dir: str | Path, output_path: str | Path | None = None) -> dict[str, Any]:
+def _write_html_previews(deck_dir: Path, previews: dict[str, str]) -> dict[str, str]:
+    """Write ``preview/<slug>.html`` per slide; remove the ones of slides no longer built.
+
+    PNG previews of the PPTX path are left alone. Returns ``{slug: "preview/<slug>.html"}``.
+    """
+    preview_dir = deck_dir / "preview"
+    preview_dir.mkdir(exist_ok=True)
+    for stale in preview_dir.glob("*.html"):
+        if stale.stem not in previews:
+            stale.unlink(missing_ok=True)
+    written: dict[str, str] = {}
+    for slug, text in previews.items():
+        (preview_dir / f"{slug}.html").write_text(text, encoding="utf-8", newline="\n")
+        written[slug] = f"preview/{slug}.html"
+    return written
+
+
+def generate_html(
+    deck_dir: str | Path,
+    output_path: str | Path | None = None,
+    *,
+    template_cache: str | Path | None = None,
+) -> dict[str, Any]:
     """Assemble an HTML deck (deck.json ``"outputFormat": "html"``) into one offline file.
 
     Reads slides/<slug>.html in outline order, runs the static checks, and writes
-    ``output_path`` (default ``<deck>/output.html``).
+    ``output_path`` (default ``<deck>/output.html``) plus one static document per
+    built slide, ``<deck>/preview/<slug>.html`` (stale ones are removed).
+    ``template_cache`` overrides the template-conversion cache directory.
 
     Returns:
         Dict with output_path, bytes, slide_count, slides (``pageNN - slug``),
         layouts_used, warnings (``"<slug>: …"`` / ``"deck.css: …"``), diagnostics
-        (``{slug, rule, message}``) and, when template decorations are missing,
-        decorations (``preview_unavailable``-shaped status).
+        (``{slug, rule, message}``), previews (``{slug: "preview/<slug>.html"}``) and,
+        when template decorations are missing, decorations
+        (``preview_unavailable``-shaped status).
 
     Raises:
         ValueError: the deck is not an HTML deck.
@@ -1041,7 +1065,7 @@ def generate_html(deck_dir: str | Path, output_path: str | Path | None = None) -
     """
     deck_path = Path(deck_dir)
     out = Path(output_path) if output_path else deck_path / "output.html"
-    result, _ = _generate_html(deck_path, out)
+    result, _ = _generate_html(deck_path, out, template_cache)
     return result
 
 
@@ -1049,6 +1073,8 @@ def refresh_html(
     deck_dir: str | Path,
     changed_paths: list[str] | None = None,
     measure_slides: list[str] | None = None,
+    *,
+    template_cache: str | Path | None = None,
 ) -> dict[str, Any]:
     """Rebuild ``<deck>/output.html`` after an edit (the run_python post-processing for HTML decks).
 
@@ -1057,9 +1083,9 @@ def refresh_html(
     Returns:
         Dict with html (path), html_bytes, warnings (only the measure_slides' and
         deck-wide ones when measure_slides is given), affected (slugs the changed
-        paths can alter) and, with measure_slides, measure (static check report),
-        preview (open-in-browser note) and decorations (when template decorations
-        are missing).
+        paths can alter), previews (``{slug: "preview/<slug>.html"}``) and, with
+        measure_slides, measure (static check report), preview (open-in-browser
+        note) and decorations (when template decorations are missing).
     """
     from sdpm.engine.html.check import format_check_report, html_preview_unavailable
     from sdpm.engine.schema import affected_slugs
@@ -1067,7 +1093,7 @@ def refresh_html(
     deck_path = Path(deck_dir)
     output = deck_path / "output.html"
     try:
-        built, tagged = _generate_html(deck_path, output)
+        built, tagged = _generate_html(deck_path, output, template_cache)
     except Exception as exc:  # reported to the agent, never raised
         return {"html_error": f"{type(exc).__name__}: {exc}"}
 
@@ -1078,6 +1104,7 @@ def refresh_html(
         "html_bytes": built["bytes"],
         "warnings": built["warnings"],
         "affected": affected_slugs(changed_paths or [], present, html=True),
+        "previews": built["previews"],
     }
     if measure_slides:
         wanted = set(measure_slides)
@@ -1088,6 +1115,42 @@ def refresh_html(
         if built.get("decorations") is not None:
             result["decorations"] = built["decorations"]
     return result
+
+
+def _outline_slide_texts(deck_dir: Path) -> list[tuple[str, str]]:
+    """``(slug, slides/<slug>.html text)`` in outline order; missing files are skipped."""
+    out = []
+    for slug in parse_outline_slugs(deck_dir / "specs" / "outline.md"):
+        path = deck_dir / "slides" / f"{slug}.html"
+        if path.is_file():
+            out.append((slug, path.read_text(encoding="utf-8")))
+    return out
+
+
+def html_slide_texts(deck_dir: str | Path) -> list[dict[str, Any]]:
+    """Per-slide text of an HTML deck, in outline order (search indexing).
+
+    Returns:
+        ``[{slug, layout, title, notes, text}]`` (``sdpm.engine.html.text.slide_text_summary``);
+        slides whose file is missing are skipped.
+    """
+    from sdpm.engine.html.text import slide_text_summary
+
+    return [{"slug": slug, **slide_text_summary(text)} for slug, text in _outline_slide_texts(Path(deck_dir))]
+
+
+def html_deck_refs(deck_dir: str | Path) -> dict[str, set[str]]:
+    """Files an HTML deck build embeds: ``{"relative": deck paths, "assets": assets: refs}``.
+
+    Scans slides/*.html of the outline and deck.css the way the assembler does, so a
+    server can fetch only these files before building.
+    """
+    from sdpm.engine.html.assemble import collect_refs
+
+    deck_path = Path(deck_dir)
+    css_path = deck_path / "deck.css"
+    deck_css = css_path.read_text(encoding="utf-8") if css_path.is_file() else None
+    return collect_refs((text for _, text in _outline_slide_texts(deck_path)), deck_css)
 
 
 def measure(

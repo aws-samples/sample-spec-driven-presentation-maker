@@ -9,7 +9,8 @@ Rules:
     structure               not exactly one top-level ``<section>``, or a nested one
     layout-missing          the section has no ``data-layout``
     layout-unknown          ``data-layout`` names no layout of the template
-    script                  ``<script>``, ``on*`` attributes, ``javascript:`` URLs,
+    script                  ``<script>``, ``on*`` attributes, ``javascript:`` URLs (also
+                            one item of an SVG animation ``values`` list),
                             ``<iframe>`` / ``<object>`` / ``<embed>`` (an embedded document
                             the checks cannot see); inline ``<svg>`` and its
                             ``<foreignObject>`` are checked like any other markup
@@ -18,8 +19,10 @@ Rules:
                             ``assets:<source>/<name>`` or a deck-relative path, in an
                             attribute, an attribute ``url()`` (SVG ``fill`` / ``filter`` …)
                             or CSS (``<a href>`` is allowed: it loads nothing); also
-                            ``@import`` and ``<link rel=stylesheet>`` of a deck file,
-                            which are not embedded
+                            every ``@import`` and ``<link rel=stylesheet>`` (``data:``
+                            included), which are not embedded and the CSP blocks
+    external-use            ``<use href>`` that is not a ``#fragment`` (another document's
+                            sprite, which the deck's CSP / the browser does not load)
     data-background         reveal.js ``data-background*`` attributes
     self-chrome             slide numbers / footers drawn by the slide (the assembler draws them)
     root-in-slide-style     ``:root`` in a slide ``<style>`` (tokens come from the style)
@@ -63,6 +66,8 @@ _JS_URL_ATTRS = frozenset({"href", "xlink:href", "src", "action", "formaction", 
                            "to", "from", "values"})
 # Elements that embed a whole document the static checks never see.
 _EMBEDDING_TAGS = frozenset({"iframe", "frame", "object", "embed"})
+# SVG animation elements (lower-cased by the HTML parser); ``values`` is a ``;`` list.
+_SVG_ANIMATION_TAGS = frozenset({"animate", "set", "animatemotion", "animatetransform"})
 
 
 def _diag(slug: str, rule: str, message: str) -> dict:
@@ -158,10 +163,9 @@ def _css_url_diags(slug: str, css: str, where: str) -> list[dict]:
             out.append(_diag(slug, "external-url",
                              f"{where} loads {url[:80]!r}; embed it (data:, assets:, or a deck file)"))
     for m in _CSS_IMPORT_RE.finditer(css):
-        if url_kind(m.group("url")) != "data":
-            out.append(_diag(slug, "external-url",
-                             f"@import {m.group('url')[:80]!r} in {where} is not embedded; "
-                             "put shared rules in deck.css"))
+        out.append(_diag(slug, "external-url",
+                         f"@import {m.group('url')[:80]!r} in {where} is not embedded (the deck's CSP "
+                         "blocks it); put shared rules in deck.css"))
     return out
 
 
@@ -252,11 +256,18 @@ def _external_attr_diags(slug: str, el) -> list[dict]:
         if url_kind(value) == "javascript" and lname in _JS_URL_ATTRS:
             out.append(_diag(slug, "script", f"<{tag} {name}> uses a javascript: URL"))
             continue
+        if lname == "values" and tag in _SVG_ANIMATION_TAGS and any(
+                url_kind(part) == "javascript" for part in value.split(";")):
+            out.append(_diag(slug, "script", f"<{tag} values> sets a javascript: URL"))
+            continue
+        if tag == "use" and lname in ("href", "xlink:href") and url_kind(value) != "fragment":
+            out.append(_diag(slug, "external-use",
+                             f"<use {name}={value[:80]!r}> loads another document's sprite; "
+                             "inline the SVG"))
         if stylesheet and lname == "href":
-            if url_kind(value) != "data":
-                out.append(_diag(slug, "external-url",
-                                 f"<link rel=stylesheet href={value[:80]!r}> is not embedded; "
-                                 "put shared rules in deck.css"))
+            out.append(_diag(slug, "external-url",
+                             f"<link rel=stylesheet href={value[:80]!r}> is not embedded (the deck's CSP "
+                             "blocks linked stylesheets, data: ones too); put shared rules in deck.css"))
             continue
         if lname != "style" and "url(" in value.lower():
             out.extend(_css_url_diags(slug, value, f"<{tag} {name}>"))

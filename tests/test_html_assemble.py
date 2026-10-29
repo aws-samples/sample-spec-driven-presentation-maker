@@ -120,9 +120,10 @@ def test_vendored_code_carries_license_notices(built) -> None:
 
 def test_reveal_initialize_config(built) -> None:
     _, result, _ = built
-    config = re.search(r"Reveal\.initialize\(\{(.*?)\}\);", result.html).group(1)
+    config = re.search(r"var o=\{(.*?)\};", result.html).group(1)
     for part in ("width:1920", "height:1080", "center:false", "hash:true", "RevealNotes"):
         assert part in config
+    assert "Reveal.initialize(o);" in result.html
 
 
 _DECORATION_RULE = r'section\[data-layout="([^"]+)"\]\{background-image:url\("data:image/svg\+xml;base64,'
@@ -394,3 +395,74 @@ def test_size_warnings(tmp_path: Path, monkeypatch) -> None:
 
 def test_inline_js_escapes_script_end_and_comment_open() -> None:
     assert inline_js('a="</SCRIPT>";b="<!--"') == 'a="<\\/SCRIPT>";b="<\\!--"'
+
+
+# ── static per-slide previews ────────────────────────────────────────────
+
+def test_one_static_preview_per_included_slide(built) -> None:
+    _, result, _ = built
+    assert list(result.previews) == list(SLIDES)
+    for slug, text in result.previews.items():
+        doc = lxml_html.document_fromstring(text)
+        assert "<script" not in text.lower()
+        meta = doc.xpath('//head/meta')
+        assert meta[0].get("charset") == "utf-8"
+        assert meta[1].get("http-equiv") == "Content-Security-Policy"
+        policy = meta[1].get("content")
+        assert "script-src 'none'" in policy and "frame-src 'none'" in policy
+        assert meta[2].get("name") == "referrer" and meta[2].get("content") == "no-referrer"
+        sections = doc.xpath("//section")
+        assert [s.get("data-slug") for s in sections] == [slug]
+        assert "present" in sections[0].get("class").split()
+
+
+def test_preview_has_only_its_own_slide_css_and_layout(tmp_path: Path) -> None:
+    deck = _make_deck(tmp_path)
+    plain = load_template_html(TEMPLATES_DIR / "blank-light.pptx", cache_root=tmp_path / "template-cache")
+    svgs = {}
+    for name in ("Title Slide", "Title Only"):
+        svg = tmp_path / f"{name}.svg"
+        svg.write_text('<svg xmlns="http://www.w3.org/2000/svg"><rect width="9" height="9"/></svg>',
+                       encoding="utf-8")
+        svgs[name] = svg
+    result = _assemble(deck, template=dataclasses.replace(plain, svg_paths=svgs), deck_css=".shared{color:red}")
+    cover = lxml_html.document_fromstring(result.previews["cover"])
+    demo = lxml_html.document_fromstring(result.previews["demo-1"])
+    assert re.findall(_DECORATION_RULE, cover.xpath('//style[@id="sdpm-deck"]')[0].text) == ["Title Slide"]
+    assert re.findall(_DECORATION_RULE, demo.xpath('//style[@id="sdpm-deck"]')[0].text) == ["Title Only"]
+    assert 'section[data-slug="demo-1"]' in demo.xpath('//style[@id="sdpm-slides"]')[0].text
+    assert (cover.xpath('//style[@id="sdpm-slides"]')[0].text or "") == ""
+    for doc in (cover, demo):
+        assert doc.xpath('//style[@id="sdpm-deck-css"]')[0].text == ".shared{color:red}"
+        assert doc.xpath('//style[@id="sdpm-theme"]') and doc.xpath('//style[@id="sdpm-style-root"]')
+
+
+def test_preview_shows_every_fragment_statically(built) -> None:
+    _, result, _ = built
+    doc = lxml_html.document_fromstring(result.previews["demo-2"])
+    css = doc.xpath('//style[@id="sdpm-preview"]')[0].text
+    assert "opacity:1!important" in css and "visibility:inherit!important" in css
+    assert ".reveal .fragment.fade-up" in css and "transform:none!important" in css
+    assert "display:block!important" in css and "width:1920px;height:1080px" in css
+    ids = [s.get("id") for s in doc.iter("style") if s.get("id")]
+    assert ids[-1] == "sdpm-preview"
+    assert len(doc.xpath('//li[@class="fragment"]')) == 2
+
+
+def test_collect_refs_matches_the_assembler_scan() -> None:
+    from sdpm.engine.html.assemble import collect_refs
+
+    slides = [
+        '<section data-layout="Blank"><style>.a{background:url("images/a.png#x")}</style>'
+        f'<img src="{ICON}"><img src="images/b.png?v=2" srcset="images/c.png 1x, https://x.example/d.png 2x">'
+        '<video poster="media/p.jpg" src="media/v.mp4"></video><object data="docs/o.svg"></object>'
+        '<svg><image href="images/e.png"/></svg>'
+        '<div style="background:image-set(&quot;images/f.png&quot; 1x)"></div>'
+        '<a href="other.html">link</a><img src="data:image/png;base64,AA"></section>',
+        "<div>not a slide</div>",
+    ]
+    refs = collect_refs(slides, ".x{background:url(images/g.png)} .y{background:url(https://x.example/h.png)}")
+    assert refs["relative"] == {"images/a.png", "images/b.png", "images/c.png", "media/p.jpg",
+                                "media/v.mp4", "docs/o.svg", "images/e.png", "images/f.png", "images/g.png"}
+    assert refs["assets"] == {ICON}
+    assert collect_refs([], None) == {"relative": set(), "assets": set()}
