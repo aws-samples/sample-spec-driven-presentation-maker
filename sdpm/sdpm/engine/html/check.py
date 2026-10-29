@@ -12,7 +12,8 @@ Rules:
     script                  ``<script>``, ``on*`` attributes, ``javascript:`` URLs (also
                             one item of an SVG animation ``values`` list),
                             ``<iframe>`` / ``<object>`` / ``<embed>`` (an embedded document
-                            the checks cannot see); inline ``<svg>`` and its
+                            the checks cannot see), ``<meta http-equiv>`` (``refresh``
+                            navigates the deck, which no CSP directive stops); inline ``<svg>`` and its
                             ``<foreignObject>`` are checked like any other markup
                             (deck.css: ``javascript:``, ``expression()``, ``</style``)
     external-url            a resource-loading reference that is not ``data:``,
@@ -339,6 +340,10 @@ def check_slide_html(
             continue
         if el.tag == "script":
             out.append(_diag(slug, "script", "<script> is not allowed in slides"))
+        if el.tag == "meta" and el.get("http-equiv") is not None:
+            out.append(_diag(slug, "script",
+                             f"<meta http-equiv={el.get('http-equiv')[:40]!r}> is not allowed in slides "
+                             "(refresh navigates the deck away, which the CSP cannot stop)"))
         out.extend(_external_attr_diags(slug, el))
         out.extend(_self_chrome_diags(slug, el, chrome_keys))
         if el.tag == "style":
@@ -389,6 +394,9 @@ def html_preview_unavailable(output_html: Path) -> dict:
     }
 
 
+CHECK_REPORT_HEADER = "Static checks (no browser; open output.html to see the slides):"
+
+
 def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None) -> str:
     """Plain-text static check report (the HTML counterpart of the measure report).
 
@@ -399,7 +407,7 @@ def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None) -
     for d in diags:
         by_slug.setdefault(d["slug"], []).append(d)
     order = list(slugs) if slugs is not None else [s for s in by_slug if s != DECK_CSS_SLUG]
-    lines = ["Static checks (no browser; open output.html to see the slides):"]
+    lines = [CHECK_REPORT_HEADER]
     if DECK_CSS_SLUG in by_slug:
         order = [DECK_CSS_SLUG, *[s for s in order if s != DECK_CSS_SLUG]]
     if not order:
@@ -415,6 +423,7 @@ def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None) -
 
 
 __all__ = [
+    "CHECK_REPORT_HEADER",
     "DECK_CSS_SLUG",
     "check_deck_css",
     "check_html_font_sizes",

@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-import { afterEach, describe, expect, it } from "vitest"
-import { cleanup, screen } from "@testing-library/react"
+import { afterEach, describe, expect, it, vi } from "vitest"
+import { cleanup, fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
-import { HtmlDeckPlayer } from "./HtmlDeckPlayer"
+import { HtmlDeckPlayer, deckUrlAtSlide } from "./HtmlDeckPlayer"
 
 afterEach(cleanup)
 
@@ -39,5 +39,39 @@ describe("HtmlDeckPlayer", () => {
     const next = "https://bucket.s3.ap-northeast-1.amazonaws.com/html/d1/def.html?X-Amz-Signature=3"
     rerender(<HtmlDeckPlayer htmlUrl={next} />)
     expect(screen.getByTitle("HTML deck").getAttribute("src")).toBe(next)
+  })
+
+  it("opens at the requested slide and keeps it across a re-signed URL", () => {
+    const { rerender } = renderWithIntl(<HtmlDeckPlayer htmlUrl={URL_1} slide={{ index: 2, seq: 1 }} />)
+    expect(screen.getByTitle("HTML deck").getAttribute("src")).toBe(`${URL_1}#/2`)
+
+    rerender(<HtmlDeckPlayer htmlUrl={URL_1.replace("Signature=1", "Signature=2")} slide={{ index: 2, seq: 1 }} />)
+    expect(screen.getByTitle("HTML deck").getAttribute("src")).toBe(`${URL_1}#/2`)
+  })
+
+  it("moves a loaded deck with reveal.js's postMessage API, an unloaded one through the URL", () => {
+    const { rerender } = renderWithIntl(<HtmlDeckPlayer htmlUrl={URL_1} />)
+    const frame = screen.getByTitle("HTML deck") as HTMLIFrameElement
+
+    rerender(<HtmlDeckPlayer htmlUrl={URL_1} slide={{ index: 3, seq: 1 }} />)
+    expect(frame.getAttribute("src")).toBe(`${URL_1}#/3`)
+
+    fireEvent.load(frame)
+    const post = vi.spyOn(frame.contentWindow!, "postMessage").mockImplementation(() => {})
+    rerender(<HtmlDeckPlayer htmlUrl={URL_1} slide={{ index: 3, seq: 2 }} />)
+    expect(post).toHaveBeenCalledWith(JSON.stringify({ method: "slide", args: [3] }), "*")
+    expect(frame.getAttribute("src")).toBe(`${URL_1}#/3`)
+
+    rerender(<HtmlDeckPlayer htmlUrl={URL_1} slide={{ index: 0, seq: 3 }} />)
+    expect(post).toHaveBeenLastCalledWith(JSON.stringify({ method: "slide", args: [0] }), "*")
+  })
+})
+
+describe("deckUrlAtSlide", () => {
+  it("adds a reveal.js slide fragment without touching the signed query", () => {
+    expect(deckUrlAtSlide(URL_1, 4)).toBe(`${URL_1}#/4`)
+    expect(deckUrlAtSlide(`${URL_1}#/4`, 1)).toBe(`${URL_1}#/1`)
+    expect(deckUrlAtSlide(`${URL_1}#/4`, 0)).toBe(URL_1)
+    expect(deckUrlAtSlide(URL_1, undefined)).toBe(URL_1)
   })
 })

@@ -84,6 +84,10 @@ HTML decks (`deck.json` `outputFormat: "html"`) use the same tools with these di
 | `generate_pptx` | Finalizes the deck as HTML: full build, every thumbnail, deck record update, knowledge-base sync (`search_slides` indexes HTML slides) |
 | `get_preview` | Returns a note instead of images: HTML decks have no PNG previews; the Web UI shows the deck and its thumbnails |
 
+The remote build reads and updates the deck record under the caller's user id, as the PPTX
+build does. Only the deck owner's `run_python` / `generate_pptx` therefore rebuild an HTML
+deck on S3; a collaborator's run reports `html_error` (`generate_pptx` returns an error)
+and the published HTML stays as the owner last built it.
 ### Storage
 
 ```

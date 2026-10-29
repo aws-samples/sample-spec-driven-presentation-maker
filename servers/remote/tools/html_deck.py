@@ -38,6 +38,8 @@ from tools import template_html_cache
 logger = logging.getLogger("sdpm.html_deck")
 
 REMOTE_PREVIEW_NOTE = "HTML decks have no PNG previews; the Web UI shows the deck and its thumbnails."
+# Replaces the core report header, which points at a local output.html.
+REMOTE_CHECK_REPORT_HEADER = "Static checks (no browser; the Web UI shows the deck and its thumbnails):"
 
 # Deck files the HTML build reads (deck.json is written from the S3 deck.json).
 _BUILD_FILES = frozenset({"specs/outline.md", "specs/art-direction.html", "deck.css"})
@@ -77,6 +79,9 @@ def prepare_html_workspace(
 
     Raises:
         ValueError: the deck does not exist or its template cannot be resolved.
+
+    The record is looked up under ``user_id`` (``USER#{user_id}``), as the PPTX
+    build does, so only the owner can rebuild; see docs/en/architecture.md.
     """
     from sdpm.api import html_deck_refs
     from tools.generate import materialize_assets, materialize_template
@@ -278,6 +283,10 @@ def refresh_html_deck(
         result["previews"] = uploaded
         if "preview" in result:
             result["preview"] = {"status": "unavailable", "reason": "html-deck", "note": REMOTE_PREVIEW_NOTE}
+        if isinstance(result.get("measure"), str):
+            from sdpm.engine.html.check import CHECK_REPORT_HEADER
+
+            result["measure"] = result["measure"].replace(CHECK_REPORT_HEADER, REMOTE_CHECK_REPORT_HEADER, 1)
         template_html_cache.persist(tmpdir / "template.pptx", storage, cache_root)
         return result
     except Exception as e:  # reported to the agent, never raised
@@ -321,6 +330,8 @@ def finalize_html_deck(
         uploaded = _upload_previews(deck_id, tmpdir, previews, order, epoch, storage)
         missing = [s for s in order if s not in uploaded]
         if missing:
+            # This run's keys would win the preview key map over the previous complete set.
+            _delete(storage, list(uploaded.values()))
             raise RuntimeError(f"preview upload failed for {', '.join(missing)}")
         _publish(
             deck_id, user_id, storage, Path(gen["output_path"]), gen["slide_count"],

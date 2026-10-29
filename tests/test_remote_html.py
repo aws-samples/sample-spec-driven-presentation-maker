@@ -305,6 +305,8 @@ def test_run_python_html_measure_reports_and_previews_measured(server, storage, 
 
     assert list(out["previews"]) == ["cover"]
     assert "cover" in out["measure"]
+    assert out["measure"].startswith(html_deck.REMOTE_CHECK_REPORT_HEADER)
+    assert "output.html" not in out["measure"]
     assert out["preview"]["note"] == html_deck.REMOTE_PREVIEW_NOTE and "open" not in out["preview"]
 
 
@@ -363,6 +365,25 @@ def test_generate_pptx_kb_failure_is_a_warning(server, storage, monkeypatch):
     monkeypatch.setattr(remote_server, "_get_kb_sync", lambda: kb)
     result = json.loads(server.generate_pptx(deck_id="d1"))
     assert result["warnings"]["kbSyncFailed"] == "vectors down"
+
+
+def test_generate_pptx_partial_preview_upload_removes_this_runs_previews(server, storage, monkeypatch):
+    previous = ["html/d1/preview/cover_1.html", "html/d1/preview/body_1.html"]
+    storage.objects.update({k: b"x" for k in previous})
+    upload = storage.upload_file
+
+    def flaky(key, data, content_type="", tagging=""):
+        if "/preview/body_" in key:
+            raise RuntimeError("S3 down")
+        upload(key, data, content_type, tagging)
+
+    monkeypatch.setattr(storage, "upload_file", flaky)
+
+    result = json.loads(server.generate_pptx(deck_id="d1"))
+
+    assert "body" in result["error"]
+    assert storage.preview_keys() == sorted(previous)  # the complete older set stays the latest
+    assert storage.html_keys() == [] and "htmlS3Key" not in storage.record
 
 
 def test_generate_pptx_pptx_deck_takes_the_pptx_path(server, storage, monkeypatch):

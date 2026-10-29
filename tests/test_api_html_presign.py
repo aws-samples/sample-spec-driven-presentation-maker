@@ -2,8 +2,9 @@
 # SPDX-License-Identifier: MIT-0
 """Tests for api/html_presign.py — presigned S3 URLs for HTML deck artifacts.
 
-api/index.py itself is not importable here (aws_lambda_powertools is not a dev
-dependency), so the endpoint's decisions live in html_presign and are tested here.
+api/index.py needs aws_lambda_powertools, which is not a dev dependency; the
+endpoint's decisions live in html_presign and are tested here. The routes
+themselves are exercised in tests/test_api_html_routes.py with a stand-in.
 """
 
 import re

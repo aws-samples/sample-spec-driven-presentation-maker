@@ -86,6 +86,8 @@ def test_layout_missing_and_unknown() -> None:
     '<iframe src="images/page.html"></iframe>',
     '<object data="images/chart.png"></object>',
     '<embed src="images/chart.svg">',
+    '<meta http-equiv="refresh" content="0;url=https://example.com/">',
+    '<svg><meta http-equiv="Refresh" content="5"/></svg>',
 ])
 def test_script(inner: str) -> None:
     assert "script" in _rules(_section(inner))

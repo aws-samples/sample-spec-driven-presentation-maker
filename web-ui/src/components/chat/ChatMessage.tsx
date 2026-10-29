@@ -61,6 +61,17 @@ function renderInlinePreviews(text: string, urls: Record<string, string>): strin
   })
 }
 
+/** Sent-message chip for the `@format:html` token (label shared with the input chip). */
+function FormatHtmlChip() {
+  const t = useTranslations("slashPicker")
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-foreground/[0.03] px-1.5 py-0.5 align-middle text-xs font-medium text-foreground">
+      <CodeXml className="h-3 w-3" aria-hidden="true" />
+      {t("formatHtml")}
+    </span>
+  )
+}
+
 /**
  * Highlight @Page N and @[DeckName] mentions within a text string,
  * and render inline color swatches next to hex color codes (#RGB / #RRGGBB).
@@ -74,13 +85,7 @@ function highlightMentions(text: string): (string | React.JSX.Element)[] {
   const parts = text.split(COMBINED_RE)
   return parts.map((part, i) => {
     if (FORMAT_HTML_TOKEN_RE.test(part)) {
-      // Format chip: "HTML" is the format's name in every locale (slashPicker.formatHtml).
-      return (
-        <span key={i} className="inline-flex items-center gap-1 rounded-md border border-border bg-foreground/[0.03] px-1.5 py-0.5 align-middle text-xs font-medium text-foreground">
-          <CodeXml className="h-3 w-3" aria-hidden="true" />
-          HTML
-        </span>
-      )
+      return <FormatHtmlChip key={i} />
     }
     if (MENTION_RE.test(part)) {
       return <span key={i} className="text-blue-400 font-medium">{part}</span>

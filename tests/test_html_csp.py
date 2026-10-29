@@ -185,6 +185,7 @@ _HOSTILE = {
     "animate-values": ('<svg><a><animate attributeName="href" values="0;javascript:window.x=1"/>'
                        "<text>t</text></a></svg>", "script"),
     "use-href": ('<svg><use href="images/s.svg#a"/></svg>', "external-use"),
+    "meta-refresh": ('<meta http-equiv="refresh" content="0;url=https://example.com/">', "script"),
 }
 
 
@@ -207,6 +208,7 @@ def test_hostile_constructs_are_kept_and_reported(tmp_path: Path) -> None:
         "onerror": "//img[@onerror]",
         "animate-values": '//animate[contains(@values, "javascript:")]',
         "use-href": '//use[@href="images/s.svg#a"]',
+        "meta-refresh": '//meta[@http-equiv="refresh"]',
     }
     for slug, xpath in present.items():
         section = doc.xpath(f'//section[@data-slug="{slug}"]')[0]

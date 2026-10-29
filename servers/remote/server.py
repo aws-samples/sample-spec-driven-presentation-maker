@@ -327,12 +327,17 @@ _MATERIALIZE_SLIDE = re.compile(r"^slides/[A-Za-z0-9_-]+\.(?:json|html)$")
 
 
 def _deck_format(deck_id: str) -> str:
-    """deck.json outputFormat of an S3 deck; "pptx" when unreadable or invalid (built as PPTX)."""
+    """deck.json outputFormat of an S3 deck; "pptx" when unreadable or invalid (built as PPTX).
+
+    The fallback keeps the PPTX path unchanged; it is logged because an HTML deck
+    whose deck.json cannot be read then fails with PPTX build errors.
+    """
     from sdpm.engine.schema import deck_output_format
 
     try:
         return deck_output_format(_storage.get_deck_json(deck_id))
-    except Exception:
+    except Exception as e:
+        logger.warning("deck.json of %s unreadable or invalid, treating it as PPTX: %s", deck_id, e)
         return "pptx"
 
 

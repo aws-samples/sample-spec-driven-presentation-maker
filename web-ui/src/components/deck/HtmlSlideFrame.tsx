@@ -43,11 +43,23 @@ export function HtmlSlideFrame({ src, title, width = 1920, height = 1080, fit = 
   useEffect(() => () => roRef.current?.disconnect(), [])
 
   // Cloud URLs are re-signed on every poll: keep the loaded document until the
-  // file itself changes, so a fresh signature never reloads the frame.
+  // file itself changes, so a fresh signature never reloads the frame. A frame
+  // that has not loaded yet (lazy, off screen) takes the fresh signature, so it
+  // does not load an expired URL later.
   const [shownSrc, setShownSrc] = useState(src)
+  const loadedRef = useRef(false)
   useEffect(() => {
-    setShownSrc((current) => (previewIdentity(current) === previewIdentity(src) ? current : src))
+    setShownSrc((current) => {
+      if (current === src) return current
+      if (previewIdentity(current) === previewIdentity(src) && loadedRef.current) return current
+      loadedRef.current = false
+      return src
+    })
   }, [src])
+  const handleLoad = useCallback(() => {
+    loadedRef.current = true
+    onLoad?.()
+  }, [onLoad])
 
   const sx = box.w / width
   const sy = box.h > 0 ? box.h / height : sx
@@ -66,7 +78,7 @@ export function HtmlSlideFrame({ src, title, width = 1920, height = 1080, fit = 
         loading="lazy"
         aria-hidden="true"
         tabIndex={-1}
-        onLoad={onLoad}
+        onLoad={handleLoad}
         className="pointer-events-none absolute border-0"
         style={{
           width,

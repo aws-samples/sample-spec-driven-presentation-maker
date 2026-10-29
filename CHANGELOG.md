@@ -29,7 +29,8 @@ Entries before v0.5.0 were written retroactively as summaries.
   `data:` images, fonts and media, plus `<meta name="referrer" content="no-referrer">`;
   the thumbnails carry a CSP without scripts. New static checks flag `javascript:` in any item of an SVG animation `values` list,
   `<use href>` pointing anywhere but a `#fragment`, and `data:` stylesheets (`<link>` and
-  `@import`), which the CSP blocks. Remote MCP tools:
+  `@import`), which the CSP blocks, and `<meta http-equiv>` in a slide (a `refresh` would
+  navigate the deck to another page, which no CSP directive stops). Remote MCP tools:
   `init_deck_workspace(output_format)` and `start_composing(mode)` take the same arguments
   as locally, `run_python` rebuilds the HTML deck and its thumbnails, `generate_pptx`
   finalizes an HTML deck as HTML (full build, thumbnails, knowledge-base sync so

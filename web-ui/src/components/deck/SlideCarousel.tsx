@@ -24,7 +24,7 @@ import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
-import { HtmlDeckPlayer } from "@/components/deck/HtmlDeckPlayer"
+import { HtmlDeckPlayer, type HtmlPlayerSlide } from "@/components/deck/HtmlDeckPlayer"
 import { DeckDefs, type DeckDefsStatus } from "@/components/deck/DeckDefs"
 import { useFollowScroll } from "@/components/deck/useFollowScroll"
 import { IS_LOCAL } from "@/lib/mode"
@@ -223,10 +223,21 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   // Grid thumbnail click: switch to full view and land on that slide once the
   // shared-layout morph has run.
   const [focusSlug, setFocusSlug] = useState<string | null>(null)
+  // HTML decks show one player instead of stacked slides: it is told which slide
+  // to open (index as numbered on the thumbnails).
+  const [playerSlide, setPlayerSlide] = useState<HtmlPlayerSlide | null>(null)
+  const previewSlugKey = slidesWithPreview.map((s) => s.slug).join(" ")
+  const showInPlayer = useCallback((slug: string): boolean => {
+    const index = previewSlugKey.split(" ").indexOf(slug)
+    if (index < 0) return false
+    setPlayerSlide((prev) => ({ index, seq: (prev?.seq ?? 0) + 1 }))
+    return true
+  }, [previewSlugKey])
   const openSlideInFullView = useCallback((slug: string) => {
-    setFocusSlug(slug)
+    if (isHtml) showInPlayer(slug)
+    else setFocusSlug(slug)
     setViewMode("full")
-  }, [setViewMode])
+  }, [isHtml, showInPlayer, setViewMode])
   useEffect(() => {
     if (!focusSlug || viewMode !== "full" || !scrollElement) return
     const el = scrollElement.querySelector(`[data-slide-id="${focusSlug}"]`)
@@ -240,6 +251,11 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   // Scroll to target slide when navigating from search results
   useEffect(() => {
     if (!scrollToSlide || !scrollElement) return
+    if (isHtml && viewMode === "full" && htmlUrl) {
+      const slug = scrollToSlide
+      const timer = setTimeout(() => { if (showInPlayer(slug)) onScrollComplete?.() }, 0)
+      return () => clearTimeout(timer)
+    }
     const el = scrollElement.querySelector(`[data-slide-id="${scrollToSlide}"]`)
     if (el) {
       setTimeout(() => {
@@ -247,7 +263,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
         onScrollComplete?.()
       }, 300)
     }
-  }, [scrollToSlide, slidesWithPreview.length, onScrollComplete, scrollElement])
+  }, [scrollToSlide, slidesWithPreview.length, onScrollComplete, scrollElement, isHtml, viewMode, htmlUrl, showInPlayer])
 
   /** Local: open deck directory in Finder/Explorer */
   async function handleFolderOpen() {
@@ -423,7 +439,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     if (isHtml && viewMode === "full" && htmlUrl) {
       return (
         <div ref={setScrollElement} data-slide-scroller className="flex-1 overflow-y-auto px-6 py-6">
-          <HtmlDeckPlayer htmlUrl={htmlUrl} slideSize={slideSize} deckName={deckName} />
+          <HtmlDeckPlayer htmlUrl={htmlUrl} slideSize={slideSize} deckName={deckName} slide={playerSlide} />
         </div>
       )
     }
