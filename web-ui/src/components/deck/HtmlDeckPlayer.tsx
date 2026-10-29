@@ -78,7 +78,7 @@ export function HtmlDeckPlayer({ htmlUrl, slideSize, deckName, slide }: HtmlDeck
     initialSeq.current = seq
     const target = frameRef.current?.contentWindow
     if (loadedRef.current && target) {
-      target.postMessage(JSON.stringify({ method: "slide", args: [index] }), "*")
+      target.postMessage(JSON.stringify({ method: "slide", args: [index] }), "*") // nosemgrep: wildcard-postmessage-configuration — opaque-origin sandboxed iframe, payload is a slide index
     } else {
       setSrc((current) => deckUrlAtSlide(current, index))
     }

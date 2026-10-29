@@ -33,15 +33,16 @@ function htmlSlideSize(deckJson: Record<string, unknown>): { width: number; heig
 
 /** HTML deck slides: `slides/<slug>.html` in outline order, previews from `preview/<slug>.html`. */
 function htmlSlides(dp: string, deckId: string, outlineSlugs: string[]): Record<string, unknown>[] {
-  const slidesDir = path.join(dp, "slides")
+  // `dp` comes from resolveDeckDir (allow-list + realpath check); every slug passes HTML_SLUG_RE before it is joined.
+  const slidesDir = path.join(dp, "slides") // nosemgrep: path-join-resolve-traversal — dp validated by resolveDeckDir
   if (!fs.existsSync(slidesDir)) return []
   const slugList = outlineSlugs.length > 0 ? outlineSlugs
     : fs.readdirSync(slidesDir).filter(f => f.endsWith(".html")).map(f => f.slice(0, -".html".length)).sort()
   return slugList
-    .filter(slug => HTML_SLUG_RE.test(slug) && fs.existsSync(path.join(slidesDir, `${slug}.html`)))
+    .filter(slug => HTML_SLUG_RE.test(slug) && fs.existsSync(path.join(slidesDir, `${slug}.html`))) // nosemgrep: path-join-resolve-traversal — slug checked by HTML_SLUG_RE first
     .map(slug => ({
       slug,
-      previewUrl: versionedUrl(path.join(dp, "preview", `${slug}.html`), `/api/preview/${deckId}/preview/${slug}.html`),
+      previewUrl: versionedUrl(path.join(dp, "preview", `${slug}.html`), `/api/preview/${deckId}/preview/${slug}.html`), // nosemgrep: path-join-resolve-traversal — slug passed HTML_SLUG_RE above
       composeUrl: null,
       updatedAt: new Date().toISOString(),
     }))
