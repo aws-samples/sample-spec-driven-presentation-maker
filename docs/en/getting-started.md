@@ -149,7 +149,7 @@ buttons:
   it works only in that tab, not in the in-app player. The link is valid for 4 hours and
   the speaker view reloads it when it opens, so press `S` early in a talk.
 - **PDF** opens the print view in a new tab; print it from the browser to save a PDF.
-- **Download HTML** saves the single `output.html`, which works offline.
+- **HTML** (download icon) saves the single `output.html`, which works offline.
 
 Sharing and public decks work as for PPTX decks: anyone who can view the deck can present
 and download it. In the local Web UI the header has one **Open** button, which opens

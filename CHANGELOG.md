@@ -20,7 +20,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   iframe, `sandbox="allow-scripts allow-popups"`, no same-origin) with an "HTML" badge and
   three buttons: **Present** opens the deck in a new tab, where `S` opens the speaker view
   (the link is valid for 4 hours); **PDF** opens the print view (`#print-pdf`) in a new tab;
-  **Download HTML** saves the single `output.html`. Sharing and public decks work as for
+  **HTML** (download icon) saves the single `output.html`. Sharing and public decks work as for
   PPTX. Slide thumbnails in the deck page, the deck list and search are static per-slide
   HTML files (`preview/<slug>.html`, no scripts, fragments shown) rendered in `sandbox=""`
   iframes. The local Web UI shows the same player and thumbnails, with one **Open** button
