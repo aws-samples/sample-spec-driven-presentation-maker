@@ -5,6 +5,7 @@
 from __future__ import annotations
 
 import base64
+import dataclasses
 import json
 import re
 from pathlib import Path
@@ -57,9 +58,12 @@ def _make_deck(tmp_path: Path, template: str = "blank-light", slides: dict[str, 
     return deck
 
 
-def _assemble(deck: Path, *, deck_css: str | None = None, slides: dict[str, str] | None = None):
+def _assemble(deck: Path, *, deck_css: str | None = None, slides: dict[str, str] | None = None,
+              template=None):
     meta = json.loads((deck / "deck.json").read_text(encoding="utf-8"))
-    template = load_template_html(TEMPLATES_DIR / f"{meta['template']}.pptx")
+    if template is None:
+        template = load_template_html(TEMPLATES_DIR / f"{meta['template']}.pptx",
+                                      cache_root=deck.parent / "template-cache")
     slides = SLIDES if slides is None else slides
     return assemble_deck(
         slides=list(slides.items()),
@@ -104,6 +108,16 @@ def test_notes_fragments_and_auto_animate_preserved(built) -> None:
     assert len(demo2.xpath('.//li[@class="fragment"]')) == 2
 
 
+def test_vendored_code_carries_license_notices(built) -> None:
+    _, result, doc = built
+    vendor_css = doc.xpath("//head/style")[0].text
+    assert vendor_css.startswith("/*! reveal.js ") and "MIT License" in vendor_css.splitlines()[0]
+    notes = [s.text for s in doc.xpath("//body/script") if "RevealNotes" in (s.text or "")
+             and "Reveal.initialize" not in s.text][0]
+    head = notes.splitlines()[:2]
+    assert head[0].startswith("/*! reveal.js ") and head[1].startswith("/*! Includes marked | MIT License")
+
+
 def test_reveal_initialize_config(built) -> None:
     _, result, _ = built
     config = re.search(r"Reveal\.initialize\(\{(.*?)\}\);", result.html).group(1)
@@ -111,12 +125,28 @@ def test_reveal_initialize_config(built) -> None:
         assert part in config
 
 
-def test_one_decoration_background_per_used_layout(built) -> None:
-    _, result, doc = built
+_DECORATION_RULE = r'section\[data-layout="([^"]+)"\]\{background-image:url\("data:image/svg\+xml;base64,'
+
+
+def test_template_without_decorations_adds_no_background_image(built) -> None:
+    _, _, doc = built
     deck_rules = doc.xpath('//style[@id="sdpm-deck"]')[0].text
-    rules = re.findall(r'section\[data-layout="([^"]+)"\]\{background-image:url\("data:image/svg\+xml;base64,',
-                       deck_rules)
-    assert rules == ["Title Slide", "Title Only"]
+    assert re.findall(_DECORATION_RULE, deck_rules) == []
+
+
+def test_one_decoration_background_per_used_layout(tmp_path: Path) -> None:
+    deck = _make_deck(tmp_path)
+    plain = load_template_html(TEMPLATES_DIR / "blank-light.pptx", cache_root=tmp_path / "template-cache")
+    svgs = {}
+    for name in ("Title Slide", "Title Only", "Blank"):  # Blank is not used by SLIDES
+        svg = tmp_path / f"{name}.svg"
+        svg.write_text('<svg xmlns="http://www.w3.org/2000/svg"><rect width="9" height="9"/></svg>',
+                       encoding="utf-8")
+        svgs[name] = svg
+    result = _assemble(deck, template=dataclasses.replace(plain, svg_paths=svgs))
+    doc = lxml_html.document_fromstring(result.html)
+    deck_rules = doc.xpath('//style[@id="sdpm-deck"]')[0].text
+    assert re.findall(_DECORATION_RULE, deck_rules) == ["Title Slide", "Title Only"]
     assert result.html.count('section[data-layout="Title Only"]{background-image') == 1
 
 

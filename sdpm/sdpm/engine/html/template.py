@@ -7,11 +7,12 @@
                    (``:where(section[data-layout="…"]) :is([data-ph="0"],[data-ph="title"])``)
 ``template.json``  layouts, placeholders (data-ph keys, boxes, resolved styles),
                    chrome (slide number / footer), decorations, grounds
-``layouts/*.svg``  decoration-only renders (LibreOffice + poppler; optional)
+``layouts/*.svg``  decoration-only renders (LibreOffice + poppler; optional), only
+                   for layouts that draw something besides placeholders
 
 The structure (theme.css + template.json) needs python-pptx only. Results are
-cached per template content hash; the bundled templates ship pre-converted
-artifacts under ``sdpm/templates/html/<stem>/``.
+converted on first use and cached per template content hash. A template without
+decorations (no non-placeholder shapes, solid grounds) never needs LibreOffice.
 """
 
 from __future__ import annotations
@@ -380,14 +381,21 @@ def _write_atomic(path: Path, text: str) -> None:
         raise
 
 
+def _needs_render(layout: dict) -> bool:
+    """A layout needs a LibreOffice render only when it draws more than placeholders."""
+    return bool(layout.get("decorations") or layout.get("groundSvg"))
+
+
 def _render_entries(info: dict) -> list[dict]:
     return [{"name": layout["name"], "file": layout["file"], "index": i,
              "baked": bool(layout.get("groundSvg"))}
-            for i, layout in enumerate(info["layouts"])]
+            for i, layout in enumerate(info["layouts"]) if _needs_render(layout)]
 
 
 def _svgs_complete(info: dict, layouts_dir: Path) -> bool:
     for layout in info["layouts"]:
+        if not _needs_render(layout):
+            continue
         if not (layouts_dir / f"{layout['file']}.svg").is_file():
             return False
         if layout.get("groundSvg") and not (layouts_dir / f"{layout['file']}.ground.svg").is_file():
@@ -438,29 +446,20 @@ def load_template_html(
     *,
     decorations: bool = True,
     cache_root: str | Path | None = None,
-    bundled_root: str | Path | None = None,
 ) -> TemplateHtml:
-    """Converted HTML artifacts for a .pptx template (bundled, cached, or freshly built).
+    """Converted HTML artifacts for a .pptx template, converted on first use and cached.
 
-    Bundled artifacts (``bundled_root/<stem>/``) are used when their template.json
-    ``sourceHash`` / ``converterVersion`` match the template; otherwise the cache
-    ``cache_root/<cache_key>/`` is filled — structure first (python-pptx only), then
-    the decoration SVGs when ``decorations`` is true and LibreOffice + poppler exist.
-    Missing tools or a failed render come back as ``decorations_status``; never raises
-    for them.
+    The cache ``cache_root/<cache_key>/`` is filled — structure first (python-pptx
+    only), then, when ``decorations`` is true, the decoration SVGs of the layouts that
+    draw more than placeholders (LibreOffice + poppler). A template with no such layout
+    never calls LibreOffice and reports nothing. Missing tools or a failed render come
+    back as ``decorations_status``; never raises for them.
     """
-    from sdpm.config import CACHE_DIR, TEMPLATES_DIR
+    from sdpm.config import CACHE_DIR
 
     template_path = Path(template_path)
     stem = template_path.stem
     key = cache_key(template_path)
-
-    bundled_dir = Path(bundled_root if bundled_root is not None else TEMPLATES_DIR / "html") / stem
-    info = _read_info(bundled_dir / "template.json")
-    css_path = bundled_dir / "theme.css"
-    if (info and info.get("sourceHash") == key and info.get("converterVersion") == CONVERTER_VERSION
-            and css_path.is_file()):
-        return _result(bundled_dir, info, css_path.read_text(encoding="utf-8"), None, stem)
 
     cache_dir = Path(cache_root if cache_root is not None else CACHE_DIR / "template-html") / key
     info = _read_info(cache_dir / "template.json")

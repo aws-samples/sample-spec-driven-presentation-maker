@@ -21,6 +21,14 @@ _W_4X3 = 9144000
 _H_4X3 = 6858000
 
 
+@pytest.fixture(autouse=True)
+def _isolated_template_html_cache(tmp_path_factory, monkeypatch):
+    """HTML template conversions go to a per-session temp cache, not the checkout's .cache."""
+    import sdpm.config
+
+    monkeypatch.setattr(sdpm.config, "CACHE_DIR", tmp_path_factory.getbasetemp() / "sdpm-cache")
+
+
 @pytest.fixture()
 def template_16x9() -> Path:
     """Path to the bundled 16:9 blank-dark template (no copy needed)."""

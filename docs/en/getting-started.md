@@ -127,9 +127,10 @@ The result is `<deck>/output.html`, a single file that works offline. In the bro
 press `S` for the speaker view with notes, `F` for full screen and `Esc` for the slide
 overview. To get a PDF, open `output.html?print-pdf` and print from the browser.
 
-- Bundled templates ship pre-converted. For your own templates, LibreOffice and poppler are
-  needed to carry over decorations (logos, bands, background art); without them the layouts
-  and placeholders still convert.
+- A template is converted for HTML on first use and cached. Carrying over its decorations
+  (logos, bands, background art) needs LibreOffice and poppler; without them the layouts and
+  placeholders still convert. Templates without decorations, such as the bundled ones, need
+  neither.
 - There is no PNG preview for HTML decks yet: open `output.html` to see the slides.
 - PPTX-only features (translation, PPTX import, hand-edit sync) refuse HTML decks.
 

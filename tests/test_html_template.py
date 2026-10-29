@@ -25,12 +25,10 @@ from sdpm.engine.html.template import (
     build_theme_css,
     cache_key,
     load_template_html,
-    template_json_text,
 )
 from sdpm.engine.html.textstyle import load_theme, resolve_placeholder_style
 from sdpm.engine.preview.environment import soffice_path
 
-_BUNDLED = ("blank-light", "blank-dark")
 _needs_lo = pytest.mark.skipif(
     soffice_path() is None or shutil.which("pdftocairo") is None,
     reason="LibreOffice and poppler (pdftocairo) required",
@@ -43,10 +41,6 @@ def _layout(prs, name):
 
 def _ph(layout, idx):
     return next(ph for ph in layout.placeholders if ph.placeholder_format.idx == idx)
-
-
-def _no_bundle(tmp_path: Path) -> Path:
-    return tmp_path / "no-bundle"
 
 
 # ── text styles ──────────────────────────────────────────────────────────
@@ -234,13 +228,14 @@ def test_cache_hit_does_not_render_twice(decorated_template: Path, tmp_path: Pat
     monkeypatch.setattr(decorations, "decoration_tools_status", lambda: None)
     monkeypatch.setattr(decorations, "render_decoration_svgs", _fake_render(calls))
 
-    first = load_template_html(decorated_template, cache_root=tmp_path / "c", bundled_root=_no_bundle(tmp_path))
-    second = load_template_html(decorated_template, cache_root=tmp_path / "c", bundled_root=_no_bundle(tmp_path))
+    first = load_template_html(decorated_template, cache_root=tmp_path / "c")
+    second = load_template_html(decorated_template, cache_root=tmp_path / "c")
 
     assert len(calls) == 1
     assert first.dir == second.dir == tmp_path / "c" / cache_key(decorated_template)
     assert first.decorations_status is None
-    assert len(second.svg_paths) == 11
+    # Blank hides the master shapes (showMasterSp="0") and has none of its own: no render.
+    assert set(second.svg_paths) == {layout["name"] for layout in second.info["layouts"]} - {"Blank"}
     assert set(second.ground_svg_paths) == {"Section Header"}
     assert (second.dir / "theme.css").read_text(encoding="utf-8") == second.theme_css
     assert json.loads((second.dir / "template.json").read_text(encoding="utf-8"))["sourceHash"] == second.dir.name
@@ -257,7 +252,7 @@ def test_failed_render_is_not_cached_as_success(decorated_template: Path, tmp_pa
     monkeypatch.setattr(decorations, "decoration_tools_status", lambda: None)
     monkeypatch.setattr(decorations, "render_decoration_svgs", render)
     for _ in range(2):
-        result = load_template_html(decorated_template, cache_root=tmp_path / "c", bundled_root=_no_bundle(tmp_path))
+        result = load_template_html(decorated_template, cache_root=tmp_path / "c")
         assert result.decorations_status == failed
         assert result.svg_paths == {}
     assert len(calls) == 1  # memoised for this process, never written as a success
@@ -273,7 +268,7 @@ def test_cache_key_changes_with_converter_version(decorated_template: Path, monk
 def test_missing_tools_still_converts_structure(decorated_template: Path, tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setattr(decorations, "soffice_path", lambda: None)
     for _ in range(2):
-        result = load_template_html(decorated_template, cache_root=tmp_path / "c", bundled_root=_no_bundle(tmp_path))
+        result = load_template_html(decorated_template, cache_root=tmp_path / "c")
         status = result.decorations_status
         assert status is not None and status["status"] == "unavailable"
         assert "libreoffice" in status["missing"]
@@ -284,20 +279,25 @@ def test_missing_tools_still_converts_structure(decorated_template: Path, tmp_pa
         assert (result.dir / "template.json").is_file()
 
 
-def test_bundled_artifacts_used_without_libreoffice(tmp_path: Path, monkeypatch) -> None:
+def test_plain_template_needs_no_libreoffice(tmp_path: Path, monkeypatch) -> None:
+    """blank-light draws nothing but placeholders: no render, no notice, no SVGs."""
+    def _no_render(*args, **kwargs):
+        raise AssertionError("LibreOffice render must not run for a template without decorations")
+
     monkeypatch.setattr(decorations, "soffice_path", lambda: None)
+    monkeypatch.setattr(decorations, "render_decoration_svgs", _no_render)
     result = load_template_html(TEMPLATES_DIR / "blank-light.pptx", cache_root=tmp_path / "c")
-    assert result.dir == TEMPLATES_DIR / "html" / "blank-light"
     assert result.decorations_status is None
-    assert len(result.svg_paths) == len(result.info["layouts"])
-    assert not (tmp_path / "c").exists()
+    assert result.svg_paths == {} and result.ground_svg_paths == {}
+    assert ":root{" in result.theme_css
+    assert result.dir.parent == tmp_path / "c"
 
 
 # ── LibreOffice render ───────────────────────────────────────────────────
 
 @_needs_lo
 def test_render_strips_sentinel_from_band_layout(decorated_template: Path, tmp_path: Path) -> None:
-    result = load_template_html(decorated_template, cache_root=tmp_path / "c", bundled_root=_no_bundle(tmp_path))
+    result = load_template_html(decorated_template, cache_root=tmp_path / "c")
     assert result.decorations_status is None
     svg = result.svg_paths["Title Only"].read_text(encoding="utf-8")
     assert "<path" in svg or "<image" in svg
@@ -307,26 +307,4 @@ def test_render_strips_sentinel_from_band_layout(decorated_template: Path, tmp_p
     assert any(all(abs(c - t) <= 1 for c, t in zip(fill, DECORATED_BAND_RGB)) for fill in fills)
     assert "<image" in svg  # master logo
     assert "Section Header" in result.ground_svg_paths
-    blank = result.svg_paths["Blank"].read_text(encoding="utf-8")
-    assert "<image" not in blank  # showMasterSp="0"
-
-
-# ── bundled artifacts (drift guard) ──────────────────────────────────────
-
-@pytest.mark.parametrize("stem", _BUNDLED)
-def test_bundled_artifacts_match_fresh_conversion(stem: str, tmp_path: Path) -> None:
-    pptx = TEMPLATES_DIR / f"{stem}.pptx"
-    bundled = TEMPLATES_DIR / "html" / stem
-    committed_json = (bundled / "template.json").read_text(encoding="utf-8")
-    info = json.loads(committed_json)
-    assert info["sourceHash"] == cache_key(pptx), (
-        "bundled HTML artifacts are stale: run `uv run python scripts/build_bundled_template_html.py`")
-
-    fresh = load_template_html(pptx, decorations=False, cache_root=tmp_path / "c", bundled_root=_no_bundle(tmp_path))
-    assert fresh.theme_css == (bundled / "theme.css").read_text(encoding="utf-8")
-    assert template_json_text(fresh.info) == committed_json
-
-    for layout in info["layouts"]:
-        assert (bundled / "layouts" / f"{layout['file']}.svg").is_file()
-        if layout.get("groundSvg"):
-            assert (bundled / "layouts" / f"{layout['file']}.ground.svg").is_file()
+    assert "Blank" not in result.svg_paths  # showMasterSp="0" and no shapes of its own

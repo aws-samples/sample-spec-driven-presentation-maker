@@ -448,6 +448,19 @@ def _vendor_text(name: str) -> str:
     return (VENDOR_DIR / "revealjs" / name).read_text(encoding="utf-8")
 
 
+# MIT requires the copyright notice in every copy. reveal.js carries its own banner;
+# reveal.css and the notes plugin (which bundles marked) do not, so output.html gets one.
+_MARKED_NOTICE = ("/*! Includes marked | MIT License | Copyright (c) 2018+ MarkedJS "
+                  "(https://github.com/markedjs/), Copyright (c) 2011-2018 Christopher Jeffrey "
+                  "(https://github.com/chjj/) */")
+
+
+def _reveal_notice() -> str:
+    version = _vendor_text("VERSION").strip()
+    return (f"/*! reveal.js {version} | MIT License | Copyright (C) 2011-2026 Hakim El Hattab, "
+            "https://hakim.se, and reveal.js contributors | https://revealjs.com */")
+
+
 def _deck_rules(template: TemplateHtml, layouts_used: list[str], default_background: str | None,
                 default_text_color: str | None) -> str:
     ground = default_background or "var(--sdpm-template-bg)"
@@ -560,7 +573,8 @@ def assemble_deck(
         '<meta charset="utf-8">',
         '<meta name="viewport" content="width=device-width, initial-scale=1">',
         f"<title>{_html.escape(title)}</title>",
-        f"<style>{_escape_css_text(_vendor_text('reset.css'))}\n{_escape_css_text(_vendor_text('reveal.css'))}</style>",
+        f"<style>{_reveal_notice()}\n{_escape_css_text(_vendor_text('reset.css'))}\n"
+        f"{_escape_css_text(_vendor_text('reveal.css'))}</style>",
         f'<style id="sdpm-style-root">{_escape_css_text(style_root_css(art_direction_html))}</style>',
         f'<style id="sdpm-theme">{_escape_css_text(template.theme_css)}</style>',
         f'<style id="sdpm-deck">{_escape_css_text(_deck_rules(template, layouts_used, default_background, default_text_color))}</style>',
@@ -577,7 +591,7 @@ def assemble_deck(
         *sections,
         "</div></div>",
         f"<script>{inline_js(_vendor_text('reveal.js'))}</script>",
-        f"<script>{inline_js(_vendor_text('plugin/notes.js'))}</script>",
+        f"<script>{_reveal_notice()}\n{_MARKED_NOTICE}\n{inline_js(_vendor_text('plugin/notes.js'))}</script>",
         f"<script>{config}</script>",
         "</body>",
         "</html>",

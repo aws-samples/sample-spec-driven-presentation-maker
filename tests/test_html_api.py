@@ -54,9 +54,9 @@ def test_generate_html_bundled_templates_without_libreoffice(tmp_path, monkeypat
     assert result["slide_count"] == 2
     assert result["slides"] == ["page01 - cover", "page02 - body"]
     assert result["layouts_used"] == ["Title Slide", "Title Only"]
-    assert "decorations" not in result  # bundled artifacts include the decoration SVGs
+    assert "decorations" not in result  # no decorations to render, so no LibreOffice notice
     text = out.read_text(encoding="utf-8")
-    assert text.count('{background-image:url("data:image/svg+xml;base64,') == 2
+    assert '{background-image:url("data:image/svg+xml;base64,' not in text
     assert "<title>API deck</title>" in text
 
 

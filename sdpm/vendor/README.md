@@ -17,7 +17,7 @@ The files below are copied verbatim from the published npm package so the assemb
 | `revealjs/reveal.js` | `dist/reveal.js` | presentation runtime (UMD, global `Reveal`) |
 | `revealjs/reveal.css` | `dist/reveal.css` | core layout CSS (no theme) |
 | `revealjs/reset.css` | `dist/reset.css` | CSS reset reveal.js expects |
-| `revealjs/plugin/notes.js` | `dist/plugin/notes.js` | speaker view (`S`), global `RevealNotes` |
+| `revealjs/plugin/notes.js` | `dist/plugin/notes.js` | speaker view (`S`), global `RevealNotes`; bundles marked (MIT), listed in `THIRD-PARTY-LICENSES` |
 | `revealjs/LICENSE` | `LICENSE` | license text |
 
 The directory is deliberately not named `dist/` (the repository `.gitignore` ignores
@@ -35,6 +35,7 @@ cp package/dist/plugin/notes.js "$dest/plugin/"
 node -p "require('./package/package.json').version" > "$dest/VERSION"
 ```
 
-Then update the version in `THIRD-PARTY-LICENSES` and run
+Then update the reveal.js version and the bundled marked major (reveal.js's `marked` devDependency) in
+`THIRD-PARTY-LICENSES`, and run
 `SDPM_AUTO_INSTALL_ASSETS=0 uv run pytest tests/test_html_assemble.py` from the repository
 root. Nothing else is generated from these files.

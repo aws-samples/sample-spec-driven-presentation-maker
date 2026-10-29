@@ -6,6 +6,14 @@ reveal.js 6.0.2
   Copyright (C) 2011-2026 Hakim El Hattab, http://hakim.se, and reveal.js contributors
   Location: sdpm/vendor/revealjs/ (full license text in sdpm/vendor/revealjs/LICENSE)
 
+marked 17.x (bundled by reveal.js into sdpm/vendor/revealjs/plugin/notes.js)
+  https://github.com/markedjs/marked
+  License: MIT
+  Copyright (c) 2018+, MarkedJS (https://github.com/markedjs/)
+  Copyright (c) 2011-2018, Christopher Jeffrey (https://github.com/chjj/)
+
+Generated HTML decks (output.html) embed both, each preceded by its license notice.
+
 Beyond that, the project relies only on the dependencies listed in
 pyproject.toml / package.json.
 

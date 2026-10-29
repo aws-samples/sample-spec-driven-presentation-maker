@@ -37,8 +37,8 @@ chrome) and one SVG per layout for the decorations the master and layouts draw (
 bands, background art). The result is cached by the template's content hash under
 `sdpm/.cache/template-html/`, so editing the `.pptx` triggers a fresh conversion. Rendering
 the decorations needs LibreOffice and poppler; without them the structure still converts
-and the build reports the missing tools once. The bundled `blank-light` / `blank-dark`
-templates ship pre-converted.
+and the build reports the missing tools once. A template that draws nothing besides its
+placeholders (such as the bundled `blank-light` / `blank-dark`) never needs them.
 
 ---
 

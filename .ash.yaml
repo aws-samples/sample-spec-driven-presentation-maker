@@ -23,17 +23,6 @@ global_settings:
         catalog (search_assets names). Vector geometry, not credentials.
       expiration: "2027-09-27"
 
-    # --- Converted HTML templates: content hash of the source .pptx ---
-    # template.json records sourceHash (a truncated SHA-256 of the .pptx bytes) so a
-    # stale conversion can be detected. It is a cache key, not a credential.
-
-    - rule_id: "SECRET-HEX-HIGH-ENTROPY-STRING"
-      path: "sdpm/templates/html/*/template.json"
-      reason: >
-        sourceHash is the truncated SHA-256 content hash of the bundled .pptx template,
-        used to detect a stale conversion. Not a secret.
-      expiration: "2027-10-29"
-
     # --- CFn Custom Resource: urlopen to pre-signed ResponseURL ---
     # Standard pattern for CloudFormation custom resources.
     # The URL is the CFn-provided ResponseURL, not user-controlled.
