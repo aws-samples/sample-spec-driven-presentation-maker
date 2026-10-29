@@ -351,6 +351,7 @@ def cmd_init(args):
     result = init(
         name=args.name or "",
         output_dir=args.output if hasattr(args, 'output') and args.output else None,
+        output_format=getattr(args, 'output_format', None) or "pptx",
     )
     print(f"output_dir:  {result['output_dir']}")
     print(f"deck_json:   {result['deck_json']}")
@@ -632,6 +633,8 @@ def main():
     p_init = subparsers.add_parser("init_deck_workspace", help="Create an empty deck workspace (deck.json, slides/, specs/)")
     p_init.add_argument("name", nargs="?", help="Presentation name (e.g. 'my-proposal')")
     p_init.add_argument("-o", "--output", help="Output directory (overrides default)")
+    p_init.add_argument("--output-format", choices=["pptx", "html"], default="pptx",
+                        help="Deck output format (html only when an HTML / browser deck is wanted)")
 
     p_layout = subparsers.add_parser("arch_diagram", help="Compute layout coordinates from logical structure JSON")
 

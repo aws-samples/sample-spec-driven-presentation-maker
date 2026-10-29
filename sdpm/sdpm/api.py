@@ -512,6 +512,7 @@ def _get_output_base_dir() -> Path:
 def init(
     name: str,
     output_dir: str | Path | None = None,
+    output_format: str = "pptx",
 ) -> dict[str, Any]:
     """Initialize a presentation workspace.
 
@@ -520,11 +521,17 @@ def init(
     Args:
         name: Presentation name (used in directory name).
         output_dir: Explicit output directory. Auto-generated if None.
+        output_format: "pptx" (default) or "html". deck.json gets
+            ``"outputFormat": "html"`` only for HTML decks.
 
     Returns:
         Dict with output_dir, deck_json, workspace.
     """
+    from sdpm.engine.schema import OUTPUT_FORMATS
     from sdpm.utils.io import write_json
+
+    if output_format not in OUTPUT_FORMATS:
+        raise ValueError(f'output_format must be "pptx" or "html", got {output_format!r}')
 
     if output_dir:
         out_dir = Path(output_dir).expanduser()
@@ -537,6 +544,8 @@ def init(
     from sdpm.engine.schema import DECK_JSON_SKELETON, complete_deck_skeleton
 
     deck_data: dict[str, Any] = complete_deck_skeleton(DECK_JSON_SKELETON)
+    if output_format == "html":
+        deck_data["outputFormat"] = "html"
 
     deck_json = out_dir / "deck.json"
     write_json(deck_json, deck_data, suffix="\n")

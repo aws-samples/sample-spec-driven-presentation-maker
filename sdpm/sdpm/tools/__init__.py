@@ -15,7 +15,7 @@ their own infrastructure-specific variants.
 """
 
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
@@ -82,6 +82,7 @@ def start_translation(
 
 def init_deck_workspace(
     name: Annotated[str, Field(description='Presentation name, e.g. "lambda-overview".')],
+    output_format: Annotated[Literal["pptx", "html"], Field(description="html only when the user asks for an HTML / browser deck; pptx otherwise.")] = "pptx",
 ) -> dict[str, Any]:
     """Create an empty deck workspace (deck.json, slides/, specs/). A step inside the
     orchestrator workflow — after the brief is agreed, before apply_style — not where a
@@ -89,7 +90,7 @@ def init_deck_workspace(
     """
     from sdpm.api import init
 
-    return init(name=name)
+    return init(name=name, output_format=output_format)
 
 
 def check_specs(

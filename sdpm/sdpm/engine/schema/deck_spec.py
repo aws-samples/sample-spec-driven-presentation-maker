@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import re
 from copy import deepcopy
-from typing import Any
+from typing import Any, Literal
 
 from sdpm.engine.schema.lint_outline import lint_outline
 
@@ -16,6 +16,10 @@ DECK_JSON_SKELETON: dict[str, Any] = {
     "defaultTextColor": "",
     "slideSize": {},
 }
+
+# deck.json "outputFormat" values. Absent means "pptx"; the field is written only for
+# HTML decks so PPTX deck.json stays unchanged (not part of DECK_JSON_SKELETON).
+OUTPUT_FORMATS: tuple[str, ...] = ("pptx", "html")
 
 _SLIDE_RE = re.compile(r"^-\s+\[([^\]]+)\]\s+.+")
 _VALID_SLUG_RE = re.compile(r"^[a-z0-9-]+$")
@@ -39,6 +43,22 @@ def complete_deck_skeleton(deck: dict) -> dict:
         fonts.setdefault(key, default)
     completed["fonts"] = fonts
     return completed
+
+
+def deck_output_format(deck_json: dict) -> Literal["pptx", "html"]:
+    """Return the deck's output format: "pptx" when outputFormat is absent or None.
+
+    Raises ValueError naming the value when outputFormat is anything other than
+    "pptx" or "html".
+    """
+    value = deck_json.get("outputFormat")
+    if value is None:
+        return "pptx"
+    if value == "pptx":
+        return "pptx"
+    if value == "html":
+        return "html"
+    raise ValueError(f'deck.json outputFormat must be "pptx" or "html", got {value!r}')
 
 
 def _is_non_empty(value: object) -> bool:
@@ -128,6 +148,13 @@ def validate_specs(
     ):
         errors.append("deck.json defaultBackground must match #RRGGBB")
 
+    output_format: str | None = None
+    if "outputFormat" in deck_json:
+        try:
+            output_format = deck_output_format(deck_json)
+        except ValueError:
+            errors.append('deck.json outputFormat must be "pptx" or "html"')
+
     if not _is_non_empty(fonts.get("halfwidth")):
         errors.append("deck.json fonts.halfwidth is empty")
     if not _is_non_empty(fonts.get("fullwidth")):
@@ -162,9 +189,13 @@ def validate_specs(
     if "[TBD]" in outline_text:
         warnings.append("outline.md contains [TBD]")
 
-    return {
+    result: dict[str, Any] = {
         "ok": not errors,
         "errors": errors,
         "warnings": warnings,
         "slugs": slugs,
     }
+    # PPTX results keep exactly {ok, errors, warnings, slugs}; consumers read absence as pptx.
+    if output_format == "html":
+        result["outputFormat"] = "html"
+    return result
