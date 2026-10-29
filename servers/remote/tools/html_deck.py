@@ -275,10 +275,15 @@ def refresh_html_deck(
                 f"Run generate_pptx to refresh it. ({e})"
             )
         else:
-            # Older epochs of the slides just uploaded are superseded.
+            # Older epochs of the slides just uploaded are superseded, and a slide the
+            # build left out (e.g. a structure error) loses its preview: the previews
+            # must list exactly the slides output.html contains, or the Web UI's
+            # thumbnail index drifts from the player's slide index.
+            built_slugs = set(order)
             _delete(storage, [
                 k for k in listed
-                if (se := _slug_epoch(k)) and se[0] in uploaded and se[1] < epoch
+                if (se := _slug_epoch(k))
+                and ((se[0] in uploaded and se[1] < epoch) or se[0] not in built_slugs)
             ])
         result["previews"] = uploaded
         if "preview" in result:

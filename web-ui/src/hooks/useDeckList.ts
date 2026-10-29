@@ -57,6 +57,9 @@ export function useDeckList(
   const [searching, setSearching] = useState(false)
   const [listEpoch, setListEpoch] = useState(0)
   const [searchEpoch, setSearchEpoch] = useState(0)
+  /** When the deck lists / the search results (and their signed preview URLs) were fetched. */
+  const listFetchedAt = useRef(0)
+  const searchFetchedAt = useRef(0)
 
   /** Fetch all deck lists when on list view. */
   const initialLoadDone = useRef(false)
@@ -83,6 +86,7 @@ export function useDeckList(
             return d
           })
         })
+        listFetchedAt.current = Date.now()
         setFavoriteIds(new Set(myData.favoriteIds))
         setPublicDecks(pubDecks)
         setSharedDecks(shDecks)
@@ -111,6 +115,7 @@ export function useDeckList(
     setSearching(true)
     const timer = setTimeout(async () => {
       const results = await searchSlides(searchQuery, idToken)
+      searchFetchedAt.current = Date.now()
       setSearchResults(results)
       setSearching(false)
     }, 300)
@@ -123,13 +128,21 @@ export function useDeckList(
   const searchHasHtml = searchResults.some((r) => isHtmlPreview(r.previewUrl))
   useEffect(() => {
     if (IS_LOCAL || activeDeckId !== null || !(listHasHtml || searchHasHtml)) return
-    let last = Date.now()
+    // Each clock starts when its URLs were signed (fetched). The deck lists are
+    // re-fetched when the list view comes back; search results survive a visit to a
+    // deck, so returning after a long visit re-signs them at once.
     const refresh = () => {
-      if (Date.now() - last < HTML_URL_REFRESH_MS) return
-      last = Date.now()
-      if (listHasHtml) setListEpoch((n) => n + 1)
-      if (searchHasHtml) setSearchEpoch((n) => n + 1)
+      const now = Date.now()
+      if (listHasHtml && now - listFetchedAt.current >= HTML_URL_REFRESH_MS) {
+        listFetchedAt.current = now
+        setListEpoch((n) => n + 1)
+      }
+      if (searchHasHtml && now - searchFetchedAt.current >= HTML_URL_REFRESH_MS) {
+        searchFetchedAt.current = now
+        setSearchEpoch((n) => n + 1)
+      }
     }
+    refresh()
     const onVisible = () => { if (document.visibilityState === "visible") refresh() }
     const timer = setInterval(refresh, 60 * 1000)
     document.addEventListener("visibilitychange", onVisible)
@@ -144,7 +157,11 @@ export function useDeckList(
     if (!idToken || searchQuery.length < 2) return
     let cancelled = false
     searchSlides(searchQuery, idToken)
-      .then((results) => { if (!cancelled) setSearchResults(results) })
+      .then((results) => {
+        if (cancelled) return
+        searchFetchedAt.current = Date.now()
+        setSearchResults(results)
+      })
       .catch(() => {})
     return () => { cancelled = true }
   }, [searchEpoch, searchQuery, idToken])
