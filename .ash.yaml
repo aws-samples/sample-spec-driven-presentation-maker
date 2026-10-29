@@ -23,6 +23,14 @@ global_settings:
         catalog (search_assets names). Vector geometry, not credentials.
       expiration: "2027-09-27"
 
+    - rule_id: "SECRET-BASE64-HIGH-ENTROPY-STRING"
+      path: "tests/test_html_csp.py"
+      reason: >
+        SPEAKER_VIEW_HASH_6_0_2 pins the public CSP sha256 hash of the reveal.js 6.0.2
+        speaker-view script, so a vendor update that changes the script fails the test.
+        A digest of public code, not a credential.
+      expiration: "2027-10-31"
+
     # --- CFn Custom Resource: urlopen to pre-signed ResponseURL ---
     # Standard pattern for CloudFormation custom resources.
     # The URL is the CFn-provided ResponseURL, not user-controlled.

@@ -133,7 +133,7 @@ def test_disposition_header_never_breaks_out():
 @pytest.fixture()
 def presign_client(monkeypatch):
     monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIDEXAMPLE")
-    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "wJalrXUtnFEMI/K7MDENG+bPxRfiCYEXAMPLEKEY")
+    monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "not-a-real-secret")
     monkeypatch.delenv("AWS_SESSION_TOKEN", raising=False)
     monkeypatch.delenv("AWS_PROFILE", raising=False)
     return html_presign_client("ap-northeast-1")
