@@ -296,6 +296,20 @@ def test_run_python_html_uploads_only_affected_previews(server, storage, monkeyp
     assert storage.record["thumbnailS3Key"] == old_cover  # slide 1 was not re-rendered
 
 
+def test_run_python_html_drops_previews_of_slides_not_in_the_build(server, storage, monkeypatch):
+    """A slide output.html leaves out keeps no preview, so thumbnail and player indexes agree."""
+    _no_pptx(monkeypatch)
+    old_cover, gone = "html/d1/preview/cover_100.html", "html/d1/preview/gone_100.html"
+    storage.objects.update({old_cover: b"x", gone: b"x", "html/d1/preview/body_100.html": b"x"})
+    _sandbox(monkeypatch, ["slides/body.html"])
+
+    out = _run(server)
+
+    assert "html_error" not in out, out
+    assert gone in storage.deleted
+    assert old_cover not in storage.deleted
+
+
 def test_run_python_html_measure_reports_and_previews_measured(server, storage, monkeypatch):
     _no_pptx(monkeypatch)
     storage.objects.update({"html/d1/preview/cover_100.html": b"x", "html/d1/preview/body_100.html": b"x"})
