@@ -80,6 +80,22 @@ def test_on_event_sees_events_while_waiting(fake_devtools) -> None:
     assert [e["method"] for e in seen] == ["Test.event"]
 
 
+def test_post_from_on_event_keeps_the_awaited_reply(fake_devtools) -> None:
+    """A command posted while a reply is awaited is sent; its own reply is ignored."""
+    posted = []
+
+    def hook(event):
+        if not posted:
+            posted.append(event)
+            cdp.post("Answer", {"n": 1}, session="S2")
+
+    with CdpConnection(fake_devtools) as cdp:
+        cdp.on_event = hook
+        assert cdp.send("X", {"k": 2}) == {"echo": {"k": 2}, "session": None}
+        assert cdp.send("Y", {"k": 3}) == {"echo": {"k": 3}, "session": None}
+    assert len(posted) == 1
+
+
 def test_evaluate(fake_devtools) -> None:
     with CdpConnection(fake_devtools) as cdp:
         assert cdp.evaluate("S1", "1+1") == 42

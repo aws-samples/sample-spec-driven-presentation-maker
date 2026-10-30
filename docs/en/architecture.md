@@ -190,8 +190,9 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
   (`aws.browser.v1`): it starts a session sized to the deck, connects to the automation
   stream with SigV4-signed headers and always stops the session. The AWS code lives in
   `servers/remote` because dependencies point inward and the core never imports boto3. Both
-  sources block `http(s)://` and `ws(s)://` requests (`Network.setBlockedURLs`) and close
-  pages the deck opens; a browser that rejects the block fails the check before any slide
+  sources fail every `http(s)://` and `ws(s)://` request of the page, navigations included
+  (the DevTools `Fetch` domain; `Network.setBlockedURLs` lets top-level navigations through
+  in AgentCore Browser), and close pages the deck opens before they load; a browser that rejects the block fails the check before any slide
   runs. The runtime role gets `bedrock-agentcore:StartBrowserSession`,
   `StopBrowserSession` and `ConnectBrowserAutomationStream` on the
   `aws.browser.v1` ARN only. A check that is skipped, stopped by a slide that navigates the

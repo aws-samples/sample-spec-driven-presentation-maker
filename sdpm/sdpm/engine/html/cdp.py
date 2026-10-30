@@ -98,6 +98,23 @@ class CdpConnection:
         except ConnectionClosed as exc:
             raise CdpError(f"{method}: connection closed ({exc})") from exc
 
+    def post(self, method: str, params: dict | None = None, *, session: str | None = None) -> None:
+        """Send one command without waiting for its reply, which ``send`` then ignores.
+
+        Safe inside ``on_event`` (a nested ``send`` would swallow the awaited reply).
+        """
+        from websockets.exceptions import ConnectionClosed
+
+        if self._ws is None:
+            raise CdpError(f"{method}: not connected")
+        msg: dict[str, Any] = {"id": next(self._ids), "method": method, "params": params or {}}
+        if session:
+            msg["sessionId"] = session
+        try:
+            self._ws.send(json.dumps(msg))
+        except ConnectionClosed as exc:
+            raise CdpError(f"{method}: connection closed ({exc})") from exc
+
     def evaluate(self, session: str, expr: str, *, await_promise: bool = False,
                  timeout: float = 15.0) -> Any:
         """``Runtime.evaluate`` by value; a thrown JS exception raises ``CdpError``."""

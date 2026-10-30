@@ -6,9 +6,10 @@
 ``sdpm.engine.html.browser.resolve_browser`` (local headless Chrome / Edge, or the source
 an adapter registered) over the DevTools protocol (``sdpm.engine.html.cdp``):
 
-1. attach to the page; enable Page / Runtime / Log; block http(s) / ws(s) requests (if
-   the browser rejects the block, the check fails before the deck loads) and close pages
-   the deck opens;
+1. attach to the page; enable Page / Runtime / Log; fail every http(s) / ws(s) request
+   through the Fetch domain, navigations included (if the browser rejects that, the check
+   fails before the deck loads); auto-attach targets the page opens paused, close the
+   pages and block the frames / workers the same way;
    set the viewport to the deck size;
 2. load the deck: up to ``DIRECT_LIMIT`` UTF-8 bytes with ``Page.setDocumentContent`` on
    ``about:blank#sdpm-check``, larger in chunks into a ``blob:`` URL (CDP drops messages
@@ -50,6 +51,7 @@ PNG_LONG_EDGE = 1280
 NAVIGATED_MARK = "sdpm-check:navigated"
 _MAX_MESSAGE = 400
 _BLOCKED = ["http://*", "https://*", "ws://*", "wss://*"]
+FETCH_BLOCK = {"patterns": [{"urlPattern": p} for p in _BLOCKED]}
 _HELPER_SLUG_RE = re.compile(r"sdpm slide (\S+?): ")
 _HASHES_RE = re.compile(r"script-src(?: 'sha256-[^']+')+")
 _CSP_HINTS = ("Content Security Policy", "Refused to")
@@ -258,20 +260,41 @@ class _Run:
             return bool(args) and args[0].get("value") == NAVIGATED_MARK
         return False
 
+    def intercept(self, event: dict) -> None:
+        """Answer request and target events as they arrive (also while a reply is awaited,
+        so a paused navigation never stalls the check): fail every paused http(s) / ws(s)
+        request (any session: the page, a frame, a worker); close a page the deck opens and
+        give a frame or worker the same block before it runs. Both arrive paused."""
+        method, params = event.get("method"), event.get("params") or {}
+        if method == "Fetch.requestPaused":
+            self.cdp.post("Fetch.failRequest", {"requestId": params.get("requestId"),
+                                                "errorReason": "BlockedByClient"}, session=event.get("sessionId"))
+        elif method == "Target.attachedToTarget" and self.session and event.get("sessionId") == self.session:
+            # Our own attachToTarget arrives without a sessionId and is not handled here.
+            info = params.get("targetInfo") or {}
+            if info.get("targetId") == self.target_id:
+                return
+            if info.get("type") == "page":
+                self.cdp.post("Target.closeTarget", {"targetId": info.get("targetId")})
+            else:
+                self.cdp.post("Fetch.enable", FETCH_BLOCK, session=params.get("sessionId"))
+                self.cdp.post("Runtime.runIfWaitingForDebugger", session=params.get("sessionId"))
+
     def watch(self, event: dict) -> None:
-        """``CdpConnection.on_event``: stop at once when the page navigates away."""
+        """``CdpConnection.on_event``: answer requests and targets, stop at once when the
+        page navigates away."""
+        self.intercept(event)
         if self.navigated_at is None and self.is_navigation(event):
             self.navigated_at = self.current or ""
             raise _Navigated()
 
     def pump(self) -> None:
-        """Process events read so far: contexts, popups, navigation, JS errors."""
+        """Process events read so far: contexts, navigation, JS errors."""
         if self.cdp is None:
             return
         events = self.cdp.take_events()
         if not events:
             return
-        popups = []
         navigated = False
         for event in events:
             method, params = event.get("method"), event.get("params") or {}
@@ -283,19 +306,10 @@ class _Run:
                 aux = ctx.get("auxData") or {}
                 if aux.get("isDefault") and (self.frame_id is None or aux.get("frameId") == self.frame_id):
                     self.main_contexts.add(ctx.get("id"))
-            elif method == "Target.targetCreated":
-                info = params.get("targetInfo") or {}
-                if info.get("openerId") == self.target_id and info.get("targetId") != self.target_id:
-                    popups.append(info.get("targetId"))
         self.errors.extend(e for e in errors_from_events(events, self.line_map, self.main_contexts or None,
                                                          self.current, slugs=self.slugs)
                            if not any(e["slug"] == d["slug"] and e["message"] == d["message"]
                                       for d in self.errors))
-        for target in popups:
-            try:
-                self.cdp.send("Target.closeTarget", {"targetId": target}, timeout=5)
-            except CdpError as exc:
-                logger.info("browser check: could not close a page the deck opened: %s", exc)
         if navigated and self.navigated_at is None:
             self.navigated_at = self.current or ""
             raise _Navigated()
@@ -310,17 +324,14 @@ def _page_setup(run: _Run, width: int, height: int) -> None:
     for domain in ("Page.enable", "Runtime.enable", "Log.enable"):
         run.send(domain)
     run.frame_id = run.send("Page.getFrameTree")["frameTree"]["frame"]["id"]
+    # Requests: the Fetch domain pauses every http(s) / ws(s) request of the page (top-level
+    # navigations included — Network.setBlockedURLs lets those through in AgentCore Browser)
+    # and pump() fails it. No Network.enable: its events carry whole data: URLs, and an
+    # event over ~10 MB makes AgentCore Browser drop the automation stream.
+    # Targets the page opens are auto-attached paused (popups closed, frames blocked too).
     try:
-        run.send("Target.setDiscoverTargets", {"discover": True}, page=False)
-    except CdpError as exc:
-        logger.info("browser check: target discovery unavailable: %s", exc)
-    try:
-        run.send("Network.enable")
-        try:
-            run.send("Network.setBlockedURLs", {"urls": _BLOCKED})
-        except CdpError:
-            run.send("Network.setBlockedURLs",
-                     {"urlPatterns": [{"urlPattern": p, "block": True} for p in _BLOCKED]})
+        run.send("Fetch.enable", FETCH_BLOCK)
+        run.send("Target.setAutoAttach", {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True})
         run.network_blocked = True
     except CdpError as exc:
         # Fail closed: slide code never runs in a browser that may reach the network

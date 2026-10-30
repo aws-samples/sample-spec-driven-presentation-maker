@@ -143,7 +143,7 @@ def test_unreachable_endpoint_is_reported(tmp_path: Path, monkeypatch) -> None:
 
 
 class _NoBlockCdp:
-    """CdpConnection stand-in whose browser rejects Network.setBlockedURLs."""
+    """CdpConnection stand-in whose browser rejects the request block (Fetch.enable)."""
 
     sent: list[str] = []
 
@@ -164,8 +164,8 @@ class _NoBlockCdp:
 
     def send(self, method, params=None, *, session=None, timeout=15.0):
         type(self).sent.append(method)
-        if method == "Network.setBlockedURLs":
-            raise browser_check.CdpError(f"{method}: 'Network.setBlockedURLs' wasn't found")
+        if method == "Fetch.enable":
+            raise browser_check.CdpError(f"{method}: 'Fetch.enable' wasn't found")
         return {"Target.getTargets": {"targetInfos": [{"type": "page", "targetId": "t1"}]},
                 "Target.attachToTarget": {"sessionId": "s1"},
                 "Page.getFrameTree": {"frameTree": {"frame": {"id": "f1"}}}}.get(method, {})
@@ -203,6 +203,40 @@ def test_rejected_network_block_is_one_warning_line_of_the_build(tmp_path: Path,
     assert line.startswith("output.html: Browser check could not run (Remote Browser): RuntimeError: could not "
                            "block network requests")
     assert result.get("preview_files") == []
+
+
+class _PostCdp:
+    """Records the commands posted from the event hook."""
+
+    def __init__(self):
+        self.sent = []
+
+    def post(self, method, params=None, *, session=None):
+        self.sent.append((method, session, params))
+
+
+def test_event_hook_fails_blocked_requests_closes_popups_and_blocks_frames() -> None:
+    """Answered as events arrive (a paused navigation would otherwise stall an awaited reply)."""
+    run = browser_check._Run(["a"], LINE_MAP, 30)
+    run.session, run.target_id = "page", "t-page"
+    run.cdp = _PostCdp()
+    for event in [
+        {"method": "Target.attachedToTarget",  # our own attachToTarget: never closed
+         "params": {"sessionId": "page", "targetInfo": {"targetId": "t-page", "type": "page"}}},
+        {"method": "Fetch.requestPaused", "sessionId": "page", "params": {"requestId": "r1"}},
+        {"method": "Fetch.requestPaused", "sessionId": "frame", "params": {"requestId": "r2"}},
+        {"method": "Target.attachedToTarget", "sessionId": "page",
+         "params": {"sessionId": "popup", "targetInfo": {"targetId": "t-popup", "type": "page"}}},
+        {"method": "Target.attachedToTarget", "sessionId": "page",
+         "params": {"sessionId": "frame", "targetInfo": {"targetId": "t-frame", "type": "iframe"}}},
+    ]:
+        run.watch(event)
+    sent = [(m, s) for m, s, _ in run.cdp.sent]
+    assert ("Fetch.failRequest", "page") in sent and ("Fetch.failRequest", "frame") in sent
+    assert ("Target.closeTarget", None) in sent
+    assert sent.index(("Fetch.enable", "frame")) < sent.index(("Runtime.runIfWaitingForDebugger", "frame"))
+    closed = [p for m, _, p in run.cdp.sent if m == "Target.closeTarget"]
+    assert closed == [{"targetId": "t-popup"}]
 
 
 def test_temp_dir_failure_is_reported(tmp_path: Path, monkeypatch) -> None:
