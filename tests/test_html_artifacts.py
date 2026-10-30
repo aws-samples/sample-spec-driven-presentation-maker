@@ -47,6 +47,28 @@ def test_preview_key_map_latest_epoch_wins_and_ignores_other_keys():
     }
 
 
+def test_png_keys_and_latest_epoch_map():
+    assert ha.png_prefix("d1") == "html/d1/png/"
+    assert ha.png_key("d1", "intro", 123) == "html/d1/png/intro_123.png"
+    assert ha.png_slug_epoch("html/d1/png/demo-1_7.png") == ("demo-1", 7)
+    assert ha.png_slug_epoch("html/d1/preview/intro_100.html") is None
+    keys = [
+        "html/d1/png/intro_100.png",
+        "html/d1/png/intro_200.png",
+        "html/d1/png/demo-1_150.png",
+        "html/d1/preview/intro_300.html",
+        "html/d1/preview/cover_300.png",
+        "html/d1/png/notes.txt",
+    ]
+    assert ha.build_html_png_key_map(keys) == {
+        "intro": "html/d1/png/intro_200.png",
+        "demo-1": "html/d1/png/demo-1_150.png",
+    }
+    assert ha.build_html_preview_key_map(keys) == {"intro": "html/d1/preview/intro_300.html"}
+    with pytest.raises(ValueError):
+        ha.png_key("d1", "../x", 1)
+
+
 def test_template_cache_object_key_allowlist():
     assert ha.template_cache_object_key("ab12", "theme.css") == "template-html-cache/ab12/theme.css"
     assert ha.template_cache_object_key("ab12", "template.json") == "template-html-cache/ab12/template.json"

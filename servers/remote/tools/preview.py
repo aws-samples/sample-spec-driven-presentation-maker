@@ -76,3 +76,32 @@ def get_preview(
         result.append(f"Slide {slug}")
         result.append(Image(data=jpeg_data, format="jpeg"))
     return result
+
+
+def get_html_preview(
+    deck_id: str,
+    slugs: list[str],
+    storage: Storage,
+    quality: str = "high",
+) -> list:
+    """The browser-check PNGs of an HTML deck's slides, as ``get_preview`` returns them.
+
+    Resolves each slug to its latest ``html/{deck}/png/{slug}_{epoch}.png``. A slug
+    without one (never checked, or its check did not finish) gets a text line instead.
+
+    Returns:
+        List of str and Image objects for MCP content serialization.
+    """
+    from shared.html_artifacts import build_html_png_key_map, png_prefix
+
+    key_map = build_html_png_key_map(storage.list_files(prefix=png_prefix(deck_id), bucket=storage.pptx_bucket))
+    result: list = []
+    for slug in slugs:
+        key = key_map.get(slug)
+        if not key:
+            result.append(f'No PNG for {slug} yet: run run_python with measure_slides=["{slug}"]')
+            continue
+        data = storage.download_file_from_pptx_bucket(key=key)
+        result.append(f"Slide {slug}")
+        result.append(Image(data=_resize_to_jpeg(data=data, quality=quality), format="jpeg"))
+    return result

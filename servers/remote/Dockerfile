@@ -35,9 +35,6 @@ COPY sdpm/references/ sdpm/references/
 COPY sdpm/templates/ sdpm/templates/
 COPY sdpm/vendor/ sdpm/vendor/
 ENV SDPM_SKILL_ROOT=/app/sdpm
-# The runtime image has no Chrome / Edge, so the headless JS check of HTML decks is off
-# (sdpm.engine.html.jscheck, design §8.5); static checks still run.
-ENV SDPM_JS_CHECK=0
 
 # Install remote server
 COPY shared/ shared/

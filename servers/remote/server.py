@@ -262,6 +262,19 @@ _storage = AwsStorage(
 )
 
 
+def _register_browser_source() -> None:
+    """The HTML browser check runs in AgentCore Browser here (the image has no Chrome).
+
+    Only the source is registered; its boto3 client is built on the first check.
+    """
+    from sdpm.engine.html.browser import register_browser_source
+    from tools.agentcore_browser import make_source
+
+    register_browser_source(make_source(_region))
+
+
+_register_browser_source()
+
 def _get_user_id() -> str:
     """Extract user ID from JWT sub claim in Authorization header.
 
@@ -664,17 +677,16 @@ def get_preview(
 ) -> list:
     """Look at slides: returns PNG images of the given slugs for visual review. Available
     once the deck has been built (run_python with measure_slides, or generate_pptx).
+    HTML decks: the PNGs run_python's browser check made of the slides it checked.
     """
     _check_deck_access(deck_id, action="preview")
     if not slugs:
         return [{"type": "text", "text": "Error: slugs must not be empty"}]
-    if _deck_format(deck_id) == "html":
-        from tools.html_deck import REMOTE_PREVIEW_NOTE
-
-        return [{"type": "text", "text": REMOTE_PREVIEW_NOTE}]
-    _wait_for_pending_previews(deck_id)
     if quality not in ("low", "high"):
         quality = "high"
+    if _deck_format(deck_id) == "html":
+        return preview.get_html_preview(deck_id=deck_id, slugs=slugs, storage=_storage, quality=quality)
+    _wait_for_pending_previews(deck_id)
     try:
         return preview.get_preview(
             deck_id=deck_id,
@@ -969,7 +981,8 @@ def run_python(
     plain open() also works. Writes persist (read-only decks: discarded, and the result
     says so); output.pptx (output.html for HTML decks) rebuilds and changed slides are
     re-rendered and previewed when deck.json, slides/, includes/ or specs/outline.md
-    changed. measure_slides measures text overflow and lints those slugs, and previews them.
+    changed. measure_slides measures text overflow and lints those slugs, and previews them;
+    HTML decks get static checks plus browser layout / JS checks and PNG previews.
     """
     if not deck_id:
         return json.dumps({
