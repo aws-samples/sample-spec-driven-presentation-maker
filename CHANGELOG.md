@@ -10,6 +10,14 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Added
+
+- **Claude Haiku 5.5** is a selectable model (`global.anthropic.claude-haiku-5-5`) for
+  both Chat and Create. It uses the extended-thinking profile (no `temperature`; Bedrock
+  rejects 0.1 with "temperature is deprecated"), with prompt caching enabled, and is
+  listed in the example config's Recommended group. Unlike Haiku 4.5 it is not
+  excluded from the Create picker.
+
 ## [0.10.4] - 2026-10-02
 
 ### Fixed
