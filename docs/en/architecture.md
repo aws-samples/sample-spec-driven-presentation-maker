@@ -190,11 +190,15 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
   the Web UI), with `text/html; charset=utf-8`: the in-app view and thumbnails for 900 s in
   `GET /decks/{id}`, and `GET /decks/{id}/html?purpose=present` (14400 s, inline) or
   `purpose=download` (900 s, attachment). Both go through the deck's `read` authorization.
-- The Web UI plays the deck in an iframe with `sandbox="allow-scripts allow-popups"` (no
-  `allow-same-origin`, so it gets an opaque origin) and renders thumbnails in `sandbox=""`
-  iframes. Present opens a new tab with `opener` cleared.
+- The Web UI plays the deck in an iframe with `sandbox="allow-scripts allow-popups
+  allow-popups-to-escape-sandbox"` (no `allow-same-origin`, so it gets an opaque origin; no
+  `allow-top-navigation`) and renders thumbnails in `sandbox=""` iframes. The engine gives
+  every external link `target="_blank" rel="noopener noreferrer"`; the escape token lets
+  the linked site load normally in its new tab, while the deck stays sandboxed. Present
+  opens a new tab with `opener` cleared.
 - The local Web UI serves `output.html` with `Content-Security-Policy: sandbox allow-scripts
-  allow-popups` and thumbnails with `Content-Security-Policy: sandbox`, both `nosniff`.
+  allow-popups allow-popups-to-escape-sandbox` and thumbnails with
+  `Content-Security-Policy: sandbox`, both `nosniff`.
 
 ### Text Measurement
 

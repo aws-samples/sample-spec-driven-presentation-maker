@@ -7,7 +7,8 @@
  *
  * HTML is served for exactly two paths of an HTML deck, each with a CSP
  * `sandbox` header so the document never runs with this app's origin:
- *   - `output.html`: the reveal.js deck (`sandbox allow-scripts allow-popups`)
+ *   - `output.html`: the reveal.js deck (`sandbox allow-scripts allow-popups
+ *     allow-popups-to-escape-sandbox`: a link it opens loads normally in its tab)
  *   - `preview/<slug>.html`: static slide thumbnails (`sandbox`, no scripts)
  * Every other `.html` path is 404.
  */
@@ -29,7 +30,7 @@ const HTML_PREVIEW_FILE_RE = /^[a-z0-9][a-z0-9_-]*\.html$/
 
 /** CSP sandbox for an allowed HTML path, or null when the path must not be served. */
 function htmlSandbox(rest: string[]): string | null {
-  if (rest.length === 1 && rest[0] === "output.html") return "sandbox allow-scripts allow-popups"
+  if (rest.length === 1 && rest[0] === "output.html") return "sandbox allow-scripts allow-popups allow-popups-to-escape-sandbox"
   if (rest.length === 2 && rest[0] === "preview" && HTML_PREVIEW_FILE_RE.test(rest[1])) return "sandbox"
   return null
 }

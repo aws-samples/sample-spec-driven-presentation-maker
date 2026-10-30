@@ -27,6 +27,9 @@ A deck without slide scripts or ``data-libs`` gets exactly the three engine scri
 ``<meta charset>``: only the hashed scripts above and the speaker view run, every
 resource is ``data:``. ``AssembleResult.previews`` holds one static document per slide
 (no script at all, every fragment shown) for thumbnails.
+
+External links (``<a href="http(s)://…">``) get ``target="_blank" rel="noopener
+noreferrer"`` so they open in a new tab instead of replacing the deck.
 """
 
 from __future__ import annotations
@@ -69,6 +72,9 @@ _JUSTIFY = {"top": "flex-start", "middle": "center", "bottom": "flex-end"}
 _IMG_ONLY_ATTRS = frozenset({"src", "alt", "srcset", "sizes", "loading", "decoding",
                              "crossorigin", "referrerpolicy", "fetchpriority"})
 _INLINE_TAG = "sdpm-inline-svg"
+_EXTERNAL_LINK_RE = re.compile(r"^\s*https?://", re.IGNORECASE)
+# Link targets that navigate the deck's own frame (or its parent/top) instead of a new tab.
+_IN_PLACE_TARGETS = frozenset({"", "_self", "_parent", "_top"})
 # Resource-loading attributes embedded as data URIs, per tag (others: src, poster).
 # <link> is left alone: a linked stylesheet is not embedded (check.py warns).
 # <script src> is never embedded or fetched (the CSP blocks it; check.py reports it).
@@ -427,6 +433,25 @@ def _process_media(section, slide_index: int, resolver: _Resolver, where: str,
             el.set(attr, _data_uri(path))
 
 
+def _external_links_new_tab(section) -> None:
+    """Open every external ``<a href="http(s)://…">`` in a new tab, without an opener.
+
+    A link that navigates in place would replace the deck (and inside the in-app player's
+    sandboxed iframe it cannot load most sites). ``target`` becomes ``_blank`` unless the
+    composer named a window; ``rel`` keeps its other tokens and gains ``noopener noreferrer``.
+    In-deck links (``#…``) and other schemes are left alone.
+    """
+    for el in section.iter("a"):
+        if not _EXTERNAL_LINK_RE.match(el.get("href") or ""):
+            continue
+        if (el.get("target") or "").strip().lower() in _IN_PLACE_TARGETS:
+            el.set("target", "_blank")
+        tokens = [t for t in (el.get("rel") or "").split() if t.lower() != "opener"]
+        lowered = {t.lower() for t in tokens}
+        tokens += [t for t in ("noopener", "noreferrer") if t not in lowered]
+        el.set("rel", " ".join(tokens))
+
+
 def _css_refs(css: str) -> list[str]:
     """Every ``url()`` and string ``image-set()`` reference in ``css`` (as ``_Resolver.css`` sees them)."""
     return [url for _, _, url in image_set_strings(css)] + [m.group("url") for m in _CSS_URL_RE.finditer(css)]
@@ -567,7 +592,8 @@ def _deck_rules(template: TemplateHtml, layouts_used: list[str], default_backgro
     ground = default_background or "var(--sdpm-template-bg)"
     color = default_text_color or "var(--color-text)"
     rules = [
-        ".reveal .slides > section{"
+        # The print view (#print-pdf) moves each section into a div.pdf-page.
+        ".reveal .slides > section,.reveal .slides > .pdf-page > section{"
         "width:var(--sdpm-canvas-w);height:var(--sdpm-canvas-h);padding:0;box-sizing:border-box;"
         "text-align:left;"
         "font-family:var(--font-family, var(--sdpm-font-minor)), var(--sdpm-font-minor);"
@@ -720,6 +746,7 @@ def assemble_deck(
             script_el.drop_tree()
         used_libraries.update(declared_libraries(section))
         _process_media(section, number, resolver, slug, inline)
+        _external_links_new_tab(section)
         layout = parsed.layout
         if layout and layout in layouts_by_name and layout not in layouts_used:
             layouts_used.append(layout)
