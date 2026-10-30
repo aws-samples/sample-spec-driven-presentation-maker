@@ -56,6 +56,8 @@ def test_complete_deck_skeleton_fills_fields_without_mutating_input() -> None:
         "fonts": {"fullwidth": "", "halfwidth": "Inter"},
         "defaultTextColor": "",
         "slideSize": {},
+        "animations": {"enabled": False},
+        "transitions": {"enabled": False},
         "extra": 1,
     }
     assert original == {"template": "custom", "fonts": {"halfwidth": "Inter"}, "extra": 1}
@@ -83,6 +85,17 @@ def test_validate_specs_rejects_missing_halfwidth_font_key_only() -> None:
     result = _validate(deck=deck)
     assert not [e for e in result["errors"] if "fullwidth" in e]
     assert "deck.json fonts.fullwidth is empty" in result["warnings"]
+
+
+def test_validate_specs_accepts_missing_optional_motion_switches() -> None:
+    assert _validate()["ok"] is True
+
+
+def test_validate_specs_rejects_invalid_optional_motion_switches() -> None:
+    deck = deepcopy(_VALID_DECK)
+    deck["animations"] = {"enabled": "yes"}
+    result = _validate(deck=deck)
+    assert "deck.json animations.enabled: animations.enabled must be boolean" in result["errors"]
 
 
 def test_validate_specs_rejects_empty_template() -> None:

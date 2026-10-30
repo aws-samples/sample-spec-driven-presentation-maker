@@ -569,6 +569,8 @@ class BuildConfig:
     lint_diagnostics: list = field(default_factory=list)
     auto_spacing: bool = True  # deck.json "autoSpacing"; False for imported decks
     default_background: str | None = None  # deck.json "defaultBackground"; None keeps template ground
+    animations_enabled: bool = False
+    transitions_enabled: bool = False
 
 
 def _assemble_slides_from_dir(
@@ -686,6 +688,8 @@ def parse_outline_slugs(outline_path: Path) -> list[str]:
 def _resolve_config(
     json_path: str | Path,
     only_slugs: set[str] | None = None,
+    animation_mode: str = "inherit",
+    transition_mode: str = "inherit",
 ) -> BuildConfig:
     """Resolve template, fonts, icons, overrides from JSON or directory.
 
@@ -695,6 +699,8 @@ def _resolve_config(
     Args:
         json_path: Path to presentation.json or deck directory.
         only_slugs: When set, include only the specified slugs in the build.
+        animation_mode: inherit, on, or off; overrides deck.json animations.enabled.
+        transition_mode: inherit, on, or off; overrides deck.json transitions.enabled.
 
     Raises FileNotFoundError, ValueError on missing template/icons.
     """
@@ -801,6 +807,8 @@ def _resolve_config(
     if only_slugs is not None and not input_path.is_dir():
         resolved_slides = [s for s in resolved_slides if s.get("id") in only_slugs]
 
+    from sdpm.engine.timing import resolve_enabled
+
     return BuildConfig(
         template_path=template_file,
         custom_template=custom,
@@ -812,6 +820,8 @@ def _resolve_config(
         lint_diagnostics=lint_diagnostics,
         auto_spacing=data.get("autoSpacing", True),
         default_background=data.get("defaultBackground") or None,
+        animations_enabled=resolve_enabled(data, "animations", animation_mode),
+        transitions_enabled=resolve_enabled(data, "transitions", transition_mode),
     )
 
 
@@ -838,6 +848,8 @@ def generate(
     json_path: str | Path,
     output_path: str | Path | None = None,
     only_slugs: set[str] | None = None,
+    animation_mode: str = "inherit",
+    transition_mode: str = "inherit",
 ) -> dict[str, Any]:
     """Generate PPTX from JSON.
 
@@ -847,13 +859,20 @@ def generate(
         json_path: Path to the slides JSON file.
         output_path: Output .pptx path. Auto-generated if None.
         only_slugs: When set, build only the specified slugs (for iso.pptx).
+        animation_mode: inherit, on, or off; overrides deck.json animations.enabled.
+        transition_mode: inherit, on, or off; overrides deck.json transitions.enabled.
 
     Returns:
         Dict with output_path, slide_count, slides summary, warnings.
     """
     from sdpm.engine.preview import check_layout_imbalance_data
 
-    config = _resolve_config(json_path, only_slugs=only_slugs)
+    config = _resolve_config(
+        json_path,
+        only_slugs=only_slugs,
+        animation_mode=animation_mode,
+        transition_mode=transition_mode,
+    )
 
     # Output path
     input_path = Path(json_path)

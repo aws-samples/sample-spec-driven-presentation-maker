@@ -17,6 +17,13 @@ DECK_JSON_SKELETON: dict[str, Any] = {
     "slideSize": {},
 }
 
+# Optional runtime features are written into new workspaces but are not part of
+# the required legacy skeleton. Existing decks without them remain valid.
+DECK_JSON_OPTIONAL_DEFAULTS: dict[str, Any] = {
+    "animations": {"enabled": False},
+    "transitions": {"enabled": False},
+}
+
 _SLIDE_RE = re.compile(r"^-\s+\[([^\]]+)\]\s+.+")
 _VALID_SLUG_RE = re.compile(r"^[a-z0-9-]+$")
 _SUB_ITEM_RE = re.compile(r"^\s{2,}-\s+(body|visual|evidence)\s*:")
@@ -28,6 +35,8 @@ def complete_deck_skeleton(deck: dict) -> dict:
     """Return a copy of deck with every deck.json skeleton field present."""
     completed = deepcopy(deck)
     for key, default in DECK_JSON_SKELETON.items():
+        completed.setdefault(key, deepcopy(default))
+    for key, default in DECK_JSON_OPTIONAL_DEFAULTS.items():
         completed.setdefault(key, deepcopy(default))
 
     fonts = completed.get("fonts")
@@ -127,6 +136,10 @@ def validate_specs(
         not isinstance(bg, str) or not _COLOR_RE.fullmatch(bg)
     ):
         errors.append("deck.json defaultBackground must match #RRGGBB")
+
+    from sdpm.engine.timing import validate_deck_switches
+
+    errors.extend(f"deck.json {diagnostic.path}: {diagnostic.message}" for diagnostic in validate_deck_switches(deck_json))
 
     if not _is_non_empty(fonts.get("halfwidth")):
         errors.append("deck.json fonts.halfwidth is empty")
