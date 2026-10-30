@@ -716,6 +716,83 @@ DIRECTION_GAP = (
     "PowerPoint read-back (Task 8)."
 )
 
+#: Behavior payloads, split into what a normative ECMA-376 element/attribute
+#: establishes and what only a PowerPoint capture can establish.
+#:
+#: The gallery capture recorded *which* behavior children PowerPoint wrote for
+#: each tile, not the values inside them. The writer may therefore generate
+#: only the presets whose every child appears under ``resolved``; a preset with
+#: any ``unresolved`` child is refused outright, because emitting the node
+#: without its coordinates, colour or formula would be a silent approximation.
+BEHAVIOR_PAYLOADS = {
+    "capabilityLevel": PRESET,
+    "evidence": (
+        "ECMA-376 Part 1 PresentationML animation behaviours (CT_TLSetBehavior, "
+        "CT_TLAnimateEffectBehavior, CT_TLCommandBehavior, CT_TLCommonBehaviorData) and the "
+        "animation attribute-name vocabulary"
+    ),
+    "verification": "powerPointReadBackRequired",
+    "resolved": {
+        "p:set": {
+            "attrName": "style.visibility",
+            "entrance": "visible",
+            "exit": "hidden",
+            "payload": "p:to/p:strVal/@val",
+            "behaviorTiming": {
+                "durMs": 1,
+                "fill": "hold",
+                "entranceDelayMs": 0,
+                "exitDelayOffsetMs": -1,
+                "note": (
+                    "CT_TLCommonBehaviorData always carries a p:cTn, so the visibility change is a "
+                    "one-millisecond discrete state change held by fill=hold rather than a "
+                    "duration-less node. An entrance shows the shape at the effect start "
+                    "(delay 0); an exit hides it exitDelayOffsetMs from the end of the active "
+                    "duration, so the outgoing filter stays visible for the whole effect and the "
+                    "state change finishes exactly with it."
+                ),
+            },
+            "note": "an entrance makes the shape visible and an exit hides it; the emphasis p:set "
+                    "children (Underline, Bold Reveal, Brush Color) set a font attribute whose name "
+                    "is not captured, so those tiles are refused",
+        },
+        "p:animEffect": {
+            "attribute": "transition",
+            "entrance": "in",
+            "exit": "out",
+            "transitionDomain": ["in", "out", "none"],
+            "filter": "the captured animEffectFilter string of the same catalog entry",
+            "note": "ST_TLAnimateEffectTransition is normative; the filter strings come from the "
+                    "native captures, and an entry without one is refused",
+        },
+        "p:cmd": {
+            "attributes": {"type": "call", "cmd": "the captured command string"},
+            "typeDomain": ["evt", "call", "verb"],
+            "note": "only media Play is captured (cmd playFrom(0.0)); ST_TLCommandType is the "
+                    "allowlist the writer validates an explicit behaviors list against",
+        },
+    },
+    "unresolved": {
+        "p:anim": "the animated attribute name and value formula of a gallery preset are not captured",
+        "p:animMotion": "preset motion-path geometry (p:animMotion/@path) is not captured",
+        "p:animScale": "the preset scale factors are not captured",
+        "p:animRot": "the preset rotation angle is not captured",
+        "p:animClr": "the preset target colour is not captured",
+    },
+    "childOrder": (
+        "the capture reports a tile's behavior children as a set, not in document order, so the "
+        "writer emits them in the recorded order. Visibility is governed by the p:set start "
+        "condition above, not by the node's position among its siblings."
+    ),
+    "writerRule": (
+        "generate a preset only when every behavior child it records appears under resolved. A "
+        "preset with any unresolved child raises BehaviorPayloadGapError naming each one; the "
+        "writer never emits a behavior node whose payload it had to omit. An explicit JSON "
+        "behaviors list supplies exact values and is written verbatim after its enumerated "
+        "attributes are validated against the ECMA-376 allowlists."
+    ),
+}
+
 #: Standard ECMA-376 transition elements with no 16.113.1 gallery tile. They
 #: are catalogued so import can decode them and the writer can round-trip them.
 STANDARD_ONLY_TRANSITIONS = (
@@ -759,6 +836,19 @@ def _merge(base: dict[str, Any], patch: dict[str, Any]) -> dict[str, Any]:
     return out
 
 
+def semantic_parameters(slug: str, attributes: dict[str, str]) -> dict[str, Any]:
+    """Return the semantic ``transition.parameters`` for one OOXML attribute set.
+
+    Every attribute that distinguishes one accepted value from another stays in
+    the semantic JSON, including ``p15:prstTrans/@prst`` (Page Curl Single and
+    Double differ only there). Morph's GUI label is "variant"; PowerPoint
+    persists it as ``p159:morph/@option``.
+    """
+    if slug == "morph":
+        return {"variant": attributes["option"]}
+    return dict(attributes)
+
+
 def transition_semantic(**patch: Any) -> dict[str, Any]:
     """Return a complete semantic slide-transition fragment."""
     base = {
@@ -776,7 +866,16 @@ def effect_semantic(**patch: Any) -> dict[str, Any]:
     base = {
         "id": CATALOG_EFFECT_ID,
         "target": {"element": CATALOG_TARGET},
-        "preset": {"category": "entrance", "effect": "flyIn", "variant": "fromBottom"},
+        # The carrier preset of a control entry has to be reproducible on its
+        # own, otherwise every timing/trigger/build example would fail on the
+        # carrier instead of exercising its own value. Entrance Fade is the
+        # fully captured baseline: presetID 10, p:animEffect filter "fade" and
+        # the normative visibility p:set.
+        #
+        # ``variant`` stays null unless an entry is specifically about a
+        # direction: a non-null variant means "use this MsoAnimDirection", and
+        # those names are the only ones the catalog defines.
+        "preset": {"category": "entrance", "effect": "fade", "variant": None},
         "start": {"type": "onPageClick", "delayMs": 0},
         "timing": dict(BASE_TIMING),
         "afterEffect": {"type": "none"},
@@ -786,6 +885,107 @@ def effect_semantic(**patch: Any) -> dict[str, Any]:
     if "behaviors" in patch:
         effect.pop("preset", None)
     return {"animations": {"mainSequence": [effect], "interactiveSequences": []}}
+
+
+def interactive_semantic(effect: dict[str, Any] | None = None) -> dict[str, Any]:
+    """Return a semantic fragment whose only effect sits in an interactive sequence."""
+    effect = effect or effect_semantic()["animations"]["mainSequence"][0]
+    return {
+        "animations": {
+            "mainSequence": [],
+            "interactiveSequences": [
+                {
+                    "id": "catalogSequence",
+                    "trigger": {"type": "onShapeClick", "target": CATALOG_TARGET, "delayMs": 0},
+                    "effects": [effect],
+                }
+            ],
+        }
+    }
+
+
+def trigger_semantic(trigger: str) -> dict[str, Any]:
+    """Return the semantic fragment for one MsoAnimTriggerType value.
+
+    PowerPoint persists a shape-click trigger as an interactive sequence whose
+    start condition targets the clicked shape, not as a main-sequence effect,
+    so that value is modelled with the sequence it actually produces.
+    """
+    if trigger == "onShapeClick":
+        return interactive_semantic()
+    return effect_semantic(start={"type": trigger, "delayMs": 0})
+
+
+#: Example inter-item delay for the by-word / by-character fragments below.
+#: ``CT_TLIterateData`` is a choice of exactly one ``p:tmAbs`` or ``p:tmPct``,
+#: so a text unit cannot be expressed without an interval. The capture does
+#: not record what PowerPoint writes when the GUI field is left alone, so the
+#: catalog's semantic JSON carries an explicit, writable example value and the
+#: writer requires one rather than inventing a default.
+CATALOG_ITEM_DELAY_PERCENT = 10
+
+
+def text_unit_semantic(unit: str) -> dict[str, Any]:
+    """Return a complete semantic fragment for one text-unit value."""
+    text: dict[str, Any] = {"unit": unit}
+    if unit != "byParagraph":
+        text["interItemDelayPercent"] = CATALOG_ITEM_DELAY_PERCENT
+    return effect_semantic(text=text)
+
+
+#: Complete payloads for the behavior-primitive fragments. An accepted entry's
+#: semantic JSON has to be a full, writable example (REQ-7.2), and the writer
+#: emits only behaviors that carry an explicit payload, so every primitive
+#: supplies one here. These are illustrative authoring values, not captured
+#: preset values: what a *gallery preset* puts inside the same element stays
+#: unresolved under ``BEHAVIOR_PAYLOADS['unresolved']``.
+BEHAVIOR_EXAMPLE_PAYLOADS: dict[str, dict[str, Any]] = {
+    "motion": {"path": "M 0 0 L 0.25 0 E", "pathEditMode": "relative", "origin": "layout"},
+    "color": {"to": "#FF8800"},
+    "scale": {"to": {"x": 1.5, "y": 1.5}},
+    "rotation": {"by": 360},
+    "property": {"attrName": "ppt_x", "to": "0.75", "calcMode": "lin", "valueType": "num"},
+    "command": {"command": "playFrom", "value": "0.0"},
+    "filter": {"filter": "fade", "transition": "in"},
+    "set": {"attrName": "style.visibility", "to": "visible"},
+}
+
+
+def behavior_semantic(kind: str) -> dict[str, Any]:
+    """Return a complete semantic fragment for one behavior primitive."""
+    return effect_semantic(behaviors=[{"type": kind, **BEHAVIOR_EXAMPLE_PAYLOADS[kind]}])
+
+
+def preset_payload_gap(category: str, children: tuple[str, ...] | list[str] | None,
+                       animation_filter: str | None, command: str | None = None) -> list[str]:
+    """Return the behavior children of a preset whose payload is unresolved.
+
+    This is the catalog side of the writer's payload gate. ``p:set`` is
+    established only for the entrance/exit visibility change, ``p:animEffect``
+    only when the tile carries a captured filter string, and ``p:cmd`` only
+    when it carries a captured command. Everything else listed under
+    ``BEHAVIOR_PAYLOADS['unresolved']`` has no captured value, so the entry
+    records the gap and the writer refuses it instead of emitting a
+    payload-free node. ``None`` children means no tile was captured at all,
+    which is the strongest form of the same gap.
+    """
+    if children is None:
+        return ["-"]
+    unresolved: list[str] = []
+    for child in children:
+        tag = child if child.startswith("p:") else f"p:{child}"
+        if tag == "p:set":
+            if category not in {"entrance", "exit"}:
+                unresolved.append(tag)
+        elif tag == "p:animEffect":
+            if not animation_filter:
+                unresolved.append(tag)
+        elif tag == "p:cmd":
+            if not command:
+                unresolved.append(tag)
+        else:
+            unresolved.append(tag)
+    return unresolved
 
 
 def catalog_slide(semantic: dict[str, Any]) -> dict[str, Any]:
@@ -889,18 +1089,7 @@ CONTROL_ITEMS: tuple[tuple[str, str, str, dict[str, Any] | None, dict[str, Any] 
         "accepted",
         NATIVE,
         {"strategy": "timingNode", "elements": ["p:seq/@nodeType=interactiveSeq", "p:cond/@evt=onClick"]},
-        {
-            "animations": {
-                "mainSequence": [],
-                "interactiveSequences": [
-                    {
-                        "id": "catalogSequence",
-                        "trigger": {"type": "onShapeClick", "target": CATALOG_TARGET, "delayMs": 0},
-                        "effects": [effect_semantic()["animations"]["mainSequence"][0]],
-                    }
-                ],
-            }
-        },
+        interactive_semantic(),
         None,
     ),
     (
@@ -995,7 +1184,8 @@ CONTROL_ITEMS: tuple[tuple[str, str, str, dict[str, Any] | None, dict[str, Any] 
         "animation.timing.acceleration",
         "accepted",
         PRESET,
-        {"strategy": "attribute", "attributes": ["p:cTn/@accel"], "note": "per-mille of the active duration"},
+        {"strategy": "attribute", "attributes": ["p:cTn/@accel"],
+         "note": "ST_PositiveFixedPercentage of the active duration: 100% is 100000"},
         effect_semantic(timing={"acceleration": 0.2}),
         None,
     ),
@@ -1003,7 +1193,8 @@ CONTROL_ITEMS: tuple[tuple[str, str, str, dict[str, Any] | None, dict[str, Any] 
         "animation.timing.deceleration",
         "accepted",
         PRESET,
-        {"strategy": "attribute", "attributes": ["p:cTn/@decel"], "note": "per-mille of the active duration"},
+        {"strategy": "attribute", "attributes": ["p:cTn/@decel"],
+         "note": "ST_PositiveFixedPercentage of the active duration: 100% is 100000"},
         effect_semantic(timing={"deceleration": 0.2}),
         None,
     ),
@@ -1048,18 +1239,7 @@ CONTROL_ITEMS: tuple[tuple[str, str, str, dict[str, Any] | None, dict[str, Any] 
         "accepted",
         NATIVE,
         {"strategy": "target", "elements": ["p:cond/p:tgtEl/p:spTgt/@spid"]},
-        {
-            "animations": {
-                "mainSequence": [],
-                "interactiveSequences": [
-                    {
-                        "id": "catalogSequence",
-                        "trigger": {"type": "onShapeClick", "target": CATALOG_TARGET, "delayMs": 0},
-                        "effects": [effect_semantic()["animations"]["mainSequence"][0]],
-                    }
-                ],
-            }
-        },
+        interactive_semantic(),
         None,
     ),
     (
@@ -1128,7 +1308,7 @@ CONTROL_ITEMS: tuple[tuple[str, str, str, dict[str, Any] | None, dict[str, Any] 
         SEMANTIC,
         {"strategy": "behavior", "elements": ["p:cmd/@cmd=playFrom"],
          "note": "playFrom(0.0) is captured in the native media timing fixture; a non-zero bookmark offset is not"},
-        effect_semantic(behaviors=[{"type": "command", "command": "playFrom", "value": "0.0"}]),
+        behavior_semantic("command"),
         None,
     ),
 )
@@ -1233,10 +1413,39 @@ def transition_template(slug: str, attrs: dict[str, str]) -> dict[str, Any]:
     }
 
 
+def apply_payload_gap(ooxml: dict[str, Any], category: str) -> dict[str, Any]:
+    """Record the unresolved behavior payloads of an already-built preset mapping.
+
+    Used by the candidate entries that reuse a captured tile's
+    ``behaviorChildren``. An entry that already records a stronger gap (a
+    missing ``presetID``, say) keeps it; the payload gap is only added when the
+    identifier side is otherwise complete.
+    """
+    unresolved = preset_payload_gap(
+        category, ooxml.get("behaviorChildren"), ooxml.get("animEffectFilter"), ooxml.get("command")
+    )
+    if not unresolved or "gap" in ooxml:
+        return ooxml
+    ooxml["unresolvedPayloads"] = unresolved
+    ooxml["requiresCapture"] = True
+    if unresolved == ["-"]:
+        ooxml["gap"] = (
+            "the presetID is corroborated but no gallery tile was captured for this effect, so its "
+            "behaviour children and their payloads are unknown and the effect cannot be written"
+        )
+        return ooxml
+    ooxml["gap"] = (
+        f"the capture records {', '.join(ooxml['behaviorChildren'])} for this effect but not the value "
+        f"payload of {', '.join(unresolved)}, so the effect cannot be reproduced; see "
+        "behaviorPayloads.unresolved"
+    )
+    return ooxml
+
+
 def animation_template(row: tuple[Any, ...]) -> dict[str, Any]:
     """Return the OOXML mapping metadata for one captured gallery tile."""
     category, _slug, label, preset_class, preset_id, subtype, group, children, filt, duration, _fixture = row
-    return {
+    template = {
         "strategy": "preset",
         "element": "p:cTn",
         "presetClass": preset_class,
@@ -1247,6 +1456,53 @@ def animation_template(row: tuple[Any, ...]) -> dict[str, Any]:
         "observedChildDurationMs": duration,
         "buildList": "p:bldP/@animBg=1" if category != "text" else "p:bldP",
         "galleryTile": f"{label} ({group})",
+    }
+    unresolved = preset_payload_gap(category, template["behaviorChildren"], filt)
+    if unresolved:
+        template["unresolvedPayloads"] = unresolved
+        template["requiresCapture"] = True
+        template["gap"] = (
+            f"the capture records {', '.join(template['behaviorChildren'])} for this tile but not the "
+            f"value payload of {', '.join(unresolved)} (coordinates, colour, scale, angle or the "
+            "animated attribute name), so the effect cannot be reproduced; see "
+            "behaviorPayloads.unresolved"
+        )
+    return template
+
+
+def build_template(element: str, attrs: dict[str, str]) -> dict[str, Any]:
+    """Return the OOXML mapping metadata for one build list entry.
+
+    ``p:bldP`` carries the paragraph build in its own attributes. A chart build
+    does not: ``CT_TLGraphicalObjectBuild`` has no build attribute, so the
+    value lives on the ``a:bldChart`` child of ``p:bldSub``. A diagram build
+    uses ``p:bldDgm/@bld``.
+    """
+    if element == "bldP":
+        return {"strategy": "build", "element": "p:bldP", "attributes": dict(attrs)}
+    value = attrs.get("build", "")
+    if element == "bldGraphic":
+        return {
+            "strategy": "build",
+            "element": "p:bldGraphic",
+            "child": "p:bldSub/a:bldChart",
+            "attribute": "bld",
+            "value": value,
+            "note": (
+                "CT_TLGraphicalObjectBuild has no build attribute: the chart build type lives on the "
+                "a:bldChart child of p:bldSub (ECMA-376 Part 1 DrawingML "
+                "CT_AnimationChartBuildProperties). The bld token still needs Task 8 read-back."
+            ),
+        }
+    return {
+        "strategy": "build",
+        "element": f"p:{element}",
+        "attribute": "bld",
+        "value": value,
+        "note": (
+            "CT_TLBuildDiagram carries the diagram build type in @bld (ECMA-376 Part 1); the token "
+            "still needs Task 8 read-back."
+        ),
     }
 
 
@@ -1324,9 +1580,7 @@ def gui_items() -> list[dict[str, Any]]:
             ))
             continue
         ooxml = transition_template(slug, {})
-        params = {k: v for k, v in ooxml["attributes"].items() if k != "prst"}
-        if slug == "morph":
-            params = {"variant": ooxml["attributes"]["option"]}
+        params = semantic_parameters(slug, ooxml["attributes"])
         items.append(_accepted(
             key, NATIVE, ooxml,
             transition_semantic(effect=slug, parameters=params, durationMs=ooxml["defaultDurationMs"]),
@@ -1409,7 +1663,7 @@ def gui_items() -> list[dict[str, Any]]:
         "animation.addAnimation.customBehavior", SEMANTIC,
         {"strategy": "behaviorPrimitives", "elements": [v[1] for v in BEHAVIOR_MAP.values() if v[1]],
          "note": "a custom effect is modelled as an explicit behaviours list rather than a preset"},
-        effect_semantic(behaviors=[{"type": "set"}]),
+        behavior_semantic("set"),
         {"source": SDEF_SOURCE, "commit": None},
     ))
 
@@ -1429,8 +1683,7 @@ def enum_value_items(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict[
             )
         items.append(_accepted(
             f"animation.start.{semantic}", level, ooxml,
-            effect_semantic(start={"type": semantic, "delayMs": 0,
-                                   **({"target": CATALOG_TARGET} if semantic == "onShapeClick" else {})}),
+            trigger_semantic(semantic),
             native_evidence("05-fly-in", "animations/entrance") if level == NATIVE
             else {"source": "ECMA-376 ST_TLTimeNodeType", "commit": None},
         ))
@@ -1438,8 +1691,9 @@ def enum_value_items(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict[
     for name, (semantic, iterate, level) in TEXT_UNIT_MAP.items():
         items.append(_accepted(
             f"animation.textOptions.unit.{semantic}", level,
-            {"strategy": "iterate", "element": "p:iterate", "type": iterate},
-            effect_semantic(text={"unit": semantic}),
+            {"strategy": "iterate", "element": "p:iterate", "type": iterate,
+             "interval": "p:tmPct or p:tmAbs, required by CT_TLIterateData"},
+            text_unit_semantic(semantic),
             native_evidence("99-fly-in-on-3-paragraph-text-box-sequence-by-paragraph", "animations/text")
             if level == NATIVE else {"source": "ECMA-376 ST_IterateType", "commit": None},
         ))
@@ -1447,7 +1701,7 @@ def enum_value_items(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict[
     for name, (semantic, element, attrs, level) in LEVEL_MAP.items():
         items.append(_accepted(
             f"animation.textOptions.level.{semantic}", level,
-            {"strategy": "build", "element": f"p:{element}", "attributes": attrs},
+            build_template(element, attrs),
             effect_semantic(text={"level": semantic}) if element == "bldP"
             else effect_semantic(chart={"build": semantic}),
             native_evidence("96-fly-in-on-3-paragraph-text-box-gallery-default-sequence-as-one-object",
@@ -1481,7 +1735,7 @@ def enum_value_items(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict[
             continue
         items.append(_accepted(
             key, level, {"strategy": "behavior", "element": element},
-            effect_semantic(behaviors=[{"type": semantic}]),
+            behavior_semantic(semantic),
             native_evidence("05-fly-in", "animations/entrance"),
         ))
 
@@ -1516,7 +1770,7 @@ def enum_value_items(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict[
     for value, build in SMARTART_BUILDS.items():
         items.append(_accepted(
             f"animation.smartArt.build.{value}", PRESET,
-            {"strategy": "build", "element": "p:bldDgm", "attributes": {"build": build}},
+            build_template("bldDgm", {"build": build}),
             effect_semantic(smartArt={"build": value}),
             {"source": "ECMA-376 ST_AnimationDgmBuildType", "commit": None},
         ))
@@ -1588,9 +1842,7 @@ def _epp_candidate(key: str, enumerator: str, code: str) -> dict[str, Any]:
         )
     elif level == PRESET and ooxml["strategy"] == "standard":
         ooxml["attributeDomain"] = STANDARD_DIR_DOMAIN.get(ooxml["element"])
-    params = {k: v for k, v in ooxml["attributes"].items() if k != "prst"}
-    if target == "morph":
-        params = {"variant": ooxml["attributes"]["option"]}
+    params = semantic_parameters(target, ooxml["attributes"])
     evidence = native_evidence(TRANSITION_FIXTURE[target].rsplit("/", 1)[-1][:-4], "transitions")
     return _accepted(
         key, level, ooxml,
@@ -1607,7 +1859,7 @@ def _effect_candidate(key: str, enumerator: str, code: str) -> dict[str, Any]:
             {"strategy": "behaviorPrimitives", "presetClass": None, "presetId": None, "requiresCapture": False,
              "note": "msoAnimEffectCustom is not a gallery preset; a custom effect is written as explicit "
                      "behaviour primitives"},
-            effect_semantic(behaviors=[{"type": "set"}]),
+            behavior_semantic("set"),
             {"source": SDEF_SOURCE, "commit": None},
             guiKey="animation.addAnimation.customBehavior",
         )
@@ -1623,6 +1875,10 @@ def _effect_candidate(key: str, enumerator: str, code: str) -> dict[str, Any]:
                 "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an "
                         "exit effect uses the same presetID with presetClass=\"exit\"",
             }
+            if tile:
+                apply_payload_gap(ooxml, tile[0])
+            else:
+                apply_payload_gap(ooxml, "entrance")
             evidence = (
                 native_evidence(tile[10], f"animations/{tile[0]}") if tile
                 else {"source": "COM-derived entrance/exit presetID table (ChristopherVR/ooxml)",
@@ -1672,6 +1928,7 @@ def _effect_candidate(key: str, enumerator: str, code: str) -> dict[str, Any]:
                 "this emphasis effect has no entry in the COM-derived emphasis presetID table and no gallery "
                 "tile, so its OOXML presetID is not established; resolve by PowerPoint read-back (Task 8)"
             )
+        apply_payload_gap(ooxml, "emphasis")
         evidence = (
             native_evidence(tile[10], "animations/emphasis") if tile
             else {"source": "COM-derived emphasis presetID table (ChristopherVR/ooxml)",
@@ -1750,9 +2007,7 @@ def candidate_entries(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict
                         "captured here"
                     )
                 entry = _accepted(
-                    key, level, ooxml,
-                    effect_semantic(start={"type": semantic, "delayMs": 0,
-                                           **({"target": CATALOG_TARGET} if semantic == "onShapeClick" else {})}),
+                    key, level, ooxml, trigger_semantic(semantic),
                     native_evidence("05-fly-in", "animations/entrance") if level == NATIVE
                     else {"source": "ECMA-376 ST_TLTimeNodeType", "commit": None},
                     guiKey=f"animation.start.{semantic}",
@@ -1760,7 +2015,7 @@ def candidate_entries(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict
             elif enum_name == "MsoAnimateByLevel":
                 semantic, element, attrs, level = LEVEL_MAP[enumerator]
                 entry = _accepted(
-                    key, level, {"strategy": "build", "element": f"p:{element}", "attributes": attrs},
+                    key, level, build_template(element, attrs),
                     effect_semantic(text={"level": semantic}) if element == "bldP"
                     else effect_semantic(chart={"build": semantic}),
                     native_evidence("96-fly-in-on-3-paragraph-text-box-gallery-default-sequence-as-one-object",
@@ -1771,8 +2026,10 @@ def candidate_entries(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict
             elif enum_name == "MsoAnimTextUnitEffect":
                 semantic, iterate, level = TEXT_UNIT_MAP[enumerator]
                 entry = _accepted(
-                    key, level, {"strategy": "iterate", "element": "p:iterate", "type": iterate},
-                    effect_semantic(text={"unit": semantic}),
+                    key, level,
+                    {"strategy": "iterate", "element": "p:iterate", "type": iterate,
+                     "interval": "p:tmPct or p:tmAbs, required by CT_TLIterateData"},
+                    text_unit_semantic(semantic),
                     native_evidence("99-fly-in-on-3-paragraph-text-box-sequence-by-paragraph", "animations/text")
                     if level == NATIVE else {"source": "ECMA-376 ST_IterateType", "commit": None},
                     guiKey=f"animation.textOptions.unit.{semantic}",
@@ -1804,7 +2061,7 @@ def candidate_entries(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict
                 else:
                     entry = _accepted(
                         key, level, {"strategy": "behavior", "element": element},
-                        effect_semantic(behaviors=[{"type": semantic}]),
+                        behavior_semantic(semantic),
                         native_evidence("05-fly-in", "animations/entrance"),
                         guiKey=f"animation.behavior.{semantic}",
                     )
@@ -1855,6 +2112,7 @@ def build_catalog(manifest: dict[str, Any], sdef_enums: dict[str, list[tuple[str
             ),
         },
         "alternateContent": ALTERNATE_CONTENT,
+        "behaviorPayloads": BEHAVIOR_PAYLOADS,
         "capabilityLevels": {
             NATIVE: "exact OOXML captured from retail PowerPoint for this value",
             PRESET: "element/attribute/identifier fixed by a normative ECMA-376 enumeration or corroborated by two independent sources; no visual capture",

@@ -74,7 +74,8 @@ class PPTXBuilder(
     def __init__(self, template_path: Path, custom_template: bool = False,
                  fonts: dict = None, base_dir: Path = None, keep_empty_placeholders: bool = False,
                  default_text_color: str = None, auto_spacing: bool = True,
-                 default_background: str = None):
+                 default_background: str = None, animations_enabled: bool = False,
+                 transitions_enabled: bool = False):
         """Initialize PPTXBuilder.
 
         Args:
@@ -88,6 +89,11 @@ class PPTXBuilder(
             default_background: Solid background applied to every slide that does
                    not set its own "background" (deck.json "defaultBackground").
                    None keeps the template background.
+            animations_enabled: Write object-animation timing (deck.json
+                   "animations.enabled" after caller override). False still
+                   preserves media timing required for video playback.
+            transitions_enabled: Write slide transitions (deck.json
+                   "transitions.enabled" after caller override).
 
         Raises:
             ValueError: If fonts or default_text_color is not provided.
@@ -122,6 +128,12 @@ class PPTXBuilder(
         self.keep_empty_placeholders = keep_empty_placeholders
         self.layouts = self._build_layout_map()
         self.invalid_layouts: list[dict] = []  # {"slug", "attempted", "used", "available"}
+        self.animations_enabled = animations_enabled
+        self.transitions_enabled = transitions_enabled
+        # Logical element id -> real shape id, per slide, for animation targets.
+        self.identity_registries: dict[str, object] = {}
+        self.timing_reports: list[dict] = []
+        self.transition_reports: list[dict] = []
         self._base_dir = base_dir if base_dir is not None else Path(".")
         self._list_styles = self._load_list_styles()
         self._clear_slides()
@@ -186,6 +198,20 @@ class PPTXBuilder(
         layout_idx = self.layouts[layout_name]
         return self.prs.slide_masters[self.master_idx].slide_layouts[layout_idx]
 
+    def _registry_key(self, slide_slug: str) -> str:
+        """Return a collision-free key for one slide's identity registry.
+
+        Slides are keyed by slug for callers that look one up by name, but a
+        slug is optional and may repeat, and two slides sharing a key would
+        silently discard the first registry (and with it every animation target
+        the first slide resolved). Ambiguous keys therefore get a positional
+        suffix.
+        """
+        key = slide_slug or f"#slide{len(self.identity_registries)}"
+        if key not in self.identity_registries:
+            return key
+        return f"{key}#{len(self.identity_registries)}"
+
     def add_slide(self, slide_def: dict):
         layout_name = slide_def.get("layout")
         if not layout_name:
@@ -224,6 +250,25 @@ class PPTXBuilder(
         # Hide Background Graphics (round-trips showMasterSp="0")
         if slide_def.get("hideMasterShapes"):
             slide._element.set("showMasterSp", "0")
+
+        # Animation identity: logical slide JSON ids are registered as the
+        # shapes are created, so the timing writer can resolve every target
+        # after the whole slide exists (REQ-6.1).
+        from sdpm.engine.timing.identity import ShapeIdentityRegistry
+
+        slide_slug = str(slide_def.get("id") or "")
+        registry = ShapeIdentityRegistry(
+            slide_slug,
+            # Ordinary decks get no extra shape metadata at all: identity is
+            # only recorded when a motion feature is switched on.
+            write_metadata=self.animations_enabled or self.transitions_enabled,
+        )
+        self.identity_registries[self._registry_key(slide_slug)] = registry
+        # Placeholders are registered before they are filled, because filling
+        # can delete one (an empty title is removed) and a registered-then-
+        # detached shape produces the precise "produced no shape" target error
+        # instead of a misleading "unknown target".
+        self._register_placeholder_identity(slide, slide_def, registry)
 
         self._fill_placeholders(slide, slide_def)
 
@@ -276,7 +321,7 @@ class PPTXBuilder(
             else:
                 break
 
-        for elem in expanded:
+        for elem_index, elem in enumerate(expanded):
             if is_comment_element(elem):
                 continue  # comment-only entries (section markers, layout regions) are not elements
             n_before = len(sp_tree)
@@ -364,10 +409,30 @@ class PPTXBuilder(
             # PowerPoint drops out-of-order spPr children (e.g. a:ln after
             # a:effectLst) — normalize every new node to schema order.
             from sdpm.engine.builder.formatting import normalize_sppr_order
-            for node in list(sp_tree)[n_before:]:
+            new_nodes = list(sp_tree)[n_before:]
+            for node in new_nodes:
                 for sp_pr_el in node.iter():
                     if sp_pr_el.tag.split('}')[-1] == 'spPr':
                         normalize_sppr_order(sp_pr_el)
+
+            # Primary target rule: when one element builder creates several
+            # shapes (e.g. an image plus its label textbox), the first root
+            # node it appended is the animation target and the rest are
+            # recorded as extra shapes of the same logical element.
+            if elem.get("id") is not None or elem.get("morphId") is not None:
+                target_nodes = new_nodes
+                if not target_nodes and elem.get("_phIdx") is not None:
+                    target_nodes = [
+                        ph._element for ph in slide.placeholders
+                        if ph.placeholder_format.idx == elem["_phIdx"]
+                    ]
+                registry.register(
+                    elem.get("id"),
+                    target_nodes,
+                    kind=str(elem_type),
+                    source_path=f"elements[{elem_index}]",
+                    morph_id=elem.get("morphId"),
+                )
 
             if elem.get("sendToBack"):
                 new_nodes = list(sp_tree)[n_before:]
@@ -389,8 +454,10 @@ class PPTXBuilder(
         if not self.keep_empty_placeholders:
             for ph in list(slide.placeholders):
                 if ph.has_text_frame and not ph.text_frame.text.strip():
+                    registry.mark_removed(ph._element)
                     slide.shapes._spTree.remove(ph._element)
                 elif not ph.has_text_frame and ph.placeholder_format.type == 18:  # PICTURE
+                    registry.mark_removed(ph._element)
                     slide.shapes._spTree.remove(ph._element)
 
         # Restore per-slide theme override
@@ -400,6 +467,28 @@ class PPTXBuilder(
 
         if slide_def.get("hidden"):
             slide._element.set("show", "0")
+
+        # Transition and timing come last: every shape, note, placeholder and
+        # media object now exists, and empty placeholders are gone (REQ-6.1).
+        from sdpm.engine.timing.transition import write_slide_transition
+        from sdpm.engine.timing.writer import write_slide_timing
+
+        self.transition_reports.append(
+            write_slide_transition(
+                slide._element,
+                slide_def.get("transition"),
+                transitions_enabled=self.transitions_enabled,
+                slide_slug=slide_slug,
+            )
+        )
+        self.timing_reports.append(
+            write_slide_timing(
+                slide._element,
+                slide_def,
+                registry,
+                animations_enabled=self.animations_enabled,
+            )
+        )
 
         return slide
 

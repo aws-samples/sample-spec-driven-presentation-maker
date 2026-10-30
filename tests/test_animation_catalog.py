@@ -267,6 +267,15 @@ def test_every_accepted_semantic_json_validates_against_the_frozen_model(catalog
     assert not failures
 
 
+def _only_effect(semantic: dict) -> dict:
+    """Return the single effect of a semantic fragment, wherever it lives."""
+    animations = semantic["animations"]
+    main = animations["mainSequence"]
+    if main:
+        return main[0]
+    return animations["interactiveSequences"][0]["effects"][0]
+
+
 def test_accepted_semantic_json_is_complete_not_just_a_name(catalog):
     for entry in catalog["candidates"]:
         if entry["status"] != "accepted":
@@ -276,7 +285,7 @@ def test_accepted_semantic_json_is_complete_not_just_a_name(catalog):
             transition = semantic["transition"]
             assert set(transition) >= {"effect", "parameters", "durationMs", "advance", "sound"}
         else:
-            effect = semantic["animations"]["mainSequence"][0]
+            effect = _only_effect(semantic)
             assert set(effect) >= {"id", "target", "start", "timing", "afterEffect", "sound"}
             assert set(effect["timing"]) >= {"durationMs", "repeatCount", "autoReverse", "restart"}
 
@@ -354,12 +363,23 @@ def test_chart_and_text_builds_are_represented(catalog):
 
 
 def test_every_trigger_type_is_accounted(catalog):
-    triggers = {
-        entry["semanticJson"]["animations"]["mainSequence"][0]["start"]["type"]
-        for entry in catalog["candidates"]
-        if entry["enum"] == "MsoAnimTriggerType"
-    }
+    entries = [entry for entry in catalog["candidates"] if entry["enum"] == "MsoAnimTriggerType"]
+    triggers = set()
+    for entry in entries:
+        animations = entry["semanticJson"]["animations"]
+        sequences = animations["interactiveSequences"]
+        triggers.add(
+            sequences[0]["trigger"]["type"] if sequences else _only_effect(entry["semanticJson"])["start"]["type"]
+        )
     assert triggers == {"none", "onPageClick", "withPrevious", "afterPrevious", "onShapeClick"}
+    # PowerPoint persists a shape-click trigger as an interactive sequence, so
+    # the catalog value must carry that sequence rather than a main-sequence
+    # effect whose start type no writer can place.
+    shape_click = next(e for e in entries if e["enumerator"] == "on shape click")
+    sequence = shape_click["semanticJson"]["animations"]["interactiveSequences"][0]
+    assert shape_click["semanticJson"]["animations"]["mainSequence"] == []
+    assert sequence["trigger"] == {"type": "onShapeClick", "target": "catalogTarget", "delayMs": 0}
+    assert shape_click["ooxml"]["nodeType"] == "interactiveSeq"
 
 
 def test_transition_gallery_covers_all_49_captured_tiles(catalog):

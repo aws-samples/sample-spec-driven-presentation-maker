@@ -121,6 +121,60 @@
     ],
     "fallbackObserved": "p:fade for extension transitions; the same standard element when the Choice is a standard element"
   },
+  "behaviorPayloads": {
+    "capabilityLevel": "presetMapping",
+    "evidence": "ECMA-376 Part 1 PresentationML animation behaviours (CT_TLSetBehavior, CT_TLAnimateEffectBehavior, CT_TLCommandBehavior, CT_TLCommonBehaviorData) and the animation attribute-name vocabulary",
+    "verification": "powerPointReadBackRequired",
+    "resolved": {
+      "p:set": {
+        "attrName": "style.visibility",
+        "entrance": "visible",
+        "exit": "hidden",
+        "payload": "p:to/p:strVal/@val",
+        "behaviorTiming": {
+          "durMs": 1,
+          "fill": "hold",
+          "entranceDelayMs": 0,
+          "exitDelayOffsetMs": -1,
+          "note": "CT_TLCommonBehaviorData always carries a p:cTn, so the visibility change is a one-millisecond discrete state change held by fill=hold rather than a duration-less node. An entrance shows the shape at the effect start (delay 0); an exit hides it exitDelayOffsetMs from the end of the active duration, so the outgoing filter stays visible for the whole effect and the state change finishes exactly with it."
+        },
+        "note": "an entrance makes the shape visible and an exit hides it; the emphasis p:set children (Underline, Bold Reveal, Brush Color) set a font attribute whose name is not captured, so those tiles are refused"
+      },
+      "p:animEffect": {
+        "attribute": "transition",
+        "entrance": "in",
+        "exit": "out",
+        "transitionDomain": [
+          "in",
+          "out",
+          "none"
+        ],
+        "filter": "the captured animEffectFilter string of the same catalog entry",
+        "note": "ST_TLAnimateEffectTransition is normative; the filter strings come from the native captures, and an entry without one is refused"
+      },
+      "p:cmd": {
+        "attributes": {
+          "type": "call",
+          "cmd": "the captured command string"
+        },
+        "typeDomain": [
+          "evt",
+          "call",
+          "verb"
+        ],
+        "note": "only media Play is captured (cmd playFrom(0.0)); ST_TLCommandType is the allowlist the writer validates an explicit behaviors list against"
+      }
+    },
+    "unresolved": {
+      "p:anim": "the animated attribute name and value formula of a gallery preset are not captured",
+      "p:animMotion": "preset motion-path geometry (p:animMotion/@path) is not captured",
+      "p:animScale": "the preset scale factors are not captured",
+      "p:animRot": "the preset rotation angle is not captured",
+      "p:animClr": "the preset target colour is not captured"
+    },
+    "childOrder": "the capture reports a tile's behavior children as a set, not in document order, so the writer emits them in the recorded order. Visibility is governed by the p:set start condition above, not by the node's position among its siblings.",
+    "writerRule": "generate a preset only when every behavior child it records appears under resolved. A preset with any unresolved child raises BehaviorPayloadGapError naming each one; the writer never emits a behavior node whose payload it had to omit. An explicit JSON behaviors list supplies exact values and is written verbatim after its enumerated attributes are validated against the ECMA-376 allowlists."
+  },
   "capabilityLevels": {
     "nativeTemplate": "exact OOXML captured from retail PowerPoint for this value",
     "presetMapping": "element/attribute/identifier fixed by a normative ECMA-376 enumeration or corroborated by two independent sources; no visual capture",
@@ -189,7 +243,9 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "set"
+                  "type": "set",
+                  "attrName": "style.visibility",
+                  "to": "visible"
                 }
               ]
             }
@@ -231,8 +287,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -289,8 +345,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -346,8 +402,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -403,8 +459,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -461,8 +517,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -543,7 +599,8 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "color"
+                  "type": "color",
+                  "to": "#FF8800"
                 }
               ]
             }
@@ -598,7 +655,9 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "command"
+                  "type": "command",
+                  "command": "playFrom",
+                  "value": "0.0"
                 }
               ]
             }
@@ -653,7 +712,9 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "filter"
+                  "type": "filter",
+                  "filter": "fade",
+                  "transition": "in"
                 }
               ]
             }
@@ -708,7 +769,10 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "motion"
+                  "type": "motion",
+                  "path": "M 0 0 L 0.25 0 E",
+                  "pathEditMode": "relative",
+                  "origin": "layout"
                 }
               ]
             }
@@ -769,7 +833,11 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "property"
+                  "type": "property",
+                  "attrName": "ppt_x",
+                  "to": "0.75",
+                  "calcMode": "lin",
+                  "valueType": "num"
                 }
               ]
             }
@@ -824,7 +892,8 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "rotation"
+                  "type": "rotation",
+                  "by": 360
                 }
               ]
             }
@@ -879,7 +948,11 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "scale"
+                  "type": "scale",
+                  "to": {
+                    "x": 1.5,
+                    "y": 1.5
+                  }
                 }
               ]
             }
@@ -934,7 +1007,9 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "set"
+                  "type": "set",
+                  "attrName": "style.visibility",
+                  "to": "visible"
                 }
               ]
             }
@@ -3529,7 +3604,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Blink (3_0)"
+        "galleryTile": "Blink (3_0)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -3595,7 +3675,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Bold Flash (1_0)"
+        "galleryTile": "Bold Flash (1_0)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -3661,7 +3746,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Bold Reveal (3_1)"
+        "galleryTile": "Bold Reveal (3_1)",
+        "unresolvedPayloads": [
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:set for this tile but not the value payload of p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -3727,7 +3817,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Brush Color (1_1)"
+        "galleryTile": "Brush Color (1_1)",
+        "unresolvedPayloads": [
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:set for this tile but not the value payload of p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -3794,7 +3889,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 250,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Color Pulse (2_0)"
+        "galleryTile": "Color Pulse (2_0)",
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this tile but not the value payload of p:animClr, p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -3861,7 +3962,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Complementary Color (1_2)"
+        "galleryTile": "Complementary Color (1_2)",
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this tile but not the value payload of p:animClr, p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -3928,7 +4035,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Complementary Color 2 (1_3)"
+        "galleryTile": "Complementary Color 2 (1_3)",
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this tile but not the value payload of p:animClr, p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -3995,7 +4108,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Contrasting Color (1_4)"
+        "galleryTile": "Contrasting Color (1_4)",
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this tile but not the value payload of p:animClr, p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4062,7 +4181,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Darken (1_5)"
+        "galleryTile": "Darken (1_5)",
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this tile but not the value payload of p:animClr, p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4129,7 +4254,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Desaturate (1_6)"
+        "galleryTile": "Desaturate (1_6)",
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this tile but not the value payload of p:animClr, p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4196,7 +4327,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 2000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Fill Color (0_0)"
+        "galleryTile": "Fill Color (0_0)",
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this tile but not the value payload of p:animClr, p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4262,7 +4399,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Font Color (0_1)"
+        "galleryTile": "Font Color (0_1)",
+        "unresolvedPayloads": [
+          "p:animClr"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr for this tile but not the value payload of p:animClr (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4328,7 +4470,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Grow/Shrink (0_2)"
+        "galleryTile": "Grow/Shrink (0_2)",
+        "unresolvedPayloads": [
+          "p:animScale"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animScale for this tile but not the value payload of p:animScale (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4396,7 +4543,14 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Grow With Color (2_1)"
+        "galleryTile": "Grow With Color (2_1)",
+        "unresolvedPayloads": [
+          "p:anim",
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animClr, p:set for this tile but not the value payload of p:anim, p:animClr, p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4463,7 +4617,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Lighten (1_7)"
+        "galleryTile": "Lighten (1_7)",
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this tile but not the value payload of p:animClr, p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4530,7 +4690,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 2000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Line Color (0_3)"
+        "galleryTile": "Line Color (0_3)",
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this tile but not the value payload of p:animClr, p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4597,7 +4763,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Object Color (1_8)"
+        "galleryTile": "Object Color (1_8)",
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this tile but not the value payload of p:animClr, p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4664,7 +4836,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 250,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Pulse (1_9)"
+        "galleryTile": "Pulse (1_9)",
+        "unresolvedPayloads": [
+          "p:animScale"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animEffect, p:animScale for this tile but not the value payload of p:animScale (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4732,7 +4909,14 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 250,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Shimmer (2_2)"
+        "galleryTile": "Shimmer (2_2)",
+        "unresolvedPayloads": [
+          "p:anim",
+          "p:animRot",
+          "p:animScale"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animRot, p:animScale for this tile but not the value payload of p:anim, p:animRot, p:animScale (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4798,7 +4982,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Spin (0_4)"
+        "galleryTile": "Spin (0_4)",
+        "unresolvedPayloads": [
+          "p:animRot"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animRot for this tile but not the value payload of p:animRot (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4864,7 +5053,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 200,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Teeter (2_3)"
+        "galleryTile": "Teeter (2_3)",
+        "unresolvedPayloads": [
+          "p:animRot"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animRot for this tile but not the value payload of p:animRot (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4931,7 +5125,12 @@
         "animEffectFilter": "image",
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Transparency (0_5)"
+        "galleryTile": "Transparency (0_5)",
+        "unresolvedPayloads": [
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animEffect, p:set for this tile but not the value payload of p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -4997,7 +5196,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Underline (1_10)"
+        "galleryTile": "Underline (1_10)",
+        "unresolvedPayloads": [
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:set for this tile but not the value payload of p:set (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -5064,7 +5268,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 125,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Wave (3_2)"
+        "galleryTile": "Wave (3_2)",
+        "unresolvedPayloads": [
+          "p:animMotion",
+          "p:animRot"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animMotion, p:animRot for this tile but not the value payload of p:animMotion, p:animRot (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -5197,7 +5407,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 5000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Basic Swivel (3_9)"
+        "galleryTile": "Basic Swivel (3_9)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -5264,7 +5479,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Basic Zoom (2_5)"
+        "galleryTile": "Basic Zoom (2_5)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -5399,7 +5619,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Boomerang (3_0)"
+        "galleryTile": "Boomerang (3_0)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -5468,7 +5693,13 @@
         "animEffectFilter": "wipe(down)",
         "observedChildDurationMs": 580,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Bounce (3_1)"
+        "galleryTile": "Bounce (3_1)",
+        "unresolvedPayloads": [
+          "p:anim",
+          "p:animScale"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:animScale, p:set for this tile but not the value payload of p:anim, p:animScale (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -5536,7 +5767,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 100,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Center Revolve (2_0)"
+        "galleryTile": "Center Revolve (2_0)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -5670,7 +5906,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 15000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Credits (3_2)"
+        "galleryTile": "Credits (3_2)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -5739,7 +5980,13 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Curve Up (3_3)"
+        "galleryTile": "Curve Up (3_3)",
+        "unresolvedPayloads": [
+          "p:animMotion",
+          "p:animScale"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animEffect, p:animMotion, p:animScale, p:set for this tile but not the value payload of p:animMotion, p:animScale (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -5873,7 +6120,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 455,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Drop (3_4)"
+        "galleryTile": "Drop (3_4)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -5941,7 +6193,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Expand (1_0)"
+        "galleryTile": "Expand (1_0)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -6076,7 +6333,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Flip (3_5)"
+        "galleryTile": "Flip (3_5)",
+        "unresolvedPayloads": [
+          "p:anim",
+          "p:animRot"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animRot, p:set for this tile but not the value payload of p:anim, p:animRot (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -6144,7 +6407,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 800,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Float (3_6)"
+        "galleryTile": "Float (3_6)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -6212,7 +6480,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Float In (2_1)"
+        "galleryTile": "Float In (2_1)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -6279,7 +6552,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Fly In (0_4)"
+        "galleryTile": "Fly In (0_4)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -6347,7 +6625,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Grow & Turn (2_2)"
+        "galleryTile": "Grow & Turn (2_2)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -6415,7 +6698,12 @@
         "animEffectFilter": "wipe(up)",
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Peek In (0_5)"
+        "galleryTile": "Peek In (0_5)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -6483,7 +6771,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 2000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Pinwheel (3_7)"
+        "galleryTile": "Pinwheel (3_7)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -6618,7 +6911,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Rise Up (2_3)"
+        "galleryTile": "Rise Up (2_3)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -6753,7 +7051,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Spinner (2_4)"
+        "galleryTile": "Spinner (2_4)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -6820,7 +7123,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Spiral In (3_8)"
+        "galleryTile": "Spiral In (3_8)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -6954,7 +7262,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Stretch (2_6)"
+        "galleryTile": "Stretch (2_6)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -7089,7 +7402,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 2000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Swivel (1_2)"
+        "galleryTile": "Swivel (1_2)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -7291,7 +7609,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Whip (3_10)"
+        "galleryTile": "Whip (3_10)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -7426,7 +7749,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Zoom (1_3)"
+        "galleryTile": "Zoom (1_3)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -7493,7 +7821,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 5000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Basic Swivel (3_9)"
+        "galleryTile": "Basic Swivel (3_9)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -7560,7 +7893,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Basic Zoom (2_6)"
+        "galleryTile": "Basic Zoom (2_6)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -7695,7 +8033,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Boomerang (3_0)"
+        "galleryTile": "Boomerang (3_0)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -7764,7 +8107,13 @@
         "animEffectFilter": "wipe(down)",
         "observedChildDurationMs": 1822,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Bounce (3_1)"
+        "galleryTile": "Bounce (3_1)",
+        "unresolvedPayloads": [
+          "p:anim",
+          "p:animScale"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:animScale, p:set for this tile but not the value payload of p:anim, p:animScale (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -7832,7 +8181,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 400,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Center Revolve (2_0)"
+        "galleryTile": "Center Revolve (2_0)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -7966,7 +8320,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Collapse (2_1)"
+        "galleryTile": "Collapse (2_1)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -8034,7 +8393,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Contract (1_0)"
+        "galleryTile": "Contract (1_0)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -8101,7 +8465,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 15000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Credits (3_2)"
+        "galleryTile": "Credits (3_2)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -8170,7 +8539,13 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Curve Down (3_3)"
+        "galleryTile": "Curve Down (3_3)",
+        "unresolvedPayloads": [
+          "p:animMotion",
+          "p:animScale"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animEffect, p:animMotion, p:animScale, p:set for this tile but not the value payload of p:animMotion, p:animScale (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -8370,7 +8745,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Drop (3_4)"
+        "galleryTile": "Drop (3_4)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -8505,7 +8885,13 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Flip (3_5)"
+        "galleryTile": "Flip (3_5)",
+        "unresolvedPayloads": [
+          "p:anim",
+          "p:animRot"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animRot, p:set for this tile but not the value payload of p:anim, p:animRot (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -8573,7 +8959,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 800,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Float (3_6)"
+        "galleryTile": "Float (3_6)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -8641,7 +9032,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Float Out (2_2)"
+        "galleryTile": "Float Out (2_2)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -8708,7 +9104,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Fly Out (0_4)"
+        "galleryTile": "Fly Out (0_4)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -8776,7 +9177,12 @@
         "animEffectFilter": "wipe(down)",
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Peek Out (0_5)"
+        "galleryTile": "Peek Out (0_5)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -8844,7 +9250,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 2000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Pinwheel (3_7)"
+        "galleryTile": "Pinwheel (3_7)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -9046,7 +9457,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Shrink & Turn (2_3)"
+        "galleryTile": "Shrink & Turn (2_3)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -9114,7 +9530,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Sink Down (2_4)"
+        "galleryTile": "Sink Down (2_4)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -9182,7 +9603,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Spinner (2_5)"
+        "galleryTile": "Spinner (2_5)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -9249,7 +9675,12 @@
         "animEffectFilter": null,
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Spiral Out (3_8)"
+        "galleryTile": "Spiral Out (3_8)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -9384,7 +9815,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 1000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Stretchy (2_7)"
+        "galleryTile": "Stretchy (2_7)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -9519,7 +9955,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 2000,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Swivel (1_2)"
+        "galleryTile": "Swivel (1_2)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -9721,7 +10162,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Whip (3_10)"
+        "galleryTile": "Whip (3_10)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -9856,7 +10302,12 @@
         "animEffectFilter": "fade",
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
-        "galleryTile": "Zoom (1_3)"
+        "galleryTile": "Zoom (1_3)",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this tile but not the value payload of p:anim (coordinates, colour, scale, angle or the animated attribute name), so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -10410,8 +10861,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "withPrevious",
@@ -10550,8 +11001,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -10620,8 +11071,8 @@
                   },
                   "preset": {
                     "category": "entrance",
-                    "effect": "flyIn",
-                    "variant": "fromBottom"
+                    "effect": "fade",
+                    "variant": null
                   },
                   "start": {
                     "type": "onPageClick",
@@ -10679,8 +11130,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -10737,8 +11188,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -10772,9 +11223,9 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldDgm",
-        "attributes": {
-          "build": "allAtOnce"
-        }
+        "attribute": "bld",
+        "value": "allAtOnce",
+        "note": "CT_TLBuildDiagram carries the diagram build type in @bld (ECMA-376 Part 1); the token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationDgmBuildType",
@@ -10796,8 +11247,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -10831,9 +11282,9 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldDgm",
-        "attributes": {
-          "build": "whole"
-        }
+        "attribute": "bld",
+        "value": "whole",
+        "note": "CT_TLBuildDiagram carries the diagram build type in @bld (ECMA-376 Part 1); the token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationDgmBuildType",
@@ -10855,8 +11306,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -10890,9 +11341,9 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldDgm",
-        "attributes": {
-          "build": "cust"
-        }
+        "attribute": "bld",
+        "value": "cust",
+        "note": "CT_TLBuildDiagram carries the diagram build type in @bld (ECMA-376 Part 1); the token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationDgmBuildType",
@@ -10914,8 +11365,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -10949,9 +11400,9 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldDgm",
-        "attributes": {
-          "build": "lvlAtOnce"
-        }
+        "attribute": "bld",
+        "value": "lvlAtOnce",
+        "note": "CT_TLBuildDiagram carries the diagram build type in @bld (ECMA-376 Part 1); the token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationDgmBuildType",
@@ -10973,8 +11424,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11008,9 +11459,9 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldDgm",
-        "attributes": {
-          "build": "lvlOne"
-        }
+        "attribute": "bld",
+        "value": "lvlOne",
+        "note": "CT_TLBuildDiagram carries the diagram build type in @bld (ECMA-376 Part 1); the token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationDgmBuildType",
@@ -11032,8 +11483,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11067,9 +11518,9 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldDgm",
-        "attributes": {
-          "build": "one"
-        }
+        "attribute": "bld",
+        "value": "one",
+        "note": "CT_TLBuildDiagram carries the diagram build type in @bld (ECMA-376 Part 1); the token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationDgmBuildType",
@@ -11091,8 +11542,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11152,8 +11603,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11213,8 +11664,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "afterPrevious",
@@ -11266,8 +11717,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "none",
@@ -11320,8 +11771,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11367,42 +11818,51 @@
       "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "animations": {
-          "mainSequence": [
+          "mainSequence": [],
+          "interactiveSequences": [
             {
-              "id": "catalogEffect",
-              "target": {
-                "element": "catalogTarget"
-              },
-              "preset": {
-                "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
-              },
-              "start": {
+              "id": "catalogSequence",
+              "trigger": {
                 "type": "onShapeClick",
-                "delayMs": 0,
-                "target": "catalogTarget"
+                "target": "catalogTarget",
+                "delayMs": 0
               },
-              "timing": {
-                "durationMs": 500,
-                "repeatCount": 1,
-                "repeatDurationMs": null,
-                "autoReverse": false,
-                "acceleration": 0,
-                "deceleration": 0,
-                "restart": "always",
-                "rewind": false,
-                "smoothStart": false,
-                "smoothEnd": false,
-                "bounceEnd": 0
-              },
-              "afterEffect": {
-                "type": "none"
-              },
-              "sound": null
+              "effects": [
+                {
+                  "id": "catalogEffect",
+                  "target": {
+                    "element": "catalogTarget"
+                  },
+                  "preset": {
+                    "category": "entrance",
+                    "effect": "fade",
+                    "variant": null
+                  },
+                  "start": {
+                    "type": "onPageClick",
+                    "delayMs": 0
+                  },
+                  "timing": {
+                    "durationMs": 500,
+                    "repeatCount": 1,
+                    "repeatDurationMs": null,
+                    "autoReverse": false,
+                    "acceleration": 0,
+                    "deceleration": 0,
+                    "restart": "always",
+                    "rewind": false,
+                    "smoothStart": false,
+                    "smoothEnd": false,
+                    "bounceEnd": 0
+                  },
+                  "afterEffect": {
+                    "type": "none"
+                  },
+                  "sound": null
+                }
+              ]
             }
-          ],
-          "interactiveSequences": []
+          ]
         }
       },
       "ooxml": {
@@ -11431,8 +11891,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "withPrevious",
@@ -11484,8 +11944,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11546,8 +12006,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11604,8 +12064,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11661,8 +12121,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11722,8 +12182,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11782,8 +12242,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11843,8 +12303,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11902,8 +12362,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -11962,8 +12422,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12022,8 +12482,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12082,8 +12542,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12142,8 +12602,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12202,8 +12662,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12237,9 +12697,10 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldGraphic",
-        "attributes": {
-          "build": "allAtOnce"
-        }
+        "child": "p:bldSub/a:bldChart",
+        "attribute": "bld",
+        "value": "allAtOnce",
+        "note": "CT_TLGraphicalObjectBuild has no build attribute: the chart build type lives on the a:bldChart child of p:bldSub (ECMA-376 Part 1 DrawingML CT_AnimationChartBuildProperties). The bld token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationChartBuildType / CT_TLBuildParagraph",
@@ -12261,8 +12722,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12296,9 +12757,10 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldGraphic",
-        "attributes": {
-          "build": "category"
-        }
+        "child": "p:bldSub/a:bldChart",
+        "attribute": "bld",
+        "value": "category",
+        "note": "CT_TLGraphicalObjectBuild has no build attribute: the chart build type lives on the a:bldChart child of p:bldSub (ECMA-376 Part 1 DrawingML CT_AnimationChartBuildProperties). The bld token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationChartBuildType / CT_TLBuildParagraph",
@@ -12320,8 +12782,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12355,9 +12817,10 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldGraphic",
-        "attributes": {
-          "build": "catElem"
-        }
+        "child": "p:bldSub/a:bldChart",
+        "attribute": "bld",
+        "value": "catElem",
+        "note": "CT_TLGraphicalObjectBuild has no build attribute: the chart build type lives on the a:bldChart child of p:bldSub (ECMA-376 Part 1 DrawingML CT_AnimationChartBuildProperties). The bld token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationChartBuildType / CT_TLBuildParagraph",
@@ -12379,8 +12842,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12414,9 +12877,10 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldGraphic",
-        "attributes": {
-          "build": "series"
-        }
+        "child": "p:bldSub/a:bldChart",
+        "attribute": "bld",
+        "value": "series",
+        "note": "CT_TLGraphicalObjectBuild has no build attribute: the chart build type lives on the a:bldChart child of p:bldSub (ECMA-376 Part 1 DrawingML CT_AnimationChartBuildProperties). The bld token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationChartBuildType / CT_TLBuildParagraph",
@@ -12438,8 +12902,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12473,9 +12937,10 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldGraphic",
-        "attributes": {
-          "build": "seriesEl"
-        }
+        "child": "p:bldSub/a:bldChart",
+        "attribute": "bld",
+        "value": "seriesEl",
+        "note": "CT_TLGraphicalObjectBuild has no build attribute: the chart build type lives on the a:bldChart child of p:bldSub (ECMA-376 Part 1 DrawingML CT_AnimationChartBuildProperties). The bld token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationChartBuildType / CT_TLBuildParagraph",
@@ -12497,8 +12962,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12555,8 +13020,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12616,8 +13081,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12675,8 +13140,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12736,8 +13201,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12761,7 +13226,8 @@
               },
               "sound": null,
               "text": {
-                "unit": "byCharacter"
+                "unit": "byCharacter",
+                "interItemDelayPercent": 10
               }
             }
           ],
@@ -12771,7 +13237,8 @@
       "ooxml": {
         "strategy": "iterate",
         "element": "p:iterate",
-        "type": "lt"
+        "type": "lt",
+        "interval": "p:tmPct or p:tmAbs, required by CT_TLIterateData"
       },
       "evidence": {
         "source": "ECMA-376 ST_IterateType",
@@ -12793,8 +13260,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12828,7 +13295,8 @@
       "ooxml": {
         "strategy": "iterate",
         "element": "p:iterate",
-        "type": null
+        "type": null,
+        "interval": "p:tmPct or p:tmAbs, required by CT_TLIterateData"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -12852,8 +13320,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12877,7 +13345,8 @@
               },
               "sound": null,
               "text": {
-                "unit": "byWord"
+                "unit": "byWord",
+                "interItemDelayPercent": 10
               }
             }
           ],
@@ -12887,7 +13356,8 @@
       "ooxml": {
         "strategy": "iterate",
         "element": "p:iterate",
-        "type": "wd"
+        "type": "wd",
+        "interval": "p:tmPct or p:tmAbs, required by CT_TLIterateData"
       },
       "evidence": {
         "source": "ECMA-376 ST_IterateType",
@@ -12909,8 +13379,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -12943,7 +13413,7 @@
         "attributes": [
           "p:cTn/@accel"
         ],
-        "note": "per-mille of the active duration"
+        "note": "ST_PositiveFixedPercentage of the active duration: 100% is 100000"
       },
       "evidence": {
         "source": "PowerPoint 16.113.1 ribbon/dialog surface",
@@ -12965,8 +13435,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13023,8 +13493,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13080,8 +13550,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13114,7 +13584,7 @@
         "attributes": [
           "p:cTn/@decel"
         ],
-        "note": "per-mille of the active duration"
+        "note": "ST_PositiveFixedPercentage of the active duration: 100% is 100000"
       },
       "evidence": {
         "source": "PowerPoint 16.113.1 ribbon/dialog surface",
@@ -13136,8 +13606,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "afterPrevious",
@@ -13193,8 +13663,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13250,8 +13720,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13306,8 +13776,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13361,8 +13831,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13417,8 +13887,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13475,8 +13945,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13531,8 +14001,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13588,8 +14058,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13644,8 +14114,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -13709,8 +14179,8 @@
                   },
                   "preset": {
                     "category": "entrance",
-                    "effect": "flyIn",
-                    "variant": "fromBottom"
+                    "effect": "fade",
+                    "variant": null
                   },
                   "start": {
                     "type": "onPageClick",
@@ -13864,7 +14334,9 @@
       "semanticJson": {
         "transition": {
           "effect": "airplane",
-          "parameters": {},
+          "parameters": {
+            "prst": "airplane"
+          },
           "durationMs": 1250,
           "advance": {
             "onClick": true,
@@ -14178,7 +14650,9 @@
       "semanticJson": {
         "transition": {
           "effect": "crush",
-          "parameters": {},
+          "parameters": {
+            "prst": "crush"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -14254,7 +14728,9 @@
       "semanticJson": {
         "transition": {
           "effect": "curtains",
-          "parameters": {},
+          "parameters": {
+            "prst": "curtains"
+          },
           "durationMs": 6000,
           "advance": {
             "onClick": true,
@@ -14408,7 +14884,9 @@
       "semanticJson": {
         "transition": {
           "effect": "drape",
-          "parameters": {},
+          "parameters": {
+            "prst": "drape"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -14484,7 +14962,9 @@
       "semanticJson": {
         "transition": {
           "effect": "fallOver",
-          "parameters": {},
+          "parameters": {
+            "prst": "fallOver"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -14679,7 +15159,9 @@
       "semanticJson": {
         "transition": {
           "effect": "fracture",
-          "parameters": {},
+          "parameters": {
+            "prst": "fracture"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -14927,7 +15409,9 @@
       "semanticJson": {
         "transition": {
           "effect": "origami",
-          "parameters": {},
+          "parameters": {
+            "prst": "origami"
+          },
           "durationMs": 3250,
           "advance": {
             "onClick": true,
@@ -14966,7 +15450,9 @@
       "semanticJson": {
         "transition": {
           "effect": "pageCurl",
-          "parameters": {},
+          "parameters": {
+            "prst": "pageCurlDouble"
+          },
           "durationMs": 1250,
           "advance": {
             "onClick": true,
@@ -15046,7 +15532,9 @@
       "semanticJson": {
         "transition": {
           "effect": "peelOff",
-          "parameters": {},
+          "parameters": {
+            "prst": "peelOff"
+          },
           "durationMs": 1250,
           "advance": {
             "onClick": true,
@@ -15085,7 +15573,9 @@
       "semanticJson": {
         "transition": {
           "effect": "prestige",
-          "parameters": {},
+          "parameters": {
+            "prst": "prestige"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -15592,7 +16082,9 @@
       "semanticJson": {
         "transition": {
           "effect": "wind",
-          "parameters": {},
+          "parameters": {
+            "prst": "wind"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -16077,7 +16569,9 @@
       "semanticJson": {
         "transition": {
           "effect": "airplane",
-          "parameters": {},
+          "parameters": {
+            "prst": "airplane"
+          },
           "durationMs": 1250,
           "advance": {
             "onClick": true,
@@ -16120,6 +16614,7 @@
         "transition": {
           "effect": "airplane",
           "parameters": {
+            "prst": "airplane",
             "invX": "1"
           },
           "durationMs": 1250,
@@ -17293,7 +17788,9 @@
       "semanticJson": {
         "transition": {
           "effect": "crush",
-          "parameters": {},
+          "parameters": {
+            "prst": "crush"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -17513,7 +18010,9 @@
       "semanticJson": {
         "transition": {
           "effect": "curtains",
-          "parameters": {},
+          "parameters": {
+            "prst": "curtains"
+          },
           "durationMs": 6000,
           "advance": {
             "onClick": true,
@@ -17806,7 +18305,9 @@
       "semanticJson": {
         "transition": {
           "effect": "drape",
-          "parameters": {},
+          "parameters": {
+            "prst": "drape"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -17849,6 +18350,7 @@
         "transition": {
           "effect": "drape",
           "parameters": {
+            "prst": "drape",
             "invX": "1"
           },
           "durationMs": 2000,
@@ -18100,7 +18602,9 @@
       "semanticJson": {
         "transition": {
           "effect": "fallOver",
-          "parameters": {},
+          "parameters": {
+            "prst": "fallOver"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -18143,6 +18647,7 @@
         "transition": {
           "effect": "fallOver",
           "parameters": {
+            "prst": "fallOver",
             "invX": "1"
           },
           "durationMs": 2000,
@@ -18883,7 +19388,9 @@
       "semanticJson": {
         "transition": {
           "effect": "fracture",
-          "parameters": {},
+          "parameters": {
+            "prst": "fracture"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -19807,7 +20314,9 @@
       "semanticJson": {
         "transition": {
           "effect": "origami",
-          "parameters": {},
+          "parameters": {
+            "prst": "origami"
+          },
           "durationMs": 3250,
           "advance": {
             "onClick": true,
@@ -19850,6 +20359,7 @@
         "transition": {
           "effect": "origami",
           "parameters": {
+            "prst": "origami",
             "invX": "1"
           },
           "durationMs": 3250,
@@ -19896,7 +20406,9 @@
       "semanticJson": {
         "transition": {
           "effect": "pageCurl",
-          "parameters": {},
+          "parameters": {
+            "prst": "pageCurlDouble"
+          },
           "durationMs": 1250,
           "advance": {
             "onClick": true,
@@ -19939,6 +20451,7 @@
         "transition": {
           "effect": "pageCurl",
           "parameters": {
+            "prst": "pageCurlDouble",
             "invX": "1"
           },
           "durationMs": 1250,
@@ -19985,7 +20498,9 @@
       "semanticJson": {
         "transition": {
           "effect": "pageCurl",
-          "parameters": {},
+          "parameters": {
+            "prst": "pageCurlSingle"
+          },
           "durationMs": 1250,
           "advance": {
             "onClick": true,
@@ -20030,6 +20545,7 @@
         "transition": {
           "effect": "pageCurl",
           "parameters": {
+            "prst": "pageCurlSingle",
             "invX": "1"
           },
           "durationMs": 1250,
@@ -20298,7 +20814,9 @@
       "semanticJson": {
         "transition": {
           "effect": "peelOff",
-          "parameters": {},
+          "parameters": {
+            "prst": "peelOff"
+          },
           "durationMs": 1250,
           "advance": {
             "onClick": true,
@@ -20341,6 +20859,7 @@
         "transition": {
           "effect": "peelOff",
           "parameters": {
+            "prst": "peelOff",
             "invX": "1"
           },
           "durationMs": 1250,
@@ -20423,7 +20942,9 @@
       "semanticJson": {
         "transition": {
           "effect": "prestige",
-          "parameters": {},
+          "parameters": {
+            "prst": "prestige"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -23406,7 +23927,9 @@
       "semanticJson": {
         "transition": {
           "effect": "wind",
-          "parameters": {},
+          "parameters": {
+            "prst": "wind"
+          },
           "durationMs": 2000,
           "advance": {
             "onClick": true,
@@ -23449,6 +23972,7 @@
         "transition": {
           "effect": "wind",
           "parameters": {
+            "prst": "wind",
             "invX": "1"
           },
           "durationMs": 2000,
@@ -23842,8 +24366,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -23904,8 +24428,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -23965,8 +24489,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -24027,8 +24551,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -27717,7 +28241,12 @@
         "behaviorChildren": [
           "p:anim"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -27783,7 +28312,12 @@
         "behaviorChildren": [
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:set for this effect but not the value payload of p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -27855,7 +28389,12 @@
           "p:set"
         ],
         "animEffectFilter": "fade",
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -27928,7 +28467,13 @@
           "p:set"
         ],
         "animEffectFilter": "wipe(down)",
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "p:anim",
+          "p:animScale"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:animScale, p:set for this effect but not the value payload of p:anim, p:animScale, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -28120,7 +28665,12 @@
         "presetSubtype": null,
         "behaviorChildren": null,
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "-"
+        ],
+        "requiresCapture": true,
+        "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written"
       },
       "evidence": {
         "source": "COM-derived entrance/exit presetID table (ChristopherVR/ooxml)",
@@ -28184,7 +28734,12 @@
         "behaviorChildren": [
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:set for this effect but not the value payload of p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -28250,7 +28805,12 @@
         "behaviorChildren": [
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:set for this effect but not the value payload of p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -28447,7 +29007,13 @@
           "p:animClr",
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -28511,7 +29077,12 @@
         "presetId": 2,
         "presetSubtype": null,
         "behaviorChildren": null,
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "-"
+        ],
+        "requiresCapture": true,
+        "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written"
       },
       "evidence": {
         "source": "COM-derived emphasis presetID table (ChristopherVR/ooxml)",
@@ -28575,7 +29146,12 @@
         "behaviorChildren": [
           "p:animClr"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animClr"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr for this effect but not the value payload of p:animClr, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -28639,7 +29215,12 @@
         "presetId": 4,
         "presetSubtype": null,
         "behaviorChildren": null,
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "-"
+        ],
+        "requiresCapture": true,
+        "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written"
       },
       "evidence": {
         "source": "COM-derived emphasis presetID table (ChristopherVR/ooxml)",
@@ -28701,7 +29282,12 @@
         "presetId": 5,
         "presetSubtype": null,
         "behaviorChildren": null,
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "-"
+        ],
+        "requiresCapture": true,
+        "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written"
       },
       "evidence": {
         "source": "COM-derived emphasis presetID table (ChristopherVR/ooxml)",
@@ -28766,7 +29352,13 @@
           "p:animClr",
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -29102,7 +29694,12 @@
         "presetSubtype": null,
         "behaviorChildren": null,
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "-"
+        ],
+        "requiresCapture": true,
+        "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written"
       },
       "evidence": {
         "source": "COM-derived entrance/exit presetID table (ChristopherVR/ooxml)",
@@ -29231,7 +29828,13 @@
           "p:animClr",
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -29298,7 +29901,13 @@
           "p:animClr",
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -29365,7 +29974,13 @@
           "p:animClr",
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -29433,7 +30048,12 @@
         "presetSubtype": null,
         "behaviorChildren": null,
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "-"
+        ],
+        "requiresCapture": true,
+        "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written"
       },
       "evidence": {
         "source": "COM-derived entrance/exit presetID table (ChristopherVR/ooxml)",
@@ -29502,7 +30122,12 @@
           "p:set"
         ],
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -29923,7 +30548,9 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "set"
+                  "type": "set",
+                  "attrName": "style.visibility",
+                  "to": "visible"
                 }
               ]
             }
@@ -30001,7 +30628,13 @@
           "p:animClr",
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -30130,7 +30763,13 @@
           "p:animClr",
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -30387,7 +31026,12 @@
         "presetSubtype": null,
         "behaviorChildren": null,
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "-"
+        ],
+        "requiresCapture": true,
+        "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written"
       },
       "evidence": {
         "source": "COM-derived entrance/exit presetID table (ChristopherVR/ooxml)",
@@ -30648,7 +31292,12 @@
         "presetSubtype": null,
         "behaviorChildren": null,
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "-"
+        ],
+        "requiresCapture": true,
+        "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written"
       },
       "evidence": {
         "source": "COM-derived entrance/exit presetID table (ChristopherVR/ooxml)",
@@ -31106,7 +31755,12 @@
           "p:animEffect",
           "p:animScale"
         ],
-        "animEffectFilter": "fade"
+        "animEffectFilter": "fade",
+        "unresolvedPayloads": [
+          "p:animScale"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animEffect, p:animScale for this effect but not the value payload of p:animScale, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -31174,7 +31828,12 @@
         "presetSubtype": null,
         "behaviorChildren": null,
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "-"
+        ],
+        "requiresCapture": true,
+        "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written"
       },
       "evidence": {
         "source": "COM-derived entrance/exit presetID table (ChristopherVR/ooxml)",
@@ -31239,7 +31898,13 @@
           "p:animClr",
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -31379,7 +32044,12 @@
           "p:set"
         ],
         "animEffectFilter": "fade",
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -31450,7 +32120,12 @@
           "p:set"
         ],
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -31776,7 +32451,12 @@
           "p:set"
         ],
         "animEffectFilter": "fade",
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -31842,7 +32522,12 @@
         "behaviorChildren": [
           "p:animScale"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animScale"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animScale for this effect but not the value payload of p:animScale, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -31910,7 +32595,14 @@
           "p:animClr",
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:anim",
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animClr, p:set for this effect but not the value payload of p:anim, p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -32476,7 +33168,13 @@
           "p:animClr",
           "p:set"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animClr",
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -33057,7 +33755,12 @@
           "p:set"
         ],
         "animEffectFilter": "wipe(up)",
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:animEffect, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -33255,7 +33958,12 @@
         "presetSubtype": null,
         "behaviorChildren": null,
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "-"
+        ],
+        "requiresCapture": true,
+        "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written"
       },
       "evidence": {
         "source": "COM-derived entrance/exit presetID table (ChristopherVR/ooxml)",
@@ -33516,7 +34224,12 @@
         "presetSubtype": null,
         "behaviorChildren": null,
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "-"
+        ],
+        "requiresCapture": true,
+        "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written"
       },
       "evidence": {
         "source": "COM-derived entrance/exit presetID table (ChristopherVR/ooxml)",
@@ -34091,7 +34804,12 @@
         "behaviorChildren": [
           "p:animRot"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animRot"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animRot for this effect but not the value payload of p:animRot, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -34230,7 +34948,12 @@
           "p:set"
         ],
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -34682,7 +35405,12 @@
           "p:set"
         ],
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -35021,7 +35749,12 @@
           "p:set"
         ],
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -35211,7 +35944,12 @@
         "behaviorChildren": [
           "p:animRot"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animRot"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animRot for this effect but not the value payload of p:animRot, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -35343,7 +36081,12 @@
           "p:animEffect",
           "p:set"
         ],
-        "animEffectFilter": "image"
+        "animEffectFilter": "image",
+        "unresolvedPayloads": [
+          "p:set"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animEffect, p:set for this effect but not the value payload of p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -35973,7 +36716,13 @@
           "p:animMotion",
           "p:animRot"
         ],
-        "animEffectFilter": null
+        "animEffectFilter": null,
+        "unresolvedPayloads": [
+          "p:animMotion",
+          "p:animRot"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:animMotion, p:animRot for this effect but not the value payload of p:animMotion, p:animRot, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -36514,7 +37263,12 @@
           "p:set"
         ],
         "animEffectFilter": null,
-        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\""
+        "note": "the MsoAnimEffect ordinal equals the OOXML entrance/exit presetID in this band; an exit effect uses the same presetID with presetClass=\"exit\"",
+        "unresolvedPayloads": [
+          "p:anim"
+        ],
+        "requiresCapture": true,
+        "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -36542,8 +37296,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -36567,7 +37321,8 @@
               },
               "sound": null,
               "text": {
-                "unit": "byCharacter"
+                "unit": "byCharacter",
+                "interItemDelayPercent": 10
               }
             }
           ],
@@ -36577,7 +37332,8 @@
       "ooxml": {
         "strategy": "iterate",
         "element": "p:iterate",
-        "type": "lt"
+        "type": "lt",
+        "interval": "p:tmPct or p:tmAbs, required by CT_TLIterateData"
       },
       "evidence": {
         "source": "ECMA-376 ST_IterateType",
@@ -36603,8 +37359,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -36638,7 +37394,8 @@
       "ooxml": {
         "strategy": "iterate",
         "element": "p:iterate",
-        "type": null
+        "type": null,
+        "interval": "p:tmPct or p:tmAbs, required by CT_TLIterateData"
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -36666,8 +37423,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -36691,7 +37448,8 @@
               },
               "sound": null,
               "text": {
-                "unit": "byWord"
+                "unit": "byWord",
+                "interItemDelayPercent": 10
               }
             }
           ],
@@ -36701,7 +37459,8 @@
       "ooxml": {
         "strategy": "iterate",
         "element": "p:iterate",
-        "type": "wd"
+        "type": "wd",
+        "interval": "p:tmPct or p:tmAbs, required by CT_TLIterateData"
       },
       "evidence": {
         "source": "ECMA-376 ST_IterateType",
@@ -36727,8 +37486,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "afterPrevious",
@@ -36784,8 +37543,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "none",
@@ -36843,8 +37602,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -36894,42 +37653,51 @@
       "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "animations": {
-          "mainSequence": [
+          "mainSequence": [],
+          "interactiveSequences": [
             {
-              "id": "catalogEffect",
-              "target": {
-                "element": "catalogTarget"
-              },
-              "preset": {
-                "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
-              },
-              "start": {
+              "id": "catalogSequence",
+              "trigger": {
                 "type": "onShapeClick",
-                "delayMs": 0,
-                "target": "catalogTarget"
+                "target": "catalogTarget",
+                "delayMs": 0
               },
-              "timing": {
-                "durationMs": 500,
-                "repeatCount": 1,
-                "repeatDurationMs": null,
-                "autoReverse": false,
-                "acceleration": 0,
-                "deceleration": 0,
-                "restart": "always",
-                "rewind": false,
-                "smoothStart": false,
-                "smoothEnd": false,
-                "bounceEnd": 0
-              },
-              "afterEffect": {
-                "type": "none"
-              },
-              "sound": null
+              "effects": [
+                {
+                  "id": "catalogEffect",
+                  "target": {
+                    "element": "catalogTarget"
+                  },
+                  "preset": {
+                    "category": "entrance",
+                    "effect": "fade",
+                    "variant": null
+                  },
+                  "start": {
+                    "type": "onPageClick",
+                    "delayMs": 0
+                  },
+                  "timing": {
+                    "durationMs": 500,
+                    "repeatCount": 1,
+                    "repeatDurationMs": null,
+                    "autoReverse": false,
+                    "acceleration": 0,
+                    "deceleration": 0,
+                    "restart": "always",
+                    "rewind": false,
+                    "smoothStart": false,
+                    "smoothEnd": false,
+                    "bounceEnd": 0
+                  },
+                  "afterEffect": {
+                    "type": "none"
+                  },
+                  "sound": null
+                }
+              ]
             }
-          ],
-          "interactiveSequences": []
+          ]
         }
       },
       "ooxml": {
@@ -36962,8 +37730,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "withPrevious",
@@ -37040,7 +37808,8 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "color"
+                  "type": "color",
+                  "to": "#FF8800"
                 }
               ]
             }
@@ -37099,7 +37868,9 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "command"
+                  "type": "command",
+                  "command": "playFrom",
+                  "value": "0.0"
                 }
               ]
             }
@@ -37158,7 +37929,9 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "filter"
+                  "type": "filter",
+                  "filter": "fade",
+                  "transition": "in"
                 }
               ]
             }
@@ -37217,7 +37990,10 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "motion"
+                  "type": "motion",
+                  "path": "M 0 0 L 0.25 0 E",
+                  "pathEditMode": "relative",
+                  "origin": "layout"
                 }
               ]
             }
@@ -37286,7 +38062,11 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "property"
+                  "type": "property",
+                  "attrName": "ppt_x",
+                  "to": "0.75",
+                  "calcMode": "lin",
+                  "valueType": "num"
                 }
               ]
             }
@@ -37345,7 +38125,8 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "rotation"
+                  "type": "rotation",
+                  "by": 360
                 }
               ]
             }
@@ -37404,7 +38185,11 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "scale"
+                  "type": "scale",
+                  "to": {
+                    "x": 1.5,
+                    "y": 1.5
+                  }
                 }
               ]
             }
@@ -37463,7 +38248,9 @@
               "sound": null,
               "behaviors": [
                 {
-                  "type": "set"
+                  "type": "set",
+                  "attrName": "style.visibility",
+                  "to": "visible"
                 }
               ]
             }
@@ -37501,8 +38288,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -37536,9 +38323,10 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldGraphic",
-        "attributes": {
-          "build": "allAtOnce"
-        }
+        "child": "p:bldSub/a:bldChart",
+        "attribute": "bld",
+        "value": "allAtOnce",
+        "note": "CT_TLGraphicalObjectBuild has no build attribute: the chart build type lives on the a:bldChart child of p:bldSub (ECMA-376 Part 1 DrawingML CT_AnimationChartBuildProperties). The bld token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationChartBuildType / CT_TLBuildParagraph",
@@ -37564,8 +38352,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -37599,9 +38387,10 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldGraphic",
-        "attributes": {
-          "build": "category"
-        }
+        "child": "p:bldSub/a:bldChart",
+        "attribute": "bld",
+        "value": "category",
+        "note": "CT_TLGraphicalObjectBuild has no build attribute: the chart build type lives on the a:bldChart child of p:bldSub (ECMA-376 Part 1 DrawingML CT_AnimationChartBuildProperties). The bld token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationChartBuildType / CT_TLBuildParagraph",
@@ -37627,8 +38416,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -37662,9 +38451,10 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldGraphic",
-        "attributes": {
-          "build": "catElem"
-        }
+        "child": "p:bldSub/a:bldChart",
+        "attribute": "bld",
+        "value": "catElem",
+        "note": "CT_TLGraphicalObjectBuild has no build attribute: the chart build type lives on the a:bldChart child of p:bldSub (ECMA-376 Part 1 DrawingML CT_AnimationChartBuildProperties). The bld token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationChartBuildType / CT_TLBuildParagraph",
@@ -37690,8 +38480,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -37725,9 +38515,10 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldGraphic",
-        "attributes": {
-          "build": "series"
-        }
+        "child": "p:bldSub/a:bldChart",
+        "attribute": "bld",
+        "value": "series",
+        "note": "CT_TLGraphicalObjectBuild has no build attribute: the chart build type lives on the a:bldChart child of p:bldSub (ECMA-376 Part 1 DrawingML CT_AnimationChartBuildProperties). The bld token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationChartBuildType / CT_TLBuildParagraph",
@@ -37753,8 +38544,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -37788,9 +38579,10 @@
       "ooxml": {
         "strategy": "build",
         "element": "p:bldGraphic",
-        "attributes": {
-          "build": "seriesEl"
-        }
+        "child": "p:bldSub/a:bldChart",
+        "attribute": "bld",
+        "value": "seriesEl",
+        "note": "CT_TLGraphicalObjectBuild has no build attribute: the chart build type lives on the a:bldChart child of p:bldSub (ECMA-376 Part 1 DrawingML CT_AnimationChartBuildProperties). The bld token still needs Task 8 read-back."
       },
       "evidence": {
         "source": "ECMA-376 ST_AnimationChartBuildType / CT_TLBuildParagraph",
@@ -37816,8 +38608,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -37881,8 +38673,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -37945,8 +38737,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -38009,8 +38801,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -38073,8 +38865,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -38136,8 +38928,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",
@@ -38200,8 +38992,8 @@
               },
               "preset": {
                 "category": "entrance",
-                "effect": "flyIn",
-                "variant": "fromBottom"
+                "effect": "fade",
+                "variant": null
               },
               "start": {
                 "type": "onPageClick",

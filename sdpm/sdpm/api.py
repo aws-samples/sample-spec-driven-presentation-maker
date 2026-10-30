@@ -837,6 +837,8 @@ def _build(config: BuildConfig, output_path: Path) -> Path:
         default_text_color=config.default_text_color,
         auto_spacing=config.auto_spacing,
         default_background=config.default_background,
+        animations_enabled=config.animations_enabled,
+        transitions_enabled=config.transitions_enabled,
     )
     for s in config.slides:
         builder.add_slide(s)
