@@ -22,6 +22,12 @@ _H_4X3 = 6858000
 
 
 @pytest.fixture(autouse=True)
+def _no_js_check(monkeypatch):
+    """No test launches a browser for the HTML JS check unless it sets SDPM_JS_CHECK itself."""
+    monkeypatch.setenv("SDPM_JS_CHECK", "0")
+
+
+@pytest.fixture(autouse=True)
 def _isolated_template_html_cache(tmp_path_factory, monkeypatch):
     """HTML template conversions go to a per-session temp cache, not the checkout's .cache."""
     import sdpm.config

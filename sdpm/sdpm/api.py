@@ -942,6 +942,7 @@ def _generate_html(
         check_html_font_sizes,
         check_slide_html,
     )
+    from sdpm.engine.html.jscheck import check_js, js_check_enabled
     from sdpm.engine.html.template import load_template_html
     from sdpm.engine.schema import deck_output_format
     from sdpm.utils.io import read_json
@@ -998,6 +999,9 @@ def _generate_html(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(assembled.html, encoding="utf-8", newline="\n")
     previews = _write_html_previews(deck_dir, assembled.previews)
+    js_check = None
+    if assembled.slide_scripts > 0 and js_check_enabled():
+        js_check = check_js(output_path, assembled.line_map)
 
     for d in diagnostics:
         label = "deck.css" if d["slug"] == DECK_CSS_SLUG else d["slug"]
@@ -1005,6 +1009,11 @@ def _generate_html(
     for warning in assembled.warnings:
         head = warning.split(":", 1)[0]
         tagged.append((head if head in texts else None, warning))
+    for err in (js_check or {}).get("errors", []):
+        if err["slug"] is not None:
+            tagged.append((err["slug"], f"{err['slug']}: JS error: {err['message']}"))
+        else:
+            tagged.append((None, f"output.html: JS error (line {err['line']}): {err['message']}"))
 
     built = assembled.slugs
     result: dict[str, Any] = {
@@ -1020,6 +1029,9 @@ def _generate_html(
     }
     if template.decorations_status is not None:
         result["decorations"] = template.decorations_status
+    if js_check is not None:
+        result["js_check"] = {key: js_check[key] for key in ("status", "browser", "seconds", "note")
+                              if key in js_check}
     return result, tagged
 
 
@@ -1060,7 +1072,12 @@ def generate_html(
         libraries (the vendored libraries embedded because a slide declares them in
         ``data-libs``, e.g. ``["echarts"]``; ``[]`` for most decks) and,
         when template decorations are missing, decorations
-        (``preview_unavailable``-shaped status).
+        (``preview_unavailable``-shaped status). A deck with slide scripts also gets
+        js_check (``{status, browser?, seconds?, note?}``; status ``ok`` / ``errors`` /
+        ``skipped`` (no Chrome or Edge) / ``timeout`` / ``failed``) from a headless
+        Chrome / Edge run, whose errors are added to warnings as
+        ``"<slug>: JS error: …"`` (``"output.html: JS error (line N): …"`` when no slide
+        owns the line); ``SDPM_JS_CHECK=0`` turns the run off.
 
     Raises:
         ValueError: the deck is not an HTML deck.
@@ -1088,7 +1105,8 @@ def refresh_html(
         deck-wide ones when measure_slides is given), affected (slugs the changed
         paths can alter), previews (``{slug: "preview/<slug>.html"}``) and, with
         measure_slides, measure (static check report), preview (open-in-browser
-        note) and decorations (when template decorations are missing).
+        note) and decorations (when template decorations are missing); js_check
+        (see generate_html) when the deck has slide scripts and the check ran.
     """
     from sdpm.engine.html.check import format_check_report, html_preview_unavailable
     from sdpm.engine.schema import affected_slugs
@@ -1109,6 +1127,8 @@ def refresh_html(
         "affected": affected_slugs(changed_paths or [], present, html=True),
         "previews": built["previews"],
     }
+    if "js_check" in built:
+        result["js_check"] = built["js_check"]
     if measure_slides:
         wanted = set(measure_slides)
         result["warnings"] = [text for slug, text in tagged if slug is None or slug in wanted]
