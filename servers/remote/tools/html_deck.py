@@ -235,15 +235,21 @@ def _listed_previews(storage: Storage, deck_id: str) -> list[str]:
     return _listed(storage, preview_prefix(deck_id))
 
 
-def _stale_pngs(listed: list[str], uploaded: dict[str, str], checked: set[str], built: set[str],
+def _stale_pngs(listed: list[str], uploaded: dict[str, str], checked: set[str], dropped: set[str],
                 epoch: int) -> list[str]:
     """PNG keys to delete: older epochs of the slides uploaded now, PNGs of slides checked
-    now that produced none (their check did not finish), and PNGs of slides not built."""
+    now that produced none (their check did not finish), and PNGs of slides whose file is
+    in this snapshot but did not build (``dropped``, e.g. a structure error).
+
+    A slug absent from the snapshot is left alone: a parallel composer may have written
+    it after this snapshot was taken, and its fresh PNG must survive. Removed slides lose
+    their PNG at ``finalize_html_deck``.
+    """
     stale = []
     for key in listed:
         se = png_slug_epoch(key)
         if se and ((se[0] in uploaded and se[1] < epoch) or (se[0] in checked and se[0] not in uploaded)
-                   or se[0] not in built):
+                   or se[0] in dropped):
             stale.append(key)
     return stale
 
@@ -259,6 +265,7 @@ def _log_browser_check(deck_id: str, user_id: str, browser: dict, html_bytes: An
         "bytes": html_bytes,
         "seconds": browser.get("seconds"),
         "timings": browser.get("timings") or {},
+        "network_blocked": browser.get("network_blocked"),
     }))
 
 
@@ -314,6 +321,7 @@ def refresh_html_deck(
             browser = dict(built["browser_check"])
             _log_browser_check(deck_id, user_id, browser, built.get("html_bytes"))
             browser.pop("timings", None)
+            browser.pop("network_blocked", None)
             result["browser_check"] = browser
         # thumbnailS3Key follows slide 1: set when slide 1 was uploaded now, or
         # when the record has none yet.
@@ -341,11 +349,12 @@ def refresh_html_deck(
             # must list exactly the slides output.html contains, or the Web UI's
             # thumbnail index drifts from the player's slide index.
             built_slugs = set(order)
+            dropped = {p.stem for p in (tmpdir / "slides").glob("*.html")} - built_slugs
             _delete(storage, [
                 k for k in listed
                 if (se := _slug_epoch(k))
                 and ((se[0] in uploaded and se[1] < epoch) or se[0] not in built_slugs)
-            ] + _stale_pngs(_listed(storage, png_prefix(deck_id)), pngs, checked, built_slugs, epoch))
+            ] + _stale_pngs(_listed(storage, png_prefix(deck_id)), pngs, checked, dropped, epoch))
         result["previews"] = uploaded
         result["png_previews"] = [s for s in order if s in pngs]
         template_html_cache.persist(tmpdir / "template.pptx", storage, cache_root)

@@ -3,11 +3,14 @@
 """Slide preview retrieval as multimodal image content for agent visual review."""
 
 import io
+import logging
 
 from mcp.server.fastmcp.utilities.types import Image
 from PIL import Image as PILImage
 
 from storage import Storage
+
+logger = logging.getLogger("sdpm.preview")
 
 # Long-edge pixel limits per quality level.
 _MAX_LONG_EDGE: dict[str, int] = {"low": 800, "high": 1280}
@@ -98,10 +101,15 @@ def get_html_preview(
     result: list = []
     for slug in slugs:
         key = key_map.get(slug)
-        if not key:
+        data = None
+        if key:
+            try:
+                data = storage.download_file_from_pptx_bucket(key=key)
+            except Exception:  # superseded or removed between the listing and the download
+                logger.info("HTML PNG %s vanished before download", key, exc_info=True)
+        if data is None:
             result.append(f'No PNG for {slug} yet: run run_python with measure_slides=["{slug}"]')
             continue
-        data = storage.download_file_from_pptx_bucket(key=key)
         result.append(f"Slide {slug}")
         result.append(Image(data=_resize_to_jpeg(data=data, quality=quality), format="jpeg"))
     return result

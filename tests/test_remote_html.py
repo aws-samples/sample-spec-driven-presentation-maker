@@ -395,7 +395,8 @@ def _fake_check(monkeypatch, *, no_png: frozenset = frozenset(), seen: list | No
         status = "timeout" if no_png else "ok"
         result = {"status": status, "browser": "AgentCore Browser", "seconds": 1.5, "slides": len(pngs),
                   "checked": list(pngs), "findings": {}, "errors": [], "pngs": pngs,
-                  "timings": {"acquire": 0.9, "connect": 0.1, "load": 0.2, "slides": 0.3, "release": 0.1}}
+                  "timings": {"acquire": 0.9, "connect": 0.1, "load": 0.2, "slides": 0.3, "release": 0.1},
+                  "network_blocked": True}
         if no_png:
             result["note"] = "Browser check did not finish within 33 s; …"
         return result
@@ -412,8 +413,10 @@ def test_run_python_html_uploads_pngs_of_checked_slides(server, storage, monkeyp
 
     _no_pptx(monkeypatch)
     _fake_check(monkeypatch)
-    old = {"html/d1/png/body_100.png", "html/d1/png/cover_100.png", "html/d1/png/gone_100.png"}
+    old = {"html/d1/png/body_100.png", "html/d1/png/cover_100.png", "html/d1/png/other_100.png",
+           "html/d1/png/broken_100.png"}
     storage.objects.update({k: b"x" for k in old})
+    storage.objects["decks/d1/slides/broken.html"] = b"<p>no section</p>"
     _sandbox(monkeypatch, ["slides/body.html"])
 
     with caplog.at_level(logging.INFO, logger="sdpm.html_deck"):
@@ -423,15 +426,17 @@ def test_run_python_html_uploads_pngs_of_checked_slides(server, storage, monkeyp
     assert out["png_previews"] == ["body"] and "preview_files" not in out
     [fresh] = [k for k in _png_keys(storage) if k not in old]
     assert _PNG_KEY.match(fresh).group(1) == "body" and storage.content_types[fresh] == "image/png"
-    # The superseded body PNG and the PNG of a slide not built go; cover was not checked.
-    assert "html/d1/png/body_100.png" in storage.deleted and "html/d1/png/gone_100.png" in storage.deleted
-    assert "html/d1/png/cover_100.png" in storage.objects
+    # The superseded body PNG and the PNG of a slide in this snapshot that did not build go;
+    # cover was not checked, and "other" is not in this snapshot (a parallel composer may
+    # have just written it), so both stay.
+    assert "html/d1/png/body_100.png" in storage.deleted and "html/d1/png/broken_100.png" in storage.deleted
+    assert "html/d1/png/cover_100.png" in storage.objects and "html/d1/png/other_100.png" in storage.objects
     assert out["browser_check"] == {"status": "ok", "browser": "AgentCore Browser", "seconds": 1.5, "slides": 1}
     [line] = [json.loads(r.getMessage()) for r in caplog.records
               if r.getMessage().startswith('{"kind": "html_browser_check"')]
     assert line["deck_id"] == "d1" and line["user_id"] == "user1" and line["status"] == "ok"
     assert line["slides"] == 1 and line["seconds"] == 1.5 and line["bytes"] > 0
-    assert line["timings"]["acquire"] == 0.9
+    assert line["timings"]["acquire"] == 0.9 and line["network_blocked"] is True
 
 
 def test_run_python_html_checked_slide_without_png_loses_its_old_png(server, storage, monkeypatch):
@@ -463,6 +468,16 @@ def test_get_preview_html_deck_returns_pngs(server, storage, monkeypatch):
     assert out[0] == "Slide cover" and isinstance(out[1], Image)
     assert out[2] == 'No PNG for body yet: run run_python with measure_slides=["body"]'
     assert len(out) == 3
+
+
+def test_get_preview_html_deck_png_gone_before_download(server, storage, monkeypatch):
+    """A PNG superseded between the listing and the download gets the text line, not an error."""
+    storage.objects["html/d1/png/cover_100.png"] = _png_bytes()
+    listed = storage.list_files
+    monkeypatch.setattr(storage, "list_files", lambda prefix, bucket="": (
+        listed(prefix, bucket), storage.objects.pop("html/d1/png/cover_100.png", None))[0])
+    out = server.get_preview(deck_id="d1", slugs=["cover"])
+    assert out == ['No PNG for cover yet: run run_python with measure_slides=["cover"]']
 
 
 def test_get_preview_html_deck_latest_png_wins(server, storage):

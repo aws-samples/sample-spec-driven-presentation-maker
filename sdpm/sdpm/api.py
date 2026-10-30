@@ -1065,7 +1065,7 @@ def _generate_html(
         result["decorations"] = template.decorations_status
     if browser is not None:
         result["browser_check"] = {key: browser[key] for key in
-                                   ("status", "browser", "seconds", "slides", "note", "timings")
+                                   ("status", "browser", "seconds", "slides", "note", "timings", "network_blocked")
                                    if key in browser}
         result["preview_files"] = [browser["pngs"][slug] for slug in built if slug in browser["pngs"]]
     return result, tagged
@@ -1123,7 +1123,7 @@ def generate_html(
         ``data-libs``, e.g. ``["echarts"]``; ``[]`` for most decks) and,
         when template decorations are missing, decorations
         (``preview_unavailable``-shaped status). With check_slides, also
-        browser_check (``{status, browser?, seconds?, slides?, note?, timings?}``;
+        browser_check (``{status, browser?, seconds?, slides?, note?, timings?, network_blocked?}``;
         status ``ok`` / ``issues`` / ``skipped`` (``SDPM_BROWSER=none`` or no Chrome or
         Edge) / ``navigated`` / ``timeout`` / ``failed``) and preview_files (PNG paths,
         deck order). Layout findings (``overlap`` / ``overflow`` / ``outside-region`` /

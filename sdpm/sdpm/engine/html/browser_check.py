@@ -211,6 +211,7 @@ class _Run:
         self.pngs: dict[str, str] = {}
         self.timings: dict[str, float] = {}
         self.navigated_at: str | None = None
+        self.network_blocked: bool | None = None
 
     # time
     def left(self) -> float:
@@ -319,8 +320,11 @@ def _page_setup(run: _Run, width: int, height: int) -> None:
         except CdpError:
             run.send("Network.setBlockedURLs",
                      {"urlPatterns": [{"urlPattern": p, "block": True} for p in _BLOCKED]})
+        run.network_blocked = True
     except CdpError as exc:
-        logger.info("browser check: could not block network requests: %s", exc)
+        # The deck's CSP still applies; the result and the log say the block is missing.
+        run.network_blocked = False
+        logger.warning("browser check: could not block network requests: %s", exc)
     run.send("Emulation.setDeviceMetricsOverride",
              {"width": width, "height": height, "deviceScaleFactor": 1, "mobile": False})
 
@@ -400,7 +404,7 @@ def check_deck(
 
     Returns:
         ``{status, browser?, seconds?, slides, checked, findings: {slug: [diag]},
-        errors: [diag], pngs: {slug: path}, timings?, note?}``; status ``ok`` / ``issues``
+        errors: [diag], pngs: {slug: path}, timings?, network_blocked?, note?}``; status ``ok`` / ``issues``
         / ``skipped`` / ``navigated`` / ``timeout`` / ``failed``.
     """
     slugs = list(dict.fromkeys(slugs))
@@ -470,6 +474,8 @@ def check_deck(
         "slides": len(run.checked), "checked": run.checked, "findings": run.findings,
         "errors": run.errors, "pngs": run.pngs, "timings": run.timings,
     }
+    if run.network_blocked is not None:
+        result["network_blocked"] = run.network_blocked
     if note:
         result["note"] = note
     return result

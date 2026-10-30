@@ -237,6 +237,7 @@ def test_real_browser_clean_deck(tmp_path: Path, use_browser) -> None:
     assert result["browser_check"]["status"] == "ok", result["warnings"]
     assert result["warnings"] == []
     assert set(result["browser_check"]["timings"]) == {"acquire", "connect", "load", "slides", "release"}
+    assert result["browser_check"]["network_blocked"] is True
 
 
 @real_browser
