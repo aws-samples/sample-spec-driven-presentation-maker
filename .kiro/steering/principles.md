@@ -73,6 +73,13 @@ Rules that follow from this:
    `start_<role>(...)` itself, passing the mode as an argument. There is no docstring heuristic to infer role from arguments, and no
    case where a role's text is embedded into a system prompt instead of fetched
    — every consumer, including the L4 agent, fetches live.
+
+   Writing role documents and guides: state what the agent can do (its tools and their
+   range) and what it should do, in positive form rather than "X is not Y" / "do not X";
+   give no concrete examples or form-to-interaction tables (models copy them); leave out
+   what a check already stops (static checks, CSP, browser check) — the warning itself
+   says how to fix it. Format-specific notes for the orchestrator come from
+   `init_deck_workspace` (`format_notes`), keeping `orchestrator.md` format-neutral.
 5. **Change-locality goal** — the structure is optimised so that:
    prompt changes touch only `sdpm/references/workflows/`; engine changes touch only
    `sdpm/sdpm/engine/`; a new MCP client touches only the client table in

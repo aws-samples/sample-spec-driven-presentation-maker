@@ -56,6 +56,9 @@ FETCH_BLOCK = {"patterns": [{"urlPattern": p} for p in _BLOCKED]}
 _HELPER_SLUG_RE = re.compile(r"sdpm slide (\S+?): ")
 _HASHES_RE = re.compile(r"script-src(?: 'sha256-[^']+')+")
 _CSP_HINTS = ("Content Security Policy", "Refused to")
+# Appended to a CSP violation: what the slide should do instead.
+CSP_FIX = ("; the deck runs offline with inline code only: put data in the slide script and "
+           "embed images (deck files, assets:)")
 
 RAF1 = "new Promise(function(r){requestAnimationFrame(function(){r(1);});})"
 RAF2 = "new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(function(){r(1);});});})"
@@ -135,7 +138,7 @@ def errors_from_events(events: Iterable[dict], line_map, main_contexts: set[int]
     wanted = set(slugs) if slugs is not None else None
     out: list[dict] = []
 
-    def add(message: str, line: int | None) -> None:
+    def add(message: str, line: int | None, fix: str = "") -> None:
         message = message.strip()
         if not message or _is_noise(message):
             return
@@ -145,7 +148,7 @@ def errors_from_events(events: Iterable[dict], line_map, main_contexts: set[int]
         if wanted is not None and slug is not None and slug not in wanted:
             return
         diag: dict[str, Any] = {"slug": slug, "rule": "js-error",
-                                "message": f"JS error: {_HASHES_RE.sub('script-src …', message)[:_MAX_MESSAGE]}"}
+                                "message": f"JS error: {_HASHES_RE.sub('script-src …', message)[:_MAX_MESSAGE]}{fix}"}
         if line is not None:
             diag["line"] = line
         if not any(d["slug"] == diag["slug"] and d["message"] == diag["message"] for d in out):
@@ -179,7 +182,7 @@ def errors_from_events(events: Iterable[dict], line_map, main_contexts: set[int]
             if entry.get("level") != "error" or not any(h in text for h in _CSP_HINTS):
                 continue
             line = entry.get("lineNumber")
-            add(text, line + 1 if isinstance(line, int) else None)
+            add(text, line + 1 if isinstance(line, int) else None, CSP_FIX)
     return out
 
 

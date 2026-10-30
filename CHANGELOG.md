@@ -106,6 +106,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **HTML deck guidance, slimmer and format-neutral.** `init_deck_workspace(...,
+  output_format="html")` now also returns `format_notes` (the new `html-deck` guide: what an
+  HTML slide can do and how `visual` and the brief describe it); PPTX decks get no extra key.
+  The orchestrator document is format-neutral, the HTML composer document is procedure only,
+  and `slide-html-spec` keeps the sdpm-specific contract (its static-check and browser-check
+  tables are gone). Static-check, layout and CSP warnings now say what to change. Deploy:
+  SdpmData, SdpmRuntime.
 - **HTML decks: `js_check` is now `browser_check`.** The `run_python` / `generate_html`
   result key `js_check` is replaced by `browser_check` (`status` `ok` / `issues` / `skipped`
   / `navigated` / `timeout` / `failed`, plus `browser`, `seconds`, `slides`, `note`), and the

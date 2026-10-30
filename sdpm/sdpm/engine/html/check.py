@@ -204,7 +204,8 @@ def _css_url_diags(slug: str, css: str, where: str) -> list[dict]:
     for url in urls:
         kind = url_kind(url)
         if kind == "javascript":
-            out.append(_diag(slug, "script", f"javascript: URL in {where}"))
+            out.append(_diag(slug, "script", f"javascript: URL in {where}; remove it (behaviour goes in a "
+                             "slide script)"))
         elif kind == "external":
             out.append(_diag(slug, "external-url",
                              f"{where} loads {url[:80]!r}; embed it (data:, assets:, or a deck file)"))
@@ -292,19 +293,21 @@ def _external_attr_diags(slug: str, el) -> list[dict]:
     for name, value in el.attrib.items():
         lname = name.lower()
         if lname.startswith("on"):
-            out.append(_diag(slug, "script", f"<{tag} {name}=…> event handler attributes are not allowed"))
+            out.append(_diag(slug, "script", f"<{tag} {name}=…> event handler attributes do not run; listen in "
+                             "a slide script: section.querySelector(…).addEventListener(…)"))
             continue
         if lname.startswith("data-background"):
             out.append(_diag(slug, "data-background",
-                             f"<{tag} {name}> — reveal.js backgrounds are not used; the template "
-                             "and style paint the ground"))
+                             f"<{tag} {name}> — remove it: the template and deck.json "
+                             "defaultBackground paint the ground; draw anything else in the slide"))
             continue
         if url_kind(value) == "javascript" and lname in _JS_URL_ATTRS:
-            out.append(_diag(slug, "script", f"<{tag} {name}> uses a javascript: URL"))
+            out.append(_diag(slug, "script", f"<{tag} {name}> uses a javascript: URL; give links a real URL "
+                             "and put behaviour in a slide script with addEventListener"))
             continue
         if lname == "values" and tag in _SVG_ANIMATION_TAGS and any(
                 url_kind(part) == "javascript" for part in value.split(";")):
-            out.append(_diag(slug, "script", f"<{tag} values> sets a javascript: URL"))
+            out.append(_diag(slug, "script", f"<{tag} values> sets a javascript: URL; remove it"))
             continue
         if tag == "use" and lname in ("href", "xlink:href") and url_kind(value) != "fragment":
             out.append(_diag(slug, "external-use",
@@ -352,7 +355,8 @@ def _placeholder_diags(slug: str, el, layout: str | None, placeholders: Mapping[
         return []
     listed = ", ".join(sorted(keys, key=_key_order)) or "none"
     return [_diag(slug, "placeholder-unknown",
-                  f'data-ph="{ph}" is not a placeholder of layout {layout!r} (keys: {listed})')]
+                  f'data-ph="{ph}" is not a placeholder of layout {layout!r} (keys: {listed}); use one of '
+                  "these keys, or drop data-ph and position the element yourself")]
 
 
 def _self_chrome_diags(slug: str, el, chrome_keys: set[str]) -> list[dict]:
@@ -363,15 +367,17 @@ def _self_chrome_diags(slug: str, el, chrome_keys: set[str]) -> list[dict]:
     if ph is not None and _is_chrome_ph(ph, chrome_keys):
         out.append(_diag(slug, "self-chrome",
                          f'data-ph="{ph}" is a date / footer / slide-number placeholder; '
-                         "the assembler draws slide numbers and footers"))
+                         "remove it: the assembler draws slide numbers and footers"))
     if el.tag == "footer":
-        out.append(_diag(slug, "self-chrome", "<footer> — the assembler draws the template footer"))
+        out.append(_diag(slug, "self-chrome", "<footer> — remove it (the assembler draws the template "
+                         "footer) or use another element for slide content"))
     tokens = (el.get("class") or "").split() + ([el.get("id")] if el.get("id") else [])
     for token in tokens:
         if _CHROME_TOKEN_RE.fullmatch(token):
             out.append(_diag(slug, "self-chrome",
                              f"<{el.tag}> {token!r} looks like a self-drawn slide number / footer; "
-                             "the assembler draws them"))
+                             "the assembler draws them: remove it, or rename the class for "
+                             "slide content (card-footer is fine)"))
             break
     return out
 
@@ -402,14 +408,15 @@ def _slide_script_diags(slug: str, section, code: str) -> list[dict]:
     if unknown:
         out.append(_diag(slug, "library-unknown",
                          f"data-libs {_token_list(unknown)} is not a bundled library "
-                         f"(known: {', '.join(LIBRARIES)})"))
+                         f"(known: {', '.join(LIBRARIES)}); use a known one or remove it"))
     if not code:
         return out
     tokens = _js_tokens(code, _JS_EXTERNAL_RES)
     if tokens:
         out.append(_diag(slug, "script-external",
                          f"slide script uses {_token_list(tokens)}: the deck CSP blocks fetch but not "
-                         "navigation or new tabs, so the deck could send data out; remove it"))
+                         "navigation or new tabs, so the deck could send data out; remove it, keep data in "
+                         "the script and put links in <a href>"))
     declared = declared_libraries(section)
     undeclared = [name for name, glob in LIBRARY_GLOBALS.items()
                   if name not in declared and re.search(rf"(?<![\w$.]){glob}\s*\.", code)]
@@ -460,7 +467,8 @@ def check_slide_html(
     elif layout not in layouts:
         sample = ", ".join(repr(n) for n in sorted(layouts)[:6])
         out.append(_diag(slug, "layout-unknown",
-                         f"data-layout {layout!r} is not a layout of the template (e.g. {sample})"))
+                         f"data-layout {layout!r} is not a layout of the template; use a layout name "
+                         f"from template_html (e.g. {sample})"))
     if section.get("data-slug") is not None:
         out.append(_diag(slug, "data-slug", "data-slug is set by the assembler; remove it"))
 
@@ -476,11 +484,13 @@ def check_slide_html(
                                  "inline scripts); put the code inline"))
             else:
                 out.append(_diag(slug, "script", "only classic inline scripts run; "
-                                 f"type={el.get('type')[:40]!r} is blocked"))
+                                 f"type={el.get('type')[:40]!r} is blocked: write a plain "
+                                 "inline <script> (data goes in its code)"))
         if el.tag == "meta" and el.get("http-equiv") is not None:
             out.append(_diag(slug, "script",
                              f"<meta http-equiv={el.get('http-equiv')[:40]!r}> is not allowed in slides "
-                             "(refresh navigates the deck away, which the CSP cannot stop)"))
+                             "(refresh navigates the deck away, which the CSP cannot stop); "
+                             "remove it"))
         out.extend(_external_attr_diags(slug, el))
         out.extend(_self_chrome_diags(slug, el, chrome_keys))
         out.extend(_placeholder_diags(slug, el, layout, placeholders, chrome_keys))
@@ -488,8 +498,8 @@ def check_slide_html(
             css = el.text or ""
             if _ROOT_SEL_RE.search(_CSS_COMMENT_RE.sub("", css)):
                 out.append(_diag(slug, "root-in-slide-style",
-                                 ":root in a slide <style> — tokens come from the style; "
-                                 "scope rules to the slide's elements"))
+                                 ":root in a slide <style> — remove it: tokens come from the style; "
+                                 "scope rules to the slide's elements (& is the section)"))
             out.extend(_css_url_diags(slug, css, "<style>"))
         style = el.get("style")
         if style:
@@ -509,14 +519,15 @@ def check_deck_css(text: str, art_direction_path: Path) -> list[dict]:
     out.extend(_css_url_diags(slug, css, "deck.css"))
     if re.search(r"javascript\s*:", css, re.IGNORECASE) and not any(
             d["rule"] == "script" for d in out):
-        out.append(_diag(slug, "script", "javascript: in deck.css"))
+        out.append(_diag(slug, "script", "javascript: in deck.css; remove it"))
     if re.search(r"expression\s*\(", css, re.IGNORECASE):
-        out.append(_diag(slug, "script", "expression() in deck.css"))
+        out.append(_diag(slug, "script", "expression() in deck.css; remove it"))
     if re.search(r"</\s*style", css, re.IGNORECASE):
-        out.append(_diag(slug, "script", "</style in deck.css"))
+        out.append(_diag(slug, "script", "</style in deck.css; remove it"))
     if _ROOT_SEL_RE.search(css):
         out.append(_diag(slug, "root-in-deck-css",
-                         ":root in deck.css — tokens come only from the style (specs/art-direction.html)"))
+                         ":root in deck.css — remove the block: tokens come only from the style "
+                         "(specs/art-direction.html)"))
     return out
 
 

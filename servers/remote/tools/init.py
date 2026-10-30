@@ -33,12 +33,14 @@ def init_deck_workspace(
             ``"outputFormat": "html"`` only for HTML decks.
 
     Returns:
-        Dict with deckId and workspace file list.
+        Dict with deckId and workspace file list; ``format_notes`` (the orchestrator's
+        notes for the format, ``sdpm.entry.format_notes``) for an HTML deck.
 
     Raises:
         ValueError: output_format is neither "pptx" nor "html" (nothing is created).
     """
     from sdpm.engine.schema import new_deck_json
+    from sdpm.entry import format_notes
 
     # Validate before creating anything.
     deck_json: dict[str, Any] = new_deck_json(output_format)
@@ -58,8 +60,12 @@ def init_deck_workspace(
         storage.upload_file(key=key, data=b"", content_type="text/markdown")
         workspace.append(spec_file)
 
-    return {
+    result: dict[str, Any] = {
         "deckId": deck_id,
         "name": name,
         "workspace": workspace,
     }
+    notes = format_notes(output_format)
+    if notes:
+        result["format_notes"] = notes
+    return result

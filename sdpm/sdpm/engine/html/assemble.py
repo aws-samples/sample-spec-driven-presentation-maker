@@ -141,22 +141,24 @@ def parse_slide(text: str) -> ParsedSlide:
     for frag in fragments:
         if isinstance(frag, str):
             if frag.strip():
-                errors.append("text outside the <section>")
+                errors.append("text outside the <section>; move it inside")
             continue
         if not isinstance(frag.tag, str):  # comment / processing instruction
             continue
         if frag.tag == "section":
             sections.append(frag)
         else:
-            errors.append(f"top-level <{frag.tag}> outside the <section>")
+            errors.append(f"top-level <{frag.tag}> outside the <section>; move it inside")
         if frag.tail and frag.tail.strip():
-            errors.append("text outside the <section>")
+            errors.append("text outside the <section>; move it inside")
     if len(sections) != 1:
-        errors.insert(0, f"expected exactly one top-level <section>, found {len(sections)}")
+        errors.insert(0, f"expected exactly one top-level <section>, found {len(sections)}; write one "
+                         "<section data-layout=…> per file")
         return ParsedSlide(sections[0] if len(sections) > 1 else None, errors=errors)
     section = sections[0]
     if any(el.tag == "section" for el in section.iterdescendants() if isinstance(el.tag, str)):
-        errors.append("nested <section> (vertical slides) is not supported")
+        errors.append("nested <section> (vertical slides) is not supported; give each slide its own "
+                      "file and use fragments for steps within one")
     styles = [el.text or "" for el in section.iter("style")]
     has_notes = any("notes" in (el.get("class") or "").split() for el in section.iter("aside"))
     return ParsedSlide(section, section.get("data-layout"), has_notes, styles, errors)
@@ -224,15 +226,16 @@ class _Resolver:
             try:
                 return resolve_asset_path(ref.strip(), theme=self.theme)
             except FileNotFoundError:
-                self.warn(f"{where}: asset not found: {ref}")
+                self.warn(f"{where}: asset not found: {ref}; take the name from search_assets")
                 return None
         if kind == "relative":
             target = (self.deck_dir / ref.strip().split("#", 1)[0].split("?", 1)[0]).resolve()
             if not target.is_relative_to(self.deck_dir):
-                self.warn(f"{where}: {ref} is outside the deck directory — not embedded")
+                self.warn(f"{where}: {ref} is outside the deck directory — not embedded; copy it into the "
+                          "deck (images/…) and use that path")
                 return None
             if not target.is_file():
-                self.warn(f"{where}: file not found: {ref}")
+                self.warn(f"{where}: file not found: {ref}; paths are relative to the deck root")
                 return None
             return target
         return None

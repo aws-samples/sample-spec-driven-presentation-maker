@@ -201,6 +201,16 @@ def test_init_html_writes_output_format():
     assert storage.put_deck_json.call_args.kwargs["deck_id"] == result["deckId"]
 
 
+def test_init_returns_format_notes_for_html_only():
+    from sdpm.entry import format_notes
+
+    _, html = _init("html")
+    assert html["format_notes"] == format_notes("html") and html["format_notes"]
+    for fmt in (None, "pptx"):
+        _, result = _init(fmt)
+        assert "format_notes" not in result
+
+
 def test_init_pptx_deck_json_unchanged():
     from sdpm.engine.schema import DECK_JSON_SKELETON, complete_deck_skeleton
 

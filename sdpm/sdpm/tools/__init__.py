@@ -87,11 +87,16 @@ def init_deck_workspace(
 ) -> dict[str, Any]:
     """Create an empty deck workspace (deck.json, slides/, specs/). A step inside the
     orchestrator workflow — after the brief is agreed, before apply_style — not where a
-    request starts; start_presentation is.
+    request starts; start_presentation is. An HTML deck also returns format_notes.
     """
     from sdpm.api import init
+    from sdpm.entry import format_notes
 
-    return init(name=name, output_format=output_format)
+    result = init(name=name, output_format=output_format)
+    notes = format_notes(output_format)
+    if notes:
+        result["format_notes"] = notes
+    return result
 
 
 def check_specs(
