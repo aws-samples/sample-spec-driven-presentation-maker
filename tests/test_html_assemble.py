@@ -15,7 +15,7 @@ from lxml import html as lxml_html
 
 from sdpm import api
 from sdpm.config import TEMPLATES_DIR, VENDOR_DIR
-from sdpm.engine.html.assemble import assemble_deck, inline_js, parse_slide, style_root_css
+from sdpm.engine.html.assemble import assemble_deck, inline_js, letterbox_color, parse_slide, style_root_css
 from sdpm.engine.html.template import load_template_html
 from sdpm.knowledge.assets import assets_installed
 
@@ -234,6 +234,49 @@ def test_ground_comes_from_style_color_bg(built) -> None:
     assert meta["defaultBackground"]
     assert f":root{{--sdpm-ground:{meta['defaultBackground']}}}" in result.html
     assert f"color:{meta['defaultTextColor']}" in result.html
+
+
+def _section_backgrounds(result) -> dict[str, str | None]:
+    doc = lxml_html.document_fromstring(result.html)
+    return {s.get("data-slug"): s.get("data-background-color")
+            for s in doc.xpath('//div[@class="slides"]/section')}
+
+
+def test_letterbox_is_the_style_ground_when_set(built) -> None:
+    deck, result, _ = built
+    ground = json.loads((deck / "deck.json").read_text(encoding="utf-8"))["defaultBackground"]
+    assert set(_section_backgrounds(result).values()) == {ground}
+
+
+def test_letterbox_is_each_layouts_solid_ground(tmp_path: Path) -> None:
+    deck = _make_deck(tmp_path, template="blank-dark")
+    slides = {"cover": '<section data-layout="Title Slide"></section>',
+              "blank": '<section data-layout="Blank"></section>',
+              "unknown": '<section data-layout="No Such Layout"></section>'}
+    template = load_template_html(TEMPLATES_DIR / "blank-dark.pptx", cache_root=tmp_path / "template-cache")
+    result = assemble_deck(
+        slides=list(slides.items()), template=template, art_direction_html="",
+        default_background=None, default_text_color=None, title="t", deck_dir=deck)
+    # blank-dark: black master, its "Blank" layout has its own #0A1628 ground.
+    assert _section_backgrounds(result) == {"cover": "#000000", "blank": "#0A1628", "unknown": "#000000"}
+
+
+def test_letterbox_of_a_gradient_ground_is_the_theme_background(tmp_path: Path, decorated_template: Path) -> None:
+    template = load_template_html(decorated_template, decorations=False, cache_root=tmp_path / "template-cache")
+    layouts = {layout["name"]: layout for layout in template.info["layouts"]}
+    assert layouts["Section Header"]["ground"] == {"kind": "baked"}
+    template.info["themeColors"]["background"] = "#ABCDEF"
+    assert letterbox_color(layouts["Section Header"], template, None) == "#ABCDEF"
+    assert letterbox_color(layouts["Section Header"], template, "#123456") == "#123456"
+
+
+def test_letterbox_color_is_engine_only(built) -> None:
+    _, result, _ = built
+    assert all(_section_backgrounds(result).values())
+    for text in result.previews.values():
+        assert "data-background-color=" not in text
+    config = re.search(r"var o=\{(.*?)\};", result.html).group(1)
+    assert "margin:0," in config
 
 
 def test_style_root_embedded_before_theme(built) -> None:
