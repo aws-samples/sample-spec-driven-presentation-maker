@@ -78,6 +78,28 @@ class TestStartPresentation:
         assert "read_workflows" not in wf
         assert "init_presentation" not in wf
 
+    def test_workflow_is_format_neutral_and_points_to_format_notes(self):
+        wf = tools.start_presentation()["static"]["workflow"]
+        assert "format_notes" in wf and 'output_format="html"' in wf
+        for html_only in ("ECharts", "D3", "deck.css", "fragment", "preview/png", "slider"):
+            assert html_only not in wf, html_only
+
+
+class TestInitDeckWorkspace:
+    def test_html_deck_returns_format_notes(self, tmp_path: Path):
+        from sdpm.knowledge.reference import read_docs
+        from sdpm.config import REFERENCES_DIR
+
+        r = tools.init_deck_workspace(str(tmp_path / "h"), output_format="html")
+        notes = read_docs(REFERENCES_DIR / "guides", ["html-deck"])[0]["content"]
+        assert r["format_notes"] == notes
+        assert "`visual`" in notes and "ECharts" in notes and "constraints" in notes
+
+    def test_pptx_deck_returns_no_format_notes(self, tmp_path: Path):
+        r = tools.init_deck_workspace(str(tmp_path / "p"))
+        assert "format_notes" not in r
+        assert set(r) == {"output_dir", "deck_json", "workspace"}
+
 
 class TestStartComposing:
     def test_static_only_without_deck(self):

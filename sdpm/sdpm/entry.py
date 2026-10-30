@@ -48,6 +48,17 @@ def _slide_spec() -> str:
     return _read_reference(_GUIDES_DIR, "slide-json-spec")
 
 
+# Orchestrator notes per deck format: the guide init_deck_workspace returns as
+# ``format_notes``. PPTX has none — orchestrator.md covers it.
+_FORMAT_NOTES = {"html": "html-deck"}
+
+
+def format_notes(output_format: str) -> str | None:
+    """What the orchestrator writes into the specs for this format; None when it needs nothing extra."""
+    name = _FORMAT_NOTES.get(output_format)
+    return _read_reference(_GUIDES_DIR, name) if name else None
+
+
 def _read_text(path: Path) -> str | None:
     return path.read_text(encoding="utf-8") if path.is_file() else None
 

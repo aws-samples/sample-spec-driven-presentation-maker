@@ -63,6 +63,8 @@ def test_errors_are_attributed() -> None:
     assert errors[0]["message"].startswith("JS error: sdpm slide b: ReferenceError")
     assert all(e["rule"] == "js-error" for e in errors)
     assert "script-src …" in errors[3]["message"] and "sha256" not in errors[3]["message"]
+    assert errors[3]["message"].endswith(browser_check.CSP_FIX)
+    assert not errors[1]["message"].endswith(browser_check.CSP_FIX)
 
 
 def test_noise_and_other_worlds_are_dropped() -> None:

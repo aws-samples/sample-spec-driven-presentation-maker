@@ -226,7 +226,8 @@ def _ph_diags(inner: str, layout: str = "Title and Content", **kw) -> list[dict]
 def test_placeholder_unknown() -> None:
     diags = _ph_diags('<div data-ph="body">x</div>')
     assert [d["message"] for d in diags] == [
-        "data-ph=\"body\" is not a placeholder of layout 'Title and Content' (keys: title, 0, 1)"]
+        "data-ph=\"body\" is not a placeholder of layout 'Title and Content' (keys: title, 0, 1)"
+        "; use one of these keys, or drop data-ph and position the element yourself"]
     assert _ph_diags('<h1 data-ph="title">t</h1><div data-ph="0">x</div><div data-ph="1">y</div>') == []
     assert "(keys: none)" in _ph_diags('<div data-ph="title">x</div>', "Blank")[0]["message"]
 

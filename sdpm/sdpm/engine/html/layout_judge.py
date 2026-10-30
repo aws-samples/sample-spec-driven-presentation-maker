@@ -101,7 +101,8 @@ def judge_slide(slug: str, measured: dict[str, Any], decorations: list[dict] | N
             iw, ih = _intersection(box(a), box(b))
             if iw > tol and ih > tol and not _contains(box(a), box(b), tol) \
                     and not _contains(box(b), box(a), tol):
-                out.append(_diag(slug, "overlap", f"{label(a)} × {label(b)} ({_px(iw)}×{_px(ih)} px)"))
+                out.append(_diag(slug, "overlap", f"{label(a)} × {label(b)} ({_px(iw)}×{_px(ih)} px); "
+                                                   "move or resize one so each has its own space"))
 
     # overflow: content past its box, elements past the slide edge
     for i, el in enumerate(elements):
@@ -110,14 +111,17 @@ def judge_slide(slug: str, measured: dict[str, Any], decorations: list[dict] | N
             sw, sh, cw, ch = scroll
             if sh > ch + tol or sw > cw + tol:
                 out.append(_diag(slug, "overflow", f"{label(i)} content {_px(sw)}×{_px(sh)} px exceeds its "
-                                                   f"box {_px(cw)}×{_px(ch)} px"))
+                                                   f"box {_px(cw)}×{_px(ch)} px; shorten the content, "
+                                                   "use a smaller --fs-* token or enlarge the box, "
+                                                   "leaving a little room (fonts differ between "
+                                                   "machines)"))
         if width and height:
             past = [(px, side) for px, side in _excess(box(i), [0, 0, width, height]) if px > tol]
             if past:
                 px, side = max(past)
                 edge = {"above": "top", "below": "bottom", "left of": "left", "right of": "right"}[side]
                 out.append(_diag(slug, "overflow", f"{label(i)} extends {_px(px)} px past the slide's "
-                                                   f"{edge} edge"))
+                                                   f"{edge} edge; keep it inside the canvas"))
 
     # outside-region: an element inside a region past the region's box
     for i, el in enumerate(elements):
@@ -127,7 +131,8 @@ def judge_slide(slug: str, measured: dict[str, Any], decorations: list[dict] | N
         past = [(px, side) for px, side in _excess(box(i), box(region)) if px > tol]
         if past:
             px, side = max(past)
-            out.append(_diag(slug, "outside-region", f"{label(i)} extends {_px(px)} px {side} {label(region)}"))
+            out.append(_diag(slug, "outside-region", f"{label(i)} extends {_px(px)} px {side} {label(region)}; "
+                                                  "fit it inside the region, or move or resize the region"))
 
     # decoration-overlap: bands and obstacles of the template layout
     for deco in decorations or []:
@@ -146,7 +151,8 @@ def judge_slide(slug: str, measured: dict[str, Any], decorations: list[dict] | N
                 hit.add(i)
                 out.append(_diag(slug, "decoration-overlap",
                                  f"{label(i)} covers the template's \"{deco.get('name', 'decoration')}\" "
-                                 f"({kind}) by {_px(iw)}×{_px(ih)} px"))
+                                 f"({kind}) by {_px(iw)}×{_px(ih)} px; move it clear of that box "
+                                 "(template_html decorations)"))
 
     if len(out) > MAX_FINDINGS:
         rest = out[MAX_FINDINGS - 1:]

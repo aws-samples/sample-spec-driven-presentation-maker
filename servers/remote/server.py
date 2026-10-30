@@ -496,7 +496,8 @@ def init_deck_workspace(
 ) -> str:
     """Create an empty deck workspace (deck.json, specs/). A step inside the orchestrator
     workflow — after the brief is agreed, before apply_style — not where a request
-    starts; start_presentation is. Returns the deckId and the workspace file list.
+    starts; start_presentation is. Returns the deckId and the workspace file list, plus
+    format_notes for an HTML deck.
     """
     return json.dumps(
         init_mod.init_deck_workspace(

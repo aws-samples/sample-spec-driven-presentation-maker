@@ -33,7 +33,8 @@ def test_clean_slide() -> None:
 def test_overlap_between_top_level_blocks() -> None:
     body = _el("region", 'data-region="body"', (96, 142, 1720, 700))
     diags = _judge(TITLE, body)
-    assert [d["message"] for d in diags] == ['overlap: data-ph="title" × data-region="body" (1720×38 px)']
+    assert [d["message"] for d in diags] == ['overlap: data-ph="title" × data-region="body" (1720×38 px); '
+                                           'move or resize one so each has its own space']
     assert diags[0]["slug"] == "s" and diags[0]["rule"] == "overlap"
 
 
@@ -62,7 +63,8 @@ def test_overlap_between_children_of_a_region() -> None:
 def test_overflow_content_past_its_box() -> None:
     title = _el("ph", 'data-ph="title"', (96, 60, 1679, 232), scroll=(1820, 260, 1679, 232))
     assert [d["message"] for d in _judge(title)] == [
-        'overflow: data-ph="title" content 1820×260 px exceeds its box 1679×232 px']
+        'overflow: data-ph="title" content 1820×260 px exceeds its box 1679×232 px; shorten the content, '
+        'use a smaller --fs-* token or enlarge the box, leaving a little room (fonts differ between machines)']
     within = _el("ph", 'data-ph="title"', (96, 60, 1679, 232), scroll=(1679, 236, 1679, 232))
     assert _judge(within) == []
     inline = _el("child", "<span>", (96, 60, 100, 20), scroll=(0, 0, 0, 0), region=None)
@@ -72,7 +74,7 @@ def test_overflow_content_past_its_box() -> None:
 def test_overflow_past_the_slide_edge() -> None:
     wide = _el("free", '<p> "Long text…"', (1800, 500, 300, 50))
     assert [d["message"] for d in _judge(wide)] == [
-        "overflow: <p> \"Long text…\" extends 180 px past the slide's right edge"]
+        "overflow: <p> \"Long text…\" extends 180 px past the slide's right edge; keep it inside the canvas"]
     assert _judge(_el("free", "<p>", (1800, 500, 123, 50))) == []  # 3 px past: tolerated
 
 
@@ -81,14 +83,16 @@ def test_outside_region() -> None:
     child = _el("child", '<p> "Long text…"', (96, 700, 1720, 192), region=0)
     diags = _judge(region, child)
     assert [d["message"] for d in diags] == [
-        'outside-region: <p> "Long text…" extends 42 px below data-region="body"']
+        'outside-region: <p> "Long text…" extends 42 px below data-region="body"; '
+        'fit it inside the region, or move or resize the region']
 
 
 def test_decoration_overlap() -> None:
     logo = {"name": "Logo", "source": "layout", "bbox": {"x": 1700, "y": 980, "w": 200, "h": 80}, "kind": "obstacle"}
     body = _el("region", 'data-region="body"', (96, 210, 1668, 790))
     assert [d["message"] for d in _judge(body, decorations=[logo])] == [
-        "decoration-overlap: data-region=\"body\" covers the template's \"Logo\" (obstacle) by 64×20 px"]
+        "decoration-overlap: data-region=\"body\" covers the template's \"Logo\" (obstacle) by 64×20 px; "
+        "move it clear of that box (template_html decorations)"]
 
 
 def test_decoration_exemptions() -> None:

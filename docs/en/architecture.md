@@ -78,7 +78,7 @@ HTML decks (`deck.json` `outputFormat: "html"`) use the same tools with these di
 
 | Tool | HTML deck behaviour |
 |------|---------------------|
-| `init_deck_workspace` | `output_format="html"` creates an HTML deck (default `pptx`) |
+| `init_deck_workspace` | `output_format="html"` creates an HTML deck (default `pptx`) and returns `format_notes` (guide `html-deck`) for the orchestrator |
 | `start_composing` | `mode="html"` returns the HTML composer document, the template converted for HTML and the deck's `deck.css` |
 | `run_python` | After a change to an HTML build input, rebuilds `output.html` and the changed slides' thumbnails, runs the browser check on the changed slides (and `measure_slides`) and uploads thumbnails and PNGs under `html/` |
 | `generate_pptx` | Finalizes the deck as HTML: full build, every thumbnail, deck record update, knowledge-base sync (`search_slides` indexes HTML slides); no browser check (every slide was checked when it was written) |

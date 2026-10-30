@@ -86,7 +86,7 @@ def test_unknown_placeholder_key_warns(tmp_path) -> None:
     result = api.generate_html(_deck(tmp_path, slides=slides))
     assert [(d["slug"], d["rule"]) for d in result["diagnostics"]] == [("wrong", "placeholder-unknown")]
     assert ("wrong: data-ph=\"body\" is not a placeholder of layout 'Title and Content' (keys: title, 0, 1)"
-            in result["warnings"])
+            "; use one of these keys, or drop data-ph and position the element yourself" in result["warnings"])
 
 
 def test_generate_html_custom_output_path(tmp_path) -> None:
