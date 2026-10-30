@@ -434,16 +434,25 @@ def _get_documents_dir():
 
 def cmd_init(args):
     from sdpm.api import init
+    from sdpm.entry import format_notes
+    output_format = getattr(args, 'output_format', None) or "pptx"
     result = init(
         name=args.name or "",
         output_dir=args.output if hasattr(args, 'output') and args.output else None,
-        output_format=getattr(args, 'output_format', None) or "pptx",
+        output_format=output_format,
     )
     print(f"output_dir:  {result['output_dir']}")
     print(f"deck_json:   {result['deck_json']}")
     for f in result["workspace"]:
         if f.startswith("specs/"):
             print(f"specs:       {Path(result['output_dir']) / f}")
+    # Same notes the init_deck_workspace tool returns as format_notes (HTML only).
+    notes = format_notes(output_format)
+    if notes:
+        print("\nformat_notes:\n")
+        print(notes)
+
+
 def cmd_code_block(args):
     """Generate elements JSON for a syntax-highlighted code block."""
     from sdpm.api import code_block
