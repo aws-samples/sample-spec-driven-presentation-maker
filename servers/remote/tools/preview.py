@@ -3,11 +3,14 @@
 """Slide preview retrieval as multimodal image content for agent visual review."""
 
 import io
+import logging
 
 from mcp.server.fastmcp.utilities.types import Image
 from PIL import Image as PILImage
 
 from storage import Storage
+
+logger = logging.getLogger("sdpm.preview")
 
 # Long-edge pixel limits per quality level.
 _MAX_LONG_EDGE: dict[str, int] = {"low": 800, "high": 1280}
@@ -75,4 +78,38 @@ def get_preview(
         jpeg_data = _resize_to_jpeg(data=data, quality=quality)
         result.append(f"Slide {slug}")
         result.append(Image(data=jpeg_data, format="jpeg"))
+    return result
+
+
+def get_html_preview(
+    deck_id: str,
+    slugs: list[str],
+    storage: Storage,
+    quality: str = "high",
+) -> list:
+    """The browser-check PNGs of an HTML deck's slides, as ``get_preview`` returns them.
+
+    Resolves each slug to its latest ``html/{deck}/png/{slug}_{epoch}.png``. A slug
+    without one (never checked, or its check did not finish) gets a text line instead.
+
+    Returns:
+        List of str and Image objects for MCP content serialization.
+    """
+    from shared.html_artifacts import build_html_png_key_map, png_prefix
+
+    key_map = build_html_png_key_map(storage.list_files(prefix=png_prefix(deck_id), bucket=storage.pptx_bucket))
+    result: list = []
+    for slug in slugs:
+        key = key_map.get(slug)
+        data = None
+        if key:
+            try:
+                data = storage.download_file_from_pptx_bucket(key=key)
+            except Exception:  # superseded or removed between the listing and the download
+                logger.info("HTML PNG %s vanished before download", key, exc_info=True)
+        if data is None:
+            result.append(f'No PNG for {slug} yet: run run_python with measure_slides=["{slug}"]')
+            continue
+        result.append(f"Slide {slug}")
+        result.append(Image(data=_resize_to_jpeg(data=data, quality=quality), format="jpeg"))
     return result

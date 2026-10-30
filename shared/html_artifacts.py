@@ -4,10 +4,13 @@
 
     html/{deck_id}/{uuid}.html                    built deck (DDB htmlS3Key)
     html/{deck_id}/preview/{slug}_{epoch}.html    static per-slide thumbnail (latest epoch wins)
+    html/{deck_id}/png/{slug}_{epoch}.png         browser-check PNG of a slide (get_preview;
+                                                  latest epoch wins)
     template-html-cache/{cache_key}/{rel}         template conversion cache
 
 ``html/`` is served only through presigned URLs: it is in no CloudFront
-behaviour and not in the CloudFront OAC bucket-policy grant.
+behaviour and not in the CloudFront OAC bucket-policy grant. The PNGs are not
+under ``preview/``, which the API lists for the Web UI thumbnails.
 """
 
 import re
@@ -23,6 +26,7 @@ _SLUG_RE = re.compile(r"[a-z0-9][a-z0-9-_]*")
 # Matches {slug}_{epoch}.html at the end of a preview key (same slug grammar as
 # shared/preview._PREVIEW_RE).
 _PREVIEW_RE = re.compile(r"([a-z0-9][a-z0-9-_]*)_(\d+)\.html$")
+_PNG_RE = re.compile(r"/png/([a-z0-9][a-z0-9-_]*)_(\d+)\.png$")
 _CACHE_KEY_RE = re.compile(r"[0-9a-f]{1,64}")
 _CACHE_FILES = frozenset({"theme.css", "template.json"})
 _CACHE_LAYOUT_RE = re.compile(r"layouts/[A-Za-z0-9_-][A-Za-z0-9_.-]*\.svg")
@@ -51,17 +55,44 @@ def preview_key(deck_id: str, slug: str, epoch: int) -> str:
     return f"{preview_prefix(deck_id)}{slug}_{int(epoch)}.html"
 
 
-def build_html_preview_key_map(keys: Iterable[str]) -> dict[str, str]:
-    """Map slug → latest preview key (highest epoch wins); other keys are ignored."""
+def _latest(keys: Iterable[str], pattern: re.Pattern) -> dict[str, str]:
     best: dict[str, tuple[int, str]] = {}
     for key in keys:
-        m = _PREVIEW_RE.search(key)
+        m = pattern.search(key)
         if not m:
             continue
         slug, epoch = m.group(1), int(m.group(2))
         if slug not in best or epoch > best[slug][0]:
             best[slug] = (epoch, key)
     return {slug: key for slug, (_, key) in best.items()}
+
+
+def build_html_preview_key_map(keys: Iterable[str]) -> dict[str, str]:
+    """Map slug → latest preview key (highest epoch wins); other keys are ignored."""
+    return _latest(keys, _PREVIEW_RE)
+
+
+def png_prefix(deck_id: str) -> str:
+    """``html/{deck_id}/png/`` — every browser-check PNG of the deck lives under it."""
+    return f"{HTML_PREFIX}{_deck(deck_id)}/png/"
+
+
+def png_key(deck_id: str, slug: str, epoch: int) -> str:
+    """``html/{deck_id}/png/{slug}_{epoch}.png``."""
+    if not isinstance(slug, str) or not _SLUG_RE.fullmatch(slug):
+        raise ValueError(f"invalid slug: {slug!r}")
+    return f"{png_prefix(deck_id)}{slug}_{int(epoch)}.png"
+
+
+def png_slug_epoch(key: str) -> tuple[str, int] | None:
+    """``(slug, epoch)`` of a PNG key, or None for any other key."""
+    m = _PNG_RE.search(key)
+    return (m.group(1), int(m.group(2))) if m else None
+
+
+def build_html_png_key_map(keys: Iterable[str]) -> dict[str, str]:
+    """Map slug → latest PNG key (highest epoch wins); other keys are ignored."""
+    return _latest(keys, _PNG_RE)
 
 
 def template_cache_object_key(cache_key: str, rel: str) -> str:

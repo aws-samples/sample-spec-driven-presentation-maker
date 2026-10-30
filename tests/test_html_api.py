@@ -76,6 +76,19 @@ def test_engine_letterbox_colour_is_not_reported(tmp_path) -> None:
     assert "data-background" not in (deck / "slides" / "cover.html").read_text(encoding="utf-8")
 
 
+def test_unknown_placeholder_key_warns(tmp_path) -> None:
+    slides = {
+        "wrong": ('<section data-layout="Title and Content"><h1 data-ph="title">T</h1>'
+                  '<div data-ph="body">x</div></section>'),
+        "right": ('<section data-layout="Title and Content"><h1 data-ph="0">T</h1>'
+                  '<div data-ph="1">x</div></section>'),
+    }
+    result = api.generate_html(_deck(tmp_path, slides=slides))
+    assert [(d["slug"], d["rule"]) for d in result["diagnostics"]] == [("wrong", "placeholder-unknown")]
+    assert ("wrong: data-ph=\"body\" is not a placeholder of layout 'Title and Content' (keys: title, 0, 1)"
+            in result["warnings"])
+
+
 def test_generate_html_custom_output_path(tmp_path) -> None:
     deck = _deck(tmp_path)
     out = tmp_path / "elsewhere" / "deck.html"
@@ -107,26 +120,131 @@ def test_deck_css_embedded_once_and_checked(tmp_path) -> None:
 def test_refresh_html_without_measure(tmp_path) -> None:
     deck = _deck(tmp_path)
     result = api.refresh_html(deck, ["slides/body.html", "slides/body.json"])
-    assert set(result) == {"html", "html_bytes", "warnings", "affected", "previews"}
+    assert set(result) == {"html", "html_bytes", "warnings", "affected", "previews", "browser_check",
+                           "preview_files"}
     assert result["html"] == str(deck / "output.html")
     assert result["affected"] == ["body"]
+    assert result["browser_check"]["status"] == "skipped"  # SDPM_BROWSER=none (conftest)
     assert api.refresh_html(deck, ["deck.css"])["affected"] == ["cover", "body"]
-    assert api.refresh_html(deck)["affected"] == []
+    unchanged = api.refresh_html(deck)
+    assert unchanged["affected"] == [] and "browser_check" not in unchanged
+
+
+def test_refresh_html_measured_slug_not_in_the_deck_is_not_ok(tmp_path) -> None:
+    """A measured slug the deck does not build is reported as not checked, never OK."""
+    deck = _deck(tmp_path)
+    (deck / "slides" / "orphan.html").write_text('<section data-layout="Title Only"></section>', encoding="utf-8")
+    result = api.refresh_html(deck, ["slides/orphan.html"], measure_slides=["cover", "orphan", "typo"])
+    for slug in ("orphan", "typo"):
+        line = (f"{slug}: not in the deck, so not checked — the outline must list [{slug}] and "
+                f"slides/{slug}.html must exist")
+        assert line in result["warnings"] and line in result["measure"].splitlines()
+        assert f"{slug}: OK" not in result["measure"]
+    assert "cover: OK" in result["measure"]
 
 
 def test_refresh_html_with_measure_filters_warnings(tmp_path) -> None:
+    from sdpm.engine.html.browser import DISABLED_NOTE
+
     deck = _deck(tmp_path)
     (deck / "deck.css").write_text(":root { --x: 1; }", encoding="utf-8")
     result = api.refresh_html(deck, ["slides/cover.html"], measure_slides=["cover"])
-    assert set(result) == {"html", "html_bytes", "warnings", "affected", "measure", "preview", "previews"}
-    assert result["warnings"] == [w for w in result["warnings"] if w.startswith("deck.css: ")]
-    assert len(result["warnings"]) == 1  # deck.css always reported; body / gone filtered out
+    assert set(result) == {"html", "html_bytes", "warnings", "affected", "measure", "preview", "previews",
+                           "browser_check", "preview_files"}
+    assert result["warnings"] == [w for w in result["warnings"] if w.startswith(("deck.css: ", "output.html: "))]
+    # deck.css and the browser note are always reported; body / gone filtered out
+    assert result["warnings"][-1] == f"output.html: {DISABLED_NOTE}" and len(result["warnings"]) == 2
     assert "cover: OK" in result["measure"] and "(deck.css): 1 issue(s)" in result["measure"]
-    assert result["preview"]["reason"] == "html-deck"
+    assert f"browser: skipped — {DISABLED_NOTE}" in result["measure"]
+    assert result["preview"] == {"status": "unavailable", "reason": "browser-skipped", "note": DISABLED_NOTE}
 
     body = api.refresh_html(deck, measure_slides=["body"])
     assert any(w.startswith("body: ") for w in body["warnings"])
     assert "[font-size-token]" in body["measure"]
+
+
+def _fake_check(monkeypatch, calls: list, *, findings=None, errors=(), status="issues", note=None):
+    """Replace browser_check.check_deck: records the slugs, writes a PNG per slug."""
+    from sdpm.engine.html import browser_check
+
+    def fake(output_html, slugs, *, slide_size, line_map, layouts, decorations, png_dir=None, deadline=None):
+        calls.append({"slugs": list(slugs), "slide_size": slide_size, "layouts": dict(layouts)})
+        pngs = {}
+        for slug in slugs:
+            png_dir.mkdir(parents=True, exist_ok=True)
+            (png_dir / f"{slug}.png").write_bytes(b"\x89PNG")
+            pngs[slug] = str(png_dir / f"{slug}.png")
+        result = {"status": status, "browser": "Fake", "seconds": 0.5, "slides": len(slugs),
+                  "checked": list(slugs), "findings": {s: f for s, f in (findings or {}).items() if s in slugs},
+                  "errors": list(errors), "pngs": pngs, "timings": {"load": 0.1}}
+        if note:
+            result["note"] = note
+        return result
+
+    monkeypatch.setattr(browser_check, "check_deck", fake)
+
+
+def test_browser_check_set_is_affected_plus_measured(tmp_path, monkeypatch) -> None:
+    deck = _deck(tmp_path)
+    calls: list = []
+    _fake_check(monkeypatch, calls)
+    api.refresh_html(deck, ["deck.css"])
+    api.refresh_html(deck, ["slides/body.html"])
+    api.refresh_html(deck, ["slides/body.html"], measure_slides=["cover"])
+    api.refresh_html(deck)
+    api.generate_html(deck)
+    assert [c["slugs"] for c in calls] == [["cover", "body"], ["body"], ["cover", "body"]]
+    assert calls[0]["slide_size"] == (1920, 1080)
+    assert calls[0]["layouts"] == {"cover": "Title Slide", "body": "Title Only"}
+    api.generate_html(deck, check_slides=["body", "gone", "cover"])
+    assert calls[-1]["slugs"] == ["cover", "body"]  # built slides only, deck order
+
+
+def test_browser_findings_join_warnings_report_and_previews(tmp_path, monkeypatch) -> None:
+    deck = _deck(tmp_path)
+    calls: list = []
+    overlap = {"slug": "cover", "rule": "overlap", "message": "overlap: data-ph=\"title\" × <p> (10×10 px)"}
+    errors = [{"slug": "cover", "rule": "js-error", "message": "JS error: boom", "line": 7},
+              {"slug": None, "rule": "js-error", "message": "JS error: loose", "line": 3}]
+    _fake_check(monkeypatch, calls, findings={"cover": [overlap]}, errors=errors)
+    result = api.refresh_html(deck, ["slides/cover.html"], measure_slides=["cover"])
+    assert 'cover: overlap: data-ph="title" × <p> (10×10 px)' in result["warnings"]
+    assert "cover: JS error: boom" in result["warnings"]
+    assert "output.html: JS error (line 3): loose" in result["warnings"]
+    assert "[overlap]" in result["measure"] and "[js-error] JS error: boom" in result["measure"]
+    assert "browser: issues (Fake, 0.5 s)" in result["measure"]
+    assert result["preview_files"] == [str(deck / "preview" / "png" / "cover.png")]
+    assert result["browser_check"] == {"status": "issues", "browser": "Fake", "seconds": 0.5, "slides": 1,
+                                       "timings": {"load": 0.1}}
+    assert "preview" not in result
+    rules = [(d["slug"], d["rule"]) for d in api.generate_html(deck, check_slides=["cover"])["diagnostics"]]
+    assert ("cover", "overlap") in rules and ("cover", "js-error") in rules
+
+
+def test_unfinished_browser_check_makes_preview_unavailable(tmp_path, monkeypatch) -> None:
+    deck = _deck(tmp_path)
+    _fake_check(monkeypatch, [], status="timeout", note="Browser check did not finish within 33 s")
+    result = api.refresh_html(deck, measure_slides=["cover"])
+    assert result["preview"] == {"status": "unavailable", "reason": "browser-timeout",
+                                 "note": "Browser check did not finish within 33 s"}
+    assert "output.html: Browser check did not finish within 33 s" in result["warnings"]
+
+
+def test_stale_pngs_are_removed(tmp_path, monkeypatch) -> None:
+    deck = _deck(tmp_path)
+    png = deck / "preview" / "png"
+    png.mkdir(parents=True)
+    for slug in ("cover", "body", "old"):
+        (png / f"{slug}.png").write_bytes(b"old")
+    api.refresh_html(deck, ["slides/cover.html"])  # SDPM_BROWSER=none: the check makes no PNG
+    assert sorted(p.name for p in png.iterdir()) == ["body.png"]
+    assert (png / "body.png").read_bytes() == b"old"  # not checked: kept
+
+    calls: list = []
+    _fake_check(monkeypatch, calls)
+    result = api.refresh_html(deck, ["slides/cover.html"])
+    assert result["preview_files"] == [str(png / "cover.png")]
+    assert (png / "cover.png").read_bytes() == b"\x89PNG"
 
 
 def test_refresh_html_never_raises(tmp_path) -> None:

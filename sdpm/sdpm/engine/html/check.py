@@ -1,9 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Browser-free static checks for HTML decks (slides/<slug>.html and deck.css).
+"""Static checks for HTML decks (slides/<slug>.html and deck.css), no browser needed.
 
 Every check returns diagnostics ``{"slug", "rule", "message"}``; callers turn them
-into warnings. Nothing here blocks a build.
+into warnings. Nothing here blocks a build. The browser check (layout, JS errors,
+PNG) lives in ``sdpm.engine.html.browser_check``; ``format_check_report`` reports both.
 
 Rules:
     structure               not exactly one top-level ``<section>``, or a nested one
@@ -28,6 +29,8 @@ Rules:
                             sprite, which the deck's CSP / the browser does not load)
     data-background         reveal.js ``data-background*`` attributes
     self-chrome             slide numbers / footers drawn by the slide (the assembler draws them)
+    placeholder-unknown     a ``data-ph`` key (idx or alias) that the slide's layout does not
+                            have (skipped for unknown layouts, chrome and self-chrome keys)
     root-in-slide-style     ``:root`` in a slide ``<style>`` (tokens come from the style)
     root-in-deck-css        ``:root`` in deck.css
     data-slug               ``data-slug`` set by the author (the assembler sets it)
@@ -54,7 +57,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from sdpm.engine.checks.font_size import parse_allowed_font_sizes
 
@@ -329,12 +332,35 @@ def _external_attr_diags(slug: str, el) -> list[dict]:
     return out
 
 
+def _is_chrome_ph(ph: str, chrome_keys: set[str]) -> bool:
+    return ph in chrome_keys or ph.lower() in _CHROME_PH_NAMES
+
+
+def _key_order(key: str) -> tuple[int, int, str]:
+    """Aliases (names) first, then idx keys numerically: ``title, 0, 1``."""
+    return (1, int(key), "") if key.isdigit() else (0, 0, key)
+
+
+def _placeholder_diags(slug: str, el, layout: str | None, placeholders: Mapping[str, set[str]] | None,
+                       chrome_keys: set[str]) -> list[dict]:
+    ph = el.get("data-ph")
+    if (ph is None or placeholders is None or layout not in placeholders
+            or el.get("data-sdpm-chrome") is not None or _is_chrome_ph(ph, chrome_keys)):
+        return []
+    keys = placeholders[layout]
+    if ph in keys:
+        return []
+    listed = ", ".join(sorted(keys, key=_key_order)) or "none"
+    return [_diag(slug, "placeholder-unknown",
+                  f'data-ph="{ph}" is not a placeholder of layout {layout!r} (keys: {listed})')]
+
+
 def _self_chrome_diags(slug: str, el, chrome_keys: set[str]) -> list[dict]:
     if el.get("data-sdpm-chrome") is not None:
         return []
     out = []
     ph = el.get("data-ph")
-    if ph is not None and (ph in chrome_keys or ph.lower() in _CHROME_PH_NAMES):
+    if ph is not None and _is_chrome_ph(ph, chrome_keys):
         out.append(_diag(slug, "self-chrome",
                          f'data-ph="{ph}" is a date / footer / slide-number placeholder; '
                          "the assembler draws slide numbers and footers"))
@@ -411,8 +437,13 @@ def check_slide_html(
     *,
     layouts: set[str],
     chrome_keys: set[str] = frozenset(),
+    placeholders: Mapping[str, set[str]] | None = None,
 ) -> list[dict]:
-    """Static checks for one ``slides/<slug>.html`` (see the module docstring for rules)."""
+    """Static checks for one ``slides/<slug>.html`` (see the module docstring for rules).
+
+    ``placeholders`` maps layout name → its ``data-ph`` keys (idx keys and aliases);
+    without it the ``placeholder-unknown`` rule is skipped.
+    """
     from sdpm.engine.html.assemble import parse_slide
     from sdpm.engine.html.slide_js import is_slide_script
 
@@ -452,6 +483,7 @@ def check_slide_html(
                              "(refresh navigates the deck away, which the CSP cannot stop)"))
         out.extend(_external_attr_diags(slug, el))
         out.extend(_self_chrome_diags(slug, el, chrome_keys))
+        out.extend(_placeholder_diags(slug, el, layout, placeholders, chrome_keys))
         if el.tag == "style":
             css = el.text or ""
             if _ROOT_SEL_RE.search(_CSS_COMMENT_RE.sub("", css)):
@@ -488,36 +520,42 @@ def check_deck_css(text: str, art_direction_path: Path) -> list[dict]:
     return out
 
 
-# ── preview / reporting ──────────────────────────────────────────────────
+# ── reporting ────────────────────────────────────────────────────────────
 
-def html_preview_unavailable(output_html: Path) -> dict:
-    """The preview result for HTML decks (phase 1 has no PNG preview)."""
-    return {
-        "status": "unavailable",
-        "reason": "html-deck",
-        "open": str(output_html),
-        "note": "HTML decks have no PNG preview yet: open output.html in a browser to check "
-                "the slides (S opens the speaker view).",
-    }
+CHECK_REPORT_HEADER = "Checks:"
 
 
-CHECK_REPORT_HEADER = "Static checks (no browser; open output.html to see the slides):"
+def not_in_deck_message(slug: str) -> str:
+    """The line for a requested slug the deck does not build (never reported as OK)."""
+    return (f"{slug}: not in the deck, so not checked — the outline must list [{slug}] and "
+            f"slides/{slug}.html must exist")
 
 
-def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None) -> str:
-    """Plain-text static check report (the HTML counterpart of the measure report).
+def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None, browser: dict | None = None,
+                        *, not_in_deck: Iterable[str] = ()) -> str:
+    """Plain-text check report (the HTML counterpart of the measure report).
 
     With ``slugs``, lists each of them (``OK`` when clean) plus deck.css findings;
-    without, lists every slug that has findings.
+    without, lists every slug that has findings. ``browser`` (generate_html's
+    ``browser_check``) adds a ``browser:`` line under the header. ``not_in_deck``: requested
+    slugs the deck does not build, listed as not checked.
     """
+    not_in_deck = list(dict.fromkeys(not_in_deck))
     by_slug: dict[str, list[dict]] = {}
     for d in diags:
         by_slug.setdefault(d["slug"], []).append(d)
     order = list(slugs) if slugs is not None else [s for s in by_slug if s != DECK_CSS_SLUG]
     lines = [CHECK_REPORT_HEADER]
+    if browser is not None:
+        if browser.get("note"):
+            lines.append(f"  browser: {browser['status']} — {browser['note']}")
+        else:
+            lines.append(f"  browser: {browser['status']} ({browser.get('browser', 'browser')}, "
+                         f"{browser.get('seconds', 0)} s)")
     if DECK_CSS_SLUG in by_slug:
         order = [DECK_CSS_SLUG, *[s for s in order if s != DECK_CSS_SLUG]]
-    if not order:
+    order = [s for s in order if s not in not_in_deck]
+    if not order and not not_in_deck:
         lines.append("  no issues")
     for slug in order:
         found = by_slug.get(slug, [])
@@ -526,6 +564,7 @@ def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None) -
             continue
         lines.append(f"{slug}: {len(found)} issue(s)")
         lines.extend(f"  [{d['rule']}] {d['message']}" for d in found)
+    lines.extend(not_in_deck_message(slug) for slug in not_in_deck)
     return "\n".join(lines)
 
 
@@ -536,7 +575,6 @@ __all__ = [
     "check_html_font_sizes",
     "check_slide_html",
     "format_check_report",
-    "html_preview_unavailable",
     "image_set_strings",
     "parse_srcset",
     "url_kind",

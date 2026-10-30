@@ -514,6 +514,8 @@ urllib3==2.8.0
     #   requests
 uvicorn==0.53.0
     # via mcp
+websockets==17.3
+    # via sdpm-skill
 wrapt==2.4.1
     # via
     #   opentelemetry-instrumentation

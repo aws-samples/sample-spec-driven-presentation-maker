@@ -9,9 +9,10 @@ Slide content may originate from LLM-generated text. Review output before distri
 
 The build itself is ``sdpm.api.refresh_html`` / ``sdpm.api.generate_html`` — the
 same code as the local server. This module only materialises the S3 workspace
-into a tmpdir, uploads ``output.html`` and the per-slide previews under ``html/``
-(served through presigned URLs only, see shared/html_artifacts.py), keeps the
-deck record pointing at the newest artifact, and deletes superseded objects.
+into a tmpdir, uploads ``output.html``, the per-slide previews and the browser
+check's PNGs under ``html/`` (served through presigned URLs only, see
+shared/html_artifacts.py), keeps the deck record pointing at the newest artifact,
+and deletes superseded objects.
 """
 
 import json
@@ -23,12 +24,15 @@ import time
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
-from typing import Any
+from typing import Any, Callable
 
 from shared.html_artifacts import (
     HTML_CONTENT_TYPE,
     build_html_preview_key_map,
     output_key,
+    png_key,
+    png_prefix,
+    png_slug_epoch,
     preview_key,
     preview_prefix,
 )
@@ -37,9 +41,7 @@ from tools import template_html_cache
 
 logger = logging.getLogger("sdpm.html_deck")
 
-REMOTE_PREVIEW_NOTE = "HTML decks have no PNG previews; the Web UI shows the deck and its thumbnails."
-# Replaces the core report header, which points at a local output.html.
-REMOTE_CHECK_REPORT_HEADER = "Static checks (no browser; the Web UI shows the deck and its thumbnails):"
+PNG_CONTENT_TYPE = "image/png"
 
 # Deck files the HTML build reads (deck.json is written from the S3 deck.json).
 _BUILD_FILES = frozenset({"specs/outline.md", "specs/art-direction.html", "deck.css"})
@@ -132,27 +134,43 @@ def _outline_order(tmpdir: Path, slugs: dict[str, str]) -> list[str]:
     return order + [s for s in slugs if s not in order]
 
 
+def _upload_all(
+    deck_id: str, files: dict[str, Path], key_for: Callable[[str], str], content_type: str, storage: Storage,
+) -> dict[str, str]:
+    """Upload ``files`` ({slug: path}) on the thread pool; returns {slug: key} of the successes."""
+
+    def _one(slug: str) -> tuple[str, str | None]:
+        key = key_for(slug)
+        try:
+            storage.upload_file(key=key, data=files[slug].read_bytes(), content_type=content_type)
+            return slug, key
+        except Exception:
+            logger.warning("upload of %s failed for %s/%s", key, deck_id, slug, exc_info=True)
+            return slug, None
+
+    if not files:
+        return {}
+    with ThreadPoolExecutor(max_workers=_UPLOAD_WORKERS) as pool:
+        done = list(pool.map(_one, files))
+    return {slug: key for slug, key in done if key}
+
+
 def _upload_previews(
     deck_id: str, tmpdir: Path, previews: dict[str, str], slugs: list[str], epoch: int, storage: Storage,
 ) -> dict[str, str]:
     """Upload ``preview/<slug>.html`` of ``slugs`` under one epoch; returns {slug: key} of the successes."""
+    return _upload_all(
+        deck_id, {slug: tmpdir / previews[slug] for slug in slugs},
+        lambda slug: preview_key(deck_id, slug, epoch), HTML_CONTENT_TYPE, storage,
+    )
 
-    def _one(slug: str) -> tuple[str, str | None]:
-        key = preview_key(deck_id, slug, epoch)
-        try:
-            storage.upload_file(
-                key=key, data=(tmpdir / previews[slug]).read_bytes(), content_type=HTML_CONTENT_TYPE,
-            )
-            return slug, key
-        except Exception:
-            logger.warning("preview upload failed for %s/%s", deck_id, slug, exc_info=True)
-            return slug, None
 
-    if not slugs:
-        return {}
-    with ThreadPoolExecutor(max_workers=_UPLOAD_WORKERS) as pool:
-        done = list(pool.map(_one, slugs))
-    return {slug: key for slug, key in done if key}
+def _upload_pngs(deck_id: str, png_files: list[str], epoch: int, storage: Storage) -> dict[str, str]:
+    """Upload the browser check's ``<slug>.png`` files under one epoch; returns {slug: key}."""
+    return _upload_all(
+        deck_id, {Path(p).stem: Path(p) for p in png_files},
+        lambda slug: png_key(deck_id, slug, epoch), PNG_CONTENT_TYPE, storage,
+    )
 
 
 def _delete(storage: Storage, keys: list[str]) -> None:
@@ -205,12 +223,51 @@ def _slug_epoch(key: str) -> tuple[str, int] | None:
     return (m.group(1), int(m.group(2))) if m else None
 
 
-def _listed_previews(storage: Storage, deck_id: str) -> list[str]:
+def _listed(storage: Storage, prefix: str) -> list[str]:
     try:
-        return storage.list_files(prefix=preview_prefix(deck_id), bucket=storage.pptx_bucket)
+        return storage.list_files(prefix=prefix, bucket=storage.pptx_bucket)
     except Exception:
-        logger.warning("preview listing failed for %s", deck_id, exc_info=True)
+        logger.warning("listing of %s failed", prefix, exc_info=True)
         return []
+
+
+def _listed_previews(storage: Storage, deck_id: str) -> list[str]:
+    return _listed(storage, preview_prefix(deck_id))
+
+
+def _stale_pngs(listed: list[str], uploaded: dict[str, str], checked: set[str], dropped: set[str],
+                epoch: int) -> list[str]:
+    """PNG keys to delete: older epochs of the slides uploaded now, PNGs of slides checked
+    now that produced none (their check did not finish), and PNGs of slides whose file is
+    in this snapshot but did not build (``dropped``, e.g. a structure error).
+
+    A slug absent from the snapshot is left alone: a parallel composer may have written
+    it after this snapshot was taken, and its fresh PNG must survive. Removed slides lose
+    their PNG at ``finalize_html_deck``.
+    """
+    stale = []
+    for key in listed:
+        se = png_slug_epoch(key)
+        if se and ((se[0] in uploaded and se[1] < epoch) or (se[0] in checked and se[0] not in uploaded)
+                   or se[0] in dropped):
+            stale.append(key)
+    return stale
+
+
+def _log_browser_check(deck_id: str, user_id: str, browser: dict, html_bytes: Any) -> None:
+    """One structured line per check (CloudWatch: per-build seconds and timings)."""
+    logger.info(json.dumps({
+        "kind": "html_browser_check",
+        "deck_id": deck_id,
+        "user_id": user_id,
+        "status": browser.get("status"),
+        "slides": browser.get("slides"),
+        "bytes": html_bytes,
+        "seconds": browser.get("seconds"),
+        "timings": browser.get("timings") or {},
+        "network_blocked": browser.get("network_blocked"),
+        "blocked_requests": browser.get("blocked_requests"),
+    }))
 
 
 def refresh_html_deck(
@@ -223,13 +280,16 @@ def refresh_html_deck(
 ) -> dict:
     """run_python post-processing for an HTML deck: rebuild, upload, record.
 
-    Uploads output.html to a new ``html/{deck}/<uuid>.html`` key and the previews of
-    the affected, measured and not-yet-uploaded slides under one epoch. Never raises:
+    Uploads output.html to a new ``html/{deck}/<uuid>.html`` key, the previews of
+    the affected, measured and not-yet-uploaded slides under one epoch, and the PNGs
+    of the slides the browser check rendered (``html/{deck}/png/``). Never raises:
     a failure comes back as ``html_error`` (the deck's HTML is then stale).
 
     Returns:
         The ``sdpm.api.refresh_html`` result with ``html`` = the S3 key, ``previews``
-        = {slug: key} uploaded now, and the remote preview note.
+        = {slug: key} uploaded now and ``png_previews`` = the slugs whose PNG was
+        uploaded now (instead of the local ``preview_files``); ``browser_check``
+        without its timings, which are logged.
     """
     from sdpm.api import refresh_html
 
@@ -250,10 +310,21 @@ def refresh_html_deck(
         listed = _listed_previews(storage, deck_id)
         existing = build_html_preview_key_map(listed)
         wanted = set(built.get("affected") or []) | set(measure_slides or [])
+        checked = wanted & set(order) if "browser_check" in built else set()
         wanted |= {s for s in order if s not in existing}
         uploaded = _upload_previews(deck_id, tmpdir, previews, [s for s in order if s in wanted], epoch, storage)
+        pngs = _upload_pngs(deck_id, built.get("preview_files") or [], epoch, storage)
 
-        result: dict[str, Any] = {k: v for k, v in built.items() if k not in ("html", "previews")}
+        result: dict[str, Any] = {
+            k: v for k, v in built.items() if k not in ("html", "previews", "preview_files", "browser_check")
+        }
+        if "browser_check" in built:
+            browser = dict(built["browser_check"])
+            _log_browser_check(deck_id, user_id, browser, built.get("html_bytes"))
+            browser.pop("timings", None)
+            browser.pop("network_blocked", None)
+            browser.pop("blocked_requests", None)
+            result["browser_check"] = browser
         # thumbnailS3Key follows slide 1: set when slide 1 was uploaded now, or
         # when the record has none yet.
         first = order[0] if order else None
@@ -280,18 +351,14 @@ def refresh_html_deck(
             # must list exactly the slides output.html contains, or the Web UI's
             # thumbnail index drifts from the player's slide index.
             built_slugs = set(order)
+            dropped = {p.stem for p in (tmpdir / "slides").glob("*.html")} - built_slugs
             _delete(storage, [
                 k for k in listed
                 if (se := _slug_epoch(k))
                 and ((se[0] in uploaded and se[1] < epoch) or se[0] not in built_slugs)
-            ])
+            ] + _stale_pngs(_listed(storage, png_prefix(deck_id)), pngs, checked, dropped, epoch))
         result["previews"] = uploaded
-        if "preview" in result:
-            result["preview"] = {"status": "unavailable", "reason": "html-deck", "note": REMOTE_PREVIEW_NOTE}
-        if isinstance(result.get("measure"), str):
-            from sdpm.engine.html.check import CHECK_REPORT_HEADER
-
-            result["measure"] = result["measure"].replace(CHECK_REPORT_HEADER, REMOTE_CHECK_REPORT_HEADER, 1)
+        result["png_previews"] = [s for s in order if s in pngs]
         template_html_cache.persist(tmpdir / "template.pptx", storage, cache_root)
         return result
     except Exception as e:  # reported to the agent, never raised
@@ -311,8 +378,10 @@ def finalize_html_deck(
     """generate_pptx for an HTML deck: full build, every preview, record, KB sync.
 
     Uploads output.html and all previews under a new epoch, deletes every older
-    preview and the superseded output, points the record (htmlS3Key, slideCount,
-    thumbnailS3Key = slide 1) at them and indexes the slides' text in the KB.
+    preview, the PNGs of slides no longer in the deck and the superseded output,
+    points the record (htmlS3Key, slideCount, thumbnailS3Key = slide 1) at them and
+    indexes the slides' text in the KB. No browser check runs: every slide was
+    checked when run_python wrote it.
 
     Returns:
         {status, outputFormat: "html", slideCount, slides, bytes} plus ``warnings``
@@ -343,7 +412,10 @@ def finalize_html_deck(
             uploaded.get(order[0]) if order else None, True,
         )
         fresh = set(uploaded.values())
-        _delete(storage, [k for k in before if k not in fresh])
+        deck_slugs = set(order)
+        gone_pngs = [k for k in _listed(storage, png_prefix(deck_id))
+                     if (se := png_slug_epoch(k)) and se[0] not in deck_slugs]
+        _delete(storage, [k for k in before if k not in fresh] + gone_pngs)
         texts = html_slide_texts(tmpdir)
         template_html_cache.persist(tmpdir / "template.pptx", storage, cache_root)
     finally:

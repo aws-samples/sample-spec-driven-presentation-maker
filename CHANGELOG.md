@@ -12,6 +12,26 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **HTML output mode (phase 4, browser check and PNG previews).** Each `run_python` that
+  writes or changes HTML slides opens those slides (and `measure_slides`) in a browser over
+  the DevTools protocol: locally headless Chrome or Edge (DevTools on 127.0.0.1 at a random
+  port, throwaway profile, networking off), in the cloud AWS AgentCore Browser
+  (`aws.browser.v1`). Both block http(s) / ws(s) requests from the page; a browser that
+  rejects the block fails the check before any slide runs. Every fragment is shown and animations are finished, then the slide is
+  measured and layout findings come back as warnings with new rules `overlap`, `overflow`,
+  `outside-region` and `decoration-overlap` (4 px tolerance), next to JS errors (`js-error`).
+  Each checked slide gets a PNG, 1280 px on the long edge: locally
+  `<deck>/preview/png/<slug>.png`, returned as `preview_files` like PPTX previews; in the
+  cloud `html/{deckId}/png/{slug}_{epoch}.png`, returned by `get_preview`, which now gives
+  images for HTML decks. A skipped, stopped or unfinished check adds a one-line
+  `output.html: Browser check …` warning and is never reported as clean. The CLI
+  `generate_html` checks every slide; `measure` / `preview` on an HTML deck run the check and
+  print the report / PNG paths. The cloud finalize (`generate_pptx`) runs no check. New
+  static-check rule `placeholder-unknown`: a `data-ph` key the slide's layout does not have.
+  New dependency: `websockets` (sync CDP client). The HTML composer document now follows
+  the PPTX flow (fix warnings, look at the PNG, then the next slug). Deploy: SdpmData,
+  SdpmRuntime, SdpmAgent.
+
 - **HTML output mode (phase 3, JavaScript).** HTML slides may contain inline `<script>`
   elements. The assembler moves each one out of its section, wraps it and runs it once per
   section element the first time the slide is shown (`section` is the slide's element); every
@@ -83,6 +103,23 @@ Entries before v0.5.0 were written retroactively as summaries.
   rejects 0.1 with "temperature is deprecated"), with prompt caching enabled, and is
   listed in the example config's Recommended group. Unlike Haiku 4.5 it is not
   excluded from the Create picker.
+
+### Changed
+
+- **HTML decks: `js_check` is now `browser_check`.** The `run_python` / `generate_html`
+  result key `js_check` is replaced by `browser_check` (`status` `ok` / `issues` / `skipped`
+  / `navigated` / `timeout` / `failed`, plus `browser`, `seconds`, `slides`, `note`), and the
+  `output.html: JS check …` warnings by `output.html: Browser check …`. The HTML measure
+  report header is now `Checks:`. Decks without scripts are checked too (layout and PNG).
+- **AgentCore runtime role.** The MCP runtime role gains
+  `bedrock-agentcore:StartBrowserSession`, `StopBrowserSession` and
+  `ConnectBrowserAutomationStream` on `arn:aws:bedrock-agentcore:<region>:aws:browser/aws.browser.v1`
+  only.
+
+### Removed
+
+- **`SDPM_JS_CHECK`.** The variable is gone, also from the cloud runtime image; use
+  `SDPM_BROWSER=none` to turn the browser check off.
 
 ### Fixed
 

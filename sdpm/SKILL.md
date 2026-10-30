@@ -41,7 +41,9 @@ and written directly with normal file I/O. Everything the workflows describe as 
 call (`read_text`, `write_file`, etc.) is just that: open the path, read or write it.
 
 HTML decks (deck.json `outputFormat` `html`; composer: `start composing --mode html`) have
-no `run_python` post-processing here — run `generate_html <deck>` after writing slides.
+no `run_python` post-processing here — run `generate_html <deck>` after writing slides. It
+also checks every slide in a local Chrome / Edge (layout, JS errors) when one is installed;
+`measure <deck>` reports those checks and `preview <deck>` writes PNGs to `preview/png/`.
 
 ## Start here
 

@@ -80,9 +80,9 @@ HTML decks (`deck.json` `outputFormat: "html"`) use the same tools with these di
 |------|---------------------|
 | `init_deck_workspace` | `output_format="html"` creates an HTML deck (default `pptx`) |
 | `start_composing` | `mode="html"` returns the HTML composer document, the template converted for HTML and the deck's `deck.css` |
-| `run_python` | After a change to an HTML build input, rebuilds `output.html` and the changed slides' thumbnails and uploads them under `html/` |
-| `generate_pptx` | Finalizes the deck as HTML: full build, every thumbnail, deck record update, knowledge-base sync (`search_slides` indexes HTML slides) |
-| `get_preview` | Returns a note instead of images: HTML decks have no PNG previews; the Web UI shows the deck and its thumbnails |
+| `run_python` | After a change to an HTML build input, rebuilds `output.html` and the changed slides' thumbnails, runs the browser check on the changed slides (and `measure_slides`) and uploads thumbnails and PNGs under `html/` |
+| `generate_pptx` | Finalizes the deck as HTML: full build, every thumbnail, deck record update, knowledge-base sync (`search_slides` indexes HTML slides); no browser check (every slide was checked when it was written) |
+| `get_preview` | Returns the PNGs the browser check made (`html/{deckId}/png/{slug}_{epoch}.png`); a slug without one gets a text line |
 
 The remote build reads and updates the deck record under the caller's user id, as the PPTX
 build does. Only the deck owner's `run_python` / `generate_pptx` therefore rebuild an HTML
@@ -177,13 +177,27 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
 - Slide scripts can still navigate or open tabs: no CSP directive stops that. The static
   checks warn on `location`, `window.open`, `top.` and external URLs in slide scripts
   (`script-external`), and the deck always plays in the sandboxed iframe described below.
-- Locally, a deck with slide scripts is opened in headless Chrome or Edge after each build to
-  collect JS errors, with networking disabled (proxy to a closed port, host resolution off,
-  no non-proxied WebRTC) and a throwaway profile. It is skipped when no browser is found and
-  in the cloud runtime image (`SDPM_JS_CHECK=0`); `SDPM_JS_CHECK=0` disables it locally too,
-  and `SDPM_BROWSER` picks the executable (`none` disables). A check that is skipped or does
-  not finish adds a one-line `output.html: JS check …` warning, and a slide that navigates
-  the page away stops the check at once (the slide helper logs `pagehide`).
+- After each build that changes slides, the browser check (`sdpm.engine.html.browser_check`)
+  opens `output.html` in a browser over the DevTools protocol, shows each changed slide with
+  every fragment and finished animations, measures placeholders, regions and blocks (layout
+  rules in `layout_judge.py`), collects JS errors and captures a 1280 px PNG. The browser
+  comes from a seam in the core, `sdpm.engine.html.browser`: `SDPM_BROWSER=none` turns it
+  off, then a source registered by an adapter, then `SDPM_BROWSER=<path>`, then an
+  auto-detected Chrome / Edge. Locally that is headless Chrome or Edge with networking
+  disabled (proxy to a closed port, host resolution off, no non-proxied WebRTC), a throwaway
+  profile and `--remote-debugging-port=0`, so DevTools listens on 127.0.0.1 at a random port.
+  In the cloud, `servers/remote/tools/agentcore_browser.py` registers AgentCore Browser
+  (`aws.browser.v1`): it starts a session sized to the deck, connects to the automation
+  stream with SigV4-signed headers and always stops the session. The AWS code lives in
+  `servers/remote` because dependencies point inward and the core never imports boto3. Both
+  sources fail every `http(s)://` and `ws(s)://` request of the page, navigations included
+  (the DevTools `Fetch` domain; `Network.setBlockedURLs` lets top-level navigations through
+  in AgentCore Browser), and close pages the deck opens before they load; a browser that rejects the block fails the check before any slide
+  runs. The runtime role gets `bedrock-agentcore:StartBrowserSession`,
+  `StopBrowserSession` and `ConnectBrowserAutomationStream` on the
+  `aws.browser.v1` ARN only. A check that is skipped, stopped by a slide that navigates the
+  page away (the slide helper logs `pagehide`), or does not finish within
+  `min(30 + 3 × slides, 110)` s adds a one-line `output.html: Browser check …` warning.
 - HTML objects live under `html/` in the deck bucket. No CloudFront behaviour serves
   `html/*` and the CloudFront OAC bucket-policy grant does not include it.
 - The API returns S3 presigned URLs on the bucket's regional host (a different origin from

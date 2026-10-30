@@ -25,7 +25,7 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 | Tool | Description |
 |------|-------------|
 | `generate_pptx` | Finalize the deck: PPTX, or `output.html` and thumbnails for an HTML deck |
-| `get_preview` | Get PNG preview URLs (HTML decks: a note, no images) |
+| `get_preview` | Get PNG preview URLs (HTML decks: the PNGs of the browser check) |
 
 ### Assets
 | Tool | Description |

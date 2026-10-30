@@ -15,6 +15,9 @@ from unittest.mock import MagicMock, patch
 import pytest
 
 from sdpm import api
+from sdpm.engine.html import browser_check
+from sdpm.engine.html.browser import DISABLED_NOTE
+from sdpm.engine.html.check import CHECK_REPORT_HEADER
 from shared.html_artifacts import HTML_CONTENT_TYPE, TEMPLATE_CACHE_PREFIX
 from tools import html_deck, template_html_cache
 from tools import init as init_mod
@@ -319,9 +322,10 @@ def test_run_python_html_measure_reports_and_previews_measured(server, storage, 
 
     assert list(out["previews"]) == ["cover"]
     assert "cover" in out["measure"]
-    assert out["measure"].startswith(html_deck.REMOTE_CHECK_REPORT_HEADER)
-    assert "output.html" not in out["measure"]
-    assert out["preview"]["note"] == html_deck.REMOTE_PREVIEW_NOTE and "open" not in out["preview"]
+    assert out["measure"].startswith(CHECK_REPORT_HEADER)
+    # SDPM_BROWSER=none (conftest): the core's unavailable preview passes through.
+    assert out["preview"] == {"status": "unavailable", "reason": "browser-skipped", "note": DISABLED_NOTE}
+    assert out["png_previews"] == [] and "preview_files" not in out
 
 
 def test_run_python_html_non_build_change_does_nothing(server, storage, monkeypatch):
@@ -342,11 +346,9 @@ def test_run_python_html_record_failure_reports_stale_html(server, storage, monk
     assert storage.html_keys() == []  # the orphaned upload was deleted
 
 
-def test_js_deck_reports_the_skipped_js_check(server, storage, tmp_path, monkeypatch):
-    """With SDPM_JS_CHECK=0 (the runtime image), run_python and generate_pptx of a deck with
-    slide scripts carry the one-line skip note among the warnings the agent reads."""
-    from sdpm.engine.html.jscheck import DISABLED_NOTE
-
+def test_js_deck_reports_the_skipped_browser_check(server, storage, tmp_path, monkeypatch):
+    """With SDPM_BROWSER=none (conftest), run_python of a deck carries the one-line skip
+    note among the warnings the agent reads; generate_pptx (finalize) checks nothing."""
     _no_pptx(monkeypatch)
     body = SLIDES["body"].replace("</section>", "<script>var x = 1;</script></section>")
     _seed_html_deck(storage, tmp_path / "js", {"cover": SLIDES["cover"], "body": body})
@@ -355,10 +357,177 @@ def test_js_deck_reports_the_skipped_js_check(server, storage, tmp_path, monkeyp
 
     out = _run(server)
     assert note in out["warnings"], out
-    assert out["js_check"] == {"status": "skipped", "note": DISABLED_NOTE}
+    assert out["browser_check"] == {"status": "skipped", "slides": 0, "note": DISABLED_NOTE}
     assert note in _run(server, measure=["cover"])["warnings"]
     result = json.loads(server.generate_pptx(deck_id="d1"))
-    assert note in result["warnings"]["build"], result
+    assert note not in (result.get("warnings") or {}).get("build", []), result
+
+
+def test_unreachable_agentcore_browser_is_one_warning_line(server, storage, monkeypatch):
+    """AgentCore Browser that cannot be started: run_python says so in one line, never clean."""
+    from tools import agentcore_browser
+    from sdpm.engine.html import browser as browser_mod
+
+    class DeniedClient:
+        def start_browser_session(self, **_kw):
+            raise RuntimeError("AccessDeniedException: not authorized")
+
+        def stop_browser_session(self, **_kw):  # pragma: no cover - nothing started
+            pytest.fail("stopped a session that never started")
+
+    _no_pptx(monkeypatch)
+    monkeypatch.delenv("SDPM_BROWSER")
+    monkeypatch.setattr(browser_mod, "_registered", agentcore_browser.make_source(
+        "ap-northeast-1", client_factory=DeniedClient))
+    _sandbox(monkeypatch, ["slides/body.html"])
+
+    out = _run(server)
+
+    lines = [w for w in out["warnings"] if w.startswith("output.html: Browser check")]
+    assert lines == [lines[0]] and "\n" not in lines[0], out["warnings"]
+    assert lines[0].startswith("output.html: Browser check could not run (AgentCore Browser): RuntimeError: "
+                               "AccessDeniedException")
+    assert out["browser_check"]["status"] == "failed" and out["png_previews"] == []
+
+
+# --- browser check PNGs -----------------------------------------------------------
+
+_PNG_KEY = re.compile(r"^html/d1/png/([a-z0-9-]+)_(\d+)\.png$")
+
+
+def _png_bytes(size=(1280, 720)) -> bytes:
+    import io
+
+    from PIL import Image as PILImage
+
+    buf = io.BytesIO()
+    PILImage.new("RGB", size, (30, 60, 90)).save(buf, format="PNG")
+    return buf.getvalue()
+
+
+def _fake_check(monkeypatch, *, no_png: frozenset = frozenset(), seen: list | None = None):
+    """check_deck stand-in: a PNG per checked slug (except ``no_png``), status ok."""
+
+    def fake(output_html, slugs, *, slide_size, line_map, layouts, decorations, png_dir=None, deadline=None):
+        if seen is not None:
+            seen.append(list(slugs))
+        pngs = {}
+        for slug in slugs:
+            if slug in no_png or png_dir is None:
+                continue
+            Path(png_dir).mkdir(parents=True, exist_ok=True)
+            path = Path(png_dir) / f"{slug}.png"
+            path.write_bytes(_png_bytes())
+            pngs[slug] = str(path)
+        status = "timeout" if no_png else "ok"
+        result = {"status": status, "browser": "AgentCore Browser", "seconds": 1.5, "slides": len(pngs),
+                  "checked": list(pngs), "findings": {}, "errors": [], "pngs": pngs,
+                  "timings": {"acquire": 0.9, "connect": 0.1, "load": 0.2, "slides": 0.3, "release": 0.1},
+                  "network_blocked": True, "blocked_requests": 0}
+        if no_png:
+            result["note"] = "Browser check did not finish within 33 s; …"
+        return result
+
+    monkeypatch.setattr(browser_check, "check_deck", fake)
+
+
+def _png_keys(storage) -> list[str]:
+    return sorted(k for k in storage.objects if _PNG_KEY.match(k))
+
+
+def test_run_python_html_uploads_pngs_of_checked_slides(server, storage, monkeypatch, caplog):
+    import logging
+
+    _no_pptx(monkeypatch)
+    _fake_check(monkeypatch)
+    old = {"html/d1/png/body_100.png", "html/d1/png/cover_100.png", "html/d1/png/other_100.png",
+           "html/d1/png/broken_100.png"}
+    storage.objects.update({k: b"x" for k in old})
+    storage.objects["decks/d1/slides/broken.html"] = b"<p>no section</p>"
+    _sandbox(monkeypatch, ["slides/body.html"])
+
+    with caplog.at_level(logging.INFO, logger="sdpm.html_deck"):
+        out = _run(server)
+
+    assert "html_error" not in out, out
+    assert out["png_previews"] == ["body"] and "preview_files" not in out
+    [fresh] = [k for k in _png_keys(storage) if k not in old]
+    assert _PNG_KEY.match(fresh).group(1) == "body" and storage.content_types[fresh] == "image/png"
+    # The superseded body PNG and the PNG of a slide in this snapshot that did not build go;
+    # cover was not checked, and "other" is not in this snapshot (a parallel composer may
+    # have just written it), so both stay.
+    assert "html/d1/png/body_100.png" in storage.deleted and "html/d1/png/broken_100.png" in storage.deleted
+    assert "html/d1/png/cover_100.png" in storage.objects and "html/d1/png/other_100.png" in storage.objects
+    assert out["browser_check"] == {"status": "ok", "browser": "AgentCore Browser", "seconds": 1.5, "slides": 1}
+    [line] = [json.loads(r.getMessage()) for r in caplog.records
+              if r.getMessage().startswith('{"kind": "html_browser_check"')]
+    assert line["deck_id"] == "d1" and line["user_id"] == "user1" and line["status"] == "ok"
+    assert line["slides"] == 1 and line["seconds"] == 1.5 and line["bytes"] > 0
+    assert line["timings"]["acquire"] == 0.9 and line["network_blocked"] is True
+    assert line["blocked_requests"] == 0
+
+
+def test_run_python_html_checked_slide_without_png_loses_its_old_png(server, storage, monkeypatch):
+    """A check that did not finish leaves no stale PNG for get_preview to show."""
+    _no_pptx(monkeypatch)
+    _fake_check(monkeypatch, no_png=frozenset({"body"}))
+    storage.objects.update({"html/d1/png/body_100.png": b"x", "html/d1/png/cover_100.png": b"x"})
+    _sandbox(monkeypatch, [])
+
+    out = _run(server, measure=["body"])
+
+    assert out["png_previews"] == []
+    assert out["browser_check"]["status"] == "timeout"
+    assert out["preview"]["reason"] == "browser-timeout"
+    assert "html/d1/png/body_100.png" in storage.deleted
+    assert "html/d1/png/cover_100.png" in storage.objects
+
+
+def test_get_preview_html_deck_returns_pngs(server, storage, monkeypatch):
+    from mcp.server.fastmcp.utilities.types import Image
+
+    _no_pptx(monkeypatch)
+    _fake_check(monkeypatch)
+    _sandbox(monkeypatch, [])
+    _run(server, measure=["cover"])
+
+    out = server.get_preview(deck_id="d1", slugs=["cover", "body"], quality="low")
+
+    assert out[0] == "Slide cover" and isinstance(out[1], Image)
+    assert out[2] == 'No PNG for body yet: run run_python with measure_slides=["body"]'
+    assert len(out) == 3
+
+
+def test_get_preview_html_deck_png_gone_before_download(server, storage, monkeypatch):
+    """A PNG superseded between the listing and the download gets the text line, not an error."""
+    storage.objects["html/d1/png/cover_100.png"] = _png_bytes()
+    listed = storage.list_files
+    monkeypatch.setattr(storage, "list_files", lambda prefix, bucket="": (
+        listed(prefix, bucket), storage.objects.pop("html/d1/png/cover_100.png", None))[0])
+    out = server.get_preview(deck_id="d1", slugs=["cover"])
+    assert out == ['No PNG for cover yet: run run_python with measure_slides=["cover"]']
+
+
+def test_get_preview_html_deck_latest_png_wins(server, storage):
+    from mcp.server.fastmcp.utilities.types import Image
+
+    storage.objects["html/d1/png/cover_100.png"] = b"not a png"
+    storage.objects["html/d1/png/cover_200.png"] = _png_bytes()
+    out = server.get_preview(deck_id="d1", slugs=["cover"])
+    assert out[0] == "Slide cover" and isinstance(out[1], Image)
+
+
+def test_generate_pptx_runs_no_check_and_drops_pngs_of_removed_slides(server, storage, monkeypatch):
+    seen: list = []
+    _fake_check(monkeypatch, seen=seen)
+    storage.objects.update({"html/d1/png/cover_1.png": b"x", "html/d1/png/gone_1.png": b"x"})
+
+    result = json.loads(server.generate_pptx(deck_id="d1"))
+
+    assert result["status"] == "completed", result
+    assert seen == []
+    assert "html/d1/png/gone_1.png" in storage.deleted
+    assert "html/d1/png/cover_1.png" in storage.objects
 
 
 # --- generate_pptx (finalize) -------------------------------------------------
@@ -432,9 +601,9 @@ def test_generate_pptx_pptx_deck_takes_the_pptx_path(server, storage, monkeypatc
 # --- get_preview ---------------------------------------------------------------
 
 
-def test_get_preview_html_deck_returns_note(server):
+def test_get_preview_html_deck_without_pngs_says_how_to_make_them(server):
     assert server.get_preview(deck_id="d1", slugs=["cover"]) == [
-        {"type": "text", "text": html_deck.REMOTE_PREVIEW_NOTE}
+        'No PNG for cover yet: run run_python with measure_slides=["cover"]'
     ]
 
 
@@ -550,11 +719,14 @@ def test_runtime_image_copies_bundled_html_data():
     assert not any(entry.rstrip("/") in ("sdpm/vendor", "sdpm") for entry in ignored)
 
 
-def test_runtime_image_turns_the_js_check_off():
-    """The runtime image has no Chrome / Edge: ENV SDPM_JS_CHECK=0 makes a JS deck's build
-    say the check was skipped instead of telling the agent to open a browser console."""
+def test_runtime_image_pins_websockets():
+    """The browser check's only new dependency is pinned for the runtime image, and the
+    image no longer turns the check off (AgentCore Browser runs it)."""
+    constraints = (_ROOT / "servers" / "remote" / "constraints.txt").read_text(encoding="utf-8")
+    assert re.search(r"^websockets==\d+", constraints, flags=re.MULTILINE)
     dockerfile = (_ROOT / "servers" / "remote" / "Dockerfile").read_text(encoding="utf-8")
-    assert re.search(r"^ENV\s+SDPM_JS_CHECK=0\s*$", dockerfile, flags=re.MULTILINE)
+    # Neither the new switch (SDPM_BROWSER) nor the removed phase-3 one may be set.
+    assert not re.search(r"^ENV\s+SDPM_(BROWSER|JS_CHECK)\b", dockerfile, flags=re.MULTILINE)
 
 
 def test_runtime_image_ships_vendored_libraries():

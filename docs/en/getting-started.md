@@ -131,12 +131,16 @@ overview. To get a PDF, open `output.html?print-pdf` and print from the browser.
   (logos, bands, background art) needs LibreOffice and poppler; without them the layouts and
   placeholders still convert. Templates without decorations, such as the bundled ones, need
   neither.
-- There is no PNG preview for HTML decks: the local server writes a static per-slide
-  thumbnail (`<deck>/preview/<slug>.html`) next to `output.html`.
+- If Chrome or Edge is installed, each `run_python` that changes slides opens them in a
+  headless browser: layout problems (overlap, overflow, content outside its region or over
+  template decorations) and JS errors come back as warnings, and each checked slide gets a
+  PNG preview (`<deck>/preview/png/<slug>.png`, returned as `preview_files`). Nothing needs
+  installing otherwise: the check is skipped with a one-line warning. `SDPM_BROWSER` picks
+  the browser executable (`none` turns the check off). The local server also writes a
+  static per-slide thumbnail (`<deck>/preview/<slug>.html`) next to `output.html`.
 - PPTX-only features (translation, PPTX import, hand-edit sync) refuse HTML decks.
 - Slides can run JavaScript, with Apache ECharts and D3 bundled (embedded only in decks that
-  use them). If Chrome or Edge is installed, JS errors are reported after each build;
-  nothing needs installing otherwise.
+  use them).
 
 #### HTML decks in the Web UI
 
