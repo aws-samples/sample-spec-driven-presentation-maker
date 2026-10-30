@@ -1165,7 +1165,7 @@ def refresh_html(
         (status other than ok / issues), measure_slides also get preview
         ``{"status": "unavailable", "reason": "browser-<status>", "note"}``.
     """
-    from sdpm.engine.html.check import format_check_report
+    from sdpm.engine.html.check import format_check_report, not_in_deck_message
     from sdpm.engine.schema import affected_slugs
 
     deck_path = Path(deck_dir)
@@ -1192,9 +1192,11 @@ def refresh_html(
         result["preview_files"] = built["preview_files"]
     if measure_slides:
         wanted = set(measure_slides)
+        missing = [s for s in dict.fromkeys(measure_slides) if s not in present]
         result["warnings"] = [text for slug, text in tagged if slug is None or slug in wanted]
+        result["warnings"].extend(not_in_deck_message(s) for s in missing)
         diags = [d for d in built["diagnostics"] if d["slug"] in wanted or d["slug"] not in present]
-        result["measure"] = format_check_report(diags, measure_slides, browser=browser)
+        result["measure"] = format_check_report(diags, measure_slides, browser=browser, not_in_deck=missing)
         if browser is not None and browser["status"] not in ("ok", "issues"):
             result["preview"] = {"status": "unavailable", "reason": f"browser-{browser['status']}",
                                  "note": browser.get("note", "")}

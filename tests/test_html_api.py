@@ -130,6 +130,19 @@ def test_refresh_html_without_measure(tmp_path) -> None:
     assert unchanged["affected"] == [] and "browser_check" not in unchanged
 
 
+def test_refresh_html_measured_slug_not_in_the_deck_is_not_ok(tmp_path) -> None:
+    """A measured slug the deck does not build is reported as not checked, never OK."""
+    deck = _deck(tmp_path)
+    (deck / "slides" / "orphan.html").write_text('<section data-layout="Title Only"></section>', encoding="utf-8")
+    result = api.refresh_html(deck, ["slides/orphan.html"], measure_slides=["cover", "orphan", "typo"])
+    for slug in ("orphan", "typo"):
+        line = (f"{slug}: not in the deck, so not checked — the outline must list [{slug}] and "
+                f"slides/{slug}.html must exist")
+        assert line in result["warnings"] and line in result["measure"].splitlines()
+        assert f"{slug}: OK" not in result["measure"]
+    assert "cover: OK" in result["measure"]
+
+
 def test_refresh_html_with_measure_filters_warnings(tmp_path) -> None:
     from sdpm.engine.html.browser import DISABLED_NOTE
 

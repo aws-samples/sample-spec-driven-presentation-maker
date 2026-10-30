@@ -525,13 +525,22 @@ def check_deck_css(text: str, art_direction_path: Path) -> list[dict]:
 CHECK_REPORT_HEADER = "Checks:"
 
 
-def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None, browser: dict | None = None) -> str:
+def not_in_deck_message(slug: str) -> str:
+    """The line for a requested slug the deck does not build (never reported as OK)."""
+    return (f"{slug}: not in the deck, so not checked — the outline must list [{slug}] and "
+            f"slides/{slug}.html must exist")
+
+
+def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None, browser: dict | None = None,
+                        *, not_in_deck: Iterable[str] = ()) -> str:
     """Plain-text check report (the HTML counterpart of the measure report).
 
     With ``slugs``, lists each of them (``OK`` when clean) plus deck.css findings;
     without, lists every slug that has findings. ``browser`` (generate_html's
-    ``browser_check``) adds a ``browser:`` line under the header.
+    ``browser_check``) adds a ``browser:`` line under the header. ``not_in_deck``: requested
+    slugs the deck does not build, listed as not checked.
     """
+    not_in_deck = list(dict.fromkeys(not_in_deck))
     by_slug: dict[str, list[dict]] = {}
     for d in diags:
         by_slug.setdefault(d["slug"], []).append(d)
@@ -545,7 +554,8 @@ def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None, b
                          f"{browser.get('seconds', 0)} s)")
     if DECK_CSS_SLUG in by_slug:
         order = [DECK_CSS_SLUG, *[s for s in order if s != DECK_CSS_SLUG]]
-    if not order:
+    order = [s for s in order if s not in not_in_deck]
+    if not order and not not_in_deck:
         lines.append("  no issues")
     for slug in order:
         found = by_slug.get(slug, [])
@@ -554,6 +564,7 @@ def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None, b
             continue
         lines.append(f"{slug}: {len(found)} issue(s)")
         lines.extend(f"  [{d['rule']}] {d['message']}" for d in found)
+    lines.extend(not_in_deck_message(slug) for slug in not_in_deck)
     return "\n".join(lines)
 
 
