@@ -24,8 +24,10 @@ Entries before v0.5.0 were written retroactively as summaries.
   (calls that need eval, such as `d3.csvParse`) and `script-dom` (`getElementById`, load
   waits). When Chrome or Edge is installed, a deck with scripts is opened headless after each
   local build, with networking disabled, and JS errors come back as `<slug>: JS error: …`
-  warnings; the result's `js_check` reports the status, or a one-line note when no browser
-  is found. `SDPM_JS_CHECK=0` turns the check off and `SDPM_BROWSER` picks the browser; the
+  warnings; the result's `js_check` reports the status. When the check is skipped (no
+  browser, or `SDPM_JS_CHECK=0`), stopped by a slide that navigates the page away, or times
+  out, a one-line `output.html: JS check …` warning says so. `SDPM_JS_CHECK=0` turns the
+  check off and `SDPM_BROWSER` picks the browser; the
   cloud runtime image sets `SDPM_JS_CHECK=0`. The guide (`slide-html-spec`, section
   Scripts) and the HTML composer document cover the rules with ECharts, D3 and click
   examples. Decks without scripts are unchanged. Deploy: SdpmData, SdpmRuntime.

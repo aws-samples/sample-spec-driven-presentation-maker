@@ -5,7 +5,9 @@
 ``check_js`` opens ``output.html#print-pdf&sdpm-check`` in a headless Chrome or Edge with
 console logging written to a file. The print view runs every slide script once (each
 fragment clone too), and the slide helper logs ``sdpm-check:done`` one second after
-``pdf-ready``. The log is read every 0.1 s until that line or the timeout; then the
+``pdf-ready``. The log is read every 0.1 s until that line, ``sdpm-check:navigated`` (the
+helper logs it on ``pagehide``: a slide script navigated the page away, so the done line
+will never come) or the timeout; then the
 browser is stopped and its temporary profile removed. Console lines that report a
 failing slide (``sdpm slide <slug>: …``), an uncaught exception or a CSP violation
 become errors, attributed to a slug through the assembler's line map.
@@ -16,7 +18,8 @@ not resolve, and WebRTC may not use UDP outside the proxy. No DevTools port is o
 
 Stdlib only: no Playwright, no WebSocket. ``SDPM_BROWSER`` names the executable
 (``none`` disables the check); ``SDPM_JS_CHECK=0`` turns it off (the cloud runtime
-image has no browser).
+image has no browser). A check that did not run or did not finish returns a one-line
+``note``, which the build also adds to its warnings.
 """
 
 from __future__ import annotations
@@ -31,6 +34,7 @@ import time
 from pathlib import Path
 
 DONE = "sdpm-check:done"
+NAVIGATED = "sdpm-check:navigated"
 _ERROR_HINTS = ("sdpm slide ", "Uncaught", "violates the following Content Security Policy",
                 "Refused to")
 # [pid:tid:date/time.us:INFO:CONSOLE:<n>] "<msg>", source: <url> (<n>)   (Chrome 156 / Edge 152)
@@ -59,8 +63,13 @@ _FLAGS = (
     "--force-webrtc-ip-handling-policy=disable_non_proxied_udp",
 )
 
-SKIPPED_NOTE = ("No Chrome or Edge found; JS errors were not checked — open output.html and "
-                "look at the browser console.")
+SKIPPED_NOTE = ("JS check skipped: no Chrome or Edge found, so the slide scripts were not run "
+                "and JS errors are unknown — open output.html and look at the browser console.")
+DISABLED_NOTE = ("JS check skipped: turned off here (SDPM_JS_CHECK=0), so the slide scripts were "
+                 "not run and JS errors are unknown.")
+NAVIGATED_NOTE = ("JS check stopped: a slide script navigated the page away (location, reload, "
+                  "form submit…), so errors after that are unknown — remove the navigation "
+                  "(see the script-external warning).")
 
 
 def js_check_enabled() -> bool:
@@ -154,29 +163,34 @@ def check_js(output_html: Path, line_map, *, timeout: float = 15.0) -> dict:
 
     Returns:
         ``{status, browser?, seconds?, errors, note?}``; status is ``ok`` / ``errors`` /
-        ``skipped`` (no browser) / ``timeout`` (no done line; errors read so far kept) /
-        ``failed`` (the browser could not be run or exited early). errors:
-        ``[{slug | None, line, message}]``.
+        ``skipped`` (``SDPM_JS_CHECK=0`` or no browser) / ``navigated`` (a slide script
+        left the page; errors read so far kept) / ``timeout`` (no done line; errors read
+        so far kept) / ``failed`` (the browser could not be run or exited early). errors:
+        ``[{slug | None, line, message}]``. Every status but ``ok`` / ``errors`` has a note.
     """
+    if not js_check_enabled():
+        return {"status": "skipped", "errors": [], "note": DISABLED_NOTE}
     browser = find_browser()
     if browser is None:
         return {"status": "skipped", "errors": [], "note": SKIPPED_NOTE}
-    profile = tempfile.mkdtemp(prefix="sdpm-jscheck-")
-    log_file = Path(profile) / "console.log"
-    url = Path(output_html).resolve().as_uri() + "#print-pdf&sdpm-check"
-    argv = [browser, *_FLAGS, f"--user-data-dir={profile}", "--enable-logging",
-            f"--log-file={log_file}", "--v=0", url]
+    profile = None
     started = time.monotonic()
-    done = False
+    done = navigated = False
     exit_code = None
     try:
+        profile = tempfile.mkdtemp(prefix="sdpm-jscheck-")
+        log_file = Path(profile) / "console.log"
+        url = Path(output_html).resolve().as_uri() + "#print-pdf&sdpm-check"
+        argv = [browser, *_FLAGS, f"--user-data-dir={profile}", "--enable-logging",
+                f"--log-file={log_file}", "--v=0", url]
         # Fixed argv, no shell; the executable comes from a fixed list or SDPM_BROWSER.
         proc = subprocess.Popen(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
             argv, stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
         try:
             while time.monotonic() - started < timeout:
-                if DONE in _read(log_file):
-                    done = True
+                text = _read(log_file)
+                done, navigated = DONE in text, NAVIGATED in text
+                if done or navigated:
                     break
                 exit_code = proc.poll()
                 if exit_code is not None:
@@ -188,25 +202,33 @@ def check_js(output_html: Path, line_map, *, timeout: float = 15.0) -> dict:
         time.sleep(0.2)
         text = _read(log_file)
     except OSError as exc:
-        _remove(profile)
+        if profile:
+            _remove(profile)
         return {"status": "failed", "browser": browser, "errors": [],
                 "note": f"JS check could not run {Path(browser).name}: {exc}"}
     _remove(profile)
     done = done or DONE in text
+    # Only a navigated line seen before the browser was stopped counts: stopping it may
+    # fire pagehide too.
+    navigated = navigated and not done
     errors = [{"slug": _slug_of(line, msg, line_map), "line": line, "message": msg}
               for line, msg in parse_console_log(text)]
     result = {"status": "errors" if errors else "ok", "browser": browser, "seconds": seconds,
               "errors": errors}
-    if not done and exit_code is not None:
+    if navigated:
+        result["status"] = "navigated"
+        result["note"] = f"{NAVIGATED_NOTE} {len(errors)} error(s) read before it stopped."
+    elif not done and exit_code is not None:
         result["status"] = "failed"
         result["note"] = (f"{Path(browser).name} exited (code {exit_code}) before the JS check "
                           f"finished; {len(errors)} error(s) read.")
     elif not done:
         result["status"] = "timeout"
         result["note"] = (f"JS check did not finish within {timeout:g} s; "
-                          f"{len(errors)} error(s) read before it stopped.")
+                          f"{len(errors)} error(s) read before it stopped. A slide script that "
+                          "never returns or navigates the page away can cause this.")
     return result
 
 
-__all__ = ["SKIPPED_NOTE", "attribute", "check_js", "find_browser", "js_check_enabled",
-           "parse_console_log"]
+__all__ = ["DISABLED_NOTE", "NAVIGATED_NOTE", "SKIPPED_NOTE", "attribute", "check_js",
+           "find_browser", "js_check_enabled", "parse_console_log"]
