@@ -76,6 +76,19 @@ def test_engine_letterbox_colour_is_not_reported(tmp_path) -> None:
     assert "data-background" not in (deck / "slides" / "cover.html").read_text(encoding="utf-8")
 
 
+def test_unknown_placeholder_key_warns(tmp_path) -> None:
+    slides = {
+        "wrong": ('<section data-layout="Title and Content"><h1 data-ph="title">T</h1>'
+                  '<div data-ph="body">x</div></section>'),
+        "right": ('<section data-layout="Title and Content"><h1 data-ph="0">T</h1>'
+                  '<div data-ph="1">x</div></section>'),
+    }
+    result = api.generate_html(_deck(tmp_path, slides=slides))
+    assert [(d["slug"], d["rule"]) for d in result["diagnostics"]] == [("wrong", "placeholder-unknown")]
+    assert ("wrong: data-ph=\"body\" is not a placeholder of layout 'Title and Content' (keys: title, 0, 1)"
+            in result["warnings"])
+
+
 def test_generate_html_custom_output_path(tmp_path) -> None:
     deck = _deck(tmp_path)
     out = tmp_path / "elsewhere" / "deck.html"

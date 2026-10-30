@@ -959,6 +959,10 @@ def _generate_html(
     template_path, _ = _resolve_template(deck_meta, deck_dir, get_templates_dirs())
     template = load_template_html(template_path, cache_root=template_cache)
     layouts = {layout["name"] for layout in template.info.get("layouts", [])}
+    placeholders = {
+        layout["name"]: {key for ph in layout.get("placeholders", []) for key in (ph["key"], *ph.get("aliases", []))}
+        for layout in template.info.get("layouts", [])
+    }
     chrome_keys = _chrome_placeholder_keys(template_path, template.info)
 
     outline_path = deck_dir / "specs" / "outline.md"
@@ -979,7 +983,8 @@ def _generate_html(
 
     diagnostics: list[dict] = []
     for slug, text in texts.items():
-        diagnostics.extend(check_slide_html(slug, text, layouts=layouts, chrome_keys=chrome_keys))
+        diagnostics.extend(check_slide_html(slug, text, layouts=layouts, chrome_keys=chrome_keys,
+                                            placeholders=placeholders))
     diagnostics.extend(check_html_font_sizes(texts, art_path))
     if deck_css is not None:
         diagnostics.extend(check_deck_css(deck_css, art_path))

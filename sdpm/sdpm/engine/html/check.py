@@ -28,6 +28,8 @@ Rules:
                             sprite, which the deck's CSP / the browser does not load)
     data-background         reveal.js ``data-background*`` attributes
     self-chrome             slide numbers / footers drawn by the slide (the assembler draws them)
+    placeholder-unknown     a ``data-ph`` key (idx or alias) that the slide's layout does not
+                            have (skipped for unknown layouts, chrome and self-chrome keys)
     root-in-slide-style     ``:root`` in a slide ``<style>`` (tokens come from the style)
     root-in-deck-css        ``:root`` in deck.css
     data-slug               ``data-slug`` set by the author (the assembler sets it)
@@ -54,7 +56,7 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import Iterable
+from typing import Iterable, Mapping
 
 from sdpm.engine.checks.font_size import parse_allowed_font_sizes
 
@@ -329,12 +331,35 @@ def _external_attr_diags(slug: str, el) -> list[dict]:
     return out
 
 
+def _is_chrome_ph(ph: str, chrome_keys: set[str]) -> bool:
+    return ph in chrome_keys or ph.lower() in _CHROME_PH_NAMES
+
+
+def _key_order(key: str) -> tuple[int, int, str]:
+    """Aliases (names) first, then idx keys numerically: ``title, 0, 1``."""
+    return (1, int(key), "") if key.isdigit() else (0, 0, key)
+
+
+def _placeholder_diags(slug: str, el, layout: str | None, placeholders: Mapping[str, set[str]] | None,
+                       chrome_keys: set[str]) -> list[dict]:
+    ph = el.get("data-ph")
+    if (ph is None or placeholders is None or layout not in placeholders
+            or el.get("data-sdpm-chrome") is not None or _is_chrome_ph(ph, chrome_keys)):
+        return []
+    keys = placeholders[layout]
+    if ph in keys:
+        return []
+    listed = ", ".join(sorted(keys, key=_key_order)) or "none"
+    return [_diag(slug, "placeholder-unknown",
+                  f'data-ph="{ph}" is not a placeholder of layout {layout!r} (keys: {listed})')]
+
+
 def _self_chrome_diags(slug: str, el, chrome_keys: set[str]) -> list[dict]:
     if el.get("data-sdpm-chrome") is not None:
         return []
     out = []
     ph = el.get("data-ph")
-    if ph is not None and (ph in chrome_keys or ph.lower() in _CHROME_PH_NAMES):
+    if ph is not None and _is_chrome_ph(ph, chrome_keys):
         out.append(_diag(slug, "self-chrome",
                          f'data-ph="{ph}" is a date / footer / slide-number placeholder; '
                          "the assembler draws slide numbers and footers"))
@@ -411,8 +436,13 @@ def check_slide_html(
     *,
     layouts: set[str],
     chrome_keys: set[str] = frozenset(),
+    placeholders: Mapping[str, set[str]] | None = None,
 ) -> list[dict]:
-    """Static checks for one ``slides/<slug>.html`` (see the module docstring for rules)."""
+    """Static checks for one ``slides/<slug>.html`` (see the module docstring for rules).
+
+    ``placeholders`` maps layout name → its ``data-ph`` keys (idx keys and aliases);
+    without it the ``placeholder-unknown`` rule is skipped.
+    """
     from sdpm.engine.html.assemble import parse_slide
     from sdpm.engine.html.slide_js import is_slide_script
 
@@ -452,6 +482,7 @@ def check_slide_html(
                              "(refresh navigates the deck away, which the CSP cannot stop)"))
         out.extend(_external_attr_diags(slug, el))
         out.extend(_self_chrome_diags(slug, el, chrome_keys))
+        out.extend(_placeholder_diags(slug, el, layout, placeholders, chrome_keys))
         if el.tag == "style":
             css = el.text or ""
             if _ROOT_SEL_RE.search(_CSS_COMMENT_RE.sub("", css)):

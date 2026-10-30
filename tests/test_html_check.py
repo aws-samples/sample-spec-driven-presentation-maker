@@ -214,6 +214,31 @@ def test_component_class_containing_footer_is_not_chrome() -> None:
     assert _rules(_section('<div class="card-footer">x</div>')) == []
 
 
+PLACEHOLDERS = {"Title and Content": {"0", "title", "1"}, "Blank": set()}
+
+
+def _ph_diags(inner: str, layout: str = "Title and Content", **kw) -> list[dict]:
+    return [d for d in check_slide_html("s", _section(inner, f'data-layout="{layout}"'),
+                                        layouts={*PLACEHOLDERS}, chrome_keys=CHROME_KEYS,
+                                        placeholders=kw.get("placeholders", PLACEHOLDERS))
+            if d["rule"] == "placeholder-unknown"]
+
+
+def test_placeholder_unknown() -> None:
+    diags = _ph_diags('<div data-ph="body">x</div>')
+    assert [d["message"] for d in diags] == [
+        "data-ph=\"body\" is not a placeholder of layout 'Title and Content' (keys: title, 0, 1)"]
+    assert _ph_diags('<h1 data-ph="title">t</h1><div data-ph="0">x</div><div data-ph="1">y</div>') == []
+    assert "(keys: none)" in _ph_diags('<div data-ph="title">x</div>', "Blank")[0]["message"]
+
+
+def test_placeholder_unknown_skips() -> None:
+    assert _ph_diags('<div data-ph="body">x</div>', "Nope") == []  # layout-unknown reports it
+    assert _ph_diags('<div data-ph="body" data-sdpm-chrome>x</div>') == []
+    assert _ph_diags('<div data-ph="12">3</div><div data-ph="sldNum">3</div>') == []  # self-chrome
+    assert _ph_diags('<div data-ph="body">x</div>', placeholders=None) == []
+
+
 def test_root_in_slide_style() -> None:
     assert _rules(_section("<style>:root{--accent:red}</style>")) == ["root-in-slide-style"]
 
