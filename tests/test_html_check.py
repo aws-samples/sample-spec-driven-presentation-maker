@@ -13,7 +13,6 @@ from sdpm.engine.html.check import (
     check_html_font_sizes,
     check_slide_html,
     format_check_report,
-    html_preview_unavailable,
 )
 
 LAYOUTS = {"Title Slide", "Title Only", "Blank"}
@@ -288,20 +287,22 @@ def test_deck_css_checks(art_direction: Path) -> None:
     assert check_deck_css(clean, art_direction) == []
 
 
-def test_preview_unavailable_shape(tmp_path: Path) -> None:
-    result = html_preview_unavailable(tmp_path / "output.html")
-    assert result["status"] == "unavailable" and result["reason"] == "html-deck"
-    assert result["open"] == str(tmp_path / "output.html")
-    assert "browser" in result["note"]
-
-
 def test_format_check_report() -> None:
     diags = [{"slug": "a", "rule": "script", "message": "no"},
              {"slug": "(deck.css)", "rule": "root-in-deck-css", "message": "root"}]
     report = format_check_report(diags, ["a", "b"])
+    assert report.startswith("Checks:\n")
     assert "(deck.css): 1 issue(s)" in report and "a: 1 issue(s)" in report and "b: OK" in report
     assert "[script] no" in report
     assert "no issues" in format_check_report([])
+    assert "browser" not in report
+
+
+def test_format_check_report_browser_line() -> None:
+    ok = format_check_report([], ["a"], browser={"status": "ok", "browser": "Google Chrome", "seconds": 2.1})
+    assert ok.splitlines()[:2] == ["Checks:", "  browser: ok (Google Chrome, 2.1 s)"]
+    skipped = format_check_report([], ["a"], browser={"status": "skipped", "note": "Browser check skipped: x"})
+    assert skipped.splitlines()[1] == "  browser: skipped — Browser check skipped: x"
 
 
 @pytest.mark.parametrize("inner", [

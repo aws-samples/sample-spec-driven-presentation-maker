@@ -1,9 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Browser-free static checks for HTML decks (slides/<slug>.html and deck.css).
+"""Static checks for HTML decks (slides/<slug>.html and deck.css), no browser needed.
 
 Every check returns diagnostics ``{"slug", "rule", "message"}``; callers turn them
-into warnings. Nothing here blocks a build.
+into warnings. Nothing here blocks a build. The browser check (layout, JS errors,
+PNG) lives in ``sdpm.engine.html.browser_check``; ``format_check_report`` reports both.
 
 Rules:
     structure               not exactly one top-level ``<section>``, or a nested one
@@ -519,33 +520,29 @@ def check_deck_css(text: str, art_direction_path: Path) -> list[dict]:
     return out
 
 
-# ── preview / reporting ──────────────────────────────────────────────────
+# ── reporting ────────────────────────────────────────────────────────────
 
-def html_preview_unavailable(output_html: Path) -> dict:
-    """The preview result for HTML decks (phase 1 has no PNG preview)."""
-    return {
-        "status": "unavailable",
-        "reason": "html-deck",
-        "open": str(output_html),
-        "note": "HTML decks have no PNG preview yet: open output.html in a browser to check "
-                "the slides (S opens the speaker view).",
-    }
+CHECK_REPORT_HEADER = "Checks:"
 
 
-CHECK_REPORT_HEADER = "Static checks (no browser; open output.html to see the slides):"
-
-
-def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None) -> str:
-    """Plain-text static check report (the HTML counterpart of the measure report).
+def format_check_report(diags: list[dict], slugs: Iterable[str] | None = None, browser: dict | None = None) -> str:
+    """Plain-text check report (the HTML counterpart of the measure report).
 
     With ``slugs``, lists each of them (``OK`` when clean) plus deck.css findings;
-    without, lists every slug that has findings.
+    without, lists every slug that has findings. ``browser`` (generate_html's
+    ``browser_check``) adds a ``browser:`` line under the header.
     """
     by_slug: dict[str, list[dict]] = {}
     for d in diags:
         by_slug.setdefault(d["slug"], []).append(d)
     order = list(slugs) if slugs is not None else [s for s in by_slug if s != DECK_CSS_SLUG]
     lines = [CHECK_REPORT_HEADER]
+    if browser is not None:
+        if browser.get("note"):
+            lines.append(f"  browser: {browser['status']} — {browser['note']}")
+        else:
+            lines.append(f"  browser: {browser['status']} ({browser.get('browser', 'browser')}, "
+                         f"{browser.get('seconds', 0)} s)")
     if DECK_CSS_SLUG in by_slug:
         order = [DECK_CSS_SLUG, *[s for s in order if s != DECK_CSS_SLUG]]
     if not order:
@@ -567,7 +564,6 @@ __all__ = [
     "check_html_font_sizes",
     "check_slide_html",
     "format_check_report",
-    "html_preview_unavailable",
     "image_set_strings",
     "parse_srcset",
     "url_kind",

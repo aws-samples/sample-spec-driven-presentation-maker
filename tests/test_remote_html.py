@@ -342,10 +342,10 @@ def test_run_python_html_record_failure_reports_stale_html(server, storage, monk
     assert storage.html_keys() == []  # the orphaned upload was deleted
 
 
-def test_js_deck_reports_the_skipped_js_check(server, storage, tmp_path, monkeypatch):
-    """With SDPM_JS_CHECK=0 (the runtime image), run_python and generate_pptx of a deck with
-    slide scripts carry the one-line skip note among the warnings the agent reads."""
-    from sdpm.engine.html.jscheck import DISABLED_NOTE
+def test_js_deck_reports_the_skipped_browser_check(server, storage, tmp_path, monkeypatch):
+    """With SDPM_BROWSER=none (conftest), run_python of a deck carries the one-line skip
+    note among the warnings the agent reads; generate_pptx (finalize) checks nothing."""
+    from sdpm.engine.html.browser import DISABLED_NOTE
 
     _no_pptx(monkeypatch)
     body = SLIDES["body"].replace("</section>", "<script>var x = 1;</script></section>")
@@ -355,10 +355,10 @@ def test_js_deck_reports_the_skipped_js_check(server, storage, tmp_path, monkeyp
 
     out = _run(server)
     assert note in out["warnings"], out
-    assert out["js_check"] == {"status": "skipped", "note": DISABLED_NOTE}
+    assert out["browser_check"] == {"status": "skipped", "slides": 0, "note": DISABLED_NOTE}
     assert note in _run(server, measure=["cover"])["warnings"]
     result = json.loads(server.generate_pptx(deck_id="d1"))
-    assert note in result["warnings"]["build"], result
+    assert note not in (result.get("warnings") or {}).get("build", []), result
 
 
 # --- generate_pptx (finalize) -------------------------------------------------
@@ -550,11 +550,10 @@ def test_runtime_image_copies_bundled_html_data():
     assert not any(entry.rstrip("/") in ("sdpm/vendor", "sdpm") for entry in ignored)
 
 
-def test_runtime_image_turns_the_js_check_off():
-    """The runtime image has no Chrome / Edge: ENV SDPM_JS_CHECK=0 makes a JS deck's build
-    say the check was skipped instead of telling the agent to open a browser console."""
-    dockerfile = (_ROOT / "servers" / "remote" / "Dockerfile").read_text(encoding="utf-8")
-    assert re.search(r"^ENV\s+SDPM_JS_CHECK=0\s*$", dockerfile, flags=re.MULTILINE)
+def test_runtime_image_pins_websockets():
+    """The browser check's only new dependency is pinned for the runtime image."""
+    constraints = (_ROOT / "servers" / "remote" / "constraints.txt").read_text(encoding="utf-8")
+    assert re.search(r"^websockets==\d+", constraints, flags=re.MULTILINE)
 
 
 def test_runtime_image_ships_vendored_libraries():

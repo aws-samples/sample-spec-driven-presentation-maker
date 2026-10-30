@@ -585,6 +585,10 @@ def test_slide_scripts_are_wrapped_and_emitted_in_order(js_built) -> None:
     assert "RevealNotes" in scripts[1]
     assert scripts[2] == inline_js(library_script("echarts"))
     assert scripts[3] == SLIDE_HELPER
+    # Browser check (#sdpm-check): slide functions see the print view; no done marker.
+    assert "Reveal.isPrintView=function(){return true;}" in SLIDE_HELPER
+    assert "try{call(section,fn);}" in SLIDE_HELPER and "sdpm-check:done" not in SLIDE_HELPER
+    assert "sdpm-check:navigated" in SLIDE_HELPER
     assert scripts[4] == inline_js(wrap_slide_script("chart", "var x=1;"))
     assert scripts[4] == '__sdpmSlide("chart",function(section){\nvar x=1;\n});'
     assert scripts[5] == inline_js(wrap_slide_script("chart-2", '\nvar y = "</div>";\n'))

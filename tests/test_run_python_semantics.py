@@ -258,14 +258,51 @@ class TestLocalRunPythonHtml:
         assert "pptx" not in out and not (html_deck / "output.pptx").exists()
         assert out["affected"] == ["title"]
 
-    def test_measure_returns_static_report_and_open_note(self, html_deck: Path, monkeypatch):
+    def test_measure_returns_report_and_browser_skip(self, html_deck: Path, monkeypatch):
         calls = self._patch_generate(monkeypatch)
         self._run(html_deck, f'write_text("slides/title.html", {_TITLE_HTML!r})')
         out = self._run(html_deck, 'print("noop")', measure_slides=["title"])
         assert calls == []
         assert "title: OK" in out["measure"]
         assert out["preview"]["status"] == "unavailable"
-        assert out["preview"]["reason"] == "html-deck"
+        assert out["preview"]["reason"] == "browser-skipped"
+        assert out["browser_check"]["status"] == "skipped"
+
+    def test_slide_change_without_browser_says_check_skipped(self, html_deck: Path, monkeypatch):
+        """SDPM_BROWSER=none (conftest): output.html is built, and the warnings say that
+        layout / JS / PNG were not checked."""
+        from sdpm.engine.html.browser import DISABLED_NOTE
+
+        self._patch_generate(monkeypatch)
+        out = self._run(html_deck, f'write_text("slides/title.html", {_TITLE_HTML!r})')
+        assert (html_deck / "output.html").is_file()
+        assert out["browser_check"] == {"status": "skipped", "slides": 0, "note": DISABLED_NOTE}
+        assert f"output.html: {DISABLED_NOTE}" in out["warnings"]
+        assert any(w.startswith("output.html: Browser check skipped: ") for w in out["warnings"])
+        assert out["preview_files"] == []
+
+    def test_browser_findings_and_pngs_come_back(self, html_deck: Path, monkeypatch):
+        from sdpm.engine.html import browser_check
+
+        self._patch_generate(monkeypatch)
+        seen: list[list[str]] = []
+
+        def fake_check(output_html, slugs, *, png_dir, **_kw):
+            seen.append(list(slugs))
+            png_dir.mkdir(parents=True, exist_ok=True)
+            (png_dir / "title.png").write_bytes(b"\x89PNG")
+            diag = {"slug": "title", "rule": "overflow", "message": "overflow: data-ph=\"title\" content"}
+            return {"status": "issues", "browser": "Fake", "seconds": 0.1, "slides": 1, "checked": ["title"],
+                    "findings": {"title": [diag]}, "errors": [], "pngs": {"title": str(png_dir / "title.png")},
+                    "timings": {}}
+
+        monkeypatch.setattr(browser_check, "check_deck", fake_check)
+        out = self._run(html_deck, f'write_text("slides/title.html", {_TITLE_HTML!r})', measure_slides=["title"])
+        assert seen == [["title"]]
+        assert 'title: overflow: data-ph="title" content' in out["warnings"]
+        assert "[overflow]" in out["measure"] and "browser: issues (Fake, 0.1 s)" in out["measure"]
+        assert out["preview_files"] == [str(html_deck / "preview" / "png" / "title.png")]
+        assert "preview" not in out
 
     def test_readonly_run_does_not_rebuild(self, html_deck: Path, monkeypatch):
         self._patch_generate(monkeypatch)

@@ -933,16 +933,17 @@ def _generate_html(
     deck_dir: Path,
     output_path: Path,
     template_cache: str | Path | None = None,
+    check_slides: list[str] | None = None,
 ) -> tuple[dict[str, Any], list[tuple[str | None, str]]]:
     """generate_html body; also returns ``(slug or None, warning)`` pairs for filtering."""
-    from sdpm.engine.html.assemble import assemble_deck
+    from sdpm.engine.html import browser_check
+    from sdpm.engine.html.assemble import assemble_deck, parse_slide
     from sdpm.engine.html.check import (
         DECK_CSS_SLUG,
         check_deck_css,
         check_html_font_sizes,
         check_slide_html,
     )
-    from sdpm.engine.html.jscheck import check_js
     from sdpm.engine.html.template import load_template_html
     from sdpm.engine.schema import deck_output_format
     from sdpm.utils.io import read_json
@@ -1004,9 +1005,33 @@ def _generate_html(
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(assembled.html, encoding="utf-8", newline="\n")
     previews = _write_html_previews(deck_dir, assembled.previews)
-    js_check = None
-    if assembled.slide_scripts > 0:
-        js_check = check_js(output_path, assembled.line_map)
+
+    built = assembled.slugs
+    wanted = set(check_slides or [])
+    check_set = [slug for slug in built if slug in wanted]
+    png_dir = deck_dir / "preview" / "png"
+    _remove_stale_pngs(png_dir, set(check_set), set(built))
+    browser = None
+    if check_set:
+        slide_size = template.info.get("slideSize") or {}
+        slide_layouts = {}
+        for slug in check_set:
+            section = parse_slide(texts[slug]).section
+            slide_layouts[slug] = (section.get("data-layout") if section is not None else None) or ""
+        browser = browser_check.check_deck(
+            output_path, check_set,
+            slide_size=(slide_size.get("width", 1920), slide_size.get("height", 1080)),
+            line_map=assembled.line_map,
+            layouts=slide_layouts,
+            decorations={layout["name"]: layout.get("decorations") or []
+                         for layout in template.info.get("layouts", [])},
+            png_dir=png_dir,
+        )
+        for slug in check_set:
+            diagnostics.extend(browser["findings"].get(slug, []))
+        diagnostics.extend({key: e[key] for key in ("slug", "rule", "message")}
+                           for e in browser["errors"] if e["slug"] is not None)
+        diagnostics.sort(key=lambda d: order.get(d["slug"], -1))
 
     for d in diagnostics:
         label = "deck.css" if d["slug"] == DECK_CSS_SLUG else d["slug"]
@@ -1014,17 +1039,17 @@ def _generate_html(
     for warning in assembled.warnings:
         head = warning.split(":", 1)[0]
         tagged.append((head if head in texts else None, warning))
-    for err in (js_check or {}).get("errors", []):
-        if err["slug"] is not None:
-            tagged.append((err["slug"], f"{err['slug']}: JS error: {err['message']}"))
-        else:
-            tagged.append((None, f"output.html: JS error (line {err['line']}): {err['message']}"))
-    if js_check is not None and js_check.get("note"):
+    for err in (browser or {}).get("errors", []):
+        if err["slug"] is None:
+            message = err["message"]
+            if err.get("line") is not None:
+                message = message.replace("JS error:", f"JS error (line {err['line']}):", 1)
+            tagged.append((None, f"output.html: {message}"))
+    if browser is not None and browser.get("note"):
         # A check that was skipped or did not finish says so with the other warnings,
-        # so an agent never reads its absence as "no JS errors".
-        tagged.append((None, f"output.html: {js_check['note']}"))
+        # so an agent never reads its absence as "no layout issues / no JS errors".
+        tagged.append((None, f"output.html: {browser['note']}"))
 
-    built = assembled.slugs
     result: dict[str, Any] = {
         "output_path": str(output_path),
         "bytes": assembled.bytes,
@@ -1038,10 +1063,22 @@ def _generate_html(
     }
     if template.decorations_status is not None:
         result["decorations"] = template.decorations_status
-    if js_check is not None:
-        result["js_check"] = {key: js_check[key] for key in ("status", "browser", "seconds", "note")
-                              if key in js_check}
+    if browser is not None:
+        result["browser_check"] = {key: browser[key] for key in
+                                   ("status", "browser", "seconds", "slides", "note", "timings")
+                                   if key in browser}
+        result["preview_files"] = [browser["pngs"][slug] for slug in built if slug in browser["pngs"]]
     return result, tagged
+
+
+def _remove_stale_pngs(png_dir: Path, checked: set[str], built: set[str]) -> None:
+    """Delete ``preview/png/<slug>.png`` of the slides about to be checked and of slides
+    no longer built, so a failed check never leaves an old PNG behind."""
+    if not png_dir.is_dir():
+        return
+    for png in png_dir.glob("*.png"):
+        if png.stem in checked or png.stem not in built:
+            png.unlink(missing_ok=True)
 
 
 def _write_html_previews(deck_dir: Path, previews: dict[str, str]) -> dict[str, str]:
@@ -1066,6 +1103,7 @@ def generate_html(
     output_path: str | Path | None = None,
     *,
     template_cache: str | Path | None = None,
+    check_slides: list[str] | None = None,
 ) -> dict[str, Any]:
     """Assemble an HTML deck (deck.json ``"outputFormat": "html"``) into one offline file.
 
@@ -1073,6 +1111,9 @@ def generate_html(
     ``output_path`` (default ``<deck>/output.html``) plus one static document per
     built slide, ``<deck>/preview/<slug>.html`` (stale ones are removed).
     ``template_cache`` overrides the template-conversion cache directory.
+    ``check_slides`` (default none) are checked in a browser
+    (``sdpm.engine.html.browser_check``: layout, JS errors, PNG
+    ``<deck>/preview/png/<slug>.png``); an empty set starts no browser.
 
     Returns:
         Dict with output_path, bytes, slide_count, slides (``pageNN - slug``),
@@ -1081,13 +1122,14 @@ def generate_html(
         libraries (the vendored libraries embedded because a slide declares them in
         ``data-libs``, e.g. ``["echarts"]``; ``[]`` for most decks) and,
         when template decorations are missing, decorations
-        (``preview_unavailable``-shaped status). A deck with slide scripts also gets
-        js_check (``{status, browser?, seconds?, note?}``; status ``ok`` / ``errors`` /
-        ``skipped`` (``SDPM_JS_CHECK=0`` or no Chrome or Edge; no browser is started) /
-        ``navigated`` / ``timeout`` / ``failed``) from a headless
-        Chrome / Edge run, whose errors are added to warnings as
-        ``"<slug>: JS error: …"`` (``"output.html: JS error (line N): …"`` when no slide
-        owns the line); a note (every status but ok / errors) is added to warnings as
+        (``preview_unavailable``-shaped status). With check_slides, also
+        browser_check (``{status, browser?, seconds?, slides?, note?, timings?}``;
+        status ``ok`` / ``issues`` / ``skipped`` (``SDPM_BROWSER=none`` or no Chrome or
+        Edge) / ``navigated`` / ``timeout`` / ``failed``) and preview_files (PNG paths,
+        deck order). Layout findings (``overlap`` / ``overflow`` / ``outside-region`` /
+        ``decoration-overlap``) and JS errors (``js-error``) join diagnostics and
+        warnings (``"<slug>: …"``; ``"output.html: JS error (line N): …"`` when no slide
+        owns the line); a note (every status but ok / issues) is added to warnings as
         ``"output.html: <note>"``.
 
     Raises:
@@ -1096,7 +1138,7 @@ def generate_html(
     """
     deck_path = Path(deck_dir)
     out = Path(output_path) if output_path else deck_path / "output.html"
-    result, _ = _generate_html(deck_path, out, template_cache)
+    result, _ = _generate_html(deck_path, out, template_cache, check_slides)
     return result
 
 
@@ -1109,43 +1151,53 @@ def refresh_html(
 ) -> dict[str, Any]:
     """Rebuild ``<deck>/output.html`` after an edit (the run_python post-processing for HTML decks).
 
+    The slides the change can alter plus measure_slides are checked in a browser (see
+    generate_html), in deck order — the set PPTX decks render previews for.
     Never raises: a failure comes back as ``{"html_error": "…"}``.
 
     Returns:
         Dict with html (path), html_bytes, warnings (only the measure_slides' and
         deck-wide ones when measure_slides is given), affected (slugs the changed
-        paths can alter), previews (``{slug: "preview/<slug>.html"}``) and, with
-        measure_slides, measure (static check report), preview (open-in-browser
-        note) and decorations (when template decorations are missing); js_check
-        (see generate_html) when the deck has slide scripts.
+        paths can alter), previews (``{slug: "preview/<slug>.html"}``), browser_check
+        and preview_files (PNG paths) when slides were checked, and, with
+        measure_slides, measure (check report) and decorations (when template
+        decorations are missing). When the browser check did not run or finish
+        (status other than ok / issues), measure_slides also get preview
+        ``{"status": "unavailable", "reason": "browser-<status>", "note"}``.
     """
-    from sdpm.engine.html.check import format_check_report, html_preview_unavailable
+    from sdpm.engine.html.check import format_check_report
     from sdpm.engine.schema import affected_slugs
 
     deck_path = Path(deck_dir)
     output = deck_path / "output.html"
     try:
-        built, tagged = _generate_html(deck_path, output, template_cache)
+        slugs = parse_outline_slugs(deck_path / "specs" / "outline.md")
+        present = {s: {} for s in slugs if (deck_path / "slides" / f"{s}.html").is_file()}
+        affected = affected_slugs(changed_paths or [], present, html=True)
+        check = [s for s in present if s in set(affected) | set(measure_slides or [])]
+        built, tagged = _generate_html(deck_path, output, template_cache, check)
     except Exception as exc:  # reported to the agent, never raised
         return {"html_error": f"{type(exc).__name__}: {exc}"}
 
-    slugs = parse_outline_slugs(deck_path / "specs" / "outline.md")
-    present = {s: {} for s in slugs if (deck_path / "slides" / f"{s}.html").is_file()}
     result: dict[str, Any] = {
         "html": built["output_path"],
         "html_bytes": built["bytes"],
         "warnings": built["warnings"],
-        "affected": affected_slugs(changed_paths or [], present, html=True),
+        "affected": affected,
         "previews": built["previews"],
     }
-    if "js_check" in built:
-        result["js_check"] = built["js_check"]
+    browser = built.get("browser_check")
+    if browser is not None:
+        result["browser_check"] = browser
+        result["preview_files"] = built["preview_files"]
     if measure_slides:
         wanted = set(measure_slides)
         result["warnings"] = [text for slug, text in tagged if slug is None or slug in wanted]
         diags = [d for d in built["diagnostics"] if d["slug"] in wanted or d["slug"] not in present]
-        result["measure"] = format_check_report(diags, measure_slides)
-        result["preview"] = html_preview_unavailable(output)
+        result["measure"] = format_check_report(diags, measure_slides, browser=browser)
+        if browser is not None and browser["status"] not in ("ok", "issues"):
+            result["preview"] = {"status": "unavailable", "reason": f"browser-{browser['status']}",
+                                 "note": browser.get("note", "")}
         if built.get("decorations") is not None:
             result["decorations"] = built["decorations"]
     return result

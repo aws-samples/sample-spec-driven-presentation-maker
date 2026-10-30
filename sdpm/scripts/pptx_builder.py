@@ -167,18 +167,19 @@ def cmd_preview(args):
     """Export slides as PNG images from JSON."""
     from sdpm.api import preview as api_preview
 
-    html_deck = _html_deck_dir(args.input)
-    if html_deck is not None:
-        from sdpm.engine.html.check import html_preview_unavailable
-
-        status = html_preview_unavailable(html_deck / "output.html")
-        print(status["note"])
-        print(f"Open: {status['open']}")
-        return
-
     pages_list = None
     if args.pages:
         pages_list = [int(p.strip()) for p in args.pages.split(",")]
+
+    html_deck = _html_deck_dir(args.input)
+    if html_deck is not None:
+        result = _refresh_html_pages(html_deck, pages_list)
+        for path in result.get("preview_files", []):
+            print(f"Generated: {path}")
+        note = (result.get("browser_check") or {}).get("note")
+        if note:
+            print(note)
+        return
 
     try:
         result = api_preview(
@@ -228,19 +229,25 @@ def cmd_measure(args):
     print(result)
 
 
-def _measure_html(deck_dir, pages):
-    """HTML deck: rebuild <deck>/output.html and print the static check report."""
-    from sdpm.api import generate_html
-    from sdpm.engine.html.check import format_check_report
+def _refresh_html_pages(deck_dir, pages):
+    """HTML deck: rebuild <deck>/output.html and check the given pages (default: all)
+    in a browser (sdpm.api.refresh_html). Exits on a build error."""
+    from sdpm.api import parse_outline_slugs, refresh_html
 
-    try:
-        result = generate_html(deck_dir)
-    except (FileNotFoundError, ValueError) as e:
-        print(f"Error: {e}", file=sys.stderr)
+    present = [s for s in parse_outline_slugs(deck_dir / "specs" / "outline.md")
+               if (deck_dir / "slides" / f"{s}.html").is_file()]
+    slugs = [present[p - 1] for p in pages if 1 <= p <= len(present)] if pages else present
+    result = refresh_html(deck_dir, measure_slides=slugs or None)
+    if "html_error" in result:
+        print(f"Error: {result['html_error']}", file=sys.stderr)
         sys.exit(1)
-    built = [line.split(" - ", 1)[1] for line in result["slides"]]
-    slugs = [built[p - 1] for p in pages if 1 <= p <= len(built)] if pages else built
-    print(format_check_report(result["diagnostics"], slugs))
+    return result
+
+
+def _measure_html(deck_dir, pages):
+    """HTML deck: rebuild <deck>/output.html, check the pages in a browser, print the report."""
+    result = _refresh_html_pages(deck_dir, pages)
+    print(result.get("measure", "Checks:\n  no slides"))
 
 
 def cmd_generate_html(args):
@@ -248,7 +255,7 @@ def cmd_generate_html(args):
     from sdpm.api import generate_html
 
     try:
-        result = generate_html(args.input, args.output)
+        result = generate_html(args.input, args.output, check_slides=_html_slugs(args.input))
     except (FileNotFoundError, ValueError) as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)
@@ -261,10 +268,18 @@ def cmd_generate_html(args):
     decorations = result.get("decorations")
     if decorations:
         print(f"  {decorations['note']}")
-    js_check = result.get("js_check")
-    if js_check and js_check.get("browser"):  # its note is already among the warnings
-        print(f"  JS check: {js_check['status']} ({Path(js_check['browser']).name}, "
-              f"{js_check.get('seconds', 0)} s)")
+    browser = result.get("browser_check")
+    if browser and not browser.get("note"):  # a note is already among the warnings
+        print(f"  Browser check: {browser['status']} ({browser.get('browser')}, {browser.get('seconds', 0)} s)")
+    for path in result.get("preview_files", []):
+        print(f"  PNG: {path}")
+
+
+def _html_slugs(deck_dir):
+    """Every slug of the outline (generate_html checks the ones it builds)."""
+    from sdpm.api import parse_outline_slugs
+
+    return parse_outline_slugs(Path(deck_dir) / "specs" / "outline.md")
 
 
 def cmd_search_assets(args):

@@ -22,9 +22,13 @@ _H_4X3 = 6858000
 
 
 @pytest.fixture(autouse=True)
-def _no_js_check(monkeypatch):
-    """No test launches a browser for the HTML JS check unless it sets SDPM_JS_CHECK itself."""
-    monkeypatch.setenv("SDPM_JS_CHECK", "0")
+def _no_browser(monkeypatch):
+    """No test starts a browser for the HTML browser check unless it sets SDPM_BROWSER
+    (or registers a source) itself."""
+    from sdpm.engine.html import browser
+
+    monkeypatch.setenv("SDPM_BROWSER", "none")
+    monkeypatch.setattr(browser, "_registered", None)
 
 
 @pytest.fixture(autouse=True)

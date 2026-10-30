@@ -108,7 +108,8 @@ def _refresh_html_deck(
     measure_slides: list[str] | None,
     result: dict[str, Any],
 ) -> None:
-    """HTML-deck post-processing: rebuild output.html (static checks, no previews).
+    """HTML-deck post-processing: rebuild output.html, static checks, and the browser
+    check (layout, JS errors, PNG previews) of the affected and measured slides.
 
     Runs when a watched file changed or measure_slides was given, and merges the
     sdpm.api.refresh_html result into ``result`` (warnings extend, other keys set).
@@ -144,7 +145,8 @@ def run_python(
     list_files(subdir="."). Writes persist; output.pptx (output.html for HTML decks)
     rebuilds and changed slides are re-rendered and previewed when deck.json, slides/,
     includes/ or specs/outline.md changed. measure_slides measures text overflow on those
-    slugs and previews them; HTML decks get static checks instead of previews.
+    slugs and previews them; HTML decks get static checks plus browser layout / JS checks
+    and PNG previews when Chrome or Edge is available.
     """
     result: dict[str, Any] = {}
     if not deck_id or not Path(deck_id).is_dir():
