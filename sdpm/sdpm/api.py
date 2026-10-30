@@ -1065,7 +1065,8 @@ def _generate_html(
         result["decorations"] = template.decorations_status
     if browser is not None:
         result["browser_check"] = {key: browser[key] for key in
-                                   ("status", "browser", "seconds", "slides", "note", "timings", "network_blocked")
+                                   ("status", "browser", "seconds", "slides", "note", "timings", "network_blocked",
+                                    "blocked_requests")
                                    if key in browser}
         result["preview_files"] = [browser["pngs"][slug] for slug in built if slug in browser["pngs"]]
     return result, tagged

@@ -423,7 +423,7 @@ def _fake_check(monkeypatch, *, no_png: frozenset = frozenset(), seen: list | No
         result = {"status": status, "browser": "AgentCore Browser", "seconds": 1.5, "slides": len(pngs),
                   "checked": list(pngs), "findings": {}, "errors": [], "pngs": pngs,
                   "timings": {"acquire": 0.9, "connect": 0.1, "load": 0.2, "slides": 0.3, "release": 0.1},
-                  "network_blocked": True}
+                  "network_blocked": True, "blocked_requests": 0}
         if no_png:
             result["note"] = "Browser check did not finish within 33 s; …"
         return result
@@ -464,6 +464,7 @@ def test_run_python_html_uploads_pngs_of_checked_slides(server, storage, monkeyp
     assert line["deck_id"] == "d1" and line["user_id"] == "user1" and line["status"] == "ok"
     assert line["slides"] == 1 and line["seconds"] == 1.5 and line["bytes"] > 0
     assert line["timings"]["acquire"] == 0.9 and line["network_blocked"] is True
+    assert line["blocked_requests"] == 0
 
 
 def test_run_python_html_checked_slide_without_png_loses_its_old_png(server, storage, monkeypatch):

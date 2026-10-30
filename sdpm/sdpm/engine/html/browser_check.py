@@ -215,6 +215,7 @@ class _Run:
         self.timings: dict[str, float] = {}
         self.navigated_at: str | None = None
         self.network_blocked: bool | None = None
+        self.blocked_requests = 0
 
     # time
     def left(self) -> float:
@@ -267,6 +268,7 @@ class _Run:
         give a frame or worker the same block before it runs. Both arrive paused."""
         method, params = event.get("method"), event.get("params") or {}
         if method == "Fetch.requestPaused":
+            self.blocked_requests += 1
             self.cdp.post("Fetch.failRequest", {"requestId": params.get("requestId"),
                                                 "errorReason": "BlockedByClient"}, session=event.get("sessionId"))
         elif method == "Target.attachedToTarget" and self.session and event.get("sessionId") == self.session:
@@ -419,7 +421,7 @@ def check_deck(
 
     Returns:
         ``{status, browser?, seconds?, slides, checked, findings: {slug: [diag]},
-        errors: [diag], pngs: {slug: path}, timings?, network_blocked?, note?}``; status ``ok`` / ``issues``
+        errors: [diag], pngs: {slug: path}, timings?, network_blocked?, blocked_requests?, note?}``; status ``ok`` / ``issues``
         / ``skipped`` / ``navigated`` / ``timeout`` / ``failed``.
     """
     slugs = list(dict.fromkeys(slugs))
@@ -466,8 +468,8 @@ def check_deck(
                 status = "navigated"
                 where = f" while {run.navigated_at} was shown" if run.navigated_at else ""
                 note = (f"Browser check stopped: a slide script navigated the page away{where} (location, "
-                        f"reload, form submit…); {_rest_note(run)}. Remove the navigation (see the "
-                        "script-external warning).")
+                        f"reload, form submit…; the check blocks network requests, so it reached no "
+                        f"site); {_rest_note(run)}. Remove the navigation (see the script-external warning).")
             except (_Deadline, CdpTimeout):
                 status = "timeout"
                 note = (f"Browser check did not finish within {limit:g} s; {_rest_note(run)}. A slide "
@@ -491,6 +493,7 @@ def check_deck(
     }
     if run.network_blocked is not None:
         result["network_blocked"] = run.network_blocked
+        result["blocked_requests"] = run.blocked_requests
     if note:
         result["note"] = note
     return result

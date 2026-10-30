@@ -237,6 +237,7 @@ def test_event_hook_fails_blocked_requests_closes_popups_and_blocks_frames() -> 
     assert sent.index(("Fetch.enable", "frame")) < sent.index(("Runtime.runIfWaitingForDebugger", "frame"))
     closed = [p for m, _, p in run.cdp.sent if m == "Target.closeTarget"]
     assert closed == [{"targetId": "t-popup"}]
+    assert run.blocked_requests == 2
 
 
 def test_temp_dir_failure_is_reported(tmp_path: Path, monkeypatch) -> None:
@@ -380,6 +381,7 @@ def test_real_browser_stops_at_navigation(tmp_path: Path, use_browser) -> None:
     result = api.refresh_html(deck, measure_slides=["cover", "away", "after"])
     assert time.monotonic() - started < 20
     assert result["browser_check"]["status"] == "navigated", result["browser_check"]
+    assert result["browser_check"]["blocked_requests"] >= 1  # the https navigation was failed
     assert any(w.startswith("output.html: Browser check stopped:") for w in result["warnings"])
     assert result["preview"]["reason"] == "browser-navigated"
 

@@ -266,6 +266,7 @@ def _log_browser_check(deck_id: str, user_id: str, browser: dict, html_bytes: An
         "seconds": browser.get("seconds"),
         "timings": browser.get("timings") or {},
         "network_blocked": browser.get("network_blocked"),
+        "blocked_requests": browser.get("blocked_requests"),
     }))
 
 
@@ -322,6 +323,7 @@ def refresh_html_deck(
             _log_browser_check(deck_id, user_id, browser, built.get("html_bytes"))
             browser.pop("timings", None)
             browser.pop("network_blocked", None)
+            browser.pop("blocked_requests", None)
             result["browser_check"] = browser
         # thumbnailS3Key follows slide 1: set when slide 1 was uploaded now, or
         # when the record has none yet.
