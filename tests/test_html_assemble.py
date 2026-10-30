@@ -466,3 +466,114 @@ def test_collect_refs_matches_the_assembler_scan() -> None:
                                 "media/v.mp4", "docs/o.svg", "images/e.png", "images/f.png", "images/g.png"}
     assert refs["assets"] == {ICON}
     assert collect_refs([], None) == {"relative": set(), "assets": set()}
+
+
+# ── slide scripts and libraries ──────────────────────────────────────────
+
+JS_SLIDES = {
+    "chart": ('<section data-layout="Title Only" data-libs="echarts"><div class="c"></div>'
+              "<script>var x=1;</script></section>"),
+    "chart-2": ('<section data-layout="Title Only" data-libs="ECharts echarts nope">'
+                '<h1 data-ph="title">Two</h1>\n<div class="c"></div>\n'
+                '<script type="text/javascript">\nvar y = "</div>";\n</script></section>'),
+    "kept": ('<section data-layout="Title Only"><h1 data-ph="title">Kept</h1>'
+             '<script src="js/x.js"></script><script type="module">export const m = 1;</script></section>'),
+    "plain": '<section data-layout="Title Only"><h1 data-ph="title">Plain</h1></section>',
+}
+
+
+@pytest.fixture
+def js_built(tmp_path: Path):
+    deck = _make_deck(tmp_path, slides=JS_SLIDES)
+    (deck / "js").mkdir()
+    (deck / "js" / "x.js").write_text("window.embedded = 1;", encoding="utf-8")
+    result = _assemble(deck, slides=JS_SLIDES)
+    return deck, result, lxml_html.document_fromstring(result.html)
+
+
+def _engine_scripts(doc) -> list[str]:
+    return [s.text or "" for s in doc.xpath("//body/script")]
+
+
+def test_slide_scripts_are_wrapped_and_emitted_in_order(js_built) -> None:
+    from sdpm.engine.html.slide_js import SLIDE_HELPER, library_script, wrap_slide_script
+
+    _, result, doc = js_built
+    scripts = _engine_scripts(doc)
+    assert len(scripts) == 7
+    assert scripts[0] == inline_js((VENDOR_DIR / "revealjs" / "reveal.js").read_text(encoding="utf-8"))
+    assert "RevealNotes" in scripts[1]
+    assert scripts[2] == inline_js(library_script("echarts"))
+    assert scripts[3] == SLIDE_HELPER
+    assert scripts[4] == inline_js(wrap_slide_script("chart", "var x=1;"))
+    assert scripts[4] == '__sdpmSlide("chart",function(section){\nvar x=1;\n});'
+    assert scripts[5] == inline_js(wrap_slide_script("chart-2", '\nvar y = "</div>";\n'))
+    assert "Reveal.initialize(o);" in scripts[6]
+    assert result.slide_scripts == 2
+    assert result.libraries == ["echarts"]
+    for slug in ("chart", "chart-2", "plain"):
+        assert not doc.xpath(f'//section[@data-slug="{slug}"]//script')
+
+
+def test_declared_library_is_embedded_once_unmodified_with_its_notice(js_built) -> None:
+    _, result, doc = js_built
+    text = (VENDOR_DIR / "echarts" / "echarts.min.js").read_text(encoding="utf-8")
+    assert inline_js(text) == text
+    echarts = _engine_scripts(doc)[2]
+    assert echarts.startswith("/*!\n")
+    assert "Apache ECharts\nCopyright 2017-2026 The Apache Software Foundation" in echarts
+    assert "Apache License" in echarts and "Mike Bostock" in echarts  # LICENSE + LICENSE-d3
+    assert echarts.endswith(text)
+    assert result.html.count(text) == 1
+    d3 = (VENDOR_DIR / "d3" / "d3.min.js").read_text(encoding="utf-8")
+    assert d3[:200] not in result.html
+
+
+def test_other_scripts_stay_in_their_section_unembedded(js_built) -> None:
+    from sdpm.engine.html.csp import script_hash
+
+    _, result, doc = js_built
+    kept = doc.xpath('//section[@data-slug="kept"]')[0]
+    assert kept.xpath('.//script[@src="js/x.js"]')
+    module = kept.xpath('.//script[@type="module"]')
+    assert module and module[0].text == "export const m = 1;"
+    assert "window.embedded" not in result.html and "data:text/javascript" not in result.html
+    assert script_hash(module[0].text) not in result.html
+
+
+def test_previews_never_contain_a_script(js_built) -> None:
+    _, result, _ = js_built
+    assert set(result.previews) == set(JS_SLIDES)
+    for slug, text in result.previews.items():
+        assert "<script" not in text.lower(), slug
+    assert 'class="c"' in result.previews["chart"]
+
+
+def test_line_map_covers_sections_and_slide_scripts(js_built) -> None:
+    _, result, _ = js_built
+    lines = result.html.split("\n")
+
+    def ranges(slug: str) -> list[tuple[int, int]]:
+        return [(start, end) for start, end, owner in result.line_map if owner == slug]
+
+    for slug in JS_SLIDES:
+        (start, end), *scripts = ranges(slug)
+        assert start <= end
+        assert any(f'data-slug="{slug}"' in lines[i - 1] for i in range(start, end + 1)), slug
+        for s_start, s_end in scripts:
+            assert any(f'__sdpmSlide("{slug}"' in lines[i - 1] for i in range(s_start, s_end + 1)), slug
+    assert len(ranges("chart")) == len(ranges("chart-2")) == 2
+    assert len(ranges("kept")) == len(ranges("plain")) == 1
+    s_start, s_end = ranges("chart-2")[1]
+    assert lines[s_start - 1].startswith('<script>__sdpmSlide("chart-2"')
+    assert lines[s_end - 1] == "});</script>"
+    covered = [n for start, end, _ in result.line_map for n in range(start, end + 1)]
+    assert len(covered) == len(set(covered)) and max(covered) <= len(lines)
+
+
+def test_deck_without_scripts_has_only_the_engine_scripts(built) -> None:
+    _, result, doc = built
+    assert len(_engine_scripts(doc)) == 3
+    assert "__sdpmSlide" not in result.html and "echarts" not in result.html.lower()
+    assert result.libraries == [] and result.slide_scripts == 0
+    assert [owner for _, _, owner in result.line_map] == list(SLIDES)

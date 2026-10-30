@@ -15,10 +15,18 @@ slide styles nested under ``section[data-slug="…"]`` (``#sdpm-slides``). At-ru
 cannot be nested (``@keyframes``, ``@font-face``, ``@property``…) are emitted unscoped
 just before their slide's rules, keyframes renamed ``sdpm-<slug>-<name>``.
 
+Scripts, in order after the slides: reveal.js, the notes plugin, the libraries the
+slides declare in ``data-libs`` (``sdpm.engine.html.slide_js.LIBRARIES``, once each,
+with their license comment), the slide helper and one wrapped script per inline classic
+slide ``<script>`` (both only when a slide has one), then the ``Reveal.initialize``
+config. Slide scripts are moved out of their sections (``slide_js``); a ``<script src>``,
+``type="module"`` or other type stays in its section, unhashed, so the CSP blocks it.
+A deck without slide scripts or ``data-libs`` gets exactly the three engine scripts.
+
 ``<meta http-equiv="Content-Security-Policy">`` (``sdpm.engine.html.csp``) follows
-``<meta charset>``: only the hashed engine scripts and the speaker view run, every
+``<meta charset>``: only the hashed scripts above and the speaker view run, every
 resource is ``data:``. ``AssembleResult.previews`` holds one static document per slide
-(no script, every fragment shown) for thumbnails.
+(no script at all, every fragment shown) for thumbnails.
 """
 
 from __future__ import annotations
@@ -43,6 +51,14 @@ from sdpm.engine.html.csp import (
     script_hash,
     speaker_view_script,
 )
+from sdpm.engine.html.slide_js import (
+    LIBRARIES,
+    SLIDE_HELPER,
+    declared_libraries,
+    is_slide_script,
+    library_script,
+    wrap_slide_script,
+)
 from sdpm.engine.html.template import TemplateHtml, css_string
 
 _ROOT_RE = re.compile(r":root\s*\{(?P<body>.*?)\}", re.DOTALL | re.IGNORECASE)
@@ -55,9 +71,11 @@ _IMG_ONLY_ATTRS = frozenset({"src", "alt", "srcset", "sizes", "loading", "decodi
 _INLINE_TAG = "sdpm-inline-svg"
 # Resource-loading attributes embedded as data URIs, per tag (others: src, poster).
 # <link> is left alone: a linked stylesheet is not embedded (check.py warns).
+# <script src> is never embedded or fetched (the CSP blocks it; check.py reports it).
 _EMBED_ATTRS = {
     "object": ("data",),
     "link": (),
+    "script": (),
     "image": ("href", "xlink:href"),
     "feimage": ("href", "xlink:href"),
 }
@@ -91,6 +109,10 @@ class AssembleResult:
     warnings: list[str]
     slugs: list[str] = field(default_factory=list)  # slides actually included, in order
     previews: dict[str, str] = field(default_factory=dict)  # slug -> static preview document
+    # (first line, last line, slug), 1-based inclusive, of each section and slide script in html.
+    line_map: list[tuple[int, int, str]] = field(default_factory=list)
+    libraries: list[str] = field(default_factory=list)  # embedded libraries, in order
+    slide_scripts: int = 0  # wrapped slide scripts emitted
 
 
 def style_root_css(art_direction_html: str) -> str:
@@ -486,7 +508,8 @@ def _chrome_html(chrome: dict, kind: str, text: str) -> str:
 
 def _serialize_section(section, slug: str, number: int, layout_info: dict | None,
                        inline: dict[str, str]) -> tuple[str, str]:
-    """``(deck text, preview text)`` of the section; the preview copy has class ``present``."""
+    """``(deck text, preview text)`` of the section; the preview copy has class ``present``
+    and no ``<script>`` element (previews never run code)."""
     section.set("data-slug", slug)
     chrome = (layout_info or {}).get("chrome") or {}
     if chrome.get("slideNumber"):
@@ -506,6 +529,8 @@ def _serialize_section(section, slug: str, number: int, layout_info: dict | None
         return text
 
     deck_text = lxml_html.tostring(section, encoding="unicode", method="html", with_tail=False)
+    for script in list(section.iter("script")):
+        script.drop_tree()
     original_class = section.get("class")
     section.set("class", " ".join([*(original_class or "").split(), "present"]))
     preview_text = lxml_html.tostring(section, encoding="unicode", method="html", with_tail=False)
@@ -644,11 +669,15 @@ def assemble_deck(
         lang: ``<html lang>`` (omitted when None).
 
     Returns:
-        AssembleResult(html, bytes, layouts_used, warnings, slugs, previews) — warnings are
+        AssembleResult(html, bytes, layouts_used, warnings, slugs, previews, line_map,
+        libraries, slide_scripts) — warnings are
         ``"<slug>: …"`` / ``"deck.css: …"`` / ``"output.html: …"`` strings (the last one
         when the file passes ``MAX_OUTPUT_HTML_BYTES``; an embedded file over
         ``MAX_EMBEDDED_FILE_BYTES`` is warned under its slide); slugs are the included slides;
-        previews maps each included slug to its static preview document.
+        previews maps each included slug to its static preview document; line_map lists the
+        1-based inclusive ``(first, last, slug)`` lines of each section and each wrapped slide
+        script in ``html`` (to attribute a browser error to its slide); libraries are the
+        embedded library names in order; slide_scripts counts the wrapped slide scripts.
     """
     warnings: list[str] = []
     ground = default_background or template.info.get("ground")
@@ -660,6 +689,8 @@ def assemble_deck(
     included: list[str] = []
     slide_css: list[str] = []
     layouts_used: list[str] = []
+    slide_scripts: list[tuple[str, str]] = []  # (slug, wrapped code), in deck order
+    used_libraries: set[str] = set()
     for slug, text in slides:
         parsed = parse_slide(text)
         if parsed.section is None or parsed.errors:
@@ -684,6 +715,10 @@ def assemble_deck(
                 if isinstance(el.tag, str) and el.get("style"):
                     el.set("style", _rename_animations(el.get("style"), renames))
         inline: dict[str, str] = {}
+        for script_el in [el for el in section.iter("script") if is_slide_script(el)]:
+            slide_scripts.append((slug, wrap_slide_script(slug, script_el.text or "")))
+            script_el.drop_tree()
+        used_libraries.update(declared_libraries(section))
         _process_media(section, number, resolver, slug, inline)
         layout = parsed.layout
         if layout and layout in layouts_by_name and layout not in layouts_used:
@@ -712,9 +747,13 @@ def assemble_deck(
 
     html_open = f'<html lang="{_html.escape(lang, quote=True)}">' if lang else "<html>"
     notes_js = _vendor_text("plugin/notes.js")
+    libraries = [name for name in LIBRARIES if name in used_libraries]
     scripts = [
         inline_js(_vendor_text("reveal.js")),
         f"{_reveal_notice()}\n{_MARKED_NOTICE}\n{inline_js(notes_js)}",
+        *(inline_js(library_script(name)) for name in libraries),
+        *([SLIDE_HELPER] if slide_scripts else []),
+        *(inline_js(code) for _, code in slide_scripts),
         _config_script(width, height),
     ]
     policy = deck_csp([script_hash(s) for s in scripts] + [script_hash(speaker_view_script(notes_js))])
@@ -740,6 +779,17 @@ def assemble_deck(
         "</html>",
     ]
     text = "\n".join(head + body) + "\n"
+    line_map: list[tuple[int, int, str]] = []
+    line = 1
+    # Owning slug of each entry: the sections, then the slide scripts (which follow
+    # "</div></div>", the engine scripts, the libraries and the helper; the config is last).
+    owners = [None] * (len(head) + 2) + included + [None] * (len(scripts) - len(slide_scripts))
+    owners += [slug for slug, _ in slide_scripts] + [None] * 3  # config, </body>, </html>
+    for entry, owner in zip(head + body, owners):
+        end = line + entry.count("\n")
+        if owner is not None:
+            line_map.append((line, end, owner))
+        line = end + 1
     total = len(text.encode("utf-8"))
     if total > MAX_OUTPUT_HTML_BYTES:
         warnings.append(f"output.html: {_mb(total)} (over {_mb(MAX_OUTPUT_HTML_BYTES)}) — it opens "
@@ -766,7 +816,8 @@ def assemble_deck(
             "</html>",
         ]) + "\n"
     return AssembleResult(html=text, bytes=total, layouts_used=layouts_used,
-                          warnings=warnings, slugs=included, previews=previews)
+                          warnings=warnings, slugs=included, previews=previews,
+                          line_map=line_map, libraries=libraries, slide_scripts=len(slide_scripts))
 
 
 __all__ = ["AssembleResult", "MAX_EMBEDDED_FILE_BYTES", "MAX_OUTPUT_HTML_BYTES", "ParsedSlide",

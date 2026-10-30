@@ -29,11 +29,15 @@ RUN python3.13 -m pip install --no-cache-dir -c servers/remote/constraints.txt .
 
 # Bundled knowledge data (references / templates) — served by the shared tool
 # contract via SDPM_SKILL_ROOT. Assets stay on S3 (user-extensible, 36MB).
-# vendor/ holds reveal.js, inlined into every HTML deck (sdpm.engine.html).
+# vendor/ holds reveal.js, ECharts and D3, inlined into HTML decks (sdpm.engine.html):
+# reveal.js into every deck, ECharts / D3 into the decks whose slides declare them.
 COPY sdpm/references/ sdpm/references/
 COPY sdpm/templates/ sdpm/templates/
 COPY sdpm/vendor/ sdpm/vendor/
 ENV SDPM_SKILL_ROOT=/app/sdpm
+# The runtime image has no Chrome / Edge, so the headless JS check of HTML decks is off
+# (sdpm.engine.html.jscheck, design §8.5); static checks still run.
+ENV SDPM_JS_CHECK=0
 
 # Install remote server
 COPY shared/ shared/

@@ -12,6 +12,23 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **HTML output mode (phase 3, JavaScript).** HTML slides may contain inline `<script>`
+  elements. The assembler moves each one out of its section, wraps it and runs it once per
+  section element the first time the slide is shown (`section` is the slide's element); every
+  script is hashed into the deck's CSP, while `<script src>`, module scripts, `on*` handlers
+  and `javascript:` URLs stay blocked, and thumbnails run no script. `<section
+  data-libs="echarts d3">` embeds Apache ECharts 6.1.0 (Apache-2.0) and D3 7.9.0 (ISC),
+  vendored under `sdpm/vendor/`, only in decks whose slides declare them, each with its
+  license notice. New static-check rules: `script-external` (navigation, new tabs and
+  external URLs in a slide script), `library-unknown`, `library-undeclared`, `script-eval`
+  (calls that need eval, such as `d3.csvParse`) and `script-dom` (`getElementById`, load
+  waits). When Chrome or Edge is installed, a deck with scripts is opened headless after each
+  local build, with networking disabled, and JS errors come back as `<slug>: JS error: …`
+  warnings; the result's `js_check` reports the status, or a one-line note when no browser
+  is found. `SDPM_JS_CHECK=0` turns the check off and `SDPM_BROWSER` picks the browser; the
+  cloud runtime image sets `SDPM_JS_CHECK=0`. The guide (`slide-html-spec`, section
+  Scripts) and the HTML composer document cover the rules with ECharts, D3 and click
+  examples. Decks without scripts are unchanged. Deploy: SdpmData, SdpmRuntime.
 - **HTML output mode (phase 2, cloud).** HTML decks now work on the AWS stack and in the
   Web UI. On the first chat screen a **Build as HTML** pill (「HTML で作成」) under
   Vibe / Spec adds `@format:html` to the message; the `/` picker has a matching **Format**

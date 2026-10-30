@@ -58,7 +58,9 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
 - The template draws its own decorations — logo, copyright, bands (`template_html`
   decorations of kind `band` / `obstacle`): never redraw them, and keep content clear of
   them. Page numbers and footers are drawn by the deck: never write them.
-- Not allowed: `<script>`, `on*` handlers, external URLs (links with `<a href>` are fine),
+- Scripts are allowed: an inline `<script>` in the section, libraries declared with
+  `data-libs` (`echarts`, `d3`); rules and examples are in slide_spec `Scripts`. Not allowed:
+  `<script src>`, `on*` handlers, external URLs (links with `<a href>` are fine),
   `data-background-*`. Speaker notes go in `<aside class="notes">`.
 - `deck.css` (deck root) holds the deck's shared component classes. Only the layout pass
   writes it, or a composer whose `task_instruction` asks for a change to `deck.css`. Content
@@ -68,6 +70,7 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
   orchestrator can have the layout pass add it. A change to `deck.css` re-renders every slide.
 - After writing, read `run_python`'s warnings — the static checks (font-size tokens, layout
   names, forbidden constructs, structure) — and fix them before moving to the next slug.
+  JS errors (`<slug>: JS error: …`, reported when a browser is available) are fixed the same way.
   There is no PNG preview: what the slide looks like is seen by opening `output.html`.
 
 ## Modes

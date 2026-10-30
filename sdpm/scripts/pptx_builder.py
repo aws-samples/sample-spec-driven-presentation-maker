@@ -261,6 +261,13 @@ def cmd_generate_html(args):
     decorations = result.get("decorations")
     if decorations:
         print(f"  {decorations['note']}")
+    js_check = result.get("js_check")
+    if js_check:
+        if js_check.get("browser"):
+            print(f"  JS check: {js_check['status']} ({Path(js_check['browser']).name}, "
+                  f"{js_check.get('seconds', 0)} s)")
+        if js_check.get("note"):
+            print(f"  {js_check['note']}")
 
 
 def cmd_search_assets(args):

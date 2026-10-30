@@ -122,6 +122,28 @@ def test_every_emitted_script_and_the_speaker_view_are_hashed(output_html: str) 
     assert len(sources) == 4
 
 
+def test_every_script_of_a_js_deck_is_hashed(tmp_path: Path, output_html: str) -> None:
+    deck = _deck(tmp_path / "js", {
+        "chart": '<section data-layout="Title Only" data-libs="echarts d3"><div class="c"></div>'
+                 "<script>var x=1;</script><script>\r\nvar y=2;\r\n</script></section>",
+        "plain": '<section data-layout="Title Only"><h1 data-ph="title">Plain</h1></section>',
+    })
+    result = api.generate_html(deck)
+    assert result["libraries"] == ["echarts", "d3"]
+    html = (deck / "output.html").read_text(encoding="utf-8")
+    directives = _directives(_policy_of(html))
+    sources = directives["script-src"]
+    scripts = _SCRIPT_RE.findall(html)
+    assert len(scripts) == 8  # reveal, notes, echarts, d3, helper, 2 slide scripts, config
+    for text in scripts:
+        assert f"'{script_hash(text)}'" in sources
+    assert f"'{script_hash(speaker_view_script(NOTES_JS))}'" in sources
+    assert len(sources) == len(set(sources)) == len(scripts) + 1
+    plain = _directives(_policy_of(output_html))
+    assert {k: v for k, v in directives.items() if k != "script-src"} == \
+        {k: v for k, v in plain.items() if k != "script-src"}
+
+
 @pytest.mark.skipif(REVEAL_VERSION != "6.0.2", reason="hash pinned for the vendored reveal.js 6.0.2")
 def test_speaker_view_hash_of_vendored_reveal() -> None:
     assert script_hash(speaker_view_script(NOTES_JS)) == SPEAKER_VIEW_HASH_6_0_2
@@ -186,6 +208,7 @@ _HOSTILE = {
                        "<text>t</text></a></svg>", "script"),
     "use-href": ('<svg><use href="images/s.svg#a"/></svg>', "external-use"),
     "meta-refresh": ('<meta http-equiv="refresh" content="0;url=https://example.com/">', "script"),
+    "script-src": ('<script src="https://example.com/x.js"></script>', "script"),
 }
 
 
@@ -209,6 +232,7 @@ def test_hostile_constructs_are_kept_and_reported(tmp_path: Path) -> None:
         "animate-values": '//animate[contains(@values, "javascript:")]',
         "use-href": '//use[@href="images/s.svg#a"]',
         "meta-refresh": '//meta[@http-equiv="refresh"]',
+        "script-src": '//script[@src="https://example.com/x.js"]',
     }
     for slug, xpath in present.items():
         section = doc.xpath(f'//section[@data-slug="{slug}"]')[0]

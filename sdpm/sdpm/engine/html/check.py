@@ -9,7 +9,9 @@ Rules:
     structure               not exactly one top-level ``<section>``, or a nested one
     layout-missing          the section has no ``data-layout``
     layout-unknown          ``data-layout`` names no layout of the template
-    script                  ``<script>``, ``on*`` attributes, ``javascript:`` URLs (also
+    script                  ``<script src>`` and non-classic ``<script type>`` (module,
+                            JSON …; inline classic scripts are allowed and run),
+                            ``on*`` attributes, ``javascript:`` URLs (also
                             one item of an SVG animation ``values`` list),
                             ``<iframe>`` / ``<object>`` / ``<embed>`` (an embedded document
                             the checks cannot see), ``<meta http-equiv>`` (``refresh``
@@ -31,6 +33,21 @@ Rules:
     data-slug               ``data-slug`` set by the author (the assembler sets it)
     font-size-token         a font size that does not use a ``--fs-*`` token
     font-size-unknown-token a ``var(--fs-*)`` the style does not define
+    script-external         a slide script uses ``location``, ``window.open`` / ``open(``,
+                            ``top.`` or an external URL (``http(s)://`` other than an XML
+                            namespace URI, ``"//host``); the
+                            CSP blocks fetch but not navigation or new tabs
+    library-unknown         a ``data-libs`` value that is not a bundled library
+    library-undeclared      a slide script uses ``echarts.`` / ``d3.`` while the section's
+                            ``data-libs`` does not name it
+    script-eval             a slide script calls something that needs eval (``d3.csvParse``,
+                            ``tsvParse``, ``dsvFormat(…).parse``, ``eval``, ``new Function``)
+    script-dom              a slide script uses ``getElementById`` / ``querySelector('#…')``
+                            or waits for ``DOMContentLoaded`` / ``load``
+
+The slide-script rules scan the text of the slide's inline classic scripts with regular
+expressions (no JS parser; comments and strings are scanned too). One diagnostic per
+slide per rule.
 """
 
 from __future__ import annotations
@@ -69,6 +86,31 @@ _JS_URL_ATTRS = frozenset({"href", "xlink:href", "src", "action", "formaction", 
 _EMBEDDING_TAGS = frozenset({"iframe", "frame", "object", "embed"})
 # SVG animation elements (lower-cased by the HTML parser); ``values`` is a ``;`` list.
 _SVG_ANIMATION_TAGS = frozenset({"animate", "set", "animatemotion", "animatetransform"})
+
+# Slide-script patterns (design §8.4). Group "tok", when present, is the token reported.
+_JS_EXTERNAL_RES = tuple(re.compile(p) for p in (
+    r"\blocation\b",
+    r"\bwindow\s*\.\s*open\b",
+    r"(?<![\w$.])open\s*\(",
+    r"(?<![\w$.])top\s*\.",
+    # XML namespace URIs (createElementNS) are names, not requests.
+    r"(?P<tok>https?://(?!www\.w3\.org/(?:2000/svg|1999/xhtml|1999/xlink|1998/Math/MathML|"
+    r"XML/1998/namespace|2000/xmlns/)[\"'`])[^\s'\"`)]*)",
+    r"[\"'`](?P<tok>//[A-Za-z0-9][^\s'\"`]*)",
+))
+_JS_EVAL_RES = tuple(re.compile(p) for p in (
+    r"\b(?:csvParse|tsvParse)\s*\(",
+    r"dsvFormat\s*\([^)]*\)\s*\.\s*parse\s*\(",
+    r"\beval\s*\(",
+    r"\bnew\s+Function\b",
+))
+_JS_DOM_RES = tuple(re.compile(p) for p in (
+    r"getElementById",
+    r"document\s*\.\s*querySelector(?:All)?\s*\(\s*[\"'`]#",
+    r"DOMContentLoaded",
+    r"addEventListener\s*\(\s*[\"'`]load[\"'`]",
+    r"\bonload\s*=",
+))
 
 
 def _diag(slug: str, rule: str, message: str) -> dict:
@@ -308,6 +350,61 @@ def _self_chrome_diags(slug: str, el, chrome_keys: set[str]) -> list[dict]:
     return out
 
 
+def _js_tokens(code: str, patterns: Iterable[re.Pattern]) -> list[str]:
+    """Distinct matched tokens (``tok`` group when the pattern has one), in pattern order."""
+    out: list[str] = []
+    for pattern in patterns:
+        for m in pattern.finditer(code):
+            token = m.group("tok") if "tok" in pattern.groupindex else m.group(0)
+            token = re.sub(r"\s+", "", token)[:60]
+            if token not in out:
+                out.append(token)
+    return out
+
+
+def _token_list(tokens: list[str]) -> str:
+    shown = ", ".join(repr(t) for t in tokens[:5])
+    return shown + (f" (+{len(tokens) - 5} more)" if len(tokens) > 5 else "")
+
+
+def _slide_script_diags(slug: str, section, code: str) -> list[dict]:
+    """Rules for a slide's classic scripts (``code`` = their concatenated text, design §8.4)."""
+    from sdpm.engine.html.slide_js import LIBRARIES, LIBRARY_GLOBALS, declared_libraries
+
+    out = []
+    unknown = [name for name in (section.get("data-libs") or "").split() if name.lower() not in LIBRARIES]
+    if unknown:
+        out.append(_diag(slug, "library-unknown",
+                         f"data-libs {_token_list(unknown)} is not a bundled library "
+                         f"(known: {', '.join(LIBRARIES)})"))
+    if not code:
+        return out
+    tokens = _js_tokens(code, _JS_EXTERNAL_RES)
+    if tokens:
+        out.append(_diag(slug, "script-external",
+                         f"slide script uses {_token_list(tokens)}: the deck CSP blocks fetch but not "
+                         "navigation or new tabs, so the deck could send data out; remove it"))
+    declared = declared_libraries(section)
+    undeclared = [name for name, glob in LIBRARY_GLOBALS.items()
+                  if name not in declared and re.search(rf"(?<![\w$.]){glob}\s*\.", code)]
+    if undeclared:
+        out.append(_diag(slug, "library-undeclared",
+                         f"slide script uses {', '.join(undeclared)} without declaring it; add "
+                         f'data-libs="{" ".join([*declared, *undeclared])}" to the <section>'))
+    tokens = _js_tokens(code, _JS_EVAL_RES)
+    if tokens:
+        out.append(_diag(slug, "script-eval",
+                         f"slide script calls {_token_list(tokens)}, which needs eval and is blocked by "
+                         "the deck CSP; use d3.csvParseRows or inline arrays"))
+    tokens = _js_tokens(code, _JS_DOM_RES)
+    if tokens:
+        out.append(_diag(slug, "script-dom",
+                         f"slide script uses {_token_list(tokens)}: find elements with "
+                         "section.querySelector (the print view clones fragment pages, so ids "
+                         "repeat) and do not wait for load events (they have fired)"))
+    return out
+
+
 def check_slide_html(
     slug: str,
     text: str,
@@ -317,6 +414,7 @@ def check_slide_html(
 ) -> list[dict]:
     """Static checks for one ``slides/<slug>.html`` (see the module docstring for rules)."""
     from sdpm.engine.html.assemble import parse_slide
+    from sdpm.engine.html.slide_js import is_slide_script
 
     parsed = parse_slide(text)
     out = [_diag(slug, "structure", err) for err in parsed.errors]
@@ -335,11 +433,19 @@ def check_slide_html(
     if section.get("data-slug") is not None:
         out.append(_diag(slug, "data-slug", "data-slug is set by the assembler; remove it"))
 
+    scripts: list[str] = []
     for el in section.iter():
         if not isinstance(el.tag, str):
             continue
         if el.tag == "script":
-            out.append(_diag(slug, "script", "<script> is not allowed in slides"))
+            if is_slide_script(el):
+                scripts.append(el.text or "")
+            elif el.get("src") is not None:
+                out.append(_diag(slug, "script", "<script src> does not run (the deck CSP allows only "
+                                 "inline scripts); put the code inline"))
+            else:
+                out.append(_diag(slug, "script", "only classic inline scripts run; "
+                                 f"type={el.get('type')[:40]!r} is blocked"))
         if el.tag == "meta" and el.get("http-equiv") is not None:
             out.append(_diag(slug, "script",
                              f"<meta http-equiv={el.get('http-equiv')[:40]!r}> is not allowed in slides "
@@ -356,6 +462,7 @@ def check_slide_html(
         style = el.get("style")
         if style:
             out.extend(_css_url_diags(slug, style, f"<{el.tag}> style"))
+    out.extend(_slide_script_diags(slug, section, "\n".join(scripts)))
     return out
 
 

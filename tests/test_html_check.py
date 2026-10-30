@@ -72,13 +72,14 @@ def test_layout_missing_and_unknown() -> None:
 
 
 @pytest.mark.parametrize("inner", [
-    "<script>alert(1)</script>",
+    '<script src="js/a.js"></script>',
+    '<script type="module">x()</script>',
+    '<script type="application/json">{}</script>',
     '<div onclick="go()">x</div>',
     '<svg><rect onload="go()"/></svg>',
     '<a href="javascript:go()">x</a>',
     '<div style="background:url(javascript:go())"></div>',
     '<svg><foreignObject><div onclick="go()">x</div></foreignObject></svg>',
-    "<svg><foreignObject><script>go()</script></foreignObject></svg>",
     '<svg><a xlink:href="javascript:go()"><text>x</text></a></svg>',
     '<svg><set attributeName="href" to="javascript:go()"/></svg>',
     '<form action="javascript:go()"></form>',
@@ -91,6 +92,63 @@ def test_layout_missing_and_unknown() -> None:
 ])
 def test_script(inner: str) -> None:
     assert "script" in _rules(_section(inner))
+
+
+CLEAN_JS = (
+    '<section data-layout="Title Only" data-libs="echarts d3">\n'
+    '  <h1 data-ph="title">Live</h1>\n'
+    '  <div class="c" style="width:800px;height:400px"></div>\n'
+    '  <svg width="400" height="300"></svg>\n'
+    "  <script>\n"
+    "  // comment: draw on first show\n"
+    "  var chart = echarts.init(section.querySelector('.c'));\n"
+    "  chart.setOption({animation: !Reveal.isPrintView(), series: [{type: 'bar', data: [1, 2]}]});\n"
+    "  var rows = d3.csvParseRows('a,1\\nb,2');\n"
+    "  var svg = d3.select(section.querySelector('svg'));\n"
+    "  var ns = document.createElementNS('http://www.w3.org/2000/svg', 'g');\n"
+    "  var el = section.querySelector('.c'); el.style.marginTop = '4px'; el.top = 1;\n"
+    "  </script>\n"
+    "</section>\n"
+)
+
+
+def test_clean_js_slide_has_no_diagnostics() -> None:
+    assert _rules(CLEAN_JS) == []
+
+
+@pytest.mark.parametrize("rule, code, attrs", [
+    ("script-external", "location.href = '/x?' + d;", ""),
+    ("script-external", "window.open('x');", ""),
+    ("script-external", "top.location = 'x';", ""),
+    ("script-external", "fetch('https://x');", ""),
+    ("script-external", 'var u = "//cdn.x/a";', ""),
+    ("library-unknown", "", ' data-libs="three"'),
+    ("library-undeclared", "echarts.init(section.querySelector('.c'));", ""),
+    ("library-undeclared", "d3.select(section);", ' data-libs="echarts"'),
+    ("script-eval", "d3.csvParse(text);", ' data-libs="d3"'),
+    ("script-eval", "d3.dsvFormat(';').parse(text);", ' data-libs="d3"'),
+    ("script-eval", "eval('1');", ""),
+    ("script-eval", "var f = new Function('return 1');", ""),
+    ("script-dom", "document.getElementById('a');", ""),
+    ("script-dom", "document.querySelector('#a');", ""),
+    ("script-dom", "document.addEventListener('DOMContentLoaded', f);", ""),
+    ("script-dom", "window.addEventListener('load', f);", ""),
+])
+def test_slide_script_rules(rule: str, code: str, attrs: str) -> None:
+    script = f"<script>{code}</script>" if code else ""
+    diags = check_slide_html("s", _section(script, f'data-layout="Blank"{attrs}'), layouts=LAYOUTS)
+    assert [d["rule"] for d in diags] == [rule]
+
+
+def test_slide_script_rules_report_once_per_slide() -> None:
+    text = _section("<script>location.href = 'https://a';</script><script>window.open('//b');</script>")
+    diags = check_slide_html("s", text, layouts=LAYOUTS)
+    assert [d["rule"] for d in diags] == ["script-external"]
+    assert "'location'" in diags[0]["message"] and "'https://a'" in diags[0]["message"]
+
+
+def test_non_classic_script_text_is_not_scanned() -> None:
+    assert _rules(_section('<script type="application/json">{"u": "https://x"}</script>')) == ["script"]
 
 
 @pytest.mark.parametrize("inner", [
