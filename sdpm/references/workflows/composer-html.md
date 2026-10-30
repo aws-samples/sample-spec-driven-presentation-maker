@@ -46,6 +46,12 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
   structure and say so in your summary. A card or node that names a concept carries an icon,
   as the style's icon rule places it. A slide that is mostly sentences inside cards is a
   defect unless its claim is itself a sentence.
+- Make it work, not just appear: where the `visual` names an interaction (the presenter
+  clicks, hovers, drags, changes a value) or the content gains from one, build it with a slide
+  script so it runs while presenting — an ECharts / D3 chart with tooltips and toggles, a
+  diagram whose parts open details on click, a slider that recomputes a figure. Fragments show
+  things in order; they are not a substitute for interaction. Rules and examples are in
+  slide_spec `Scripts`.
 - Helpers: `grid(purpose, spec)` computes exact coordinates for row × column layouts — use
   them as absolute `left` / `top` / `width` / `height`. `search_assets` finds icons:
   `<img src="assets:<source>/<name>">`. `code_to_slide` and `arch_diagram` return PPTX
