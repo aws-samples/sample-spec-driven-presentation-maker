@@ -67,6 +67,15 @@ def test_generate_html_warnings_and_diagnostics(tmp_path) -> None:
     assert [(d["slug"], d["rule"]) for d in result["diagnostics"]] == [("body", "font-size-token")]
 
 
+def test_engine_letterbox_colour_is_not_reported(tmp_path) -> None:
+    deck = _deck(tmp_path)
+    api.generate_html(deck)
+    assert 'data-background-color="' in (deck / "output.html").read_text(encoding="utf-8")
+    again = api.refresh_html(deck, measure_slides=["cover", "body"])
+    assert not any("data-background" in w for w in again["warnings"])
+    assert "data-background" not in (deck / "slides" / "cover.html").read_text(encoding="utf-8")
+
+
 def test_generate_html_custom_output_path(tmp_path) -> None:
     deck = _deck(tmp_path)
     out = tmp_path / "elsewhere" / "deck.html"

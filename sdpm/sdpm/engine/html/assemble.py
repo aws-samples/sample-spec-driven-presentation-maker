@@ -15,6 +15,9 @@ slide styles nested under ``section[data-slug="…"]`` (``#sdpm-slides``). At-ru
 cannot be nested (``@keyframes``, ``@font-face``, ``@property``…) are emitted unscoped
 just before their slide's rules, keyframes renamed ``sdpm-<slug>-<name>``.
 
+Each deck ``<section>`` gets the engine's ``data-background-color`` (``letterbox_color``)
+and reveal.js runs with ``margin:0``: the area around the slide, when the window aspect
+differs from the deck's, shows the slide's base ground colour instead of the white page.
 Scripts, in order after the slides: reveal.js, the notes plugin, the libraries the
 slides declare in ``data-libs`` (``sdpm.engine.html.slide_js.LIBRARIES``, once each,
 with their license comment), the slide helper and one wrapped script per inline classic
@@ -506,9 +509,25 @@ def _chrome_html(chrome: dict, kind: str, text: str) -> str:
             f"<span>{_html.escape(text)}</span></div>")
 
 
+def letterbox_color(layout_info: dict | None, template: TemplateHtml, default_background: str | None) -> str:
+    """Colour of the area around a slide (reveal.js margin / window letterbox).
+
+    deck.json ``defaultBackground`` when set (it replaces the template ground), else the
+    layout's solid ground, else (gradient / picture ground, unknown layout) the theme
+    background colour.
+    """
+    if default_background:
+        return default_background
+    ground = (layout_info or {}).get("ground") or {}
+    if ground.get("kind") == "solid" and ground.get("color"):
+        return ground["color"]
+    return (template.info.get("themeColors") or {}).get("background") or template.info.get("ground") or "#FFFFFF"
+
+
 def _serialize_section(section, slug: str, number: int, layout_info: dict | None,
-                       inline: dict[str, str]) -> tuple[str, str]:
-    """``(deck text, preview text)`` of the section; the preview copy has class ``present``
+                       inline: dict[str, str], background: str) -> tuple[str, str]:
+    """``(deck text, preview text)`` of the section; the deck copy carries the engine's
+    ``data-background-color`` (``letterbox_color``); the preview copy has class ``present``
     and no ``<script>`` element (previews never run code)."""
     section.set("data-slug", slug)
     chrome = (layout_info or {}).get("chrome") or {}
@@ -528,7 +547,11 @@ def _serialize_section(section, slug: str, number: int, layout_info: dict | None
             text = text.replace(f'<{_INLINE_TAG} data-k="{key}"></{_INLINE_TAG}>', svg, 1)
         return text
 
+    # Set by the engine after the checks (a composer-written data-background-* is reported
+    # and replaced here): reveal.js paints it across the viewport, behind the slide.
+    section.set("data-background-color", background)
     deck_text = lxml_html.tostring(section, encoding="unicode", method="html", with_tail=False)
+    del section.attrib["data-background-color"]
     for script in list(section.iter("script")):
         script.drop_tree()
     original_class = section.get("class")
@@ -606,10 +629,12 @@ def _config_script(width: int, height: int) -> str:
     speaker view's receivers load ``url`` (ending in ``#sdpm-receiver``) plus their
     parameters, read back here through an allowlist (no hash sync, ``S`` disabled);
     ``#print-pdf`` selects the print view (``?print-pdf`` still works natively).
+    ``margin:0``: the template ground is drawn inside the slide, so any margin shows the
+    slide background colour around it instead (``letterbox_color``).
     """
     return (
         "(function(){"
-        f"var o={{width:{width},height:{height},margin:0.04,center:false,hash:true,plugins:[RevealNotes]}};"
+        f"var o={{width:{width},height:{height},margin:0,center:false,hash:true,plugins:[RevealNotes]}};"
         "o.url=location.href.split('#')[0]+'#sdpm-receiver';"
         "var h=location.hash,m=/^#sdpm-receiver[?&]([^#]*)/.exec(h);"
         "if(m){o.hash=false;o.keyboard={83:null};"
@@ -723,7 +748,10 @@ def assemble_deck(
         layout = parsed.layout
         if layout and layout in layouts_by_name and layout not in layouts_used:
             layouts_used.append(layout)
-        deck_text, preview_text = _serialize_section(section, slug, number, layouts_by_name.get(layout), inline)
+        layout_info = layouts_by_name.get(layout)
+        deck_text, preview_text = _serialize_section(
+            section, slug, number, layout_info, inline,
+            letterbox_color(layout_info, template, default_background))
         sections.append(deck_text)
         preview_sections[slug] = (preview_text, layout if layout in layouts_by_name else None, own_css)
         included.append(slug)
@@ -821,4 +849,5 @@ def assemble_deck(
 
 
 __all__ = ["AssembleResult", "MAX_EMBEDDED_FILE_BYTES", "MAX_OUTPUT_HTML_BYTES", "ParsedSlide",
-           "assemble_deck", "collect_refs", "inline_js", "parse_slide", "style_root_css"]
+           "assemble_deck", "collect_refs", "inline_js", "letterbox_color", "parse_slide",
+           "style_root_css"]
