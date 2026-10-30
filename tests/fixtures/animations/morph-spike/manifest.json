@@ -1,0 +1,47 @@
+{
+  "schemaVersion": 1,
+  "oracle": {
+    "application": "Microsoft PowerPoint for Mac",
+    "version": "16.113.1",
+    "visualAcceptance": "pending-task-8"
+  },
+  "identity": {
+    "jsonMorphId": "hero",
+    "powerPointName": "!!sdpm-morph-hero",
+    "sameSlideDuplicates": "invalid",
+    "sourceSlide": 1,
+    "destinationSlides": [2, 3, 4]
+  },
+  "pairs": [
+    {
+      "source": {"slide": 1, "name": "!!sdpm-morph-hero", "geometryInches": [1.0, 2.0, 2.0, 1.0]},
+      "destination": {"slide": 2, "name": "!!sdpm-morph-hero", "geometryInches": [6.0, 3.0, 3.0, 1.5]},
+      "option": "byObject",
+      "expected": "interpolate-geometry",
+      "forbidden": "cross-fade"
+    },
+    {
+      "source": {"slide": 2, "name": "!!sdpm-morph-hero", "geometryInches": [6.0, 3.0, 3.0, 1.5]},
+      "destination": {"slide": 3, "name": "!!sdpm-morph-hero", "geometryInches": [2.0, 4.0, 4.0, 1.0]},
+      "option": "byWord",
+      "expected": "match-object-and-morph-words",
+      "forbidden": "unmatched-object-cross-fade"
+    },
+    {
+      "source": {"slide": 3, "name": "!!sdpm-morph-hero", "geometryInches": [2.0, 4.0, 4.0, 1.0]},
+      "destination": {"slide": 4, "name": "!!sdpm-morph-hero", "geometryInches": [5.0, 1.0, 2.5, 2.0]},
+      "option": "byChar",
+      "expected": "match-object-and-morph-characters",
+      "forbidden": "unmatched-object-cross-fade"
+    }
+  ],
+  "transition": {
+    "namespace": "http://schemas.microsoft.com/office/powerpoint/2015/09/main",
+    "choiceRequires": "p159",
+    "durationMs": 800,
+    "fallback": "fade"
+  },
+  "evidence": [
+    "https://support.microsoft.com/en-us/office/morph-tips-and-tricks-bc7f48ff-f152-4ee8-9081-d3121788024f"
+  ]
+}
