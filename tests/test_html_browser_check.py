@@ -250,6 +250,15 @@ def test_real_browser_checks_only_the_requested_slugs(tmp_path: Path, use_browse
 
 
 @real_browser
+def test_real_browser_reports_a_js_error_on_the_first_slide(tmp_path: Path, use_browser) -> None:
+    """The first slide gets no ready event on the check's page; its script still runs."""
+    deck = _deck(tmp_path, {"first": _slide("First", "<script>\nnotDefinedFunction();\n</script>"), "b": CLEAN})
+    result = api.refresh_html(deck, measure_slides=["first"])
+    assert result["browser_check"]["status"] == "issues", result
+    assert any(w.startswith("first: JS error: ") and "notDefinedFunction" in w for w in result["warnings"])
+
+
+@real_browser
 def test_real_browser_endless_animation_does_not_hang(tmp_path: Path, use_browser) -> None:
     spin = ("<style>@keyframes sdpm-spin { to { transform: rotate(360deg); } }"
             ".spin { display: inline-block; width: 40px; height: 40px; margin: 40px;"

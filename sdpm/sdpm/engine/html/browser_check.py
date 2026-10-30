@@ -359,7 +359,8 @@ def _load(run: _Run, html: str) -> None:
 def _slide(run: _Run, slug: str, index: int, *, width: int, height: int, decorations: list[dict],
            png_dir: Path | None) -> None:
     run.current = slug
-    run.js(f"Reveal.slide({index},0,999);0")
+    # __sdpmCheckRun: the slide shown first gets no ready / slidechanged event here.
+    run.js(f"Reveal.slide({index},0,999);window.__sdpmCheckRun&&window.__sdpmCheckRun();0")
     run.js(RAF1, await_promise=True, timeout=10)
     run.js(FINISH)
     run.js(RAF2, await_promise=True, timeout=10)

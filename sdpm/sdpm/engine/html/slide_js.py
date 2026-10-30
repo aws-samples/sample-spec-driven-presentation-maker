@@ -19,9 +19,11 @@ element, the first time the slide is laid out:
 
 When the URL fragment carries ``sdpm-check`` (the browser check), ``Reveal.isPrintView()``
 returns true while a slide function runs, so slides that follow the print-view rule draw
-their final state at once (no entry animation in the PNG), and the helper logs
+their final state at once (no entry animation in the PNG), the helper logs
 ``sdpm-check:navigated`` on ``pagehide``, so the check stops at once when a slide script
-navigates the page away.
+navigates the page away, and ``__sdpmCheckRun()`` runs the current slide's functions if
+no event has: on the check's ``about:blank`` / ``blob:`` page reveal.js's ``replaceState``
+throws during start-up, so ``ready`` never fires and the first slide would go unchecked.
 
 An exception is caught and logged as ``console.error('sdpm slide <slug>: <stack>')`` so
 one broken slide does not stop the others.
@@ -58,7 +60,8 @@ function run(section){
  section.__sdpmRan=true;
  (fns[section.getAttribute('data-slug')]||[]).forEach(function(fn){try{call(section,fn);}catch(e){fail(section.getAttribute('data-slug'),e);}});
 }
-if(check)window.addEventListener('pagehide',function(){console.info('sdpm-check:navigated');});
+if(check){window.addEventListener('pagehide',function(){console.info('sdpm-check:navigated');});
+ window.__sdpmCheckRun=function(){run(Reveal.getCurrentSlide());};}
 Reveal.on('ready',function(e){if(!Reveal.isPrintView())run(e.currentSlide);});
 Reveal.on('slidechanged',function(e){run(e.currentSlide);});
 Reveal.on('overviewshown',function(){document.querySelectorAll('.reveal .slides section[data-slug]').forEach(function(s){if(s.offsetWidth)run(s);});});
