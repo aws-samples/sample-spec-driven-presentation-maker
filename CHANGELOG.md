@@ -18,6 +18,23 @@ Entries before v0.5.0 were written retroactively as summaries.
   listed in the example config's Recommended group. Unlike Haiku 4.5 it is not
   excluded from the Create picker.
 
+### Removed
+
+- **Python 3.10 is no longer supported (breaking).** `requires-python` is now `>=3.11`
+  for `sdpm`, `servers/local`, `servers/remote` and the repository root, and the Claude
+  Desktop bundle (`scripts/mcpb/manifest.json`) requires `>=3.11`. Python 3.10 reached
+  end of life in October 2026, and Pillow 13 (which fixes the open Pillow advisories) no
+  longer supports it, so 3.10 installs were stuck on a vulnerable Pillow 12.3.0.
+  **Migration:** usually nothing to do. Every entry point runs through `uv`, which
+  downloads a matching Python when the one on the machine is too old. Only setups that
+  disable uv's Python downloads (`UV_PYTHON_DOWNLOADS=never`, offline machines) need a
+  Python 3.11+ on the machine.
+
+### Security
+
+- Pillow 12.3.0 → 13.0.0 and pypdf 6.19.0 → 6.21.4 in every lock and in the
+  `servers/remote` image constraints (Dependabot critical / high advisories).
+
 ## [0.10.4] - 2026-10-02
 
 ### Fixed
