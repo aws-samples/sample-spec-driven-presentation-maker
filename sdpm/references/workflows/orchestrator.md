@@ -35,9 +35,17 @@ Output format. The deck is PPTX unless the user asks for an HTML / browser / rev
 or the message carries `@format:html` — an explicit choice like `@template:`, in `fast` mode
 too; do not ask about it otherwise. For HTML, call `init_deck_workspace(name,
 output_format="html")` before the style and the outline. If `init_deck_workspace` has no
-`output_format` parameter here, HTML is not available: say so and build PPTX. In an HTML
-outline, a progressive build is fragments within one slide or an auto-animate prefix group
-(`demo-1`, `demo-2`). Changing the format after composing means recomposing every slide.
+`output_format` parameter here, HTML is not available: say so and build PPTX. An HTML slide
+is a web page: anything HTML, CSS and JS can do is available offline — interactive charts
+(bundled ECharts and D3), parts that change on click or hover, a slider or input that
+recomputes a result, a small simulation. reveal.js only turns the pages and runs the presenter
+view; do not describe the deck's possibilities in terms of it. Use interaction wherever the
+content gains from it, without being asked: data the audience should explore becomes a chart
+they can operate, a mechanism becomes something the presenter runs. In the outline, such a
+slide's `visual` says what the presenter touches and what changes. Showing things in order is
+fragments within one slide or an auto-animate prefix group (`demo-1`, `demo-2`). Nothing loads
+from the network, so live websites and online video cannot be embedded. Changing the format
+after composing means recomposing every slide.
 Write the specs in this order — brief, then style, then outline — because the style decides how an outline for it must be shaped. Composers see only the deck directory and what `specs/` points them to:
 
 | File | What it is |
