@@ -389,15 +389,33 @@ export function OutlineView({ content, deckId, idToken = "" }: OutlineViewProps)
     return () => window.removeEventListener("beforeunload", preventUnload)
   }, [editor.dirty])
 
+  // Timers below set state after a delay; clear them on unmount so they never
+  // fire into an unmounted tree (or a torn-down test environment).
+  const timersRef = useRef(new Set<number>())
+  useEffect(() => {
+    const timers = timersRef.current
+    return () => {
+      timers.forEach((timer) => window.clearTimeout(timer))
+      timers.clear()
+    }
+  }, [])
+  const later = useCallback((fn: () => void, ms: number) => {
+    const timer = window.setTimeout(() => {
+      timersRef.current.delete(timer)
+      fn()
+    }, ms)
+    timersRef.current.add(timer)
+  }, [])
+
   const announce = useCallback((message: string) => {
     setAnnouncement("")
-    window.setTimeout(() => setAnnouncement(message), 20)
-  }, [])
+    later(() => setAnnouncement(message), 20)
+  }, [later])
 
   const flashLanding = useCallback((id: string) => {
     setLandingId(id)
-    window.setTimeout(() => setLandingId((current) => current === id ? null : current), 900)
-  }, [])
+    later(() => setLandingId((current) => current === id ? null : current), 900)
+  }, [later])
 
   const focusLogicalSlide = useCallback((id: string, delta: number) => {
     const index = slides.findIndex((slide) => slide.id === id)

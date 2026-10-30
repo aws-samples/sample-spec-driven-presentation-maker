@@ -9,7 +9,7 @@ Setup steps for using the spec-driven-presentation-maker Skill in a new environm
 ## Prerequisites
 
 - kiro-cli installed
-- Python 3.10+
+- Python 3.11+
 - [uv](https://docs.astral.sh/uv/getting-started/installation/) installed
 
 ## 1. Install dependencies

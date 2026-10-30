@@ -8,36 +8,36 @@ anyio==4.15.1
     #   mcp
     #   sse-starlette
     #   starlette
-asgiref==3.12.1
+asgiref==3.13.0
     # via opentelemetry-instrumentation-asgi
 attrs==26.1.0
     # via
     #   jsonschema
     #   referencing
-aws-opentelemetry-distro==0.19.0
+aws-opentelemetry-distro==0.21.0
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
-boto3==1.43.100
+boto3==1.43.122
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
-botocore==1.43.100
+botocore==1.43.122
     # via
     #   boto3
     #   s3transfer
 cachetools==6.2.4
     # via aws-opentelemetry-distro
-certifi==2026.7.22
+certifi==2026.10.23
     # via
     #   httpcore
     #   httpx
     #   requests
 cffi==2.1.1
     # via cryptography
-charset-normalizer==3.5.1
+charset-normalizer==3.5.2
     # via
     #   pdfminer-six
     #   requests
 click==8.5.0
     # via uvicorn
-cryptography==50.0.1
+cryptography==50.0.2
     # via
     #   pdfminer-six
     #   pyjwt
@@ -45,11 +45,11 @@ defusedxml==0.7.1
     # via sdpm-skill
 et-xmlfile==2.0.0
     # via openpyxl
-googleapis-common-protos==1.75.3
+googleapis-common-protos==1.76.0
     # via
     #   opentelemetry-exporter-otlp-proto-grpc
     #   opentelemetry-exporter-otlp-proto-http
-grpcio==1.84.0
+grpcio==1.85.0
     # via opentelemetry-exporter-otlp-proto-grpc
 h11==0.16.0
     # via
@@ -61,7 +61,7 @@ httpx==0.28.1
     # via mcp
 httpx-sse==0.4.3
     # via mcp
-idna==3.19
+idna==3.20
     # via
     #   anyio
     #   httpx
@@ -117,7 +117,6 @@ opentelemetry-api==1.44.0
     #   opentelemetry-instrumentation-logging
     #   opentelemetry-instrumentation-mysql
     #   opentelemetry-instrumentation-mysqlclient
-    #   opentelemetry-instrumentation-openai-agents-v2
     #   opentelemetry-instrumentation-pika
     #   opentelemetry-instrumentation-psycopg2
     #   opentelemetry-instrumentation-pymemcache
@@ -144,7 +143,6 @@ opentelemetry-api==1.44.0
     #   opentelemetry-propagator-ot-trace
     #   opentelemetry-sdk
     #   opentelemetry-semantic-conventions
-    #   opentelemetry-util-genai
 opentelemetry-distro==0.65b0
     # via aws-opentelemetry-distro
 opentelemetry-exporter-otlp-proto-common==1.44.0
@@ -184,7 +182,6 @@ opentelemetry-instrumentation==0.65b0
     #   opentelemetry-instrumentation-logging
     #   opentelemetry-instrumentation-mysql
     #   opentelemetry-instrumentation-mysqlclient
-    #   opentelemetry-instrumentation-openai-agents-v2
     #   opentelemetry-instrumentation-pika
     #   opentelemetry-instrumentation-psycopg2
     #   opentelemetry-instrumentation-pymemcache
@@ -204,7 +201,6 @@ opentelemetry-instrumentation==0.65b0
     #   opentelemetry-instrumentation-urllib
     #   opentelemetry-instrumentation-urllib3
     #   opentelemetry-instrumentation-wsgi
-    #   opentelemetry-util-genai
 opentelemetry-instrumentation-aio-pika==0.65b0
     # via aws-opentelemetry-distro
 opentelemetry-instrumentation-aiohttp-client==0.65b0
@@ -262,8 +258,6 @@ opentelemetry-instrumentation-logging==0.65b0
 opentelemetry-instrumentation-mysql==0.65b0
     # via aws-opentelemetry-distro
 opentelemetry-instrumentation-mysqlclient==0.65b0
-    # via aws-opentelemetry-distro
-opentelemetry-instrumentation-openai-agents-v2==0.1.0
     # via aws-opentelemetry-distro
 opentelemetry-instrumentation-pika==0.65b0
     # via aws-opentelemetry-distro
@@ -360,7 +354,6 @@ opentelemetry-semantic-conventions==0.65b0
     #   opentelemetry-instrumentation-httpx
     #   opentelemetry-instrumentation-kafka-python
     #   opentelemetry-instrumentation-logging
-    #   opentelemetry-instrumentation-openai-agents-v2
     #   opentelemetry-instrumentation-pika
     #   opentelemetry-instrumentation-pymemcache
     #   opentelemetry-instrumentation-pymongo
@@ -377,9 +370,6 @@ opentelemetry-semantic-conventions==0.65b0
     #   opentelemetry-instrumentation-urllib3
     #   opentelemetry-instrumentation-wsgi
     #   opentelemetry-sdk
-    #   opentelemetry-util-genai
-opentelemetry-util-genai==1.1b0
-    # via opentelemetry-instrumentation-openai-agents-v2
 opentelemetry-util-http==0.65b0
     # via
     #   opentelemetry-instrumentation-aiohttp-client
@@ -407,7 +397,7 @@ pdfminer-six==20260107
     # via pdfplumber
 pdfplumber==0.11.10
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
-pillow==12.3.0
+pillow==13.0.0
     # via
     #   pdfplumber
     #   python-pptx
@@ -419,25 +409,25 @@ protobuf==6.33.5
     #   opentelemetry-proto
 psutil==7.2.2
     # via opentelemetry-instrumentation-system-metrics
-pycparser==3.0
+pycparser==3.12
     # via cffi
-pydantic==2.13.5
+pydantic==2.14.2
     # via
     #   mcp
     #   pydantic-settings
-pydantic-core==2.46.5
+pydantic-core==2.50.2
     # via pydantic
-pydantic-settings==2.15.0
+pydantic-settings==2.16.2
     # via mcp
 pygments==2.21.0
     # via
     #   rich
     #   sdpm-skill
-pyjwt==2.14.0
+pyjwt==2.15.1
     # via mcp
-pypdf==6.18.1
+pypdf==6.21.4
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
-pypdfium2==5.13.0
+pypdfium2==5.14.0
     # via pdfplumber
 python-dateutil==2.9.0.post0
     # via
@@ -445,7 +435,7 @@ python-dateutil==2.9.0.post0
     #   botocore
 python-docx==1.2.0
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
-python-dotenv==1.2.3
+python-dotenv==1.2.4
     # via
     #   mcp
     #   pydantic-settings
@@ -467,23 +457,23 @@ requests==2.34.2
     #   opentelemetry-exporter-otlp-proto-http
 rich==15.0.0
     # via typer
-rpds-py==2026.6.3
+rpds-py==2026.9.1
     # via
     #   jsonschema
     #   referencing
-s3transfer==0.19.2
+s3transfer==0.19.3
     # via boto3
 shellingham==1.5.4
     # via typer
 six==1.17.0
     # via python-dateutil
-sse-starlette==3.4.11
+sse-starlette==3.6.0
     # via mcp
-starlette==1.6.0
+starlette==1.10.0
     # via
     #   mcp
     #   sse-starlette
-typer==0.27.2
+typer==0.27.3
     # via mcp
 typing-extensions==4.16.0
     # via
@@ -499,6 +489,7 @@ typing-extensions==4.16.0
     #   opentelemetry-semantic-conventions
     #   pydantic
     #   pydantic-core
+    #   pydantic-settings
     #   python-docx
     #   python-pptx
     #   typing-inspection
@@ -512,11 +503,11 @@ urllib3==2.8.0
     #   aws-opentelemetry-distro
     #   botocore
     #   requests
-uvicorn==0.53.0
+uvicorn==0.54.0
     # via mcp
 websockets==17.3
     # via sdpm-skill
-wrapt==2.4.1
+wrapt==2.5.2
     # via
     #   opentelemetry-instrumentation
     #   opentelemetry-instrumentation-aio-pika
@@ -538,8 +529,7 @@ wrapt==2.4.1
     #   opentelemetry-instrumentation-threading
     #   opentelemetry-instrumentation-urllib3
     #   opentelemetry-processor-baggage
-    #   opentelemetry-util-genai
-xlsxwriter==3.2.9
+xlsxwriter==3.3.1
     # via python-pptx
 
 # The following packages were excluded from the output:
