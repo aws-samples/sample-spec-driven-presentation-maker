@@ -50,7 +50,8 @@ READY_TIMEOUT = 30.0
 PNG_LONG_EDGE = 1280
 NAVIGATED_MARK = "sdpm-check:navigated"
 _MAX_MESSAGE = 400
-_BLOCKED = ["http://*", "https://*", "ws://*", "wss://*"]
+# URL patterns the check BLOCKS (Fetch.requestPaused → failRequest); nothing connects to them.
+_BLOCKED = ["http://*", "https://*", "ws://*", "wss://*"]  # nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket
 FETCH_BLOCK = {"patterns": [{"urlPattern": p} for p in _BLOCKED]}
 _HELPER_SLUG_RE = re.compile(r"sdpm slide (\S+?): ")
 _HASHES_RE = re.compile(r"script-src(?: 'sha256-[^']+')+")
