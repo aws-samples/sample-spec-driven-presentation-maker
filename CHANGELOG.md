@@ -112,7 +112,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   `output.html: JS check …` warnings by `output.html: Browser check …`. The HTML measure
   report header is now `Checks:`. Decks without scripts are checked too (layout and PNG).
 - **AgentCore runtime role.** The MCP runtime role gains
-  `bedrock-agentcore:StartBrowserSession`, `StopBrowserSession`, `GetBrowserSession` and
+  `bedrock-agentcore:StartBrowserSession`, `StopBrowserSession` and
   `ConnectBrowserAutomationStream` on `arn:aws:bedrock-agentcore:<region>:aws:browser/aws.browser.v1`
   only.
 

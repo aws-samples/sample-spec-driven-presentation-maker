@@ -191,8 +191,9 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
   stream with SigV4-signed headers and always stops the session. The AWS code lives in
   `servers/remote` because dependencies point inward and the core never imports boto3. Both
   sources block `http(s)://` and `ws(s)://` requests (`Network.setBlockedURLs`) and close
-  pages the deck opens. The runtime role gets `bedrock-agentcore:StartBrowserSession`,
-  `StopBrowserSession`, `GetBrowserSession` and `ConnectBrowserAutomationStream` on the
+  pages the deck opens; a browser that rejects the block fails the check before any slide
+  runs. The runtime role gets `bedrock-agentcore:StartBrowserSession`,
+  `StopBrowserSession` and `ConnectBrowserAutomationStream` on the
   `aws.browser.v1` ARN only. A check that is skipped, stopped by a slide that navigates the
   page away (the slide helper logs `pagehide`), or does not finish within
   `min(30 + 3 × slides, 110)` s adds a one-line `output.html: Browser check …` warning.

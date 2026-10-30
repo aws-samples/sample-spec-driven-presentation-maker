@@ -173,7 +173,6 @@ export class RuntimeStack extends cdk.Stack {
         actions: [
           "bedrock-agentcore:StartBrowserSession",
           "bedrock-agentcore:StopBrowserSession",
-          "bedrock-agentcore:GetBrowserSession",
           "bedrock-agentcore:ConnectBrowserAutomationStream",
         ],
         resources: [
