@@ -12,7 +12,25 @@ marked 17.x (bundled by reveal.js into sdpm/vendor/revealjs/plugin/notes.js)
   Copyright (c) 2018+, MarkedJS (https://github.com/markedjs/)
   Copyright (c) 2011-2018, Christopher Jeffrey (https://github.com/chjj/)
 
-Generated HTML decks (output.html) embed both, each preceded by its license notice.
+Apache ECharts 6.1.0
+  https://github.com/apache/echarts
+  License: Apache-2.0
+  NOTICE:
+    Apache ECharts
+    Copyright 2017-2026 The Apache Software Foundation
+    This product includes software developed at
+    The Apache Software Foundation (https://www.apache.org/).
+  Includes parts of d3, License: BSD-3-Clause (sdpm/vendor/echarts/licenses/LICENSE-d3)
+  Location: sdpm/vendor/echarts/ (full license text in sdpm/vendor/echarts/LICENSE)
+
+D3 7.9.0
+  https://github.com/d3/d3
+  License: ISC
+  Copyright 2010-2023 Mike Bostock
+  Location: sdpm/vendor/d3/ (full license text in sdpm/vendor/d3/LICENSE)
+
+Generated HTML decks (output.html) always embed reveal.js and marked, and embed
+ECharts / D3 only when a slide declares them, each preceded by its license notice.
 
 Beyond that, the project relies only on the dependencies listed in
 pyproject.toml / package.json.

@@ -39,3 +39,67 @@ Then update the reveal.js version and the bundled marked major (reveal.js's `mar
 `THIRD-PARTY-LICENSES`, and run
 `SDPM_AUTO_INSTALL_ASSETS=0 uv run pytest tests/test_html_assemble.py` from the repository
 root. Nothing else is generated from these files.
+
+## Apache ECharts — `echarts/`
+
+- Project: https://github.com/apache/echarts
+- Version: see `echarts/VERSION`
+- License: Apache-2.0 — `echarts/LICENSE` and `echarts/NOTICE`; ECharts includes parts of d3
+  under BSD-3-Clause (`echarts/licenses/LICENSE-d3`). Also listed in the repository's
+  `THIRD-PARTY-LICENSES`.
+
+Embedded only into decks whose slides declare it (`<section data-libs="echarts">`), once
+per deck, preceded by a `/*! … */` comment holding `LICENSE`, `NOTICE` and `LICENSE-d3`.
+
+| File | From the npm package | Used for |
+|---|---|---|
+| `echarts/echarts.min.js` | `dist/echarts.min.js` | chart library (UMD, global `echarts`) |
+| `echarts/LICENSE` | `LICENSE` | license text |
+| `echarts/NOTICE` | `NOTICE` | Apache-2.0 NOTICE (must accompany every copy) |
+| `echarts/licenses/LICENSE-d3` | `licenses/LICENSE-d3` | license of the d3 parts ECharts includes |
+
+### Updating
+
+```bash
+tmp=$(mktemp -d) && cd "$tmp"
+npm pack echarts@6
+tar xzf echarts-*.tgz
+dest=<repo>/sdpm/vendor/echarts
+cp package/dist/echarts.min.js package/LICENSE package/NOTICE "$dest/"
+cp package/licenses/LICENSE-d3 "$dest/licenses/"
+node -p "require('./package/package.json').version" > "$dest/VERSION"
+```
+
+## D3 — `d3/`
+
+- Project: https://github.com/d3/d3
+- Version: see `d3/VERSION`
+- License: ISC — `d3/LICENSE` (Copyright 2010-2023 Mike Bostock). Also listed in the
+  repository's `THIRD-PARTY-LICENSES`.
+
+Embedded only into decks whose slides declare it (`<section data-libs="d3">`), once per
+deck, preceded by a `/*! … */` comment holding `LICENSE`.
+
+`d3.csvParse`, `d3.tsvParse` and `d3.dsvFormat(…).parse` build their row parser with
+`new Function`, which needs `eval` and fails under the deck CSP (`d3.csvParseRows` and the
+other `*Rows` functions do not).
+
+| File | From the npm package | Used for |
+|---|---|---|
+| `d3/d3.min.js` | `dist/d3.min.js` | visualization library (UMD, global `d3`) |
+| `d3/LICENSE` | `LICENSE` | license text |
+
+### Updating
+
+```bash
+tmp=$(mktemp -d) && cd "$tmp"
+npm pack d3@7
+tar xzf d3-*.tgz
+dest=<repo>/sdpm/vendor/d3
+cp package/dist/d3.min.js package/LICENSE "$dest/"
+node -p "require('./package/package.json').version" > "$dest/VERSION"
+```
+
+After updating either library, update its version in `THIRD-PARTY-LICENSES` and run
+`SDPM_AUTO_INSTALL_ASSETS=0 uv run pytest tests/test_html_assemble.py tests/test_html_csp.py`
+from the repository root.

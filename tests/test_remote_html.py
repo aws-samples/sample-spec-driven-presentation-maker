@@ -529,3 +529,27 @@ def test_runtime_image_copies_bundled_html_data():
         assert data_dir in copies, data_dir
     ignored = (_ROOT / ".dockerignore").read_text(encoding="utf-8").split()
     assert not any(entry.rstrip("/") in ("sdpm/vendor", "sdpm") for entry in ignored)
+
+
+def test_runtime_image_ships_vendored_libraries():
+    """Every vendored file the HTML engine inlines (reveal.js, ECharts, D3 and their
+    license files) exists and no .dockerignore entry keeps it out of the image."""
+    import fnmatch
+
+    from sdpm.engine.html.slide_js import LIBRARIES
+
+    files = [path for paths in LIBRARIES.values() for path in paths]
+    files += ["revealjs/reveal.js", "revealjs/reveal.css", "revealjs/reset.css",
+              "revealjs/plugin/notes.js", "revealjs/LICENSE", "revealjs/VERSION",
+              "echarts/VERSION", "d3/VERSION"]
+    entries = [line.strip().rstrip("/") for line in
+               (_ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+               if line.strip() and not line.lstrip().startswith("#")]
+    for name in files:
+        rel = f"sdpm/vendor/{name}"
+        assert (_ROOT / rel).is_file(), rel
+        parts = rel.split("/")
+        candidates = ["/".join(parts[:i]) for i in range(1, len(parts) + 1)]
+        for entry in entries:
+            matched = [c for c in candidates if fnmatch.fnmatch(c, entry)]
+            assert not matched, f".dockerignore entry {entry!r} excludes {matched[0]}"

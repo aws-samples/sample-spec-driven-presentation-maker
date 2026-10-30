@@ -1016,6 +1016,7 @@ def _generate_html(
         "warnings": [text for _, text in tagged],
         "diagnostics": diagnostics,
         "previews": previews,
+        "libraries": assembled.libraries,
     }
     if template.decorations_status is not None:
         result["decorations"] = template.decorations_status
@@ -1055,7 +1056,9 @@ def generate_html(
     Returns:
         Dict with output_path, bytes, slide_count, slides (``pageNN - slug``),
         layouts_used, warnings (``"<slug>: …"`` / ``"deck.css: …"``), diagnostics
-        (``{slug, rule, message}``), previews (``{slug: "preview/<slug>.html"}``) and,
+        (``{slug, rule, message}``), previews (``{slug: "preview/<slug>.html"}``),
+        libraries (the vendored libraries embedded because a slide declares them in
+        ``data-libs``, e.g. ``["echarts"]``; ``[]`` for most decks) and,
         when template decorations are missing, decorations
         (``preview_unavailable``-shaped status).
 

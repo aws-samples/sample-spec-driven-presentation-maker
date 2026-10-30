@@ -3,11 +3,13 @@
 """Content-Security-Policy for HTML decks.
 
 ``output.html`` carries a ``<meta http-equiv="Content-Security-Policy">`` right after
-``<meta charset>``: scripts run only when their sha256 is listed (the three engine
-scripts plus the speaker view the notes plugin ``document.write()``s into its popup,
-which inherits the policy), styles stay inline, every other resource is ``data:``
-only, and ``frame-src 'self'`` lets the speaker view load the deck itself as its
-current / next slide frames. The static per-slide previews run no script at all.
+``<meta charset>``: scripts run only when their sha256 is listed (the engine scripts,
+the libraries the slides declare, the slide helper and each wrapped slide script, all
+emitted by the assembler, plus the speaker view the notes plugin ``document.write()``s
+into its popup, which inherits the policy), styles stay inline, every other resource is
+``data:`` only (``connect-src 'none'``), and ``frame-src 'self'`` lets the speaker view
+load the deck itself as its current / next slide frames. The static per-slide previews
+run no script at all.
 """
 
 from __future__ import annotations
