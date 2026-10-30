@@ -71,6 +71,8 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
 - After writing, read `run_python`'s warnings — the static checks (font-size tokens, layout
   names, forbidden constructs, structure) — and fix them before moving to the next slug.
   JS errors (`<slug>: JS error: …`, reported when a browser is available) are fixed the same way.
+  An `output.html: JS check skipped / stopped / did not finish` warning means the scripts
+  were not checked: never report JS as clean then — say it was not checked.
   There is no PNG preview: what the slide looks like is seen by opening `output.html`.
 
 ## Modes
@@ -103,6 +105,7 @@ and say so in your summary.
 
 ## Return
 
-Slugs written / changed / untouched; remaining static-check warnings; shared components
+Slugs written / changed / untouched; remaining static-check warnings and JS-check warnings
+(a skipped JS check included); shared components
 missing from `deck.css`; anything the specs did not cover that you had to decide. Say that the
 user should open `<deck>/output.html` in a browser to see the slides.

@@ -181,7 +181,9 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
   collect JS errors, with networking disabled (proxy to a closed port, host resolution off,
   no non-proxied WebRTC) and a throwaway profile. It is skipped when no browser is found and
   in the cloud runtime image (`SDPM_JS_CHECK=0`); `SDPM_JS_CHECK=0` disables it locally too,
-  and `SDPM_BROWSER` picks the executable (`none` disables).
+  and `SDPM_BROWSER` picks the executable (`none` disables). A check that is skipped or does
+  not finish adds a one-line `output.html: JS check …` warning, and a slide that navigates
+  the page away stops the check at once (the slide helper logs `pagehide`).
 - HTML objects live under `html/` in the deck bucket. No CloudFront behaviour serves
   `html/*` and the CloudFront OAC bucket-policy grant does not include it.
 - The API returns S3 presigned URLs on the bucket's regional host (a different origin from

@@ -19,6 +19,9 @@ element, the first time the slide is laid out:
   and, when the URL fragment carries ``sdpm-check``, ``console.info('sdpm-check:done')``
   one second later for the headless JS check.
 
+With ``sdpm-check`` in the fragment the helper also logs ``sdpm-check:navigated`` on
+``pagehide``, so the check stops at once when a slide script navigates the page away.
+
 An exception is caught and logged as ``console.error('sdpm slide <slug>: <stack>')`` so
 one broken slide does not stop the others.
 
@@ -52,6 +55,7 @@ function run(section){
  section.__sdpmRan=true;
  (fns[section.getAttribute('data-slug')]||[]).forEach(function(fn){try{fn.call(section,section);}catch(e){fail(section.getAttribute('data-slug'),e);}});
 }
+if(/(^#|&)sdpm-check(&|$)/.test(location.hash))window.addEventListener('pagehide',function(){console.info('sdpm-check:navigated');});
 Reveal.on('ready',function(e){if(!Reveal.isPrintView())run(e.currentSlide);});
 Reveal.on('slidechanged',function(e){run(e.currentSlide);});
 Reveal.on('overviewshown',function(){document.querySelectorAll('.reveal .slides section[data-slug]').forEach(function(s){if(s.offsetWidth)run(s);});});

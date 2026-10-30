@@ -20,6 +20,8 @@ import pytest
 from sdpm import api
 from sdpm.engine.html import jscheck
 from sdpm.engine.html.jscheck import (
+    DISABLED_NOTE,
+    NAVIGATED_NOTE,
     SKIPPED_NOTE,
     attribute,
     check_js,
@@ -79,9 +81,31 @@ def test_js_check_enabled(monkeypatch, value: str, enabled: bool) -> None:
 
 
 def test_check_js_skipped_without_a_browser(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setenv("SDPM_JS_CHECK", "1")
     monkeypatch.setattr(jscheck, "find_browser", lambda: None)
     result = check_js(tmp_path / "output.html", [])
     assert result == {"status": "skipped", "errors": [], "note": SKIPPED_NOTE}
+
+
+def test_check_js_skipped_when_turned_off(monkeypatch, tmp_path: Path) -> None:
+    monkeypatch.setattr(jscheck, "find_browser", lambda: pytest.fail("browser looked up"))
+    result = check_js(tmp_path / "output.html", [])
+    assert result == {"status": "skipped", "errors": [], "note": DISABLED_NOTE}
+
+
+def test_check_js_temp_profile_failure_is_reported(monkeypatch, tmp_path: Path) -> None:
+    """An unwritable temp directory degrades to a note; check_js never raises."""
+    monkeypatch.setenv("SDPM_JS_CHECK", "1")
+    monkeypatch.setattr(jscheck, "find_browser", lambda: "/opt/chrome")
+
+    def no_space(**_kwargs):
+        raise OSError(28, "No space left on device")
+
+    monkeypatch.setattr(jscheck.tempfile, "mkdtemp", no_space)
+    monkeypatch.setattr(jscheck.subprocess, "Popen", lambda *a, **k: pytest.fail("browser started"))
+    result = check_js(tmp_path / "output.html", [])
+    assert result["status"] == "failed" and result["errors"] == []
+    assert "No space left on device" in result["note"]
 
 
 # ── fake browser (POSIX) ─────────────────────────────────────────────────
@@ -101,9 +125,10 @@ for i, text in enumerate(open(url2pathname(urlparse(url).path), encoding="utf-8"
         break
 with open(os.environ["FAKE_RECORD"], "w", encoding="utf-8") as f:
     f.write("\\n".join([str(os.getpid()), opt("--user-data-dir"), *args]))
+last = "sdpm-check:navigated" if os.environ.get("FAKE_MODE") == "navigate" else "sdpm-check:done"
 with open(opt("--log-file"), "a", encoding="utf-8") as f:
     f.write(f'[1:1:0101/000000.000000:INFO:CONSOLE:{line}] "Uncaught Error: boom", source: {url} ({line})\\n')
-    f.write(f'[1:1:0101/000000.000001:INFO:CONSOLE:{line}] "sdpm-check:done", source: {url} ({line})\\n')
+    f.write(f'[1:1:0101/000000.000001:INFO:CONSOLE:{line}] "{last}", source: {url} ({line})\\n')
 time.sleep(30)
 '''
 
@@ -112,7 +137,8 @@ posix_only = pytest.mark.skipif(os.name == "nt", reason="the fake browser is a s
 
 @pytest.fixture
 def fake_browser(tmp_path: Path, monkeypatch) -> Path:
-    """A browser stand-in that logs one error in s1's script and the done line, then hangs."""
+    """A browser stand-in that logs one error in s1's script and the done line (the
+    navigated line with ``FAKE_MODE=navigate``), then hangs."""
     script = tmp_path / "fake_browser.py"
     script.write_text(_FAKE, encoding="utf-8")
     exe = tmp_path / "fake-chrome"
@@ -133,7 +159,8 @@ def _gone(pid: int) -> bool:
 
 
 @posix_only
-def test_check_js_with_a_fake_browser(fake_browser: Path, tmp_path: Path) -> None:
+def test_check_js_with_a_fake_browser(fake_browser: Path, tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("SDPM_JS_CHECK", "1")
     page = tmp_path / "output.html"
     page.write_text('<html>\n<body>\n<script>__sdpmSlide("s1",function(section){\nboom();\n});</script>\n',
                     encoding="utf-8")
@@ -150,6 +177,25 @@ def test_check_js_with_a_fake_browser(fake_browser: Path, tmp_path: Path) -> Non
                  "--host-resolver-rules=MAP * ~NOTFOUND", "--enable-logging", "--v=0"):
         assert flag in argv
     assert not any(a.startswith("--remote-debugging") for a in argv)
+
+
+@posix_only
+def test_check_js_stops_when_the_page_navigates(fake_browser: Path, tmp_path: Path, monkeypatch) -> None:
+    """A slide that navigates away never logs the done line: stop at the navigated line
+    instead of waiting for the timeout."""
+    monkeypatch.setenv("SDPM_JS_CHECK", "1")
+    monkeypatch.setenv("FAKE_MODE", "navigate")
+    page = tmp_path / "output.html"
+    page.write_text('<script>__sdpmSlide("s1",function(section){\nlocation.href="x";\n});</script>\n',
+                    encoding="utf-8")
+    started = time.monotonic()
+    result = check_js(page, [(1, 3, "s1")], timeout=15)
+    assert time.monotonic() - started < 10
+    assert result["status"] == "navigated"
+    assert result["note"].startswith(NAVIGATED_NOTE)
+    assert result["errors"] == [{"slug": "s1", "line": 1, "message": "Uncaught Error: boom"}]
+    pid = int(fake_browser.read_text(encoding="utf-8").splitlines()[0])
+    assert _gone(pid)
 
 
 # ── generate_html wiring ─────────────────────────────────────────────────
@@ -191,6 +237,16 @@ def test_generate_html_reports_js_errors(fake_browser: Path, tmp_path: Path, mon
     assert "s1: JS error: Uncaught Error: boom" in refreshed["warnings"]
 
 
+@posix_only
+def test_generate_html_warns_when_a_slide_navigates(fake_browser: Path, tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("SDPM_JS_CHECK", "1")
+    monkeypatch.setenv("FAKE_MODE", "navigate")
+    deck = _deck(tmp_path, JS_SLIDES)
+    result = api.generate_html(deck)
+    assert result["js_check"]["status"] == "navigated"
+    assert f"output.html: {result['js_check']['note']}" in result["warnings"]
+
+
 def test_generate_html_without_a_browser(tmp_path: Path, monkeypatch) -> None:
     monkeypatch.setenv("SDPM_JS_CHECK", "1")
     monkeypatch.setenv("SDPM_BROWSER", "none")
@@ -198,6 +254,7 @@ def test_generate_html_without_a_browser(tmp_path: Path, monkeypatch) -> None:
     result = api.generate_html(deck)
     assert (deck / "output.html").is_file()
     assert result["js_check"] == {"status": "skipped", "note": SKIPPED_NOTE}
+    assert f"output.html: {SKIPPED_NOTE}" in result["warnings"]
 
 
 def test_non_js_deck_launches_no_browser(tmp_path: Path, monkeypatch) -> None:
@@ -209,9 +266,15 @@ def test_non_js_deck_launches_no_browser(tmp_path: Path, monkeypatch) -> None:
 
 
 def test_js_check_off_launches_no_browser(tmp_path: Path, monkeypatch) -> None:
+    """SDPM_JS_CHECK=0 (the cloud runtime image) runs no browser but still says, among the
+    warnings, that the scripts were not checked, so the agent cannot read it as clean."""
     monkeypatch.setattr(jscheck, "find_browser", lambda: pytest.fail("browser looked up"))
     deck = _deck(tmp_path, JS_SLIDES)
-    assert "js_check" not in api.generate_html(deck)
+    result = api.generate_html(deck)
+    assert result["js_check"] == {"status": "skipped", "note": DISABLED_NOTE}
+    assert f"output.html: {DISABLED_NOTE}" in result["warnings"]
+    refreshed = api.refresh_html(deck, measure_slides=["cover"])
+    assert f"output.html: {DISABLED_NOTE}" in refreshed["warnings"]
 
 
 # ── real browser (opt-in) ────────────────────────────────────────────────
@@ -300,10 +363,25 @@ def test_real_browser_has_no_network(tmp_path: Path, monkeypatch) -> None:
                            "</script>"),
         })
         api.generate_html(deck)  # SDPM_JS_CHECK=0 (autouse): build only
+        monkeypatch.setenv("SDPM_JS_CHECK", "1")
         result = check_js(deck / "output.html", [], timeout=6)
         time.sleep(0.5)
     finally:
         server.shutdown()
         server.server_close()
-    assert result["status"] in {"ok", "errors", "timeout"}, result
+    assert result["status"] in {"ok", "errors", "timeout", "navigated"}, result
     assert hits == []
+
+
+@real_browser
+def test_real_browser_stops_at_navigation(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("SDPM_JS_CHECK", "1")
+    deck = _deck(tmp_path, {
+        "cover": _slide("Cover"),
+        "away": _slide("Away", "<script>\nlocation.href = 'https://example.com/';\n</script>"),
+    })
+    started = time.monotonic()
+    result = api.generate_html(deck)
+    assert time.monotonic() - started < 10
+    assert result["js_check"]["status"] == "navigated", result["js_check"]
+    assert any(w.startswith("output.html: JS check stopped:") for w in result["warnings"])

@@ -303,8 +303,10 @@ The checks need no browser. Overflow and overlap are not measured: look at the s
 When Chrome or Edge is installed, a deck with slide scripts is opened headless after each
 build, with networking off, and exceptions and CSP violations come back as warnings:
 `<slug>: JS error: …` (or `output.html: JS error (line N): …` when the line belongs to no
-slide). Fix them like static-check warnings. Without a browser the build still succeeds and
-the result's `js_check` carries a one-line note. Cloud builds do not run the check.
+slide). Fix them like static-check warnings. When the check does not run or does not finish
+(no browser, turned off as in cloud builds, a slide script that navigates away, a timeout),
+the build still succeeds and a one-line warning says so (`output.html: JS check skipped: …` /
+`JS check stopped: …` / `JS check did not finish …`): JS errors are then unknown, not absent.
 
 ## Viewing
 
