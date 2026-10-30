@@ -6,8 +6,9 @@
 ``sdpm.engine.html.browser.resolve_browser`` (local headless Chrome / Edge, or the source
 an adapter registered) over the DevTools protocol (``sdpm.engine.html.cdp``):
 
-1. attach to the page; enable Page / Runtime / Log; block http(s) / ws(s) requests
-   (best effort; the local browser has no network anyway) and close pages the deck opens;
+1. attach to the page; enable Page / Runtime / Log; block http(s) / ws(s) requests (if
+   the browser rejects the block, the check fails before the deck loads) and close pages
+   the deck opens;
    set the viewport to the deck size;
 2. load the deck: up to ``DIRECT_LIMIT`` UTF-8 bytes with ``Page.setDocumentContent`` on
    ``about:blank#sdpm-check``, larger in chunks into a ``blob:`` URL (CDP drops messages
@@ -322,9 +323,11 @@ def _page_setup(run: _Run, width: int, height: int) -> None:
                      {"urlPatterns": [{"urlPattern": p, "block": True} for p in _BLOCKED]})
         run.network_blocked = True
     except CdpError as exc:
-        # The deck's CSP still applies; the result and the log say the block is missing.
+        # Fail closed: slide code never runs in a browser that may reach the network
+        # (AgentCore Browser has internet access); the check fails with a note.
         run.network_blocked = False
         logger.warning("browser check: could not block network requests: %s", exc)
+        raise RuntimeError(f"could not block network requests, so no slide was run ({exc})") from exc
     run.send("Emulation.setDeviceMetricsOverride",
              {"width": width, "height": height, "deviceScaleFactor": 1, "mobile": False})
 

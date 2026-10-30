@@ -16,7 +16,8 @@ Entries before v0.5.0 were written retroactively as summaries.
   writes or changes HTML slides opens those slides (and `measure_slides`) in a browser over
   the DevTools protocol: locally headless Chrome or Edge (DevTools on 127.0.0.1 at a random
   port, throwaway profile, networking off), in the cloud AWS AgentCore Browser
-  (`aws.browser.v1`). Every fragment is shown and animations are finished, then the slide is
+  (`aws.browser.v1`). Both block http(s) / ws(s) requests from the page; a browser that
+  rejects the block fails the check before any slide runs. Every fragment is shown and animations are finished, then the slide is
   measured and layout findings come back as warnings with new rules `overlap`, `overflow`,
   `outside-region` and `decoration-overlap` (4 px tolerance), next to JS errors (`js-error`).
   Each checked slide gets a PNG, 1280 px on the long edge: locally

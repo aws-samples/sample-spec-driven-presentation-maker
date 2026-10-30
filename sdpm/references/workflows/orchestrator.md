@@ -89,8 +89,9 @@ Passes, the second waiting for the first to finish:
 
 Composers' own tool results are not visible to you. To see the deck, look at the previews
 yourself — `get_preview(deck_id, slugs=[...])`, or `<deck>/preview/<slug>.png` where you have
-the files. HTML decks have no previews: tell the user to open `<deck>/output.html` in a
-browser. To change a slide, afterwards or on any later request, dispatch a composer for that
+the files (HTML decks: `<deck>/preview/png/<slug>.png`, the PNGs of the composers' browser
+checks). An HTML slide without a PNG was not checked in a browser: say so rather than call it
+fine. To change a slide, afterwards or on any later request, dispatch a composer for that
 slug with an instruction describing what you observed.
 
 If an HTML-deck composer reports a component missing from `deck.css`, dispatch one composer

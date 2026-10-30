@@ -363,6 +363,33 @@ def test_js_deck_reports_the_skipped_browser_check(server, storage, tmp_path, mo
     assert note not in (result.get("warnings") or {}).get("build", []), result
 
 
+def test_unreachable_agentcore_browser_is_one_warning_line(server, storage, monkeypatch):
+    """AgentCore Browser that cannot be started: run_python says so in one line, never clean."""
+    from tools import agentcore_browser
+    from sdpm.engine.html import browser as browser_mod
+
+    class DeniedClient:
+        def start_browser_session(self, **_kw):
+            raise RuntimeError("AccessDeniedException: not authorized")
+
+        def stop_browser_session(self, **_kw):  # pragma: no cover - nothing started
+            pytest.fail("stopped a session that never started")
+
+    _no_pptx(monkeypatch)
+    monkeypatch.delenv("SDPM_BROWSER")
+    monkeypatch.setattr(browser_mod, "_registered", agentcore_browser.make_source(
+        "ap-northeast-1", client_factory=DeniedClient))
+    _sandbox(monkeypatch, ["slides/body.html"])
+
+    out = _run(server)
+
+    lines = [w for w in out["warnings"] if w.startswith("output.html: Browser check")]
+    assert lines == [lines[0]] and "\n" not in lines[0], out["warnings"]
+    assert lines[0].startswith("output.html: Browser check could not run (AgentCore Browser): RuntimeError: "
+                               "AccessDeniedException")
+    assert out["browser_check"]["status"] == "failed" and out["png_previews"] == []
+
+
 # --- browser check PNGs -----------------------------------------------------------
 
 _PNG_KEY = re.compile(r"^html/d1/png/([a-z0-9-]+)_(\d+)\.png$")

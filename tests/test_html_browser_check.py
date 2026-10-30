@@ -142,6 +142,69 @@ def test_unreachable_endpoint_is_reported(tmp_path: Path, monkeypatch) -> None:
     assert released == [(1920, 1080)]
 
 
+class _NoBlockCdp:
+    """CdpConnection stand-in whose browser rejects Network.setBlockedURLs."""
+
+    sent: list[str] = []
+
+    def __init__(self, url, headers=None, **_kw):
+        self.on_event = None
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return None
+
+    def take_events(self):
+        return []
+
+    def evaluate(self, session, expr, **_kw):
+        pytest.fail(f"page script evaluated: {expr[:40]}")
+
+    def send(self, method, params=None, *, session=None, timeout=15.0):
+        type(self).sent.append(method)
+        if method == "Network.setBlockedURLs":
+            raise browser_check.CdpError(f"{method}: 'Network.setBlockedURLs' wasn't found")
+        return {"Target.getTargets": {"targetInfos": [{"type": "page", "targetId": "t1"}]},
+                "Target.attachToTarget": {"sessionId": "s1"},
+                "Page.getFrameTree": {"frameTree": {"frame": {"id": "f1"}}}}.get(method, {})
+
+
+def _no_block_source(monkeypatch):
+    @contextlib.contextmanager
+    def source(width, height):
+        yield BrowserEndpoint("ws://127.0.0.1:9/devtools/browser/x", {}, "Remote Browser")
+
+    _NoBlockCdp.sent = []
+    monkeypatch.delenv("SDPM_BROWSER")
+    monkeypatch.setattr(browser, "_registered", source)
+    monkeypatch.setattr(browser_check, "CdpConnection", _NoBlockCdp)
+
+
+def test_rejected_network_block_fails_closed(tmp_path: Path, monkeypatch) -> None:
+    """A browser that will not block requests never loads the deck: failed, with a note."""
+    _no_block_source(monkeypatch)
+    result = _check(tmp_path, ["a", "b"])
+    assert result["status"] == "failed" and result["network_blocked"] is False
+    assert result["note"].startswith("Browser check could not run (Remote Browser): RuntimeError: could not "
+                                     "block network requests, so no slide was run")
+    assert "0 of 2 slide(s) checked" in result["note"] and "\n" not in result["note"]
+    assert "Page.navigate" not in _NoBlockCdp.sent and "Page.setDocumentContent" not in _NoBlockCdp.sent
+    assert result["pngs"] == {}
+
+
+def test_rejected_network_block_is_one_warning_line_of_the_build(tmp_path: Path, monkeypatch) -> None:
+    deck = _deck(tmp_path, {"a": CLEAN})
+    _no_block_source(monkeypatch)
+    result = api.refresh_html(deck, measure_slides=["a"])
+    assert result["browser_check"]["status"] == "failed"
+    [line] = [w for w in result["warnings"] if w.startswith("output.html: Browser check")]
+    assert line.startswith("output.html: Browser check could not run (Remote Browser): RuntimeError: could not "
+                           "block network requests")
+    assert result.get("preview_files") == []
+
+
 def test_temp_dir_failure_is_reported(tmp_path: Path, monkeypatch) -> None:
     """An unwritable temp directory degrades to a note; check_deck never raises."""
     def no_space(**_kwargs):
