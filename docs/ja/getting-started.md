@@ -127,6 +127,8 @@ PDF にするには `output.html?print-pdf` を開いてブラウザから印刷
 - HTML デッキには PNG プレビューがありません。ローカルサーバーは `output.html` と一緒に、スライドごとの
   静止サムネイル（`<deck>/preview/<slug>.html`）を書き出します。
 - PPTX 専用の機能（翻訳、PPTX 取り込み、手修正の同期）は HTML デッキでは使えません。
+- スライドで JavaScript を動かせます。Apache ECharts と D3 を同梱しています（使うデッキにだけ埋め込まれます）。
+  Chrome か Edge が入っていればビルドのたびに JS エラーを報告します。無ければ何も追加で入れる必要はありません。
 
 #### Web UI で HTML デッキを使う
 

@@ -167,10 +167,21 @@ that reference a changed `includes/` file, slides that inherit from an affected 
 An HTML deck runs scripts, so it is never served from the Web UI's origin:
 
 - `output.html` carries a Content-Security-Policy `<meta>` that allows only the engine's own
-  scripts (reveal.js, the notes plugin, the config and the speaker view, by sha256 hash) and
-  `data:` images, fonts and media; `connect-src` and `form-action` are `'none'`. It also sets
+  scripts (reveal.js, the notes plugin, the config and the speaker view), the bundled
+  libraries a deck declares (ECharts, D3) and each slide's inline scripts, all by sha256
+  hash computed at assembly, plus `data:` images, fonts and media; `connect-src` and
+  `form-action` are `'none'`. A script added to `output.html` afterwards, a `<script src>`,
+  an `on*` handler or a `javascript:` URL does not run. It also sets
   `<meta name="referrer" content="no-referrer">` so slide links do not leak the signed URL.
   Thumbnails carry a CSP without scripts.
+- Slide scripts can still navigate or open tabs: no CSP directive stops that. The static
+  checks warn on `location`, `window.open`, `top.` and external URLs in slide scripts
+  (`script-external`), and the deck always plays in the sandboxed iframe described below.
+- Locally, a deck with slide scripts is opened in headless Chrome or Edge after each build to
+  collect JS errors, with networking disabled (proxy to a closed port, host resolution off,
+  no non-proxied WebRTC) and a throwaway profile. It is skipped when no browser is found and
+  in the cloud runtime image (`SDPM_JS_CHECK=0`); `SDPM_JS_CHECK=0` disables it locally too,
+  and `SDPM_BROWSER` picks the executable (`none` disables).
 - HTML objects live under `html/` in the deck bucket. No CloudFront behaviour serves
   `html/*` and the CloudFront OAC bucket-policy grant does not include it.
 - The API returns S3 presigned URLs on the bucket's regional host (a different origin from

@@ -1,6 +1,6 @@
 ---
 name: slide-html-spec
-description: "Slide HTML format — slides/<slug>.html sections, data-ph / data-region, fragments, auto-animate, what is forbidden"
+description: "Slide HTML format — slides/<slug>.html sections, data-ph / data-region, fragments, auto-animate, slide scripts with the bundled ECharts / D3, what is forbidden"
 category: guide
 ---
 
@@ -131,6 +131,110 @@ sized with `--fs-*` tokens and coloured from `:root` tokens.
   resizes it between the slides. Each slide of the group is complete on its own (no
   `override`, no `includes/`).
 
+## Scripts
+
+Write plain code in an inline `<script>` inside the section. The deck wraps it in a function
+and runs it once per section element, the first time the slide is shown — also in the
+overview, in the speaker view's frames and on every printed page. `section` (and `this`) is
+the slide's element; variables stay local to the slide.
+
+**Libraries.** Declare them on the section: `<section data-layout="…" data-libs="echarts d3">`.
+Known values: `echarts` (Apache ECharts 6.1.0, global `echarts`) and `d3` (D3 7.9.0, global
+`d3`). A deck embeds a library only when a slide declares it: ECharts adds about 1.1 MB,
+D3 about 280 KB. Declare it on every slide that uses it, even when another slide already does.
+
+**Rules.**
+- Find elements with `section.querySelector(…)`, never by `id` / `document.getElementById`:
+  the print view clones a slide once per fragment step, so ids repeat and the script runs
+  once per clone.
+- Do not wait for `DOMContentLoaded` or `load`: they have fired before the code runs.
+- Turn animation off when `Reveal.isPrintView()` is true, or the PDF catches it halfway.
+- For something that repeats on every visit, listen yourself:
+  `Reveal.on('slidechanged', function (e) { if (e.currentSlide === section) … })`.
+- Listen with `addEventListener`; `on*` attributes do not run.
+- Size the draw target with its region's px box (`width` / `height` in the style); a chart
+  takes the size of the element it is drawn into.
+- Colours: `getComputedStyle(section).getPropertyValue('--color-…').trim()` (the style's
+  tokens, or `--sdpm-theme-<role>`). Text sizes: `parseFloat(getComputedStyle(el).fontSize)`
+  of an element styled with a `--fs-*` token — never a px number of your own.
+- ECharts: `renderer: 'svg'` prints sharp in the PDF; the default canvas becomes a bitmap.
+- D3: `d3.csvParse`, `tsvParse` and `dsvFormat(…).parse` need eval and fail in the deck. Use
+  `d3.csvParseRows` or inline arrays.
+
+**No network, no navigation.** `fetch`, XHR and external images are blocked by the deck's
+CSP: put the data in the script. The CSP cannot stop navigation, so `location`,
+`window.open`, `top.` and external URLs are warned (`script-external`) even in comments and
+strings; SVG namespace URIs (`http://www.w3.org/2000/svg` …) are fine. `<script src>` and
+`type="module"` do not run.
+
+**Thumbnails run no script.** `preview/<slug>.html` shows a JS slide's HTML — title, frame,
+labels — with empty draw targets. Keep the title and the frame in HTML, not in the script.
+
+ECharts bar chart (svg renderer, colours and text size from tokens, no animation in print):
+
+```html
+<section data-layout="Title Only" data-libs="echarts">
+  <h1 data-ph="title">Revenue doubled in two years</h1>
+  <div data-region="body" class="chart" style="position:absolute;left:96px;top:210px;width:1728px;height:600px"></div>
+  <p class="label" style="position:absolute;left:96px;top:830px;font-size:calc(var(--fs-caption) * var(--sdpm-pt-scale))">Revenue, $M</p>
+  <script>
+    var css = getComputedStyle(section);
+    var token = function (name) { return css.getPropertyValue(name).trim(); };
+    var size = parseFloat(getComputedStyle(section.querySelector('.label')).fontSize);
+    var chart = echarts.init(section.querySelector('.chart'), null, { renderer: 'svg' });
+    chart.setOption({
+      animation: !Reveal.isPrintView(),
+      textStyle: { color: token('--color-text'), fontSize: size },
+      xAxis: { type: 'category', data: ['2024', '2025', '2026'] },
+      yAxis: { type: 'value', splitLine: { lineStyle: { color: token('--color-border') } } },
+      series: [{ type: 'bar', data: [120, 180, 260], itemStyle: { color: token('--sdpm-theme-accent1') } }]
+    });
+  </script>
+</section>
+```
+
+D3 chart drawn into an SVG inside a region (data from `csvParseRows`):
+
+```html
+<section data-layout="Title Only" data-libs="d3">
+  <h1 data-ph="title">Three regions carry the growth</h1>
+  <div data-region="body" style="position:absolute;left:96px;top:210px;width:1728px;height:640px">
+    <svg class="plot" width="1728" height="640"></svg>
+  </div>
+  <script>
+    var rows = d3.csvParseRows('North,260\nWest,180\nSouth,120', function (r) { return [r[0], +r[1]]; });
+    var color = getComputedStyle(section).getPropertyValue('--sdpm-theme-accent1').trim();
+    var x = d3.scaleLinear().domain([0, d3.max(rows, function (r) { return r[1]; })]).range([0, 1400]);
+    var y = d3.scaleBand().domain(rows.map(function (r) { return r[0]; })).range([0, 640]).padding(0.3);
+    var bars = d3.select(section.querySelector('.plot')).selectAll('rect').data(rows).join('rect')
+      .attr('x', 300).attr('y', function (r) { return y(r[0]); })
+      .attr('height', y.bandwidth()).attr('fill', color);
+    var width = function (r) { return x(r[1]); };
+    if (Reveal.isPrintView()) bars.attr('width', width);
+    else bars.attr('width', 0).transition().duration(600).attr('width', width);
+  </script>
+</section>
+```
+
+Click interaction (a button toggles a class; no `onclick`). The state before any click is
+what prints:
+
+```html
+<section data-layout="Title Only">
+  <h1 data-ph="title">Same service, two cost models</h1>
+  <div data-region="body" style="position:absolute;left:96px;top:210px;width:1728px;height:640px">
+    <button class="toggle" type="button">Show the cost view</button>
+    <div class="panel">…</div>
+  </div>
+  <style>.panel{opacity:0;transition:opacity .3s} &.cost .panel{opacity:1}</style>
+  <script>
+    section.querySelector('.toggle').addEventListener('click', function () {
+      section.classList.toggle('cost');
+    });
+  </script>
+</section>
+```
+
 ## Notes
 
 `<aside class="notes">…</aside>` inside the section. Press `S` in `output.html` for the
@@ -161,9 +265,11 @@ yourself: no `<footer>`, no `data-ph` for date / footer / slide-number placehold
 
 ## Not allowed
 
-`<script>`, `on*` event handlers, `javascript:` URLs, `<iframe>` / `<object>` / `<embed>`,
-external URLs, `data-background-*` (the ground comes from the template and
-`defaultBackground`). Inline `<svg>` follows the same rules, `<foreignObject>` content included.
+`<script src>`, module and other non-classic scripts, code that needs eval (`eval`,
+`new Function`, D3's `csvParse`), `on*` event handlers, `javascript:` URLs,
+`<iframe>` / `<object>` / `<embed>`, external URLs, `data-background-*` (the ground comes
+from the template and `defaultBackground`). Inline `<svg>` follows the same rules,
+`<foreignObject>` content included.
 
 ## Static checks
 
@@ -174,7 +280,7 @@ external URLs, `data-background-*` (the ground comes from the template and
 | `structure` | not exactly one `<section>`, nested sections, or unparsable HTML — the slide is skipped |
 | `layout-missing` | the section has no `data-layout` |
 | `layout-unknown` | `data-layout` is not a layout of the template |
-| `script` | `<script>`, an `on*` handler, `javascript:` (also in an SVG animation `values` list), `expression()`, `<iframe>` / `<object>` / `<embed>`, or `<meta http-equiv>` (a `refresh` navigates the deck away) |
+| `script` | `<script src>` or a non-classic `<script type>` (module, JSON…; inline classic scripts run), an `on*` handler, `javascript:` (also in an SVG animation `values` list), `expression()`, `<iframe>` / `<object>` / `<embed>`, or `<meta http-equiv>` (a `refresh` navigates the deck away) |
 | `external-url` | a non-local URL in `src` / `srcset` / `poster` / `data` / `href` (not `<a>`) / `url()` (also in SVG attributes such as `fill`) / `image-set()` / `@import`; any `@import` or `<link rel=stylesheet>` (not embedded, and the deck blocks linked stylesheets, `data:` ones too) |
 | `external-use` | `<use href>` that is not a `#id` in the same slide (another file's sprite does not load): inline the SVG |
 | `data-background` | a `data-background-*` attribute |
@@ -184,8 +290,21 @@ external URLs, `data-background-*` (the ground comes from the template and
 | `data-slug` | `data-slug` set by hand |
 | `font-size-token` | a font size that is not `calc(var(--fs-x) * var(--sdpm-pt-scale))` |
 | `font-size-unknown-token` | an `--fs-*` token the style does not define |
+| `script-external` | a slide script uses `location`, `window.open` / `open(`, `top.` or an external URL (`http(s)://` other than an SVG / XML namespace URI, `"//host`), comments and strings included |
+| `library-unknown` | a `data-libs` value that is not a bundled library (`echarts`, `d3`) |
+| `library-undeclared` | a slide script uses `echarts.` / `d3.` while its section's `data-libs` does not name it |
+| `script-eval` | a slide script calls something that needs eval: `d3.csvParse`, `tsvParse`, `dsvFormat(…).parse`, `eval`, `new Function` |
+| `script-dom` | a slide script uses `getElementById` / `querySelector('#…')` or waits for `DOMContentLoaded` / `load` |
 
 The checks need no browser. Overflow and overlap are not measured: look at the slides.
+
+## JS errors
+
+When Chrome or Edge is installed, a deck with slide scripts is opened headless after each
+build, with networking off, and exceptions and CSP violations come back as warnings:
+`<slug>: JS error: …` (or `output.html: JS error (line N): …` when the line belongs to no
+slide). Fix them like static-check warnings. Without a browser the build still succeeds and
+the result's `js_check` carries a one-line note. Cloud builds do not run the check.
 
 ## Viewing
 
