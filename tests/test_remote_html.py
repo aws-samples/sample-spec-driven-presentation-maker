@@ -682,7 +682,8 @@ def test_runtime_image_pins_websockets():
     constraints = (_ROOT / "servers" / "remote" / "constraints.txt").read_text(encoding="utf-8")
     assert re.search(r"^websockets==\d+", constraints, flags=re.MULTILINE)
     dockerfile = (_ROOT / "servers" / "remote" / "Dockerfile").read_text(encoding="utf-8")
-    assert "SDPM_JS_CHECK" not in dockerfile
+    # Neither the new switch (SDPM_BROWSER) nor the removed phase-3 one may be set.
+    assert not re.search(r"^ENV\s+SDPM_(BROWSER|JS_CHECK)\b", dockerfile, flags=re.MULTILINE)
 
 
 def test_runtime_image_ships_vendored_libraries():
