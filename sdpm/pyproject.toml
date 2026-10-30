@@ -2,7 +2,7 @@
 name = "sdpm-skill"
 dynamic = ["version"]
 description = "PowerPoint generation engine — JSON to PPTX with template analysis and design patterns"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "python-pptx",
     "lxml",
