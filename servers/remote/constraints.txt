@@ -429,7 +429,7 @@ pypdf==6.21.4
     # via sdpm-mcp-server (servers/remote/pyproject.toml)
 pypdfium2==5.14.0
     # via pdfplumber
-python-dateutil==2.9.0.post0
+python-dateutil==3.0.0
     # via
     #   aws-opentelemetry-distro
     #   botocore
