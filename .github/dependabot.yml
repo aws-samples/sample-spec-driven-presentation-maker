@@ -1,4 +1,8 @@
 version: 2
+# Every entry carries a `*-security` group: without it, security updates
+# bypass `groups` and arrive as one PR per package. Since every npm/uv
+# security PR touches the same lockfile, each merge sent the rest back
+# through rebase + CI (19 open PRs piled up by 2026-10-30).
 updates:
   - package-ecosystem: npm
     directory: /web-ui
@@ -23,6 +27,9 @@ updates:
       - dependency-name: "eslint"
         versions: [">=10"]
     groups:
+      web-ui-security:
+        applies-to: security-updates
+        patterns: ["*"]
       web-ui-deps:
         patterns: ["*"]
         update-types: ["minor", "patch"]
@@ -46,24 +53,49 @@ updates:
       - dependency-name: "typescript"
         versions: [">=6"]
     groups:
+      infra-security:
+        applies-to: security-updates
+        patterns: ["*"]
       infra-deps:
         patterns: ["*"]
         update-types: ["minor", "patch"]
       infra-majors:
         patterns: ["*"]
         update-types: ["major"]
+  # Root uv.lock (dev/test environment). Version updates are off
+  # (open-pull-requests-limit: 0); the entry exists only so its security
+  # updates are grouped instead of arriving one PR per package.
+  - package-ecosystem: pip
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 0
+    cooldown:
+      default-days: 7
+    groups:
+      root-security:
+        applies-to: security-updates
+        patterns: ["*"]
   - package-ecosystem: pip
     directory: /sdpm
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      sdpm-security:
+        applies-to: security-updates
+        patterns: ["*"]
   - package-ecosystem: pip
     directory: /servers/local
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      local-security:
+        applies-to: security-updates
+        patterns: ["*"]
     ignore:
       # mcp 2.0 removes mcp.server.fastmcp (FastMCP) — the server fails at
       # import. Requires migration to mcp.server.mcpserver.MCPServer,
@@ -102,9 +134,15 @@ updates:
       remote-deps:
         patterns: ["*"]
         update-types: ["minor", "patch"]
+      remote-security:
+        applies-to: security-updates
+        patterns: ["*"]
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: weekly
     cooldown:
       default-days: 7
+    groups:
+      actions:
+        patterns: ["*"]
