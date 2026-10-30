@@ -74,12 +74,17 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
   goes in that slide's own `<style>`. If a shared component the slide needs is missing, build
   the slide with a slide `<style>` and report the missing component in your Return so the
   orchestrator can have the layout pass add it. A change to `deck.css` re-renders every slide.
-- After writing, read `run_python`'s warnings — the static checks (font-size tokens, layout
-  names, forbidden constructs, structure) — and fix them before moving to the next slug.
-  JS errors (`<slug>: JS error: …`, reported when a browser is available) are fixed the same way.
-  An `output.html: JS check skipped / stopped / did not finish` warning means the scripts
-  were not checked: never report JS as clean then — say it was not checked.
-  There is no PNG preview: what the slide looks like is seen by opening `output.html`.
+- After writing a slide, check it as you would a PPTX slide, before moving to the next slug:
+  1. Read `run_python`'s warnings and fix them: the static checks (font-size tokens, layout
+     names, forbidden constructs, structure), the browser check's layout findings
+     (`<slug>: overlap: …`, `overflow: …`, `outside-region: …`, `decoration-overlap: …`) and
+     JS errors (`<slug>: JS error: …`).
+  2. Look at the PNG of the slide: `preview_files` in the `run_python` result locally,
+     `get_preview(deck_id, slugs=[…])` in the cloud. Fix what looks wrong.
+  An `output.html: Browser check skipped / stopped / did not finish` (or `could not run`)
+  warning means layout and JS were not checked and the PNGs of the slides it names are missing:
+  never report them as clean, say they were not checked. A slide that ignores the
+  `Reveal.isPrintView()` rule shows mid-animation in the PNG, as it would in the PDF.
 
 ## Modes
 
@@ -111,7 +116,7 @@ and say so in your summary.
 
 ## Return
 
-Slugs written / changed / untouched; remaining static-check warnings and JS-check warnings
-(a skipped JS check included); shared components
+Slugs written / changed / untouched; remaining static-check warnings and browser-check
+warnings (layout, JS errors, a skipped or unfinished check included); shared components
 missing from `deck.css`; anything the specs did not cover that you had to decide. Say that the
 user should open `<deck>/output.html` in a browser to see the slides.

@@ -395,7 +395,7 @@ def check_deck(
         slide_size: canvas ``(width, height)`` in px (template.json ``slideSize``).
         line_map: the assembler's ``(first, last, slug)`` line ranges.
         layouts: slug → its ``data-layout``; decorations: layout → template decorations.
-        png_dir: where ``<slug>.png`` goes (None: no PNG).
+        png_dir: where ``<slug>.png`` goes (None: skip the PNG).
         deadline: the time budget in seconds (default ``deadline_for(len(slugs))``).
 
     Returns:

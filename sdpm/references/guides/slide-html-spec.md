@@ -286,6 +286,7 @@ from the template and `defaultBackground`). Inline `<svg>` follows the same rule
 | `external-use` | `<use href>` that is not a `#id` in the same slide (another file's sprite does not load): inline the SVG |
 | `data-background` | a `data-background-*` attribute |
 | `self-chrome` | a hand-drawn page number or footer |
+| `placeholder-unknown` | a `data-ph` key (idx or alias) that the slide's layout does not have (not checked for unknown layouts, chrome and `self-chrome` keys) |
 | `root-in-slide-style` | a `:root` block in a slide `<style>` |
 | `root-in-deck-css` | a `:root` block in `deck.css` |
 | `data-slug` | `data-slug` set by hand |
@@ -297,17 +298,39 @@ from the template and `defaultBackground`). Inline `<svg>` follows the same rule
 | `script-eval` | a slide script calls something that needs eval: `d3.csvParse`, `tsvParse`, `dsvFormat(…).parse`, `eval`, `new Function` |
 | `script-dom` | a slide script uses `getElementById` / `querySelector('#…')` or waits for `DOMContentLoaded` / `load` |
 
-The checks need no browser. Overflow and overlap are not measured: look at the slides.
+## Browser check
 
-## JS errors
+After each `run_python` that writes or changes slides, those slides (and the
+`measure_slides` you name) are opened in a headless browser — Chrome or Edge locally, AWS
+AgentCore Browser in the cloud — with networking off. Each slide is shown with every
+fragment visible and its animations finished, then measured. Findings come back as warnings
+`<slug>: <rule>: …`; fix them like static-check warnings. Boxes are canvas px; an
+intersection counts only when both sides exceed 4 px, "inside" allows 4 px.
 
-When Chrome or Edge is installed, a deck with slide scripts is opened headless after each
-build, with networking off, and exceptions and CSP violations come back as warnings:
-`<slug>: JS error: …` (or `output.html: JS error (line N): …` when the line belongs to no
-slide). Fix them like static-check warnings. When the check does not run or does not finish
-(no browser, turned off as in cloud builds, a slide script that navigates away, a timeout),
-the build still succeeds and a one-line warning says so (`output.html: JS check skipped: …` /
-`JS check stopped: …` / `JS check did not finish …`): JS errors are then unknown, not absent.
+| Rule | Message | Meaning |
+|---|---|---|
+| `overlap` | `overlap: data-ph="title" × data-region="body" (W×H px)` | two top-level blocks (placeholders, regions, other elements) or two children of the same region partly overlap; one fully inside the other is fine |
+| `overflow` | `overflow: … content W×H px exceeds its box W×H px` / `overflow: … extends N px past the slide's bottom edge` | content larger than its placeholder, region or region child (it scrolls or spills), or any element past the slide edge |
+| `outside-region` | `outside-region: … extends N px below data-region="body"` | an element inside a region sticks out of the region's box |
+| `decoration-overlap` | `decoration-overlap: … covers the template's "Logo" (obstacle) by W×H px` | an element over a template decoration of kind `band` or `obstacle` |
+| `js-error` | `JS error: …` (`output.html: JS error (line N): …` when the line belongs to no slide) | an uncaught exception, a slide-helper error or a CSP violation |
+
+More than 10 layout findings on one slide end with `… and N more`. Not judged: the template
+ground (decorations of kind `ground`), the page number and footer the deck draws
+(`data-sdpm-chrome`), speaker notes. Placeholders may sit on a `band` (it backs them).
+Fonts the template names but the checking machine lacks fall back to another font, so a
+line that just fits can measure differently on the presenting machine: leave a little room.
+
+Each checked slide also gets a PNG, 1280 px on the long edge, like the PPTX previews:
+`preview_files` in the `run_python` result locally, `get_preview` in the cloud. A slide that
+ignores the `Reveal.isPrintView()` rule (Scripts) is captured mid-animation, as in the PDF.
+
+When the check does not run or does not finish, the build still succeeds and one warning
+says so: `output.html: Browser check skipped: …` (no Chrome or Edge found, or
+`SDPM_BROWSER=none`), `Browser check stopped: …` (a slide script navigated the page away),
+`Browser check did not finish within N s; …` (a script that never returns) or
+`Browser check could not run (…): …`. Layout, JS errors and PNGs of the unchecked slides
+are then unknown, not clean.
 
 ## Viewing
 
