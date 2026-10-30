@@ -49,6 +49,6 @@ uv run python server.py
 
 ## Requirements
 
-- Python 3.10+
+- Python 3.11+
 - LibreOffice (for `run_python` preview generation and text measurement)
 - poppler-utils (`pdftoppm`) for PNG conversion

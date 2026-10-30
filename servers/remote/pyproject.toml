@@ -2,7 +2,7 @@
 name = "sdpm-mcp-server"
 version = "1.0.0"
 description = "spec-driven-presentation-maker MCP Server — Streamable HTTP for AgentCore Runtime (Layer 3)"
-requires-python = ">=3.10"
+requires-python = ">=3.11"
 dependencies = [
     "mcp[cli]>=1.28.1,<2",
     "boto3",
