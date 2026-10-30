@@ -162,6 +162,8 @@ when the template has literal footer text), marked `data-sdpm-chrome`.
 
 ## Notes and viewing
 
-Speaker notes go in `<aside class="notes">` inside the section. Open `<deck>/output.html` in a
+Speaker notes go in `<aside class="notes">` inside the section. The slide itself carries only
+what the audience reads; how the presenter operates the slide goes in the notes. Open
+`<deck>/output.html` in a
 browser: arrow keys step through slides and fragments, `S` opens the speaker view with the
 notes, and `output.html?print-pdf` prints to PDF.
