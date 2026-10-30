@@ -43,6 +43,7 @@ model:
     - "global.anthropic.claude-sonnet-4-6"           # default chat/create
     - "global.anthropic.claude-opus-4-7"
     - "global.anthropic.claude-opus-4-6-v1"
+    - "global.anthropic.claude-haiku-5-5"            # latest Haiku, fast and economical
     - "global.anthropic.claude-haiku-4-5-20251001-v1:0"
     - "global.openai.gpt-6-astra"                    # Converse API (global inference profile)
     - "global.openai.gpt-6.1-sol"                    # Converse API (global inference profile), latest Sol
@@ -59,6 +60,7 @@ model:
     - "global.anthropic.claude-sonnet-5-5"
     - "global.anthropic.claude-opus-5-5"
     - "global.openai.gpt-6.1-sol"
+    - "global.anthropic.claude-haiku-5-5"
 
 # OAuth settings for external MCP clients (Layer 3).
 # enableDCR: Allow any MCP client to register dynamically via RFC 7591 (default: true).

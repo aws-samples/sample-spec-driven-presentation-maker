@@ -873,8 +873,10 @@ def _post_processing_plan(deck_changed: bool, measure_slides: list[str] | None) 
                 refresh and the verification pass
     - artifact: refresh the deck's PPTX artifact (follows deck changes
                 automatically; failure must surface in the result)
-    - verify:   expensive verification (measure / SVG compose / preview) —
-                triggered by measure_slides and ONLY by measure_slides
+    - verify:   expensive verification (measure / layout bias / invalid
+                layout) — triggered by measure_slides and ONLY by measure_slides.
+                Compose and preview images are decided after the build:
+                every slide the change affects, plus measure_slides.
 
     Contract matrix (pinned by tests/test_run_python_semantics.py):
         changed=False, measure=None → nothing
@@ -894,14 +896,15 @@ def run_python(
     purpose: Annotated[str, Field(description="One line on what this code does, in the user's language (shown in the UI).")],
     code: Annotated[str, Field(description='Python code.')],
     deck_id: Annotated[str, Field(description='Deck ID.')],
-    measure_slides: Annotated[list[str] | None, Field(description='Slugs to render, measure, lint and preview after the code ran — the ones you edited.')] = None,
+    measure_slides: Annotated[list[str] | None, Field(description='Slugs to measure for text overflow and lint after the code ran — the ones you edited.')] = None,
 ) -> str:
     """Run Python inside the deck workspace — the way to read and write deck files
     (deck.json, specs/, slides/, includes/, attachments/). Helpers: read_json(path),
     write_json(path, data), read_text(path), write_text(path, text), list_files(subdir=".");
     plain open() also works. Writes persist (read-only decks: discarded, and the result
-    says so); output.pptx rebuilds when deck.json, slides/, includes/ or specs/outline.md
-    changed. measure_slides renders, measures text overflow, lints and previews those slugs.
+    says so); output.pptx rebuilds and changed slides are re-rendered and previewed when
+    deck.json, slides/, includes/ or specs/outline.md changed. measure_slides measures
+    text overflow and lints those slugs, and previews them.
     """
     if not deck_id:
         return json.dumps({
@@ -942,7 +945,8 @@ def run_python(
 
     # Post-processing: rebuild the PPTX artifact whenever build-relevant files
     # changed (the artifact follows the deck automatically); measure_slides
-    # (and ONLY measure_slides) triggers the expensive verification pass.
+    # (and ONLY measure_slides) triggers measurement. Compose + preview images
+    # follow the change: affected slides plus measure_slides (see below).
     deck_changed = any(_build_relevant(p) for p in changed_paths)
     plan = _post_processing_plan(deck_changed, measure_slides)
     if plan["build"]:
@@ -971,6 +975,14 @@ def run_python(
                     slug_to_page[sid] = i + 1
             page_numbers = [slug_to_page[slug] for slug in (measure_slides or []) if slug in slug_to_page]
             page_to_slug = {v: k for k, v in slug_to_page.items()}
+
+            # Live-preview data and preview images follow the change: every
+            # slide it can alter is re-rendered, plus the measured slugs.
+            from sdpm.engine.schema import affected_slugs
+
+            _slides_by_slug = {s["id"]: s for s in slides if s.get("id")}
+            _render_set = set(measure_slides or []) | set(affected_slugs(changed_paths, _slides_by_slug))
+            render_slugs = [s for s in slug_to_page if s in _render_set]
 
             if plan["verify"]:
                 # Measure
@@ -1072,14 +1084,14 @@ def run_python(
                             pass
 
             _phase["artifact_s3"] = time.monotonic() - _t
-            if plan["verify"]:
+            if render_slugs:
                 # Everything the composer needs is in `result` now. The live
-                # preview JSON (compose) and the measured slugs' WebP are for
+                # preview JSON (compose) and the rendered slugs' WebP are for
                 # the Web UI / the next get_preview, and take 5-10s; finish them
                 # in the background so the tool returns after measure.
                 # The task owns tmpdir and removes it when done.
                 _bg_t0 = time.monotonic()
-                _bg_slugs = list(measure_slides or [])
+                _bg_slugs = list(render_slugs)
                 _pending_event = _register_pending_preview(deck_id)
 
                 def _finish_compose_and_previews() -> None:
@@ -1087,13 +1099,13 @@ def run_python(
                         # Previews first: the composer's next get_preview waits on
                         # _pending_event, so the images must be on S3 as early as
                         # possible; compose (Web UI) follows.
-                        if measure_slides:
+                        if _bg_slugs:
                             try:
                                 from tools.generate import generate_previews_for_pages
 
                                 preview_dir = tmpdir / "preview_out"
                                 preview_dir.mkdir(exist_ok=True)
-                                wanted = {s: slug_to_page[s] for s in measure_slides if slug_to_page.get(s)}
+                                wanted = {s: slug_to_page[s] for s in _bg_slugs if slug_to_page.get(s)}
                                 webp_by_page = generate_previews_for_pages(pptx_path, preview_dir, list(wanted.values()))
                                 uploaded = []
                                 for slug, page in wanted.items():
@@ -1147,10 +1159,10 @@ def run_python(
                                 def _fp(c: dict) -> str:
                                     return f"{c['class']}|{c.get('text', '')}"
 
-                                # Determine which slugs to generate compose for
-                                # Always include slugs that have no existing compose (migration + first build)
-                                # Verify-gated: measure_slides is always set here
-                                compose_slugs = set(measure_slides)
+                                # Determine which slugs to generate compose for:
+                                # the rendered slugs, plus any slug with no compose
+                                # yet (migration + first build)
+                                compose_slugs = set(_bg_slugs)
                                 for s in slug_to_page:
                                     if not _latest_key(f"{compose_prefix}{s}_"):
                                         compose_slugs.add(s)

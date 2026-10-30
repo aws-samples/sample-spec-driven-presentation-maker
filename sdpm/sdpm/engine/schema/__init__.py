@@ -7,12 +7,15 @@ from sdpm.engine.schema.deck_spec import (
     validate_specs,
 )
 from sdpm.engine.schema.regions import extract_regions, is_comment_element
+from sdpm.engine.schema.render_scope import affected_slugs, with_override_bases
 
 __all__ = [
     "DECK_JSON_SKELETON",
+    "affected_slugs",
     "complete_deck_skeleton",
     "extract_regions",
     "is_comment_element",
     "validate_specs",
+    "with_override_bases",
 ]
 
