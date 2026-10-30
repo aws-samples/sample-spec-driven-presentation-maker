@@ -4,9 +4,12 @@
  * HtmlDeckPlayer — In-app view of an HTML deck (output.html, reveal.js).
  *
  * The deck runs its own scripts, so it is isolated in a sandboxed iframe:
- * `allow-scripts allow-popups` only. Never add `allow-same-origin` (the deck
- * would share the app's origin and storage), `allow-modals` or
- * `allow-popups-to-escape-sandbox`. Cloud URLs are S3 presigned URLs on a
+ * `allow-scripts allow-popups allow-popups-to-escape-sandbox` only. The last
+ * token lets a link opened from the deck (the engine gives external links
+ * `target="_blank" rel="noopener noreferrer"`) load the site normally in its
+ * own tab; the deck itself stays sandboxed. Never add `allow-same-origin` (the
+ * deck would share the app's origin and storage), `allow-top-navigation*` or
+ * `allow-modals`. Cloud URLs are S3 presigned URLs on a
  * different origin from the app; local URLs are served with a CSP `sandbox`
  * header as well.
  */
@@ -18,7 +21,7 @@ import { useTranslations } from "next-intl"
 import { previewIdentity } from "@/lib/preview"
 
 /** The iframe sandbox tokens of the in-app player (exported for tests). */
-export const HTML_PLAYER_SANDBOX = "allow-scripts allow-popups"
+export const HTML_PLAYER_SANDBOX = "allow-scripts allow-popups allow-popups-to-escape-sandbox"
 
 /** A request to show a slide; a new `seq` repeats the jump to the same index. */
 export interface HtmlPlayerSlide {

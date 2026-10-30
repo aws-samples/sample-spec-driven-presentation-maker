@@ -157,6 +157,43 @@ def test_regions_and_chrome_are_absolutely_positioned(built) -> None:
     assert "[data-sdpm-chrome],[data-region]{position:absolute}" in deck_rules
 
 
+def test_section_box_also_applies_in_the_print_view(built) -> None:
+    # reveal.js's print view (#print-pdf) moves each section into div.pdf-page; without the
+    # second selector the section collapses to 1px and its gradient / picture ground is lost.
+    _, _, doc = built
+    deck_rules = doc.xpath('//style[@id="sdpm-deck"]')[0].text
+    box = re.search(r"^([^{]*)\{width:var\(--sdpm-canvas-w\);height:var\(--sdpm-canvas-h\);",
+                    deck_rules, re.MULTILINE)
+    assert box and [s.strip() for s in box.group(1).split(",")] == [
+        ".reveal .slides > section", ".reveal .slides > .pdf-page > section"]
+    assert "background-size:100% 100%" in deck_rules[box.start():deck_rules.index("}", box.start())]
+
+
+def test_external_links_open_in_a_new_tab(tmp_path: Path) -> None:
+    slides = {"links": (
+        '<section data-layout="Title Only">\n'
+        '  <h1 data-ph="title">Links</h1>\n'
+        '  <a id="plain" href="https://example.com/a">a</a>\n'
+        '  <a id="upper" href=" HTTP://example.com/b">b</a>\n'
+        '  <a id="self" href="https://example.com/c" target="_top" rel="Opener nofollow">c</a>\n'
+        '  <a id="named" href="https://example.com/d" target="docs" rel="noopener">d</a>\n'
+        '  <a id="deck" href="#/1">next</a>\n'
+        '  <a id="mail" href="mailto:a@example.com">mail</a>\n'
+        "</section>\n"
+    )}
+    deck = _make_deck(tmp_path, slides=slides)
+    result = _assemble(deck, slides=slides)
+    for document in (result.html, result.previews["links"]):
+        doc = lxml_html.document_fromstring(document)
+        link = {a.get("id"): a for a in doc.iter("a")}
+        assert (link["plain"].get("target"), link["plain"].get("rel")) == ("_blank", "noopener noreferrer")
+        assert (link["upper"].get("target"), link["upper"].get("rel")) == ("_blank", "noopener noreferrer")
+        assert (link["self"].get("target"), link["self"].get("rel")) == ("_blank", "nofollow noopener noreferrer")
+        assert (link["named"].get("target"), link["named"].get("rel")) == ("docs", "noopener noreferrer")
+        for kept in ("deck", "mail"):
+            assert link[kept].get("target") is None and link[kept].get("rel") is None
+
+
 def test_no_external_resource_reference(built) -> None:
     _, result, doc = built
     for el in doc.iter():

@@ -15,14 +15,14 @@ describe("HtmlDeckPlayer", () => {
     renderWithIntl(<HtmlDeckPlayer htmlUrl={URL_1} deckName="Launch" />)
 
     const frame = screen.getByTitle("HTML deck: Launch") as HTMLIFrameElement
-    expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-popups")
+    expect(frame.getAttribute("sandbox")).toBe("allow-scripts allow-popups allow-popups-to-escape-sandbox")
     expect(frame.getAttribute("allow")).toBe("fullscreen *")
     expect(frame.getAttribute("referrerpolicy")).toBe("no-referrer")
     expect(frame.getAttribute("src")).toBe(URL_1)
     const tokens = frame.getAttribute("sandbox")!.split(/\s+/)
     expect(tokens).not.toContain("allow-same-origin")
     expect(tokens).not.toContain("allow-modals")
-    expect(tokens).not.toContain("allow-popups-to-escape-sandbox")
+    expect(tokens.filter((t) => t.startsWith("allow-top-navigation"))).toEqual([])
   })
 
   it("follows the deck aspect ratio", () => {

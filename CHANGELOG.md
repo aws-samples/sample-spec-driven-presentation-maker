@@ -84,6 +84,20 @@ Entries before v0.5.0 were written retroactively as summaries.
   listed in the example config's Recommended group. Unlike Haiku 4.5 it is not
   excluded from the Create picker.
 
+### Fixed
+
+- **HTML decks: external links open in a new tab.** Clicking a link in a slide used to
+  replace the deck (and inside the in-app player the site loaded sandboxed). The assembler
+  now gives every `<a href="http(s)://…">` `target="_blank" rel="noopener noreferrer"`;
+  in-deck `#…` links are unchanged. The in-app player and the local `output.html` route add
+  `allow-popups-to-escape-sandbox`, so the opened site works normally in its tab while the
+  deck stays sandboxed (still no `allow-same-origin` or `allow-top-navigation`).
+- **HTML decks: PDF export prints gradient and picture template backgrounds.** In the print
+  view (`#print-pdf` / `?print-pdf`) reveal.js moves each slide into a `.pdf-page`, which
+  the engine's slide-box rule did not match, so the slide collapsed to 1 px and only its
+  solid page colour printed. The rule now covers the print view too; layout-specific solid
+  grounds print in their own colour as well. Deploy: SdpmData, SdpmRuntime, Web UI.
+
 ## [0.10.4] - 2026-10-02
 
 ### Fixed

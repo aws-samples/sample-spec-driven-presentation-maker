@@ -252,7 +252,8 @@ speaker view.
   slide.
 - `<link rel=stylesheet>` and `@import` are not embedded (`external-url`): shared rules go in
   `deck.css`, one-slide rules in the slide's `<style>`.
-- No external URLs in any of those positions. Links (`<a href="https://…">`) are allowed.
+- No external URLs in any of those positions. Links (`<a href="https://…">`) are allowed; the
+  engine opens them in a new tab (`target="_blank" rel="noopener noreferrer"`).
 - Everything ends up in one file: an embedded file over 5 MB and an `output.html` over 25 MB
   are warned. Compress or shrink large images.
 
