@@ -75,16 +75,25 @@ def _resolve_template(data, input_path):
 
 
 def _html_deck_dir(input_path):
-    """The deck directory when ``input_path`` is an HTML deck (deck.json outputFormat html)."""
+    """The deck directory when ``input_path`` is an HTML deck (deck.json outputFormat html).
+
+    An unreadable deck.json keeps the PPTX path; an explicit invalid outputFormat stops the
+    command with exit code 1.
+    """
     from sdpm.engine.schema import deck_output_format
 
     if not input_path or input_path == "-" or not Path(input_path).is_dir():
         return None
     try:
         deck_json = read_json(Path(input_path) / "deck.json")
-        return Path(input_path) if deck_output_format(deck_json) == "html" else None
     except (OSError, ValueError):
         return None
+    try:
+        output_format = deck_output_format(deck_json)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    return Path(input_path) if output_format == "html" else None
 
 
 def cmd_generate(args):

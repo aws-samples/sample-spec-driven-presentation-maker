@@ -284,6 +284,14 @@ class TestHtmlDeckGuards:
         with pytest.raises(ValueError, match="PPTX decks only"):
             diff_report(html_deck, html_deck)
 
+    def test_generate_pptx_refuses_an_invalid_output_format(self, deck: Path):
+        deck_json = json.loads((deck / "deck.json").read_text(encoding="utf-8"))
+        deck_json["outputFormat"] = "htlm"
+        (deck / "deck.json").write_text(json.dumps(deck_json), encoding="utf-8")
+        with pytest.raises(ValueError, match="outputFormat"):
+            tools.generate_pptx(str(deck))
+        assert not (deck / "output.pptx").exists()
+
 
 def test_local_server_binds_entry_tools_and_not_workflow_readers():
     src = (Path(__file__).resolve().parents[1] / "servers" / "local" / "server.py").read_text(encoding="utf-8")

@@ -63,3 +63,23 @@ def test_cli_init_pptx_prints_no_format_notes(tmp_path: Path) -> None:
     out = _cli_init(tmp_path)
     assert "format_notes" not in out
     assert out.startswith("output_dir:")
+
+
+def test_cli_generate_stops_on_invalid_output_format(tmp_path: Path) -> None:
+    """An explicit invalid outputFormat exits 1 instead of falling through to a PPTX build."""
+    import json
+
+    _cli_init(tmp_path)
+    deck = tmp_path / "d"
+    deck_json = json.loads((deck / "deck.json").read_text(encoding="utf-8"))
+    deck_json["outputFormat"] = "htlm"
+    (deck / "deck.json").write_text(json.dumps(deck_json), encoding="utf-8")
+    cli = Path(__file__).resolve().parents[1] / "sdpm" / "scripts" / "pptx_builder.py"
+    result = subprocess.run(
+        [sys.executable, str(cli), "generate_pptx", str(deck), "-o", str(deck / "output.pptx")],
+        capture_output=True,
+        text=True,
+    )
+    assert result.returncode == 1
+    assert "outputFormat" in result.stderr
+    assert not (deck / "output.pptx").exists()

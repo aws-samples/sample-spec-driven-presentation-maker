@@ -30,7 +30,10 @@ def _rejection_message(violations: list[str]) -> str:
 
 
 def _deck_format(deck_dir: Path) -> str:
-    """deck.json outputFormat; raises ValueError for an invalid value, "pptx" when unreadable."""
+    """deck.json outputFormat; "pptx" when deck.json is unreadable.
+
+    Raises ValueError for an explicit invalid value; run_python then stops before any build.
+    """
     from sdpm.engine.schema import deck_output_format
 
     try:
@@ -202,8 +205,9 @@ def run_python(
     try:
         deck_format = _deck_format(deck_dir)
     except ValueError as e:
+        # An explicit invalid outputFormat stops the build: no PPTX is produced.
         result.setdefault("errors", {})["outputFormat"] = str(e)
-        deck_format = "pptx"
+        return json.dumps(result, ensure_ascii=False)
     if deck_format == "html":
         _refresh_html_deck(deck_dir, pre_snap, measure_slides, result)
         return json.dumps(result, ensure_ascii=False)

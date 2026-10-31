@@ -145,14 +145,18 @@ def analyze_template(
 
 
 def _is_html_deck(deck_id: str) -> bool:
-    """True when deck.json says outputFormat html; unreadable or invalid → False."""
+    """True when deck.json says outputFormat html; unreadable deck.json → False.
+
+    Raises ValueError when deck.json names an invalid outputFormat.
+    """
     from sdpm.engine.schema import deck_output_format
     from sdpm.utils.io import read_json
 
     try:
-        return deck_output_format(read_json(Path(deck_id) / "deck.json")) == "html"
-    except Exception:
+        deck_json = read_json(Path(deck_id) / "deck.json")
+    except (OSError, ValueError):
         return False
+    return deck_output_format(deck_json) == "html"
 
 
 def generate_pptx(deck_id: Annotated[str, Field(description='Deck directory path.')]) -> dict[str, Any]:

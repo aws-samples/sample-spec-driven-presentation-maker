@@ -608,6 +608,36 @@ def test_generate_pptx_pptx_deck_takes_the_pptx_path(server, storage, monkeypatc
     assert called["deck_id"] == "d1"
 
 
+def _misspell_output_format(storage):
+    deck_json = storage.get_deck_json("d1")
+    deck_json["outputFormat"] = "htlm"
+    storage.put_deck_json("d1", deck_json)
+
+
+def test_run_python_invalid_output_format_stops_the_build(server, storage, monkeypatch):
+    _misspell_output_format(storage)
+    _no_pptx(monkeypatch)
+    _sandbox(monkeypatch, ["slides/cover.html"])
+    out = _run(server)
+    assert "htlm" in out["errors"]["outputFormat"]
+    assert storage.html_keys() == []
+
+
+def test_generate_pptx_invalid_output_format_returns_error(server, storage, monkeypatch):
+    _misspell_output_format(storage)
+    called = []
+    monkeypatch.setattr(remote_server.generate, "generate_pptx", lambda **kw: called.append(kw))
+    result = json.loads(server.generate_pptx(deck_id="d1"))
+    assert "outputFormat" in result["error"]
+    assert called == []
+
+
+def test_get_preview_invalid_output_format_returns_error(server, storage):
+    _misspell_output_format(storage)
+    [item] = server.get_preview(deck_id="d1", slugs=["cover"])
+    assert item["type"] == "text" and "outputFormat" in item["text"]
+
+
 # --- get_preview ---------------------------------------------------------------
 
 
