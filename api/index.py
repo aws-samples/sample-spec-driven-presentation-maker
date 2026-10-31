@@ -18,6 +18,7 @@ import json
 import os
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import boto3
@@ -42,6 +43,15 @@ from html_presign import (
     slide_size,
 )
 from shared.html_artifacts import build_html_preview_key_map, preview_prefix as html_preview_prefix
+from shared.review import (
+    MAX_BODY_BYTES as REVIEW_MAX_BODY_BYTES,
+    build_review_file,
+    created_at_iso,
+    is_review_id,
+    new_review_id,
+    slide_size_of,
+    validate_review_submission,
+)
 from shared.schema import (
     deck_pk, deck_sk, shared_pk, fav_sk,
     DECK_SK_PREFIX, FAV_SK_PREFIX,
@@ -1182,6 +1192,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         "template": template,
         "defsUrl": preview_url(defs_key) if has_defs else None,
         "pptxUrl": (_cf_signed_url(pptx_key) or presigned_url(s3_client, BUCKET_NAME, pptx_key)) if pptx_key else None,
+        "slideSize": slide_size(deck_json),
         "updatedAt": deck.get("updatedAt", ""),
         "chatSessionId": deck.get("chatSessionId"),
         "isOwner": decision.role == "owner",
@@ -1305,6 +1316,114 @@ def put_outline(deck_id: str) -> Dict[str, Any]:
             ExpressionAttributeValues={":t": now_iso()},
         )
     return {"bytes": len(data)}
+
+
+def _review_key(deck_id: str, review_id: str) -> str:
+    """S3 key of a review file; ``review_id`` must already have passed ``is_review_id``."""
+    return f"decks/{deck_id}/reviews/{review_id}.json"
+
+
+def _slide_slugs(deck_id: str) -> set:
+    """Slugs that have a slides/<slug>.json or slides/<slug>.html object."""
+    prefix = f"decks/{deck_id}/slides/"
+    resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
+    slugs = set()
+    for obj in resp.get("Contents", []):
+        name = obj["Key"][len(prefix):]
+        for ext in (".json", ".html"):
+            if name.endswith(ext) and "/" not in name:
+                slugs.add(name[: -len(ext)])
+    return slugs
+
+
+def _object_exists(key: str) -> bool:
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=key)
+    except Exception:
+        return False
+    return True
+
+
+@app.post("/decks/<deck_id>/reviews")
+def create_review(deck_id: str) -> Any:
+    """Create a review request (`reviews/<id>.json`) from the Web UI comment tool.
+
+    The server picks the id and timestamp, takes slide_size from deck.json and computes
+    each comment's refs; the client sends only ``{note, comments: [{name, slide, rect, text}]}``.
+    Owners and collaborators may write (same permission as editing slides).
+
+    Args:
+        deck_id: Deck identifier.
+
+    Returns:
+        The review file as written.
+    """
+    user_id = get_user_id(app.current_event)
+    decision = authorize(user_id, deck_id, "edit_slide", table)
+    if not decision.allowed:
+        return {"error": decision.reason}, 403
+
+    raw = app.current_event.body or ""
+    if len(raw.encode("utf-8")) > REVIEW_MAX_BODY_BYTES:
+        return {"error": f"body exceeds {REVIEW_MAX_BODY_BYTES} bytes"}, 413
+    try:
+        body = app.current_event.json_body
+    except Exception:
+        return {"error": "Invalid JSON"}, 400
+
+    size = slide_size_of(_read_deck_json(deck_id))
+    slugs = _slide_slugs(deck_id)
+    normalized, error = validate_review_submission(body, size, lambda slug: slug in slugs)
+    if error:
+        return {"error": error}, 400
+
+    for _ in range(3):
+        now = datetime.now(timezone.utc)
+        review_id = new_review_id(now)
+        key = _review_key(deck_id, review_id)
+        if not _object_exists(key):
+            break
+    else:
+        return {"error": "Could not allocate a review id"}, 409
+
+    review = build_review_file(review_id, created_at_iso(now), size, normalized)
+    s3_client.put_object(
+        Bucket=BUCKET_NAME,
+        Key=key,
+        Body=json.dumps(review, ensure_ascii=False, indent=2).encode("utf-8"),
+        ContentType="application/json; charset=utf-8",
+    )
+    return review
+
+
+@app.get("/decks/<deck_id>/reviews/<review_id>")
+def get_review(deck_id: str, review_id: str) -> Any:
+    """Read a review request file (status and replies written back by the agent).
+
+    Same permission as writing it: review files are only shown in the deck chat.
+
+    Args:
+        deck_id: Deck identifier.
+        review_id: Review id (``YYYYMMDD-HHMMSS-xxxx``).
+
+    Returns:
+        The review file as stored.
+    """
+    if not is_review_id(review_id):
+        return {"error": "Invalid review id"}, 400
+    user_id = get_user_id(app.current_event)
+    decision = authorize(user_id, deck_id, "edit_slide", table)
+    if not decision.allowed:
+        return {"error": decision.reason}, 403
+
+    try:
+        resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=_review_key(deck_id, review_id))
+        data = json.loads(resp["Body"].read())
+    except Exception:
+        return {"error": "Review not found"}, 404
+    if not isinstance(data, dict):
+        return {"error": "Review not found"}, 404
+    return data
 
 
 @app.delete("/decks/<deck_id>")
