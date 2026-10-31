@@ -185,7 +185,7 @@ def template_html_view(template_path: str | Path, *, cache_root: str | Path | No
     a blocker: any failure returns None.
     """
     from sdpm.engine.html.decorations import decoration_tools_status
-    from sdpm.engine.html.template import load_template_html
+    from sdpm.engine.html.template import decorations_complete, load_template_html
 
     try:
         converted = load_template_html(Path(template_path), decorations=False, cache_root=cache_root)
@@ -195,7 +195,7 @@ def template_html_view(template_path: str | Path, *, cache_root: str | Path | No
     layouts = list(info.get("layouts", []))
     view: dict[str, Any] = {key: info.get(key) for key in _TEMPLATE_HTML_KEYS}
     view["layouts"] = [layout for layout in layouts if layout.get("curated")] or layouts
-    rendered = len(converted.svg_paths) >= len(layouts)
+    rendered = decorations_complete(info, converted.dir / "layouts")
     view["decorations_status"] = None if rendered else decoration_tools_status()
     return view
 

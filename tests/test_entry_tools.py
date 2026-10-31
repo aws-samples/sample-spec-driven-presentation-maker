@@ -173,6 +173,38 @@ class TestStartComposing:
         assert view == payload
         assert template_html_view(tmp_path / "missing.pptx") is None
 
+    def test_template_html_view_plain_template_needs_no_libreoffice(self, tmp_path: Path, monkeypatch):
+        from sdpm.config import TEMPLATES_DIR
+        from sdpm.engine.html import decorations
+        from sdpm.entry import template_html_view
+
+        monkeypatch.setattr(decorations, "soffice_path", lambda: None)
+        view = template_html_view(TEMPLATES_DIR / "blank-light.pptx", cache_root=tmp_path / "c")
+        assert view is not None and view["decorations_status"] is None
+
+    def test_template_html_view_complete_mixed_cache(self, decorated_template: Path, tmp_path: Path, monkeypatch):
+        """Layouts without decorations have no SVG; a cache holding every needed SVG is complete."""
+        from sdpm.engine.html import decorations
+        from sdpm.engine.html.template import load_template_html
+        from sdpm.entry import template_html_view
+
+        def fake_render(template_path, layouts, out_dir, *, work_dir):
+            out_dir.mkdir(parents=True, exist_ok=True)
+            for entry in layouts:
+                (out_dir / f"{entry['file']}.svg").write_text("<svg/>", encoding="utf-8")
+                if entry["baked"]:
+                    (out_dir / f"{entry['file']}.ground.svg").write_text("<svg/>", encoding="utf-8")
+            return {"svgs": {}, "ground_svgs": {}, "status": None}
+
+        cache = tmp_path / "c"
+        monkeypatch.setattr(decorations, "decoration_tools_status", lambda: None)
+        monkeypatch.setattr(decorations, "render_decoration_svgs", fake_render)
+        converted = load_template_html(decorated_template, cache_root=cache)
+        assert len(converted.svg_paths) < len(converted.info["layouts"])  # Blank needs no render
+        monkeypatch.undo()
+        monkeypatch.setattr(decorations, "soffice_path", lambda: None)
+        assert template_html_view(decorated_template, cache_root=cache)["decorations_status"] is None
+
     def test_supplied_template_html_is_used(self, html_deck: Path, monkeypatch: pytest.MonkeyPatch):
         from sdpm import entry
 

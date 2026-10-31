@@ -392,7 +392,8 @@ def _render_entries(info: dict) -> list[dict]:
             for i, layout in enumerate(info["layouts"]) if _needs_render(layout)]
 
 
-def _svgs_complete(info: dict, layouts_dir: Path) -> bool:
+def decorations_complete(info: dict, layouts_dir: Path) -> bool:
+    """True when every layout that needs a render has its SVGs in ``layouts_dir``."""
     for layout in info["layouts"]:
         if not _needs_render(layout):
             continue
@@ -472,7 +473,7 @@ def load_template_html(
         _write_atomic(cache_dir / "template.json", template_json_text(info))
 
     status: dict | None = None
-    if decorations and not _svgs_complete(info, cache_dir / "layouts"):
+    if decorations and not decorations_complete(info, cache_dir / "layouts"):
         status = _decorations.decoration_tools_status()
         if status is None:
             status = _render_into(template_path, info, cache_dir)
@@ -485,6 +486,7 @@ __all__ = [
     "build_template_info",
     "build_theme_css",
     "cache_key",
+    "decorations_complete",
     "layout_file_name",
     "load_template_html",
     "template_json_text",
