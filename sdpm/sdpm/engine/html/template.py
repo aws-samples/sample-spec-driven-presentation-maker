@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -42,8 +43,9 @@ _AUTONUM = (("arabic", "decimal"), ("alphaLc", "lower-alpha"), ("alphaUc", "uppe
             ("romanLc", "lower-roman"), ("romanUc", "upper-roman"))
 
 # Process-local memo of failed renders (cache dir → status) so a broken
-# LibreOffice conversion is attempted once per process, not on every build.
-_FAILED_RENDERS: dict[str, dict] = {}
+# A failed LibreOffice conversion is retried after FAILED_RENDER_RETRY_S, not on every build.
+FAILED_RENDER_RETRY_S = 600
+_FAILED_RENDERS: dict[str, tuple[float, dict]] = {}
 
 
 @dataclass
@@ -422,8 +424,8 @@ def _result(directory: Path, info: dict, theme_css: str, status: dict | None, st
 def _render_into(template_path: Path, info: dict, cache_dir: Path) -> dict | None:
     """Render decoration SVGs into ``cache_dir/layouts``; returns the failure status or None."""
     memo = _FAILED_RENDERS.get(str(cache_dir))
-    if memo is not None:
-        return memo
+    if memo is not None and time.monotonic() - memo[0] < FAILED_RENDER_RETRY_S:
+        return memo[1]
     staging = Path(tempfile.mkdtemp(prefix=".render-", dir=cache_dir))
     try:
         rendered = _decorations.render_decoration_svgs(
@@ -431,7 +433,7 @@ def _render_into(template_path: Path, info: dict, cache_dir: Path) -> dict | Non
         if rendered["status"] is not None:
             if rendered["status"].get("missing"):
                 return rendered["status"]  # tools vanished: report, do not memoise
-            _FAILED_RENDERS[str(cache_dir)] = rendered["status"]
+            _FAILED_RENDERS[str(cache_dir)] = (time.monotonic(), rendered["status"])
             return rendered["status"]
         layouts_dir = cache_dir / "layouts"
         layouts_dir.mkdir(parents=True, exist_ok=True)
