@@ -186,6 +186,10 @@ EDITOR_PANE_ROLE = "AXSplitGroup"
 #: needs. Resolving it by title rather than by role-and-size is what keeps the mapping
 #: right when the ribbon collapses and the pane grows.
 EDITOR_PANE_TITLE_PREFIX = "Slide Editor Pane"
+
+#: A ribbon tab that is present whatever is selected and whatever tab is active. Used to
+#: tell PowerPoint's two same-titled windows apart: only one of them carries the ribbon.
+RIBBON_ANCHOR_TAB = "Home"
 ZOOM_TITLE_PATTERN = re.compile(r"^\s*\d+(?:\.\d+)?\s*%\s*$")
 
 
@@ -643,10 +647,20 @@ def document_window(backend: AXBackend) -> AXNode:
     if not windows:
         raise ControlNotFound("PowerPoint reports no windows")
     popups = {"Effect Options", "Path Animation"}
-    for window in windows:
-        if (window.title or "") not in popups:
-            return window
-    raise ControlNotFound("every PowerPoint window is a popup; no document window")
+    candidates = [window for window in windows if (window.title or "") not in popups]
+    if not candidates:
+        raise ControlNotFound("every PowerPoint window is a popup; no document window")
+    # PowerPoint publishes TWO AXWindows with the SAME document title, and only one of
+    # them carries the ribbon. Taking the first non-popup picked them inconsistently:
+    # one run reached Save on its first target and then failed every later one with
+    # "no element titled 'Animations'". So the document window is the one that holds the
+    # ribbon tab strip, identified by a tab that is always present.
+    with_ribbon = [
+        window for window in candidates if find_all_by_title(window, RIBBON_ANCHOR_TAB)
+    ]
+    if with_ribbon:
+        return with_ribbon[0]
+    return candidates[0]
 
 
 def find_window(backend: AXBackend, title: str) -> AXNode | None:
@@ -795,10 +809,14 @@ def press_path(
     # 76 targets failed waiting for a gallery that had stopped existing. So the tab is
     # pressed only when its own controls are not already reachable, which is the same
     # evidence the wait below uses and needs no extra attribute.
-    tab_node = _resolve_in(resolve_scope(backend, scope), path[0])
+    # Reachability is checked BEFORE the tab is resolved, not after. Measured: three
+    # live elements are titled 'Animations' (an AXRadioButton and two AXGroups), so
+    # resolving the tab raises AmbiguousControl — and resolving it first would fail every
+    # target even when the tab is already active and nothing needs pressing.
     if _reachable_any(resolve_scope(backend, scope), [path[1]]):
-        steps.append(StepOutcome(path[0], "tabAlreadyActive", tab_node.role))
+        steps.append(StepOutcome(path[0], "tabAlreadyActive", None))
     else:
+        tab_node = _resolve_in(resolve_scope(backend, scope), path[0])
         tab_node.press()
         steps.append(StepOutcome(path[0], "pressedTab", tab_node.role))
         wait_until(
@@ -1288,6 +1306,30 @@ def read_canvas_geometry(
     )
 
 
+def ensure_tab(backend: AXBackend, path: Sequence[str], *, timeout: float) -> str:
+    """Make the ribbon tab named by ``path`` active, and return what it took.
+
+    Pressing a tab that is already active **collapses the ribbon**, so the tab is pressed
+    only when its own controls are not already reachable. Reachability is checked before
+    the tab is resolved, because three live elements are titled 'Animations' — an
+    ``AXRadioButton`` and two ``AXGroup``s — so resolving it raises
+    :class:`AmbiguousControl` even when nothing needs pressing.
+    """
+    if len(path) < 2:
+        raise ControlNotFound(f"a GUI path needs a ribbon tab and a control, got {list(path)}")
+    scope = Scope()
+    if _reachable_any(resolve_scope(backend, scope), [path[1]]):
+        return "alreadyActive"
+    _resolve_in(resolve_scope(backend, scope), path[0]).press()
+    wait_until(
+        backend,
+        lambda: _reachable_any(resolve_scope(backend, scope), [path[1]]),
+        timeout=timeout,
+        what=f"{path[1]!r} after selecting the {path[0]!r} tab",
+    )
+    return "pressed"
+
+
 def capture_target(
     backend: AXBackend,
     target: dict[str, Any],
@@ -1309,6 +1351,13 @@ def capture_target(
     try:
         carried["shape_spid"] = spid = read_shape_spid(settings.document, slide_index, shape_name)
         before = read_slide_effects(settings.document, slide_index)
+        # The ribbon tab comes first, before the shape is clicked. ``select_shape``
+        # confirms the click by that tab's gallery becoming enabled, and a gallery on an
+        # inactive tab is not in the tree at all — so with the tab left for later, the
+        # confirmation waits for a control that does not exist. Measured: a freshly
+        # opened deck starts on Home and all 76 targets timed out on 'Emphasis Effects'
+        # before a single shape was clicked.
+        ensure_tab(backend, target["guiPath"], timeout=timeout)
         carried["click_point"] = select_shape(
             backend,
             geometry,

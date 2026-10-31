@@ -128,7 +128,13 @@ CELL_GAP_Y_PX = 20.0
 #: today is 46 characters, which does not fit a 100 pt wide box on one line at any size a
 #: person would read, so the label is two lines rather than one overflowing into its
 #: neighbour.
-LABEL_HEIGHT_PX = 34.0
+#: One line, not two. The label is for a human glancing at the deck; the authoritative
+#: key lives in the plan and the attribution is by ``spid``, so the label does not need
+#: to carry the whole key. Height bought back here goes straight into the shape, and
+#: height was the limiting axis: a 100x22 pt shape was the measured cause of clicks
+#: landing on empty canvas, which left the previous shape selected so the next press
+#: overwrote ITS effect — 71 presses produced five effects.
+LABEL_HEIGHT_PX = 16.0
 
 #: Half the minimum side of a shape: the distance from the point the driver clicks to the
 #: nearest edge of the shape it is aiming at. 20 px is 10 pt, which is 9.2 screen points
@@ -140,10 +146,10 @@ CLICK_MARGIN_PX = 20.0
 #: neighbour, which would apply the right effect to the wrong target.
 NEIGHBOUR_CLEARANCE_PX = 20.0
 
-#: Preferred cell width-to-height ratio. Wide cells leave room for the target key as
-#: readable text under its shape; the grid picks the column count whose cell aspect comes
-#: closest to this.
-CELL_ASPECT = 2.2
+#: Preferred cell width-to-height ratio. Squarer cells than the 2.2 first chosen: a
+#: click's accuracy is bounded by the shape's **smaller** side, and at 2.2 that side was
+#: 22 pt. The grid picks the column count whose cell aspect comes closest to this.
+CELL_ASPECT = 1.5
 
 #: Font sizes, in points, for the ordinal inside a shape and the key below it.
 SHAPE_FONT_PT = 11
@@ -650,14 +656,15 @@ def build_plan(catalog: dict[str, Any], manifest: dict[str, Any]) -> dict[str, A
 
 # --- the capture deck -------------------------------------------------------
 def label_text(key: str) -> str:
-    """Return the key as the label under its shape, split onto two lines at the last dot.
+    """Return the label under a shape: the key's last segment, on one line.
 
-    Nothing is abbreviated: stripping the newline gives the key back exactly. A key is up
-    to 46 characters and a cell is 100 pt wide, so one line would run over the neighbour's
-    label and make the deck harder to read than no label at all.
+    Deliberately **not** the whole key. The label orients a human looking at the deck;
+    the authoritative key is in the plan and the attribution is by ``spid``, so a label
+    that costs the shape half its height is a bad trade — height was the axis that made
+    clicks miss. The segment is unique within a category, and the ordinal inside the
+    shape ties a label back to its plan entry when two categories share a name.
     """
-    head, dot, tail = key.rpartition(".")
-    return f"{head}{dot}\n{tail}" if dot else key
+    return key.rpartition(".")[2] or key
 
 
 def slide_elements(targets: Sequence[dict[str, Any]], grid: Grid, slide_index: int) -> list[dict[str, Any]]:

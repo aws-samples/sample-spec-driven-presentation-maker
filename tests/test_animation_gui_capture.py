@@ -68,7 +68,13 @@ EDITOR_AREA_TITLE = "Slide Editor Pane, Slide 1 of 1 Slides"
 #: The target count the checked-in catalog derives today, and the grid it fits on one
 #: slide. Both are asserted against the plan rather than trusted.
 EXPECTED_TARGETS = 76
-EXPECTED_GRID = (8, 10)
+#: 10 columns by 8 rows, not the 8x10 first chosen. A click's accuracy is bounded by the
+#: shape's SHORT side, which was 22 pt at a 2.2 cell aspect with a two-line label. A live
+#: run then put 71 presses onto five shapes, because a click that lands on empty canvas
+#: leaves the previous shape selected and the next press overwrites ITS effect. Squarer
+#: cells and a one-line label take the short side to 43.5 pt.
+EXPECTED_GRID = (10, 8)
+EXPECTED_SHAPE_PX = (154, 87)
 
 
 def measured_pane() -> driver.Frame:
@@ -594,6 +600,10 @@ class TestShapeGrid:
         assert deck["slides"] == 1
         assert deck["split"] is False
         assert (deck["columns"], deck["rows"]) == EXPECTED_GRID
+        assert tuple(deck["shapePx"]) == EXPECTED_SHAPE_PX
+        # The short side is what bounds a click. 87 px is 43.5 pt, double the 22 pt that
+        # made a live run land 71 presses on five shapes.
+        assert min(deck["shapePx"]) / 2 >= 40, "the short side is back under 40 pt"
         assert {target["slideIndex"] for target in real_plan["targets"]} == {1}
 
     def test_every_target_gets_its_own_cell_in_plan_order(self, real_plan):
@@ -1426,27 +1436,36 @@ class TestCaptureDeck:
         elements = json.loads(
             (built_deck["deck"] / "slides" / "s001.json").read_text(encoding="utf-8")
         )["elements"]
-        # The label wraps onto two lines, and stripping the wrap gives the key back
-        # exactly — nothing about the key is abbreviated away.
-        texts = {element["text"].replace("\n", ""): element for element in elements}
+        # The label is the key's last segment on one line. The whole key used to be
+        # wrapped onto two, and those two lines cost the shape half its height — the axis
+        # that made clicks land on empty canvas. The authoritative key is in the plan and
+        # the attribution is by spid, so the label only has to orient a reader.
+        texts = {element["text"]: element for element in elements}
         for target in small_plan["targets"]:
-            assert target["key"] in texts, "a human cannot tell which shape is which target"
-            label = texts[target["key"]]
+            segment = target["key"].rpartition(".")[2]
+            assert segment in texts, "a human cannot tell which shape is which target"
+            label = texts[segment]
             rect = planner.Rect(**target["shapeRectPx"])
             # Directly under its own shape, same width, so the pairing is unambiguous.
             assert (label["x"], label["y"]) == (rect.x, rect.y + rect.height)
             assert label["width"] == rect.width
 
-    def test_a_wrapped_label_loses_nothing_and_fits_its_box(self, real_plan):
-        longest = max((target["key"] for target in real_plan["targets"]), key=len)
-        wrapped = planner.label_text(longest)
-        assert wrapped.replace("\n", "") == longest
-        assert wrapped.count("\n") == 1
+    def test_a_label_is_one_line_that_fits_its_box(self, real_plan):
+        """Every label is a single line inside its box, for every target in the catalog.
+
+        One line is the point: two lines needed 34 px of cell height, which left the
+        shape 22 pt tall on its short axis, and a live run then landed 71 presses on five
+        shapes. The key itself is not lost — it is in the plan, and the shape's ordinal
+        ties the label back to it.
+        """
         width_pt = real_plan["deck"]["shapePx"][0] / 2
-        for line in wrapped.splitlines():
+        for target in real_plan["targets"]:
+            label = planner.label_text(target["key"])
+            assert "\n" not in label
+            assert target["key"].endswith(label)
             # Arial's lowercase averages well under 0.5 em, so 0.5 is the pessimistic
             # bound; a line that fits under it fits.
-            assert len(line) * planner.LABEL_FONT_PT * 0.5 <= width_pt, line
+            assert len(label) * planner.LABEL_FONT_PT * 0.5 <= width_pt, label
         assert planner.label_text("nodots") == "nodots"
 
     def test_each_shape_carries_its_ordinal_so_the_deck_can_be_read_against_the_plan(
