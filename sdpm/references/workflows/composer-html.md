@@ -35,9 +35,12 @@ Sources your slides need. Facts come from the brief and its sources.
   structure and say so in your summary. A card or node that names a concept carries an icon,
   placed as the style's icon rule says. Where the presenter operates the slide, build the
   operation with a slide script so it works while presenting, and make the state before any
-  operation the one that reads on its own (it is what prints). The slide shows the controls
-  and what they change; the presenter's operating steps go in `<aside class="notes">`. A slide
-  whose claim is itself a sentence may stay text.
+  operation the one that reads on its own (it is what prints): a field that a control fills
+  starts with content. Every text the audience sees on the slide (headings, labels, captions,
+  button text and the starting text of every field) names the content; a control is known by
+  its form and its label. Every sentence on how to operate the slide, what the presenter does
+  and what follows, is written only in `<aside class="notes">`. A slide whose claim is itself
+  a sentence may stay text.
 - **Follow the style.** `specs/art-direction.html` is a short deck built in the style, about the
   style: its `Frame:` comments say what repeats on every slide, its `Component:` comments the
   parts slides are built from, its `Pattern:` slides how it builds each slide type and which
