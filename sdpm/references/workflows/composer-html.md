@@ -52,7 +52,9 @@ Sources your slides need. Facts come from the brief and its sources.
   (`write_text("slides/<slug>.html", …)`). Each write returns warnings — static checks,
   then the browser check's layout findings and JS errors — and a PNG of the slide
   (`preview_files` locally, `get_preview(deck_id, slugs=[…])` in the cloud). Apply the fix each
-  warning names, look at the PNG and fix what looks wrong, then go to the next slug. When a
+  warning names, look at the PNG and fix what looks wrong (each icon stands out from the
+  background it sits on; `search_assets` `theme_filter` finds its other variant), then go to
+  the next slug. When a
   warning says the browser check was skipped, stopped or did not finish, report the slides it
   names as not checked.
 
