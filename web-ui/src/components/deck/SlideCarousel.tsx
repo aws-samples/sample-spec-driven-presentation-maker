@@ -10,6 +10,11 @@
  * (HtmlDeckPlayer), the grid shows `preview/<slug>.html` thumbnails, and the
  * header carries a read-only "HTML" badge with Present / PDF / Download (cloud)
  * or Open (local) instead of the PPTX button.
+ *
+ * Comment tool (inside a ReviewProvider that is enabled): header toggle, C key, slide-hover
+ * button; frames are drawn on the full view. While the tool is on, HTML decks show the stacked
+ * static previews instead of the player so every slide can carry frames. Without a provider
+ * nothing of this renders.
  */
 
 "use client"
@@ -33,6 +38,13 @@ import { previewIdentity } from "@/lib/preview"
 import { notifyError } from "@/lib/errors"
 import { useTranslations } from "next-intl"
 import { AGENT_WAIT_COLORS } from "@/components/deck/SpecWaiting"
+import { useReview } from "@/components/review/ReviewProvider"
+import { ReviewSlideLayer } from "@/components/review/ReviewSlideLayer"
+import { ReviewSlideCta } from "@/components/review/ReviewSlideCta"
+import { ReviewToolButton } from "@/components/review/ReviewToolButton"
+import { ReviewToolHint } from "@/components/review/ReviewToolHint"
+import { ReviewCommentCard } from "@/components/review/ReviewCommentCard"
+import { ReviewKeyboard } from "@/components/review/ReviewKeyboard"
 
 
 /**
@@ -41,11 +53,12 @@ import { AGENT_WAIT_COLORS } from "@/components/deck/SpecWaiting"
  * `layout` lets neighbours slide when a slide is inserted or removed.
  */
 const CARD_SPRING = { type: "spring", stiffness: 500, damping: 40, mass: 0.8 } as const
-function SlideCard({ slug, children, className }: { slug: string; children: React.ReactNode; className?: string }) {
+function SlideCard({ slug, children, className, reviewSlide }: { slug: string; children: React.ReactNode; className?: string; reviewSlide?: boolean }) {
   return (
     <motion.div
       layout
       layoutId={`slide-${slug}`}
+      data-review-slide={reviewSlide ? slug : undefined}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.18 } }}
@@ -113,6 +126,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   }
   if (dupUrls.length) console.warn("[SlideCarousel] same composeUrl used for multiple slides:", dupUrls, urlBySlug)
   const { viewMode, setViewMode } = usePreferences()
+  const review = useReview()
+  const reviewOn = !!review?.enabled && slidesWithPreview.length > 0
+  const [playerHover, setPlayerHover] = useState(false)
+  const toolOn = reviewOn && !!review?.toolOn
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   const followChangedSlide = useFollowScroll(scrollElement)
   const [defsState, setDefsState] = useState<{ url: string; status: DeckDefsStatus }>({
@@ -222,6 +239,16 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
       setSpecTab("slides")
     }
   }, [slides.length])
+
+  // Turning the comment tool on shows the slides in the full view, where frames are drawn (R1.5).
+  const prevToolOn = useRef(false)
+  useEffect(() => {
+    if (toolOn && !prevToolOn.current) {
+      setSpecTab("slides")
+      if (viewMode === "grid") setViewMode("full")
+    }
+    prevToolOn.current = toolOn
+  }, [toolOn, viewMode, setViewMode])
 
   // Grid thumbnail click: switch to full view and land on that slide once the
   // shared-layout morph has run.
@@ -439,17 +466,33 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
    * @returns JSX element for the slides view
    */
   function renderSlidesContent(): React.ReactNode {
-    if (isHtml && viewMode === "full" && htmlUrl) {
+    if (isHtml && viewMode === "full" && htmlUrl && !toolOn) {
+      // The deck iframe hides the pointer from the page: the pane around it tracks the hover
+      // that shows the slide's "Comment" button.
       return (
-        <div ref={setScrollElement} data-slide-scroller className="flex-1 overflow-y-auto px-6 py-6">
-          <HtmlDeckPlayer htmlUrl={htmlUrl} slideSize={slideSize} deckName={deckName} slide={playerSlide} />
+        <div
+          ref={setScrollElement}
+          data-slide-scroller
+          className="flex-1 overflow-y-auto px-6 py-6"
+          onMouseEnter={reviewOn ? () => setPlayerHover(true) : undefined}
+          onMouseLeave={reviewOn ? () => setPlayerHover(false) : undefined}
+        >
+          <HtmlDeckPlayer
+            htmlUrl={htmlUrl}
+            slideSize={slideSize}
+            deckName={deckName}
+            slide={playerSlide}
+            overlay={reviewOn ? <ReviewSlideCta onClick={() => review?.setToolOn(true)} /> : undefined}
+            hovered={reviewOn && playerHover}
+          />
         </div>
       )
     }
     if (slidesWithPreview.length === 0) return renderSlidesEmpty()
 
     return (
-      <div ref={setScrollElement} data-slide-scroller className="flex-1 overflow-y-auto px-6 py-6">
+      <div ref={setScrollElement} data-slide-scroller className={`flex-1 overflow-y-auto px-6 py-6 transition-shadow duration-200 ${toolOn ? "review-tooling" : ""}`}>
+        {toolOn && !review?.hintSeen && <ReviewToolHint />}
         {viewMode === "grid" ? (
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
             <AnimatePresence initial={false}>
@@ -480,7 +523,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                style={{ maxWidth: `calc((100vh - 170px) * ${deckAr})` }}>
           <AnimatePresence initial={false}>
           {slidesWithPreview.map((slide, i) => (
-            <SlideCard key={slide.slug} slug={slide.slug}>
+            <SlideCard key={slide.slug} slug={slide.slug} reviewSlide={reviewOn} className={reviewOn ? "relative group/slide" : undefined}>
             {slide.composeUrl && defsUrl ? (
               <AnimatedSlidePreview
                 defsUrl={defsUrl}
@@ -515,6 +558,8 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 className="slide-cv slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
               />
             )}
+            {reviewOn && <ReviewSlideLayer slug={slide.slug} index={i} />}
+            {reviewOn && !toolOn && <ReviewSlideCta onClick={() => review?.setToolOn(true)} />}
             </SlideCard>
           ))}
           </AnimatePresence>
@@ -563,6 +608,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             {headerActions}
           </div>
           <div className="flex items-center gap-1">
+            {reviewOn && <ReviewToolButton on={toolOn} onClick={() => review?.toggleTool()} />}
             {/* View mode toggle */}
             <div className="flex items-center rounded-lg border border-border/40 p-0.5 mr-1">
               <button
@@ -573,7 +619,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 <Rows3 className="h-3.5 w-3.5" />
               </button>
               <button
-                onClick={() => setViewMode("grid")}
+                onClick={() => { if (toolOn) review?.setToolOn(false); setViewMode("grid") }}
                 className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-background-hover text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                 aria-label={t("gridView")}
               >
@@ -638,6 +684,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             )}
           </div>
         </div>
+      )}
+
+      {reviewOn && specTab === "slides" && (
+        <>
+          <ReviewKeyboard />
+          <ReviewCommentCard />
+        </>
       )}
 
       {/* Content area */}

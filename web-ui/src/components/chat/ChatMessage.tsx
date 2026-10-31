@@ -3,7 +3,8 @@
 /**
  * ChatMessage — Renders a single chat message with tool indicators.
  *
- * User messages: right-aligned bubble.
+ * User messages: right-aligned bubble; a change request message (`[review:<id>]` plus its
+ * JSON block, built by the server) renders as the 修正依頼 card (ReviewRequestCard) instead.
  * Assistant messages: left-aligned bubble with Markdown rendering.
  * Tool indicators appear below the message bubble:
  *   - Latest tool is remains visible
@@ -18,7 +19,7 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Markdown from "react-markdown"
 import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
@@ -29,6 +30,8 @@ import { SnippetBlock } from "./SnippetBlock"
 import { batchGetSlidePreviewUrls } from "@/services/deckService"
 import { SLASH_TOKEN_SOURCE } from "@/lib/slashToken"
 import { useTranslations } from "next-intl"
+import { parseReviewMessage } from "@/lib/review/marker"
+import { ReviewRequestCard } from "@/components/review/ReviewRequestCard"
 
 type HearingQuestion = { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }
 
@@ -180,9 +183,13 @@ interface ChatMessageProps {
   onSend?: (text: string) => void
   /** Whether hearing cards should be disabled (a new message was sent). */
   hearingDisabled?: boolean
+  /** Deck of this chat; a change request card links to the frames only for the open deck. */
+  deckId?: string
+  /** The agent turn for this (user) message is running: a change request card shows 対応中. */
+  reviewWorking?: boolean
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, sessionId, accessToken, onSend, hearingDisabled = false }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, sessionId, accessToken, onSend, hearingDisabled = false, deckId, reviewWorking = false }: ChatMessageProps) {
   const t = useTranslations("chat")
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
@@ -202,6 +209,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
   // Strip compact v1 attachment markers from display text
   cleanContent = cleanContent.replace(/\[Attached:\s*[^\]]+\]\n*/g, "").trim()
   const allSnippets = [...inlineSnippets, ...snippets]
+  const reviewRequest = useMemo(() => (isUser ? parseReviewMessage(content) : null), [isUser, content])
   const outlineDiff = cleanContent.match(/^([^\n]+)\n\n```diff\n([\s\S]*?)\n```([\s\S]*)$/)
   const isOutlineEdit = cleanContent.startsWith("📝") ||
     cleanContent.startsWith("I manually edited outline.md.") ||
@@ -261,8 +269,25 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
           <Sparkles className="h-3 w-3 text-foreground-secondary" />
         </div>
       )}
-      <div className={isUser ? "max-w-[85%]" : "flex-1 min-w-0"}>
-        {isUser ? (
+      <div className={isUser ? (reviewRequest ? "w-[94%]" : "max-w-[85%]") : "flex-1 min-w-0"}>
+        {reviewRequest ? (
+          /* 修正依頼 card (attachment chips above it, as on the bubble) */
+          <div>
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap justify-end gap-1.5 mb-2">
+                {attachments.map((att, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] border border-border/40 bg-background/30">
+                    {att.fileType.startsWith("image/")
+                      ? <ImageIcon className="h-3 w-3 text-blue-400" />
+                      : <FileTextIcon className="h-3 w-3 text-orange-400" />}
+                    <span className="max-w-[140px] truncate">{att.fileName}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+            <ReviewRequestCard request={reviewRequest} working={reviewWorking} deckId={deckId} />
+          </div>
+        ) : isUser ? (
           /* User bubble */
           <div className="text-sm leading-relaxed break-words px-3.5 py-2.5 rounded-2xl rounded-br-md bg-brand-teal-soft border border-brand-teal/15">
             {attachments.length > 0 && (

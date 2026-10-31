@@ -160,3 +160,49 @@ describe("ChatInput replaceText", () => {
     expect(onInputChange).toHaveBeenLastCalledWith("")
   })
 })
+
+describe("ChatInput send override and keep-on-failure", () => {
+  it("renders the override label and sends with an empty input", () => {
+    const { onSend } = renderInput({ sendOverride: { label: "Request changes", blocked: false } })
+    const button = screen.getByRole("button", { name: "Request changes" }) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    fireEvent.click(button)
+    expect(onSend).toHaveBeenCalledWith("", [], [], [])
+  })
+
+  it("disables the override button while blocked", () => {
+    const { onSend, textarea } = renderInput({ sendOverride: { label: "Request changes", blocked: true } })
+    const button = screen.getByRole("button", { name: "Request changes" }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    changeValue(textarea, "fix it")
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true })
+    expect(onSend).not.toHaveBeenCalled()
+  })
+
+  it("keeps the text when onSend resolves to false", async () => {
+    const onSend = vi.fn(async () => false as const)
+    const { textarea } = renderInput({ onSend, sendOverride: { label: "Request changes", blocked: false } })
+    changeValue(textarea, "make it shorter")
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Request changes" }))
+    })
+    expect(onSend).toHaveBeenCalledWith("make it shorter", [], [], [])
+    expect(textarea.value).toBe("make it shorter")
+  })
+
+  it("clears the text when an async onSend succeeds", async () => {
+    const onSend = vi.fn(async () => undefined)
+    const { textarea } = renderInput({ onSend })
+    changeValue(textarea, "hello")
+    await act(async () => {
+      fireEvent.keyDown(textarea, { key: "Enter", metaKey: true })
+    })
+    expect(onSend).toHaveBeenCalled()
+    expect(textarea.value).toBe("")
+  })
+
+  it("renders the top slot inside the form", () => {
+    const { textarea } = renderInput({ topSlot: <div data-testid="top-slot" /> })
+    expect(textarea.closest("form")?.querySelector("[data-testid='top-slot']")).toBeTruthy()
+  })
+})

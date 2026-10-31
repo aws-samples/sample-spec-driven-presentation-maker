@@ -41,6 +41,7 @@ import { useTranslations } from "next-intl"
 import { IS_LOCAL } from "@/lib/mode"
 import { buildToken } from "@/lib/slashToken"
 import { OutlineChatContext } from "@/components/deck/OutlineChatContext"
+import { ReviewProvider } from "@/components/review/ReviewProvider"
 
 export default function DecksPage() {
   const t = useTranslations("decksPage")
@@ -97,6 +98,16 @@ export default function DecksPage() {
     () => setActiveTab("chat"),
   )
 
+  /* ── Comment tool: one state for the preview and the chat ── */
+  const reviewDeckId = ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null
+  const deckSlides = ws.deck?.slides
+  const reviewSlugs = useMemo(
+    () => (deckSlides ?? []).filter((s) => s.previewUrl || s.composeUrl).map((s) => s.slug),
+    [deckSlides],
+  )
+  const { setChatOpen, setChatTab } = ws
+  const openReviewChat = useCallback(() => { setChatOpen(true); setChatTab("deck") }, [setChatOpen, setChatTab])
+
   /** Handle inline style selection — insert a `@style:<name>` token into chat input. */
   const handleStyleSelect = useCallback((name: string) => {
     chatRef.current?.insertAtCursor(buildToken({ kind: "style", name }))
@@ -110,6 +121,15 @@ export default function DecksPage() {
   /* ── Render ── */
   return (
     <OutlineChatContext.Provider value={outlineChatBridge}>
+    <ReviewProvider
+      deckId={reviewDeckId}
+      slugs={reviewSlugs}
+      slideSize={ws.deck?.slideSize}
+      enabled={!!ws.deck && ws.isWorkspace && ws.canChat && !isMobile}
+      agentBusy={agentIsLoading}
+      openChat={openReviewChat}
+      idToken={idToken}
+    >
     <AppShell
       deckName={ws.isWorkspace && ws.deck ? ws.deck.name : undefined}
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
@@ -335,6 +355,7 @@ export default function DecksPage() {
       )}
 
     </AppShell>
+    </ReviewProvider>
     </OutlineChatContext.Provider>
   )
 }

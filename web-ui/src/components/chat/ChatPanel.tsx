@@ -36,6 +36,9 @@ import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./ch
 import { useLocale, useTranslations } from "next-intl"
 import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsService"
 import type { ForkSessionPhase, KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
+import { useReview } from "@/components/review/ReviewProvider"
+import { ReviewDraftBar } from "@/components/review/ReviewDraftBar"
+import { parseReviewMessage } from "@/lib/review/marker"
 
 interface ChatPanelProps {
   deckId: string
@@ -68,6 +71,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const t = useTranslations("chat")
   const tCompose = useTranslations("compose")
   const tSessionPicker = useTranslations("sessionPicker")
+  const tReview = useTranslations("review")
   const locale = useLocale()
   // --- Session ---
   const [sessionId, setSessionId] = useState(() => {
@@ -145,6 +149,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const slashPickerItems = useSlashPickerItems(auth.user?.id_token)
   // Mirror of the chat input; the HTML pill derives its state from the text alone.
   const [inputText, setInputText] = useState("")
+
+  // --- Review comments (only the ChatPanel of the open deck shows and sends them) ---
+  const review = useReview()
+  const reviewActive = !!review?.enabled && review.deckId === deckId
+  const hasReviewDrafts = reviewActive && (review?.readyDrafts.length ?? 0) > 0
+  // Read in callbacks that outlive a render.
+  const reviewRef = useRef(review)
+  useEffect(() => { reviewRef.current = review })
 
   /** Persist chat messages to disk (Local mode only). */
   const saveLocalChat = useCallback((overrideDeckId?: string) => {
@@ -270,8 +282,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     insertAtCursor(text: string) {
       chatInputRef.current?.insertAtCursor(text)
     },
-    sendMessage(text: string, options?: { displayContent?: string }) {
-      return stream.sendMessage(text, undefined, undefined, undefined, options)
+    async sendMessage(text: string, options?: { displayContent?: string }) {
+      await stream.sendMessage(text, undefined, undefined, undefined, options)
     },
   }), [stream.sendMessage])
 
@@ -486,8 +498,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     uploadedFiles: UploadedFile[],
     snippets: { label: string; text: string }[],
     attachments: { fileName: string; fileType: string }[],
-  ) => {
-    if (!configLoaded) return
+    hideUserMessage = false,
+  ): Promise<boolean> => {
+    if (!configLoaded) return Promise.resolve(false)
 
     let fullMessage = text
 
@@ -502,9 +515,45 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       fullMessage = `<!--sdpm:include_images=true-->\n${fullMessage}`
     }
 
-    stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments, { displayContent: text })
+    return stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments, { displayContent: text, hideUserMessage })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configLoaded, deckId, fetchWebImages, stream.sendMessage])
+
+  /**
+   * Send from the input. With comments waiting, the server first writes the review file and
+   * returns the chat message (note, comments, file path, instructions, `[review:<id>]`),
+   * which is sent as-is and also shown (Local .chat.json keeps the display text). A failed
+   * write keeps the comments and the typed note (`false` keeps the input).
+   */
+  const handleInputSend = useCallback(async (
+    text: string,
+    uploadedFiles: UploadedFile[],
+    snippets: { label: string; text: string }[],
+    attachments: { fileName: string; fileType: string }[],
+  ): Promise<void | false> => {
+    if (!configLoaded) return false
+    const r = reviewRef.current
+    if (!hasReviewDrafts || !r) {
+      handleSend(text, uploadedFiles, snippets, attachments)
+      return
+    }
+    let id: string
+    let message: string
+    try {
+      ({ id, message } = await r.submit(text))
+    } catch (err) {
+      notifyError(tReview("sendFailed"), err)
+      return false
+    }
+    // The review file exists once submit() returns: a send that does not reach the agent
+    // leaves the request open, so its card offers to send the same message again.
+    const send = (again: boolean) => {
+      void handleSend(message, uploadedFiles, snippets, attachments, again).then((ok) => {
+        if (!ok) r.markFailed(id, () => send(true))
+      })
+    }
+    send(false)
+  }, [configLoaded, hasReviewDrafts, handleSend, tReview])
 
   // --- Compose in-flight detection (for stop tooltip) ---
   const composeInFlight = useMemo(() => {
@@ -534,6 +583,21 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     }
     return () => onLoadingChange?.(false)
   }, [isLoading, onLoadingChange])
+
+  // The change request of the running turn: its frames stay on the canvas as 対応中 and
+  // leave with the turn. Derived from the chat, so a reconnected turn shows them too.
+  const lastUserIdx = stream.messages.findLastIndex((m) => m.role === "user")
+  const workingContent = isLoading && lastUserIdx >= 0 ? stream.messages[lastUserIdx].content : null
+  const workingReview = useMemo(() => (workingContent ? parseReviewMessage(workingContent) : null), [workingContent])
+  const setWorkingReview = review?.setWorkingReview
+  useEffect(() => {
+    if (!reviewActive || !setWorkingReview) return
+    setWorkingReview(deckId, workingReview)
+  }, [reviewActive, setWorkingReview, deckId, workingReview])
+  useEffect(() => {
+    if (!reviewActive || !setWorkingReview) return
+    return () => setWorkingReview(deckId, null)
+  }, [reviewActive, setWorkingReview, deckId])
 
   const isInitial = stream.messages.length === 0 && !historyLoading
 
@@ -638,7 +702,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         ) : (
           <div className="space-y-4">
             {(() => {
-              const lastUserIdx = stream.messages.findLastIndex((m) => m.role === "user")
               return stream.messages.map((msg, i) => (
               <div key={i}>
                 {msg.mcpStatus && (
@@ -659,6 +722,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   sessionId={sessionId}
                   onSend={(text: string) => handleSend(text, [], [], [])}
                   hearingDisabled={i < lastUserIdx}
+                  deckId={deckId}
+                  reviewWorking={isLoading && i === lastUserIdx}
                 />
               </div>
             ))
@@ -671,11 +736,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       {/* Input area */}
       <ChatInput
           ref={chatInputRef}
-          onSend={handleSend}
+          onSend={handleInputSend}
           isLoading={isLoading}
           onStop={stream.stopGeneration}
           disabled={!configLoaded || reconnectLoading}
-          placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
+          placeholder={hasReviewDrafts ? tReview("notePlaceholder") : isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
+          topSlot={reviewActive ? <ReviewDraftBar /> : undefined}
+          sendOverride={hasReviewDrafts ? { label: tReview("send"), blocked: isLoading } : undefined}
           idToken={auth.user?.id_token}
           sessionId={sessionId}
           deckId={deckId}

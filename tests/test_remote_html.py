@@ -267,6 +267,10 @@ def test_sandbox_syncs_deck_css():
     assert "deck.css" in sandbox_mod._WORKSPACE_PREFIXES
 
 
+def test_sandbox_syncs_reviews():
+    assert "reviews/" in sandbox_mod._WORKSPACE_PREFIXES
+
+
 # --- run_python ---------------------------------------------------------------
 
 

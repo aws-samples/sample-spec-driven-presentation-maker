@@ -39,6 +39,13 @@ export function resolveDeckDir(deckId: string): string | null {
   }
 }
 
+/** deck.json `slideSize` as {width, height} px (1920x1080 when missing or invalid). */
+export function readSlideSize(deckJson: Record<string, unknown>): { width: number; height: number } {
+  const size = deckJson.slideSize as { width?: unknown; height?: unknown } | undefined
+  const ok = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v > 0
+  return size && ok(size.width) && ok(size.height) ? { width: size.width, height: size.height } : { width: 1920, height: 1080 }
+}
+
 /**
  * Resolve a full path under a deck (deckId + subpath segments).
  * Returns null if any segment escapes the deck directory.

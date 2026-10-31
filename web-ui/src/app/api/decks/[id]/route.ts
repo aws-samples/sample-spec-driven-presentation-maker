@@ -9,7 +9,7 @@
 
 import fs from "fs"
 import path from "path"
-import { resolveDeckDir, DECK_ROOT } from "@/lib/local/deck-paths"
+import { resolveDeckDir, readSlideSize, DECK_ROOT } from "@/lib/local/deck-paths"
 import { readOriginFromDeck } from "@/lib/local/acp-process"
 
 function safeRead(p: string): string | null {
@@ -22,13 +22,6 @@ const HTML_SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/
 /** `?v=<mtime>` cache-buster so the UI sees a rebuilt file as a new URL; null when absent. */
 function versionedUrl(filePath: string, url: string): string | null {
   try { return `${url}?v=${Math.floor(fs.statSync(filePath).mtimeMs)}` } catch { return null }
-}
-
-/** deck.json slideSize as {width, height} CSS px (1920x1080 when missing or invalid). */
-function htmlSlideSize(deckJson: Record<string, unknown>): { width: number; height: number } {
-  const size = deckJson.slideSize as { width?: unknown; height?: unknown } | undefined
-  const ok = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v > 0
-  return size && ok(size.width) && ok(size.height) ? { width: size.width, height: size.height } : { width: 1920, height: 1080 }
 }
 
 /** HTML deck slides: `slides/<slug>.html` in outline order, previews from `preview/<slug>.html`. */
@@ -145,10 +138,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     isOwner: true,
     collaborators: [],
     collaboratorAliases: {},
+    slideSize: readSlideSize(deckJson),
     ...(isHtml ? {
       outputFormat: "html",
       htmlUrl: versionedUrl(path.join(dp, "output.html"), `/api/preview/${deckId}/output.html`),
-      slideSize: htmlSlideSize(deckJson),
     } : {}),
   })
 }
