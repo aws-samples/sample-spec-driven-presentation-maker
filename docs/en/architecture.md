@@ -27,6 +27,7 @@ Dependencies always flow top-down.
 The core presentation engine. No network, no AWS, no MCP — just Python.
 
 - **sdpm/sdpm/engine/** — json↔pptx conversion: builder, converter, layout engine, schema lint, preview, checks, diff, analyzer
+- **sdpm/sdpm/engine/html/** — HTML output mode: converts a .pptx template to `theme.css` / `template.json` / decoration SVGs, assembles slide HTML files into a single offline `output.html` (vendored reveal.js under `sdpm/vendor/revealjs/`), and runs the static slide checks
 - **sdpm/sdpm/knowledge/** — knowledge retrieval: references (guides/workflows/examples) and asset search
 - **sdpm/sdpm/tools/** — the MCP tool contract: every tool's name, schema, docstring, and logic defined once; both servers register these functions directly
 - **sdpm/references/** — workflows (role documents: orchestrator/composer/style/translate),
@@ -73,6 +74,20 @@ Additional tools over Layer 2:
 - `run_python` — Execute Python in Amazon Bedrock AgentCore Code Interpreter sandbox (edit deck workspace, analyze data)
 - `search_slides` — Semantic slide search via Amazon Bedrock Knowledge Base (optional)
 
+HTML decks (`deck.json` `outputFormat: "html"`) use the same tools with these differences:
+
+| Tool | HTML deck behaviour |
+|------|---------------------|
+| `init_deck_workspace` | `output_format="html"` creates an HTML deck (default `pptx`) and returns `format_notes` (guide `html-deck`) for the orchestrator |
+| `start_composing` | `mode="html"` returns the HTML composer document, the template converted for HTML and the deck's `deck.css` |
+| `run_python` | After a change to an HTML build input, rebuilds `output.html` and the changed slides' thumbnails, runs the browser check on the changed slides (and `measure_slides`) and uploads thumbnails and PNGs under `html/` |
+| `generate_pptx` | Finalizes the deck as HTML: full build, every thumbnail, deck record update, knowledge-base sync (`search_slides` indexes HTML slides); no browser check (every slide was checked when it was written) |
+| `get_preview` | Returns the PNGs the browser check made (`html/{deckId}/png/{slug}_{epoch}.png`); a slug without one gets a text line |
+
+The remote build reads and updates the deck record under the caller's user id, as the PPTX
+build does. Only the deck owner's `run_python` / `generate_pptx` therefore rebuild an HTML
+deck on S3; a collaborator's run reports `html_error` (`generate_pptx` returns an error)
+and the published HTML stays as the owner last built it.
 ### Storage
 
 ```
@@ -87,6 +102,10 @@ S3 (pptx bucket):
   decks/{deckId}/includes/          — code block JSON
   decks/{deckId}/compose/           — per-slide SVG compose JSON (for Web UI animation)
   previews/{deckId}/{slideId}.png   — slide previews
+  html/{deckId}/{uuid}.html         — HTML deck output.html (DynamoDB htmlS3Key)
+  html/{deckId}/preview/{slug}_{epoch}.html — HTML slide thumbnails (latest epoch wins)
+  template-html-cache/{cacheKey}/   — template HTML conversion (theme.css, template.json,
+                                      layouts/*.svg); expires after 30 days
 
 S3 (resource bucket):
   references/                       — examples, workflows, guides
@@ -100,8 +119,10 @@ Using `run_python(deck_id=...)` loads the entire deck workspace into the sandbox
 The agent can read and write files using standard Python file I/O (`open`, `json.load`, etc.); modified files are written back to S3 automatically after every execution.
 
 ```
-deck.json           — deck metadata (template, fonts, defaultTextColor)
+deck.json           — deck metadata (template, fonts, defaultTextColor, outputFormat)
 slides/{slug}.json  — per-slide data (one file per slide, slug from outline)
+slides/{slug}.html  — per-slide HTML fragment (HTML decks)
+deck.css            — shared slide CSS (HTML decks)
 specs/brief.md          — briefing (audience, purpose, key messages)
 specs/outline.md        — one line per slide: - [slug] message
 specs/art-direction.html — visual design direction (HTML style guide)
@@ -140,6 +161,86 @@ every slide the written files can alter is re-rendered — the edited `slides/<s
 that reference a changed `includes/` file, slides that inherit from an affected one via
 `override`, and every slide when `deck.json` or `specs/outline.md` changed
 (`sdpm.engine.schema.affected_slugs`) — plus the `measure_slides` slugs.
+
+### HTML Deck Security
+
+An HTML deck runs scripts, so it is never served from the Web UI's origin:
+
+- `output.html` carries a Content-Security-Policy `<meta>` that allows only the engine's own
+  scripts (reveal.js, the notes plugin, the config and the speaker view), the bundled
+  libraries a deck declares (ECharts, D3) and each slide's inline scripts, all by sha256
+  hash computed at assembly, plus `data:` images, fonts and media; `connect-src` and
+  `form-action` are `'none'`. A script added to `output.html` afterwards, a `<script src>`,
+  an `on*` handler or a `javascript:` URL does not run. It also sets
+  `<meta name="referrer" content="no-referrer">` so slide links do not leak the signed URL.
+  Thumbnails carry a CSP without scripts.
+- Slide scripts can still navigate or open tabs: no CSP directive stops that. The static
+  checks warn on `location`, `window.open`, `top.` and external URLs in slide scripts
+  (`script-external`), and the deck always plays in the sandboxed iframe described below.
+  The checks also flag `RTCPeerConnection` and `stun:` / `turn:` URLs. In the cloud each
+  build keeps these findings (slide and kind: navigation, popup, external URL, WebRTC) on the
+  deck record (`htmlScriptExternal`); `GET /decks/{id}` returns them as `scriptWarnings`
+  and the deck page shows a warning next to Present / Download, on shared decks too.
+- After each build that changes slides, the browser check (`sdpm.engine.html.browser_check`)
+  opens `output.html` in a browser over the DevTools protocol, shows each changed slide with
+  every fragment and finished animations, measures placeholders, regions and blocks (layout
+  rules in `layout_judge.py`), collects JS errors and captures a 1280 px PNG. The browser
+  comes from a seam in the core, `sdpm.engine.html.browser`: `SDPM_BROWSER=none` turns it
+  off, then a source registered by an adapter, then `SDPM_BROWSER=<path>`, then an
+  auto-detected Chrome / Edge. Locally that is headless Chrome or Edge with networking
+  disabled (proxy to a closed port, host resolution off, no non-proxied WebRTC), a throwaway
+  profile and `--remote-debugging-port=0`, so DevTools listens on 127.0.0.1 at a random port.
+  In the cloud, `servers/remote/tools/agentcore_browser.py` registers AgentCore Browser
+  (`aws.browser.v1`): it starts a session sized to the deck, connects to the automation
+  stream with SigV4-signed headers and always stops the session. The AWS code lives in
+  `servers/remote` because dependencies point inward and the core never imports boto3. Both
+  sources fail every `http(s)://` and `ws(s)://` request of the page, navigations included
+  (the DevTools `Fetch` domain; `Network.setBlockedURLs` lets top-level navigations through
+  in AgentCore Browser), and close pages the deck opens before they load; a browser that rejects the block fails the check before any slide
+  runs. WebRTC and WebTransport do not go through `Fetch`, so before any deck code runs a
+  guard (`Page.addScriptToEvaluateOnNewDocument`, also sent to every iframe target the page
+  attaches) removes the WebRTC constructors and `WebTransport` and makes `window.open`
+  return null. After the deck loads, a probe looks for those names in the page, a new
+  iframe, a `srcdoc` iframe and `window.open`; any name still reachable fails the check before any slide
+  runs. The result's `network_blocked` is true only when the `Fetch` block was accepted and
+  the probe passed. A canary run against AgentCore Browser in ap-northeast-1
+  (`scripts/verify_agentcore_browser_egress.py`) confirmed both: WebRTC was unavailable to
+  the slide and `network_blocked` was true. DNS resolution hints (`dns-prefetch`,
+  `preconnect`) are not proven blocked there; the canary did not test DNS egress. The runtime role gets `bedrock-agentcore:StartBrowserSession`,
+  `StopBrowserSession` and `ConnectBrowserAutomationStream` on the
+  `aws.browser.v1` ARN only. A check that is skipped, stopped by a slide that navigates the
+  page away (the slide helper logs `pagehide`), or does not finish within
+  `min(30 + 3 × slides, 110)` s adds a one-line `output.html: Browser check …` warning.
+- HTML objects live under `html/` in the deck bucket. No CloudFront behaviour serves
+  `html/*` and the CloudFront OAC bucket-policy grant does not include it.
+- The API returns S3 presigned URLs on the bucket's regional host (a different origin from
+  the Web UI), with `text/html; charset=utf-8`: the in-app view and thumbnails for 900 s in
+  `GET /decks/{id}`, and `GET /decks/{id}/html?purpose=present` (14400 s, inline) or
+  `purpose=download` (900 s, attachment). Both go through the deck's `read` authorization.
+- The Web UI plays the deck in an iframe with `sandbox="allow-scripts allow-popups
+  allow-popups-to-escape-sandbox"` (no `allow-same-origin`, so it gets an opaque origin; no
+  `allow-top-navigation`) and renders thumbnails in `sandbox=""` iframes. The engine gives
+  every external link `target="_blank" rel="noopener noreferrer"`; the escape token lets
+  the linked site load normally in its new tab, while the deck stays sandboxed. Present
+  opens a new tab with `opener` cleared.
+- The local Web UI serves `output.html` with `Content-Security-Policy: sandbox allow-scripts
+  allow-popups allow-popups-to-escape-sandbox` and thumbnails with
+  `Content-Security-Policy: sandbox`, both `nosniff`.
+
+Accepted risks:
+
+- The Present URL is a presigned bearer link valid for 4 hours. Anyone holding it can open
+  the deck until it expires, even after the deck is unshared or its permissions change.
+  4 hours is the shortest expiry that still covers a presentation; the in-app view and
+  downloads use 900 s.
+- All HTML decks are served from one origin, the deck bucket's regional host. This is
+  bounded by reads that each need their own signature, `connect-src 'none'` in every deck,
+  and the player iframe's sandbox without `allow-same-origin`, which gives each deck an
+  opaque origin.
+- In the cloud browser check (AgentCore Browser), DNS resolution hints (`dns-prefetch`,
+  `preconnect`) are not proven blocked; the egress canary does not test DNS. A slide's
+  script could leak a short value through a DNS lookup during the check. Every other
+  channel the canary probes is blocked, and a published deck keeps `connect-src 'none'`.
 
 ### Text Measurement
 
@@ -231,9 +332,9 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Category | Tool | Description |
 |----------|------|-------------|
 | Prompts | `sdpm-vibe`, `sdpm-spec`, `sdpm-style`, `sdpm-translate` | User-invoked (slash-command) entry points; `vibe` / `spec` set the interaction mode |
-| Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate) |
-| Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template` | Create deck workspace, validate specs, apply style, analyze template |
-| Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview |
+| Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate). `start_composing(mode="pptx"\|"html")` picks the composer document for the deck's output format |
+| Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template` | Create deck workspace (`output_format="pptx"\|"html"`), validate specs, apply style, analyze template |
+| Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview (local `generate_pptx` refuses HTML decks; `run_python` builds them) |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
 | References | `list_styles` | Bundled and user styles |
 | References | `read_guides` | Design rules, guides, and the slide JSON spec (`slide-json-spec`) |
@@ -271,6 +372,10 @@ Deliberate asymmetries between surfaces — these are design decisions, not gaps
   MCP schema tokens and are the only operability for agents without MCP
   support, so overlap with MCP tools is acceptable — they are two adapters
   over the same engine.
+- **HTML output mode adds no MCP tool.** `run_python` rebuilds `output.html`
+  through `sdpm.api.refresh_html` after every change to an HTML deck, the CLI
+  has `generate_html` for the no-MCP path, and on the remote server
+  `generate_pptx` finalizes an HTML deck as HTML (see Layer 3).
 - **`search_slides` redesign is deferred.** The KB-backed search tool is kept
   as-is on Layer 3; rethinking it (scope, index lifecycle) is a separate
   theme, tracked outside the attachment/tool-cleanup work.

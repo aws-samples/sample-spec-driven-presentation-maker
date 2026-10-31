@@ -8,9 +8,9 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 | Tool | Description |
 |------|-------------|
 | `start_presentation` | Entry point — orchestrator role document + styles and templates |
-| `start_composing` | Composer entry — role document, slide spec, and the deck's specs and assigned slides |
+| `start_composing` | Composer entry — role document, slide spec, and the deck's specs and assigned slides (`mode="html"` for HTML decks) |
 | `start_style` | Style entry — role document, style catalogue, a base style's HTML |
-| `init_deck_workspace` | Create an empty deck workspace |
+| `init_deck_workspace` | Create an empty deck workspace (`output_format="pptx"\|"html"`) |
 | `analyze_template` | Get pre-analyzed template info (layouts, colors, fonts) |
 
 ### Deck CRUD
@@ -24,8 +24,8 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 ### Generation
 | Tool | Description |
 |------|-------------|
-| `generate_pptx` | Generate final PPTX file |
-| `get_preview` | Get PNG preview URLs |
+| `generate_pptx` | Finalize the deck: PPTX, or `output.html` and thumbnails for an HTML deck |
+| `get_preview` | Get PNG preview URLs (HTML decks: the PNGs of the browser check) |
 
 ### Assets
 | Tool | Description |

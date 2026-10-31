@@ -119,6 +119,49 @@ result carries `preview: {"status": "unavailable", "install": "…"}` with the o
 for your OS, and the agent relays it. Icon catalogs missing for any reason are fetched in
 the background on the server's first start.
 
+### HTML decks
+
+Ask for an HTML, browser or reveal.js deck (or put `@format:html` in the message) and the
+agent builds a browser presentation instead of a PPTX. It uses the same templates and styles.
+The result is `<deck>/output.html`, a single file that works offline. In the browser,
+press `S` for the speaker view with notes, `F` for full screen and `Esc` for the slide
+overview. To get a PDF, open `output.html?print-pdf` and print from the browser.
+
+- A template is converted for HTML on first use and cached. Carrying over its decorations
+  (logos, bands, background art) needs LibreOffice and poppler; without them the layouts and
+  placeholders still convert. Templates without decorations, such as the bundled ones, need
+  neither.
+- If Chrome or Edge is installed, each `run_python` that changes slides opens them in a
+  headless browser: layout problems (overlap, overflow, content outside its region or over
+  template decorations) and JS errors come back as warnings, and each checked slide gets a
+  PNG preview (`<deck>/preview/png/<slug>.png`, returned as `preview_files`). Nothing needs
+  installing otherwise: the check is skipped with a one-line warning. `SDPM_BROWSER` picks
+  the browser executable (`none` turns the check off). The local server also writes a
+  static per-slide thumbnail (`<deck>/preview/<slug>.html`) next to `output.html`.
+- PPTX-only features (translation, PPTX import, hand-edit sync) refuse HTML decks.
+- Slides can run JavaScript, with Apache ECharts and D3 bundled (embedded only in decks that
+  use them).
+
+#### HTML decks in the Web UI
+
+On the first chat screen, turn on **Build as HTML** (under Vibe / Spec) before sending, or
+type `/` and pick **HTML** under **Format**. Both put `@format:html` in the message, shown as
+an "HTML" chip you can remove. Without it the deck is a PPTX.
+
+The deck page of an HTML deck shows an "HTML" badge and plays the deck in the page. The
+slide grid shows a static thumbnail of each slide. On the AWS stack the header has three
+buttons:
+
+- **Present** opens the deck in a new tab. Press `S` there for the speaker view with notes;
+  it works only in that tab, not in the in-app player. The link is valid for 4 hours and
+  the speaker view reloads it when it opens, so press `S` early in a talk.
+- **PDF** opens the print view in a new tab; print it from the browser to save a PDF.
+- **HTML** (download icon) saves the single `output.html`, which works offline.
+
+Sharing and public decks work as for PPTX decks: anyone who can view the deck can present
+and download it. In the local Web UI the header has one **Open** button, which opens
+`output.html` in your default browser.
+
 ## Your browser (Web UI)
 
 `sdpm webui` starts the Web UI in Local mode — Next.js on `http://localhost:3000` talking to

@@ -23,9 +23,18 @@ import {
 } from "@/services/deckService"
 import { toast } from "sonner"
 import { notifyError } from "@/lib/errors"
+import { isHtmlPreview } from "@/lib/preview"
 
 /** Parallel DELETE calls during a bulk delete. */
 const BULK_DELETE_CONCURRENCY = 5
+
+/**
+ * HTML thumbnails (deck cards, search results) are 15-minute S3 presigned URLs.
+ * While any are listed, the lists and the search are re-fetched after this age
+ * so frames that load later get a valid signature; loaded frames keep their
+ * document (HtmlSlideFrame compares the file, not the signature).
+ */
+const HTML_URL_REFRESH_MS = 10 * 60 * 1000
 
 export function useDeckList(
   idToken: string | undefined,
@@ -46,6 +55,11 @@ export function useDeckList(
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<SlideSearchResult[]>([])
   const [searching, setSearching] = useState(false)
+  const [listEpoch, setListEpoch] = useState(0)
+  const [searchEpoch, setSearchEpoch] = useState(0)
+  /** When the deck lists / the search results (and their signed preview URLs) were fetched. */
+  const listFetchedAt = useRef(0)
+  const searchFetchedAt = useRef(0)
 
   /** Fetch all deck lists when on list view. */
   const initialLoadDone = useRef(false)
@@ -66,12 +80,13 @@ export function useDeckList(
           const prevMap = new Map(prev.map((d) => [d.deckId, d]))
           return myData.decks.map((d) => {
             const existing = prevMap.get(d.deckId)
-            if (existing && existing.thumbnailUrl && d.thumbnailUrl) {
+            if (existing && existing.thumbnailUrl && d.thumbnailUrl && !isHtmlPreview(d.thumbnailUrl)) {
               return { ...d, thumbnailUrl: existing.thumbnailUrl }
             }
             return d
           })
         })
+        listFetchedAt.current = Date.now()
         setFavoriteIds(new Set(myData.favoriteIds))
         setPublicDecks(pubDecks)
         setSharedDecks(shDecks)
@@ -87,7 +102,7 @@ export function useDeckList(
     }
 
     load()
-  }, [isAuthenticated, idToken, activeDeckId])
+  }, [isAuthenticated, idToken, activeDeckId, listEpoch])
 
   /** Debounced slide search. */
   useEffect(() => {
@@ -100,11 +115,56 @@ export function useDeckList(
     setSearching(true)
     const timer = setTimeout(async () => {
       const results = await searchSlides(searchQuery, idToken)
+      searchFetchedAt.current = Date.now()
       setSearchResults(results)
       setSearching(false)
     }, 300)
     return () => { clearTimeout(timer); setSearching(false) }
   }, [searchQuery, idToken])
+
+  /** Re-sign HTML thumbnails before they expire (cloud; only while any are listed). */
+  const listHasHtml = [decks, publicDecks, sharedDecks, favoriteDecks]
+    .some((list) => list.some((d) => isHtmlPreview(d.thumbnailUrl)))
+  const searchHasHtml = searchResults.some((r) => isHtmlPreview(r.previewUrl))
+  useEffect(() => {
+    if (IS_LOCAL || activeDeckId !== null || !(listHasHtml || searchHasHtml)) return
+    // Each clock starts when its URLs were signed (fetched). The deck lists are
+    // re-fetched when the list view comes back; search results survive a visit to a
+    // deck, so returning after a long visit re-signs them at once.
+    const refresh = () => {
+      const now = Date.now()
+      if (listHasHtml && now - listFetchedAt.current >= HTML_URL_REFRESH_MS) {
+        listFetchedAt.current = now
+        setListEpoch((n) => n + 1)
+      }
+      if (searchHasHtml && now - searchFetchedAt.current >= HTML_URL_REFRESH_MS) {
+        searchFetchedAt.current = now
+        setSearchEpoch((n) => n + 1)
+      }
+    }
+    refresh()
+    const onVisible = () => { if (document.visibilityState === "visible") refresh() }
+    const timer = setInterval(refresh, 60 * 1000)
+    document.addEventListener("visibilitychange", onVisible)
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onVisible) }
+  }, [activeDeckId, listHasHtml, searchHasHtml])
+
+  /** Silent re-run of the current search (no loading state) for fresh preview signatures. */
+  const handledSearchEpoch = useRef(0)
+  useEffect(() => {
+    if (searchEpoch === handledSearchEpoch.current) return
+    handledSearchEpoch.current = searchEpoch
+    if (!idToken || searchQuery.length < 2) return
+    let cancelled = false
+    searchSlides(searchQuery, idToken)
+      .then((results) => {
+        if (cancelled) return
+        searchFetchedAt.current = Date.now()
+        setSearchResults(results)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [searchEpoch, searchQuery, idToken])
 
   const handleToggleFavorite = useCallback(async (deckId: string, action: "add" | "remove") => {
     if (!idToken) return

@@ -13,21 +13,28 @@ from collections.abc import Iterable, Mapping
 
 # Deck-wide inputs: template, fonts, colours, slide order / page numbers.
 _DECK_WIDE = frozenset({"deck.json", "presentation.json", "specs/outline.md"})
+# HTML decks also embed the style :root and the shared deck.css in every slide.
+_DECK_WIDE_HTML = _DECK_WIDE | {"specs/art-direction.html", "deck.css"}
 
 
-def _slide_path_slug(path: str) -> str | None:
-    if path.startswith("slides/") and path.endswith(".json") and path.count("/") == 1:
-        return path[len("slides/"):-len(".json")]
+def _slide_path_slug(path: str, suffix: str = ".json") -> str | None:
+    if path.startswith("slides/") and path.endswith(suffix) and path.count("/") == 1:
+        return path[len("slides/"):-len(suffix)]
     return None
 
 
-def affected_slugs(changed_paths: Iterable[str], slides: Mapping[str, dict]) -> list[str]:
+def affected_slugs(
+    changed_paths: Iterable[str], slides: Mapping[str, dict], *, html: bool = False
+) -> list[str]:
     """Return the slugs whose rendering the changed files can alter.
 
     Args:
         changed_paths: Deck-relative paths that changed (``slides/a.json``,
             ``includes/code.json``, ``deck.json`` ...). Other paths are ignored.
         slides: ``slug -> slide JSON`` (overrides unresolved) in deck order.
+        html: HTML deck — ``slides/<slug>.html`` hits that slide,
+            ``specs/art-direction.html`` and ``deck.css`` hit every slide, and
+            JSON slides, includes and overrides play no part.
 
     Returns:
         Affected slugs in deck order:
@@ -38,6 +45,11 @@ def affected_slugs(changed_paths: Iterable[str], slides: Mapping[str, dict]) -> 
           via ``"override"``
     """
     changed = [p.replace("\\", "/").removeprefix("./") for p in changed_paths]
+    if html:
+        if any(p in _DECK_WIDE_HTML for p in changed):
+            return list(slides)
+        hit_html = {_slide_path_slug(p, ".html") for p in changed}
+        return [s for s in slides if s in hit_html]
     if any(p in _DECK_WIDE for p in changed):
         return list(slides)
 

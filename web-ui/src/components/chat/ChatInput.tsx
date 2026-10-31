@@ -71,6 +71,8 @@ export interface ChatInputProps {
 
 export interface ChatInputHandle {
   insertAtCursor: (text: string) => void
+  /** Replace the whole input (e.g. the HTML format pill); keeps focus, caret at the end. */
+  replaceText: (next: string) => void
   focus: () => void
   /** Ref to the internal textarea element (for MentionOverlay positioning). */
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
@@ -106,10 +108,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     }, 400)
   }, [])
 
+  // Every programmatic change goes through here so `onInputChange` mirrors the
+  // textarea exactly (picker inserts, example prompts, send reset, pill toggle).
+  const updateInput = useCallback((next: string) => {
+    setInput(next)
+    onInputChange?.(next)
+  }, [onInputChange])
+
   const picker = useSlashPicker({
     textareaRef,
     value: input,
-    setValue: setInput,
+    setValue: updateInput,
     items: slashItems ?? [],
     onInserted: handleSlashInserted,
   })
@@ -134,13 +143,23 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       const after = input.slice(end)
       const next = before + text + after
       const pos = start + text.length
-      setInput(next)
+      updateInput(next)
       // Programmatic inserts bypass onChange, so feed the slash picker here too
       // (e.g. the empty-state hint inserts "/" to open it).
       if (slashEnabled) picker.onInputChange(next, pos)
       requestAnimationFrame(() => {
         ta.focus()
         ta.setSelectionRange(pos, pos)
+      })
+    },
+    replaceText(next: string) {
+      updateInput(next)
+      picker.close()
+      const ta = textareaRef.current
+      if (!ta) return
+      requestAnimationFrame(() => {
+        ta.focus()
+        ta.setSelectionRange(next.length, next.length)
       })
     },
     focus() {
@@ -151,7 +170,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       handleFilesRef.current(fakeList)
     },
     textareaRef,
-  }), [input, picker, slashEnabled])
+  }), [input, picker, slashEnabled, updateInput])
 
   const handleFiles = useCallback((files: FileList) => {
     const currentCount = attachments.length
@@ -195,13 +214,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const removeSlashToken = useCallback((match: TokenMatch) => {
     const end = input[match.end] === " " ? match.end + 1 : match.end
     const next = input.slice(0, match.start) + input.slice(end)
-    setInput(next)
-    onInputChange?.(next)
+    updateInput(next)
     requestAnimationFrame(() => {
       textareaRef.current?.focus()
       textareaRef.current?.setSelectionRange(match.start, match.start)
     })
-  }, [input, onInputChange])
+  }, [input, updateInput])
 
   const handleSend = async () => {
     if ((!input.trim() && attachments.length === 0 && snippets.length === 0) || isLoading || disabled) return
@@ -237,7 +255,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     const sentAttachments = uploadedFiles.map((f) => ({ fileName: f.fileName, fileType: f.fileType }))
 
     onSend(input, uploadedFiles, sentSnippets, sentAttachments)
-    setInput("")
+    updateInput("")
     picker.close()
     setAttachments([])
     setSnippets([])
@@ -314,9 +332,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 maxRows={5}
                 value={input}
                 onChange={(e) => {
-                  setInput(e.target.value)
+                  updateInput(e.target.value)
                   if (slashEnabled) picker.onInputChange(e.target.value, e.target.selectionStart)
-                  onInputChange?.(e.target.value)
                 }}
                 onKeyDown={(e) => {
                   if (slashEnabled && picker.onKeyDown(e, getIsComposing(e))) return

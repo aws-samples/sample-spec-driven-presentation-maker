@@ -28,6 +28,18 @@ When you call `analyze_template`, the engine inspects the .pptx file and extract
 
 The agent uses this information to place elements precisely within the template's design system.
 
+### HTML decks
+
+HTML decks (`deck.json` `outputFormat: "html"`) use the same `.pptx` templates. The engine
+converts a template into a `theme.css` (canvas size, theme colors, fonts, placeholder
+positions and text styles), a `template.json` (layouts, placeholders, slide-number and footer
+chrome) and one SVG per layout for the decorations the master and layouts draw (logos,
+bands, background art). The result is cached by the template's content hash under
+`sdpm/.cache/template-html/`, so editing the `.pptx` triggers a fresh conversion. Rendering
+the decorations needs LibreOffice and poppler; without them the structure still converts
+and the build reports the missing tools once. A template that draws nothing besides its
+placeholders (such as the bundled `blank-light` / `blank-dark`) never needs them.
+
 ---
 
 ## Creating a Template

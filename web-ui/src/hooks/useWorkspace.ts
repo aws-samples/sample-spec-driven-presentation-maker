@@ -15,6 +15,32 @@
 import { useEffect, useState, useRef, useCallback } from "react"
 import { getDeck, DeckDetail } from "@/services/deckService"
 import { ChatTabKey } from "@/components/chat/ChatPanelShell"
+import { isHtmlPreview, previewIdentity } from "@/lib/preview"
+
+/**
+ * HTML deck URLs are 15-minute S3 presigned URLs. A stabilised URL is swapped for
+ * the fresh one after this age (same file, new signature) so a frame that mounts
+ * later never gets an expired link; mounted frames ignore the swap (identity is
+ * unchanged), so nothing reloads.
+ */
+const HTML_URL_REFRESH_MS = 10 * 60 * 1000
+
+type StableUrl = { url: string; at: number }
+
+/**
+ * Keep `cached` while it points at the same file, so a re-signed URL does not
+ * re-download anything; take `fresh` when the file changed (or, for HTML URLs,
+ * when the cached signature is getting old).
+ */
+function stabilise(cache: Map<string, StableUrl>, key: string, fresh: string): string {
+  const cached = cache.get(key)
+  const now = Date.now()
+  const sameFile = cached != null && previewIdentity(cached.url) === previewIdentity(fresh)
+  const stale = cached != null && isHtmlPreview(fresh) && now - cached.at > HTML_URL_REFRESH_MS
+  if (sameFile && !stale) return cached.url
+  cache.set(key, { url: fresh, at: now })
+  return fresh
+}
 
 /** Extract deckId from hash, stripping any path prefix like "decks/" and query params. */
 function parseDeckIdFromHash(hash: string): string {
@@ -67,7 +93,7 @@ export function useWorkspace(
   /* ── Data loading: workspace polling with exponential backoff ── */
   const pollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const prevSlideKeyRef = useRef<string>("")
-  const stablePreviewUrls = useRef<Map<string, { url: string }>>(new Map())
+  const stablePreviewUrls = useRef<Map<string, StableUrl>>(new Map())
   const prevDeckSnapshotRef = useRef<string>("")
 
   // Clear URL cache when switching decks
@@ -110,7 +136,7 @@ export function useWorkspace(
         if (cancelled) return
         // Detect slide changes (added/removed/preview updated)
         const slideKey = data.slides.map((s) => {
-          const base = s.previewUrl?.split("?")[0] || ""
+          const base = s.previewUrl ? previewIdentity(s.previewUrl) : ""
           return `${s.slug}:${base}`
         }).join("|")
         if (slideKey !== prevSlideKeyRef.current) {
@@ -119,44 +145,19 @@ export function useWorkspace(
         }
         // Stabilise presigned URLs to prevent unnecessary image re-downloads.
         // Update cache when the underlying S3 key changes (epoch in path).
+        const cache = stablePreviewUrls.current
         for (const s of data.slides) {
           if (s.previewUrl) {
-            const cached = stablePreviewUrls.current.get(s.slug)
-            const stableKey = (slide: typeof s) => {
-              return slide.previewUrl?.split("?")[0] || ""
-            }
-            if (stableKey(s) !== (cached ? stableKey({ previewUrl: cached.url } as typeof s) : "")) {
-              stablePreviewUrls.current.set(s.slug, { url: s.previewUrl })
-            } else if (cached) {
-              s.previewUrl = cached.url
-            }
+            s.previewUrl = stabilise(cache, s.slug, s.previewUrl)
           } else {
-            stablePreviewUrls.current.delete(s.slug)
+            cache.delete(s.slug)
           }
           // Stabilise composeUrl with same pattern as previewUrl
-          if (s.composeUrl) {
-            const cacheKey = `${s.slug}:compose`
-            const cached = stablePreviewUrls.current.get(cacheKey)
-            const base = s.composeUrl.split("?")[0]
-            const cachedBase = cached?.url.split("?")[0] || ""
-            if (base !== cachedBase) {
-              stablePreviewUrls.current.set(cacheKey, { url: s.composeUrl })
-            } else if (cached) {
-              s.composeUrl = cached.url
-            }
-          }
+          if (s.composeUrl) s.composeUrl = stabilise(cache, `${s.slug}:compose`, s.composeUrl)
         }
-        // Stabilise defsUrl
-        if (data.defsUrl) {
-          const cached = stablePreviewUrls.current.get("__defs__")
-          const base = data.defsUrl.split("?")[0]
-          const cachedBase = cached?.url.split("?")[0] || ""
-          if (base !== cachedBase) {
-            stablePreviewUrls.current.set("__defs__", { url: data.defsUrl })
-          } else if (cached) {
-            data.defsUrl = cached.url
-          }
-        }
+        // Stabilise defsUrl and (HTML decks) the in-app view URL
+        if (data.defsUrl) data.defsUrl = stabilise(cache, "__defs__", data.defsUrl)
+        if (data.htmlUrl) data.htmlUrl = stabilise(cache, "__html__", data.htmlUrl)
         // Skip the state update when nothing changed — URLs are stabilised
         // above, so an identical snapshot means an identical render. Polling
         // runs every 1-6s; without this every poll re-renders the carousel.
@@ -228,7 +229,7 @@ export function useWorkspace(
   const prevPngKeyRef = useRef<string>("")
   useEffect(() => {
     if (!pptxRequested || !deck?.slides) return
-    const pngKey = deck.slides.map((s) => `${s.slug}:${s.previewUrl?.split("?")[0] || ""}`).join("|")
+    const pngKey = deck.slides.map((s) => `${s.slug}:${s.previewUrl ? previewIdentity(s.previewUrl) : ""}`).join("|")
     if (prevPngKeyRef.current && pngKey !== prevPngKeyRef.current) {
       setPptxRequested(false)
     }

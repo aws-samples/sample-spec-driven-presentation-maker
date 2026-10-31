@@ -5,23 +5,31 @@
  * Shows all slides stacked vertically with PPTX download and folder open links.
  * Features a polished loading animation during PPTX generation.
  * Integrates SpecStepNav for viewing brief/outline/art-direction content.
+ *
+ * HTML decks (outputFormat "html"): the full view is the sandboxed in-app player
+ * (HtmlDeckPlayer), the grid shows `preview/<slug>.html` thumbnails, and the
+ * header carries a read-only "HTML" badge with Present / PDF / Download (cloud)
+ * or Open (local) instead of the PPTX button.
  */
 
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { SlidePreview } from "@/services/deckService"
-import type { SpecFiles } from "@/services/deckService"
-import { Download, Layers, LayoutGrid, Rows3, FolderOpen } from "lucide-react"
+import { SlidePreview, fetchHtmlUrl } from "@/services/deckService"
+import type { ScriptWarning, SpecFiles } from "@/services/deckService"
+import { Download, ExternalLink, Layers, LayoutGrid, Presentation, Printer, Rows3, FolderOpen } from "lucide-react"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
+import { HtmlDeckPlayer, type HtmlPlayerSlide } from "@/components/deck/HtmlDeckPlayer"
+import { ScriptWarningBadge } from "@/components/deck/ScriptWarningBadge"
 import { DeckDefs, type DeckDefsStatus } from "@/components/deck/DeckDefs"
 import { useFollowScroll } from "@/components/deck/useFollowScroll"
 import { IS_LOCAL } from "@/lib/mode"
+import { previewIdentity } from "@/lib/preview"
 import { notifyError } from "@/lib/errors"
 import { useTranslations } from "next-intl"
 import { AGENT_WAIT_COLORS } from "@/components/deck/SpecWaiting"
@@ -77,10 +85,21 @@ interface SlideCarouselProps {
   currentTemplate?: string | null
   /** Cognito ID token for style API calls. */
   idToken?: string
+  /** deck.json outputFormat; missing means PPTX. */
+  outputFormat?: "pptx" | "html"
+  /** HTML decks: in-app view URL of output.html (null until built). */
+  htmlUrl?: string | null
+  /** HTML decks: canvas size in CSS px. */
+  slideSize?: { width: number; height: number }
+  /** HTML decks (cloud): slides whose script can send data outside the deck. */
+  scriptWarnings?: ScriptWarning[]
 }
 
-export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken }: SlideCarouselProps) {
+const HEADER_BUTTON = "inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
+
+export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outputFormat, htmlUrl, slideSize, scriptWarnings }: SlideCarouselProps) {
   const t = useTranslations("carousel")
+  const isHtml = outputFormat === "html"
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
   const slugs = slides.map(s => s.slug)
   if (new Set(slugs).size !== slugs.length) console.warn("[SlideCarousel] duplicate slugs:", slugs)
@@ -151,7 +170,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   useEffect(() => {
     const newUpdated = new Set<string>()
     for (const slide of slides) {
-      const newKey = slide.previewUrl?.split("?")[0] || ""
+      const newKey = slide.previewUrl ? previewIdentity(slide.previewUrl) : ""
       const prevKey = prevUrlKeys.current.get(slide.slug) || ""
       if (prevKey && newKey && newKey !== prevKey) {
         newUpdated.add(slide.slug)
@@ -207,10 +226,21 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   // Grid thumbnail click: switch to full view and land on that slide once the
   // shared-layout morph has run.
   const [focusSlug, setFocusSlug] = useState<string | null>(null)
+  // HTML decks show one player instead of stacked slides: it is told which slide
+  // to open (index as numbered on the thumbnails).
+  const [playerSlide, setPlayerSlide] = useState<HtmlPlayerSlide | null>(null)
+  const previewSlugKey = slidesWithPreview.map((s) => s.slug).join(" ")
+  const showInPlayer = useCallback((slug: string): boolean => {
+    const index = previewSlugKey.split(" ").indexOf(slug)
+    if (index < 0) return false
+    setPlayerSlide((prev) => ({ index, seq: (prev?.seq ?? 0) + 1 }))
+    return true
+  }, [previewSlugKey])
   const openSlideInFullView = useCallback((slug: string) => {
-    setFocusSlug(slug)
+    if (isHtml) showInPlayer(slug)
+    else setFocusSlug(slug)
     setViewMode("full")
-  }, [setViewMode])
+  }, [isHtml, showInPlayer, setViewMode])
   useEffect(() => {
     if (!focusSlug || viewMode !== "full" || !scrollElement) return
     const el = scrollElement.querySelector(`[data-slide-id="${focusSlug}"]`)
@@ -224,6 +254,11 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   // Scroll to target slide when navigating from search results
   useEffect(() => {
     if (!scrollToSlide || !scrollElement) return
+    if (isHtml && viewMode === "full" && htmlUrl) {
+      const slug = scrollToSlide
+      const timer = setTimeout(() => { if (showInPlayer(slug)) onScrollComplete?.() }, 0)
+      return () => clearTimeout(timer)
+    }
     const el = scrollElement.querySelector(`[data-slide-id="${scrollToSlide}"]`)
     if (el) {
       setTimeout(() => {
@@ -231,7 +266,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
         onScrollComplete?.()
       }, 300)
     }
-  }, [scrollToSlide, slidesWithPreview.length, onScrollComplete, scrollElement])
+  }, [scrollToSlide, slidesWithPreview.length, onScrollComplete, scrollElement, isHtml, viewMode, htmlUrl, showInPlayer])
 
   /** Local: open deck directory in Finder/Explorer */
   async function handleFolderOpen() {
@@ -243,6 +278,48 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   async function handlePptxOpen() {
     if (!deckId || !IS_LOCAL) return
     fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch((err) => notifyError(t("errorOpenPptx"), err, { retry: handlePptxOpen }))
+  }
+
+  /**
+   * HTML decks, cloud: open Present (or the print view for PDF) in a new tab.
+   * The tab opens synchronously inside the click (popup blockers), drops its
+   * opener, then navigates to the 4-hour presigned URL once it arrives.
+   */
+  async function handleHtmlPresent(view: "present" | "pdf") {
+    if (!deckId || IS_LOCAL) return
+    const tab = window.open("about:blank", "_blank")
+    if (tab) tab.opener = null
+    try {
+      const { url } = await fetchHtmlUrl(deckId, "present", idToken ?? "")
+      const target = view === "pdf" ? `${url}#print-pdf` : url
+      if (tab) tab.location.replace(target)
+      else window.open(target, "_blank", "noopener,noreferrer")
+    } catch (err) {
+      tab?.close()
+      notifyError(view === "pdf" ? t("errorPdf") : t("errorPresent"), err, { retry: () => void handleHtmlPresent(view) })
+    }
+  }
+
+  /** HTML decks, cloud: download output.html (the presigned URL is an attachment). */
+  async function handleHtmlDownload() {
+    if (!deckId || IS_LOCAL) return
+    try {
+      const { url } = await fetchHtmlUrl(deckId, "download", idToken ?? "")
+      window.location.assign(url)
+    } catch (err) {
+      notifyError(t("errorDownloadHtml"), err, { retry: () => void handleHtmlDownload() })
+    }
+  }
+
+  /** HTML decks, local: open output.html in the default browser. */
+  async function handleHtmlOpen() {
+    if (!deckId || !IS_LOCAL) return
+    try {
+      const res = await fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.html" }) })
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    } catch (err) {
+      notifyError(t("errorOpenHtml"), err, { retry: handleHtmlOpen })
+    }
   }
 
   /**
@@ -349,7 +426,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4 text-muted-foreground/40">
               <Layers className="h-7 w-7" />
             </div>
-            <p className="text-sm text-muted-foreground">{t("previewsPlaceholder")}</p>
+            <p className="text-sm text-muted-foreground">{t(isHtml ? "htmlPreviewsPlaceholder" : "previewsPlaceholder")}</p>
           </>
         )}
       </div>
@@ -362,6 +439,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
    * @returns JSX element for the slides view
    */
   function renderSlidesContent(): React.ReactNode {
+    if (isHtml && viewMode === "full" && htmlUrl) {
+      return (
+        <div ref={setScrollElement} data-slide-scroller className="flex-1 overflow-y-auto px-6 py-6">
+          <HtmlDeckPlayer htmlUrl={htmlUrl} slideSize={slideSize} deckName={deckName} slide={playerSlide} />
+        </div>
+      )
+    }
     if (slidesWithPreview.length === 0) return renderSlidesEmpty()
 
     return (
@@ -378,6 +462,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                     slug={slide.slug}
                     onClick={() => { openSlideInFullView(slide.slug); onSlideClick?.(i + 1) }}
                     updated={updatedIds.has(slide.slug)}
+                    slideSize={isHtml ? slideSize : undefined}
                     className="slide-cv border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 cursor-pointer group"
                   >
                     <span className="absolute bottom-1.5 right-2 text-[11px] font-medium text-white/30 group-hover:text-white/50 transition-colors">
@@ -426,6 +511,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 onClick={() => onSlideClick?.(i + 1)}
                 updated={updatedIds.has(slide.slug)}
                 onAspectRatio={handleAspectRatio}
+                slideSize={isHtml ? slideSize : undefined}
                 className="slide-cv slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
               />
             )}
@@ -456,9 +542,19 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
         <div className="flex-none flex items-center justify-between px-5 py-3 border-b border-border/40">
           <div className="flex items-center gap-3">
             <div>
-              <h2 className="text-sm font-medium truncate max-w-[200px]">
-                {deckName || t("preview")}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-medium truncate max-w-[200px]">
+                  {deckName || t("preview")}
+                </h2>
+                {isHtml && (
+                  <span
+                    className="shrink-0 rounded border border-border px-1.5 py-px text-[11px] font-medium text-foreground-secondary"
+                    title={t("formatBadgeTitle")}
+                  >
+                    {t("formatHtml")}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
                 {slidesWithPreview.length} {slidesWithPreview.length === 1 ? "slide" : "slides"}
                 {ownerAlias && <span> · by {ownerAlias}</span>}
@@ -494,7 +590,31 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 Folder
               </button>
             )}
-            {pptxUrl && (
+            {isHtml && htmlUrl && (
+              IS_LOCAL ? (
+                <button onClick={handleHtmlOpen} className={HEADER_BUTTON} aria-label={t("openHtml")}>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {t("open")}
+                </button>
+              ) : (
+                <>
+                  {scriptWarnings && scriptWarnings.length > 0 && <ScriptWarningBadge warnings={scriptWarnings} />}
+                  <button onClick={() => void handleHtmlPresent("present")} className={HEADER_BUTTON} aria-label={t("presentAria")}>
+                    <Presentation className="h-3.5 w-3.5" />
+                    {t("present")}
+                  </button>
+                  <button onClick={() => void handleHtmlPresent("pdf")} className={HEADER_BUTTON} aria-label={t("pdfAria")}>
+                    <Printer className="h-3.5 w-3.5" />
+                    {t("pdf")}
+                  </button>
+                  <button onClick={() => void handleHtmlDownload()} className={HEADER_BUTTON} aria-label={t("downloadHtml")}>
+                    <Download className="h-3.5 w-3.5" />
+                    {t("formatHtml")}
+                  </button>
+                </>
+              )
+            )}
+            {pptxUrl && !isHtml && (
               IS_LOCAL ? (
                 <button
                   onClick={handlePptxOpen}

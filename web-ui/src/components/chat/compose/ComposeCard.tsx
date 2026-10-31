@@ -70,19 +70,23 @@ export function ComposeCard({
   const isStopped = isHardStopped || isSoftStopped
   const isDone = !isActive && !isStopped && !hasError && (status === "success" || state.phase === "done")
   const rushedCount = state.agents.filter((agent) => agent.budgetReached).length
+  // Tool completion is the source of truth: a lane with no terminal stream state is done.
+  const agents = isDone
+    ? state.agents.map((a) => a.status === "starting" || a.status === "working" ? { ...a, status: "done" as const } : a)
+    : state.agents
 
   // A slug counts as created once the composer agent owning it has finished
   // (or the whole tool has completed successfully).
   const expectedSlugs = [...new Set(state.agents.flatMap((agent) => agent.slugs))]
   const createdSlugs = new Set<string>()
-  for (const agent of state.agents) {
+  for (const agent of agents) {
     if (agent.status === "done" || isDone) agent.slugs.forEach((slug) => createdSlugs.add(slug))
   }
   const totalSlides = expectedSlugs.length
   const createdSlides = expectedSlugs.filter((slug) => createdSlugs.has(slug)).length
   const creationPercent = totalSlides > 0 ? Math.min(100, Math.round((createdSlides / totalSlides) * 100)) : 0
   const doneSlides = new Set(
-    state.agents.filter((agent) => agent.status === "done").flatMap((agent) => agent.slugs),
+    agents.filter((agent) => agent.status === "done").flatMap((agent) => agent.slugs),
   ).size
 
   return (
@@ -148,7 +152,7 @@ export function ComposeCard({
       )}
 
       <div className="flex flex-col px-2 pb-2">
-        {state.agents.map((agent, index) => (
+        {agents.map((agent, index) => (
           <AgentCard
             key={agent.groupIndex}
             agent={agent}

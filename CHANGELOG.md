@@ -12,11 +12,58 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **HTML output mode.** A deck can be a browser presentation instead of a PPTX, locally and
+  on the AWS stack. Ask for an HTML / browser deck, write `@format:html`, or use the
+  **Build as HTML** pill (「HTML で作成」) on the first chat screen (also in the `/` picker's
+  **Format** section; PPTX stays the default). The deck gets `deck.json`
+  `outputFormat: "html"` (`init_deck_workspace(name, output_format="html")`, which also
+  returns `format_notes`, the `html-deck` guide), and composers are dispatched with
+  `start_composing(deck_id, assigned_slugs, mode="html")`, which returns the HTML composer
+  document, the template's converted layouts and the deck's shared `deck.css`. HTML decks
+  choose a template and style as PPTX decks do (`apply_style(deck_id, style, template)`);
+  template decorations are converted to SVG when LibreOffice and poppler are installed.
+  Each slide is an HTML fragment under `slides/`; `run_python` assembles them into one
+  offline `output.html` on reveal.js 6 with speaker notes (`S` opens the speaker view), and
+  every image is embedded. Slides may run inline scripts, with Apache ECharts 6.1.0 and D3
+  7.9.0 embedded only in decks that declare them (`<section data-libs="echarts d3">`); all
+  three libraries are vendored under `sdpm/vendor/` with their licenses and a checksum
+  manifest checked in CI. `output.html` carries a Content-Security-Policy that allows only
+  the engine's scripts and each slide's inline scripts by sha256 hash, plus `data:` images,
+  fonts and media (`connect-src 'none'`, no-referrer), and every external link opens in a new
+  tab. Static checks cover structure, layouts and placeholders, fonts, `deck.css`, embedded
+  sizes, CSP-blocked constructs and scripts that reach outside the deck (`script-external`:
+  navigation, new tabs, external URLs, WebRTC). After each build that changes slides, the
+  browser check opens those slides in a browser (locally headless Chrome or Edge, in the
+  cloud AWS AgentCore Browser) with network requests blocked and WebRTC disabled before slide
+  code runs, reports layout findings (`overlap`, `overflow`, `outside-region`,
+  `decoration-overlap`) and JS errors as warnings (`browser_check` in the result;
+  `SDPM_BROWSER=none` turns it off), and leaves a PNG per slide (`preview_files` locally,
+  `get_preview` in the cloud). A skipped, stopped or unfinished check is reported as such,
+  never as clean. In the Web UI an HTML deck plays in a sandboxed in-app player with
+  **Present** (new tab, link valid for 4 hours), **PDF** (print view, template backgrounds
+  included) and **HTML** (download `output.html`); slides whose scripts reach outside the
+  deck are listed in a warning next to Present / Download, on shared decks too. Thumbnails
+  are static per-slide HTML in `sandbox=""` iframes; the local Web UI has one **Open**
+  button. Sharing and public decks work as for PPTX; HTML files live under `html/` in the
+  deck bucket and are served only through presigned URLs. The CLI gains `generate_html
+  <deck>`. Translation, PPTX import, hand-edit sync, `code_to_slide` and the local
+  `generate_pptx` refuse HTML decks with a message, and an invalid `deck.json`
+  `outputFormat` stops every build. New dependency: `websockets`. The local Web UI dev
+  servers (`npm run dev`, `npm run dev:local`) now listen on 127.0.0.1 only. PPTX behaviour
+  is unchanged and the MCP tool count stays at 20. Deploy: SdpmData, SdpmRuntime,
+  SdpmAgent, SdpmWebUi and the Web UI.
 - **Claude Haiku 5.5** is a selectable model (`global.anthropic.claude-haiku-5-5`) for
   both Chat and Create. It uses the extended-thinking profile (no `temperature`; Bedrock
   rejects 0.1 with "temperature is deprecated"), with prompt caching enabled, and is
   listed in the example config's Recommended group. Unlike Haiku 4.5 it is not
   excluded from the Create picker.
+
+### Changed
+
+- **AgentCore runtime role.** The MCP runtime role gains
+  `bedrock-agentcore:StartBrowserSession`, `StopBrowserSession` and
+  `ConnectBrowserAutomationStream` on `arn:aws:bedrock-agentcore:<region>:aws:browser/aws.browser.v1`
+  only.
 
 ### Removed
 

@@ -18,6 +18,7 @@ def init_deck_workspace(
     name: str,
     user_id: str,
     storage: Storage,
+    output_format: str = "pptx",
 ) -> dict[str, Any]:
     """Create a Deck, write deck.json and spec files to S3.
 
@@ -28,18 +29,27 @@ def init_deck_workspace(
         name: Presentation name (used as Deck display name).
         user_id: Owner's user ID.
         storage: Storage backend instance.
+        output_format: "pptx" (default) or "html"; deck.json gets
+            ``"outputFormat": "html"`` only for HTML decks.
 
     Returns:
-        Dict with deckId and workspace file list.
+        Dict with deckId and workspace file list; ``format_notes`` (the orchestrator's
+        notes for the format, ``sdpm.entry.format_notes``) for an HTML deck.
+
+    Raises:
+        ValueError: output_format is neither "pptx" nor "html" (nothing is created).
     """
+    from sdpm.engine.schema import new_deck_json
+    from sdpm.entry import format_notes
+
+    # Validate before creating anything.
+    deck_json: dict[str, Any] = new_deck_json(output_format)
+
     # Create deck META in DDB
     deck = create_deck(name=name, user_id=user_id, storage=storage)
     deck_id = deck["deckId"]
 
     # Write the shared deck.json skeleton to S3.
-    from sdpm.engine.schema import DECK_JSON_SKELETON, complete_deck_skeleton
-
-    deck_json: dict[str, Any] = complete_deck_skeleton(DECK_JSON_SKELETON)
     storage.put_deck_json(deck_id=deck_id, data=deck_json)
 
     workspace = ["deck.json"]
@@ -50,8 +60,12 @@ def init_deck_workspace(
         storage.upload_file(key=key, data=b"", content_type="text/markdown")
         workspace.append(spec_file)
 
-    return {
+    result: dict[str, Any] = {
         "deckId": deck_id,
         "name": name,
         "workspace": workspace,
     }
+    notes = format_notes(output_format)
+    if notes:
+        result["format_notes"] = notes
+    return result

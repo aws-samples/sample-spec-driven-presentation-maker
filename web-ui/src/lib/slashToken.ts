@@ -1,16 +1,16 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 
-/** The two candidate kinds the `/` picker offers. */
-export type PickerKind = "template" | "style"
+/** The candidate kinds the `/` picker offers. */
+export type PickerKind = "template" | "style" | "format"
 
-/** A single template/style candidate shown in the `/` picker. */
+/** A single template/style/format candidate shown in the `/` picker. */
 export interface PickerItem {
   kind: PickerKind
   name: string
   description: string
   source: "builtin" | "user"
-  pinned: boolean // style only; templates are always false
+  pinned: boolean // style only; templates and formats are always false
   themeColors?: Record<string, string> // template only
   fonts?: { fullwidth?: string | null; halfwidth?: string | null }
   layoutCount?: number // template only
@@ -18,16 +18,23 @@ export interface PickerItem {
 }
 
 /** Token grammar shared by insertion (`buildToken`) and detection (`parseTokens`, `ChatMessage`). */
-export const SLASH_TOKEN_RE = /@(template|style):(?:"([^"]+)"|([A-Za-z0-9._-]+))/g
+export const SLASH_TOKEN_RE = /@(template|style|format):(?:"([^"]+)"|([A-Za-z0-9._-]+))/g
 
 /**
  * Same grammar without capturing groups — for embedding inside another regex
  * (e.g. a `String.split` pattern, where inner captures would leak into the output).
  */
-export const SLASH_TOKEN_SOURCE = '@(?:template|style):(?:"[^"]+"|[A-Za-z0-9._-]+)'
+export const SLASH_TOKEN_SOURCE = '@(?:template|style|format):(?:"[^"]+"|[A-Za-z0-9._-]+)'
+
+/** i18n key (`slashPicker` namespace) of a kind's section heading, also used as its chip label. */
+export function sectionTitleKey(kind: PickerKind): "sectionTemplate" | "sectionStyle" | "sectionFormat" {
+  if (kind === "template") return "sectionTemplate"
+  if (kind === "style") return "sectionStyle"
+  return "sectionFormat"
+}
 
 const BARE_NAME_RE = /^[A-Za-z0-9._-]+$/
-const KIND_WORDS: PickerKind[] = ["template", "style"]
+const KIND_WORDS: PickerKind[] = ["template", "style", "format"]
 
 /**
  * Detect the `/` fragment ending at `caret`, if the picker should be open (R1.1-R1.3, R3.3).
@@ -111,7 +118,7 @@ function stableSortByRank(items: PickerItem[]): PickerItem[] {
     .map(({ item }) => item)
 }
 
-const KIND_ORDER: Record<PickerKind, number> = { template: 0, style: 1 }
+const KIND_ORDER: Record<PickerKind, number> = { template: 0, style: 1, format: 2 }
 
 /**
  * Filter and order candidates for the given raw query (R3.1, R3.2, R4.1, R4.2).
@@ -162,7 +169,7 @@ export function buildToken(item: Pick<PickerItem, "kind" | "name">): string {
   return `@${item.kind}:${name} `
 }
 
-/** A `@template:`/`@style:` token located within free-form text (R12.3). */
+/** A `@template:`/`@style:`/`@format:` token located within free-form text (R12.3). */
 export interface TokenMatch {
   kind: PickerKind
   name: string
@@ -171,7 +178,7 @@ export interface TokenMatch {
 }
 
 /**
- * Locate every `@template:<name>` / `@style:<name>` token within `text`.
+ * Locate every `@template:<name>` / `@style:<name>` / `@format:<name>` token within `text`.
  *
  * @param text - Chat input or message text to scan
  */
@@ -184,4 +191,41 @@ export function parseTokens(text: string): TokenMatch[] {
     matches.push({ kind, name, start, end: start + match[0].length })
   }
   return matches
+}
+
+/**
+ * The one output-format candidate. Its label and description are localized by the
+ * picker (`slashPicker.formatHtml*`); `name` is the token value the agent reads.
+ */
+export const FORMAT_HTML_ITEM: PickerItem = {
+  kind: "format",
+  name: "html",
+  description: "",
+  source: "builtin",
+  pinned: false,
+}
+
+const FORMAT_TOKEN = "@format:html"
+
+/** Whether `text` asks for an HTML deck (`@format:html` is the only state; PPTX sends nothing). */
+export function hasFormatToken(text: string): boolean {
+  return parseTokens(text).some((match) => match.kind === "format" && match.name === FORMAT_HTML_ITEM.name)
+}
+
+/**
+ * Turn the HTML format on or off in `text`.
+ * On: prepend `@format:html `. Off: remove every `@format:<name>` token and one trailing space.
+ *
+ * @param text - Current chat input
+ */
+export function toggleFormatToken(text: string): string {
+  if (!hasFormatToken(text)) return `${FORMAT_TOKEN} ${text}`
+  let next = ""
+  let cursor = 0
+  for (const match of parseTokens(text)) {
+    if (match.kind !== "format") continue
+    next += text.slice(cursor, match.start)
+    cursor = text[match.end] === " " ? match.end + 1 : match.end
+  }
+  return next + text.slice(cursor)
 }

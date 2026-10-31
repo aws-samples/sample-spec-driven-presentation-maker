@@ -21,9 +21,10 @@ The SPEC agent handles user dialogue (Phase 1). Composer agents handle slide gen
 (Phase 2+3) via the `compose_slides` tool (Agents as Tools pattern).
 
 Role and procedure text lives in `sdpm/references/workflows/<role>.md` (orchestrator,
-composer, style, translate) and reaches MCP clients through the role's entry tool
-(`start_presentation` / `start_composing` / `start_style` / `start_translation`), which also
-returns what that role reads first (`sdpm.entry`).
+composer, style, translate; the composer's html mode in `composer-html.md`) and reaches MCP
+clients through the role's entry tool (`start_presentation` / `start_composing` /
+`start_style` / `start_translation`), which also returns what that role reads first
+(`sdpm.entry`).
 Client-side files are thin wiring (composer sub-agent registration) that name a role
 document without restating it. The L4 agent fetches role documents through the same
 port (`Source.mcp("start_*", pick="static.workflow")` in `agent/modes/`); only transport-specific
@@ -55,20 +56,30 @@ Rules that follow from this:
    hexagonal purity for one less abstraction — acceptable while there is a
    single cloud backend. Revisit only if a second backend appears.
 4. **Role documents are content, not client config** ("server-driven behavior").
-   Each role (orchestrator, composer, style, translate) has exactly one document,
-   `sdpm/references/workflows/<role>.md`, served through the port via
-   the role's `start_*` entry tool. Entry points (the `sdpm-*` prompts, ACP agent
+   Each role (orchestrator, composer, style, translate) has exactly one document per
+   mode, `sdpm/references/workflows/<role>.md`, served through the port via
+   the role's `start_*` entry tool. The composer has two modes, pptx (`composer.md`) and
+   html (`composer-html.md`); the spawner chooses the mode through the entry tool argument
+   (`start_composing(..., mode=…)`) at dispatch time — never inferred from deck contents —
+   and the entry tool's `static` part depends only on the mode. Entry points (the `sdpm-*` prompts, ACP agent
    definitions, `SKILL.md`, server instructions) only ever name a role document — they
    never restate or duplicate its content. Nothing else lives on the client side: a client
    holds the one line that starts the server, written by `sdpm register`.
 
    Role assignment is a dispatch-time decision, not a discovery-time one: a
    spawner (the orchestrator delegating to a composer, a prompt dispatching a
-   role, a client picking a mode) tells the spawned agent which role to load in
-   its first instruction. The agent then calls `start_<role>(...)`
-   itself. There is no docstring heuristic to infer role from arguments, and no
+   role, a client picking a mode) tells the spawned agent which role — and, for the
+   composer, which mode — to load in its first instruction. The agent then calls
+   `start_<role>(...)` itself, passing the mode as an argument. There is no docstring heuristic to infer role from arguments, and no
    case where a role's text is embedded into a system prompt instead of fetched
    — every consumer, including the L4 agent, fetches live.
+
+   Writing role documents and guides: state what the agent can do (its tools and their
+   range) and what it should do, in positive form rather than "X is not Y" / "do not X";
+   give no concrete examples or form-to-interaction tables (models copy them); leave out
+   what a check already stops (static checks, CSP, browser check) — the warning itself
+   says how to fix it. Format-specific notes for the orchestrator come from
+   `init_deck_workspace` (`format_notes`), keeping `orchestrator.md` format-neutral.
 5. **Change-locality goal** — the structure is optimised so that:
    prompt changes touch only `sdpm/references/workflows/`; engine changes touch only
    `sdpm/sdpm/engine/`; a new MCP client touches only the client table in

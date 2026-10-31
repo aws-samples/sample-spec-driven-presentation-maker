@@ -74,6 +74,12 @@ describe("ComposeCard production board", () => {
     expect(screen.queryAllByLabelText("Slide created")).toHaveLength(0)
   })
 
+  it("settles every lane when the tool completes without stream updates", () => {
+    renderWithIntl(<ComposeCard input={twoGroups} status="success" isActive={false} />)
+    expect(screen.queryByText("Queued")).toBeNull()
+    expect(screen.getAllByText("1/1 created")).toHaveLength(2)
+  })
+
   it("renders cancel only when all credentials are present", () => {
     const { rerender } = renderWithIntl(
       <ComposeCard input={twoGroups} isActive streamMessages={twoStarted} />

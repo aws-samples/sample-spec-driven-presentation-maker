@@ -46,6 +46,24 @@ def deck(tmp_path: Path) -> Path:
     return deck_dir
 
 
+_SLIDE_HTML = '<section data-layout="Title Only"><h1 data-ph="title">{slug}</h1></section>\n'
+
+
+@pytest.fixture
+def html_deck(tmp_path: Path) -> Path:
+    r = tools.init_deck_workspace(str(tmp_path / "html-deck"), output_format="html")
+    deck_dir = Path(r["output_dir"])
+    tools.apply_style(str(deck_dir), style="typographic", template="blank-dark")
+    specs = deck_dir / "specs"
+    (specs / "brief.md").write_text("# Brief\n\nAudience: engineers.\n\n## Sources\n1. pasted notes\n", encoding="utf-8")
+    (specs / "outline.md").write_text(_OUTLINE, encoding="utf-8")
+    slides = deck_dir / "slides"
+    slides.mkdir(exist_ok=True)
+    for slug in ("intro", "demo-1", "demo-2"):
+        (slides / f"{slug}.html").write_text(_SLIDE_HTML.format(slug=slug), encoding="utf-8")
+    return deck_dir
+
+
 class TestStartPresentation:
     def test_returns_workflow_and_environment(self):
         r = tools.start_presentation()
@@ -60,6 +78,28 @@ class TestStartPresentation:
         assert "read_workflows" not in wf
         assert "init_presentation" not in wf
 
+    def test_workflow_is_format_neutral_and_points_to_format_notes(self):
+        wf = tools.start_presentation()["static"]["workflow"]
+        assert "format_notes" in wf and 'output_format="html"' in wf
+        for html_only in ("ECharts", "D3", "deck.css", "fragment", "preview/png", "slider"):
+            assert html_only not in wf, html_only
+
+
+class TestInitDeckWorkspace:
+    def test_html_deck_returns_format_notes(self, tmp_path: Path):
+        from sdpm.knowledge.reference import read_docs
+        from sdpm.config import REFERENCES_DIR
+
+        r = tools.init_deck_workspace(str(tmp_path / "h"), output_format="html")
+        notes = read_docs(REFERENCES_DIR / "guides", ["html-deck"])[0]["content"]
+        assert r["format_notes"] == notes
+        assert "`visual`" in notes and "ECharts" in notes and "constraints" in notes
+
+    def test_pptx_deck_returns_no_format_notes(self, tmp_path: Path):
+        r = tools.init_deck_workspace(str(tmp_path / "p"))
+        assert "format_notes" not in r
+        assert set(r) == {"output_dir", "deck_json", "workspace"}
+
 
 class TestStartComposing:
     def test_static_only_without_deck(self):
@@ -68,8 +108,117 @@ class TestStartComposing:
         assert "# Composer" in r["static"]["workflow"]
         assert "deck.json" in r["static"]["slide_spec"]
 
-    def test_static_is_identical_across_calls(self, deck: Path):
-        assert tools.start_composing()["static"] == tools.start_composing(str(deck), ["intro"])["static"]
+    @pytest.mark.parametrize("mode", ["pptx", "html"])
+    def test_static_depends_only_on_mode(self, mode: str, request: pytest.FixtureRequest):
+        deck_dir = request.getfixturevalue("deck" if mode == "pptx" else "html_deck")
+        with_deck = tools.start_composing(str(deck_dir), ["intro"], mode=mode)
+        assert with_deck["deck"]["specs_ok"] is True
+        assert tools.start_composing(mode=mode)["static"] == with_deck["static"]
+
+    def test_static_differs_between_modes(self):
+        pptx = tools.start_composing()["static"]
+        html = tools.start_composing(mode="html")["static"]
+        assert pptx == tools.start_composing(mode="pptx")["static"]
+        assert pptx != html
+        assert "# Composer" in html["workflow"] and "html" in html["workflow"].lower()
+        assert "slide-html" in html["slide_spec"] or "data-layout" in html["slide_spec"]
+
+    def test_invalid_mode_is_rejected(self, deck: Path):
+        for args in ((), (str(deck), ["intro"])):
+            r = tools.start_composing(*args, mode="svg")
+            assert r["specs_ok"] is False and r["errors"]
+            assert "static" not in r
+
+    def test_mode_mismatch_names_the_deck_format(self, deck: Path, html_deck: Path):
+        r = tools.start_composing(str(deck), ["intro"], mode="html")
+        assert r["specs_ok"] is False and r["mode"] == "pptx"
+        assert 'mode="pptx"' in r["errors"][0]
+        assert "static" not in r and "deck" not in r
+        r = tools.start_composing(str(html_deck), ["intro"])
+        assert r["specs_ok"] is False and r["mode"] == "html"
+        assert 'mode="html"' in r["errors"][0]
+
+    def test_html_deck_payload(self, html_deck: Path):
+        d = tools.start_composing(str(html_deck), ["demo-2", "closing"], mode="html")["deck"]
+        assert d["specs_ok"] is True
+        assert "template_analysis" not in d
+        assert d["slides_present"] == ["demo-1", "demo-2", "intro"]
+        assert set(d["existing_slides"]) == {"demo-1", "demo-2"}
+        assert "<section" in d["existing_slides"]["demo-2"]["html"]
+        assert d["existing_slides"]["demo-1"]["readonly"] is True
+        assert "readonly" not in d["existing_slides"]["demo-2"]
+        assert "Audience: engineers" in d["brief"] and "[demo-2]" in d["outline"]
+        th = d["template_html"]
+        assert th["slideSize"]["width"] and th["ptScale"] and th["themeColors"]
+        assert th["layouts"] and all(layout["curated"] for layout in th["layouts"])
+        assert any(layout["placeholders"] for layout in th["layouts"])
+        assert "decorations_status" in th
+
+    def test_html_deck_css(self, html_deck: Path):
+        assert tools.start_composing(str(html_deck), ["intro"], mode="html")["deck"]["deck_css"] is None
+        (html_deck / "deck.css").write_text(".card { padding: 8px; }\n", encoding="utf-8")
+        d = tools.start_composing(str(html_deck), ["intro"], mode="html")["deck"]
+        assert d["deck_css"] == ".card { padding: 8px; }\n"
+
+    def test_template_html_view_matches_the_payload(self, html_deck: Path, tmp_path: Path):
+        from sdpm.config import TEMPLATES_DIR
+        from sdpm.engine.html.template import cache_key
+        from sdpm.entry import template_html_view
+
+        template = TEMPLATES_DIR / "blank-dark.pptx"
+        cache = tmp_path / "view-cache"
+        view = template_html_view(template, cache_root=cache)
+        assert (cache / cache_key(template) / "template.json").is_file()
+        payload = tools.start_composing(str(html_deck), ["intro"], mode="html")["deck"]["template_html"]
+        assert view == payload
+        assert template_html_view(tmp_path / "missing.pptx") is None
+
+    def test_template_html_view_plain_template_needs_no_libreoffice(self, tmp_path: Path, monkeypatch):
+        from sdpm.config import TEMPLATES_DIR
+        from sdpm.engine.html import decorations
+        from sdpm.entry import template_html_view
+
+        monkeypatch.setattr(decorations, "soffice_path", lambda: None)
+        view = template_html_view(TEMPLATES_DIR / "blank-light.pptx", cache_root=tmp_path / "c")
+        assert view is not None and view["decorations_status"] is None
+
+    def test_template_html_view_complete_mixed_cache(self, decorated_template: Path, tmp_path: Path, monkeypatch):
+        """Layouts without decorations have no SVG; a cache holding every needed SVG is complete."""
+        from sdpm.engine.html import decorations
+        from sdpm.engine.html.template import load_template_html
+        from sdpm.entry import template_html_view
+
+        def fake_render(template_path, layouts, out_dir, *, work_dir):
+            out_dir.mkdir(parents=True, exist_ok=True)
+            for entry in layouts:
+                (out_dir / f"{entry['file']}.svg").write_text("<svg/>", encoding="utf-8")
+                if entry["baked"]:
+                    (out_dir / f"{entry['file']}.ground.svg").write_text("<svg/>", encoding="utf-8")
+            return {"svgs": {}, "ground_svgs": {}, "status": None}
+
+        cache = tmp_path / "c"
+        monkeypatch.setattr(decorations, "decoration_tools_status", lambda: None)
+        monkeypatch.setattr(decorations, "render_decoration_svgs", fake_render)
+        converted = load_template_html(decorated_template, cache_root=cache)
+        assert len(converted.svg_paths) < len(converted.info["layouts"])  # Blank needs no render
+        monkeypatch.undo()
+        monkeypatch.setattr(decorations, "soffice_path", lambda: None)
+        assert template_html_view(decorated_template, cache_root=cache)["decorations_status"] is None
+
+    def test_supplied_template_html_is_used(self, html_deck: Path, monkeypatch: pytest.MonkeyPatch):
+        from sdpm import entry
+
+        monkeypatch.setattr(entry, "_template_html", lambda *a, **k: pytest.fail("computed locally"))
+        supplied = {"slideSize": {"width": 1, "height": 1}, "layouts": []}
+        d = entry.start_composing(str(html_deck), ["intro"], mode="html", template_html=supplied)["deck"]
+        assert d["template_html"] is supplied
+
+    def test_template_html_does_not_touch_pptx_payload(self, deck: Path):
+        from sdpm import entry
+
+        plain = entry.start_composing(str(deck), ["intro"])
+        with_html = entry.start_composing(str(deck), ["intro"], template_html={"x": 1})
+        assert with_html == plain and "template_html" not in plain["deck"]
 
     def test_deck_payload_for_assigned_slugs(self, deck: Path):
         r = tools.start_composing(str(deck), ["intro", "closing"])
@@ -144,6 +293,41 @@ class TestStartTranslation:
     def test_not_a_deck(self, tmp_path: Path):
         with pytest.raises(FileNotFoundError):
             tools.start_translation(str(tmp_path), "en")
+
+    def test_html_deck_is_refused(self, html_deck: Path):
+        with pytest.raises(ValueError, match="PPTX decks only"):
+            tools.start_translation(str(html_deck), "en")
+
+
+class TestHtmlDeckGuards:
+    def test_generate_pptx_builds_nothing(self, html_deck: Path):
+        r = tools.generate_pptx(str(html_deck))
+        assert r["output_format"] == "html" and "output.html" in r["message"]
+        assert not (html_deck / "output.pptx").exists()
+
+    def test_code_to_slide_is_refused(self, html_deck: Path):
+        r = tools.code_to_slide(str(html_deck), "print(1)", "snippet")
+        assert "<pre><code>" in r["error"]
+        assert not (html_deck / "includes").exists()
+
+    def test_diff_refuses_html_decks(self, html_deck: Path):
+        from sdpm.api import diff_report
+
+        with pytest.raises(ValueError, match="PPTX decks only"):
+            diff_report(html_deck, html_deck)
+
+    def test_generate_pptx_refuses_an_invalid_output_format(self, deck: Path):
+        deck_json = json.loads((deck / "deck.json").read_text(encoding="utf-8"))
+        deck_json["outputFormat"] = "htlm"
+        (deck / "deck.json").write_text(json.dumps(deck_json), encoding="utf-8")
+        with pytest.raises(ValueError, match="outputFormat"):
+            tools.generate_pptx(str(deck))
+        assert not (deck / "output.pptx").exists()
+
+    @pytest.mark.parametrize("payload", [[], "deck", 3])
+    def test_non_object_deck_json_is_not_html(self, deck: Path, payload):
+        (deck / "deck.json").write_text(json.dumps(payload), encoding="utf-8")
+        assert tools._is_html_deck(str(deck)) is False
 
 
 def test_local_server_binds_entry_tools_and_not_workflow_readers():

@@ -169,6 +169,74 @@ def test_composer_start_rejects_broken_specs(monkeypatch, tmp_path: Path) -> Non
         composer._start_composing(_ContractClient(), deck_dir, ["a"])
 
 
+def _dispatch(monkeypatch, output_format: str | None) -> tuple[MagicMock, list, list]:
+    """Run compose_slides with a fake MCP client; returns (client, resolved mode parts, outputs)."""
+    composer = _load_composer(monkeypatch)
+    resolved: list = []
+    monkeypatch.setattr(composer, "resolve_parts", lambda parts, **_kw: resolved.append(parts) or ("", []))
+    _stub_module(monkeypatch, "model_profiles", MODEL_PROFILES={})
+    monkeypatch.setattr(composer, "MODES", {
+        "composer": SimpleNamespace(parts=["pptx-parts"]),
+        "html_composer": SimpleNamespace(parts=["html-parts"]),
+    })
+    spec = {"ok": True, "errors": [], "warnings": [], "slugs": ["a"]}
+    if output_format:
+        spec["outputFormat"] = output_format
+
+    def call_tool_sync(tool_use_id, name, arguments):
+        del tool_use_id
+        if name == "check_specs":
+            return {"status": "success", "content": [{"text": json.dumps(spec)}]}
+        if name == "start_composing":
+            return {"status": "success", "content": [{"text": json.dumps({"deck": {"specs_ok": True}})}]}
+        return {"status": "success", "content": [{"text": "{}"}]}
+
+    client = MagicMock()
+    client.call_tool_sync.side_effect = call_tool_sync
+    compose_slides = composer.make_compose_slides([client], model=object())
+
+    async def collect() -> list:
+        return [
+            item
+            async for item in compose_slides(
+                deck_id="deck-1",
+                slide_groups=[{"slugs": ["a"], "instruction": "Layout pass."}],
+                tool_context=SimpleNamespace(tool_use={"toolUseId": "parent-html"}),
+            )
+        ]
+
+    return client, resolved, asyncio.run(collect())
+
+
+def _calls(client: MagicMock, name: str) -> list[dict]:
+    return [c.kwargs["arguments"] for c in client.call_tool_sync.call_args_list if c.kwargs["name"] == name]
+
+
+def test_compose_slides_dispatches_html_composer_for_html_decks(monkeypatch) -> None:
+    client, resolved, outputs = _dispatch(monkeypatch, "html")
+    assert resolved == [["html-parts"]]
+    assert _calls(client, "start_composing") == [{"deck_id": "deck-1", "assigned_slugs": ["a"], "mode": "html"}]
+    building = [o for o in outputs if isinstance(o, dict) and o.get("status") == "building"]
+    assert building == [{"status": "building", "message": "Building the HTML deck..."}]
+
+
+@pytest.mark.parametrize("output_format", [None, "pptx"])
+def test_compose_slides_pptx_arguments_unchanged(monkeypatch, output_format) -> None:
+    client, resolved, outputs = _dispatch(monkeypatch, output_format)
+    assert resolved == [["pptx-parts"]]
+    assert _calls(client, "start_composing") == [{"deck_id": "deck-1", "assigned_slugs": ["a"]}]
+    building = [o for o in outputs if isinstance(o, dict) and o.get("status") == "building"]
+    assert building == [{"status": "building", "message": "Building final PPTX..."}]
+
+
+def test_html_replay_carries_mode(monkeypatch) -> None:
+    composer = _load_composer(monkeypatch)
+    replay = composer._replay_start_composing("deck-1", ["a"], {"specs_ok": True}, "html")
+    assert replay[0]["content"][1]["toolUse"]["input"] == {"deck_id": "deck-1", "assigned_slugs": ["a"], "mode": "html"}
+    pptx = composer._replay_start_composing("deck-1", ["a"], {"specs_ok": True})
+    assert pptx[0]["content"][1]["toolUse"]["input"] == {"deck_id": "deck-1", "assigned_slugs": ["a"]}
+
+
 def test_composer_no_longer_prefetches_by_hand() -> None:
     src = (Path(__file__).resolve().parents[1] / "agent" / "modes" / "composer.py").read_text(encoding="utf-8")
     assert "_prefetch_deck_specs" not in src

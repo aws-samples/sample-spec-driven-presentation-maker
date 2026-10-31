@@ -21,6 +21,7 @@ SKILL_ROOT = Path(_skill_root_env).expanduser() if _skill_root_env else PACKAGE_
 ASSETS_DIR = SKILL_ROOT / "assets"
 REFERENCES_DIR = SKILL_ROOT / "references"
 TEMPLATES_DIR = SKILL_ROOT / "templates"
+VENDOR_DIR = SKILL_ROOT / "vendor"
 SCRIPTS_DIR = SKILL_ROOT / "scripts"
 CACHE_DIR = SKILL_ROOT / ".cache"
 

@@ -167,6 +167,20 @@ export class RuntimeStack extends cdk.Stack {
       })
     );
 
+    // --- Browser permissions (browser check of HTML decks: servers/remote/tools/agentcore_browser.py) ---
+    runtimeRole.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "bedrock-agentcore:StartBrowserSession",
+          "bedrock-agentcore:StopBrowserSession",
+          "bedrock-agentcore:ConnectBrowserAutomationStream",
+        ],
+        resources: [
+          `arn:aws:bedrock-agentcore:${cdk.Aws.REGION}:aws:browser/aws.browser.v1`,
+        ],
+      })
+    );
+
     // --- AWS Marketplace permissions (required for Bedrock model subscriptions) ---
     runtimeRole.addToPolicy(
       new iam.PolicyStatement({

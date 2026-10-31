@@ -10,6 +10,7 @@ dependencies = [
     "qrcode",
     "pygments>=2.19.2",
     "defusedxml",
+    "websockets>=13",
 ]
 
 [tool.setuptools.packages.find]

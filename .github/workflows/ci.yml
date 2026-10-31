@@ -20,6 +20,8 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
       - name: Lint
         run: uv run ruff check sdpm/ servers/ shared/ api/ agent/
+      - name: Vendored files match the manifest
+        run: cd sdpm/vendor && sha256sum -c SHA256SUMS
       - name: Test
         run: uv run pytest tests/ -v --cov=sdpm --cov-report=term
 
@@ -37,6 +39,26 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
       - name: Smoke test local MCP server
         run: uv run python scripts/smoke_local.py
+
+  # The HTML browser check against a real Chrome: network block, popups, WebRTC
+  # removal, layout measurement and the speaker view under the deck CSP. The
+  # fixture fails (not skips) when no browser is found.
+  browser:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: astral-sh/setup-uv@v10.3.2
+      - name: Allow Chrome's sandbox (Ubuntu 24.04 restricts unprivileged user namespaces)
+        run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
+      - name: Real-browser tests
+        env:
+          SDPM_TEST_BROWSER: "1"
+          SDPM_BROWSER: google-chrome
+        run: google-chrome --version && command -v lsof && uv run pytest tests/test_html_browser_check.py -k real_browser -v -rs
 
   web-ui:
     runs-on: ubuntu-latest

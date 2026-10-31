@@ -25,6 +25,7 @@ import { FileDropZone } from "./FileDropZone"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { Send, ChevronRight, GitBranch } from "lucide-react"
 import { ModeSelector } from "./ModeSelector"
+import { HtmlFormatPill } from "./HtmlFormatPill"
 import { SessionPickerDialog } from "./SessionPickerDialog"
 import { ContinuedFromChip } from "./ContinuedFromChip"
 import { ForkProgressCard } from "./ForkProgressCard"
@@ -142,6 +143,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const auth = useAuth()
   const isMobile = useIsMobile()
   const slashPickerItems = useSlashPickerItems(auth.user?.id_token)
+  // Mirror of the chat input; the HTML pill derives its state from the text alone.
+  const [inputText, setInputText] = useState("")
 
   /** Persist chat messages to disk (Local mode only). */
   const saveLocalChat = useCallback((overrideDeckId?: string) => {
@@ -630,6 +633,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               </div>
             )}
             <ModeSelector value={agentMode} onChange={setAgentMode} />
+            <HtmlFormatPill text={inputText} onChange={(next) => chatInputRef.current?.replaceText(next)} />
           </div>
         ) : (
           <div className="space-y-4">
@@ -682,6 +686,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           slashLoading={slashPickerItems.loading}
           onSlashOpen={slashPickerItems.ensure}
           onTextareaFocus={slashPickerItems.ensure}
+          // Only the initial screen shows the pill; skip the per-keystroke re-render of a long chat.
+          onInputChange={isInitial ? setInputText : undefined}
         >
           {/* Options expander — the only option (web images) is cloud-only */}
           {!IS_LOCAL && (

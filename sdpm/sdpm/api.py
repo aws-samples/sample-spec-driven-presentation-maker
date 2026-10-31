@@ -512,6 +512,7 @@ def _get_output_base_dir() -> Path:
 def init(
     name: str,
     output_dir: str | Path | None = None,
+    output_format: str = "pptx",
 ) -> dict[str, Any]:
     """Initialize a presentation workspace.
 
@@ -520,11 +521,16 @@ def init(
     Args:
         name: Presentation name (used in directory name).
         output_dir: Explicit output directory. Auto-generated if None.
+        output_format: "pptx" (default) or "html". deck.json gets
+            ``"outputFormat": "html"`` only for HTML decks.
 
     Returns:
         Dict with output_dir, deck_json, workspace.
     """
+    from sdpm.engine.schema import new_deck_json
     from sdpm.utils.io import write_json
+
+    deck_data: dict[str, Any] = new_deck_json(output_format)
 
     if output_dir:
         out_dir = Path(output_dir).expanduser()
@@ -533,10 +539,6 @@ def init(
         dir_name = f"{ts}-{name}" if name else ts
         out_dir = _get_output_base_dir() / dir_name
     out_dir.mkdir(parents=True, exist_ok=True)
-
-    from sdpm.engine.schema import DECK_JSON_SKELETON, complete_deck_skeleton
-
-    deck_data: dict[str, Any] = complete_deck_skeleton(DECK_JSON_SKELETON)
 
     deck_json = out_dir / "deck.json"
     write_json(deck_json, deck_data, suffix="\n")
@@ -894,6 +896,358 @@ def generate(
     return result
 
 
+# ── HTML decks ───────────────────────────────────────────────────────────
+
+
+def _chrome_placeholder_keys(template_path: Path, info: dict) -> set[str]:
+    """idx keys of the template's date / footer / slide-number placeholders.
+
+    Keys that some layout uses for a content placeholder are left out, so a
+    content ``data-ph`` is never mistaken for chrome.
+    """
+    from pptx import Presentation
+
+    from sdpm.engine.html.textstyle import placeholder_type
+
+    prs = Presentation(str(template_path))
+    keys = {
+        str(ph.placeholder_format.idx)
+        for layout in prs.slide_masters[0].slide_layouts
+        for ph in layout.placeholders
+        if placeholder_type(ph._element) in ("dt", "ftr", "sldNum")
+    }
+    content = {ph["key"] for layout in info.get("layouts", []) for ph in layout.get("placeholders", [])}
+    return keys - content
+
+
+def _outline_title(outline_path: Path) -> str | None:
+    if not outline_path.is_file():
+        return None
+    for line in outline_path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("# "):
+            return line[2:].strip() or None
+    return None
+
+
+def _generate_html(
+    deck_dir: Path,
+    output_path: Path,
+    template_cache: str | Path | None = None,
+    check_slides: list[str] | None = None,
+) -> tuple[dict[str, Any], list[tuple[str | None, str]]]:
+    """generate_html body; also returns ``(slug or None, warning)`` pairs for filtering."""
+    from sdpm.engine.html import browser_check
+    from sdpm.engine.html.assemble import assemble_deck, parse_slide
+    from sdpm.engine.html.check import (
+        DECK_CSS_SLUG,
+        check_deck_css,
+        check_html_font_sizes,
+        check_slide_html,
+    )
+    from sdpm.engine.html.template import load_template_html
+    from sdpm.engine.schema import deck_output_format
+    from sdpm.utils.io import read_json
+
+    deck_json = deck_dir / "deck.json"
+    if not deck_json.is_file():
+        raise FileNotFoundError(f"deck.json not found in {deck_dir}")
+    deck_meta = read_json(deck_json)
+    if deck_output_format(deck_meta) != "html":
+        raise ValueError(
+            f"{deck_dir} is a PPTX deck (deck.json has no \"outputFormat\": \"html\"); "
+            "build it with generate_pptx")
+
+    template_path, _ = _resolve_template(deck_meta, deck_dir, get_templates_dirs())
+    template = load_template_html(template_path, cache_root=template_cache)
+    layouts = {layout["name"] for layout in template.info.get("layouts", [])}
+    placeholders = {
+        layout["name"]: {key for ph in layout.get("placeholders", []) for key in (ph["key"], *ph.get("aliases", []))}
+        for layout in template.info.get("layouts", [])
+    }
+    chrome_keys = _chrome_placeholder_keys(template_path, template.info)
+
+    outline_path = deck_dir / "specs" / "outline.md"
+    slugs = parse_outline_slugs(outline_path)
+    tagged: list[tuple[str | None, str]] = []
+    texts: dict[str, str] = {}
+    for slug in slugs:
+        path = deck_dir / "slides" / f"{slug}.html"
+        if not path.is_file():
+            tagged.append((slug, f"slides/{slug}.html missing — skipped"))
+            continue
+        texts[slug] = path.read_text(encoding="utf-8")
+
+    art_path = deck_dir / "specs" / "art-direction.html"
+    art_html = art_path.read_text(encoding="utf-8") if art_path.is_file() else ""
+    deck_css_path = deck_dir / "deck.css"
+    deck_css = deck_css_path.read_text(encoding="utf-8") if deck_css_path.is_file() else None
+
+    diagnostics: list[dict] = []
+    for slug, text in texts.items():
+        diagnostics.extend(check_slide_html(slug, text, layouts=layouts, chrome_keys=chrome_keys,
+                                            placeholders=placeholders))
+    diagnostics.extend(check_html_font_sizes(texts, art_path))
+    if deck_css is not None:
+        diagnostics.extend(check_deck_css(deck_css, art_path))
+    order = {slug: i for i, slug in enumerate(slugs)}
+    diagnostics.sort(key=lambda d: order.get(d["slug"], -1))  # deck.css first, then deck order
+
+    assembled = assemble_deck(
+        slides=list(texts.items()),
+        template=template,
+        art_direction_html=art_html,
+        default_background=deck_meta.get("defaultBackground") or None,
+        default_text_color=deck_meta.get("defaultTextColor") or None,
+        title=_outline_title(outline_path) or deck_dir.name,
+        deck_dir=deck_dir,
+        deck_css=deck_css,
+    )
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(assembled.html, encoding="utf-8", newline="\n")
+    previews = _write_html_previews(deck_dir, assembled.previews)
+
+    built = assembled.slugs
+    wanted = set(check_slides or [])
+    check_set = [slug for slug in built if slug in wanted]
+    png_dir = deck_dir / "preview" / "png"
+    _remove_stale_pngs(png_dir, set(check_set), set(built))
+    browser = None
+    if check_set:
+        slide_size = template.info.get("slideSize") or {}
+        slide_layouts = {}
+        for slug in check_set:
+            section = parse_slide(texts[slug]).section
+            slide_layouts[slug] = (section.get("data-layout") if section is not None else None) or ""
+        browser = browser_check.check_deck(
+            output_path, check_set,
+            slide_size=(slide_size.get("width", 1920), slide_size.get("height", 1080)),
+            line_map=assembled.line_map,
+            layouts=slide_layouts,
+            decorations={layout["name"]: layout.get("decorations") or []
+                         for layout in template.info.get("layouts", [])},
+            png_dir=png_dir,
+        )
+        for slug in check_set:
+            diagnostics.extend(browser["findings"].get(slug, []))
+        diagnostics.extend({key: e[key] for key in ("slug", "rule", "message")}
+                           for e in browser["errors"] if e["slug"] is not None)
+        diagnostics.sort(key=lambda d: order.get(d["slug"], -1))
+
+    for d in diagnostics:
+        label = "deck.css" if d["slug"] == DECK_CSS_SLUG else d["slug"]
+        tagged.append((None if d["slug"] == DECK_CSS_SLUG else d["slug"], f"{label}: {d['message']}"))
+    for warning in assembled.warnings:
+        head = warning.split(":", 1)[0]
+        tagged.append((head if head in texts else None, warning))
+    for err in (browser or {}).get("errors", []):
+        if err["slug"] is None:
+            message = err["message"]
+            if err.get("line") is not None:
+                message = message.replace("JS error:", f"JS error (line {err['line']}):", 1)
+            tagged.append((None, f"output.html: {message}"))
+    if browser is not None and browser.get("note"):
+        # A check that was skipped or did not finish says so with the other warnings,
+        # so an agent never reads its absence as "no layout issues / no JS errors".
+        tagged.append((None, f"output.html: {browser['note']}"))
+
+    result: dict[str, Any] = {
+        "output_path": str(output_path),
+        "bytes": assembled.bytes,
+        "slide_count": len(built),
+        "slides": [f"page{i:02d} - {slug}" for i, slug in enumerate(built, 1)],
+        "layouts_used": assembled.layouts_used,
+        "warnings": [text for _, text in tagged],
+        "diagnostics": diagnostics,
+        "previews": previews,
+        "libraries": assembled.libraries,
+        "script_external": [{"slug": d["slug"], "kinds": d["kinds"]}
+                            for d in diagnostics if d["rule"] == "script-external"],
+    }
+    if template.decorations_status is not None:
+        result["decorations"] = template.decorations_status
+    if browser is not None:
+        result["browser_check"] = {key: browser[key] for key in
+                                   ("status", "browser", "seconds", "slides", "note", "timings", "network_blocked",
+                                    "blocked_requests")
+                                   if key in browser}
+        result["preview_files"] = [browser["pngs"][slug] for slug in built if slug in browser["pngs"]]
+    return result, tagged
+
+
+def _remove_stale_pngs(png_dir: Path, checked: set[str], built: set[str]) -> None:
+    """Delete ``preview/png/<slug>.png`` of the slides about to be checked and of slides
+    no longer built, so a failed check never leaves an old PNG behind."""
+    if not png_dir.is_dir():
+        return
+    for png in png_dir.glob("*.png"):
+        if png.stem in checked or png.stem not in built:
+            png.unlink(missing_ok=True)
+
+
+def _write_html_previews(deck_dir: Path, previews: dict[str, str]) -> dict[str, str]:
+    """Write ``preview/<slug>.html`` per slide; remove the ones of slides no longer built.
+
+    PNG previews of the PPTX path are left alone. Returns ``{slug: "preview/<slug>.html"}``.
+    """
+    preview_dir = deck_dir / "preview"
+    preview_dir.mkdir(exist_ok=True)
+    for stale in preview_dir.glob("*.html"):
+        if stale.stem not in previews:
+            stale.unlink(missing_ok=True)
+    written: dict[str, str] = {}
+    for slug, text in previews.items():
+        (preview_dir / f"{slug}.html").write_text(text, encoding="utf-8", newline="\n")
+        written[slug] = f"preview/{slug}.html"
+    return written
+
+
+def generate_html(
+    deck_dir: str | Path,
+    output_path: str | Path | None = None,
+    *,
+    template_cache: str | Path | None = None,
+    check_slides: list[str] | None = None,
+) -> dict[str, Any]:
+    """Assemble an HTML deck (deck.json ``"outputFormat": "html"``) into one offline file.
+
+    Reads slides/<slug>.html in outline order, runs the static checks, and writes
+    ``output_path`` (default ``<deck>/output.html``) plus one static document per
+    built slide, ``<deck>/preview/<slug>.html`` (stale ones are removed).
+    ``template_cache`` overrides the template-conversion cache directory.
+    ``check_slides`` (default none) are checked in a browser
+    (``sdpm.engine.html.browser_check``: layout, JS errors, PNG
+    ``<deck>/preview/png/<slug>.png``); an empty set starts no browser.
+
+    Returns:
+        Dict with output_path, bytes, slide_count, slides (``pageNN - slug``),
+        layouts_used, warnings (``"<slug>: …"`` / ``"deck.css: …"``), diagnostics
+        (``{slug, rule, message}``), previews (``{slug: "preview/<slug>.html"}``),
+        libraries (the vendored libraries embedded because a slide declares them in
+        ``data-libs``, e.g. ``["echarts"]``; ``[]`` for most decks), script_external
+        (``[{slug, kinds}]`` in deck order, one per slide whose script can reach outside the
+        deck: the ``script-external`` diagnostics; ``[]`` for most decks) and,
+        when template decorations are missing, decorations
+        (``preview_unavailable``-shaped status). With check_slides, also
+        browser_check (``{status, browser?, seconds?, slides?, note?, timings?, network_blocked?}``;
+        status ``ok`` / ``issues`` / ``skipped`` (``SDPM_BROWSER=none`` or no Chrome or
+        Edge) / ``navigated`` / ``timeout`` / ``failed``) and preview_files (PNG paths,
+        deck order). Layout findings (``overlap`` / ``overflow`` / ``outside-region`` /
+        ``decoration-overlap``) and JS errors (``js-error``) join diagnostics and
+        warnings (``"<slug>: …"``; ``"output.html: JS error (line N): …"`` when no slide
+        owns the line); a note (every status but ok / issues) is added to warnings as
+        ``"output.html: <note>"``.
+
+    Raises:
+        ValueError: the deck is not an HTML deck.
+        FileNotFoundError: deck.json or the template is missing.
+    """
+    deck_path = Path(deck_dir)
+    out = Path(output_path) if output_path else deck_path / "output.html"
+    result, _ = _generate_html(deck_path, out, template_cache, check_slides)
+    return result
+
+
+def refresh_html(
+    deck_dir: str | Path,
+    changed_paths: list[str] | None = None,
+    measure_slides: list[str] | None = None,
+    *,
+    template_cache: str | Path | None = None,
+) -> dict[str, Any]:
+    """Rebuild ``<deck>/output.html`` after an edit (the run_python post-processing for HTML decks).
+
+    The slides the change can alter plus measure_slides are checked in a browser (see
+    generate_html), in deck order — the set PPTX decks render previews for.
+    Never raises: a failure comes back as ``{"html_error": "…"}``.
+
+    Returns:
+        Dict with html (path), html_bytes, warnings (only the measure_slides' and
+        deck-wide ones when measure_slides is given), affected (slugs the changed
+        paths can alter), previews (``{slug: "preview/<slug>.html"}``), script_external
+        (as in generate_html, for the whole deck), browser_check
+        and preview_files (PNG paths) when slides were checked, and, with
+        measure_slides, measure (check report) and decorations (when template
+        decorations are missing). When the browser check did not run or finish
+        (status other than ok / issues), measure_slides also get preview
+        ``{"status": "unavailable", "reason": "browser-<status>", "note"}``.
+    """
+    from sdpm.engine.html.check import format_check_report, not_in_deck_message
+    from sdpm.engine.schema import affected_slugs
+
+    deck_path = Path(deck_dir)
+    output = deck_path / "output.html"
+    try:
+        slugs = parse_outline_slugs(deck_path / "specs" / "outline.md")
+        present = {s: {} for s in slugs if (deck_path / "slides" / f"{s}.html").is_file()}
+        affected = affected_slugs(changed_paths or [], present, html=True)
+        check = [s for s in present if s in set(affected) | set(measure_slides or [])]
+        built, tagged = _generate_html(deck_path, output, template_cache, check)
+    except Exception as exc:  # reported to the agent, never raised
+        return {"html_error": f"{type(exc).__name__}: {exc}"}
+
+    result: dict[str, Any] = {
+        "html": built["output_path"],
+        "html_bytes": built["bytes"],
+        "warnings": built["warnings"],
+        "affected": affected,
+        "previews": built["previews"],
+        "script_external": built["script_external"],
+    }
+    browser = built.get("browser_check")
+    if browser is not None:
+        result["browser_check"] = browser
+        result["preview_files"] = built["preview_files"]
+    if measure_slides:
+        wanted = set(measure_slides)
+        missing = [s for s in dict.fromkeys(measure_slides) if s not in present]
+        result["warnings"] = [text for slug, text in tagged if slug is None or slug in wanted]
+        result["warnings"].extend(not_in_deck_message(s) for s in missing)
+        diags = [d for d in built["diagnostics"] if d["slug"] in wanted or d["slug"] not in present]
+        result["measure"] = format_check_report(diags, measure_slides, browser=browser, not_in_deck=missing)
+        if browser is not None and browser["status"] not in ("ok", "issues"):
+            result["preview"] = {"status": "unavailable", "reason": f"browser-{browser['status']}",
+                                 "note": browser.get("note", "")}
+        if built.get("decorations") is not None:
+            result["decorations"] = built["decorations"]
+    return result
+
+
+def _outline_slide_texts(deck_dir: Path) -> list[tuple[str, str]]:
+    """``(slug, slides/<slug>.html text)`` in outline order; missing files are skipped."""
+    out = []
+    for slug in parse_outline_slugs(deck_dir / "specs" / "outline.md"):
+        path = deck_dir / "slides" / f"{slug}.html"
+        if path.is_file():
+            out.append((slug, path.read_text(encoding="utf-8")))
+    return out
+
+
+def html_slide_texts(deck_dir: str | Path) -> list[dict[str, Any]]:
+    """Per-slide text of an HTML deck, in outline order (search indexing).
+
+    Returns:
+        ``[{slug, layout, title, notes, text}]`` (``sdpm.engine.html.text.slide_text_summary``);
+        slides whose file is missing are skipped.
+    """
+    from sdpm.engine.html.text import slide_text_summary
+
+    return [{"slug": slug, **slide_text_summary(text)} for slug, text in _outline_slide_texts(Path(deck_dir))]
+
+
+def html_deck_refs(deck_dir: str | Path) -> dict[str, set[str]]:
+    """Files an HTML deck build embeds: ``{"relative": deck paths, "assets": assets: refs}``.
+
+    Scans slides/*.html of the outline and deck.css the way the assembler does, so a
+    server can fetch only these files before building.
+    """
+    from sdpm.engine.html.assemble import collect_refs
+
+    deck_path = Path(deck_dir)
+    css_path = deck_path / "deck.css"
+    deck_css = css_path.read_text(encoding="utf-8") if css_path.is_file() else None
+    return collect_refs((text for _, text in _outline_slide_texts(deck_path)), deck_css)
+
+
 def measure(
     json_path: str | Path,
     slides: list[int] | list[str] | None = None,
@@ -1228,6 +1582,15 @@ def load_slides_json_or_pptx(path) -> dict:
 
     path_obj = Path(path)
     if path_obj.is_dir():
+        from sdpm.engine.schema import deck_output_format
+
+        deck_json = path_obj / "deck.json"
+        try:
+            is_html = deck_output_format(json.loads(deck_json.read_text(encoding="utf-8"))) == "html"
+        except (OSError, ValueError):  # unreadable or invalid: the build below reports it
+            is_html = False
+        if is_html:
+            raise ValueError("diff_pptx / hand-edit sync support PPTX decks only; this deck has outputFormat html")
         # Deck-structure directory (deck.json + slides/*.json + specs/outline.md):
         # build via the canonical pipeline (outline.md ordering, includes,
         # overrides), then roundtrip the built PPTX so both sides of the diff

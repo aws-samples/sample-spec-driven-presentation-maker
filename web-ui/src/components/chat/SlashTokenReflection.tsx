@@ -1,14 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * SlashTokenReflection — Text-derived chips for template/style tokens in chat input.
+ * SlashTokenReflection — Text-derived chips for template/style/format tokens in chat input.
  */
 
 "use client"
 
-import { Star, X } from "lucide-react"
+import { CodeXml, Star, X } from "lucide-react"
 import { useTranslations } from "next-intl"
-import { parseTokens, type PickerItem, type TokenMatch } from "@/lib/slashToken"
+import { FORMAT_HTML_ITEM, parseTokens, sectionTitleKey, type PickerItem, type TokenMatch } from "@/lib/slashToken"
 
 export interface SlashTokenReflectionProps {
   text: string
@@ -43,6 +43,14 @@ function StyleTokenMark({ item }: { item: PickerItem }) {
   )
 }
 
+function FormatTokenMark() {
+  return (
+    <span className="grid h-3 w-5 shrink-0 place-items-center text-foreground-muted" aria-hidden="true">
+      <CodeXml className="h-3 w-3" />
+    </span>
+  )
+}
+
 export function SlashTokenReflection({ text, items, onRemove }: SlashTokenReflectionProps) {
   const t = useTranslations("slashPicker")
   const matches = parseTokens(text)
@@ -54,6 +62,10 @@ export function SlashTokenReflection({ text, items, onRemove }: SlashTokenReflec
         const item = items.find((candidate) => candidate.kind === match.kind && candidate.name === match.name)
         // Before the catalogue has loaded nothing is known yet — don't flag every chip as unknown.
         const unknown = items.length > 0 && item == null
+        // `@format:html` reads as a plain "HTML" chip; other kinds show "<Kind> <name>".
+        const isHtmlFormat = match.kind === "format" && match.name === FORMAT_HTML_ITEM.name
+        const kindLabel = t(sectionTitleKey(match.kind))
+        const nameLabel = isHtmlFormat ? t("formatHtml") : match.name
         return (
           <span
             key={`${match.start}-${match.end}`}
@@ -63,22 +75,23 @@ export function SlashTokenReflection({ text, items, onRemove }: SlashTokenReflec
             }`}
           >
             {item ? (
-              item.kind === "template" ? <TemplateTokenSwatch item={item} /> : <StyleTokenMark item={item} />
+              item.kind === "template" ? (
+                <TemplateTokenSwatch item={item} />
+              ) : item.kind === "format" ? (
+                <FormatTokenMark />
+              ) : (
+                <StyleTokenMark item={item} />
+              )
             ) : (
               <span className="grid h-3 w-5 place-items-center text-[11px] text-foreground-muted" aria-hidden="true">?</span>
             )}
-            <span className="text-[11px] uppercase text-foreground-muted">
-              {t(match.kind === "template" ? "sectionTemplate" : "sectionStyle")}
-            </span>
-            <span className="max-w-40 truncate text-xs text-foreground">{match.name}</span>
+            {!isHtmlFormat && <span className="text-[11px] uppercase text-foreground-muted">{kindLabel}</span>}
+            <span className="max-w-40 truncate text-xs text-foreground">{nameLabel}</span>
             <button
               type="button"
               onClick={() => onRemove(match)}
               className="grid h-5 w-5 place-items-center rounded text-foreground-muted motion-safe:transition-colors hover:bg-foreground/[0.08] hover:text-foreground"
-              aria-label={t("removeToken", {
-                kind: t(match.kind === "template" ? "sectionTemplate" : "sectionStyle"),
-                name: match.name,
-              })}
+              aria-label={t("removeToken", { kind: kindLabel, name: nameLabel })}
             >
               <X className="h-3 w-3" />
             </button>

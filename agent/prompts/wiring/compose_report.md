@@ -32,3 +32,10 @@ You cannot see the composers' own tool results (their `preview_files` stay
 inside each composer). After the content call returns, call
 `get_preview(deck_id, slugs=[...all slugs...])` yourself to see the
 rendering — this is how you look before deciding whether any slide needs another composer.
+
+For an HTML deck (`check_specs` returns `outputFormat: "html"`), `get_preview` returns the
+PNGs the composers' browser checks made of the slides they wrote or changed; a slug with no
+PNG yet comes back as a text line (its check was skipped or did not finish — see the
+`output.html: Browser check …` warnings in the composers' `summaries`). Review through those
+images, the `summaries` and the warnings in `build`, and never tell the user to open a local
+`output.html` path.
