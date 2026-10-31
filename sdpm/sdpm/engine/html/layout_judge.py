@@ -19,7 +19,7 @@ within ``tol``):
     overlap             partial overlap (neither contains the other) between top-level
                         blocks (ph, region, free) or between children of the same region
     overflow            content larger than its box (scroll size past the client size) for
-                        ph / region / child, or any element past the slide edge
+                        ph / region / child / free, or any element past the slide edge
     outside-region      an element inside a region extends past the region's box
     decoration-overlap  an element over a template decoration of kind ``band`` or
                         ``obstacle`` (placeholders skip ``band``, which backs them; ``ground``
@@ -35,7 +35,7 @@ from typing import Any, Iterable
 TOLERANCE_PX = 4
 MAX_FINDINGS = 10
 
-_SCROLL_KINDS = ("ph", "region", "child")
+_SCROLL_KINDS = ("ph", "region", "child", "free")
 
 
 def _diag(slug: str, rule: str, message: str) -> dict:

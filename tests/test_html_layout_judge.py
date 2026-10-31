@@ -71,6 +71,11 @@ def test_overflow_content_past_its_box() -> None:
     assert _judge(inline) == []  # no client box: nothing to compare
 
 
+def test_overflow_of_a_free_positioned_block() -> None:
+    free = _el("free", '<div class="x">', (96, 300, 400, 50), scroll=(400, 200, 400, 50))
+    assert _rules(free) == ["overflow"]
+
+
 def test_overflow_past_the_slide_edge() -> None:
     wide = _el("free", '<p> "Long text…"', (1800, 500, 300, 50))
     assert [d["message"] for d in _judge(wide)] == [
