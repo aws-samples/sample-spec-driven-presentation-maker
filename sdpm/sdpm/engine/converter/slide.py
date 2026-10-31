@@ -120,9 +120,67 @@ def _resolve_inherited_styles(elements, slide, theme_colors, color_mapping):
                         elem["fontFamily"] = run_fonts.pop()
                 break
 
-def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=None, master_idx=0, output_dir=None, slide_idx=0, pptx_path=None, use_layout_names=False, builder_text_color=None):
-    """Extract slide content to dict."""
+def _extract_motion(slide, slide_dict, slide_slug, element_targets, placeholder_targets, sidecar_writer):
+    """Recover this slide's animations and transition into the slide JSON.
+
+    Returns the per-slide detection flags the deck switches are derived from
+    (REQ-1.2). Failures are deliberately **not** swallowed the way the rest of
+    this extractor tolerates odd packages: an unmappable animation target or an
+    uncopyable relationship has to stop the import rather than silently produce
+    a deck whose motion is gone (REQ-5.7, REQ-6.4).
+    """
+    from sdpm.engine.timing.reader import (
+        MotionReadError,
+        apply_motion_to_slide_json,
+        read_slide_motion,
+    )
+
+    motion = read_slide_motion(slide._element, slide_slug=slide_slug, part=slide.part)
+    references: dict[str, dict] = {}
+    for key, fragment in (("_rawTiming", motion.raw_timing), ("_rawTransition", motion.raw_transition)):
+        if fragment is None:
+            continue
+        if sidecar_writer is None:
+            raise MotionReadError(
+                f"slide {slide_slug!r} carries {fragment.kind} XML sdpm cannot decode "
+                f"({'; '.join(fragment.reasons) or 'unknown content'}) and no import bundle is "
+                "available to preserve it; converting it would lose the setting"
+            )
+        references[key] = sidecar_writer.add_fragment(slide_slug, fragment)
+    for asset in motion.assets:
+        if sidecar_writer is None:
+            raise MotionReadError(
+                f"slide {slide_slug!r} references the sound asset {asset.path!r} and no import "
+                "bundle is available to copy it into"
+            )
+        sidecar_writer.add_asset(asset)
+    apply_motion_to_slide_json(
+        slide_dict,
+        motion,
+        element_targets=element_targets,
+        placeholder_targets=placeholder_targets,
+        raw_references=references,
+    )
+    return {
+        "animations": motion.has_object_animation,
+        "transitions": motion.has_transition,
+    }
+
+
+def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=None, master_idx=0, output_dir=None, slide_idx=0, pptx_path=None, use_layout_names=False, builder_text_color=None, sidecar_writer=None, motion_out=None):
+    """Extract slide content to dict.
+
+    ``sidecar_writer`` is a :class:`sdpm.engine.timing.raw.RawSidecarWriter`
+    for the deck being converted; it receives any timing/transition XML that
+    cannot be decoded semantically plus the semantic sound assets. When
+    ``motion_out`` is a dict it collects this slide's animation/transition
+    detection flags, which :func:`pptx_to_json` turns into the deck switches.
+    """
     emu_per_px = get_emu_per_px()
+    #: (source spid, element dict) for every extracted element, so a recovered
+    #: logical animation ID lands on the JSON node that recreates that shape.
+    element_targets = []
+    placeholder_targets = {}
     if use_layout_names:
         layout_name = slide.slide_layout.name if slide.slide_layout.name else f"layout-{master_idx+1:02d}"
     else:
@@ -339,6 +397,7 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
         except Exception:
             pass
         placeholders[str_idx] = val
+        placeholder_targets[shape.shape_id] = str_idx
     if placeholders:
         slide_dict["placeholders"] = placeholders
     
@@ -419,6 +478,7 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                         except Exception:
                             pass
                     elem.update(_extract_autofit_props(shape))
+                    element_targets.append((shape.shape_id, elem))
                     # Resolve bodyPr margins from master placeholder
                     if not elem.get("marginLeft") and not elem.get("marginRight"):
                         try:
@@ -450,6 +510,7 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                 elem["width"] = round(shape.width / emu_per_px)
                 elem["height"] = round(shape.height / emu_per_px)
                 elements.append(elem)
+                element_targets.append((shape.shape_id, elem))
         except Exception:
             pass
 
@@ -474,6 +535,7 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                     "height": round(shape.height / emu_per_px),
                 }
                 elements.append(elem)
+                element_targets.append((shape.shape_id, elem))
                 img_counter += 1
             except Exception:
                 pass
@@ -507,6 +569,7 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
                 if _has_used_placeholder and not _seen_placeholder:
                     elem["sendToBack"] = True
                 elements.append(elem)
+                element_targets.append((shape.shape_id, elem))
         except Exception as e:
             print(f"Warning: Failed to extract shape {shape.name}: {e}", file=sys.stderr)
     
@@ -534,5 +597,19 @@ def extract_slide(slide, theme_colors=None, color_mapping=None, theme_styles=Non
 
     if elements:
         slide_dict["elements"] = elements
-    
+
+    # Animations and transitions are read last: every element and placeholder
+    # the slide produced is now known, so a recovered animation target can be
+    # mapped onto the JSON node that will recreate its shape.
+    detected = _extract_motion(
+        slide,
+        slide_dict,
+        f"slide-{slide_idx + 1:03d}",
+        element_targets,
+        placeholder_targets,
+        sidecar_writer,
+    )
+    if motion_out is not None:
+        motion_out.update(detected)
+
     return slide_dict

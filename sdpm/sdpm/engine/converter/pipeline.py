@@ -26,9 +26,52 @@ from .constants import conversion_scale
 from .slide import extract_slide
 from sdpm.utils.io import write_json
 from sdpm.engine.schema.defaults import sort_element_keys
+from sdpm.engine.timing.raw import RAW_MANIFEST_VERSION, RawSidecarWriter
+from sdpm.engine.timing.reader import resolve_import_switches
 
 
-def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: bool = True, minimal: bool = False):
+def _source_provenance(pptx_path: Path) -> dict:
+    """Return the authoring application the source package records.
+
+    Provenance has to be stable, not a wall-clock stamp, so the sidecar
+    manifest records where the XML came from (``docProps/app.xml``) rather than
+    when it was converted. A package without those properties simply records
+    nulls — guessing a version would be worse than admitting it is unknown.
+    """
+    import zipfile
+    from xml.etree import ElementTree
+
+    provenance = {
+        "sourceFile": pptx_path.name,
+        "sourceApplication": None,
+        "sourceAppVersion": None,
+        "sidecarSchema": RAW_MANIFEST_VERSION,
+    }
+    try:
+        with zipfile.ZipFile(pptx_path) as package:
+            data = package.read("docProps/app.xml")
+    except (OSError, KeyError, zipfile.BadZipFile):
+        return provenance
+    try:
+        root = ElementTree.fromstring(data)
+    except ElementTree.ParseError:
+        return provenance
+    for child in root:
+        tag = child.tag.rsplit("}", 1)[-1]
+        if tag == "Application":
+            provenance["sourceApplication"] = (child.text or "").strip() or None
+        elif tag == "AppVersion":
+            provenance["sourceAppVersion"] = (child.text or "").strip() or None
+    return provenance
+
+
+def pptx_to_json(
+    pptx_path: Path,
+    output_dir: Path = None,
+    use_layout_names: bool = True,
+    minimal: bool = False,
+    existing_deck: dict = None,
+):
     """Convert PPTX to JSON. Output is a deck-structure directory.
 
     Args:
@@ -36,14 +79,20 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: boo
         output_dir: Output directory (auto-derived from pptx_path stem if None).
         use_layout_names: Use layout names verbatim (else heuristic detection).
         minimal: Strip defaults for clean output.
+        existing_deck: The current ``deck.json`` when this is a hand-edit sync
+            rather than a new import. An explicit ``animations``/``transitions``
+            switch in it is preserved; only a missing one is derived from the
+            detected content (REQ-1.2).
 
     Returns:
         Dict with {slides, fonts, defaultTextColor} for in-memory consumers.
 
     On-disk output:
-        deck.json  (fonts + defaultTextColor; template left unset)
+        deck.json  (fonts + defaultTextColor + animation/transition switches)
         slides/slide-{NNN}.json  (one per slide; NNN is 3-digit 1-based)
         images/   (unchanged — populated by extract_slide)
+        media/    (semantic sound/media assets referenced by slide JSON)
+        animations/  (raw timing/transition sidecars + hashed manifest)
     """
     actual_path = pptx_path
     prs = Presentation(str(actual_path))
@@ -78,6 +127,11 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: boo
     if builder_text_color:
         result["defaultTextColor"] = builder_text_color
 
+    # Animation/transition preservation: one sidecar writer per deck, so the
+    # whole dependency closure lands in one retainable subtree.
+    sidecar_writer = RawSidecarWriter(output_dir, provenance=_source_provenance(actual_path))
+    detected = {"animations": False, "transitions": False}
+
     # Scope the px scale to this deck's actual slide width (restored on exit)
     with conversion_scale(int(prs.slide_width)):
         for slide_idx, slide in enumerate(prs.slides):
@@ -88,10 +142,14 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: boo
             # Extract theme colors and mapping for this master
             theme_colors, color_mapping, theme_styles = extract_theme_colors_and_mapping(actual_path, master_idx)
 
+            motion_out: dict = {}
             slide_dict = extract_slide(
                 slide, theme_colors, color_mapping, theme_styles, master_idx, output_dir, slide_idx,
                 pptx_path=actual_path, use_layout_names=use_layout_names, builder_text_color=builder_text_color,
+                sidecar_writer=sidecar_writer, motion_out=motion_out,
             )
+            for feature in detected:
+                detected[feature] = detected[feature] or bool(motion_out.get(feature))
             slide_dict["elements"] = [sort_element_keys(e) for e in slide_dict.get("elements", [])]
             if minimal:
                 from sdpm.engine.schema.minimal import minimize
@@ -111,7 +169,22 @@ def pptx_to_json(pptx_path: Path, output_dir: Path = None, use_layout_names: boo
     _w, _h = _slide_size_px(int(prs.slide_width), int(prs.slide_height))
     _pt_per_px = round((int(prs.slide_width) / 12700) / 1920, 6)
     deck_meta["slideSize"] = {"width": _w, "height": _h, "ptPerPx": _pt_per_px}
+    # A new import writes each switch from detected content; a hand-edit sync
+    # preserves an explicit switch and derives only a missing one (REQ-1.2).
+    #
+    # A switch that resolves to false *and* was not already explicit is left
+    # out rather than written as `false`: the deck schema defines an absent
+    # switch as disabled, so the two are the same deck, and REQ-9.4 requires an
+    # ordinary still deck to import exactly as it did before this feature
+    # existed. A deck that carries motion always gets both switches written, so
+    # the enabled state is never implicit where it matters.
+    switches = resolve_import_switches(detected, existing_deck)
+    for feature, value in switches.items():
+        was_explicit = isinstance((existing_deck or {}).get(feature), dict)
+        if value["enabled"] or was_explicit or any(switches[f]["enabled"] for f in switches):
+            deck_meta[feature] = value
     write_json(output_dir / "deck.json", deck_meta)
+    sidecar_writer.write_manifest()
 
     # Write slides/slide-{NNN}.json (1-based, zero-padded, hyphen separator to match parse_outline_slugs).
     # 3-digit padding keeps lexicographic sort == presentation order for decks
