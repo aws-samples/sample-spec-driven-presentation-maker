@@ -128,6 +128,14 @@
     "presentAria": "新しいタブで発表",
     "pdf": "PDF",
     "pdfAria": "新しいタブで印刷画面を開いて PDF に保存",
+    "scriptWarning": "外部アクセスあり",
+    "scriptWarningDetail": "{slugs} のスライドスクリプトはデッキの外にデータを送れます（{kinds}）。発表タブとダウンロードしたファイルで実行されます。",
+    "scriptKind": {
+      "navigation": "ページ移動",
+      "popup": "新しいタブ",
+      "externalUrl": "外部 URL",
+      "webrtc": "WebRTC"
+    },
     "downloadHtml": "HTML をダウンロード",
     "open": "開く",
     "openHtml": "HTML デッキをブラウザで開く",

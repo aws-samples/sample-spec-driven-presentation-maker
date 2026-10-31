@@ -1060,6 +1060,8 @@ def _generate_html(
         "diagnostics": diagnostics,
         "previews": previews,
         "libraries": assembled.libraries,
+        "script_external": [{"slug": d["slug"], "kinds": d["kinds"]}
+                            for d in diagnostics if d["rule"] == "script-external"],
     }
     if template.decorations_status is not None:
         result["decorations"] = template.decorations_status
@@ -1121,7 +1123,9 @@ def generate_html(
         layouts_used, warnings (``"<slug>: …"`` / ``"deck.css: …"``), diagnostics
         (``{slug, rule, message}``), previews (``{slug: "preview/<slug>.html"}``),
         libraries (the vendored libraries embedded because a slide declares them in
-        ``data-libs``, e.g. ``["echarts"]``; ``[]`` for most decks) and,
+        ``data-libs``, e.g. ``["echarts"]``; ``[]`` for most decks), script_external
+        (``[{slug, kinds}]`` in deck order, one per slide whose script can reach outside the
+        deck: the ``script-external`` diagnostics; ``[]`` for most decks) and,
         when template decorations are missing, decorations
         (``preview_unavailable``-shaped status). With check_slides, also
         browser_check (``{status, browser?, seconds?, slides?, note?, timings?, network_blocked?}``;
@@ -1159,7 +1163,8 @@ def refresh_html(
     Returns:
         Dict with html (path), html_bytes, warnings (only the measure_slides' and
         deck-wide ones when measure_slides is given), affected (slugs the changed
-        paths can alter), previews (``{slug: "preview/<slug>.html"}``), browser_check
+        paths can alter), previews (``{slug: "preview/<slug>.html"}``), script_external
+        (as in generate_html, for the whole deck), browser_check
         and preview_files (PNG paths) when slides were checked, and, with
         measure_slides, measure (check report) and decorations (when template
         decorations are missing). When the browser check did not run or finish
@@ -1186,6 +1191,7 @@ def refresh_html(
         "warnings": built["warnings"],
         "affected": affected,
         "previews": built["previews"],
+        "script_external": built["script_external"],
     }
     browser = built.get("browser_check")
     if browser is not None:

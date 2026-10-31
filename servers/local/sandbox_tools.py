@@ -126,6 +126,7 @@ def _refresh_html_deck(
 
     invalidate_manifest_cache()
     refreshed = refresh_html(deck_dir, changed_paths, list(measure_slides) if measure_slides else None)
+    refreshed.pop("script_external", None)  # the warnings already name these; it feeds the remote record
     warnings = refreshed.pop("warnings", [])
     if warnings:
         existing = result.get("warnings")

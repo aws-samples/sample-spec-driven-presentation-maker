@@ -202,8 +202,12 @@ def _publish(
     slide_count: int,
     thumbnail_key: str | None,
     set_thumbnail: bool,
+    script_external: list[dict] | None,
 ) -> str:
     """Upload output.html under a fresh key, point the record at it, delete the superseded one.
+
+    ``script_external`` (the build's ``[{slug, kinds}]``) becomes ``htmlScriptExternal``;
+    a clean build removes the attribute.
 
     Raises on upload / record failure after deleting the orphaned upload (best effort).
     """
@@ -213,6 +217,7 @@ def _publish(
         "htmlS3Key": new_key,
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "slideCount": slide_count,
+        "htmlScriptExternal": script_external or None,
     }
     if set_thumbnail:
         updates["thumbnailS3Key"] = thumbnail_key
@@ -344,7 +349,8 @@ def refresh_html_deck(
         pngs = _upload_pngs(deck_id, built.get("preview_files") or [], epoch, storage)
 
         result: dict[str, Any] = {
-            k: v for k, v in built.items() if k not in ("html", "previews", "preview_files", "browser_check")
+            k: v for k, v in built.items()
+            if k not in ("html", "previews", "preview_files", "browser_check", "script_external")
         }
         if "browser_check" in built:
             browser = dict(built["browser_check"])
@@ -366,6 +372,7 @@ def refresh_html_deck(
         try:
             result["html"] = _publish(
                 deck_id, user_id, storage, Path(built["html"]), len(order), thumbnail, set_thumbnail,
+                built.get("script_external"),
             )
         except Exception as e:
             logger.warning("HTML artifact refresh failed for %s: %s", deck_id, e)
@@ -438,7 +445,7 @@ def finalize_html_deck(
             raise RuntimeError(f"preview upload failed for {', '.join(missing)}")
         _publish(
             deck_id, user_id, storage, Path(gen["output_path"]), gen["slide_count"],
-            uploaded.get(order[0]) if order else None, True,
+            uploaded.get(order[0]) if order else None, True, gen.get("script_external"),
         )
         fresh = set(uploaded.values())
         deck_slugs = set(order)

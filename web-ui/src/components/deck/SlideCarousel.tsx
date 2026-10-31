@@ -17,7 +17,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { SlidePreview, fetchHtmlUrl } from "@/services/deckService"
-import type { SpecFiles } from "@/services/deckService"
+import type { ScriptWarning, SpecFiles } from "@/services/deckService"
 import { Download, ExternalLink, Layers, LayoutGrid, Presentation, Printer, Rows3, FolderOpen } from "lucide-react"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
@@ -25,6 +25,7 @@ import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
 import { HtmlDeckPlayer, type HtmlPlayerSlide } from "@/components/deck/HtmlDeckPlayer"
+import { ScriptWarningBadge } from "@/components/deck/ScriptWarningBadge"
 import { DeckDefs, type DeckDefsStatus } from "@/components/deck/DeckDefs"
 import { useFollowScroll } from "@/components/deck/useFollowScroll"
 import { IS_LOCAL } from "@/lib/mode"
@@ -90,11 +91,13 @@ interface SlideCarouselProps {
   htmlUrl?: string | null
   /** HTML decks: canvas size in CSS px. */
   slideSize?: { width: number; height: number }
+  /** HTML decks (cloud): slides whose script can send data outside the deck. */
+  scriptWarnings?: ScriptWarning[]
 }
 
 const HEADER_BUTTON = "inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
 
-export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outputFormat, htmlUrl, slideSize }: SlideCarouselProps) {
+export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outputFormat, htmlUrl, slideSize, scriptWarnings }: SlideCarouselProps) {
   const t = useTranslations("carousel")
   const isHtml = outputFormat === "html"
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
@@ -595,6 +598,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 </button>
               ) : (
                 <>
+                  {scriptWarnings && scriptWarnings.length > 0 && <ScriptWarningBadge warnings={scriptWarnings} />}
                   <button onClick={() => void handleHtmlPresent("present")} className={HEADER_BUTTON} aria-label={t("presentAria")}>
                     <Presentation className="h-3.5 w-3.5" />
                     {t("present")}
