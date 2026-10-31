@@ -54,6 +54,8 @@ CHUNK = 2_000_000  # characters per blob chunk
 READY_TIMEOUT = 30.0
 PNG_LONG_EDGE = 1280
 NAVIGATED_MARK = "sdpm-check:navigated"
+# After a failed page command, how long to read events for a navigation that explains it.
+SETTLE_S = 0.5
 _MAX_MESSAGE = 400
 # URL patterns the check BLOCKS (Fetch.requestPaused → failRequest); nothing connects to them.
 _BLOCKED = ["http://*", "https://*", "ws://*", "wss://*"]  # nosemgrep: javascript.lang.security.detect-insecure-websocket.detect-insecure-websocket
@@ -303,6 +305,9 @@ class _Run:
         try:
             return self.cdp.send(method, params, session=self.session if page else None,
                                  timeout=self.budget(timeout))
+        except CdpError as exc:
+            self.settle_after(exc)
+            raise
         finally:
             self.pump()
 
@@ -311,8 +316,30 @@ class _Run:
         try:
             return self.cdp.evaluate(self.session, expr, await_promise=await_promise,
                                      timeout=self.budget(timeout))
+        except CdpError as exc:
+            self.settle_after(exc)
+            raise
         finally:
             self.pump()
+
+    def settle_after(self, exc: CdpError) -> None:
+        """A page command failed: read events for up to SETTLE_S before the error stands.
+
+        When a slide navigates, the browser can answer the pending command with an error
+        ("context destroyed") before it sends the navigation events; ``watch`` / ``pump``
+        then raise ``_Navigated`` here. A timeout or a lost connection is not waited on.
+        """
+        if (self.cdp is None or self.navigated_at is not None or isinstance(exc, CdpTimeout)
+                or "connection closed" in str(exc) or "not connected" in str(exc)):
+            return
+        end = min(time.monotonic() + SETTLE_S, self.end)
+        while time.monotonic() < end:
+            try:
+                self.cdp.send("Target.getTargets", timeout=max(end - time.monotonic(), 0.05))
+            except CdpError:
+                return
+            self.pump()
+            time.sleep(0.05)
 
     def is_navigation(self, event: dict) -> bool:
         """True for an event that says the deck page navigated away."""

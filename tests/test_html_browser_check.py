@@ -290,6 +290,69 @@ def test_event_hook_fails_blocked_requests_closes_popups_and_blocks_frames() -> 
     assert run.blocked_requests == 2
 
 
+class _LateNavigationCdp:
+    """A page command fails; the navigation events arrive only with a later reply."""
+
+    def __init__(self, run, events):
+        self.run, self.events, self.sent = run, list(events), []
+        self._events: list[dict] = []
+
+    def evaluate(self, session, expr, *, await_promise=False, timeout=15.0):
+        raise browser_check.CdpError("Runtime.evaluate: Execution context was destroyed.")
+
+    def send(self, method, params=None, *, session=None, timeout=15.0):
+        self.sent.append(method)
+        if self.events:
+            event = self.events.pop(0)
+            self._events.append(event)
+            self.run.watch(event)
+        return {}
+
+    def post(self, method, params=None, *, session=None):
+        self.sent.append(method)
+
+    def take_events(self):
+        events, self._events = self._events, []
+        return events
+
+
+def _loaded_run():
+    run = browser_check._Run(["a"], LINE_MAP, 30)
+    run.session, run.target_id, run.frame_id, run.loaded, run.current = "page", "t-page", "f1", True, "a"
+    return run
+
+
+def test_error_before_the_navigation_events_reports_navigated() -> None:
+    """The browser may answer the pending command before it reports the navigation."""
+    run = _loaded_run()
+    run.cdp = _LateNavigationCdp(run, [
+        {"method": "Fetch.requestPaused", "sessionId": "page", "params": {"requestId": "r1"}},
+        {"method": "Page.frameNavigated", "sessionId": "page",
+         "params": {"frame": {"id": "f1", "url": "chrome-error://chromewebdata/"}}},
+    ])
+    with pytest.raises(browser_check._Navigated):
+        run.js("1")
+    assert run.navigated_at == "a"
+    assert run.blocked_requests == 1
+
+
+def test_error_without_a_navigation_stands() -> None:
+    run = _loaded_run()
+    run.cdp = _LateNavigationCdp(run, [])
+    started = time.monotonic()
+    with pytest.raises(browser_check.CdpError, match="context was destroyed"):
+        run.js("1")
+    assert time.monotonic() - started < browser_check.SETTLE_S + 0.5
+    assert run.navigated_at is None
+
+
+def test_timeout_is_not_waited_on() -> None:
+    run = _loaded_run()
+    run.cdp = _LateNavigationCdp(run, [])
+    run.settle_after(browser_check.CdpTimeout("Runtime.evaluate: no reply within 15 s"))
+    assert run.cdp.sent == []
+
+
 def test_temp_dir_failure_is_reported(tmp_path: Path, monkeypatch) -> None:
     """An unwritable temp directory degrades to a note; check_deck never raises."""
     def no_space(**_kwargs):
