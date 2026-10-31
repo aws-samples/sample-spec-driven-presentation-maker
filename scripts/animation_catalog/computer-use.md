@@ -14,6 +14,37 @@ a maintainer promotes those entries.
 than as coverage: Box ▸ Effect Options ▸ From Right. See "Driving mechanics"
 below for the method and "What the pilot capture established" for its result.
 
+## This is the only route to an animation value
+
+> `add effect` is declared in `PowerPoint.sdef` but **PowerPoint for Mac
+> 16.113.1 does not implement it** on `main sequence`. In the 2026-10-31
+> scripting-oracle run, all 150 `MsoAnimEffect` candidates were refused with
+> one identical error:
+>
+> ```
+> main sequence of timeline of slide N of presentation "Presentation1"
+> doesn't understand the "add effect" message.
+> ```
+>
+> No slide in that run's package carries a `p:timing` tree. The evidence is
+> checked in at `tests/fixtures/animations/oracle-16.113.1/`, and each refused
+> candidate's catalog entry records the error in its `capture` block.
+
+Two consequences, both load-bearing for the steps below:
+
+1. **Do not rewrite the AppleScript animation probes.** `probeAnimations`,
+   `probeDirections`, `probeTriggers`, `probeBuildLevels`, `probeTextUnits`,
+   `probeBehaviors` and `probeAfterEffects` all begin by adding an effect, so
+   no terminology fix can make them work in this build. Steps 3 to 10 of this
+   file are the *only* way to capture an animation value: every remaining
+   capture-required animation entry and every unresolved behavior payload has
+   to come through the Accessibility API, by hand, through this procedure.
+2. **The transition steps are already closed**, and not from here. The
+   scripting oracle applies a candidate by enumerator code, which is what the
+   catalog is keyed on, so it settled the transition half outright — see
+   Steps 1 and 2. Transitions are scriptable in this build; animations are not.
+   That splits the remaining work by mechanism rather than by effort.
+
 ## Baseline
 
 | Item | Value |
@@ -163,37 +194,40 @@ with both motion switches off, then saved and extracted offline:
 - The catalog's predicted `p14:prism`, `p:fade` fallback, `p14` strategy,
   `alternateContent: true` and `legacySpeed: "slow"` are all confirmed.
 - The direction is carried by **`isInverted`**, not a `dir` attribute — which
-  is the question Step 1 says to answer.
-- The catalog's `defaultDurationMs: 1000` for Box is **wrong**: PowerPoint
-  wrote `p14:dur="1600"`, and the ribbon's Duration field read `01.60`.
+  is the question Step 1 asked.
+- Box's duration is **1600 ms**: PowerPoint wrote `p14:dur="1600"` and the
+  ribbon's Duration field read `01.60`, which is what
+  `ooxml.defaultDurationMs` now carries. (The later scripting-oracle run reads
+  `2000` for every effect, because it set the entry effect and nothing else and
+  the probe slide already carried that duration. A ribbon-applied value is the
+  effect's own default; a scripted one is not.)
 
-## Step 1 — transition directions on extension elements
+## Step 1 — transition directions on extension elements — **CLOSED**
 
-Covers every `EPPEntryEffect` candidate whose `ooxml.gap` mentions an extension
-attribute: the non-default directions of Box, Cube, Rotate, Orbit, Doors,
-Window, Switch, Flip, Gallery, Pan, Ferris Wheel, Conveyor, Vortex, Ripple,
-Glitter, Shred, Reveal, Fly Through, and the `p15:prstTrans` mirror variants
-(Fall Over, Drape, Wind, Peel Off, Page Curl, Airplane, Origami).
+Closed on 2026-10-31 by the scripting oracle, not from here. It applied all 207
+`EPPEntryEffect` candidates **by enumerator code** and kept what PowerPoint
+wrote, which is the mapping the catalog is keyed on; applying by GUI label
+cannot produce it — Box ▸ "From Right" writes `p14:prism isInverted="1"` with
+no `dir`, while `entry effect box right` writes `dir="r" isInverted="1"`, so the
+label and the enumerator are not the same value.
 
-For each tile and each direction:
+Evidence: `tests/fixtures/animations/oracle-16.113.1/`. The entries carry
+`verification: "scriptingOracleCapture"` and a `capture` block naming the slide
+and the measured attributes. Nothing here needs recapturing unless the
+application version changes; if it does, rerun the oracle rather than the GUI.
 
-1. Select slide 2. Open **Transitions**.
-2. Click the tile. The captured default is already in the catalog; skip it.
-3. Open **Effect Options** and choose the direction.
-4. Save as `<guiKey>--<direction>.pptx`, close, reopen, confirm **Effect
-   Options** still shows the direction, and capture the four evidence files.
+The capture also corrected 15 directions the catalog had read off the
+enumerator's name — `entry effect cube right` is `dir="u"`, `cube up` is
+`dir="r"` — and moved `entry effect wheel reverse 1 spoke` from a guessed
+`reverse` attribute on `p:wheel` to the `p14:wheelReverse` element PowerPoint
+actually writes.
 
-What to look for in the XML: whether the direction is a `dir` attribute, an
-`invX`/`invY` boolean, or a different `prst` value. The catalog's current guess
-is in `ooxml.attributes`; replace it with what PowerPoint wrote and drop
-`requiresCapture`.
+## Step 2 — Page Curl Single and the mirror variants — **CLOSED**
 
-## Step 2 — Page Curl Single and the mirror variants
-
-`entry effect page curl single left/right` share the Page Curl tile with
-`pageCurlDouble`, which is the captured default. Use **Effect Options ▸ Single
-Left / Single Right / Double Left / Double Right** and record which `prst` value
-and which `invX` each of the four produces.
+Closed by the same run. `entry effect page curl single left/right` write
+`p15:prstTrans prst="pageCurlSingle"`, and the mirror of each `p15:prstTrans`
+variant is carried by `invX="1"` on the **left**-hand enumerator, which is the
+opposite of what the catalog had inferred for Airplane, Origami and Wind.
 
 ## Step 3 — After animation (dim, hide, hide on next click)
 

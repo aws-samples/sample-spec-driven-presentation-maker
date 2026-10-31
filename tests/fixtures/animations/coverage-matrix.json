@@ -13,7 +13,7 @@
   },
   "source": {
     "catalog": "sdpm/references/catalogs/powerpoint-animation-catalog.json",
-    "catalogDigest": "sha256:fda8cece3c12aaad132ef33529e92c2681ec0c4af0735093ff5a49b6e8b20ba6",
+    "catalogDigest": "sha256:d262b48f316e80c4af4574bfee1bb43475f6c6a84352556bc0fef26a8635c326",
     "catalogGeneratedAt": "2026-10-30T00:00:00Z",
     "guiManifest": "powerpoint-gui-surface-16.113.1.json@2026-10-30.1",
     "baseline": {
@@ -2066,7 +2066,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 56,
-      "formEstablishedMembers": 54,
+      "formEstablishedMembers": 55,
       "formEstablishedCatalogKey": "transition.gallery.clock",
       "note": "catalog-pinned value 1000; the catalog establishes 21 distinct value(s) for this path"
     },
@@ -2184,7 +2184,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 95,
-      "formEstablishedMembers": 44,
+      "formEstablishedMembers": 95,
       "formEstablishedCatalogKey": "transition.gallery.box"
     },
     {
@@ -2197,7 +2197,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 31,
-      "formEstablishedMembers": 22,
+      "formEstablishedMembers": 31,
       "formEstablishedCatalogKey": "transition.gallery.airplane"
     },
     {
@@ -2314,7 +2314,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 95,
-      "formEstablishedMembers": 44,
+      "formEstablishedMembers": 95,
       "formEstablishedCatalogKey": "transition.gallery.box"
     },
     {
@@ -2327,7 +2327,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 31,
-      "formEstablishedMembers": 22,
+      "formEstablishedMembers": 31,
       "formEstablishedCatalogKey": "transition.gallery.airplane"
     },
     {
@@ -2379,7 +2379,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 95,
-      "formEstablishedMembers": 44,
+      "formEstablishedMembers": 95,
       "formEstablishedCatalogKey": "transition.gallery.box"
     },
     {
@@ -2392,7 +2392,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 31,
-      "formEstablishedMembers": 22,
+      "formEstablishedMembers": 31,
       "formEstablishedCatalogKey": "transition.gallery.airplane"
     },
     {
@@ -2526,7 +2526,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.airplane"
     },
     {
@@ -2552,7 +2552,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.box"
     },
     {
@@ -2604,7 +2604,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.conveyor"
     },
     {
@@ -2643,7 +2643,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.cube"
     },
     {
@@ -2708,7 +2708,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.doors"
     },
     {
@@ -2721,7 +2721,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.drape"
     },
     {
@@ -2747,7 +2747,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.fallOver"
     },
     {
@@ -2760,7 +2760,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.ferris"
     },
     {
@@ -2773,7 +2773,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 4,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.flash"
     },
     {
@@ -2786,7 +2786,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.flip"
     },
     {
@@ -2799,7 +2799,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.flythrough"
     },
     {
@@ -2825,7 +2825,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.gallery"
     },
     {
@@ -2838,7 +2838,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 9,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 9,
       "formEstablishedCatalogKey": "transition.gallery.glitter"
     },
     {
@@ -2890,7 +2890,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.orbit"
     },
     {
@@ -2903,7 +2903,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.origami"
     },
     {
@@ -2916,7 +2916,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.pageCurl"
     },
     {
@@ -2929,7 +2929,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.pan"
     },
     {
@@ -2942,7 +2942,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.peelOff"
     },
     {
@@ -3020,7 +3020,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.reveal"
     },
     {
@@ -3033,7 +3033,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 6,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 6,
       "formEstablishedCatalogKey": "transition.gallery.ripple"
     },
     {
@@ -3046,7 +3046,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.rotate"
     },
     {
@@ -3072,7 +3072,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.shred"
     },
     {
@@ -3111,7 +3111,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.switch"
     },
     {
@@ -3137,7 +3137,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 5,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 5,
       "formEstablishedCatalogKey": "transition.gallery.vortex"
     },
     {
@@ -3163,7 +3163,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.wind"
     },
     {
@@ -3176,7 +3176,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.window"
     },
     {
@@ -3202,7 +3202,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 4,
-      "formEstablishedMembers": 3,
+      "formEstablishedMembers": 4,
       "formEstablishedCatalogKey": "transition.gallery.zoom"
     },
     {
@@ -3215,7 +3215,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 88,
-      "formEstablishedMembers": 60,
+      "formEstablishedMembers": 88,
       "formEstablishedCatalogKey": "transition.gallery.blinds"
     },
     {
@@ -3225,11 +3225,11 @@
       "catalogKey": "EPPEntryEffect.entry effect fly through out bounce",
       "catalogGroup": "candidates",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "scriptingOracleCapture",
       "members": 1,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
+      "formEstablishedMembers": 1,
+      "formEstablishedCatalogKey": "EPPEntryEffect.entry effect fly through out bounce"
     },
     {
       "id": "transitionParameters:dir+isContent",
@@ -3238,11 +3238,11 @@
       "catalogKey": "EPPEntryEffect.entry effect rotate down",
       "catalogGroup": "candidates",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "scriptingOracleCapture",
       "members": 3,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
+      "formEstablishedMembers": 3,
+      "formEstablishedCatalogKey": "EPPEntryEffect.entry effect rotate down"
     },
     {
       "id": "transitionParameters:dir+isContent+isInverted",
@@ -3251,11 +3251,11 @@
       "catalogKey": "EPPEntryEffect.entry effect orbit down",
       "catalogGroup": "candidates",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "scriptingOracleCapture",
       "members": 3,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
+      "formEstablishedMembers": 3,
+      "formEstablishedCatalogKey": "EPPEntryEffect.entry effect orbit down"
     },
     {
       "id": "transitionParameters:dir+isInverted",
@@ -3264,11 +3264,11 @@
       "catalogKey": "EPPEntryEffect.entry effect box down",
       "catalogGroup": "candidates",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "scriptingOracleCapture",
       "members": 3,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
+      "formEstablishedMembers": 3,
+      "formEstablishedCatalogKey": "EPPEntryEffect.entry effect box down"
     },
     {
       "id": "transitionParameters:dir+orient",
@@ -3277,8 +3277,8 @@
       "catalogKey": "EPPEntryEffect.entry effect split horizontal in",
       "catalogGroup": "candidates",
       "status": "accepted",
-      "capabilityLevel": "presetMapping",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "scriptingOracleCapture",
       "members": 4,
       "formEstablishedMembers": 4,
       "formEstablishedCatalogKey": "EPPEntryEffect.entry effect split horizontal in"
@@ -3290,11 +3290,11 @@
       "catalogKey": "EPPEntryEffect.entry effect glitter diamond down",
       "catalogGroup": "candidates",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 7,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
+      "capabilityLevel": "nativeTemplate",
+      "verification": "scriptingOracleCapture",
+      "members": 8,
+      "formEstablishedMembers": 8,
+      "formEstablishedCatalogKey": "EPPEntryEffect.entry effect glitter diamond down"
     },
     {
       "id": "transitionParameters:dir+thruBlk",
@@ -3303,11 +3303,11 @@
       "catalogKey": "EPPEntryEffect.entry effect reveal black right",
       "catalogGroup": "candidates",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "scriptingOracleCapture",
       "members": 1,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
+      "formEstablishedMembers": 1,
+      "formEstablishedCatalogKey": "EPPEntryEffect.entry effect reveal black right"
     },
     {
       "id": "transitionParameters:hasBounce",
@@ -3316,24 +3316,24 @@
       "catalogKey": "EPPEntryEffect.entry effect fly through in bounce",
       "catalogGroup": "candidates",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "scriptingOracleCapture",
       "members": 1,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
+      "formEstablishedMembers": 1,
+      "formEstablishedCatalogKey": "EPPEntryEffect.entry effect fly through in bounce"
     },
     {
       "id": "transitionParameters:invX+prst",
       "axis": "transitionParameters",
       "value": "invX+prst",
-      "catalogKey": "EPPEntryEffect.entry effect airplane right",
+      "catalogKey": "EPPEntryEffect.entry effect airplane left",
       "catalogGroup": "candidates",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "scriptingOracleCapture",
       "members": 8,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
+      "formEstablishedMembers": 8,
+      "formEstablishedCatalogKey": "EPPEntryEffect.entry effect airplane left"
     },
     {
       "id": "transitionParameters:isContent",
@@ -3384,7 +3384,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 52,
-      "formEstablishedMembers": 49,
+      "formEstablishedMembers": 50,
       "formEstablishedCatalogKey": "transition.gallery.checker"
     },
     {
@@ -3409,8 +3409,8 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
-      "members": 4,
-      "formEstablishedMembers": 2,
+      "members": 3,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "transition.gallery.glitter"
     },
     {
@@ -3423,7 +3423,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 23,
-      "formEstablishedMembers": 22,
+      "formEstablishedMembers": 23,
       "formEstablishedCatalogKey": "transition.gallery.airplane"
     },
     {
@@ -3459,10 +3459,10 @@
       "catalogKey": "EPPEntryEffect.entry effect cut black",
       "catalogGroup": "candidates",
       "status": "accepted",
-      "capabilityLevel": "presetMapping",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "scriptingOracleCapture",
       "members": 3,
-      "formEstablishedMembers": 2,
+      "formEstablishedMembers": 3,
       "formEstablishedCatalogKey": "EPPEntryEffect.entry effect cut black"
     },
     {

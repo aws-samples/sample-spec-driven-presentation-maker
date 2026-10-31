@@ -47,12 +47,19 @@ NS = {
 #: tile, and the EPPEntryEffect variants. ``controls`` are the accepted
 #: transition entries that modify a transition (duration, advance, sound,
 #: Morph object matching) instead of choosing its element.
+#: The scripting-oracle capture under
+#: ``tests/fixtures/animations/oracle-16.113.1`` asked PowerPoint for every
+#: EPPEntryEffect value and kept what it wrote, so no transition element entry
+#: is capture-required any more: ``refused`` is 0 and the 60 refusals that were
+#: split ``{"p14": 50, "p15": 9, "standard": 1}`` are now generated from their
+#: own measurement. The two refused entries left on the transition side are the
+#: sound controls, whose relationship form the capture does not contain.
 TRANSITION_COVERAGE = {
     "galleryTiles": 49,
     "acceptedTiles": 48,
-    "generated": 154,
-    "refused": 60,
-    "refusedByStrategy": {"p14": 50, "p15": 9, "standard": 1},
+    "generated": 213,
+    "refused": 1,
+    "refusedByStrategy": {"standard": 1},
     "controls": 6,
     "controlStrategies": {"attribute", "shapeName", "relationship"},
     "refusedControls": {"transition.sound.effect", "transition.sound.loopUntilNext"},
@@ -282,19 +289,51 @@ def test_split_carries_both_orientation_and_direction():
     assert (split.get("orient"), split.get("dir")) == ("horz", "out")
 
 
-def test_page_curl_single_and_double_are_distinguishable_values(index):
+def test_page_curl_single_and_double_are_distinguishable_values(index, catalog):
+    """Both Page Curl variants are now written, and they stay distinguishable.
+
+    The single-page variant used to be refused as capture-required; the
+    scripting-oracle capture asked PowerPoint for ``entry effect page curl
+    single left`` and it wrote ``prst="pageCurlSingle"``, so the entry is
+    generated from that measurement instead of raising.
+    """
     node, report = _node("pageCurl")
     assert node.xpath(".//p15:prstTrans/@prst", namespaces=NS) == ["pageCurlDouble"]
-    with pytest.raises(CapabilityGapError) as error:
-        build_transition(_transition("pageCurl", parameters={"prst": "pageCurlSingle"}), index=index)
-    assert error.value.key == "EPPEntryEffect.entry effect page curl single left"
+    single, _report = build_transition(
+        _transition("pageCurl", parameters={"prst": "pageCurlSingle"}), index=index
+    )
+    assert single.xpath(".//p15:prstTrans/@prst", namespaces=NS) == ["pageCurlSingle"]
+    entry = next(
+        row for row in catalog["candidates"]
+        if row["key"] == "EPPEntryEffect.entry effect page curl single left"
+    )
+    assert entry["ooxml"]["attributes"] == {"prst": "pageCurlSingle"}
+    assert entry["verification"] == "scriptingOracleCapture"
 
 
-def test_an_uncaptured_extension_variant_is_refused_with_its_catalog_gap(index):
+def test_a_captured_extension_variant_is_written_and_an_uncaptured_one_is_still_refused(index, catalog):
+    """Vortex Left was the catalog's example of a refused extension variant.
+
+    The capture closed it: PowerPoint wrote a bare ``<p14:vortex/>`` for the
+    enumerator, with ``dir`` left at its default, so the variant is written
+    rather than approximated. The refusal path itself is unchanged, and the
+    transition surface still has entries on it - the sound controls, whose
+    relationship form no capture contains.
+    """
+    node, _report = build_transition(_transition("vortex", parameters={"dir": "l"}), index=index)
+    assert node.xpath(".//p14:vortex/@dir", namespaces=NS) == ["l"]
+    entry = next(
+        row for row in catalog["candidates"] if row["key"] == "EPPEntryEffect.entry effect vortex left"
+    )
+    assert entry["verification"] == "scriptingOracleCapture"
+    assert entry["capture"]["attributes"] == {}, "PowerPoint wrote no attributes for this value"
+
     with pytest.raises(CapabilityGapError) as error:
-        build_transition(_transition("vortex", parameters={"dir": "l"}), index=index)
-    assert error.value.key == "EPPEntryEffect.entry effect vortex left"
-    assert "semantic-preservation-only" in str(error.value)
+        build_transition(
+            _transition("fade", duration=700, sound={"src": "audio/chime.wav", "mediaType": "audio/wav"}),
+            index=index,
+        )
+    assert error.value.key == "transition.sound.effect"
     assert "refuses to approximate" in str(error.value)
 
 
@@ -523,10 +562,18 @@ def test_catalog_transition_coverage_is_counted(coverage, index):
         assert index.entry(record.key).gap
         by_strategy[record.strategy] = by_strategy.get(record.strategy, 0) + 1
     assert by_strategy == TRANSITION_COVERAGE["refusedByStrategy"]
-    # The single refused standard element is Wheel Reverse, whose reverse
-    # attribute the capture does not contain.
+    # Wheel Reverse is the single refused standard element, and it is the only
+    # transition element entry left. The catalog had guessed a reverse
+    # attribute on p:wheel; the scripting-oracle capture shows PowerPoint
+    # writing p14:wheelReverse, where "reverse" is the element name and no
+    # attribute carries it, so a parameter set cannot select the measured form.
+    # The gap is therefore about authoring rather than about capture.
     standard = [record.key for record in refused if record.strategy == "standard"]
     assert standard == ["EPPEntryEffect.entry effect wheel reverse 1 spoke"]
+    wheel_reverse = index.entry(standard[0])
+    assert wheel_reverse.ooxml["element"] == "p:wheel"
+    assert "p14:wheelReverse" in wheel_reverse.gap
+    assert not wheel_reverse.writable
 
 
 def test_transition_controls_are_counted_in_the_same_pass(coverage):

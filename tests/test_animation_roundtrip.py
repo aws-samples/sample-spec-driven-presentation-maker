@@ -41,7 +41,12 @@ A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 #: Counted bidirectional coverage of the checked-in catalog. A form counts only
 #: when the writer can emit it *and* the reader can turn the emitted XML back
 #: into the same semantic JSON.
-BIDIRECTIONAL_COVERAGE = {"transitions": 93, "presets": 25}
+#: Reversible forms in the catalog. The transition count rose from 93 to 147
+#: when the scripting-oracle capture under
+#: ``tests/fixtures/animations/oracle-16.113.1`` closed the last transition
+#: gaps: an entry with no established element form has no inverse mapping
+#: either, so closing the gap makes it reversible in both directions.
+BIDIRECTIONAL_COVERAGE = {"transitions": 147, "presets": 25}
 
 FADE = {"category": "entrance", "effect": "fade", "variant": None}
 

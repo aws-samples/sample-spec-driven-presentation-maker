@@ -63,9 +63,26 @@
 --     presetID, presetSubtype, motion-path geometry and the extension-namespace
 --                            transition attributes are package-only facts in
 --                            every case; the Python side parses them.
---   Nothing here is promoted to a verified capability level by this script.
---   generate.py only reads its output when a maintainer deliberately promotes
---   an entry, and the capability level then names the artefact it came from.
+--   Nothing here promotes anything by itself. A maintainer runs this script,
+--   keeps its output as a fixture, and generate.py --write folds that checked-in
+--   fixture into the catalog, where each promoted entry names the artefact its
+--   values came from.
+--
+-- WHAT THIS BUILD WILL NOT DO: "add effect"
+--   The 2026-10-31 run (kept in tests/fixtures/animations/oracle-16.113.1)
+--   probed all 207 EPPEntryEffect candidates successfully and every one of the
+--   150 MsoAnimEffect candidates was refused with the same error:
+--     main sequence of timeline of slide N of presentation "Presentation1"
+--     doesn't understand the "add effect" message.
+--   No slide in that package carries a p:timing tree. "add effect" is declared
+--   in PowerPoint.sdef but PowerPoint for Mac 16.113.1 does not implement it on
+--   "main sequence", so probeAnimations, probeDirections, probeTriggers,
+--   probeBuildLevels, probeTextUnits, probeBehaviors and probeAfterEffects -
+--   all of which begin by adding an effect - cannot work in this build, and no
+--   terminology fix will change that. Do not rewrite them: every animation-side
+--   capture has to go through the GUI procedure in
+--   scripts/animation_catalog/computer-use.md. Transitions are scriptable here
+--   and animations are not, which splits the remaining work by mechanism.
 
 property kRunToken : "--run-powerpoint"
 property kProbeShapeName : "sdpmOracleProbe"
@@ -105,17 +122,72 @@ on captureCatalog(outDir)
 		my kv("driver", "scripting dictionary"), ¬
 		my kvRaw("usesVisualBasic", "false")}))
 
-	my probeTransitions(readbackPath, probe)
-	my probeAnimations(readbackPath, probe)
-	my probeDirections(readbackPath, probe)
-	my probeTriggers(readbackPath, probe)
-	my probeBuildLevels(readbackPath, probe)
-	my probeTextUnits(readbackPath, probe)
-	my probeBehaviors(readbackPath, probe)
-	my probeAfterEffects(readbackPath, probe)
+	-- Each probe is contained and snapshotted. A capture run is expensive and
+	-- partially valuable by nature: on 2026-10-31 one bad term in the fourth
+	-- probe threw away 357 candidates that had already been applied, because
+	-- the failure propagated out of captureCatalog before savePackage ran and
+	-- only a hand save of the still-open deck recovered them. A failing probe
+	-- is now a record like any other, the run continues to the next one, the
+	-- package is written after every probe, and savePackage always runs.
+	repeat with probeName in {"probeTransitions", "probeAnimations", "probeDirections", ¬
+		"probeTriggers", "probeBuildLevels", "probeTextUnits", "probeBehaviors", "probeAfterEffects"}
+		my runProbe(readbackPath, probe, packagePath, contents of probeName)
+	end repeat
 	my savePackage(readbackPath, probe, packagePath)
 	return readbackPath
 end captureCatalog
+
+-- Run one probe, record whatever it does, and keep the run alive. The snapshot
+-- after each probe means even a crash inside savePackage leaves the applied
+-- candidates on disk.
+on runProbe(readbackPath, probe, packagePath, probeName)
+	set failure to missing value
+	try
+		if probeName is "probeTransitions" then
+			my probeTransitions(readbackPath, probe)
+		else if probeName is "probeAnimations" then
+			my probeAnimations(readbackPath, probe)
+		else if probeName is "probeDirections" then
+			my probeDirections(readbackPath, probe)
+		else if probeName is "probeTriggers" then
+			my probeTriggers(readbackPath, probe)
+		else if probeName is "probeBuildLevels" then
+			my probeBuildLevels(readbackPath, probe)
+		else if probeName is "probeTextUnits" then
+			my probeTextUnits(readbackPath, probe)
+		else if probeName is "probeBehaviors" then
+			my probeBehaviors(readbackPath, probe)
+		else if probeName is "probeAfterEffects" then
+			my probeAfterEffects(readbackPath, probe)
+		else
+			error "unknown probe: " & probeName
+		end if
+	on error errText number errNum
+		set failure to {errText, errNum}
+	end try
+	my emit(readbackPath, my rec({my kv("record", "probe"), ¬
+		my kv("probe", probeName)} & my failed(failure)))
+	my saveSnapshot(readbackPath, probe, packagePath, probeName)
+end runProbe
+
+-- Write the probe deck out where it stands, so a later failure cannot discard
+-- what has already been applied. Contained for the same reason.
+on saveSnapshot(readbackPath, probe, packagePath, afterProbe)
+	set failure to missing value
+	set slideCount to 0
+	try
+		tell application "Microsoft PowerPoint"
+			save probe in (POSIX file packagePath) as save as Open XML presentation
+			set slideCount to count of slides of probe
+		end tell
+	on error errText number errNum
+		set failure to {errText, errNum}
+	end try
+	my emit(readbackPath, my rec({my kv("record", "snapshot"), ¬
+		my kv("afterProbe", afterProbe), ¬
+		my kv("path", packagePath), ¬
+		my kvRaw("slideCount", slideCount as string)} & my failed(failure)))
+end saveSnapshot
 
 -- EPPEntryEffect: set on the slide's own transition object and read straight
 -- back, then confirmed again after the save/reopen round trip.
@@ -389,33 +461,101 @@ end probeAfterEffects
 on savePackage(readbackPath, probe, packagePath)
 	set eppConstants to my eppEntryEffectConstants()
 	set eppNames to my eppEntryEffectNames()
-	tell application "Microsoft PowerPoint"
-		save probe in (POSIX file packagePath) as save as Open XML presentation
-		set slideCount to count of slides of probe
-		close probe saving no
-		open (POSIX file packagePath)
-		set reopened to active presentation
-	end tell
-	repeat with k from 1 to slideCount
+	set slideCount to 0
+	set failure to missing value
+	try
 		tell application "Microsoft PowerPoint"
-			set theSlide to slide k of reopened
-			set appliedIndex to my valueIndex(eppConstants, entry effect of slide show transition of theSlide)
-			set effectCount to count of effects of main sequence of timeline of theSlide
+			save probe in (POSIX file packagePath) as save as Open XML presentation
+			set slideCount to count of slides of probe
+			close probe saving no
+			open (POSIX file packagePath)
+			set reopened to active presentation
 		end tell
-		my emit(readbackPath, my rec({my kv("record", "reopened"), ¬
-			my kvRaw("slideIndex", k as string), ¬
-			my applied2("entryEffect", eppNames, appliedIndex), ¬
-			my kvRaw("effectCount", effectCount as string)}))
-	end repeat
-	tell application "Microsoft PowerPoint"
-		close reopened saving no
-	end tell
+		repeat with k from 1 to slideCount
+			set rowFailure to missing value
+			set appliedIndex to 0
+			set effectCount to 0
+			try
+				tell application "Microsoft PowerPoint"
+					set theSlide to slide k of reopened
+					set appliedIndex to my valueIndex(eppConstants, ¬
+						entry effect of slide show transition of theSlide)
+					set effectCount to count of effects of main sequence of timeline of theSlide
+				end tell
+			on error errText number errNum
+				set rowFailure to {errText, errNum}
+			end try
+			my emit(readbackPath, my rec({my kv("record", "reopened"), ¬
+				my kvRaw("slideIndex", k as string), ¬
+				my applied2("entryEffect", eppNames, appliedIndex), ¬
+				my kvRaw("effectCount", effectCount as string)} & my failed(rowFailure)))
+		end repeat
+		tell application "Microsoft PowerPoint"
+			close reopened saving no
+		end tell
+	on error errText number errNum
+		set failure to {errText, errNum}
+	end try
+	if failure is not missing value then
+		my emit(readbackPath, my rec({my kv("record", "saveFailure"), ¬
+			my kv("path", packagePath), ¬
+			my kv("note", "the package written by the last snapshot is still on disk and can be analysed as it stands")} & ¬
+			my failed(failure)))
+	end if
 	my emit(readbackPath, my rec({my kv("record", "package"), ¬
 		my kv("path", packagePath), ¬
 		my kvRaw("slideCount", slideCount as string), ¬
 		my kv("parser", "scripts/animation_catalog/generate.py --parse-oracle <output directory>"), ¬
 		my kv("note", "presetID, presetSubtype, trigger node types, after-effect values, motion-path geometry and extension-namespace transition attributes are resolved from this package, not from the dictionary")}))
 end savePackage
+
+-- ---------------------------------------------------------------------------
+-- Candidate constants, named by code rather than by term
+-- ---------------------------------------------------------------------------
+-- The generated arrays below call enumConstant with twelve characters: the
+-- four-character type code of the enumeration, then the enumerator's own eight
+-- hexadecimal digits. An Apple Event enumerator is exactly that - a descriptor
+-- of the enumeration's type carrying the enumerator's four bytes - and
+-- AppleScript's raw constant syntax takes those bytes literally, so
+-- "run script" is the one way to build one from a code without writing control
+-- characters into this file.
+--
+-- WHY NOT THE ENUMERATOR TERM ITSELF
+--   A bare term inside "using terms from" is ambiguous twice over, and the
+--   2026-10-31 capture was lost to the first kind:
+--     top, font bold, font italic (MsoAnimDirection) and dim
+--     (MsoAnimAfterEffect) are also PowerPoint PROPERTY names, so the compiler
+--     resolves them as property references and evaluating one raises
+--     "Can't get <class> (-1728)", which aborts the whole array.
+--     horizontal and vertical (MsoAnimDirection) compile to constants of a
+--     DIFFERENT enumeration - TxOr, text orientation - which is worse: nothing
+--     fails, the probe applies the wrong value, and the record names the value
+--     that was asked for.
+--   Naming every candidate by code removes both classes by construction.
+--
+-- WHY NOT A RAW «data ...» LITERAL
+--   «data pEeF00F60F55» compiles and keeps its type, but its AppleScript class
+--   is "data", not "constant": it compares unequal to the value PowerPoint
+--   reports back, so valueIndex would find nothing and every record would
+--   claim "applied": null. A constant built here compares equal to the term it
+--   names, which is what keeps the read-back comparison honest.
+on enumConstant(typedCode)
+	set theBytes to ""
+	repeat with i in {5, 7, 9, 11}
+		set theHigh to my hexDigit(character (contents of i) of typedCode)
+		set theLow to my hexDigit(character ((contents of i) + 1) of typedCode)
+		set theBytes to theBytes & (ASCII character (theHigh * 16 + theLow))
+	end repeat
+	return run script ("«constant " & (text 1 thru 4 of typedCode) & theBytes & "»")
+end enumConstant
+
+on hexDigit(theChar)
+	set theDigits to "0123456789ABCDEF"
+	repeat with i from 1 to 16
+		if character i of theDigits is theChar then return i - 1
+	end repeat
+	error "the candidate code carries a character that is not a hexadecimal digit: " & theChar
+end hexDigit
 
 on makeProbeShape(theSlide)
 	tell application "Microsoft PowerPoint"
@@ -510,165 +650,165 @@ end replaceText
 -- every name and every code in this region against the scripting definition,
 -- so a PowerPoint upgrade shows up as a failure rather than as silent drift.
 --
--- Each enumeration gets three parallel arrays: the enum constants themselves,
--- resolved at compile time inside a "using terms from" block so no
--- name-to-constant mapper is needed at run time; their sdef names, for the
--- JSONL records; and their sdef codes, for drift detection.
+-- Each enumeration gets three parallel arrays: the constants, each named by
+-- its enumeration type code plus its own enumerator code and built by
+-- enumConstant rather than written as a bare AppleScript term, which would be
+-- ambiguous against PowerPoint's property names and against other
+-- enumerations; their sdef names, for the JSONL records; and their sdef codes,
+-- for drift detection.
 
--- MsoAnimEffect: 150 candidates
+-- MsoAnimEffect: 150 candidates, type code AnFX
 on msoAnimEffectConstants()
-	using terms from application "Microsoft PowerPoint"
-		return {animation type custom, ¬
-			animation type appear, ¬
-			animation type fly, ¬
-			animation type blinds, ¬
-			animation type box, ¬
-			animation type checkerboard, ¬
-			animation type circle, ¬
-			animation type crawl, ¬
-			animation type diamond, ¬
-			animation type dissolve, ¬
-			animation type fade, ¬
-			animation type flash once, ¬
-			animation type peek, ¬
-			animation type plus, ¬
-			animation type random bars, ¬
-			animation type spiral, ¬
-			animation type split, ¬
-			animation type stretch, ¬
-			animation type strips, ¬
-			animation type swivel, ¬
-			animation type wedge, ¬
-			animation type wheel, ¬
-			animation type wipe, ¬
-			animation type zoom, ¬
-			animation type random effect, ¬
-			animation type boomerang, ¬
-			animation type bounce, ¬
-			animation type color reveal, ¬
-			animation type credits, ¬
-			animation type ease in, ¬
-			animation type float, ¬
-			animation type grow and turn, ¬
-			animation type light speed, ¬
-			animation type pinwheel, ¬
-			animation type rise up, ¬
-			animation type swish, ¬
-			animation type thin line, ¬
-			animation type unfold, ¬
-			animation type whip, ¬
-			animation type ascend, ¬
-			animation type center revolve, ¬
-			animation type faded swivel, ¬
-			animation type descend, ¬
-			animation type sling, ¬
-			animation type spinner, ¬
-			animation type stretchy, ¬
-			animation type zip, ¬
-			animation type arc up, ¬
-			animation type fade zoom, ¬
-			animation type glide, ¬
-			animation type expand, ¬
-			animation type flip, ¬
-			animation type shimmer, ¬
-			animation type fold, ¬
-			animation type change fill color, ¬
-			animation type change font, ¬
-			animation type change font color, ¬
-			animation type change font size, ¬
-			animation type change font style, ¬
-			animation type grow shrink, ¬
-			animation type change line color, ¬
-			animation type spin, ¬
-			animation type transparency, ¬
-			animation type bold flash, ¬
-			animation type blast, ¬
-			animation type bold reveal, ¬
-			animation type brush on color, ¬
-			animation type brush on underline, ¬
-			animation type color blend, ¬
-			animation type color wave, ¬
-			animation type complementary color, ¬
-			animation type complementary color 2, ¬
-			animation type constrasting color, ¬
-			animation type darken, ¬
-			animation type desaturate, ¬
-			animation type flash bulb, ¬
-			animation type flicker, ¬
-			animation type grow with color, ¬
-			animation type lighten, ¬
-			animation type style emphasis, ¬
-			animation type teeter, ¬
-			animation type vertical grow, ¬
-			animation type wave, ¬
-			animation type media play, ¬
-			animation type media pause, ¬
-			animation type media stop, ¬
-			animation type circle path, ¬
-			animation type right triangle path, ¬
-			animation type diamond path, ¬
-			animation type hexagon path, ¬
-			animation type 5 point star path, ¬
-			animation type crescent moon path, ¬
-			animation type square path, ¬
-			animation type trapezoid path, ¬
-			animation type heart path, ¬
-			animation type octagon path, ¬
-			animation type 6 point star path, ¬
-			animation type football path, ¬
-			animation type equal triangle path, ¬
-			animation type parallelogram path, ¬
-			animation type pentagon path, ¬
-			animation type 4 point star path, ¬
-			animation type 8 point star path, ¬
-			animation type teardrop path, ¬
-			animation type pointy star path, ¬
-			animation type curved square path, ¬
-			animation type curved x path, ¬
-			animation type vertical figure 8 path, ¬
-			animation type curvy star path, ¬
-			animation type loop de loop path, ¬
-			animation type buzzsaw path, ¬
-			animation type horizontal figure 8 path, ¬
-			animation type peanut path, ¬
-			animation type figure 8 four path, ¬
-			animation type neutron path, ¬
-			animation type swoosh path, ¬
-			animation type bean path, ¬
-			animation type plus path, ¬
-			animation type inverted triangle path, ¬
-			animation type inverted square path, ¬
-			animation type left path, ¬
-			animation type turn right path, ¬
-			animation type arc down path, ¬
-			animation type zigzag path, ¬
-			animation type s curve 2 path, ¬
-			animation type sine wave path, ¬
-			animation type bounce left path, ¬
-			animation type down path, ¬
-			animation type turn up path, ¬
-			animation type arc up path, ¬
-			animation type heartbeat path, ¬
-			animation type spiral right path, ¬
-			animation type wave path, ¬
-			animation type curvy left path, ¬
-			animation type diagonal down right path, ¬
-			animation type turn down path, ¬
-			animation type arc left path, ¬
-			animation type funnel path, ¬
-			animation type spring path, ¬
-			animation type bounce right path, ¬
-			animation type spiral left path, ¬
-			animation type diagonal up right path, ¬
-			animation type turn up right path, ¬
-			animation type arc right path, ¬
-			animation type s curve 1 path, ¬
-			animation type decaying wave path, ¬
-			animation type curvy right path, ¬
-			animation type stairs down path, ¬
-			animation type up path, ¬
-			animation type right path}
-	end using terms from
+	return {my enumConstant("AnFX01020000"), ¬
+		my enumConstant("AnFX01020001"), ¬
+		my enumConstant("AnFX01020002"), ¬
+		my enumConstant("AnFX01020003"), ¬
+		my enumConstant("AnFX01020004"), ¬
+		my enumConstant("AnFX01020005"), ¬
+		my enumConstant("AnFX01020006"), ¬
+		my enumConstant("AnFX01020007"), ¬
+		my enumConstant("AnFX01020008"), ¬
+		my enumConstant("AnFX01020009"), ¬
+		my enumConstant("AnFX0102000A"), ¬
+		my enumConstant("AnFX0102000B"), ¬
+		my enumConstant("AnFX0102000C"), ¬
+		my enumConstant("AnFX0102000D"), ¬
+		my enumConstant("AnFX0102000E"), ¬
+		my enumConstant("AnFX0102000F"), ¬
+		my enumConstant("AnFX01020010"), ¬
+		my enumConstant("AnFX01020011"), ¬
+		my enumConstant("AnFX01020012"), ¬
+		my enumConstant("AnFX01020013"), ¬
+		my enumConstant("AnFX01020014"), ¬
+		my enumConstant("AnFX01020015"), ¬
+		my enumConstant("AnFX01020016"), ¬
+		my enumConstant("AnFX01020017"), ¬
+		my enumConstant("AnFX01020018"), ¬
+		my enumConstant("AnFX01020019"), ¬
+		my enumConstant("AnFX0102001A"), ¬
+		my enumConstant("AnFX0102001B"), ¬
+		my enumConstant("AnFX0102001C"), ¬
+		my enumConstant("AnFX0102001D"), ¬
+		my enumConstant("AnFX0102001E"), ¬
+		my enumConstant("AnFX0102001F"), ¬
+		my enumConstant("AnFX01020020"), ¬
+		my enumConstant("AnFX01020021"), ¬
+		my enumConstant("AnFX01020022"), ¬
+		my enumConstant("AnFX01020023"), ¬
+		my enumConstant("AnFX01020024"), ¬
+		my enumConstant("AnFX01020025"), ¬
+		my enumConstant("AnFX01020026"), ¬
+		my enumConstant("AnFX01020027"), ¬
+		my enumConstant("AnFX01020028"), ¬
+		my enumConstant("AnFX01020029"), ¬
+		my enumConstant("AnFX0102002A"), ¬
+		my enumConstant("AnFX0102002B"), ¬
+		my enumConstant("AnFX0102002C"), ¬
+		my enumConstant("AnFX0102002D"), ¬
+		my enumConstant("AnFX0102002E"), ¬
+		my enumConstant("AnFX0102002F"), ¬
+		my enumConstant("AnFX01020030"), ¬
+		my enumConstant("AnFX01020031"), ¬
+		my enumConstant("AnFX01020032"), ¬
+		my enumConstant("AnFX01020033"), ¬
+		my enumConstant("AnFX01020034"), ¬
+		my enumConstant("AnFX01020035"), ¬
+		my enumConstant("AnFX01020036"), ¬
+		my enumConstant("AnFX01020037"), ¬
+		my enumConstant("AnFX01020038"), ¬
+		my enumConstant("AnFX01020039"), ¬
+		my enumConstant("AnFX0102003A"), ¬
+		my enumConstant("AnFX0102003B"), ¬
+		my enumConstant("AnFX0102003C"), ¬
+		my enumConstant("AnFX0102003D"), ¬
+		my enumConstant("AnFX0102003E"), ¬
+		my enumConstant("AnFX0102003F"), ¬
+		my enumConstant("AnFX01020040"), ¬
+		my enumConstant("AnFX01020041"), ¬
+		my enumConstant("AnFX01020042"), ¬
+		my enumConstant("AnFX01020043"), ¬
+		my enumConstant("AnFX01020044"), ¬
+		my enumConstant("AnFX01020045"), ¬
+		my enumConstant("AnFX01020046"), ¬
+		my enumConstant("AnFX01020047"), ¬
+		my enumConstant("AnFX01020048"), ¬
+		my enumConstant("AnFX01020049"), ¬
+		my enumConstant("AnFX0102004A"), ¬
+		my enumConstant("AnFX0102004B"), ¬
+		my enumConstant("AnFX0102004C"), ¬
+		my enumConstant("AnFX0102004D"), ¬
+		my enumConstant("AnFX0102004E"), ¬
+		my enumConstant("AnFX0102004F"), ¬
+		my enumConstant("AnFX01020050"), ¬
+		my enumConstant("AnFX01020051"), ¬
+		my enumConstant("AnFX01020052"), ¬
+		my enumConstant("AnFX01020053"), ¬
+		my enumConstant("AnFX01020054"), ¬
+		my enumConstant("AnFX01020055"), ¬
+		my enumConstant("AnFX01020056"), ¬
+		my enumConstant("AnFX01020057"), ¬
+		my enumConstant("AnFX01020058"), ¬
+		my enumConstant("AnFX01020059"), ¬
+		my enumConstant("AnFX0102005A"), ¬
+		my enumConstant("AnFX0102005B"), ¬
+		my enumConstant("AnFX0102005C"), ¬
+		my enumConstant("AnFX0102005D"), ¬
+		my enumConstant("AnFX0102005E"), ¬
+		my enumConstant("AnFX0102005F"), ¬
+		my enumConstant("AnFX01020060"), ¬
+		my enumConstant("AnFX01020061"), ¬
+		my enumConstant("AnFX01020062"), ¬
+		my enumConstant("AnFX01020063"), ¬
+		my enumConstant("AnFX01020064"), ¬
+		my enumConstant("AnFX01020065"), ¬
+		my enumConstant("AnFX01020066"), ¬
+		my enumConstant("AnFX01020067"), ¬
+		my enumConstant("AnFX01020068"), ¬
+		my enumConstant("AnFX01020069"), ¬
+		my enumConstant("AnFX0102006A"), ¬
+		my enumConstant("AnFX0102006B"), ¬
+		my enumConstant("AnFX0102006C"), ¬
+		my enumConstant("AnFX0102006D"), ¬
+		my enumConstant("AnFX0102006E"), ¬
+		my enumConstant("AnFX0102006F"), ¬
+		my enumConstant("AnFX01020070"), ¬
+		my enumConstant("AnFX01020071"), ¬
+		my enumConstant("AnFX01020072"), ¬
+		my enumConstant("AnFX01020073"), ¬
+		my enumConstant("AnFX01020074"), ¬
+		my enumConstant("AnFX01020075"), ¬
+		my enumConstant("AnFX01020076"), ¬
+		my enumConstant("AnFX01020077"), ¬
+		my enumConstant("AnFX01020078"), ¬
+		my enumConstant("AnFX01020079"), ¬
+		my enumConstant("AnFX0102007A"), ¬
+		my enumConstant("AnFX0102007B"), ¬
+		my enumConstant("AnFX0102007C"), ¬
+		my enumConstant("AnFX0102007D"), ¬
+		my enumConstant("AnFX0102007E"), ¬
+		my enumConstant("AnFX0102007F"), ¬
+		my enumConstant("AnFX01020080"), ¬
+		my enumConstant("AnFX01020081"), ¬
+		my enumConstant("AnFX01020082"), ¬
+		my enumConstant("AnFX01020083"), ¬
+		my enumConstant("AnFX01020084"), ¬
+		my enumConstant("AnFX01020085"), ¬
+		my enumConstant("AnFX01020086"), ¬
+		my enumConstant("AnFX01020087"), ¬
+		my enumConstant("AnFX01020088"), ¬
+		my enumConstant("AnFX01020089"), ¬
+		my enumConstant("AnFX0102008A"), ¬
+		my enumConstant("AnFX0102008B"), ¬
+		my enumConstant("AnFX0102008C"), ¬
+		my enumConstant("AnFX0102008D"), ¬
+		my enumConstant("AnFX0102008E"), ¬
+		my enumConstant("AnFX0102008F"), ¬
+		my enumConstant("AnFX01020090"), ¬
+		my enumConstant("AnFX01020091"), ¬
+		my enumConstant("AnFX01020092"), ¬
+		my enumConstant("AnFX01020093"), ¬
+		my enumConstant("AnFX01020094"), ¬
+		my enumConstant("AnFX01020095")}
 end msoAnimEffectConstants
 
 on msoAnimEffectNames()
@@ -977,55 +1117,53 @@ on msoAnimEffectCodes()
 		"0x01020095"}
 end msoAnimEffectCodes
 
--- MsoAnimDirection: 45 candidates
+-- MsoAnimDirection: 45 candidates, type code AnDi
 on msoAnimDirectionConstants()
-	using terms from application "Microsoft PowerPoint"
-		return {no direction, ¬
-			up, ¬
-			right, ¬
-			down, ¬
-			left, ¬
-			ordinal mask, ¬
-			up left, ¬
-			up right, ¬
-			down right, ¬
-			down left, ¬
-			top, ¬
-			bottom, ¬
-			top left, ¬
-			top right, ¬
-			bottom right, ¬
-			bottom left, ¬
-			horizontal, ¬
-			vertical, ¬
-			across, ¬
-			inward, ¬
-			out, ¬
-			clockwise, ¬
-			counterclockwise, ¬
-			horizontal in, ¬
-			horizontal out, ¬
-			vertical in, ¬
-			vertical out, ¬
-			slightly, ¬
-			center, ¬
-			in slightly, ¬
-			in center, ¬
-			in bottom, ¬
-			out slightly, ¬
-			out center, ¬
-			out bottom, ¬
-			font bold, ¬
-			font italic, ¬
-			font underline, ¬
-			font strikethrough, ¬
-			font shadow, ¬
-			font all caps, ¬
-			instant, ¬
-			gradual, ¬
-			cycle clockwise, ¬
-			cycle counterclockwise}
-	end using terms from
+	return {my enumConstant("AnDi00F90000"), ¬
+		my enumConstant("AnDi00F90001"), ¬
+		my enumConstant("AnDi00F90002"), ¬
+		my enumConstant("AnDi00F90003"), ¬
+		my enumConstant("AnDi00F90004"), ¬
+		my enumConstant("AnDi00F90005"), ¬
+		my enumConstant("AnDi00F90006"), ¬
+		my enumConstant("AnDi00F90007"), ¬
+		my enumConstant("AnDi00F90008"), ¬
+		my enumConstant("AnDi00F90009"), ¬
+		my enumConstant("AnDi00F9000A"), ¬
+		my enumConstant("AnDi00F9000B"), ¬
+		my enumConstant("AnDi00F9000C"), ¬
+		my enumConstant("AnDi00F9000D"), ¬
+		my enumConstant("AnDi00F9000E"), ¬
+		my enumConstant("AnDi00F9000F"), ¬
+		my enumConstant("AnDi00F90010"), ¬
+		my enumConstant("AnDi00F90011"), ¬
+		my enumConstant("AnDi00F90012"), ¬
+		my enumConstant("AnDi00F90013"), ¬
+		my enumConstant("AnDi00F90014"), ¬
+		my enumConstant("AnDi00F90015"), ¬
+		my enumConstant("AnDi00F90016"), ¬
+		my enumConstant("AnDi00F90017"), ¬
+		my enumConstant("AnDi00F90018"), ¬
+		my enumConstant("AnDi00F90019"), ¬
+		my enumConstant("AnDi00F9001A"), ¬
+		my enumConstant("AnDi00F9001B"), ¬
+		my enumConstant("AnDi00F9001C"), ¬
+		my enumConstant("AnDi00F9001D"), ¬
+		my enumConstant("AnDi00F9001E"), ¬
+		my enumConstant("AnDi00F9001F"), ¬
+		my enumConstant("AnDi00F90020"), ¬
+		my enumConstant("AnDi00F90021"), ¬
+		my enumConstant("AnDi00F90022"), ¬
+		my enumConstant("AnDi00F90023"), ¬
+		my enumConstant("AnDi00F90024"), ¬
+		my enumConstant("AnDi00F90025"), ¬
+		my enumConstant("AnDi00F90026"), ¬
+		my enumConstant("AnDi00F90027"), ¬
+		my enumConstant("AnDi00F90028"), ¬
+		my enumConstant("AnDi00F90029"), ¬
+		my enumConstant("AnDi00F9002A"), ¬
+		my enumConstant("AnDi00F9002B"), ¬
+		my enumConstant("AnDi00F9002C")}
 end msoAnimDirectionConstants
 
 on msoAnimDirectionNames()
@@ -1124,15 +1262,13 @@ on msoAnimDirectionCodes()
 		"0x00f9002c"}
 end msoAnimDirectionCodes
 
--- MsoAnimTriggerType: 5 candidates
+-- MsoAnimTriggerType: 5 candidates, type code AnTr
 on msoAnimTriggerTypeConstants()
-	using terms from application "Microsoft PowerPoint"
-		return {no trigger, ¬
-			on page click, ¬
-			with previous, ¬
-			after previous, ¬
-			on shape click}
-	end using terms from
+	return {my enumConstant("AnTr01000000"), ¬
+		my enumConstant("AnTr01000001"), ¬
+		my enumConstant("AnTr01000002"), ¬
+		my enumConstant("AnTr01000003"), ¬
+		my enumConstant("AnTr01000004")}
 end msoAnimTriggerTypeConstants
 
 on msoAnimTriggerTypeNames()
@@ -1151,22 +1287,20 @@ on msoAnimTriggerTypeCodes()
 		"0x01000004"}
 end msoAnimTriggerTypeCodes
 
--- MsoAnimateByLevel: 12 candidates
+-- MsoAnimateByLevel: 12 candidates, type code AnLv
 on msoAnimateByLevelConstants()
-	using terms from application "Microsoft PowerPoint"
-		return {text by no levels, ¬
-			text by all levels, ¬
-			text by first level, ¬
-			text by second level, ¬
-			text by third level, ¬
-			text by fourth level, ¬
-			text by fifth level, ¬
-			chart all at once, ¬
-			chart by category, ¬
-			chart by ctageory elements, ¬
-			chart by series, ¬
-			chart by series elements}
-	end using terms from
+	return {my enumConstant("AnLv01010000"), ¬
+		my enumConstant("AnLv01010001"), ¬
+		my enumConstant("AnLv01010002"), ¬
+		my enumConstant("AnLv01010003"), ¬
+		my enumConstant("AnLv01010004"), ¬
+		my enumConstant("AnLv01010005"), ¬
+		my enumConstant("AnLv01010006"), ¬
+		my enumConstant("AnLv01010007"), ¬
+		my enumConstant("AnLv01010008"), ¬
+		my enumConstant("AnLv01010009"), ¬
+		my enumConstant("AnLv0101000A"), ¬
+		my enumConstant("AnLv0101000B")}
 end msoAnimateByLevelConstants
 
 on msoAnimateByLevelNames()
@@ -1199,13 +1333,11 @@ on msoAnimateByLevelCodes()
 		"0x0101000b"}
 end msoAnimateByLevelCodes
 
--- MsoAnimTextUnitEffect: 3 candidates
+-- MsoAnimTextUnitEffect: 3 candidates, type code AnTU
 on msoAnimTextUnitEffectConstants()
-	using terms from application "Microsoft PowerPoint"
-		return {by paragraph, ¬
-			by character, ¬
-			by word}
-	end using terms from
+	return {my enumConstant("AnTU00FE0000"), ¬
+		my enumConstant("AnTU00FE0001"), ¬
+		my enumConstant("AnTU00FE0002")}
 end msoAnimTextUnitEffectConstants
 
 on msoAnimTextUnitEffectNames()
@@ -1220,14 +1352,12 @@ on msoAnimTextUnitEffectCodes()
 		"0x00fe0002"}
 end msoAnimTextUnitEffectCodes
 
--- MsoAnimAfterEffect: 4 candidates
+-- MsoAnimAfterEffect: 4 candidates, type code AnAE
 on msoAnimAfterEffectConstants()
-	using terms from application "Microsoft PowerPoint"
-		return {no after effect, ¬
-			dim, ¬
-			hide, ¬
-			hide on next click}
-	end using terms from
+	return {my enumConstant("AnAE00FF0000"), ¬
+		my enumConstant("AnAE00FF0001"), ¬
+		my enumConstant("AnAE00FF0002"), ¬
+		my enumConstant("AnAE00FF0003")}
 end msoAnimAfterEffectConstants
 
 on msoAnimAfterEffectNames()
@@ -1244,19 +1374,17 @@ on msoAnimAfterEffectCodes()
 		"0x00ff0003"}
 end msoAnimAfterEffectCodes
 
--- MsoAnimType: 9 candidates
+-- MsoAnimType: 9 candidates, type code AnTy
 on msoAnimTypeConstants()
-	using terms from application "Microsoft PowerPoint"
-		return {animation type none, ¬
-			animation type motion, ¬
-			animation type color, ¬
-			animation type scale, ¬
-			animation type rotation, ¬
-			animation type property, ¬
-			animation type command, ¬
-			animation type filter, ¬
-			animation type set}
-	end using terms from
+	return {my enumConstant("AnTy01030000"), ¬
+		my enumConstant("AnTy01030001"), ¬
+		my enumConstant("AnTy01030002"), ¬
+		my enumConstant("AnTy01030003"), ¬
+		my enumConstant("AnTy01030004"), ¬
+		my enumConstant("AnTy01030005"), ¬
+		my enumConstant("AnTy01030006"), ¬
+		my enumConstant("AnTy01030007"), ¬
+		my enumConstant("AnTy01030008")}
 end msoAnimTypeConstants
 
 on msoAnimTypeNames()
@@ -1283,217 +1411,215 @@ on msoAnimTypeCodes()
 		"0x01030008"}
 end msoAnimTypeCodes
 
--- EPPEntryEffect: 207 candidates
+-- EPPEntryEffect: 207 candidates, type code pEeF
 on eppEntryEffectConstants()
-	using terms from application "Microsoft PowerPoint"
-		return {entry effect airplane left, ¬
-			entry effect airplane right, ¬
-			entry effect appear, ¬
-			entry effect blinds horizontal, ¬
-			entry effect blinds vertical, ¬
-			entry effect box down, ¬
-			entry effect box in, ¬
-			entry effect box left, ¬
-			entry effect box out, ¬
-			entry effect box right, ¬
-			entry effect box up, ¬
-			entry effect checkerboard across, ¬
-			entry effect checkerboard down, ¬
-			entry effect circle, ¬
-			entry effect collapse across, ¬
-			entry effect collapse bottom, ¬
-			entry effect collapse left, ¬
-			entry effect collapse right, ¬
-			entry effect collapse up, ¬
-			entry effect crush, ¬
-			entry effect comb horizontal, ¬
-			entry effect comb vertical, ¬
-			entry effect conveyor left, ¬
-			entry effect conveyor right, ¬
-			entry effect cover down, ¬
-			entry effect cover left down, ¬
-			entry effect cover left up, ¬
-			entry effect cover left, ¬
-			entry effect cover right down, ¬
-			entry effect cover right up, ¬
-			entry effect cover right, ¬
-			entry effect cover up, ¬
-			entry effect crawl from down, ¬
-			entry effect crawl from left, ¬
-			entry effect crawl from right, ¬
-			entry effect crawl from up, ¬
-			entry effect cube down, ¬
-			entry effect cube left, ¬
-			entry effect cube right, ¬
-			entry effect cube up, ¬
-			entry effect curtains, ¬
-			entry effect cut black, ¬
-			entry effect cut, ¬
-			entry effect diamond, ¬
-			entry effect dissolve, ¬
-			entry effect doors horizontal, ¬
-			entry effect doors vertical, ¬
-			entry effect drape left, ¬
-			entry effect drape right, ¬
-			entry effect fade black, ¬
-			entry effect fade fly from bottom left, ¬
-			entry effect fade fly from bottom right, ¬
-			entry effect fade fly from bottom, ¬
-			entry effect fade fly from left, ¬
-			entry effect fade fly from right, ¬
-			entry effect fade fly from top left, ¬
-			entry effect fade fly from top right, ¬
-			entry effect fade fly from top, ¬
-			entry effect fade smoothly, ¬
-			entry effect fade, ¬
-			entry effect fall over left, ¬
-			entry effect fall over right, ¬
-			entry effect ferris wheel left, ¬
-			entry effect ferris wheel right, ¬
-			entry effect flash once fast, ¬
-			entry effect flash once medium, ¬
-			entry effect flash once slow, ¬
-			entry effect flashbulb, ¬
-			entry effect flip down, ¬
-			entry effect flip left, ¬
-			entry effect flip right, ¬
-			entry effect flip up, ¬
-			entry effect fly from bottom left, ¬
-			entry effect fly from bottom right, ¬
-			entry effect fly from bottom, ¬
-			entry effect fly from left, ¬
-			entry effect fly from right, ¬
-			entry effect fly from top left, ¬
-			entry effect fly from top right, ¬
-			entry effect fly from top, ¬
-			entry effect fly through in bounce, ¬
-			entry effect fly through in, ¬
-			entry effect fly through out bounce, ¬
-			entry effect fly through out, ¬
-			entry effect fracture, ¬
-			entry effect gallery left, ¬
-			entry effect gallery right, ¬
-			entry effect glitter diamond down, ¬
-			entry effect glitter diamond left, ¬
-			entry effect glitter diamond right, ¬
-			entry effect glitter diamond up, ¬
-			entry effect glitter hexagon down, ¬
-			entry effect glitter hexagon left, ¬
-			entry effect glitter hexagon right, ¬
-			entry effect glitter hexagon up, ¬
-			entry effect honeycomb, ¬
-			entry effect morph by object, ¬
-			entry effect morph by word, ¬
-			entry effect morph by char, ¬
-			entry effect news flash, ¬
-			entry effect none, ¬
-			entry effect orbit down, ¬
-			entry effect orbit left, ¬
-			entry effect orbit right, ¬
-			entry effect orbit up, ¬
-			entry effect origami left, ¬
-			entry effect origami right, ¬
-			entry effect page curl double left, ¬
-			entry effect page curl double right, ¬
-			entry effect page curl single left, ¬
-			entry effect page curl single right, ¬
-			entry effect pan down, ¬
-			entry effect pan left, ¬
-			entry effect pan right, ¬
-			entry effect pan up, ¬
-			entry effect peek from down, ¬
-			entry effect peek from left, ¬
-			entry effect peek from right, ¬
-			entry effect peek from up, ¬
-			entry effect peel off left, ¬
-			entry effect peel off right, ¬
-			entry effect plus, ¬
-			entry effect prestige, ¬
-			entry effect push down, ¬
-			entry effect push left, ¬
-			entry effect push right, ¬
-			entry effect push up, ¬
-			entry effect random bars horizontal, ¬
-			entry effect random bars vertical, ¬
-			entry effect random, ¬
-			entry effect reveal black left, ¬
-			entry effect reveal black right, ¬
-			entry effect reveal smooth left, ¬
-			entry effect reveal smooth right, ¬
-			entry effect ripple center, ¬
-			entry effect ripple left down, ¬
-			entry effect ripple left up, ¬
-			entry effect ripple right down, ¬
-			entry effect ripple right up, ¬
-			entry effect rotate down, ¬
-			entry effect rotate left, ¬
-			entry effect rotate right, ¬
-			entry effect rotate up, ¬
-			entry effect shred rectangle in, ¬
-			entry effect shred rectangle out, ¬
-			entry effect shred strips in, ¬
-			entry effect shred strips out, ¬
-			entry effect spinner, ¬
-			entry effect spiral, ¬
-			entry effect split horizontal in, ¬
-			entry effect split horizontal out, ¬
-			entry effect split vertical in, ¬
-			entry effect split vertical out, ¬
-			entry effect stretch across, ¬
-			entry effect stretch down, ¬
-			entry effect stretch left, ¬
-			entry effect stretch right, ¬
-			entry effect stretch up, ¬
-			entry effect strips down left, ¬
-			entry effect strips down right, ¬
-			entry effect strips left down, ¬
-			entry effect strips left up, ¬
-			entry effect strips right down, ¬
-			entry effect strips right up, ¬
-			entry effect strips up left, ¬
-			entry effect strips up right, ¬
-			entry effect switch down, ¬
-			entry effect switch left, ¬
-			entry effect switch right, ¬
-			entry effect switch up, ¬
-			entry effect swivel, ¬
-			entry effect uncover down, ¬
-			entry effect uncover left down, ¬
-			entry effect uncover left up, ¬
-			entry effect uncover left, ¬
-			entry effect uncover right down, ¬
-			entry effect uncover right up, ¬
-			entry effect uncover right, ¬
-			entry effect uncover up, ¬
-			entry effect unset, ¬
-			entry effect vortex down, ¬
-			entry effect vortex left, ¬
-			entry effect vortex right, ¬
-			entry effect vortex up, ¬
-			entry effect warp in, ¬
-			entry effect warp out, ¬
-			entry effect wedge, ¬
-			entry effect wheel 1 spoke, ¬
-			entry effect wheel 2 spokes, ¬
-			entry effect wheel 3 spokes, ¬
-			entry effect wheel 4 spokes, ¬
-			entry effect wheel 8 spokes, ¬
-			entry effect wheel reverse 1 spoke, ¬
-			entry effect wind left, ¬
-			entry effect wind right, ¬
-			entry effect window horizontal, ¬
-			entry effect window vertical, ¬
-			entry effect wipe down, ¬
-			entry effect wipe left, ¬
-			entry effect wipe right, ¬
-			entry effect wipe up, ¬
-			entry effect zoom bottom, ¬
-			entry effect zoom center, ¬
-			entry effect zoom in slightly, ¬
-			entry effect zoom in, ¬
-			entry effect zoom out slightly, ¬
-			entry effect zoom out}
-	end using terms from
+	return {my enumConstant("pEeF00F60F6E"), ¬
+		my enumConstant("pEeF00F60F6F"), ¬
+		my enumConstant("pEeF00F60F04"), ¬
+		my enumConstant("pEeF00F60301"), ¬
+		my enumConstant("pEeF00F60302"), ¬
+		my enumConstant("pEeF00F60F55"), ¬
+		my enumConstant("pEeF00F60C02"), ¬
+		my enumConstant("pEeF00F60F52"), ¬
+		my enumConstant("pEeF00F60C01"), ¬
+		my enumConstant("pEeF00F60F54"), ¬
+		my enumConstant("pEeF00F60F53"), ¬
+		my enumConstant("pEeF00F60401"), ¬
+		my enumConstant("pEeF00F60402"), ¬
+		my enumConstant("pEeF00F60F05"), ¬
+		my enumConstant("pEeF00F60D17"), ¬
+		my enumConstant("pEeF00F60D1B"), ¬
+		my enumConstant("pEeF00F60D18"), ¬
+		my enumConstant("pEeF00F60D1A"), ¬
+		my enumConstant("pEeF00F60D19"), ¬
+		my enumConstant("pEeF00F60F67"), ¬
+		my enumConstant("pEeF00F60F07"), ¬
+		my enumConstant("pEeF00F60F08"), ¬
+		my enumConstant("pEeF00F60F2A"), ¬
+		my enumConstant("pEeF00F60F2B"), ¬
+		my enumConstant("pEeF00F60504"), ¬
+		my enumConstant("pEeF00F60507"), ¬
+		my enumConstant("pEeF00F60505"), ¬
+		my enumConstant("pEeF00F60501"), ¬
+		my enumConstant("pEeF00F60508"), ¬
+		my enumConstant("pEeF00F60506"), ¬
+		my enumConstant("pEeF00F60503"), ¬
+		my enumConstant("pEeF00F60502"), ¬
+		my enumConstant("pEeF00F60D10"), ¬
+		my enumConstant("pEeF00F60D0D"), ¬
+		my enumConstant("pEeF00F60D0F"), ¬
+		my enumConstant("pEeF00F60D0E"), ¬
+		my enumConstant("pEeF00F60F4D"), ¬
+		my enumConstant("pEeF00F60F4A"), ¬
+		my enumConstant("pEeF00F60F4B"), ¬
+		my enumConstant("pEeF00F60F4C"), ¬
+		my enumConstant("pEeF00F60F62"), ¬
+		my enumConstant("pEeF00F60102"), ¬
+		my enumConstant("pEeF00F60101"), ¬
+		my enumConstant("pEeF00F60F06"), ¬
+		my enumConstant("pEeF00F60601"), ¬
+		my enumConstant("pEeF00F60F2D"), ¬
+		my enumConstant("pEeF00F60F2C"), ¬
+		my enumConstant("pEeF00F60F60"), ¬
+		my enumConstant("pEeF00F60F61"), ¬
+		my enumConstant("pEeF00F60701"), ¬
+		my enumConstant("pEeF00F60D24"), ¬
+		my enumConstant("pEeF00F60D25"), ¬
+		my enumConstant("pEeF00F60D21"), ¬
+		my enumConstant("pEeF00F60D1E"), ¬
+		my enumConstant("pEeF00F60D20"), ¬
+		my enumConstant("pEeF00F60D22"), ¬
+		my enumConstant("pEeF00F60D23"), ¬
+		my enumConstant("pEeF00F60D1F"), ¬
+		my enumConstant("pEeF00F60F09"), ¬
+		my enumConstant("pEeF00F60F09"), ¬
+		my enumConstant("pEeF00F60F5E"), ¬
+		my enumConstant("pEeF00F60F5F"), ¬
+		my enumConstant("pEeF00F60F3B"), ¬
+		my enumConstant("pEeF00F60F3C"), ¬
+		my enumConstant("pEeF00F60F01"), ¬
+		my enumConstant("pEeF00F60F02"), ¬
+		my enumConstant("pEeF00F60F03"), ¬
+		my enumConstant("pEeF00F60F45"), ¬
+		my enumConstant("pEeF00F60F44"), ¬
+		my enumConstant("pEeF00F60F41"), ¬
+		my enumConstant("pEeF00F60F42"), ¬
+		my enumConstant("pEeF00F60F43"), ¬
+		my enumConstant("pEeF00F60D07"), ¬
+		my enumConstant("pEeF00F60D08"), ¬
+		my enumConstant("pEeF00F60D04"), ¬
+		my enumConstant("pEeF00F60D01"), ¬
+		my enumConstant("pEeF00F60D03"), ¬
+		my enumConstant("pEeF00F60D05"), ¬
+		my enumConstant("pEeF00F60D06"), ¬
+		my enumConstant("pEeF00F60D02"), ¬
+		my enumConstant("pEeF00F60F34"), ¬
+		my enumConstant("pEeF00F60F32"), ¬
+		my enumConstant("pEeF00F60F35"), ¬
+		my enumConstant("pEeF00F60F33"), ¬
+		my enumConstant("pEeF00F60F66"), ¬
+		my enumConstant("pEeF00F60F28"), ¬
+		my enumConstant("pEeF00F60F29"), ¬
+		my enumConstant("pEeF00F60F23"), ¬
+		my enumConstant("pEeF00F60F20"), ¬
+		my enumConstant("pEeF00F60F22"), ¬
+		my enumConstant("pEeF00F60F21"), ¬
+		my enumConstant("pEeF00F60F27"), ¬
+		my enumConstant("pEeF00F60F24"), ¬
+		my enumConstant("pEeF00F60F26"), ¬
+		my enumConstant("pEeF00F60F25"), ¬
+		my enumConstant("pEeF00F60F3A"), ¬
+		my enumConstant("pEeF00F60F72"), ¬
+		my enumConstant("pEeF00F60F73"), ¬
+		my enumConstant("pEeF00F60F74"), ¬
+		my enumConstant("pEeF00F60F0A"), ¬
+		my enumConstant("pEeF00F60000"), ¬
+		my enumConstant("pEeF00F60F59"), ¬
+		my enumConstant("pEeF00F60F56"), ¬
+		my enumConstant("pEeF00F60F58"), ¬
+		my enumConstant("pEeF00F60F57"), ¬
+		my enumConstant("pEeF00F60F70"), ¬
+		my enumConstant("pEeF00F60F71"), ¬
+		my enumConstant("pEeF00F60F6C"), ¬
+		my enumConstant("pEeF00F60F6D"), ¬
+		my enumConstant("pEeF00F60F6A"), ¬
+		my enumConstant("pEeF00F60F6B"), ¬
+		my enumConstant("pEeF00F60F5D"), ¬
+		my enumConstant("pEeF00F60F5A"), ¬
+		my enumConstant("pEeF00F60F5C"), ¬
+		my enumConstant("pEeF00F60F5B"), ¬
+		my enumConstant("pEeF00F60D0A"), ¬
+		my enumConstant("pEeF00F60D09"), ¬
+		my enumConstant("pEeF00F60D0B"), ¬
+		my enumConstant("pEeF00F60D0C"), ¬
+		my enumConstant("pEeF00F60F68"), ¬
+		my enumConstant("pEeF00F60F69"), ¬
+		my enumConstant("pEeF00F60F0B"), ¬
+		my enumConstant("pEeF00F60F65"), ¬
+		my enumConstant("pEeF00F60F0C"), ¬
+		my enumConstant("pEeF00F60F0D"), ¬
+		my enumConstant("pEeF00F60F0E"), ¬
+		my enumConstant("pEeF00F60F0F"), ¬
+		my enumConstant("pEeF00F60901"), ¬
+		my enumConstant("pEeF00F60902"), ¬
+		my enumConstant("pEeF00F60201"), ¬
+		my enumConstant("pEeF00F60F38"), ¬
+		my enumConstant("pEeF00F60F39"), ¬
+		my enumConstant("pEeF00F60F36"), ¬
+		my enumConstant("pEeF00F60F37"), ¬
+		my enumConstant("pEeF00F60F1B"), ¬
+		my enumConstant("pEeF00F60F1E"), ¬
+		my enumConstant("pEeF00F60F1D"), ¬
+		my enumConstant("pEeF00F60F1F"), ¬
+		my enumConstant("pEeF00F60F1C"), ¬
+		my enumConstant("pEeF00F60F51"), ¬
+		my enumConstant("pEeF00F60F4E"), ¬
+		my enumConstant("pEeF00F60F50"), ¬
+		my enumConstant("pEeF00F60F4F"), ¬
+		my enumConstant("pEeF00F60F48"), ¬
+		my enumConstant("pEeF00F60F49"), ¬
+		my enumConstant("pEeF00F60F46"), ¬
+		my enumConstant("pEeF00F60F47"), ¬
+		my enumConstant("pEeF00F60F0A"), ¬
+		my enumConstant("pEeF00F60D1D"), ¬
+		my enumConstant("pEeF00F60E02"), ¬
+		my enumConstant("pEeF00F60E01"), ¬
+		my enumConstant("pEeF00F60E04"), ¬
+		my enumConstant("pEeF00F60E03"), ¬
+		my enumConstant("pEeF00F60D17"), ¬
+		my enumConstant("pEeF00F60D1B"), ¬
+		my enumConstant("pEeF00F60D18"), ¬
+		my enumConstant("pEeF00F60D1A"), ¬
+		my enumConstant("pEeF00F60D19"), ¬
+		my enumConstant("pEeF00F60A03"), ¬
+		my enumConstant("pEeF00F60A04"), ¬
+		my enumConstant("pEeF00F60A07"), ¬
+		my enumConstant("pEeF00F60A05"), ¬
+		my enumConstant("pEeF00F60A08"), ¬
+		my enumConstant("pEeF00F60A06"), ¬
+		my enumConstant("pEeF00F60A01"), ¬
+		my enumConstant("pEeF00F60A02"), ¬
+		my enumConstant("pEeF00F60F40"), ¬
+		my enumConstant("pEeF00F60F3D"), ¬
+		my enumConstant("pEeF00F60F3F"), ¬
+		my enumConstant("pEeF00F60F3E"), ¬
+		my enumConstant("pEeF00F60D1C"), ¬
+		my enumConstant("pEeF00F60804"), ¬
+		my enumConstant("pEeF00F60807"), ¬
+		my enumConstant("pEeF00F60805"), ¬
+		my enumConstant("pEeF00F60801"), ¬
+		my enumConstant("pEeF00F60808"), ¬
+		my enumConstant("pEeF00F60806"), ¬
+		my enumConstant("pEeF00F60803"), ¬
+		my enumConstant("pEeF00F60802"), ¬
+		my enumConstant("pEeF00F5FFFE"), ¬
+		my enumConstant("pEeF00F60F1A"), ¬
+		my enumConstant("pEeF00F60F17"), ¬
+		my enumConstant("pEeF00F60F19"), ¬
+		my enumConstant("pEeF00F60F18"), ¬
+		my enumConstant("pEeF00F60F30"), ¬
+		my enumConstant("pEeF00F60F31"), ¬
+		my enumConstant("pEeF00F60F10"), ¬
+		my enumConstant("pEeF00F60F11"), ¬
+		my enumConstant("pEeF00F60F12"), ¬
+		my enumConstant("pEeF00F60F13"), ¬
+		my enumConstant("pEeF00F60F14"), ¬
+		my enumConstant("pEeF00F60F15"), ¬
+		my enumConstant("pEeF00F60F16"), ¬
+		my enumConstant("pEeF00F60F63"), ¬
+		my enumConstant("pEeF00F60F64"), ¬
+		my enumConstant("pEeF00F60F2F"), ¬
+		my enumConstant("pEeF00F60F2E"), ¬
+		my enumConstant("pEeF00F60B04"), ¬
+		my enumConstant("pEeF00F60B01"), ¬
+		my enumConstant("pEeF00F60B03"), ¬
+		my enumConstant("pEeF00F60B02"), ¬
+		my enumConstant("pEeF00F60D16"), ¬
+		my enumConstant("pEeF00F60D15"), ¬
+		my enumConstant("pEeF00F60D12"), ¬
+		my enumConstant("pEeF00F60D11"), ¬
+		my enumConstant("pEeF00F60D14"), ¬
+		my enumConstant("pEeF00F60D13")}
 end eppEntryEffectConstants
 
 on eppEntryEffectNames()

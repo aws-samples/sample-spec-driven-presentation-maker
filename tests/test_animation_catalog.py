@@ -15,13 +15,20 @@ import pytest
 from scripts.animation_catalog.generate import (
     ALTERNATE_CONTENT,
     BASELINE_GENERATED_AT,
+    BASELINE_VERSION,
+    CANDIDATE_ENUM_CODES,
     CANDIDATE_ENUMS,
     CAPABILITY_LEVELS,
     DEFAULT_ORACLE,
+    DEFAULT_ORACLE_EVIDENCE,
     DEFAULT_SDEF,
     FORBIDDEN_ORACLE_TOKENS,
     NATIVE,
+    ORACLE_EVIDENCE_MERGED,
+    ORACLE_EVIDENCE_PACKAGE,
+    ORACLE_EVIDENCE_READBACK,
     ORACLE_RUN_TOKEN,
+    ORACLE_VERIFICATION,
     REQUIRED_ORACLE_TOKENS,
     SEMANTIC,
     STATUSES,
@@ -29,13 +36,17 @@ from scripts.animation_catalog.generate import (
     catalog_slide,
     check,
     dump,
+    load_oracle_evidence,
     main,
     merge_oracle_readback,
+    oracle_constant_call,
     oracle_findings,
+    oracle_transition_form,
     parse_oracle_arrays,
     parse_oracle_package,
     read_oracle_readback,
     read_sdef,
+    read_sdef_enum_codes,
     rewrite_oracle,
     split_oracle,
 )
@@ -480,11 +491,17 @@ def test_oracle_candidate_arrays_account_for_every_sdef_candidate(oracle):
     # The two enumerations the task calls out explicitly.
     assert len(arrays["MsoAnimEffect"]["constants"]) == 150
     assert len(arrays["EPPEntryEffect"]["constants"]) == 207
-    # Each constant is the enumerator itself, so a record can never report a
-    # name that a different constant applied.
+    # Each constant names its own candidate by code - the enumeration's type
+    # code plus the enumerator's own - so a record can never report a name that
+    # a different constant applied. Position i of all three arrays is the same
+    # candidate.
     for enum_name in CANDIDATE_ENUMS:
-        assert arrays[enum_name]["constants"] == arrays[enum_name]["names"], enum_name
-        assert all(code.startswith("0x") for code in arrays[enum_name]["codes"]), enum_name
+        codes = arrays[enum_name]["codes"]
+        assert all(code.startswith("0x") for code in codes), enum_name
+        assert arrays[enum_name]["constants"] == [
+            oracle_constant_call(enum_name, code) for code in codes
+        ], enum_name
+        assert len(set(arrays[enum_name]["constants"])) == len(set(codes)), enum_name
 
 
 def test_oracle_has_no_empty_array_and_no_name_to_constant_placeholder(oracle):
@@ -572,11 +589,15 @@ def test_oracle_candidate_names_and_codes_match_the_local_sdef(oracle):
     _head, region, _tail = split_oracle(oracle)
     arrays = parse_oracle_arrays(region)
     checked = 0
+    enum_codes = read_sdef_enum_codes(DEFAULT_SDEF)
+    assert enum_codes == CANDIDATE_ENUM_CODES, "the oracle names every candidate with its enumeration's code"
     for enum_name, values in sdef_enums.items():
         names = [name for name, _ in values]
         codes = [code for _, code in values]
         assert arrays[enum_name]["names"] == names, enum_name
-        assert arrays[enum_name]["constants"] == names, enum_name
+        assert arrays[enum_name]["constants"] == [
+            oracle_constant_call(enum_name, code) for code in codes
+        ], enum_name
         assert arrays[enum_name]["codes"] == codes, enum_name
         checked += len(names)
     assert checked == 435
@@ -620,6 +641,194 @@ def test_oracle_compiles_without_launching_powerpoint(tmp_path):
         assert "add effect (main sequence of timeline of theSlide)" in source.stdout
         assert "entry effect morph by object" in source.stdout
         assert "animation type 4 point star path" in source.stdout
+
+
+#: The six MsoAnimDirection/MsoAnimAfterEffect terms a generated array may not
+#: carry, and what each one does when it is evaluated as a bare term. Four are
+#: PowerPoint property names, so the compiler builds a property reference and
+#: evaluating it raises -1728 - that is what aborted the 2026-10-31 capture.
+#: Two compile to a constant of a different enumeration altogether, which is
+#: worse: nothing fails, the probe applies a text-orientation value, and the
+#: record names the direction that was asked for.
+AMBIGUOUS_ORACLE_TERMS = {
+    "top": "propertyReference",
+    "font bold": "propertyReference",
+    "font italic": "propertyReference",
+    "dim": "propertyReference",
+    "horizontal": "otherEnumeration",
+    "vertical": "otherEnumeration",
+}
+
+
+def _run_applescript(tmp_path: Path, source: str, name: str = "probe") -> str:
+    """Compile and run one AppleScript, returning its stdout.
+
+    Nothing here addresses PowerPoint: a ``using terms from`` block is resolved
+    at compile time out of the application bundle, and the values it produces
+    are local constants. No Apple Event is sent, so this cannot launch
+    PowerPoint and does not need the Automation grant.
+    """
+    script = tmp_path / f"{name}.applescript"
+    compiled = tmp_path / f"{name}.scpt"
+    script.write_text(source, encoding="utf-8")
+    built = subprocess.run(
+        [shutil.which("osacompile"), "-o", str(compiled), str(script)],
+        capture_output=True, text=True, timeout=180, check=False,
+    )
+    assert built.returncode == 0, built.stderr
+    ran = subprocess.run(
+        [shutil.which("osascript"), str(compiled)], capture_output=True, text=True, timeout=300, check=False,
+    )
+    assert ran.returncode == 0, ran.stderr
+    return ran.stdout
+
+
+def _oracle_handler(oracle: str, name: str) -> str:
+    match = re.search(rf"^on {name}\(.*?\nend {name}$", oracle, re.MULTILINE | re.DOTALL)
+    assert match, f"the oracle has no {name} handler"
+    return match.group(0)
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="osacompile is macOS only")
+@pytest.mark.skipif(not DEFAULT_SDEF.exists(), reason="PowerPoint 16.113.1 is not installed")
+@pytest.mark.skipif(shutil.which("osacompile") is None, reason="osacompile is unavailable")
+@pytest.mark.skipif(shutil.which("osascript") is None, reason="osascript is unavailable")
+def test_every_generated_constant_is_the_value_its_name_claims(oracle, tmp_path):
+    """Run the shipped arrays through the shipped handler and compare each
+    constant with the enumerator term it stands for.
+
+    This is the contract that makes naming candidates by code safe: the
+    constant ``enumConstant`` builds has to be the same value the term names,
+    or the oracle would apply something other than what its record says. It
+    holds for every candidate whose term is unambiguous; the six that are not
+    are the reason the arrays carry codes at all, and they are asserted
+    separately below.
+    """
+    sdef_enums = read_sdef(DEFAULT_SDEF)
+    _head, region, _tail = split_oracle(oracle)
+    arrays = parse_oracle_arrays(region)
+    lines = [_oracle_handler(oracle, "enumConstant"), _oracle_handler(oracle, "hexDigit"),
+             "set zzAcc to {}", 'using terms from application "Microsoft PowerPoint"']
+    order: list[tuple[str, str]] = []
+    for enum_name in CANDIDATE_ENUMS:
+        for (name, _code), call in zip(sdef_enums[enum_name], arrays[enum_name]["constants"]):
+            order.append((enum_name, name))
+            lines += ["\ttry", f"\t\tset end of zzAcc to (({call}) is ({name}))",
+                      "\ton error zzT number zzN", '\t\tset end of zzAcc to ("ERR " & zzN)', "\tend try"]
+    lines += ["end using terms from", "set AppleScript's text item delimiters to \"|\"",
+              "return zzAcc as text"]
+    results = _run_applescript(tmp_path, "\n".join(lines) + "\n", "constants").rstrip("\n").split("|")
+
+    assert len(results) == 435
+    unequal = {name: value for (_enum, name), value in zip(order, results) if value != "true"}
+    assert set(unequal) == set(AMBIGUOUS_ORACLE_TERMS), (
+        "a generated constant is not the value its own name claims"
+    )
+    for name, value in unequal.items():
+        if AMBIGUOUS_ORACLE_TERMS[name] == "propertyReference":
+            assert value.startswith("ERR"), name
+        else:
+            assert value == "false", name
+
+
+@pytest.mark.skipif(sys.platform != "darwin", reason="osacompile is macOS only")
+@pytest.mark.skipif(not DEFAULT_SDEF.exists(), reason="PowerPoint 16.113.1 is not installed")
+@pytest.mark.skipif(shutil.which("osacompile") is None, reason="osacompile is unavailable")
+@pytest.mark.skipif(shutil.which("osascript") is None, reason="osascript is unavailable")
+def test_a_bare_enumerator_term_is_ambiguous_which_is_why_codes_are_generated(oracle, tmp_path):
+    """Establish the defect the generated codes remove, rather than asserting
+    it from the commit message.
+
+    ``top``, ``font bold``, ``font italic`` and ``dim`` compile to property
+    references and raise -1728 when evaluated - one of them aborted a whole
+    capture run. ``horizontal`` and ``vertical`` compile to a constant of the
+    ``TxOr`` enumeration instead of ``AnDi``, so a probe would silently apply a
+    text orientation. No generated array may carry a bare term.
+    """
+    lines = ["set zzAcc to {}", 'using terms from application "Microsoft PowerPoint"']
+    for term in AMBIGUOUS_ORACLE_TERMS:
+        lines += ["\ttry", f"\t\tset end of zzAcc to (({term}) as text)",
+                  "\ton error zzT number zzN", '\t\tset end of zzAcc to ("ERR " & zzN)', "\tend try"]
+    lines += ["end using terms from", "set AppleScript's text item delimiters to \"|\"",
+              "return zzAcc as text"]
+    results = _run_applescript(tmp_path, "\n".join(lines) + "\n", "ambiguous").rstrip("\n").split("|")
+
+    for term, value in zip(AMBIGUOUS_ORACLE_TERMS, results):
+        if AMBIGUOUS_ORACLE_TERMS[term] == "propertyReference":
+            assert value.startswith("ERR"), f"{term} no longer resolves to a PowerPoint property"
+        else:
+            assert "TxOr" in value, f"{term} no longer resolves to the wrong enumeration: {value}"
+    _head, region, _tail = split_oracle(oracle)
+    for term in AMBIGUOUS_ORACLE_TERMS:
+        assert f'"{term}"' in region, f"{term} must still be carried as a name"
+        assert f", {term},"  not in region and f"{{{term}," not in region, (
+            f"{term} is back in a generated array as a bare term"
+        )
+
+
+def test_the_oracle_names_constants_by_code_and_not_by_term(oracle):
+    """No generated array may hold an AppleScript term, and the handler that
+    turns a code into a constant has to be the one in the oracle."""
+    _head, region, _tail = split_oracle(oracle)
+    assert "using terms from" not in region, (
+        "a generated array with terminology in it is resolving names at compile time again"
+    )
+    assert region.count("my enumConstant(\"") == 435
+    assert "on enumConstant(typedCode)" in oracle
+    assert "on hexDigit(theChar)" in oracle
+    # The constant is built from the code, through AppleScript's raw constant
+    # syntax. A «data ...» literal would compile but would not compare equal to
+    # a value PowerPoint reports back, so valueIndex would never match it.
+    assert "run script (\"\u00abconstant \"" in oracle
+    handler = _oracle_handler(oracle, "enumConstant")
+    assert "\u00abdata " not in handler and "\u00abdata " not in region
+
+
+def test_oracle_findings_catch_a_constant_that_is_not_its_own_code(oracle):
+    """The drift check the one-to-one name comparison used to provide."""
+    swapped = oracle.replace(
+        oracle_constant_call("EPPEntryEffect", "0x00f60f55"),
+        oracle_constant_call("EPPEntryEffect", "0x00f60f56"),
+        1,
+    )
+    assert any(
+        "constants are not each the code of their own candidate" in finding
+        for finding in oracle_findings(swapped)
+    )
+    without_handler = oracle.replace("on enumConstant(typedCode)", "on enumConstantUnused(typedCode)")
+    assert any("has no 'on enumConstant(typedCode)' handler" in finding
+               for finding in oracle_findings(without_handler))
+
+
+def test_one_failed_probe_cannot_discard_the_whole_run(oracle):
+    """Containment, probe by probe, with the package written as it goes.
+
+    A capture run is expensive and partially valuable: the 2026-10-31 run
+    applied 357 candidates and then lost all of them when the fourth probe
+    raised before ``savePackage``. Every probe now runs inside ``runProbe``,
+    which records a failure as a record and carries on, the package is written
+    after each probe, and ``savePackage`` is reached whatever happened.
+    """
+    capture = oracle[oracle.index("on captureCatalog("):oracle.index("end captureCatalog")]
+    for probe in ("probeTransitions", "probeAnimations", "probeDirections", "probeTriggers",
+                  "probeBuildLevels", "probeTextUnits", "probeBehaviors", "probeAfterEffects"):
+        assert f'"{probe}"' in capture, f"{probe} is not dispatched through runProbe"
+        assert f"my {probe}(" not in capture, (
+            f"{probe} is still called straight from captureCatalog, outside the containment"
+        )
+    assert "my runProbe(readbackPath, probe, packagePath, contents of probeName)" in capture
+    assert "my savePackage(readbackPath, probe, packagePath)" in capture
+    # A failure is a record, not an abort: runProbe emits one either way.
+    contained = oracle[oracle.index("on runProbe("):oracle.index("end runProbe")]
+    assert "on error errText number errNum" in contained
+    assert 'my kv("record", "probe")' in contained
+    assert "my saveSnapshot(readbackPath, probe, packagePath, probeName)" in contained
+    snapshot = oracle[oracle.index("on saveSnapshot("):oracle.index("end saveSnapshot")]
+    assert "save probe in (POSIX file packagePath) as save as Open XML presentation" in snapshot
+    assert "on error errText number errNum" in snapshot
+    # savePackage's own failure leaves the last snapshot analysable.
+    saver = oracle[oracle.index("on savePackage("):oracle.index("end savePackage")]
+    assert 'my kv("record", "saveFailure")' in saver
 
 
 # --- the Python half: OOXML analysis of the saved package ------------------
@@ -770,3 +979,359 @@ def test_check_require_sdef_inspects_the_oracle_and_fails_on_drift(tmp_path, cap
     missing = tmp_path / "absent.applescript"
     assert main(["--check", "--require-sdef", "--oracle", str(missing)]) == 1
     assert "no oracle script at" in capsys.readouterr().err
+
+
+# --- the captured scripting oracle, folded into the catalog ----------------
+#
+# Every expectation below is derived from the checked-in capture rather than
+# copied out of it, so changing the evidence changes the test.
+
+
+@pytest.fixture(scope="module")
+def evidence() -> dict:
+    return load_oracle_evidence()
+
+
+@pytest.fixture(scope="module")
+def captured(evidence) -> dict:
+    """The candidates PowerPoint wrote a transition for, keyed by catalog key."""
+    return {
+        key: form
+        for key, record in evidence.items()
+        if (form := oracle_transition_form(record)) is not None
+    }
+
+
+def test_the_capture_is_a_checked_in_generator_input(evidence):
+    """``--write`` reads the capture from the fixture directory, so a promoted
+    entry is derived from evidence in the repository and ``--check`` fails when
+    the two drift apart. All three artefacts are present."""
+    for name in (ORACLE_EVIDENCE_MERGED, ORACLE_EVIDENCE_PACKAGE, ORACLE_EVIDENCE_READBACK):
+        assert (DEFAULT_ORACLE_EVIDENCE / name).is_file(), name
+    assert len(evidence) == 357
+    assert {record["enum"] for record in evidence.values()} == {"EPPEntryEffect", "MsoAnimEffect"}
+
+
+def test_the_merged_evidence_is_the_join_of_the_two_artefacts_beside_it(evidence):
+    """The file ``--write`` reads is reproducible from the package and the
+    read-back, so the generator input cannot drift from the capture itself."""
+    rebuilt = merge_oracle_readback(
+        read_oracle_readback(DEFAULT_ORACLE_EVIDENCE / ORACLE_EVIDENCE_READBACK),
+        parse_oracle_package(DEFAULT_ORACLE_EVIDENCE / ORACLE_EVIDENCE_PACKAGE),
+    )
+    checked_in = json.loads(
+        (DEFAULT_ORACLE_EVIDENCE / ORACLE_EVIDENCE_MERGED).read_text(encoding="utf-8")
+    )
+    assert rebuilt == checked_in
+    assert rebuilt["slideCount"] == 357
+
+
+def test_every_captured_transition_is_promoted_and_names_its_evidence(catalog, captured):
+    """A promoted entry no longer asks for a read-back that has happened: it
+    carries the measured element, drops the capture-required gap, and names the
+    package, the read-back, the version and the slide it came from."""
+    promoted = [
+        entry for entry in catalog["candidates"] if entry.get("verification") == ORACLE_VERIFICATION
+    ]
+    # Every captured candidate whose entry is an accepted mapping is promoted,
+    # except the one whose measured element sdpm cannot select from a parameter
+    # set (asserted on its own below). The rest of the captured candidates are
+    # the legacy values the catalog holds as outOfScope.
+    expected = {
+        key for key in captured
+        if next(e for e in catalog["candidates"] if e["key"] == key)["status"] == "accepted"
+    }
+    not_authorable = {
+        entry["key"] for entry in catalog["candidates"]
+        if entry.get("capture", {}).get("attributeRelation") == "measuredButNotAuthorable"
+    }
+    assert not_authorable == {"EPPEntryEffect.entry effect wheel reverse 1 spoke"}
+    assert {entry["key"] for entry in promoted} == expected - not_authorable
+    assert len(promoted) == 156
+    for entry in promoted:
+        form = captured[entry["key"]]
+        ooxml = entry["ooxml"]
+        assert ooxml["element"] == form["element"], entry["key"]
+        assert "requiresCapture" not in ooxml, entry["key"]
+        assert "gap" not in ooxml, entry["key"]
+        assert entry["capabilityLevel"] == NATIVE, entry["key"]
+        assert entry["evidence"]["fixture"].endswith(ORACLE_EVIDENCE_PACKAGE), entry["key"]
+        assert entry["evidence"]["capturedApplicationVersion"] == BASELINE_VERSION, entry["key"]
+        capture = entry["capture"]
+        assert capture["outcome"] == "transitionWritten", entry["key"]
+        assert capture["attributes"] == form["attributes"], entry["key"]
+        assert capture["transitionAttributes"] == form["transitionAttributes"], entry["key"]
+        assert capture["fallbackElement"] == form["fallbackElement"], entry["key"]
+        assert capture["readBack"].endswith(ORACLE_EVIDENCE_READBACK), entry["key"]
+        assert capture["slideIndex"] == entry["evidence"]["slideIndex"], entry["key"]
+
+
+def test_a_promoted_attribute_set_is_the_captured_one_or_states_what_was_left_out(catalog, captured):
+    """Attributes are resolved one at a time. A value the capture wrote is the
+    value the catalog carries. An attribute the capture left out keeps its
+    explicit form - that is what still distinguishes one direction from another
+    - and the entry says which attributes those are, so nothing claims to be
+    measured that was not."""
+    relations: dict[str, int] = {}
+    for entry in catalog["candidates"]:
+        if entry.get("verification") != ORACLE_VERIFICATION:
+            continue
+        form, capture, attributes = captured[entry["key"]], entry["capture"], entry["ooxml"]["attributes"]
+        relations[capture["attributeRelation"]] = relations.get(capture["attributeRelation"], 0) + 1
+        kept = capture.get("keptAttributes", {})
+        for name, value in form["attributes"].items():
+            assert attributes[name] == value, f"{entry['key']} {name} is not the captured value"
+        assert set(attributes) == set(form["attributes"]) | set(kept), entry["key"]
+        for name, value in kept.items():
+            assert name not in form["attributes"], entry["key"]
+            assert attributes[name] == value, entry["key"]
+            assert capture["keptAttributesNote"], entry["key"]
+        for name, change in capture.get("correctedAttributes", {}).items():
+            assert change["captured"] == form["attributes"][name], entry["key"]
+            assert change["catalogued"] != change["captured"], entry["key"]
+    assert relations == {
+        "agrees": 126,
+        "keepsOmittedDefaults": 15,
+        "correctsValues": 12,
+        "correctsValuesAndKeepsOmittedDefaults": 3,
+    }
+
+
+def test_a_kept_attribute_is_never_another_captured_value_s_own_form(catalog, captured):
+    """An omitted attribute can only be a restatement of a default while no
+    other value of the same element was measured with that exact form.
+    ``airplane right`` was written without ``invX``, and ``airplane left`` *was*
+    written with ``invX="1"``, so keeping it would give two values one form."""
+    measured: dict[str, set[frozenset]] = {}
+    for form in captured.values():
+        measured.setdefault(form["element"], set()).add(frozenset(form["attributes"].items()))
+    conflicts = []
+    for entry in catalog["candidates"]:
+        if entry.get("verification") != ORACLE_VERIFICATION:
+            continue
+        ooxml, capture = entry["ooxml"], entry["capture"]
+        if capture.get("keptAttributes"):
+            assert frozenset(ooxml["attributes"].items()) not in measured[ooxml["element"]], entry["key"]
+        if "attributeConflict" in capture:
+            conflicts.append(entry["key"])
+            assert ooxml["attributes"] == captured[entry["key"]]["attributes"], entry["key"]
+    assert conflicts == [
+        "EPPEntryEffect.entry effect airplane right",
+        "EPPEntryEffect.entry effect glitter hexagon right",
+        "EPPEntryEffect.entry effect origami right",
+        "EPPEntryEffect.entry effect wind right",
+    ]
+
+
+def test_the_capture_corrects_the_mappings_the_catalog_had_inferred_from_names(catalog, captured):
+    """The catalog had read a direction off the enumerator's name. PowerPoint
+    disagrees for 16 values, and the measurement wins."""
+    corrected = {
+        entry["key"]: entry["capture"]["correctedAttributes"]
+        for entry in catalog["candidates"]
+        if entry.get("capture", {}).get("correctedAttributes")
+    }
+    assert len(corrected) == 15
+    assert corrected["EPPEntryEffect.entry effect cube right"] == {
+        "dir": {"catalogued": "r", "captured": "u"}
+    }
+    assert corrected["EPPEntryEffect.entry effect cube up"] == {
+        "dir": {"catalogued": "u", "captured": "r"}
+    }
+
+def test_a_measured_form_sdpm_cannot_select_is_recorded_and_still_refused(catalog, captured):
+    """The one value whose element itself was wrong, and which the measurement
+    does not make authorable.
+
+    The catalog had the reversed Clock variant as a ``reverse`` attribute on
+    the standard ``p:wheel``. PowerPoint writes ``<p14:wheelReverse
+    spokes="1"/>``: "reverse" is the element name, and no attribute carries it.
+    sdpm's transition JSON selects a value by its parameters, so the measured
+    form cannot be reached from one - promoting it would either emit an
+    attribute the element does not have or collapse the value onto the plain
+    Clock tile, which writes a different element. The entry records the
+    measurement and stays refused, which is a different gap from a missing
+    capture and says so.
+    """
+    key = "EPPEntryEffect.entry effect wheel reverse 1 spoke"
+    wheel = next(entry for entry in catalog["candidates"] if entry["key"] == key)
+    assert wheel["capture"]["attributeRelation"] == "measuredButNotAuthorable"
+    assert wheel["capture"]["element"] == captured[key]["element"] == "p14:wheelReverse"
+    assert wheel["capture"]["attributes"] == captured[key]["attributes"] == {"spokes": "1"}
+    assert "semantic model that can select an element" in wheel["capture"]["notPromoted"]
+    # Not promoted: the mapping the writer would use is untouched, the entry is
+    # still refused, and its gap names the measurement instead of asking for
+    # the read-back that has already happened.
+    assert wheel["ooxml"]["element"] == "p:wheel"
+    assert wheel["ooxml"]["attributes"] == {"spokes": "1", "reverse": "1"}
+    assert "requiresCapture" not in wheel["ooxml"]
+    assert "p14:wheelReverse" in wheel["ooxml"]["gap"]
+    assert wheel["capabilityLevel"] == SEMANTIC
+    assert wheel["verification"] == "powerPointReadBackRequired"
+
+
+def test_a_promoted_entry_keeps_its_semantic_json_in_step_with_its_ooxml(catalog):
+    """The semantic parameters are the ones the writer will emit, and no
+    transition entry claims a default duration its own ooxml does not record.
+    That second rule is the one the gallery tiles' ``durationMs: 500`` broke."""
+    for entry in catalog["candidates"]:
+        transition = (entry.get("semanticJson") or {}).get("transition")
+        if not isinstance(transition, dict) or "element" not in (entry.get("ooxml") or {}):
+            continue
+        ooxml = entry["ooxml"]
+        if entry["key"].startswith("EPPEntryEffect.") and "attributes" in ooxml:
+            expected = dict(ooxml["attributes"])
+            if transition["effect"] == "morph":
+                expected = {"variant": expected["option"]}
+            assert transition["parameters"] == expected, entry["key"]
+        if ooxml.get("defaultDurationMs") is not None:
+            assert transition["durationMs"] == ooxml["defaultDurationMs"], entry["key"]
+        else:
+            assert ooxml.get("durationEvidence"), (
+                f"{entry['key']} records no default duration and does not say so"
+            )
+
+
+def test_the_capture_does_not_establish_a_per_effect_default_duration(catalog, captured):
+    """The probe set each slide's entry effect and nothing else, so the
+    duration it read back is the one the script-created probe slide already
+    held: all 160 captured transitions carry the same ``p14:dur``, while the
+    native tile captures record 22 different defaults, and Box is 1600 in both
+    the tile capture and the Transitions ribbon. The capture is recorded as the
+    probe-context duration and ``defaultDurationMs`` is left alone."""
+    durations = {form["transitionAttributes"].get("p14:dur") for form in captured.values()}
+    speeds = {form["transitionAttributes"].get("spd") for form in captured.values()}
+    assert durations == {"2000"} and speeds == {"slow"}, (
+        "a per-effect duration would vary between effects"
+    )
+    oracle = catalog["provenance"]["scriptingOracle"]
+    assert oracle["transitionDurationObserved"] == ["2000"]
+    assert "not the effect's own default" in oracle["transitionDurationEvidence"]
+    box = next(e for e in catalog["candidates"] if e["key"] == "EPPEntryEffect.entry effect box down")
+    assert box["ooxml"]["defaultDurationMs"] == 1600
+    assert box["semanticJson"]["transition"]["durationMs"] == 1600
+    assert box["capture"]["transitionAttributes"]["p14:dur"] == "2000"
+    defaults = {
+        entry["ooxml"].get("defaultDurationMs")
+        for entry in catalog["candidates"]
+        if entry.get("ooxml", {}).get("defaultDurationMs")
+    }
+    assert len(defaults) > 1 and 2000 in defaults
+
+
+def test_every_rejection_is_recorded_with_the_reason_powerpoint_gave(catalog, evidence):
+    """A refused candidate is probed evidence, not an unprobed one, and the two
+    refusal families are classified rather than left looking like gaps."""
+    rejected = {key for key, record in evidence.items() if record["rejected"]}
+    assert len(rejected) == 196
+    entries = {entry["key"]: entry for entry in catalog["candidates"]}
+    animation, legacy = [], []
+    for key in rejected:
+        capture = entries[key]["capture"]
+        assert capture["outcome"] == "rejectedByPowerPoint", key
+        assert capture["error"] == evidence[key]["error"], key
+        assert capture["error"].strip(), key
+        (animation if key.startswith("MsoAnimEffect.") else legacy).append(key)
+    assert len(animation) == 150 and len(legacy) == 46
+    # The animation half captured nothing at all, for one reason.
+    assert {
+        "doesn\u2019t understand the \u201cadd effect\u201d message" in entries[key]["capture"]["error"]
+        for key in animation
+    } == {True}
+    assert all(not entries[key]["capture"].get("element") for key in animation)
+    assert {entries[key]["capture"]["classification"] for key in animation} == {
+        "the dictionary does not implement add effect on main sequence in this build, so no animation value "
+        "could be applied at all; this says nothing about the value's OOXML mapping"
+    }
+    # A refused entry effect mostly confirms a classification the catalog
+    # already carried: the 0x00f60d** per-shape band and the 'unset' sentinel.
+    unsurprising = [key for key in legacy if entries[key]["status"] in ("outOfScope", "rejected")]
+    assert len(unsurprising) == 43
+    assert {entries[key]["guiKey"] for key in unsurprising} == {
+        "animation.legacyShapeEntryEffect", "transition.gallery.none"
+    }
+    # Three refusals do contradict the catalog, which accepts a p14:flash
+    # mapping for values PowerPoint will not set. The refusal is evidence about
+    # the enumerator rather than about the element, so the entry records the
+    # contradiction instead of resolving it in either direction.
+    contradicting = sorted(key for key in legacy if entries[key]["status"] == "accepted")
+    assert contradicting == [
+        "EPPEntryEffect.entry effect flash once fast",
+        "EPPEntryEffect.entry effect flash once medium",
+        "EPPEntryEffect.entry effect flash once slow",
+    ]
+    for key in contradicting:
+        assert entries[key]["ooxml"]["element"] == "p14:flash"
+        assert "contradictsAcceptedMapping" in entries[key]["capture"]
+        assert "computer-use.md" in entries[key]["capture"]["contradictsAcceptedMapping"]
+
+
+def test_the_capture_confirms_that_none_persists_nothing(catalog, evidence):
+    """The one candidate PowerPoint accepted without writing anything. The
+    catalog already said so; now it is measured."""
+    silent = [key for key, record in evidence.items()
+              if not record["rejected"] and oracle_transition_form(record) is None]
+    assert silent == ["EPPEntryEffect.entry effect none"]
+    entry = next(e for e in catalog["candidates"] if e["key"] == silent[0])
+    assert entry["status"] == "nonPersisted"
+    assert entry["capture"]["outcome"] == "appliedWithoutPersistedForm"
+
+
+def test_a_value_powerpoint_substituted_says_so(catalog, evidence):
+    """``entry effect appear`` is applied as ``entry effect cut``, so its
+    written form belongs to Cut. An entry whose read-back names a different
+    value records that rather than claiming the form as its own."""
+    coerced = {
+        key for key, record in evidence.items()
+        if record["dictionaryApplied"] not in (None, record["enumerator"])
+    }
+    entries = {entry["key"]: entry for entry in catalog["candidates"]}
+    assert "EPPEntryEffect.entry effect appear" in coerced
+    for key in coerced:
+        assert entries[key]["capture"]["coercedByPowerPoint"], key
+        assert entries[key]["capture"]["dictionaryApplied"] == evidence[key]["dictionaryApplied"], key
+
+
+def test_the_enumerations_the_capture_never_reached_claim_nothing(catalog, evidence):
+    """The run aborted before six of the eight enumerations, and the catalog
+    says which, instead of leaving their entries looking probed."""
+    oracle = catalog["provenance"]["scriptingOracle"]
+    assert oracle["probedEnumerations"] == ["EPPEntryEffect", "MsoAnimEffect"]
+    assert set(oracle["unprobedEnumerations"]) == set(CANDIDATE_ENUMS) - {"EPPEntryEffect", "MsoAnimEffect"}
+    for entry in catalog["candidates"]:
+        if entry["enum"] in oracle["unprobedEnumerations"]:
+            assert "capture" not in entry, entry["key"]
+        else:
+            assert entry["key"] in evidence
+            assert "capture" in entry, entry["key"]
+
+
+def test_the_catalog_no_longer_says_powerpoint_was_never_driven(catalog):
+    """The provenance used to say the oracle had never been executed. It has."""
+    automation = catalog["provenance"]["powerPointAutomation"]
+    assert "never executed" not in automation
+    assert "-10004" in automation, "the sandbox still cannot drive PowerPoint, and that still matters"
+    assert ORACLE_VERIFICATION in automation
+    assert "VBA is not used" in automation
+    summary = catalog["summary"]["scriptingOracleCapture"]
+    assert summary == {
+        "probed": 357,
+        "transitionWritten": 160,
+        "rejectedByPowerPoint": 196,
+        "appliedWithoutPersistedForm": 1,
+        "promoted": 156,
+    }
+
+
+def test_check_detects_a_catalog_that_drifts_from_the_capture(manifest, catalog):
+    """``--check`` compares the catalog against a regeneration that reads the
+    capture, so editing a promoted value by hand fails."""
+    broken = json.loads(json.dumps(catalog))
+    target = next(
+        entry for entry in broken["candidates"] if entry.get("verification") == ORACLE_VERIFICATION
+    )
+    target["ooxml"]["attributes"] = {"dir": "nonsense"}
+    sdef_enums = read_sdef(DEFAULT_SDEF) if DEFAULT_SDEF.exists() else None
+    if sdef_enums is None:
+        pytest.skip("PowerPoint 16.113.1 is not installed")
+    assert any("deterministic regeneration" in finding for finding in check(manifest, broken, sdef_enums))

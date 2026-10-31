@@ -63,32 +63,39 @@ NS = {
 #: generated-versus-refused that this file, ``test_transition_writer.py`` and
 #: the Task 8 acceptance harness all read. ``generated`` entries have an
 #: established OOXML form; ``refused`` entries are capture-required and must
-#: raise. The single ``generatedDespiteGap`` candidate is ``flashbulb``, an enum
-#: value whose semantic JSON is identical to the captured Flash transition tile,
-#: so writing it is evidence-backed even though the enum→element mapping itself
-#: is still open.
+#: raise.
+#:
+#: The scripting-oracle capture under
+#: ``tests/fixtures/animations/oracle-16.113.1`` moved 59 transition candidates
+#: from refused to generated and emptied ``generatedDespiteGap``: ``flashbulb``
+#: used to be written off a same-shaped tile while its own enum→element mapping
+#: stayed open, and PowerPoint has now written ``p14:flash`` for it directly.
+#: Every remaining refusal but one is animation-side, where the dictionary
+#: cannot author anything at all (``add effect`` is not implemented in
+#: 16.113.1); the exception is the reversed Clock variant, whose element is
+#: measured but which sdpm's parameter-keyed JSON cannot select.
 CATALOG_COVERAGE = {
     "total": 667,
     "generated": {
-        "total": 284,
+        "total": 343,
         "guiItems": 142,
-        "candidates": 142,
+        "candidates": 201,
         "animation": 126,
-        "transition": 158,
+        "transition": 217,
     },
     "refused": {
-        "total": 383,
+        "total": 324,
         "guiItems": 138,
-        "candidates": 245,
+        "candidates": 186,
         "animation": 321,
-        "transition": 62,
+        "transition": 3,
     },
-    "generatedDespiteGap": ["EPPEntryEffect.entry effect flashbulb"],
+    "generatedDespiteGap": [],
     #: The two numbers Task 8 has to drive to zero, as slices of the same pass:
     #: refusals whose OOXML *mapping* was never captured, and refusals whose
     #: behavior *payload* was never captured (the 71 gallery tiles plus the 50
     #: enum candidates that mirror them).
-    "captureRequiredRefusals": 262,
+    "captureRequiredRefusals": 203,
     "payloadRefusals": {"total": 121, "guiItems": 71, "candidates": 50},
 }
 
@@ -2412,7 +2419,15 @@ def test_the_transition_slice_splits_into_elements_and_controls(coverage):
 
 
 def test_entries_generated_despite_their_own_gap_resolve_to_a_captured_equivalent(coverage, index):
-    """The one exception must land on a gap-free catalog entry, not a guess."""
+    """An entry written despite its own gap must land on a gap-free catalog
+    entry, not a guess. There are none left: ``flashbulb`` was the only one,
+    and the scripting-oracle capture closed its gap by writing ``p14:flash``
+    for the enumerator itself, so the entry now stands on its own measurement
+    instead of on the tile that happened to share its shape."""
+    flashbulb = index.entry("EPPEntryEffect.entry effect flashbulb")
+    assert flashbulb.gap in (None, "")
+    assert flashbulb.ooxml["element"] == "p14:flash"
+    assert [record.key for record in coverage if record.key == flashbulb.key and record.has_gap] == []
     checked = []
     for record in coverage:
         if not (record.generated and record.has_gap):
