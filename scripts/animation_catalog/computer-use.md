@@ -144,6 +144,29 @@ tiles (Rise Up, Spinner, Basic Zoom, Stretch, Boomerang) that had not been
 there. Re-read the tree after each press rather than caching an index list,
 and never assume the first read enumerated the whole gallery.
 
+### Two constraints that set the cost of a batch
+
+Both were measured, and together they rule out the obvious shortcuts.
+
+**A gallery press replaces the shape's effect; it does not add one.** There is
+no Add Animation button on this build. Pressing Lines, then Appear, then a
+third tile on one shape leaves **one** effect — the last. A batch therefore
+needs **one slide per value**, not one slide with a stack of them, and a
+saved package's `p:timing` for slide N is evidence about value N alone.
+
+**Indices shift as soon as a press scrolls the gallery.** `perform_action`
+keeps the state across consecutive actions, so several presses can share one
+read — but only while the tile list holds still. After one press the Entrance
+gallery scrolled, grew a Previous button, and materialized Swivel, Zoom,
+Center Revolve, Float In and Grow Turn, so the index that had been
+Checkerboard was Shape. A press aimed by a stale index applies the wrong
+effect and the record names the right one, which is worse than failing.
+**Re-read before every press.**
+
+So the real cost per value is four calls — select the slide, select the shape,
+read, press — of which the two clicks invalidate the state the press needs.
+Plan one save per deck, and size a batch by the number of slides in it.
+
 Set `max_tree_nodes: 1` before a run of presses when you do not need the tree:
 a press returns a refreshed tree at the budget of the last read, and the full
 ribbon tree is large.
