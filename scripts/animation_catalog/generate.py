@@ -1442,6 +1442,29 @@ def apply_payload_gap(ooxml: dict[str, Any], category: str) -> dict[str, Any]:
     return ooxml
 
 
+def tile_duration_ms(row: tuple[Any, ...]) -> int | None:
+    """Return the ``timing.durationMs`` one gallery tile's semantic JSON should claim.
+
+    ``observedChildDurationMs`` carries two different kinds of ``None``, and
+    they must not be collapsed:
+
+    * The tile's **only** behaviour child is the normative visibility
+      ``p:set``. There is nothing to give a duration to — PowerPoint persists
+      Appear and Disappear as a discrete toggle — so the effect really is
+      instantaneous and the semantic JSON must not claim a duration. Saying
+      500 ms here makes the entry contradict its own capture, and the writer
+      then emits XML the reader cannot read back as what was written.
+    * The tile animates something (``p:anim``, ``p:animEffect``, …) but the
+      available capture did not record a child duration. ``None`` means
+      *unknown*, not instantaneous, so the carrier default stands as the
+      authoring example and the entry stays capture-required.
+    """
+    _category, _slug, _label, _preset_class, _preset_id, _subtype, _group, children, _filt, duration, _fixture = row
+    if duration is not None:
+        return duration
+    return None if tuple(children) == ("set",) else BASE_TIMING["durationMs"]
+
+
 def animation_template(row: tuple[Any, ...]) -> dict[str, Any]:
     """Return the OOXML mapping metadata for one captured gallery tile."""
     category, _slug, label, preset_class, preset_id, subtype, group, children, filt, duration, _fixture = row
@@ -1613,8 +1636,11 @@ def gui_items() -> list[dict[str, Any]]:
         category, slug = row[0], row[1]
         items.append(_accepted(
             f"animation.gallery.{category}.{slug}", NATIVE, animation_template(row),
-            effect_semantic(preset={"category": "entrance" if category == "text" else category,
-                                    "effect": slug, "variant": None}),
+            effect_semantic(
+                preset={"category": "entrance" if category == "text" else category,
+                        "effect": slug, "variant": None},
+                timing={"durationMs": tile_duration_ms(row)},
+            ),
             native_evidence(row[10], f"animations/{category}"),
             label=row[2],
         ))

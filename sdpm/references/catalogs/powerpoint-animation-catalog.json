@@ -3713,7 +3713,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": null,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -3855,7 +3855,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 250,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -4293,7 +4293,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 2000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -4656,7 +4656,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 2000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -4802,7 +4802,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 250,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -4874,7 +4874,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 250,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -5020,7 +5020,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 200,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -5163,7 +5163,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": null,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -5234,7 +5234,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 125,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -5307,7 +5307,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": null,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -5373,7 +5373,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 5000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -5657,7 +5657,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 580,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -5732,7 +5732,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 100,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -5872,7 +5872,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 15000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -5944,7 +5944,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -6086,7 +6086,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 455,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -6158,7 +6158,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -6372,7 +6372,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 800,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -6445,7 +6445,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -6590,7 +6590,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -6736,7 +6736,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 2000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -6876,7 +6876,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -6949,7 +6949,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 2000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -7089,7 +7089,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -7367,7 +7367,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 2000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -7440,7 +7440,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 2000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -7507,7 +7507,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 2000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -7787,7 +7787,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 5000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -8071,7 +8071,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1822,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -8146,7 +8146,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 400,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -8358,7 +8358,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -8431,7 +8431,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 15000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -8503,7 +8503,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -8578,7 +8578,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": null,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -8711,7 +8711,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -8924,7 +8924,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 800,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -8997,7 +8997,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -9215,7 +9215,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 2000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -9422,7 +9422,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -9495,7 +9495,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -9641,7 +9641,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -9780,7 +9780,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 1000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -9920,7 +9920,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": 2000,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,

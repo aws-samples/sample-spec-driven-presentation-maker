@@ -13,7 +13,7 @@ The agent always edits the deck's source JSON, so hand-edits must be synced ther
 
 ### 0. Review available guides
 
-Call `list_guides()` and use `read_guides([...])` for guides relevant to the upcoming edits.
+Use `read_guides([...])` for the guides relevant to the upcoming edits.
 
 **Constraints:**
 - You MUST complete Steps 1-2 BEFORE making any additional edits because hand-edits will be lost on regeneration

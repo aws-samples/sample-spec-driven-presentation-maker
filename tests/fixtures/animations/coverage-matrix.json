@@ -13,7 +13,7 @@
   },
   "source": {
     "catalog": "sdpm/references/catalogs/powerpoint-animation-catalog.json",
-    "catalogDigest": "sha256:a1ae9f820f178d83d776b95ec23b0cd2ef01b60901baacb9e0e377a72d1e470e",
+    "catalogDigest": "sha256:fda8cece3c12aaad132ef33529e92c2681ec0c4af0735093ff5a49b6e8b20ba6",
     "catalogGeneratedAt": "2026-10-30T00:00:00Z",
     "guiManifest": "powerpoint-gui-surface-16.113.1.json@2026-10-30.1",
     "baseline": {
@@ -1864,29 +1864,29 @@
       "id": "boundary:animations.mainSequence[].timing.durationMs:maximum",
       "axis": "boundary",
       "value": "animations.mainSequence[].timing.durationMs:maximum",
-      "catalogKey": "animation.timing.durationMs",
+      "catalogKey": "animation.gallery.entrance.credits",
       "catalogGroup": "guiItems",
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
-      "members": 1,
-      "formEstablishedMembers": 1,
-      "formEstablishedCatalogKey": "animation.timing.durationMs",
-      "note": "catalog-pinned value 2000; the catalog establishes 2 distinct value(s) for this path"
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null,
+      "note": "catalog-pinned value 15000; the catalog establishes 14 distinct value(s) for this path"
     },
     {
       "id": "boundary:animations.mainSequence[].timing.durationMs:minimum",
       "axis": "boundary",
       "value": "animations.mainSequence[].timing.durationMs:minimum",
-      "catalogKey": "animation.gallery.emphasis.blink",
+      "catalogKey": "animation.gallery.entrance.centerRevolve",
       "catalogGroup": "guiItems",
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
-      "members": 442,
-      "formEstablishedMembers": 121,
-      "formEstablishedCatalogKey": "animation.gallery.entrance.appear",
-      "note": "catalog-pinned value 500; the catalog establishes 2 distinct value(s) for this path"
+      "members": 1,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null,
+      "note": "catalog-pinned value 100; the catalog establishes 14 distinct value(s) for this path"
     },
     {
       "id": "boundary:animations.mainSequence[].timing.durationMs:normal",
@@ -1897,10 +1897,10 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
-      "members": 442,
-      "formEstablishedMembers": 121,
-      "formEstablishedCatalogKey": "animation.gallery.entrance.appear",
-      "note": "catalog-pinned value 500; the catalog establishes 2 distinct value(s) for this path"
+      "members": 399,
+      "formEstablishedMembers": 116,
+      "formEstablishedCatalogKey": "animation.gallery.entrance.blinds",
+      "note": "catalog-pinned value 500; the catalog establishes 14 distinct value(s) for this path"
     },
     {
       "id": "boundary:animations.mainSequence[].timing.repeatCount:maximum",

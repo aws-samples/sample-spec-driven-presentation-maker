@@ -564,24 +564,32 @@ class PPTXBuilder(
         from sdpm.engine.timing.raw import apply_raw_fragment
 
         what = f"raw {kind} of slide {slide_slug!r}"
-        manifest = self._raw_manifest(reference)
+        manifest, root = self._raw_manifest(reference)
         return apply_raw_fragment(
             slide._element,
             reference,
-            root=self._base_dir,
+            root=root,
             resolve_shape=lambda logical: registry.resolve(logical, context=what),
-            resolve_relationship=self._raw_relationship_resolver(slide, manifest, what),
+            resolve_relationship=self._raw_relationship_resolver(slide, manifest, root, what),
             # Only timing distinguishes object animation from media; a
             # transition fragment is governed by transitions_enabled above.
             animations_enabled=self.animations_enabled or kind != "timing",
             manifest=manifest,
         )
 
-    def _raw_manifest(self, reference: dict) -> dict:
+    def _raw_manifest(self, reference: dict) -> tuple[dict, Path]:
         """Load and validate the sidecar manifest that owns one raw reference.
 
-        Validation runs against the deck root, so a sidecar or media part that
-        the manifest declares but the deck no longer holds — or whose bytes
+        Returns the manifest and the root its own relative paths resolve
+        against. A manifest's paths are relative to the directory owning its
+        ``animations/`` subtree, which is the deck root for an active deck and
+        the bundle's deck root for a bundle-relative reference. The root is
+        therefore derived from the reference, exactly as the remote workspace
+        derives it, so the two sides cannot disagree about where a declared
+        part lives.
+
+        Validation runs against that root, so a sidecar or media part the
+        manifest declares but the deck no longer holds — or whose bytes
         changed — fails before any output is written (REQ-5.5, REQ-6.4).
         """
         from sdpm.engine.timing.raw import (
@@ -591,12 +599,13 @@ class PPTXBuilder(
         relative = reference.get("manifest") or MANIFEST_PATH
         if relative not in self._raw_manifests:
             path = resolve_within(self._base_dir, relative, what="raw manifest path")
+            root = path.parent.parent
             manifest = load_raw_manifest(path)
-            validate_raw_manifest(manifest, root=self._base_dir)
-            self._raw_manifests[relative] = manifest
+            validate_raw_manifest(manifest, root=root)
+            self._raw_manifests[relative] = (manifest, root)
         return self._raw_manifests[relative]
 
-    def _raw_relationship_resolver(self, slide, manifest: dict, what: str):
+    def _raw_relationship_resolver(self, slide, manifest: dict, root: Path, what: str):
         """Return the callable that recreates one copied package part.
 
         Only a part the validated manifest declares is copied, and only with
@@ -624,7 +633,7 @@ class PPTXBuilder(
                     "will not copy it into the package"
                 )
             check_relationship(relationship_type, content_type, what=what)
-            blob = resolve_within(self._base_dir, part_path, what="raw relationship part").read_bytes()
+            blob = resolve_within(root, part_path, what="raw relationship part").read_bytes()
             if sha256_hex(blob) != record.get("sha256"):
                 raise RawReplayError(
                     f"{what}: part {part_path!r} does not match the digest the manifest recorded"

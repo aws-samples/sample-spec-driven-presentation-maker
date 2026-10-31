@@ -1323,7 +1323,16 @@ class TimingWriter:
         """
         if tag == "p:set":
             rule = self._visibility_timing()
-            if category == "entrance":
+            instantaneous = tuple(entry.ooxml.get("behaviorChildren") or ()) == ("p:set",)
+            if category == "entrance" or instantaneous:
+                # The captured exit offset exists so the outgoing filter stays
+                # visible for the whole effect and the state change finishes
+                # with it. A preset whose only behaviour child is the
+                # visibility p:set — Disappear — persists no accompanying
+                # animation, so there is no active duration to offset from and
+                # the state change sits at the effect start, exactly as an
+                # entrance Appear does. Inferred from the captured rule's own
+                # rationale rather than measured; Task 8 read-back confirms it.
                 delay = _int(rule.get("entranceDelayMs", 0), "entranceDelayMs")
             else:
                 if duration is None:
