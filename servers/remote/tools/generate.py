@@ -138,6 +138,124 @@ def _assemble_slides(tmpdir: Path) -> list[dict]:
     return slides
 
 
+def _raw_manifest_paths(slides: list[dict]) -> list[str]:
+    """Return every sidecar manifest this deck could depend on.
+
+    The default location is always considered: a deck can carry semantic
+    sound/media assets (declared in the manifest's ``assets``) without any
+    slide holding a raw reference. Anything a slide names explicitly is added,
+    path-checked, so a reference can never point outside the workspace.
+    """
+    from sdpm.engine.timing.raw import MANIFEST_PATH, safe_bundle_path
+
+    paths = {MANIFEST_PATH}
+    for slide in slides:
+        for key in ("_rawTiming", "_rawTransition"):
+            reference = slide.get(key)
+            if not isinstance(reference, dict) or not reference.get("manifest"):
+                continue
+            candidate = safe_bundle_path(reference["manifest"], what=f"{key}.manifest")
+            if not candidate.endswith(MANIFEST_PATH):
+                raise ValueError(
+                    f"{key}.manifest must end with {MANIFEST_PATH!r} so its dependency closure "
+                    f"resolves against one known root; got {candidate!r}"
+                )
+            paths.add(candidate)
+    return sorted(paths)
+
+
+def _referenced_manifests(slides: list[dict]) -> set[str]:
+    """Return only the manifests a slide reference requires to exist."""
+    from sdpm.engine.timing.raw import MANIFEST_PATH
+
+    required: set[str] = set()
+    for slide in slides:
+        for key in ("_rawTiming", "_rawTransition"):
+            reference = slide.get(key)
+            if isinstance(reference, dict):
+                required.add(str(reference.get("manifest") or MANIFEST_PATH))
+    return required
+
+
+def _materialize_raw_closure(
+    tmpdir: Path,
+    deck_id: str,
+    storage: Storage,
+    slides: list[dict],
+) -> list[str]:
+    """Fetch every sidecar and part a raw dependency manifest declares.
+
+    Returns the workspace-relative paths written. A manifest a slide requires
+    but S3 does not hold, a manifest that fails validation (path traversal, a
+    relationship or content type outside the allowlist, an external
+    ``TargetMode``, an undeclared part, a digest mismatch) and a declared file
+    that arrives altered all fail generation here, before the engine is called
+    (REQ-5.5, REQ-5.7, REQ-6.4).
+    """
+    from sdpm.engine.timing.raw import (
+        MANIFEST_PATH,
+        RawManifestError,
+        load_raw_manifest,
+        manifest_dependency_closure,
+        resolve_within,
+        validate_raw_manifest,
+    )
+
+    required = _referenced_manifests(slides)
+    written: list[str] = []
+    for relative in _raw_manifest_paths(slides):
+        try:
+            payload = storage.download_file_from_pptx_bucket(f"decks/{deck_id}/{relative}")
+        except Exception as error:
+            if relative in required:
+                raise ValueError(
+                    f"Deck {deck_id} references the preserved-animation manifest {relative!r}, "
+                    f"which is not in storage; its animations cannot be regenerated: {error}"
+                ) from error
+            # Nothing references it, so the usual case is a deck with no
+            # preserved motion. Logged because the other case — a transient
+            # read failure for a deck that only has semantic sound assets —
+            # looks identical from here.
+            logger.info("no preserved-animation manifest at %s for deck %s (%s)",
+                        relative, deck_id, error)
+            continue
+        # The manifest's paths are relative to the directory that owns its
+        # ``animations/`` subtree, which is the workspace root for an active
+        # deck and the bundle's deck root for a bundle-relative reference.
+        prefix = relative[: -len(MANIFEST_PATH)]
+        manifest_file = resolve_within(tmpdir, relative, what="raw manifest path")
+        root = manifest_file.parent.parent
+        manifest_file.parent.mkdir(parents=True, exist_ok=True)
+        manifest_file.write_bytes(payload)
+        manifest = load_raw_manifest(manifest_file)
+        try:
+            closure = manifest_dependency_closure(manifest)
+        except RawManifestError as error:
+            raise ValueError(
+                f"Deck {deck_id}: the preserved-animation manifest {relative!r} is invalid, so "
+                f"sdpm will not materialize it: {error}"
+            ) from error
+        for member in closure:
+            destination = resolve_within(root, member, what="raw manifest path")
+            destination.parent.mkdir(parents=True, exist_ok=True)
+            destination.write_bytes(
+                storage.download_file_from_pptx_bucket(f"decks/{deck_id}/{prefix}{member}")
+            )
+            written.append(f"{prefix}{member}")
+        try:
+            validate_raw_manifest(manifest, root=root)
+        except RawManifestError as error:
+            raise ValueError(
+                f"Deck {deck_id}: the preserved-animation dependency closure of {relative!r} did "
+                f"not materialize intact: {error}"
+            ) from error
+        logger.info(
+            "materialized %d preserved-animation files for deck %s from %s",
+            len(closure), deck_id, relative,
+        )
+    return written
+
+
 def _prepare_workspace(
     deck_id: str,
     user_id: str,
@@ -191,7 +309,15 @@ def _prepare_workspace(
     if not slides:
         raise ValueError(f"Deck {deck_id} has no slides.")
 
-    # Materialize only immutable bundle artifacts referenced by active slide JSON.
+    # Preserved animation/transition dependencies are materialized from their
+    # hashed manifest, not by scanning slide JSON for path-shaped strings: the
+    # manifest is the only place that knows the complete closure (every
+    # retained branch, every copied media part) and the only thing that can
+    # prove the closure arrived intact (REQ-5.5).
+    _materialize_raw_closure(tmpdir, deck_id, storage, slides)
+
+    # Other immutable bundle artifacts (imported images, the bundle template)
+    # are still referenced by path from active slide JSON — see #265.
     def _collect_import_refs(value: object) -> set[str]:
         refs: set[str] = set()
         if isinstance(value, str) and value.startswith("attachments/imports/"):
@@ -337,6 +463,8 @@ def generate_pptx(
     user_id: str,
     storage: Storage,
     kb_sync: object | None = None,
+    animation_mode: str = "inherit",
+    transition_mode: str = "inherit",
 ) -> dict:
     """Generate a PowerPoint file from the deck's S3 workspace.
 
@@ -351,14 +479,22 @@ def generate_pptx(
         user_id: Owner's user ID.
         storage: Storage backend instance.
         kb_sync: Optional KBSync instance for vector synchronization.
+        animation_mode: inherit, on, or off; overrides deck.json animations.enabled.
+        transition_mode: inherit, on, or off; overrides deck.json transitions.enabled.
 
     Returns:
         Dict with status, slideCount, slides summary, and optional warnings.
 
     Raises:
-        ValueError: If deck not found or has no slides.
+        ValueError: If deck not found, has no slides, or a mode is invalid.
     """
     from sdpm.api import generate as api_generate
+    from sdpm.engine.timing import normalize_mode
+
+    # Validated before the S3 workspace is materialized: an invalid mode is a
+    # caller error, not a reason to download a deck.
+    animation_mode = normalize_mode(animation_mode, "animation_mode")
+    transition_mode = normalize_mode(transition_mode, "transition_mode")
 
     _t0 = time.monotonic()
     tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, storage)
@@ -376,7 +512,12 @@ def generate_pptx(
         )
 
         out = tmpdir / "output.pptx"
-        gen_result = api_generate(json_path=tmpdir, output_path=out)
+        gen_result = api_generate(
+            json_path=tmpdir,
+            output_path=out,
+            animation_mode=animation_mode,
+            transition_mode=transition_mode,
+        )
 
         # Upload PPTX to S3
         pptx_key = f"pptx/{deck_id}/{uuid.uuid4()}.pptx"

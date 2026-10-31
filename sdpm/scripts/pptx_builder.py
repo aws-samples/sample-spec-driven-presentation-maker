@@ -82,6 +82,8 @@ def cmd_generate(args):
         result = generate(
             json_path=args.input if args.input and args.input != "-" else None,
             output_path=args.output,
+            animation_mode=args.animation_mode,
+            transition_mode=args.transition_mode,
         )
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -587,6 +589,12 @@ def main():
     p_gen.add_argument("input", nargs="?", help="Input JSON file (or - for stdin)")
     p_gen.add_argument("-o", "--output", required=True, help="Output PPTX path")
     p_gen.add_argument("--keep-empty-placeholders", action="store_true", help="Keep empty placeholders visible")
+    # Independent render-time overrides. The engine validates the value (one
+    # definition of the accepted set) so every surface reports it identically.
+    p_gen.add_argument("--animation-mode", default="inherit",
+                       help="Object animations: inherit|on|off (overrides deck.json animations.enabled)")
+    p_gen.add_argument("--transition-mode", default="inherit",
+                       help="Slide transitions: inherit|on|off (overrides deck.json transitions.enabled)")
 
     p_prev = subparsers.add_parser("preview", help="Export slides as PNG images")
     p_prev.add_argument("input", help="Input JSON file")

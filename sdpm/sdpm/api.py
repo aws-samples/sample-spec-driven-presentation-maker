@@ -705,7 +705,14 @@ def _resolve_config(
     Raises FileNotFoundError, ValueError on missing template/icons.
     """
     from sdpm.engine.builder import resolve_override, validate_icons_in_json
+    from sdpm.engine.timing import normalize_mode
     from sdpm.utils.io import read_json
+
+    # Both overrides are validated before anything is read or built, so an
+    # invalid mode names its argument instead of surfacing later as a
+    # template or lint error (design: Error Handling).
+    animation_mode = normalize_mode(animation_mode, "animation_mode")
+    transition_mode = normalize_mode(transition_mode, "transition_mode")
 
     input_path = Path(json_path)
     if not input_path.exists():
@@ -863,11 +870,21 @@ def generate(
         only_slugs: When set, build only the specified slugs (for iso.pptx).
         animation_mode: inherit, on, or off; overrides deck.json animations.enabled.
         transition_mode: inherit, on, or off; overrides deck.json transitions.enabled.
+            Each mode is independent of the other; a caller value overrides the
+            deck switch and never rewrites deck.json.
 
     Returns:
         Dict with output_path, slide_count, slides summary, warnings.
+
+    Raises:
+        ValueError: If animation_mode or transition_mode is not inherit, on, or
+            off — raised before any build work happens.
     """
     from sdpm.engine.preview import check_layout_imbalance_data
+    from sdpm.engine.timing import normalize_mode
+
+    animation_mode = normalize_mode(animation_mode, "animation_mode")
+    transition_mode = normalize_mode(transition_mode, "transition_mode")
 
     config = _resolve_config(
         json_path,
@@ -1224,6 +1241,19 @@ def _load_deck_as_roundtrip(deck_dir: Path) -> dict:
             with open(slide_file) as f:
                 slides.append(json.load(f))
     data["slides"] = slides
+    # Preserved-motion sidecars are referenced by digest from slide JSON; the
+    # manifest is what names the targets each one animates. It is read here,
+    # while the converted deck still exists, so the pure diff can summarize a
+    # raw fallback without the XML and without touching the filesystem.
+    manifest_path = deck_dir / "animations" / "manifest.json"
+    if manifest_path.is_file():
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+            manifest = None
+        if isinstance(manifest, dict):
+            data["_rawManifest"] = manifest
     return data
 
 

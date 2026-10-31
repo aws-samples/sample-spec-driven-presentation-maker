@@ -134,6 +134,9 @@ class PPTXBuilder(
         self.identity_registries: dict[str, object] = {}
         self.timing_reports: list[dict] = []
         self.transition_reports: list[dict] = []
+        # Raw sidecar manifests already loaded and validated, keyed by their
+        # deck-relative path: one deck shares one manifest across its slides.
+        self._raw_manifests: dict[str, dict] = {}
         self._base_dir = base_dir if base_dir is not None else Path(".")
         self._list_styles = self._load_list_styles()
         self._clear_slides()
@@ -470,27 +473,171 @@ class PPTXBuilder(
 
         # Transition and timing come last: every shape, note, placeholder and
         # media object now exists, and empty placeholders are gone (REQ-6.1).
-        from sdpm.engine.timing.transition import write_slide_transition
-        from sdpm.engine.timing.writer import write_slide_timing
+        # Each feature is written from whichever representation the slide
+        # carries — semantic JSON or a preserved raw fragment.
+        self.transition_reports.append(self._write_transition(slide, slide_def, registry, slide_slug))
+        self.timing_reports.append(self._write_timing(slide, slide_def, registry, slide_slug))
 
-        self.transition_reports.append(
-            write_slide_transition(
+        return slide
+
+    # -- motion: semantic or preserved raw --------------------------------
+    def _write_transition(self, slide, slide_def: dict, registry, slide_slug: str) -> dict:
+        """Write the slide's transition from semantic JSON or a raw sidecar."""
+        from sdpm.engine.timing.transition import (
+            TransitionWriteError, remove_transition, write_slide_transition,
+        )
+
+        reference = slide_def.get("_rawTransition")
+        if isinstance(reference, dict) and slide_def.get("transition") is not None:
+            raise TransitionWriteError(
+                f"slide {slide_slug!r}: the slide carries both a semantic transition and a "
+                "preserved _rawTransition; sdpm will not apply either rather than guess which "
+                "one the deck means (REQ-5.6). Remove one of them."
+            )
+        if not isinstance(reference, dict):
+            return write_slide_transition(
                 slide._element,
                 slide_def.get("transition"),
                 transitions_enabled=self.transitions_enabled,
                 slide_slug=slide_slug,
             )
-        )
-        self.timing_reports.append(
-            write_slide_timing(
-                slide._element,
-                slide_def,
-                registry,
-                animations_enabled=self.animations_enabled,
-            )
+        if not self.transitions_enabled:
+            # Transitions off removes transition content and nothing else.
+            return {"transition": False, "raw": True, "removed": remove_transition(slide._element)}
+        self._replay_raw(slide, reference, registry, kind="transition", slide_slug=slide_slug)
+        return {
+            "transition": True,
+            "raw": True,
+            "sidecar": str(reference.get("sidecar", "")),
+            "removed": 0,
+        }
+
+    def _write_timing(self, slide, slide_def: dict, registry, slide_slug: str) -> dict:
+        """Write the slide's timing from semantic JSON or a raw sidecar.
+
+        A slide whose motion was preserved raw has to regenerate *with* that
+        motion: ignoring the reference would drop every animation the import
+        deliberately kept (REQ-5.5, REQ-6.4). With animations disabled the
+        media-only tree recorded at import is replayed instead, and an
+        unclassifiable media/object boundary fails here — before the package
+        is saved (REQ-5.4).
+        """
+        from sdpm.engine.timing.writer import (
+            TimingWriteError, TimingWriter, insert_in_schema_order, media_timing_nodes, reparse,
+            write_slide_timing,
         )
 
-        return slide
+        reference = slide_def.get("_rawTiming")
+        if isinstance(reference, dict) and slide_def.get("animations") is not None:
+            raise TimingWriteError(
+                f"slide {slide_slug!r}: the slide carries both a semantic animations timeline and "
+                "a preserved _rawTiming; sdpm will not apply either rather than drop one silently "
+                "(REQ-5.6). Remove one of them."
+            )
+        if not isinstance(reference, dict):
+            return write_slide_timing(
+                slide._element, slide_def, registry, animations_enabled=self.animations_enabled,
+            )
+        # Harvested before the replay removes the existing representation:
+        # media_timing_nodes returns copies, so they survive it.
+        media_nodes = media_timing_nodes(slide._element)
+        node = self._replay_raw(slide, reference, registry, kind="timing", slide_slug=slide_slug)
+        report = {
+            "timing": node is not None,
+            "raw": True,
+            "animationsEnabled": self.animations_enabled,
+            "sidecar": str(reference.get("sidecar", "")),
+            "mediaNodes": len(media_nodes),
+        }
+        if node is None and media_nodes:
+            # The preserved tree carried no media of its own, so this build's
+            # own media timing is what keeps video playable (REQ-1.4).
+            timing = TimingWriter(registry, slide_slug=slide_slug).build(None, media_nodes)
+            if timing is not None:
+                insert_in_schema_order(slide._element, reparse(timing), "timing")
+                report["timing"] = True
+                report["mediaOnlyRebuilt"] = True
+        return report
+
+    def _replay_raw(self, slide, reference: dict, registry, *, kind: str, slide_slug: str):
+        """Replay one preserved fragment into the slide being generated."""
+        from sdpm.engine.timing.raw import apply_raw_fragment
+
+        what = f"raw {kind} of slide {slide_slug!r}"
+        manifest = self._raw_manifest(reference)
+        return apply_raw_fragment(
+            slide._element,
+            reference,
+            root=self._base_dir,
+            resolve_shape=lambda logical: registry.resolve(logical, context=what),
+            resolve_relationship=self._raw_relationship_resolver(slide, manifest, what),
+            # Only timing distinguishes object animation from media; a
+            # transition fragment is governed by transitions_enabled above.
+            animations_enabled=self.animations_enabled or kind != "timing",
+            manifest=manifest,
+        )
+
+    def _raw_manifest(self, reference: dict) -> dict:
+        """Load and validate the sidecar manifest that owns one raw reference.
+
+        Validation runs against the deck root, so a sidecar or media part that
+        the manifest declares but the deck no longer holds — or whose bytes
+        changed — fails before any output is written (REQ-5.5, REQ-6.4).
+        """
+        from sdpm.engine.timing.raw import (
+            MANIFEST_PATH, load_raw_manifest, resolve_within, validate_raw_manifest,
+        )
+
+        relative = reference.get("manifest") or MANIFEST_PATH
+        if relative not in self._raw_manifests:
+            path = resolve_within(self._base_dir, relative, what="raw manifest path")
+            manifest = load_raw_manifest(path)
+            validate_raw_manifest(manifest, root=self._base_dir)
+            self._raw_manifests[relative] = manifest
+        return self._raw_manifests[relative]
+
+    def _raw_relationship_resolver(self, slide, manifest: dict, what: str):
+        """Return the callable that recreates one copied package part.
+
+        Only a part the validated manifest declares is copied, and only with
+        the relationship and content type it recorded, so replay can never
+        pull an undeclared file into the package or emit a dangling rId
+        (REQ-5.7, security boundary).
+        """
+        from pptx.opc.package import Part
+
+        from sdpm.engine.timing.raw import (
+            RawReplayError, check_relationship, resolve_within, sha256_hex,
+        )
+
+        declared = {
+            str(part.get("path")): part
+            for part in manifest.get("parts") or []
+            if isinstance(part, dict)
+        }
+
+        def resolve(part_path: str, relationship_type: str, content_type: str) -> str:
+            record = declared.get(part_path)
+            if record is None:
+                raise RawReplayError(
+                    f"{what}: the dependency manifest does not declare part {part_path!r}, so sdpm "
+                    "will not copy it into the package"
+                )
+            check_relationship(relationship_type, content_type, what=what)
+            blob = resolve_within(self._base_dir, part_path, what="raw relationship part").read_bytes()
+            if sha256_hex(blob) != record.get("sha256"):
+                raise RawReplayError(
+                    f"{what}: part {part_path!r} does not match the digest the manifest recorded"
+                )
+            package = slide.part.package
+            # The part name is ours to choose, so the recorded path only
+            # contributes a conservative extension.
+            suffix = Path(part_path).suffix.lstrip(".").lower()
+            extension = suffix if suffix.isalnum() else "bin"
+            part = Part(package.next_media_partname(extension), content_type, package, blob)
+            return slide.part.relate_to(part, relationship_type)
+
+        return resolve
 
     def save(self, output_path: Path):
         self.prs.save(str(output_path))

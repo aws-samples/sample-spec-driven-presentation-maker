@@ -368,6 +368,262 @@ class TestReplay:
         )
 
 
+# --- regeneration: the builder replays what the import preserved ----------
+
+#: A raw fragment that also names a package relationship, so replay has to
+#: copy the part and rewrite the rId as well as the spid.
+WAV = b"RIFF\x24\x00\x00\x00WAVEfmt " + b"\x00" * 32
+R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
+UNREADABLE_TRANSITION = (
+    '<mc:AlternateContent xmlns:mc="%s" xmlns:p="%s">'
+    '<mc:Choice Requires="p2051"><p:transition spd="fast">'
+    "<p:futureEffect/></p:transition></mc:Choice></mc:AlternateContent>"
+) % (MC, P)
+
+
+def _inject_sound(path):
+    """Attach an audio part and an unreadable timing tree that names it."""
+    from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+    from pptx.opc.package import Part
+    from pptx.opc.packuri import PackURI
+
+    presentation = Presentation(str(path))
+    slide = list(presentation.slides)[0]
+    rid = slide.part.relate_to(
+        Part(PackURI("/ppt/media/audio1.wav"), "audio/wav", slide.part.package, WAV), RT.AUDIO,
+    )
+    spid = slide.shapes[-1].shape_id
+    for node in slide._element.findall("{%s}timing" % P):
+        slide._element.remove(node)
+    slide._element.append(etree.fromstring(
+        '<p:timing xmlns:p="%s" xmlns:r="%s"><p:tnLst><p:par>'
+        '<p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>'
+        '<p:seq concurrent="1" nextAc="seek"><p:cTn id="2" nodeType="mainSeq"><p:childTnLst>'
+        '<p:par><p:cTn id="3" futureThing="7">'
+        '<p:tgtEl><p:spTgt spid="%d"/></p:tgtEl>'
+        '<p:snd r:embed="%s" name="alarm.wav"/>'
+        "</p:cTn></p:par></p:childTnLst></p:cTn></p:seq>"
+        "</p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>" % (P, R, spid, rid)
+    ))
+    presentation.save(str(path))
+    return path
+
+
+def _inject_unreadable_transition(path):
+    presentation = Presentation(str(path))
+    slide = list(presentation.slides)[0]
+    for node in slide._element.findall("{%s}transition" % P):
+        slide._element.remove(node)
+    slide._element.insert(
+        len(slide._element) - len(slide._element.findall("{%s}timing" % P)),
+        etree.fromstring(UNREADABLE_TRANSITION),
+    )
+    presentation.save(str(path))
+    return path
+
+
+def _import(media_dir, package):
+    """Convert a package and return (slide JSON, deck root)."""
+    pptx_to_json(package, media_dir / "out")
+    slide = json.loads((media_dir / "out" / "slides" / "slide-001.json").read_text())
+    return slide, media_dir / "out"
+
+
+def _regenerate(root, slide_def, *, animations=True, transitions=False, name="regen.pptx"):
+    """Rebuild one imported slide from the deck root that holds its sidecars."""
+    builder = PPTXBuilder(
+        TEMPLATE,
+        fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"},
+        default_text_color="#FFFFFF",
+        base_dir=root,
+        animations_enabled=animations,
+        transitions_enabled=transitions,
+    )
+    builder.add_slide(slide_def)
+    out = root / name
+    builder.save(out)
+    return out, builder
+
+
+def _slide_root(path):
+    slide = list(Presentation(str(path)).slides)[0]
+    return etree.fromstring(etree.tostring(slide._element))
+
+
+def _spids(root, tag="spTgt"):
+    return {node.get("spid") for node in root.findall(".//{%s}%s" % (P, tag))}
+
+
+class TestGenerationReplaysPreservedMotion:
+    def test_an_imported_raw_slide_regenerates_with_its_motion(self, media_dir):
+        slide, root = _import(media_dir, _inject_unknown_sequence(
+            _package(media_dir, _video_slide())
+        ))
+        out, builder = _regenerate(root, slide)
+
+        regenerated = _slide_root(out)
+        assert b"futureThing" in etree.tostring(regenerated), (
+            "REQ-5.5: a slide whose motion imported raw must regenerate with it, "
+            "not silently without it"
+        )
+        assert len(regenerated.findall("{%s}timing" % P)) == 1, "one representation"
+        assert builder.timing_reports[-1]["raw"] is True
+        assert builder.timing_reports[-1]["timing"] is True
+
+    def test_the_spid_is_remapped_to_this_builds_shape(self, media_dir):
+        slide, root = _import(media_dir, _inject_unknown_sequence(
+            _package(media_dir, _video_slide())
+        ))
+        manifest = load_raw_manifest(root / MANIFEST_PATH)
+        source_spid, logical = next(iter(manifest["sidecars"][0]["shapeMappings"].items()))
+
+        # An extra element in front shifts every generated shape id, so a
+        # replayed spid that is still the source one would be a stale target.
+        slide["elements"].insert(0, {
+            "type": "shape", "shape": "rect", "x": 0, "y": 0, "width": 40, "height": 40,
+        })
+        out, builder = _regenerate(root, slide)
+
+        registry = next(iter(builder.identity_registries.values()))
+        expected = str(registry.resolve(logical))
+        assert expected in _spids(_slide_root(out))
+        assert expected != source_spid, "the fixture must actually shift the ids"
+        assert source_spid not in _spids(_slide_root(out))
+
+    def test_the_relationship_part_is_recopied_and_the_rid_remapped(self, media_dir):
+        slide, root = _import(media_dir, _inject_sound(
+            _package(media_dir, _video_slide(), name="sound.pptx")
+        ))
+        out, _builder = _regenerate(root, slide)
+
+        regenerated = list(Presentation(str(out)).slides)[0]
+        sounds = regenerated._element.findall(".//{%s}snd" % P)
+        assert len(sounds) == 1
+        rid = sounds[0].get("{%s}embed" % R)
+        relationship = regenerated.part.rels[rid]
+        assert relationship.reltype.endswith("/audio")
+        assert relationship.target_part.blob == WAV, "the manifest-declared part was copied"
+
+    def test_a_missing_target_fails_before_the_package_is_written(self, media_dir):
+        slide, root = _import(media_dir, _inject_unknown_sequence(
+            _package(media_dir, _video_slide())
+        ))
+        manifest = load_raw_manifest(root / MANIFEST_PATH)
+        logical = set(manifest["sidecars"][0]["shapeMappings"].values())
+        slide["elements"] = [
+            element for element in slide["elements"] if element.get("id") not in logical
+        ]
+        with pytest.raises(RawReplayError, match="not on the generated slide"):
+            _regenerate(root, slide, name="never.pptx")
+        assert not (root / "never.pptx").exists()
+
+    def test_a_missing_relationship_part_fails_before_the_package_is_written(self, media_dir):
+        slide, root = _import(media_dir, _inject_sound(
+            _package(media_dir, _video_slide(), name="sound.pptx")
+        ))
+        manifest = load_raw_manifest(root / MANIFEST_PATH)
+        (root / manifest["parts"][0]["path"]).unlink()
+        with pytest.raises(RawManifestError, match="missing"):
+            _regenerate(root, slide, name="never.pptx")
+        assert not (root / "never.pptx").exists()
+
+    def test_a_tampered_sidecar_fails_before_the_package_is_written(self, media_dir):
+        slide, root = _import(media_dir, _inject_unknown_sequence(
+            _package(media_dir, _video_slide())
+        ))
+        sidecar = root / slide["_rawTiming"]["sidecar"]
+        sidecar.write_bytes(sidecar.read_bytes().replace(b"futureThing", b"futureThinG"))
+        with pytest.raises(RawManifestError, match="digest mismatch"):
+            _regenerate(root, slide, name="never.pptx")
+        assert not (root / "never.pptx").exists()
+
+    def test_animations_off_regenerates_the_media_timing_only(self, media_dir):
+        slide, root = _import(media_dir, _inject_unknown_sequence(
+            _package(media_dir, _video_slide())
+        ))
+        out, builder = _regenerate(root, slide, animations=False, name="off.pptx")
+
+        regenerated = _slide_root(out)
+        xml = etree.tostring(regenerated)
+        assert b"futureThing" not in xml, "the object-animation branch is suppressed"
+        locals_ = [etree.QName(node).localname for node in regenerated.iter()
+                   if isinstance(node.tag, str)]
+        assert "video" in locals_, "REQ-1.4: media playback timing survives"
+        assert builder.timing_reports[-1]["animationsEnabled"] is False
+
+    def test_animations_off_fails_when_the_boundary_is_unclassifiable(self, media_dir):
+        slide, root = _import(media_dir, _inject_unknown_sequence(
+            _package(media_dir, _video_slide()), nest_media=True,
+        ))
+        with pytest.raises(RawReplayError, match="cannot separate"):
+            _regenerate(root, slide, animations=False, name="never.pptx")
+        assert not (root / "never.pptx").exists()
+
+    def test_a_raw_transition_is_replayed_only_when_transitions_are_enabled(self, media_dir):
+        slide, root = _import(media_dir, _inject_unreadable_transition(
+            _package(media_dir, _video_slide(), name="trans.pptx")
+        ))
+        assert "_rawTransition" in slide
+
+        on, _builder = _regenerate(root, slide, transitions=True, name="trans-on.pptx")
+        assert b"futureEffect" in etree.tostring(_slide_root(on))
+
+        order = [etree.QName(child).localname for child in _slide_root(on)]
+        assert order.index("AlternateContent") < order.index("timing"), (
+            "p:sld child order: a transition precedes timing"
+        )
+
+        off, builder = _regenerate(root, slide, transitions=False, name="trans-off.pptx")
+        off_root = _slide_root(off)
+        assert b"futureEffect" not in etree.tostring(off_root)
+        assert not off_root.findall("{%s}transition" % P)
+        assert builder.transition_reports[-1] == {"transition": False, "raw": True, "removed": 0}
+
+    def test_a_slide_carrying_both_representations_is_refused(self, media_dir):
+        """REQ-5.6: raw and semantic are mutually exclusive. Preferring one
+        would drop the other without saying so, so the build stops."""
+        slide, root = _import(media_dir, _inject_unknown_sequence(
+            _package(media_dir, _video_slide())
+        ))
+        conflicted = dict(slide)
+        conflicted["animations"] = {"mainSequence": []}
+        with pytest.raises(Exception, match="REQ-5.6"):
+            _regenerate(root, conflicted, name="never.pptx")
+
+        conflicted = dict(slide)
+        conflicted.pop("animations", None)
+        conflicted["_rawTransition"] = slide["_rawTiming"]
+        conflicted["transition"] = {"effect": "fade", "parameters": {}}
+        with pytest.raises(Exception, match="REQ-5.6"):
+            _regenerate(root, conflicted, transitions=True, name="never.pptx")
+        assert not (root / "never.pptx").exists()
+
+    def test_the_facade_replays_raw_motion_and_honours_the_override(self, media_dir):
+        """End to end through sdpm.api.generate: the deck-level switch the
+        import derived turns the replay on, and the caller override turns it
+        off without touching the deck."""
+        from sdpm.api import generate
+
+        slide, root = _import(media_dir, _inject_unknown_sequence(
+            _package(media_dir, _video_slide())
+        ))
+        (root / "template.pptx").write_bytes(TEMPLATE.read_bytes())
+        deck = json.loads((root / "deck.json").read_text())
+        assert deck["animations"] == {"enabled": True}, "the import derived the switch"
+        deck["template"] = "template.pptx"
+        (root / "deck.json").write_text(json.dumps(deck))
+        (root / "specs").mkdir(exist_ok=True)
+        (root / "specs" / "outline.md").write_text("- [slide-001] imported\n")
+
+        inherited = root / "inherited.pptx"
+        generate(root, output_path=inherited)
+        assert b"futureThing" in etree.tostring(_slide_root(inherited))
+
+        suppressed = root / "suppressed.pptx"
+        generate(root, output_path=suppressed, animation_mode="off")
+        assert b"futureThing" not in etree.tostring(_slide_root(suppressed))
+
+
 # --- media boundary classification ----------------------------------------
 
 

@@ -137,9 +137,14 @@ def analyze_template(
     return result
 
 
-def generate_pptx(deck_id: Annotated[str, Field(description='Deck directory path.')]) -> dict[str, Any]:
+def generate_pptx(
+    deck_id: Annotated[str, Field(description='Deck directory path.')],
+    animation_mode: Annotated[str, Field(description='Object animations: inherit|on|off, overriding deck.json.')] = "inherit",
+    transition_mode: Annotated[str, Field(description='Slide transitions: inherit|on|off, overriding deck.json.')] = "inherit",
+) -> dict[str, Any]:
     """Build output.pptx from the deck workspace (deck.json + slides/*.json). run_python
-    already rebuilds after edits; use this for an explicit full build.
+    already rebuilds after edits; use this for an explicit full build. The two mode
+    arguments render without animations or transitions without editing the deck.
     """
     from sdpm.api import generate
     from sdpm.knowledge.assets import invalidate_manifest_cache
@@ -148,6 +153,8 @@ def generate_pptx(deck_id: Annotated[str, Field(description='Deck directory path
     return generate(
         json_path=deck_id,
         output_path=str(Path(deck_id) / "output.pptx"),
+        animation_mode=animation_mode,
+        transition_mode=transition_mode,
     )
 
 

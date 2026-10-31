@@ -575,7 +575,11 @@ def import_attachment(
 
 
 @offloaded_tool
-def generate_pptx(deck_id: Annotated[str, Field(description='Deck ID.')]) -> str:
+def generate_pptx(
+    deck_id: Annotated[str, Field(description='Deck ID.')],
+    animation_mode: Annotated[str, Field(description='Object animations: inherit|on|off, overriding deck.json.')] = "inherit",
+    transition_mode: Annotated[str, Field(description='Slide transitions: inherit|on|off, overriding deck.json.')] = "inherit",
+) -> str:
     """Finalize the deck: full PPTX build, the WebP preview set, knowledge-base sync, and a
     whole-deck warnings report. run_python already rebuilds the PPTX after edits; this is
     the explicit hand-off step.
@@ -587,6 +591,7 @@ def generate_pptx(deck_id: Annotated[str, Field(description='Deck ID.')]) -> str
         result = generate.generate_pptx(
             deck_id=deck_id, user_id=_get_user_id(), storage=_storage,
             kb_sync=_get_kb_sync(),
+            animation_mode=animation_mode, transition_mode=transition_mode,
         )
         logger.info("generate_pptx completed: deck=%s slides=%s", deck_id, result.get("slideCount"))
         return json.dumps(result)
