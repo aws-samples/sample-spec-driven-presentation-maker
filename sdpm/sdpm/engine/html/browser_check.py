@@ -9,12 +9,17 @@ an adapter registered) over the DevTools protocol (``sdpm.engine.html.cdp``):
 1. attach to the page; enable Page / Runtime / Log; fail every http(s) / ws(s) request
    through the Fetch domain, navigations included (if the browser rejects that, the check
    fails before the deck loads); auto-attach targets the page opens paused, close the
-   pages and block the frames / workers the same way;
+   pages and block the frames / workers the same way; install the egress guard
+   (``EGRESS_GUARD``, on every new document of the page and its frames) that removes
+   WebRTC and ``WebTransport`` and makes ``window.open`` return null;
    set the viewport to the deck size;
 2. load the deck: up to ``DIRECT_LIMIT`` UTF-8 bytes with ``Page.setDocumentContent`` on
    ``about:blank#sdpm-check``, larger in chunks into a ``blob:`` URL (CDP drops messages
    around 10–12 MB); wait for ``Reveal.isReady()``; turn margins, controls, transitions
-   and the URL hash off;
+   and the URL hash off; prove the guard (``EGRESS_PROBE``: the top window, a fresh
+   iframe, a srcdoc iframe, ``window.open``) — a reachable WebRTC constructor fails the
+   check before any slide runs. ``network_blocked`` then means requests fail through Fetch
+   and WebRTC is removed (probed); DNS hints (``dns-prefetch``, ``preconnect``) are not covered;
 3. per requested slug, in deck order: ``Reveal.slide(i, 0, 999)`` (every fragment
    shown), settle (1 frame → ``finish()`` every running animation → 2 frames; the slide
    helper makes ``Reveal.isPrintView()`` true while slide code runs under
@@ -66,6 +71,67 @@ FINISH = ("(function(){var n=0;document.getAnimations().forEach(function(a){try{
           "return n;})()")
 CONFIGURE = "Reveal.configure({margin:0,controls:false,progress:false,transition:'none',hash:false})"
 SLUGS = "Array.prototype.map.call(Reveal.getSlides(),function(s){return s.getAttribute('data-slug');})"
+
+# Egress the Fetch block does not see: WebRTC (ICE / STUN / TURN over UDP and TCP) and
+# WebTransport. The guard runs before any script of every new document of the page and its
+# frames: it removes these constructors from the window, seals every same-origin child
+# window reached through contentWindow / contentDocument before it is returned, and makes
+# window.open return null. EGRESS_PROBE proves it after the deck loaded.
+_EGRESS_NAMES = ("RTCPeerConnection", "webkitRTCPeerConnection", "RTCDataChannel", "RTCIceTransport",
+                 "RTCSctpTransport", "RTCDtlsTransport", "RTCRtpSender", "RTCRtpReceiver",
+                 "RTCRtpTransceiver", "RTCIceCandidate", "RTCSessionDescription", "WebTransport")
+EGRESS_GUARD = r"""(function(){
+var N=%s;
+function no(){return null;}
+function lock(w,n,v){try{Object.defineProperty(w,n,{value:v,writable:false,configurable:false});}catch(e){}}
+function seal(w){
+ if(!w)return w;
+ try{if(w.__sdpmSealed)return w;}catch(e){return w;}
+ N.forEach(function(n){lock(w,n,undefined);});
+ lock(w,'open',no);
+ lock(w,'__sdpmSealed',true);
+ return w;}
+seal(window);
+[window.HTMLIFrameElement,window.HTMLFrameElement,window.HTMLObjectElement].forEach(function(C){
+ if(!C)return;var p=C.prototype;
+ var cw=Object.getOwnPropertyDescriptor(p,'contentWindow');
+ if(cw&&cw.get)Object.defineProperty(p,'contentWindow',{configurable:false,enumerable:cw.enumerable,
+  get:function(){return seal(cw.get.call(this));}});
+ var cd=Object.getOwnPropertyDescriptor(p,'contentDocument');
+ if(cd&&cd.get)Object.defineProperty(p,'contentDocument',{configurable:false,enumerable:cd.enumerable,
+  get:function(){var d=cd.get.call(this);if(d)seal(d.defaultView);return d;}});
+});
+})();""" % json.dumps(list(_EGRESS_NAMES))
+# Resolves to the reachable "<where>.<name>" list (empty: the guard holds). window[n] of a
+# fresh iframe is read before its contentWindow (whose getter seals it).
+EGRESS_PROBE = r"""(function(){
+var N=%s,out=[];
+function check(w,where){if(!w)return;
+ try{N.forEach(function(n){if(typeof w[n]!=='undefined')out.push(where+'.'+n);});}
+ catch(e){out.push(where+' (unreadable)');}}
+function frame(){var f=document.createElement('iframe');f.style.display='none';
+ document.body.appendChild(f);return f;}
+check(window,'top');
+var f=frame();
+check(window[window.length-1],'frame');
+check(f.contentWindow,'iframe');
+f.remove();
+var p=null;
+try{p=window.open('about:blank');}catch(e){}
+check(p,'open');
+try{if(p)p.close();}catch(e){}
+return new Promise(function(resolve){
+ var s=frame(),done=false;
+ function fin(loaded){if(done)return;done=true;
+  if(loaded){check(window[window.length-1],'srcdoc frame');check(s.contentWindow,'srcdoc');}
+  else out.push('srcdoc (did not load)');
+  s.remove();resolve(out);}
+ s.onload=function(){fin(true);};
+ setTimeout(function(){fin(false);},3000);
+ s.srcdoc='<p>probe</p>';
+});
+})()""" % json.dumps(list(_EGRESS_NAMES))
+_GUARD_PARAMS = {"source": EGRESS_GUARD, "runImmediately": True}
 
 MEASURE = r"""(function(){
 var s=Reveal.getCurrentSlide();if(!s)return null;
@@ -284,6 +350,9 @@ class _Run:
                 self.cdp.post("Target.closeTarget", {"targetId": info.get("targetId")})
             else:
                 self.cdp.post("Fetch.enable", FETCH_BLOCK, session=params.get("sessionId"))
+                if info.get("type") == "iframe":
+                    self.cdp.post("Page.addScriptToEvaluateOnNewDocument", _GUARD_PARAMS,
+                                  session=params.get("sessionId"))
                 self.cdp.post("Runtime.runIfWaitingForDebugger", session=params.get("sessionId"))
 
     def watch(self, event: dict) -> None:
@@ -338,13 +407,20 @@ def _page_setup(run: _Run, width: int, height: int) -> None:
     try:
         run.send("Fetch.enable", FETCH_BLOCK)
         run.send("Target.setAutoAttach", {"autoAttach": True, "waitForDebuggerOnStart": True, "flatten": True})
-        run.network_blocked = True
     except CdpError as exc:
         # Fail closed: slide code never runs in a browser that may reach the network
         # (AgentCore Browser has internet access); the check fails with a note.
         run.network_blocked = False
         logger.warning("browser check: could not block network requests: %s", exc)
         raise RuntimeError(f"could not block network requests, so no slide was run ({exc})") from exc
+    # WebRTC and WebTransport bypass Fetch: the guard removes them before deck code runs;
+    # check_deck probes it after the load and only then sets network_blocked.
+    try:
+        run.send("Page.addScriptToEvaluateOnNewDocument", _GUARD_PARAMS)
+    except CdpError as exc:
+        run.network_blocked = False
+        logger.warning("browser check: could not disable WebRTC: %s", exc)
+        raise RuntimeError(f"could not disable WebRTC, so no slide was run ({exc})") from exc
     run.send("Emulation.setDeviceMetricsOverride",
              {"width": width, "height": height, "deviceScaleFactor": 1, "mobile": False})
 
@@ -426,7 +502,9 @@ def check_deck(
     Returns:
         ``{status, browser?, seconds?, slides, checked, findings: {slug: [diag]},
         errors: [diag], pngs: {slug: path}, timings?, network_blocked?, blocked_requests?, note?}``; status ``ok`` / ``issues``
-        / ``skipped`` / ``navigated`` / ``timeout`` / ``failed``.
+        / ``skipped`` / ``navigated`` / ``timeout`` / ``failed``. ``network_blocked`` is True
+        when http(s) / ws(s) requests failed through Fetch and WebRTC was removed (probed
+        before the first slide ran); DNS hints are not covered.
     """
     slugs = list(dict.fromkeys(slugs))
     base: dict[str, Any] = {"slides": 0, "checked": [], "findings": {}, "errors": [], "pngs": {}}
@@ -456,6 +534,12 @@ def check_deck(
                     t2 = time.monotonic()
                     _load(run, html)
                     run.timings["load"] = round(time.monotonic() - t2, 3)
+                    reachable = run.js(EGRESS_PROBE, await_promise=True)
+                    if reachable:
+                        run.network_blocked = False
+                        raise RuntimeError(f"could not disable WebRTC ({', '.join(map(str, reachable))}), "
+                                           "so no slide was run")
+                    run.network_blocked = True
                     order = run.js(SLUGS) or []
                     index = {}
                     for i, slug in enumerate(order):

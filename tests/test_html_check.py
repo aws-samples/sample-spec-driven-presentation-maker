@@ -121,6 +121,8 @@ def test_clean_js_slide_has_no_diagnostics() -> None:
     ("script-external", "top.location = 'x';", ""),
     ("script-external", "fetch('https://x');", ""),
     ("script-external", 'var u = "//cdn.x/a";', ""),
+    ("script-external", "new RTCPeerConnection({iceServers:[{urls:'stun:s.example:3478'}]});", ""),
+    ("script-external", "var u = 'turn:t.example';", ""),
     ("library-unknown", "", ' data-libs="three"'),
     ("library-undeclared", "echarts.init(section.querySelector('.c'));", ""),
     ("library-undeclared", "d3.select(section);", ' data-libs="echarts"'),
@@ -144,6 +146,16 @@ def test_slide_script_rules_report_once_per_slide() -> None:
     diags = check_slide_html("s", text, layouts=LAYOUTS)
     assert [d["rule"] for d in diags] == ["script-external"]
     assert "'location'" in diags[0]["message"] and "'https://a'" in diags[0]["message"]
+
+
+def test_script_external_lists_its_kinds() -> None:
+    code = "location.hash = 'x'; window.open('y'); var u = 'https://a'; new RTCPeerConnection();"
+    [diag] = check_slide_html("s", _section(f"<script>{code}</script>"), layouts=LAYOUTS)
+    assert diag["rule"] == "script-external"
+    assert diag["kinds"] == ["navigation", "popup", "external-url", "webrtc"]
+    assert "WebRTC" in diag["message"]
+    [diag] = check_slide_html("s", _section("<script>var u = 'stun:s.example';</script>"), layouts=LAYOUTS)
+    assert diag["kinds"] == ["webrtc"]
 
 
 def test_non_classic_script_text_is_not_scanned() -> None:

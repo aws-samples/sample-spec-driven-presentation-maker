@@ -37,9 +37,12 @@ Rules:
     font-size-token         a font size that does not use a ``--fs-*`` token
     font-size-unknown-token a ``var(--fs-*)`` the style does not define
     script-external         a slide script uses ``location``, ``window.open`` / ``open(``,
-                            ``top.`` or an external URL (``http(s)://`` other than an XML
-                            namespace URI, ``"//host``); the
-                            CSP blocks fetch but not navigation or new tabs
+                            ``top.``, an external URL (``http(s)://`` other than an XML
+                            namespace URI, ``"//host``) or WebRTC (``RTCPeerConnection``,
+                            ``"stun:`` / ``"turn:`` URLs); the CSP blocks fetch but not
+                            navigation, new tabs or WebRTC. The diagnostic's ``kinds`` lists
+                            which of ``navigation`` / ``popup`` / ``external-url`` /
+                            ``webrtc`` were found
     library-unknown         a ``data-libs`` value that is not a bundled library
     library-undeclared      a slide script uses ``echarts.`` / ``d3.`` while the section's
                             ``data-libs`` does not name it
@@ -91,16 +94,28 @@ _EMBEDDING_TAGS = frozenset({"iframe", "frame", "object", "embed"})
 _SVG_ANIMATION_TAGS = frozenset({"animate", "set", "animatemotion", "animatetransform"})
 
 # Slide-script patterns (design §8.4). Group "tok", when present, is the token reported.
-_JS_EXTERNAL_RES = tuple(re.compile(p) for p in (
-    r"\blocation\b",
-    r"\bwindow\s*\.\s*open\b",
-    r"(?<![\w$.])open\s*\(",
-    r"(?<![\w$.])top\s*\.",
-    # XML namespace URIs (createElementNS) are names, not requests.
-    r"(?P<tok>https?://(?!www\.w3\.org/(?:2000/svg|1999/xhtml|1999/xlink|1998/Math/MathML|"
-    r"XML/1998/namespace|2000/xmlns/)[\"'`])[^\s'\"`)]*)",
-    r"[\"'`](?P<tok>//[A-Za-z0-9][^\s'\"`]*)",
+# script-external: (kind, patterns); the diagnostic's ``kinds`` follow this order.
+_JS_EXTERNAL_KINDS = tuple((kind, tuple(re.compile(p) for p in patterns)) for kind, patterns in (
+    ("navigation", (
+        r"\blocation\b",
+        r"(?<![\w$.])top\s*\.",
+    )),
+    ("popup", (
+        r"\bwindow\s*\.\s*open\b",
+        r"(?<![\w$.])open\s*\(",
+    )),
+    ("external-url", (
+        # XML namespace URIs (createElementNS) are names, not requests.
+        r"(?P<tok>https?://(?!www\.w3\.org/(?:2000/svg|1999/xhtml|1999/xlink|1998/Math/MathML|"
+        r"XML/1998/namespace|2000/xmlns/)[\"'`])[^\s'\"`)]*)",
+        r"[\"'`](?P<tok>//[A-Za-z0-9][^\s'\"`]*)",
+    )),
+    ("webrtc", (
+        r"\b(?:webkit)?RTCPeerConnection\b",
+        r"[\"'`](?P<tok>(?:stun|turns?):[^\s'\"`]*)",
+    )),
 ))
+_JS_EXTERNAL_RES = tuple(p for _, patterns in _JS_EXTERNAL_KINDS for p in patterns)
 _JS_EVAL_RES = tuple(re.compile(p) for p in (
     r"\b(?:csvParse|tsvParse)\s*\(",
     r"dsvFormat\s*\([^)]*\)\s*\.\s*parse\s*\(",
@@ -413,10 +428,13 @@ def _slide_script_diags(slug: str, section, code: str) -> list[dict]:
         return out
     tokens = _js_tokens(code, _JS_EXTERNAL_RES)
     if tokens:
-        out.append(_diag(slug, "script-external",
-                         f"slide script uses {_token_list(tokens)}: the deck CSP blocks fetch but not "
-                         "navigation or new tabs, so the deck could send data out; remove it, keep data in "
-                         "the script and put links in <a href>"))
+        diag = _diag(slug, "script-external",
+                     f"slide script uses {_token_list(tokens)}: the deck CSP blocks fetch but not "
+                     "navigation, new tabs or WebRTC, so the deck could send data out; remove it, keep data "
+                     "in the script and put links in <a href>")
+        diag["kinds"] = [kind for kind, patterns in _JS_EXTERNAL_KINDS
+                         if any(p.search(code) for p in patterns)]
+        out.append(diag)
     declared = declared_libraries(section)
     undeclared = [name for name, glob in LIBRARY_GLOBALS.items()
                   if name not in declared and re.search(rf"(?<![\w$.]){glob}\s*\.", code)]
