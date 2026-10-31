@@ -128,6 +128,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   const { viewMode, setViewMode } = usePreferences()
   const review = useReview()
   const reviewOn = !!review?.enabled && slidesWithPreview.length > 0
+  const [playerHover, setPlayerHover] = useState(false)
   const toolOn = reviewOn && !!review?.toolOn
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   const followChangedSlide = useFollowScroll(scrollElement)
@@ -466,9 +467,24 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
    */
   function renderSlidesContent(): React.ReactNode {
     if (isHtml && viewMode === "full" && htmlUrl && !toolOn) {
+      // The deck iframe hides the pointer from the page: the pane around it tracks the hover
+      // that shows the slide's "Comment" button.
       return (
-        <div ref={setScrollElement} data-slide-scroller className="flex-1 overflow-y-auto px-6 py-6">
-          <HtmlDeckPlayer htmlUrl={htmlUrl} slideSize={slideSize} deckName={deckName} slide={playerSlide} />
+        <div
+          ref={setScrollElement}
+          data-slide-scroller
+          className="flex-1 overflow-y-auto px-6 py-6"
+          onMouseEnter={reviewOn ? () => setPlayerHover(true) : undefined}
+          onMouseLeave={reviewOn ? () => setPlayerHover(false) : undefined}
+        >
+          <HtmlDeckPlayer
+            htmlUrl={htmlUrl}
+            slideSize={slideSize}
+            deckName={deckName}
+            slide={playerSlide}
+            overlay={reviewOn ? <ReviewSlideCta onClick={() => review?.setToolOn(true)} /> : undefined}
+            hovered={reviewOn && playerHover}
+          />
         </div>
       )
     }

@@ -161,6 +161,27 @@ describe("SlideCarousel — comment tool", () => {
     expect(screen.queryAllByTitle("Comment on this slide (C)")).toHaveLength(0)
   })
 
+  it("the slide-hover button on the HTML player turns the tool on (R1.2)", () => {
+    viewMode.current = "full"
+    renderWithReview()
+    expect(screen.getByTitle(/HTML deck/)).not.toBeNull()
+    const cta = screen.getAllByTitle("Comment on this slide (C)")
+    expect(cta).toHaveLength(1)
+    // The deck iframe takes the pointer, so the pane around the player marks the hover.
+    const box = screen.getByTitle(/HTML deck/).parentElement!
+    const zone = document.querySelector("[data-slide-scroller]")!
+    expect(box.hasAttribute("data-hover")).toBe(false)
+    fireEvent.mouseEnter(zone)
+    expect(box.hasAttribute("data-hover")).toBe(true)
+    fireEvent.mouseLeave(zone)
+    expect(box.hasAttribute("data-hover")).toBe(false)
+    fireEvent.mouseEnter(zone)
+    fireEvent.click(cta[0])
+    expect(toolButton().getAttribute("aria-pressed")).toBe("true")
+    expect(screen.queryByTitle(/HTML deck/)).toBeNull()
+    expect(layers()).toHaveLength(3)
+  })
+
   it("shows no tool when the provider is disabled", () => {
     renderWithReview(false)
     expect(screen.queryByTitle("Comment on the slides (C)")).toBeNull()
