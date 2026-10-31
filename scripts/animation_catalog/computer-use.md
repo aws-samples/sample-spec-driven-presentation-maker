@@ -4,12 +4,15 @@ These steps close the gaps the offline evidence cannot close. They are
 development-only (REQ-7.3): sdpm's runtime, CLI, MCP servers, tests and CI never
 invoke Computer Use, AppleScript, VBA or PowerPoint.
 
-They were **not executed for the current catalog**. Task 3 was scoped not to
-launch or drive PowerPoint, so every entry in
+Almost every entry in
 `sdpm/references/catalogs/powerpoint-animation-catalog.json` whose
 `capabilityLevel` is `semanticPreservationOnly` still carries its `ooxml.gap`
 and `verification: "powerPointReadBackRequired"`. Running the steps below is how
 a maintainer promotes those entries.
+
+**One capture has been executed** (2026-10-31), as a proof of the loop rather
+than as coverage: Box ▸ Effect Options ▸ From Right. See "Driving mechanics"
+below for the method and "What the pilot capture established" for its result.
 
 ## Baseline
 
@@ -57,6 +60,112 @@ a row to that directory's `README.md` naming the application version, the date,
 and the control path. Then update the catalog entry's `capabilityLevel`,
 `evidence` and `verification`, and run
 `uv run python scripts/animation_catalog/generate.py --check --require-sdef`.
+
+## Driving mechanics (measured 2026-10-31, PowerPoint 16.113.1, 1512x900 window)
+
+AppleScript is not the route. `osascript` reaches PowerPoint's **static**
+properties (`get version`) but every document-model access and every
+`System Events` call fails with `-10004`. The working route is the macOS
+**Accessibility API** through KiroCrew's computer-use tools, which is a
+different mechanism and is not blocked.
+
+Three facts decide how a batch is written:
+
+- **`computer_get_state` is reliable**, and the ribbon is fully enumerated:
+  every gallery tile, the Duration incrementor, the Sound popup, the advance
+  checkboxes, and each thumbnail's `Has Transition` state.
+- **`computer_click` with `element_index` always fails** against the main
+  window (`element … is no longer present`), because PowerPoint rebuilds its
+  accessibility elements between queries. `computer_perform_action` with
+  `element_index` **does** work — use it for menu items.
+- **`click_method: "app_post"` is delivered but ignored** by the ribbon: it is
+  custom-drawn and does not process per-process synthetic mouse events. Only
+  `click_method: "global"`, which moves the real pointer, drives it.
+
+Consequences for an unattended batch:
+
+- The machine's pointer is taken over for the length of the batch. PowerPoint
+  must hold the capture deck and nothing the operator cares about.
+- After a `global` click the pointer rests on the control and macOS raises a
+  tooltip there, which makes the **next** click at the same point refuse with
+  `the topmost window there is 'Window Server'`. Interleave an unrelated click
+  (selecting the slide thumbnail works and is needed anyway) between two
+  clicks on the same control.
+- Set `max_tree_nodes: 1` before a run of clicks. A click returns a refreshed
+  tree at the budget of the last read, and the full ribbon tree is large.
+
+The Transition Styles gallery is positioned arithmetically, verified against
+the tree:
+
+```
+tile x = 100 + 92 * i - 920 * page        visible band: x in [100, 1012]
+page   = floor(92 * i / 920)              Next/Previous move exactly one page
+tile centre = (x + 47, 107)               window-relative; add window origin y
+```
+
+`i` is the index in gallery order, which is fixed:
+None, Morph, Fade, Push, Wipe, Split, Reveal, Cut, Random Bars, Shape,
+Uncover, Cover, Flash, Fall Over, Drape, Curtains, Wind, Prestige, Fracture,
+Crush, Peel Off, Page Curl, Airplane, Origami, Dissolve, Checkerboard, Blinds,
+Clock, Ripple, Honeycomb, Glitter, Vortex, Shred, Switch, Flip, Gallery, Cube,
+Doors, Box, Comb, Zoom, Random, Pan, Ferris Wheel, Conveyor, Rotate, Window,
+Orbit, Fly Through.
+
+Order a batch by gallery page so the sweep is monotonic: 49 tiles are 5 pages,
+so a whole pass costs four `Next` clicks rather than one per tile.
+
+Other measured coordinates, window-relative (add the window origin):
+
+| Control | Frame | Centre |
+| --- | --- | --- |
+| Transitions ribbon tab | x=247,y=39 94x26 | 294, 52 |
+| Previous gallery page | x=82,y=78 18x58 | 91, 107 |
+| Next gallery page | x=1020,y=78 18x58 | 1029, 107 |
+| Effect Options | x=1040,y=74 50x66 | 1065, 107 |
+| Duration (read-back) | x=1204,y=78 78x24 | — |
+| Sound (read-back) | x=1180,y=109 102x26 | — |
+| Save (Quick Access) | x=221,y=5 30x30 | 236, 20 |
+| Thumbnail cell *n* | x=0,y=150+130(n-1) 250x118 | 125, 209+130(n-1) |
+
+Effect Options opens as its own window titled `Effect Options`, whose items
+are `menubutton`s. Activate one with `computer_perform_action` + `AXPress`; a
+plain `global` click only focuses it and leaves the menu open.
+
+### What the GUI route cannot establish
+
+The AppleScript oracle applied a candidate **by its enumerator code**, so its
+read-back was an unambiguous `EPPEntryEffect.<enumerator>` → OOXML mapping.
+The GUI applies by **label**, so a capture establishes
+`gallery tile + Effect Options label` → OOXML. Linking that to a scripting
+enumerator such as `entry effect box down` is a name correspondence, not a
+measurement. Record a GUI capture under a `transition.gallery.<tile>.<label>`
+key and promote a scripting candidate only by stating the correspondence as
+inferred.
+
+### What the pilot capture established
+
+Box ▸ From Right, applied to slide 1 of a four-slide deck generated by sdpm
+with both motion switches off, then saved and extracted offline:
+
+```xml
+<mc:AlternateContent>
+  <mc:Choice Requires="p14">
+    <p:transition spd="slow" p14:dur="1600"><p14:prism isInverted="1"/></p:transition>
+  </mc:Choice>
+  <mc:Fallback>
+    <p:transition spd="slow"><p:fade/></p:transition>
+  </mc:Fallback>
+</mc:AlternateContent>
+```
+
+- The deck opened with **no repair prompt**, and only slide 1 gained a
+  transition — the other three stayed clean.
+- The catalog's predicted `p14:prism`, `p:fade` fallback, `p14` strategy,
+  `alternateContent: true` and `legacySpeed: "slow"` are all confirmed.
+- The direction is carried by **`isInverted`**, not a `dir` attribute — which
+  is the question Step 1 says to answer.
+- The catalog's `defaultDurationMs: 1000` for Box is **wrong**: PowerPoint
+  wrote `p14:dur="1600"`, and the ribbon's Duration field read `01.60`.
 
 ## Step 1 — transition directions on extension elements
 
