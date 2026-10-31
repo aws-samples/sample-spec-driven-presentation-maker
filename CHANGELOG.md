@@ -10,6 +10,8 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-10-31
+
 ### Added
 
 - **HTML output mode.** A deck can be a browser presentation instead of a PPTX, locally and
@@ -1247,7 +1249,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.4...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.4...v0.11.0
 [0.10.4]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.2...v0.10.3
 [0.10.2]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.1...v0.10.2
