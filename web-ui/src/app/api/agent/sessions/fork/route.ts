@@ -4,10 +4,13 @@
 import { getOrCreateProcess, pendingOrigins, terminateProcess } from "@/lib/local/acp-process"
 import { forkSession, removeForkedSession } from "@/lib/local/kiro-sessions"
 import type { ForkSessionRequest, ForkSessionPhase, ForkSessionPhaseDetail } from "@/lib/local/kiro-sessions.types"
+import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 export const dynamic = "force-dynamic"
 
 export async function POST(req: Request) {
+  const refused = rejectCrossSite(req)
+  if (refused) return refused
   let body: Partial<ForkSessionRequest>
   try {
     body = await req.json()

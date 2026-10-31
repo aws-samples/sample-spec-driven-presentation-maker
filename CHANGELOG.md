@@ -32,6 +32,14 @@ Entries before v0.5.0 were written retroactively as summaries.
   validated frames, slugs and sizes) with matching local routes; `get_deck` now returns
   `slideSize` for PPTX decks too, and the cloud sandbox syncs `reviews/`.
 
+### Security
+
+- **Local Web UI refuses cross-site POSTs.** Every POST route of the local server (`sdpm webui`,
+  `npm run dev:local`) now answers 403 when the browser's `Origin` is another site, so a page
+  open in the same browser can no longer drive the local agent, upload files or change styles
+  and templates through `127.0.0.1`. Requests without an `Origin` header (scripts, curl) are
+  unaffected.
+
 ## [0.11.0] - 2026-10-31
 
 ### Added

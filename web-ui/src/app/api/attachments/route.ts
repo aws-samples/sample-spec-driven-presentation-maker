@@ -7,6 +7,7 @@ import fs from "fs"
 import path from "path"
 import { DECK_ROOT } from "@/lib/local/deck-paths"
 import { hasProcess } from "@/lib/local/acp-process"
+import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024
 const SESSION_MAX_OBJECTS = 100
@@ -80,6 +81,8 @@ function maybeCollectExpired(root: string): void {
 }
 
 export async function POST(req: Request): Promise<Response> {
+  const refused = rejectCrossSite(req)
+  if (refused) return refused
   const form = await req.formData()
   const sessionId = form.get("sessionId")
   const file = form.get("file")
