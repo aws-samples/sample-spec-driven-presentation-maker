@@ -21,7 +21,7 @@ Nothing is dropped silently. Every capture-required entry lands in exactly one l
 
 ``targets``
     GUI-addressable and resolvable by title in one press. These are what the driver runs,
-    one slide each.
+    one **shape** each.
 ``deferredTargets``
     GUI-addressable namespace, but the metadata does not imply a pressable path — a
     motion path that must be *drawn*, a Media gallery that needs a media object, the
@@ -41,12 +41,37 @@ Nothing is dropped silently. Every capture-required entry lands in exactly one l
     They are listed so the selection rule's edge is visible instead of looking like
     coverage.
 
-## The deck
+## The deck: one slide, many shapes
 
-``--build-deck`` writes an sdpm deck with one slide per target, one named shape, and the
-target key as visible text, then ``--generate`` builds it through ``sdpm.api.generate``
-with **both motion switches off** so sdpm contributes no motion of its own and every
-``p:timing`` tree in the saved package came from PowerPoint.
+The deck used to be one slide per target. The 2026-10-31 live run proved that shape
+unusable: **every** one of its 76 targets was rejected in slide selection, because the
+navigator's cells expose no actions and publish only the handful currently scrolled into
+view (``computer-use.md``, "Why the driver does not select slides"). So the deck is now
+**one slide carrying one named shape per target**, laid out as a grid by
+:func:`grid_layout`, and the driver selects a target by clicking its own shape.
+
+That is not a workaround with weaker evidence; it is stronger evidence. A gallery press
+replaces the effect **of the selected shape**, so each target's effect lands in the
+slide's ``p:timing`` carrying ``p:spTgt/@spid``, and the slide's ``p:cNvPr/@id``/``@name``
+map that spid back to the shape and hence to the target. "Slide N is target N" survived
+nothing; an spid survives reordering and catches a mis-aimed click instead of recording
+the wrong key.
+
+The grid is derived from the target count and checked rather than eyeballed: shapes may
+not overlap, a shape's centre must sit :data:`CLICK_MARGIN_PX` inside its own edges, and
+it must clear every other shape by :data:`NEIGHBOUR_CLEARANCE_PX`, so a click aimed at a
+centre cannot land on a neighbour. If the count does not fit one slide under those
+constraints the plan splits across as few slides as it can and says so in ``deck``.
+
+sdpm derives a shape's **name** from its geometry rather than from the element id the
+deck JSON asks for — that is the trap that bit the single-shape version — so
+``--generate`` reads every name back out of the package it actually wrote, matching each
+target by its shape's position, and writes the ``target key -> shape name`` mapping into
+the plan.
+
+``--generate`` builds through ``sdpm.api.generate`` with **both motion switches off** so
+sdpm contributes no motion of its own and every ``p:timing`` tree in the saved package
+came from PowerPoint.
 
 Usage::
 
@@ -58,10 +83,13 @@ from __future__ import annotations
 
 import argparse
 import json
+import math
 import re
 import sys
+import zipfile
+from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Sequence
+from typing import Any, Iterable, Sequence
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CATALOG_DIR = REPO_ROOT / "sdpm" / "references" / "catalogs"
@@ -72,13 +100,62 @@ DEFAULT_TEMPLATE = REPO_ROOT / "sdpm" / "templates" / "blank-dark.pptx"
 #: The driver this plan feeds.
 DRIVER = "scripts/animation_catalog/gui_capture.py"
 
-#: The element id the deck gives the shape to click. sdpm names the *shape* itself from
-#: its geometry rather than from this id, so the name the driver looks up is read back out
-#: of the generated package by :func:`resolve_shape_name` instead of being assumed here.
-SHAPE_ELEMENT_ID = "target"
+#: Element id prefixes the deck JSON asks for. sdpm names the *shape* itself from its
+#: geometry rather than from these, so the names the driver looks up are read back out of
+#: the generated package by :func:`resolve_shape_names` instead of being assumed here.
+SHAPE_ELEMENT_PREFIX = "target"
+LABEL_ELEMENT_PREFIX = "key"
 
-#: The geometry preset of that shape, which is how it is identified in the package.
+#: The geometry preset of the clickable shape, which is how it is told apart in the
+#: package from the label text boxes (python-pptx gives those ``prst="rect"``).
 SHAPE_PRESET = "roundRect"
+
+#: sdpm's deck coordinates are in a fixed 1920x1080 "px" basis that it maps onto whatever
+#: the template's slide size is, so a 960x540 pt slide makes one px half a point. The
+#: grid is computed in this basis because that is what the deck JSON carries; the
+#: separation constraints below are therefore px and worth halving before comparing them
+#: to anything in points.
+DECK_BASIS_PX = (1920.0, 1080.0)
+
+#: Empty border kept around the whole grid, in deck px.
+SLIDE_MARGIN_PX = 48.0
+
+#: Empty space kept inside each grid cell: horizontally between neighbouring shapes, and
+#: vertically between a shape and the row below it. The label sits in the vertical gap.
+CELL_GAP_X_PX = 28.0
+CELL_GAP_Y_PX = 20.0
+#: Tall enough for the two lines :func:`label_text` splits a key into. The longest key
+#: today is 46 characters, which does not fit a 100 pt wide box on one line at any size a
+#: person would read, so the label is two lines rather than one overflowing into its
+#: neighbour.
+LABEL_HEIGHT_PX = 34.0
+
+#: Half the minimum side of a shape: the distance from the point the driver clicks to the
+#: nearest edge of the shape it is aiming at. 20 px is 10 pt, which is 9.2 screen points
+#: at the 92% zoom the 2026-10-31 session measured.
+CLICK_MARGIN_PX = 20.0
+
+#: The distance a click point must keep from **every other** shape on its slide. This is
+#: the constraint that makes a mis-aimed click miss rather than silently select the
+#: neighbour, which would apply the right effect to the wrong target.
+NEIGHBOUR_CLEARANCE_PX = 20.0
+
+#: Preferred cell width-to-height ratio. Wide cells leave room for the target key as
+#: readable text under its shape; the grid picks the column count whose cell aspect comes
+#: closest to this.
+CELL_ASPECT = 2.2
+
+#: Font sizes, in points, for the ordinal inside a shape and the key below it.
+SHAPE_FONT_PT = 11
+LABEL_FONT_PT = 6
+
+#: How far, in points, a shape's centre in the generated package may sit from the centre
+#: the grid asked for before :func:`resolve_shape_names` refuses to match the two. Any
+#: two shapes are at least ``CELL_GAP_X_PX`` apart, so this cannot match a neighbour.
+MATCH_TOLERANCE_PT = 1.0
+
+#: 914400 EMU per inch, 72 points per inch.
+EMU_PER_POINT = 12700
 
 #: Key namespaces the GUI can address at all. A capture-required entry outside these is
 #: a scripting enumerator and goes to the set-aside list.
@@ -261,7 +338,241 @@ def derive_entry(key: str, entry: dict[str, Any], item: dict[str, Any] | None) -
     }
 
 
+# --- the shape grid ---------------------------------------------------------
+@dataclass(frozen=True)
+class Rect:
+    """A rectangle in deck px, with the top-left origin the deck JSON uses."""
+
+    x: float
+    y: float
+    width: float
+    height: float
+
+    @property
+    def center(self) -> tuple[float, float]:
+        return (self.x + self.width / 2.0, self.y + self.height / 2.0)
+
+    def overlaps(self, other: Rect) -> bool:
+        return (
+            self.x < other.x + other.width
+            and other.x < self.x + self.width
+            and self.y < other.y + other.height
+            and other.y < self.y + self.height
+        )
+
+    def distance_to(self, point: tuple[float, float]) -> float:
+        """Shortest distance from ``point`` to this rectangle; 0 when it is inside."""
+        dx = max(self.x - point[0], 0.0, point[0] - (self.x + self.width))
+        dy = max(self.y - point[1], 0.0, point[1] - (self.y + self.height))
+        return math.hypot(dx, dy)
+
+    def as_dict(self) -> dict[str, float]:
+        return {"x": self.x, "y": self.y, "width": self.width, "height": self.height}
+
+
+@dataclass(frozen=True)
+class Cell:
+    """One target's place on the deck: the shape to click and the label under it."""
+
+    slide_index: int
+    cell_index: int
+    shape: Rect
+    label: Rect
+
+
+@dataclass(frozen=True)
+class Grid:
+    """The whole layout, derived from the target count and checked before it is used."""
+
+    count: int
+    columns: int
+    rows: int
+    slides: int
+    per_slide: int
+    cell: tuple[float, float]
+    shape: tuple[float, float]
+    cells: tuple[Cell, ...]
+
+    @property
+    def split(self) -> bool:
+        return self.slides > 1
+
+    def as_dict(self) -> dict[str, Any]:
+        note = (
+            f"{self.count} targets fit one slide as a {self.columns}x{self.rows} grid"
+            if not self.split
+            else (
+                f"{self.count} targets do not fit one slide with a {CLICK_MARGIN_PX:g}px click "
+                f"margin and {NEIGHBOUR_CLEARANCE_PX:g}px neighbour clearance, so they are split "
+                f"across {self.slides} slides of at most {self.per_slide} as a "
+                f"{self.columns}x{self.rows} grid"
+            )
+        )
+        return {
+            "slides": self.slides,
+            "targetsPerSlide": self.per_slide,
+            "columns": self.columns,
+            "rows": self.rows,
+            "basisPx": list(DECK_BASIS_PX),
+            "cellPx": list(self.cell),
+            "shapePx": list(self.shape),
+            "clickMarginPx": CLICK_MARGIN_PX,
+            "neighbourClearancePx": NEIGHBOUR_CLEARANCE_PX,
+            "split": self.split,
+            "note": note,
+        }
+
+
+def _usable(basis: tuple[float, float]) -> tuple[float, float]:
+    return (basis[0] - 2 * SLIDE_MARGIN_PX, basis[1] - 2 * SLIDE_MARGIN_PX)
+
+
+def _candidate_grids(per_slide: int, basis: tuple[float, float]) -> list[tuple[float, int, int]]:
+    """Return every column count that fits ``per_slide`` cells, best aspect ratio first.
+
+    A candidate only counts when the shape it implies is at least twice
+    :data:`CLICK_MARGIN_PX` on both sides, which is the whole point of deriving the grid:
+    a cell too small to be clicked in the middle is not a layout, it is a trap.
+    """
+    usable_w, usable_h = _usable(basis)
+    candidates: list[tuple[float, int, int]] = []
+    for columns in range(1, per_slide + 1):
+        rows = math.ceil(per_slide / columns)
+        cell_w, cell_h = usable_w / columns, usable_h / rows
+        shape_w = cell_w - CELL_GAP_X_PX
+        shape_h = cell_h - CELL_GAP_Y_PX - LABEL_HEIGHT_PX
+        if shape_w < 2 * CLICK_MARGIN_PX or shape_h < 2 * CLICK_MARGIN_PX:
+            continue
+        candidates.append((abs(cell_w / cell_h - CELL_ASPECT), columns, rows))
+    return sorted(candidates)
+
+
+def max_targets_per_slide(*, basis: tuple[float, float] = DECK_BASIS_PX) -> int:
+    """How many clickable shapes one slide can carry under the separation constraints.
+
+    A cell has to be at least ``2 * CLICK_MARGIN_PX`` wide once its horizontal gap is
+    removed, and that much tall once its vertical gap and its label are, so the capacity
+    is just how many such cells fit the usable area. Stated here rather than found by
+    search so "as few slides as possible" is arithmetic a reader can check.
+    """
+    usable_w, usable_h = _usable(basis)
+    columns = int(usable_w // (2 * CLICK_MARGIN_PX + CELL_GAP_X_PX))
+    rows = int(usable_h // (2 * CLICK_MARGIN_PX + CELL_GAP_Y_PX + LABEL_HEIGHT_PX))
+    return columns * rows
+
+
+def grid_layout(count: int, *, basis: tuple[float, float] = DECK_BASIS_PX) -> Grid:
+    """Lay ``count`` clickable shapes out over as few slides as the constraints allow.
+
+    One slide is preferred and is what the catalog's current 76 targets get. The returned
+    grid is **checked, not asserted by eye**: no two shapes on a slide overlap, every
+    shape's centre is :data:`CLICK_MARGIN_PX` inside its own edges, every centre clears
+    every other shape by :data:`NEIGHBOUR_CLEARANCE_PX`, and nothing leaves the slide. A
+    violation raises, because a grid that silently puts two click points within a few
+    points of each other would apply the right effect to the wrong target.
+    """
+    if count < 1:
+        raise ValueError(f"a grid needs at least one target, got {count}")
+    # The closed form above says where to start; the loop is the guarantee, so a wrong
+    # capacity would cost a slide rather than produce an unclickable grid.
+    per_slide = min(count, max_targets_per_slide(basis=basis))
+    while per_slide > 1 and not _candidate_grids(per_slide, basis):
+        per_slide -= 1
+    if not _candidate_grids(per_slide, basis):
+        raise ValueError(
+            f"not even one shape fits a {basis[0]:g}x{basis[1]:g} px slide with a "
+            f"{CLICK_MARGIN_PX:g}px click margin; the constraints are unsatisfiable"
+        )
+    slides = math.ceil(count / per_slide)
+    per_slide = math.ceil(count / slides)
+    _aspect, columns, rows = _candidate_grids(per_slide, basis)[0]
+
+    usable_w, usable_h = _usable(basis)
+    cell_w, cell_h = usable_w / columns, usable_h / rows
+    shape_w = round(cell_w - CELL_GAP_X_PX)
+    shape_h = round(cell_h - CELL_GAP_Y_PX - LABEL_HEIGHT_PX)
+
+    cells: list[Cell] = []
+    for ordinal in range(count):
+        slide_index, position = divmod(ordinal, per_slide)
+        row, column = divmod(position, columns)
+        cell_x = SLIDE_MARGIN_PX + column * cell_w
+        cell_y = SLIDE_MARGIN_PX + row * cell_h
+        shape = Rect(
+            round(cell_x + CELL_GAP_X_PX / 2),
+            round(cell_y + CELL_GAP_Y_PX / 2),
+            shape_w,
+            shape_h,
+        )
+        label = Rect(shape.x, shape.y + shape.height, shape_w, round(LABEL_HEIGHT_PX))
+        cells.append(Cell(slide_index + 1, position + 1, shape, label))
+
+    grid = Grid(count, columns, rows, slides, per_slide, (cell_w, cell_h), (shape_w, shape_h), tuple(cells))
+    _check_grid(grid, basis)
+    return grid
+
+
+def _check_grid(grid: Grid, basis: tuple[float, float]) -> None:
+    """Refuse a grid that a click could not address unambiguously."""
+    slide = Rect(0, 0, basis[0], basis[1])
+    for cell in grid.cells:
+        centre = cell.shape.center
+        inset = min(
+            centre[0] - cell.shape.x,
+            cell.shape.x + cell.shape.width - centre[0],
+            centre[1] - cell.shape.y,
+            cell.shape.y + cell.shape.height - centre[1],
+        )
+        if inset < CLICK_MARGIN_PX:
+            raise ValueError(
+                f"shape {cell.cell_index} on slide {cell.slide_index} puts its centre {inset:g}px "
+                f"from its own edge, under the {CLICK_MARGIN_PX:g}px click margin"
+            )
+        for rect in (cell.shape, cell.label):
+            if rect.x < 0 or rect.y < 0 or rect.x + rect.width > slide.width or rect.y + rect.height > slide.height:
+                raise ValueError(
+                    f"shape {cell.cell_index} on slide {cell.slide_index} leaves the "
+                    f"{basis[0]:g}x{basis[1]:g} px slide: {rect.as_dict()}"
+                )
+    by_slide: dict[int, list[Cell]] = {}
+    for cell in grid.cells:
+        by_slide.setdefault(cell.slide_index, []).append(cell)
+    for slide_index, cells in by_slide.items():
+        for first in range(len(cells)):
+            for second in range(first + 1, len(cells)):
+                one, other = cells[first], cells[second]
+                if one.shape.overlaps(other.shape):
+                    raise ValueError(
+                        f"shapes {one.cell_index} and {other.cell_index} overlap on slide {slide_index}"
+                    )
+                for a, b in ((one, other), (other, one)):
+                    clearance = b.shape.distance_to(a.shape.center)
+                    if clearance < NEIGHBOUR_CLEARANCE_PX:
+                        raise ValueError(
+                            f"the click point of shape {a.cell_index} on slide {slide_index} is "
+                            f"{clearance:g}px from shape {b.cell_index}, under the "
+                            f"{NEIGHBOUR_CLEARANCE_PX:g}px neighbour clearance"
+                        )
+
+
 # --- the plan ---------------------------------------------------------------
+def assign_cells(targets: Sequence[dict[str, Any]]) -> Grid:
+    """Lay the targets out and write each one's slide, cell and shape rectangle into it.
+
+    ``shapeName`` is left null here on purpose: it is settled by ``--generate``, which
+    reads the name back out of the package sdpm wrote, because sdpm derives a shape's name
+    from its geometry rather than from the element id the deck JSON asked for.
+    """
+    grid = grid_layout(len(targets))
+    for ordinal, (target, cell) in enumerate(zip(targets, grid.cells), start=1):
+        target["targetIndex"] = ordinal
+        target["slideIndex"] = cell.slide_index
+        target["cellIndex"] = cell.cell_index
+        target["shapeRectPx"] = cell.shape.as_dict()
+        target["shapeName"] = target.get("shapeName")
+    return grid
+
+
 def build_plan(catalog: dict[str, Any], manifest: dict[str, Any]) -> dict[str, Any]:
     """Derive the whole plan from the catalog's remaining gaps."""
     manifest_version = assert_manifest_linkage(catalog, manifest)
@@ -305,15 +616,15 @@ def build_plan(catalog: dict[str, Any], manifest: dict[str, Any]) -> dict[str, A
             }
         )
 
-    for index, target in enumerate(targets, start=1):
-        target["slideIndex"] = index
+    grid = assign_cells(targets) if targets else None
 
     return {
         "plan": "sdpm animation GUI capture",
         "driver": DRIVER,
-        # Filled in by --generate from the package sdpm actually wrote, because sdpm
-        # derives a shape's name from its geometry rather than from the element id.
-        "shapeName": None,
+        # Target key -> shape name, filled in by --generate alongside each target's own
+        # ``shapeName``. The driver refuses to run a target without one.
+        "shapeNames": {},
+        "deck": grid.as_dict() if grid is not None else {"slides": 0, "note": "no targets"},
         "generatedFrom": {
             "catalog": DEFAULT_CATALOG.relative_to(REPO_ROOT).as_posix(),
             "manifest": DEFAULT_MANIFEST.relative_to(REPO_ROOT).as_posix(),
@@ -338,57 +649,66 @@ def build_plan(catalog: dict[str, Any], manifest: dict[str, Any]) -> dict[str, A
 
 
 # --- the capture deck -------------------------------------------------------
-def slide_json(target: dict[str, Any]) -> dict[str, Any]:
-    """One slide: one named shape to click, and the target key as visible text.
+def label_text(key: str) -> str:
+    """Return the key as the label under its shape, split onto two lines at the last dot.
 
-    The shape's name is what the driver looks up in the package to compute its click
-    point, and the visible key is what lets a saved slide be read back against the target
-    it was meant for rather than against its position in a list.
+    Nothing is abbreviated: stripping the newline gives the key back exactly. A key is up
+    to 46 characters and a cell is 100 pt wide, so one line would run over the neighbour's
+    label and make the deck harder to read than no label at all.
     """
-    index = target["slideIndex"]
-    return {
-        "layout": "Blank",
-        "elements": [
+    head, dot, tail = key.rpartition(".")
+    return f"{head}{dot}\n{tail}" if dot else key
+
+
+def slide_elements(targets: Sequence[dict[str, Any]], grid: Grid, slide_index: int) -> list[dict[str, Any]]:
+    """Return one slide's elements: per target, a shape to click and its key beneath it.
+
+    The shape's name — read back out of the package, not asked for here — is what the
+    driver looks up to compute its click point and its ``spid``. The visible key is what
+    lets a human read the deck and check a saved slide against the target it was for
+    rather than against a position in a list.
+    """
+    cells = {cell.cell_index: cell for cell in grid.cells if cell.slide_index == slide_index}
+    elements: list[dict[str, Any]] = []
+    for target in targets:
+        if target["slideIndex"] != slide_index:
+            continue
+        cell = cells[target["cellIndex"]]
+        ordinal = target["targetIndex"]
+        elements.append(
             {
-                "id": SHAPE_ELEMENT_ID,
+                "id": f"{SHAPE_ELEMENT_PREFIX}{ordinal:03d}",
                 "type": "shape",
                 "shape": "rounded_rectangle",
-                "text": f"{index:03d}",
-                "x": 120,
-                "y": 300,
-                "width": 320,
-                "height": 160,
-                "fontSize": 40,
-            },
+                "text": f"{ordinal:03d}",
+                "x": cell.shape.x,
+                "y": cell.shape.y,
+                "width": cell.shape.width,
+                "height": cell.shape.height,
+                "fontSize": SHAPE_FONT_PT,
+            }
+        )
+        elements.append(
             {
-                "id": "label",
+                "id": f"{LABEL_ELEMENT_PREFIX}{ordinal:03d}",
                 "type": "textbox",
-                "text": target["key"],
-                "x": 120,
-                "y": 120,
-                "width": 1040,
-                "height": 70,
-                "fontSize": 24,
-            },
-            {
-                "id": "howto",
-                "type": "textbox",
-                "text": " > ".join(target["guiPath"]),
-                "x": 120,
-                "y": 200,
-                "width": 1040,
-                "height": 60,
-                "fontSize": 16,
-            },
-        ],
-    }
+                "text": label_text(target["key"]),
+                "x": cell.label.x,
+                "y": cell.label.y,
+                "width": cell.label.width,
+                "height": cell.label.height,
+                "fontSize": LABEL_FONT_PT,
+            }
+        )
+    return elements
 
 
 def build_capture_deck(plan: dict[str, Any], deck_dir: Path, *, template: Path = DEFAULT_TEMPLATE) -> Path:
-    """Write the sdpm deck source for a plan: one slide per target, in plan order."""
+    """Write the sdpm deck source for a plan: one slide of shapes, in plan order."""
     targets = plan.get("targets", [])
     if not targets:
         raise ValueError("the plan has no targets, so there is no deck to build")
+    grid = grid_layout(len(targets))
     (deck_dir / "slides").mkdir(parents=True, exist_ok=True)
     (deck_dir / "specs").mkdir(parents=True, exist_ok=True)
     (deck_dir / "deck.json").write_text(
@@ -411,11 +731,18 @@ def build_capture_deck(plan: dict[str, Any], deck_dir: Path, *, template: Path =
     (deck_dir / "template.pptx").write_bytes(template.read_bytes())
 
     outline = []
-    for target in targets:
-        slug = f"t{target['slideIndex']:03d}"
-        outline.append(f"- [{slug}] {target['slideIndex']:03d} {target['key']}")
+    for slide_index in range(1, grid.slides + 1):
+        slug = f"s{slide_index:03d}"
+        on_slide = [target for target in targets if target["slideIndex"] == slide_index]
+        outline.append(f"- [{slug}] slide {slide_index}: {len(on_slide)} capture targets")
         (deck_dir / "slides" / f"{slug}.json").write_text(
-            json.dumps(slide_json(target), indent=2, ensure_ascii=False) + "\n", encoding="utf-8"
+            json.dumps(
+                {"layout": "Blank", "elements": slide_elements(targets, grid, slide_index)},
+                indent=2,
+                ensure_ascii=False,
+            )
+            + "\n",
+            encoding="utf-8",
         )
     (deck_dir / "specs" / "outline.md").write_text("\n".join(outline) + "\n", encoding="utf-8")
     return deck_dir
@@ -434,55 +761,133 @@ def generate_capture_deck(deck_dir: Path, output: Path) -> dict[str, Any]:
     return generate(deck_dir, output, animation_mode="off", transition_mode="off")
 
 
-def resolve_shape_name(package: Path, *, preset: str = SHAPE_PRESET) -> str:
-    """Read the name sdpm gave the target shape, from the package it actually wrote.
+def _emu_to_points(value: int | str) -> float:
+    return int(value) / EMU_PER_POINT
 
-    The driver clicks a point computed from this shape, so the name has to be the one in
-    the file rather than the element id the deck JSON asked for. Requiring exactly one
-    such shape per slide, with one name across every slide, is what makes the click point
-    attributable: two candidates would mean the driver could compute a point for the
-    wrong shape and the record would still name the right target.
+
+def read_package_shapes(package: Path, *, preset: str = SHAPE_PRESET) -> dict[int, list[dict[str, Any]]]:
+    """Return, per 1-based slide, every ``preset`` shape the package carries.
+
+    Each entry is the shape's own ``p:cNvPr`` name and id plus its centre in points. This
+    is the read-back the whole design rests on: sdpm names a shape from its geometry, so
+    the name in the file is the only name the driver can click, and the ``id`` is the
+    ``spid`` PowerPoint will write into ``p:spTgt`` when it animates that shape.
     """
-    import zipfile
-
     from lxml import etree
 
     parser = etree.XMLParser(resolve_entities=False, load_dtd=False, no_network=True)
-    names: dict[str, list[int]] = {}
     slide_part = re.compile(r"ppt/slides/slide(\d+)\.xml")
+    found: dict[int, list[dict[str, Any]]] = {}
     with zipfile.ZipFile(package) as archive:
         parts = sorted(
-            ((int(match.group(1)), match.group(0)) for match in map(slide_part.fullmatch, archive.namelist()) if match)
+            (int(match.group(1)), match.group(0))
+            for match in map(slide_part.fullmatch, archive.namelist())
+            if match
         )
         if not parts:
             raise ValueError(f"{package} has no slide parts")
         for index, part in parts:
             root = etree.fromstring(archive.read(part), parser=parser)
-            found = [
-                name
-                for shape in root.iter()
-                if etree.QName(shape).localname == "sp"
-                and any(
-                    etree.QName(el).localname == "prstGeom" and el.get("prst") == preset for el in shape.iter()
+            shapes: list[dict[str, Any]] = []
+            for shape in root.iter():
+                if etree.QName(shape).localname != "sp":
+                    continue
+                if not any(
+                    etree.QName(el).localname == "prstGeom" and el.get("prst") == preset
+                    for el in shape.iter()
+                ):
+                    continue
+                props = next(
+                    (el for el in shape.iter() if etree.QName(el).localname == "cNvPr" and el.get("name")),
+                    None,
                 )
-                for name in (
-                    next(
-                        (
-                            el.get("name")
-                            for el in shape.iter()
-                            if etree.QName(el).localname == "cNvPr" and el.get("name")
-                        ),
-                        None,
-                    ),
+                off = next((el for el in shape.iter() if etree.QName(el).localname == "off"), None)
+                ext = next((el for el in shape.iter() if etree.QName(el).localname == "ext"), None)
+                if props is None or off is None or ext is None:
+                    continue
+                x, y = _emu_to_points(off.get("x")), _emu_to_points(off.get("y"))
+                cx, cy = _emu_to_points(ext.get("cx")), _emu_to_points(ext.get("cy"))
+                shapes.append(
+                    {
+                        "name": props.get("name"),
+                        "id": props.get("id"),
+                        "centerPt": (x + cx / 2.0, y + cy / 2.0),
+                    }
                 )
-                if name
-            ]
-            if len(found) != 1:
-                raise ValueError(f"slide {index} has {len(found)} {preset} shapes, expected exactly one: {found}")
-            names.setdefault(found[0], []).append(index)
-    if len(names) != 1:
-        raise ValueError(f"the {preset} shape is not named consistently across slides: { {k: len(v) for k, v in names.items()} }")
-    return next(iter(names))
+            found[index] = shapes
+    return found
+
+
+def read_slide_size_pt(package: Path) -> tuple[float, float]:
+    """Return the deck's slide size in points, from ``ppt/presentation.xml``."""
+    from lxml import etree
+
+    parser = etree.XMLParser(resolve_entities=False, load_dtd=False, no_network=True)
+    with zipfile.ZipFile(package) as archive:
+        root = etree.fromstring(archive.read("ppt/presentation.xml"), parser=parser)
+    size = next((el for el in root.iter() if etree.QName(el).localname == "sldSz"), None)
+    if size is None:
+        raise ValueError(f"{package.name} has no p:sldSz in ppt/presentation.xml")
+    return _emu_to_points(size.get("cx")), _emu_to_points(size.get("cy"))
+
+
+def resolve_shape_names(package: Path, plan: dict[str, Any], *, preset: str = SHAPE_PRESET) -> dict[str, str]:
+    """Read every target's shape name out of the package, matched by its own position.
+
+    Each target is matched to the ``preset`` shape whose centre is within
+    :data:`MATCH_TOLERANCE_PT` of the centre the grid asked for, converted from the deck's
+    px basis using the slide size the package itself declares. Requiring exactly one
+    match, and a name used by exactly one target, is what makes a click attributable: two
+    candidates would mean the driver could compute a point for one shape and record the
+    other target's key.
+    """
+    targets = plan.get("targets", [])
+    if not targets:
+        raise ValueError("the plan has no targets, so there are no shape names to resolve")
+    slide_w_pt, _slide_h_pt = read_slide_size_pt(package)
+    scale = slide_w_pt / DECK_BASIS_PX[0]
+    shapes = read_package_shapes(package, preset=preset)
+
+    names: dict[str, str] = {}
+    for target in targets:
+        slide_index = target["slideIndex"]
+        rect = target["shapeRectPx"]
+        wanted = (
+            (rect["x"] + rect["width"] / 2.0) * scale,
+            (rect["y"] + rect["height"] / 2.0) * scale,
+        )
+        on_slide = shapes.get(slide_index, [])
+        matches = [
+            shape
+            for shape in on_slide
+            if math.dist(shape["centerPt"], wanted) <= MATCH_TOLERANCE_PT
+        ]
+        if len(matches) != 1:
+            raise ValueError(
+                f"{target['key']} expects exactly one {preset} shape centred near "
+                f"({wanted[0]:.1f}, {wanted[1]:.1f}) pt on slide {slide_index}; the package has "
+                f"{len(matches)} within {MATCH_TOLERANCE_PT:g} pt of it, out of {len(on_slide)} on "
+                f"that slide"
+            )
+        names[target["key"]] = matches[0]["name"]
+
+    duplicates = sorted({name for name in names.values() if list(names.values()).count(name) > 1})
+    if duplicates:
+        raise ValueError(f"the package names more than one target's shape the same: {duplicates}")
+    expected = sum(len(shapes.get(index, [])) for index in {target["slideIndex"] for target in targets})
+    if expected != len(targets):
+        raise ValueError(
+            f"the package carries {expected} {preset} shapes on the target slides but the plan has "
+            f"{len(targets)} targets; an unmatched shape could be clicked instead of a target"
+        )
+    return names
+
+
+def apply_shape_names(plan: dict[str, Any], names: dict[str, str]) -> None:
+    """Write the resolved names into the plan, on each target and as the mapping."""
+    plan["shapeNames"] = {key: names[key] for key in sorted(names)}
+    for target in plan.get("targets", []):
+        target["shapeName"] = names[target["key"]]
 
 
 # --- CLI --------------------------------------------------------------------
@@ -505,6 +910,10 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+def _distinct_warnings(warnings: Iterable[str]) -> list[str]:
+    return sorted({re.sub(r"^page\d+ ", "", text) for text in warnings})
+
+
 def main(argv: Sequence[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     if not any((args.emit_plan, args.build_deck, args.generate, args.summary)):
@@ -516,29 +925,30 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 1
 
-    report: dict[str, Any] = {"counts": plan["counts"]}
+    report: dict[str, Any] = {"counts": plan["counts"], "deck": plan["deck"]}
     if args.build_deck:
         build_capture_deck(plan, args.build_deck, template=args.template)
-        report["deck"] = str(args.build_deck)
+        report["deckSource"] = str(args.build_deck)
     if args.generate:
         if not args.build_deck:
             print("FAIL: --generate needs --build-deck", file=sys.stderr)
             return 1
         result = generate_capture_deck(args.build_deck, args.generate)
-        # Read the shape name back out of the package before the plan is written, so the
-        # plan the driver reads names the shape the file actually carries.
-        plan["shapeName"] = resolve_shape_name(Path(result["output_path"]))
+        # Read the shape names back out of the package before the plan is written, so the
+        # plan the driver reads names the shapes the file actually carries.
+        apply_shape_names(plan, resolve_shape_names(Path(result["output_path"]), plan))
         report["package"] = result["output_path"]
         report["slideCount"] = result["slide_count"]
-        report["shapeName"] = plan["shapeName"]
+        report["shapeNames"] = len(plan["shapeNames"])
+        report["firstShapeName"] = plan["targets"][0]["shapeName"] if plan["targets"] else None
         warnings = result.get("warnings") or []
         if warnings:
-            # A capture deck is deliberately lopsided — the shape sits low so the key is
-            # readable above it — so the layout warnings repeat once per slide. Reported
-            # as a count plus the distinct kinds, which is the part worth reading.
+            # A capture deck is deliberately dense — 76 small shapes with a small key
+            # under each — so the layout warnings repeat per cell. Reported as a count
+            # plus the distinct kinds, which is the part worth reading.
             report["warningCount"] = len(warnings)
-            report["distinctWarnings"] = sorted({re.sub(r"^page\d+ ", "", text) for text in warnings})
-    # Written last: --generate is what settles ``shapeName``.
+            report["distinctWarnings"] = _distinct_warnings(warnings)
+    # Written last: --generate is what settles the shape names.
     if args.out:
         args.out.parent.mkdir(parents=True, exist_ok=True)
         args.out.write_text(json.dumps(plan, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")

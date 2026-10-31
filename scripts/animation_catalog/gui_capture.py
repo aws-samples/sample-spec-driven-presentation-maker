@@ -17,23 +17,62 @@ a different mechanism and is not blocked. Driving it by hand costs four agent ro
 trips per value — select the slide, select the shape, read the tree, press the control —
 which does not fit a session. This module is that loop as one script.
 
+## There is no slide navigation here, and that is deliberate
+
+The first version of this driver selected a slide per target. A live run of it on
+2026-10-31 against a 76-target plan returned **76 records, 0 captured, 76 rejected**, and
+every record's ``steps`` was empty: nothing ever got as far as pressing a control. Two
+distinct causes, both inside slide selection:
+
+1. **Slides 1 to 6 timed out.** ``select_slide`` pressed the navigator cell, then set
+   ``kAXSelected``, then waited for ``AXSelected`` to read back true. In the live tree the
+   cells expose **no actions at all** — a manual read showed
+   ``cell "Slide 1 of 17 Slides"`` with no ``[AXPress]`` — and ``AXSelected`` never became
+   true. The only thing that selected a slide by hand was a synthetic global click on the
+   cell's own frame.
+2. **Slides 7 to 76 were not addressable.** The navigator publishes only the cells
+   currently scrolled into view — 6 of 76 — so position-indexing into the cell list cannot
+   reach the rest.
+
+Making that work would have needed scrollbar arithmetic, title matching and a status-bar
+cross-check: three more assumptions nothing offline can check. So slide selection is
+**gone**, along with the thumbnail-position lookup and the ``Has Animation`` thumbnail
+check that depended on it. ``gui_capture_plan.py`` now puts every target's shape on **one
+slide**, and a target is selected by clicking its own shape. Do not reintroduce either
+function; ``tests/test_animation_gui_capture.py`` fails if their names come back.
+
 ## What it assumes, measured rather than guessed
 
 Every mechanic below is recorded in ``computer-use.md`` and is not re-derived here:
 
-- A gallery press **replaces** the shape's effect rather than adding one, so the deck
-  carries **one slide per target** and slide N's ``p:timing`` is evidence about target N.
+- A gallery press **replaces** the effect of the **selected shape** rather than adding
+  one. That is what makes one slide of many shapes work: each target owns a shape, and
+  each press lands on the shape the click selected.
 - Tile indices shift as soon as a press scrolls a gallery, and galleries lazily
   materialize tiles. Nothing positional is ever cached: the tree is re-read and every
   control re-resolved **by title** immediately before each press.
 - ``Effect Options`` and ``Path Animation`` open as their own AX windows, whose items
   are ``AXMenuButton``s activated with ``AXPress``.
-- The ribbon exposes the read-back directly: the ``Start:`` popup's value, the
-  ``Duration:`` incrementor's value, and each slide thumbnail's title gaining
-  ``Has Animation``.
+- The ribbon exposes a read-back directly: the ``Start:`` popup's value and the
+  ``Duration:`` incrementor's value. Both are recorded as evidence; neither is the gate.
 - Canvas shapes have **no AX element**. They are selected with a synthetic mouse event
   at a point derived from the package geometry, the live editor-pane frame and the live
   zoom — never a hardcoded coordinate.
+
+## Attribution, not position, is the evidence
+
+Because every target shares one slide, "slide N is target N" is no longer available —
+and it was never worth much, since it survived no reordering and no mis-aimed click. In
+its place each target is verified against the package it just saved: the slide's effect
+count must have grown by **exactly one**, and that new effect's ``p:spTgt/@spid`` must be
+the ``p:cNvPr/@id`` of the shape the driver clicked. A new effect on another shape is a
+``rejected`` record naming **both** spids, not a pass; a press that added nothing is a
+recorded failure. The record carries the shape name, the expected spid, the attributed
+spid and the new effect's own ``p:cTn`` attributes, so merged evidence is per target even
+though ``--parse-oracle`` joins every record to the same slide.
+
+This also makes the per-target save part of the measurement rather than only crash
+insurance, so it is no longer optional.
 
 ## It moves the real pointer
 
@@ -81,6 +120,7 @@ import shutil
 import sys
 import time
 import zipfile
+from collections import Counter
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
@@ -113,8 +153,10 @@ RECORD_ENUM = "guiCapture"
 RECORD_KIND = "guiCapture"
 RESOLVED_BY = "accessibilityPress"
 
-#: The substring a slide thumbnail's title gains once the slide carries an animation.
-HAS_ANIMATION = "Has Animation"
+#: The ``p:cTn`` attribute that marks a timing node as an animation **effect** rather than
+#: one of the container nodes above it or a behaviour node below it. Counting these, and
+#: reading the ``p:spTgt/@spid`` under each, is how a press is attributed to a shape.
+EFFECT_MARKER_ATTRIBUTE = "presetClass"
 
 #: Ribbon controls read back after a press.
 START_LABEL = "Start:"
@@ -139,6 +181,11 @@ POLL_INTERVAL = 0.2
 #: the live tree. ``computer-use.md``'s coordinate table is a fallback for a control with
 #: no element, not a source of these.
 EDITOR_PANE_ROLE = "AXSplitGroup"
+
+#: The slide editor area names itself, and its own frame is what the canvas mapping
+#: needs. Resolving it by title rather than by role-and-size is what keeps the mapping
+#: right when the ribbon collapses and the pane grows.
+EDITOR_PANE_TITLE_PREFIX = "Slide Editor Pane"
 ZOOM_TITLE_PATTERN = re.compile(r"^\s*\d+(?:\.\d+)?\s*%\s*$")
 
 
@@ -148,12 +195,23 @@ class DriverRefusal(RuntimeError):
 
 
 class TargetFailure(RuntimeError):
-    """One target failed. Recorded as ``rejected`` and the run continues."""
+    """One target failed. Recorded as ``rejected`` and the run continues.
+
+    ``detail`` is for the figures a reader would otherwise have to parse back out of the
+    message. An attribution failure names the spid it found and the spid it wanted, so a
+    merged evidence file can be queried for "which targets landed on another shape"
+    without reading prose.
+    """
 
     kind = "targetFailure"
 
+    def __init__(self, message: str, **detail: Any) -> None:
+        super().__init__(message)
+        self.detail = detail
+
     def as_error(self) -> dict[str, Any]:
-        return {"kind": self.kind, "message": str(self)}
+        error = {"kind": self.kind, "message": str(self)}
+        return {**error, "detail": self.detail} if self.detail else error
 
 
 class ControlNotFound(TargetFailure):
@@ -174,6 +232,24 @@ class GeometryError(TargetFailure):
 
 class TreeTooLarge(TargetFailure):
     kind = "treeTooLarge"
+
+
+class PackageEvidenceError(TargetFailure):
+    """The saved package could not be read where the per-target evidence lives."""
+
+    kind = "packageEvidence"
+
+
+class EffectNotAdded(TargetFailure):
+    """The press did not add exactly one animation effect to the slide."""
+
+    kind = "effectNotAdded"
+
+
+class EffectMisattributed(TargetFailure):
+    """The press added an effect, but to a shape other than the one that was clicked."""
+
+    kind = "effectMisattributed"
 
 
 # --- geometry ---------------------------------------------------------------
@@ -212,49 +288,197 @@ def read_slide_size_pt(package: Path) -> tuple[float, float]:
     return emu_to_points(size.get("cx")), emu_to_points(size.get("cy"))
 
 
-def read_shape_center_pt(package: Path, slide_index: int, shape_name: str) -> tuple[float, float]:
-    """Return the named shape's centre on one slide, in points from the slide's top-left.
-
-    Reads ``a:off``/``a:ext`` out of the slide part. A shape the driver cannot find by
-    name is an error that lists the names present, because clicking an estimated point
-    would select the wrong thing and the record would name the right one.
-    """
+def _read_slide_part(package: Path, slide_index: int) -> Any:
+    """Parse one slide part, or fail naming the part that is not there."""
     from lxml import etree
 
     parser = etree.XMLParser(resolve_entities=False, load_dtd=False, no_network=True)
     part = f"ppt/slides/slide{slide_index}.xml"
     with zipfile.ZipFile(package) as archive:
         try:
-            root = etree.fromstring(archive.read(part), parser=parser)
+            blob = archive.read(part)
         except KeyError as exc:
-            raise GeometryError(f"{package.name} has no {part}") from exc
-    names: list[str] = []
+            raise PackageEvidenceError(f"{package.name} has no {part}") from exc
+    return etree.fromstring(blob, parser=parser)
+
+
+def read_slide_shapes(package: Path, slide_index: int) -> list[dict[str, Any]]:
+    """Return every named shape on one slide, with its ``spid`` and its centre in points.
+
+    The ``spid`` is the shape's own ``p:cNvPr/@id``, which is what PowerPoint writes into
+    ``p:spTgt`` when it animates that shape — so this one read supplies both the point to
+    click and the identity the capture is attributed to. The two are **not** the same
+    number: the generated deck's first shape is named ``Rounded Rectangle 1`` and carries
+    ``id="2"``.
+    """
+    from lxml import etree
+
+    root = _read_slide_part(package, slide_index)
+    shapes: list[dict[str, Any]] = []
     for shape in root.iter():
         if etree.QName(shape).localname not in {"sp", "pic", "graphicFrame", "grpSp"}:
             continue
-        name = next(
+        props = next(
             (
-                el.get("name")
+                el
                 for el in shape.iter()
                 if etree.QName(el).localname == "cNvPr" and el.get("name")
             ),
             None,
         )
-        if name is None:
-            continue
-        names.append(name)
-        if name != shape_name:
+        if props is None:
             continue
         off = next((el for el in shape.iter() if etree.QName(el).localname == "off"), None)
         ext = next((el for el in shape.iter() if etree.QName(el).localname == "ext"), None)
-        if off is None or ext is None:
-            raise GeometryError(f"shape {shape_name!r} on slide {slide_index} has no a:off/a:ext")
-        x, y = emu_to_points(off.get("x")), emu_to_points(off.get("y"))
-        cx, cy = emu_to_points(ext.get("cx")), emu_to_points(ext.get("cy"))
-        return (x + cx / 2.0, y + cy / 2.0)
-    raise GeometryError(
-        f"no shape named {shape_name!r} on slide {slide_index}; shapes present: {sorted(set(names))}"
-    )
+        entry: dict[str, Any] = {"name": props.get("name"), "spid": props.get("id"), "center": None}
+        if off is not None and ext is not None:
+            x, y = emu_to_points(off.get("x")), emu_to_points(off.get("y"))
+            cx, cy = emu_to_points(ext.get("cx")), emu_to_points(ext.get("cy"))
+            entry["center"] = (x + cx / 2.0, y + cy / 2.0)
+        shapes.append(entry)
+    return shapes
+
+
+def _shape_by_name(package: Path, slide_index: int, shape_name: str) -> dict[str, Any]:
+    """Return one named shape, or fail listing the names the slide does carry.
+
+    A shape the driver cannot find by name is an error rather than an estimate, because
+    clicking an estimated point would select the wrong thing and the record would name
+    the right one.
+    """
+    shapes = read_slide_shapes(package, slide_index)
+    found = [shape for shape in shapes if shape["name"] == shape_name]
+    if len(found) > 1:
+        raise GeometryError(
+            f"slide {slide_index} has {len(found)} shapes named {shape_name!r}; a click could not "
+            "be attributed to one of them"
+        )
+    if not found:
+        raise GeometryError(
+            f"no shape named {shape_name!r} on slide {slide_index}; shapes present: "
+            f"{sorted({shape['name'] for shape in shapes})}"
+        )
+    return found[0]
+
+
+def read_shape_center_pt(package: Path, slide_index: int, shape_name: str) -> tuple[float, float]:
+    """Return the named shape's centre on one slide, in points from the slide's top-left."""
+    shape = _shape_by_name(package, slide_index, shape_name)
+    if shape["center"] is None:
+        raise GeometryError(f"shape {shape_name!r} on slide {slide_index} has no a:off/a:ext")
+    return shape["center"]
+
+
+def read_shape_spid(package: Path, slide_index: int, shape_name: str) -> str:
+    """Return the named shape's ``p:cNvPr/@id``, the spid its effects will carry."""
+    spid = _shape_by_name(package, slide_index, shape_name)["spid"]
+    if not spid:
+        raise GeometryError(f"shape {shape_name!r} on slide {slide_index} has no p:cNvPr/@id")
+    return str(spid)
+
+
+def read_slide_effects(package: Path, slide_index: int) -> list[dict[str, Any]]:
+    """Return one entry per animation effect on a slide, each with the spid it targets.
+
+    An effect is a ``p:cTn`` carrying :data:`EFFECT_MARKER_ATTRIBUTE` — the preset node
+    PowerPoint writes per applied effect — and its target is the ``p:spTgt/@spid`` beneath
+    it. A node whose subtree names more than one spid gets ``spid: None`` and keeps the
+    whole list, because an effect that targets two shapes attributes to neither.
+
+    Only the spids are compared across reads. PowerPoint is free to renumber the timing
+    tree's ``id`` attributes when it adds an effect, so an identity built from them would
+    make every earlier effect look new.
+    """
+    from lxml import etree
+
+    root = _read_slide_part(package, slide_index)
+    effects: list[dict[str, Any]] = []
+    for node in root.iter():
+        if etree.QName(node).localname != "cTn" or node.get(EFFECT_MARKER_ATTRIBUTE) is None:
+            continue
+        spids = sorted(
+            {
+                el.get("spid")
+                for el in node.iter()
+                if etree.QName(el).localname == "spTgt" and el.get("spid")
+            }
+        )
+        effects.append(
+            {
+                "spid": spids[0] if len(spids) == 1 else None,
+                "spids": spids,
+                "cTn": dict(node.attrib),
+            }
+        )
+    effects.sort(key=lambda effect: (effect["spid"] or "", json.dumps(effect["cTn"], sort_keys=True)))
+    return effects
+
+
+def _spid_counts(effects: Sequence[dict[str, Any]]) -> Counter[str | None]:
+    return Counter(effect["spid"] for effect in effects)
+
+
+def attribute_new_effect(
+    before: Sequence[dict[str, Any]],
+    after: Sequence[dict[str, Any]],
+    expected_spid: str,
+) -> dict[str, Any]:
+    """Return the effect the press added, or fail saying what the package shows instead.
+
+    This is the per-target acceptance gate, and it replaced a thumbnail label that only
+    ever said *the slide* has an animation — which is not per-target evidence once every
+    target shares a slide. Two distinct failures, because they mean different things:
+
+    - the effect count did not grow by exactly one. A click that landed on a shape which
+      already carries an effect looks exactly like this, since a gallery press *replaces*
+      that shape's effect, and so does a press that applied nothing at all. It is also
+      what ``--force`` produces against a deck that has already been captured once, which
+      is why ``--force`` wants a freshly generated deck: a re-press on an animated shape
+      cannot produce the new effect this gate requires, and reporting it as a pass would
+      be crediting a target on the strength of a *previous* run's evidence;
+    - exactly one effect appeared but on another shape. The value was applied, just not
+      to this target, so the record names both spids and is rejected rather than
+      crediting the wrong key.
+    """
+    if len(after) != len(before) + 1:
+        appeared = sorted(str(spid) for spid in _spid_counts(after) - _spid_counts(before))
+        vanished = sorted(str(spid) for spid in _spid_counts(before) - _spid_counts(after))
+        raise EffectNotAdded(
+            f"the slide carried {len(before)} animation effects before the press and {len(after)} "
+            f"after it, so the press did not add exactly one; spids that appeared: "
+            f"{appeared or ['none']}, spids that vanished: {vanished or ['none']}. The clicked "
+            f"shape's spid is {expected_spid!r}",
+            expectedSpid=expected_spid,
+            effectsBefore=len(before),
+            effectsAfter=len(after),
+            appearedSpids=appeared,
+            vanishedSpids=vanished,
+        )
+    added = _spid_counts(after) - _spid_counts(before)
+    if sum(added.values()) != 1:
+        raise EffectNotAdded(
+            f"the slide gained one effect but {sum(added.values())} spids changed, so no single new "
+            f"effect can be attributed; the clicked shape's spid is {expected_spid!r}",
+            expectedSpid=expected_spid,
+            effectsBefore=len(before),
+            effectsAfter=len(after),
+            appearedSpids=sorted(str(spid) for spid in added),
+        )
+    spid = next(iter(added.elements()))
+    effect = next((candidate for candidate in after if candidate["spid"] == spid), None)
+    if spid != expected_spid:
+        raise EffectMisattributed(
+            f"the press added an effect targeting shape spid {spid!r} (p:spTgt spids "
+            f"{(effect or {}).get('spids')}), but the click was aimed at the shape with spid "
+            f"{expected_spid!r}; the effect belongs to another shape, so this target is not captured",
+            attributedSpid=spid,
+            expectedSpid=expected_spid,
+            spTgtSpids=(effect or {}).get("spids"),
+            effectCTn=(effect or {}).get("cTn"),
+        )
+    if effect is None:  # pragma: no cover - the count arithmetic above makes this impossible
+        raise EffectNotAdded(f"no effect in the saved slide targets spid {expected_spid!r}")
+    return effect
 
 
 def parse_zoom(title: str | None) -> float:
@@ -329,13 +553,10 @@ class AXNode(Protocol):
     @property
     def enabled(self) -> bool: ...
     @property
-    def selected(self) -> bool: ...
-    @property
     def frame(self) -> Frame | None: ...
     @property
     def children(self) -> Sequence[AXNode]: ...
     def press(self) -> None: ...
-    def select(self) -> None: ...
 
 
 class AXBackend(Protocol):
@@ -568,15 +789,24 @@ def press_path(
     scope = Scope()
     final_titles = (path[-1], *alternatives)
 
-    tab = _resolve_in(resolve_scope(backend, scope), path[0])
-    tab.press()
-    steps.append(StepOutcome(path[0], "pressedTab", tab.role))
-    wait_until(
-        backend,
-        lambda: _reachable_any(resolve_scope(backend, scope), [path[1]]),
-        timeout=timeout,
-        what=f"{path[1]!r} after selecting the {path[0]!r} tab",
-    )
+    # Pressing a ribbon tab that is ALREADY active collapses the ribbon, which takes
+    # every control on it out of the tree. Measured: a run against a deck whose
+    # Animations tab was already selected pressed it anyway, the ribbon folded, and all
+    # 76 targets failed waiting for a gallery that had stopped existing. So the tab is
+    # pressed only when its own controls are not already reachable, which is the same
+    # evidence the wait below uses and needs no extra attribute.
+    tab_node = _resolve_in(resolve_scope(backend, scope), path[0])
+    if _reachable_any(resolve_scope(backend, scope), [path[1]]):
+        steps.append(StepOutcome(path[0], "tabAlreadyActive", tab_node.role))
+    else:
+        tab_node.press()
+        steps.append(StepOutcome(path[0], "pressedTab", tab_node.role))
+        wait_until(
+            backend,
+            lambda: _reachable_any(resolve_scope(backend, scope), [path[1]]),
+            timeout=timeout,
+            what=f"{path[1]!r} after selecting the {path[0]!r} tab",
+        )
 
     for index in range(1, len(path) - 1):
         title = path[index]
@@ -643,7 +873,7 @@ def read_labelled_value(window: AXNode, label: str) -> str | None:
 
     The read-back is recorded evidence, not an acceptance gate, so an absent or
     ambiguous control is reported as ``null`` rather than failing the target. The
-    acceptance gate is the thumbnail label, which is unambiguous.
+    acceptance gate is :func:`attribute_new_effect`, which reads the saved package.
     """
     found = find_all_by_title(window, label)
     if len(found) == 1:
@@ -661,67 +891,37 @@ def ribbon_readback(backend: AXBackend) -> dict[str, str | None]:
     }
 
 
-#: Slide-navigator cell roles, preferred in this order. A row that contains a cell would
-#: otherwise be counted twice.
-THUMBNAIL_ROLES = ("AXRow", "AXCell")
-
-
-def thumbnail_cells(window: AXNode) -> list[AXNode]:
-    """Return the slide navigator's thumbnail cells in slide order."""
-    for role in THUMBNAIL_ROLES:
-        cells = [node for node in walk(window) if node.role == role]
-        if not cells:
-            continue
-        if all(cell.frame is not None for cell in cells):
-            cells.sort(key=lambda cell: (cell.frame.y, cell.frame.x))  # type: ignore[union-attr]
-        return cells
-    return []
-
-
-def slide_thumbnail(window: AXNode, slide_index: int) -> AXNode:
-    """Return the thumbnail cell for a 1-based slide index."""
-    cells = thumbnail_cells(window)
-    if not 1 <= slide_index <= len(cells):
-        raise ControlNotFound(f"slide {slide_index} is outside the {len(cells)} thumbnail cells read")
-    return cells[slide_index - 1]
-
-
-def thumbnail_label(backend: AXBackend, slide_index: int) -> str | None:
-    """Return the current title of one slide's thumbnail cell, from a fresh read."""
-    return slide_thumbnail(document_window(backend), slide_index).title
-
-
-def has_animation(label: str | None) -> bool:
-    """Has this thumbnail label gained PowerPoint's ``Has Animation`` marker?"""
-    return HAS_ANIMATION in (label or "")
-
-
 # --- driving ----------------------------------------------------------------
-def select_slide(backend: AXBackend, slide_index: int, *, timeout: float) -> str:
-    """Select one slide in the navigator and confirm it, returning its cell title."""
-
-    def selected() -> AXNode | None:
-        cell = slide_thumbnail(document_window(backend), slide_index)
-        return cell if cell.selected else None
-
-    slide_thumbnail(document_window(backend), slide_index).select()
-    cell = wait_until(
-        backend,
-        selected,
-        timeout=timeout,
-        what=f"slide {slide_index} to become the selected thumbnail",
-    )
-    return cell.title
+# There is deliberately no slide selection and no thumbnail lookup here. See the module
+# docstring: the live 2026-10-31 run rejected all 76 targets inside them, because the
+# navigator's cells expose no actions and only the handful scrolled into view is published
+# at all. Every target now lives on one slide and is reached by clicking its own shape.
 
 
-def select_shape(backend: AXBackend, point: tuple[float, float], gate_title: str, *, timeout: float) -> None:
-    """Click the canvas shape and confirm the selection, by the only means there is.
+def select_shape(
+    backend: AXBackend,
+    geometry: CanvasGeometry,
+    package: Path,
+    slide_index: int,
+    shape_name: str,
+    gate_title: str,
+    *,
+    timeout: float,
+) -> tuple[float, float]:
+    """Click one named shape and confirm something is selected. Returns the point clicked.
 
-    The shape has **no accessibility element**, so this posts a synthetic mouse event at
-    a derived point, which physically moves the pointer. Confirmation is indirect: the
-    gallery named by the target's path is disabled until a shape is selected, so waiting
-    for it to become enabled is the available evidence that the click landed.
+    The shape has **no accessibility element**, so the point is derived from the
+    package's own geometry for *this* shape plus the live editor-pane frame and zoom, and
+    posting it physically moves the pointer.
+
+    Confirmation is weak by nature and weaker than it used to be: the gallery named by
+    the target's path is disabled until *some* shape is selected, so its becoming enabled
+    says a shape is selected — and after the first target of a run, one already is. It
+    is kept because it still catches a click that lands on empty canvas, which deselects.
+    What establishes that the click landed on the *right* shape is
+    :func:`attribute_new_effect`, after the press and the save.
     """
+    point = geometry.point_for(package, slide_index, shape_name)
 
     def gate_enabled() -> bool:
         return _resolve_in(document_window(backend), gate_title).enabled
@@ -731,16 +931,22 @@ def select_shape(backend: AXBackend, point: tuple[float, float], gate_title: str
         backend,
         gate_enabled,
         timeout=timeout,
-        what=f"{gate_title!r} to become enabled after clicking the shape at {point[0]:.0f},{point[1]:.0f}",
+        what=(
+            f"{gate_title!r} to become enabled after clicking {shape_name!r} at "
+            f"{point[0]:.0f},{point[1]:.0f}"
+        ),
     )
+    return point
 
 
 def press_save(backend: AXBackend, document: Path, *, timeout: float) -> None:
     """Press Save in the Quick Access toolbar and wait, bounded, for the file to change.
 
-    Incremental saving is what makes a crash cost one target rather than the run. The
-    document must already exist on disk so Save overwrites in place and PowerPoint does
-    not open a Save As sheet, which this driver would not answer.
+    Incremental saving is what makes a crash cost one target rather than the run, and it
+    is now also the measurement: :func:`attribute_new_effect` reads the file this writes,
+    so there is no option to skip it. The document must already exist on disk so Save
+    overwrites in place and PowerPoint does not open a Save As sheet, which this driver
+    would not answer.
     """
     before = (document.stat().st_mtime_ns, document.stat().st_size) if document.exists() else None
     _resolve_in(document_window(backend), SAVE_LABEL).press()
@@ -817,8 +1023,12 @@ def capture_record(
     applied: str | None = None,
     matched_title: str | None = None,
     readback: dict[str, str | None] | None = None,
-    thumbnail: str | None = None,
     steps: Sequence[dict[str, Any]] = (),
+    shape_name: str | None = None,
+    shape_spid: str | None = None,
+    click_point: tuple[float, float] | None = None,
+    effect: dict[str, Any] | None = None,
+    effect_count: tuple[int, int] | None = None,
     saved: bool = False,
     rejected: bool = False,
     error: dict[str, Any] | None = None,
@@ -832,8 +1042,16 @@ def capture_record(
     the enumerator. ``code`` is null by construction: a GUI control has no four-char
     scripting code, and inventing one would assert a name correspondence the capture
     does not measure.
+
+    Every target now shares one slide, so that join puts the **whole slide's** OOXML
+    beside every record. The per-target evidence therefore lives in the record itself:
+    ``shapeName`` and ``shapeSpid`` say which shape was aimed at, ``attributedSpid`` and
+    ``effectCTn`` say which effect the package gained and what it says, and
+    ``effectCount`` says the slide went from n to n+1. A merged view is read per target by
+    matching ``attributedSpid`` against the slide's ``p:spTgt/@spid``.
     """
     key = target["key"]
+    attributed = bool(effect and shape_spid and effect.get("spid") == shape_spid)
     return {
         "record": RECORD_KIND,
         "enum": RECORD_ENUM,
@@ -842,11 +1060,19 @@ def capture_record(
         "catalogKey": key,
         "slideIndex": target["slideIndex"],
         "guiPath": list(target["guiPath"]),
+        "shapeName": shape_name,
+        "shapeSpid": shape_spid,
+        "clickPoint": [round(click_point[0], 1), round(click_point[1], 1)] if click_point else None,
         "applied": applied,
         "matchedTitle": matched_title,
         "ribbonReadBack": readback or {"start": None, "duration": None},
-        "thumbnailLabel": thumbnail,
-        "hasAnimation": has_animation(thumbnail),
+        "attributedSpid": effect.get("spid") if effect else None,
+        "effectCTn": effect.get("cTn") if effect else None,
+        "effectCount": {
+            "before": effect_count[0] if effect_count else None,
+            "after": effect_count[1] if effect_count else None,
+        },
+        "attributed": attributed,
         "pathResolution": list(steps),
         "saved": saved,
         "saveError": save_error,
@@ -898,6 +1124,40 @@ def split_plan(
     return todo, skipped
 
 
+def plan_shape_names(plan: dict[str, Any]) -> dict[str, str]:
+    """Return the plan's ``target key -> shape name`` mapping, refusing an incomplete one.
+
+    The names are settled by ``gui_capture_plan.py --generate``, which reads them back out
+    of the package sdpm wrote; sdpm derives a shape's name from its geometry, so neither
+    side may assume one. A target with no name has nothing to click and nothing to
+    attribute an effect to, so this refuses the whole run rather than producing a record
+    per target that says the same thing.
+    """
+    mapping = {str(key): str(name) for key, name in (plan.get("shapeNames") or {}).items() if name}
+    missing: list[str] = []
+    conflicting: list[str] = []
+    for target in plan.get("targets", []):
+        key, name = target["key"], target.get("shapeName")
+        if name:
+            if key in mapping and mapping[key] != name:
+                conflicting.append(key)
+            mapping[key] = str(name)
+        elif key not in mapping:
+            missing.append(key)
+    if conflicting:
+        raise DriverRefusal(
+            f"the plan's shapeNames mapping disagrees with the targets' own shapeName for "
+            f"{sorted(conflicting)}; regenerate the plan rather than guessing which is current"
+        )
+    if missing:
+        raise DriverRefusal(
+            f"{len(missing)} targets carry no shapeName and the plan's shapeNames mapping does not "
+            f"name them either, starting with {sorted(missing)[:3]}; shape names are settled by "
+            "gui_capture_plan.py --generate, which reads them out of the generated package"
+        )
+    return mapping
+
+
 def retained_records(records: Sequence[dict[str, Any]], rerunning: Sequence[dict[str, Any]]) -> list[dict[str, Any]]:
     """Return the prior records to keep: everything not about a target being re-run.
 
@@ -920,13 +1180,8 @@ class CaptureSettings:
     out_dir: Path
     document: Path
     expect_document: str | None = None
-    #: Overridden by the plan's own ``shapeName``, which ``gui_capture_plan.py --generate``
-    #: reads back out of the package sdpm wrote. This default is only the name that
-    #: generation produced for the committed deck layout.
-    shape_name: str = "Rounded Rectangle 1"
     timeout: float = DEFAULT_TIMEOUT
     force: bool = False
-    save_each: bool = True
     pane_role: str = EDITOR_PANE_ROLE
     pane: Frame | None = None
     zoom: float | None = None
@@ -982,18 +1237,38 @@ def read_canvas_geometry(
     source: dict[str, Any] = {"paneRole": pane_role}
     window = document_window(backend)
     if pane is None:
-        panes = [
+        # Identified by the editor area's OWN title, not by being the biggest pane of a
+        # role. Measured: picking the largest AXSplitGroup returns the outer split that
+        # also holds the navigator and the notes, which is 254 px too wide and 188 px too
+        # tall, so every click landed off its shape and all 76 targets timed out. The
+        # editor area is the only element whose title starts with this phrase, and its
+        # frame follows the ribbon being expanded or collapsed, which a constant cannot.
+        # The editor area names itself, but its OWN frame lags a ribbon expand or
+        # collapse — measured once as y=89 h=594 while its parent scroll area already
+        # reported the settled y=144 h=540. So the pane is the smallest framed container
+        # whose subtree holds that titled element: identified by the title, measured by
+        # the container that has re-laid out.
+        holders = [
             node
             for node in walk(window)
-            if node.role == pane_role and node.frame is not None and node.frame.width > 0
-        ]
-        if not panes:
-            raise GeometryError(
-                f"no {pane_role} with a frame in the document window; pass --pane-role or --pane-frame"
+            if node.frame is not None
+            and node.frame.width > 0
+            and node.frame.height > 0
+            and any(
+                (inner.title or "").startswith(EDITOR_PANE_TITLE_PREFIX)
+                for inner in walk(node)
+                if inner is not node
             )
-        widest = max(panes, key=lambda node: node.frame.width * node.frame.height)  # type: ignore[union-attr]
-        assert widest.frame is not None
-        pane, source["paneSource"] = widest.frame, "accessibilityTree"
+        ]
+        if not holders:
+            raise GeometryError(
+                f"no framed container holds an element titled {EDITOR_PANE_TITLE_PREFIX!r}*; "
+                "pass --pane-frame with a measured x,y,w,h"
+            )
+        smallest = min(holders, key=lambda node: node.frame.width * node.frame.height)  # type: ignore[union-attr]
+        assert smallest.frame is not None
+        pane, source["paneSource"] = smallest.frame, "editorPaneContainer"
+        source["paneRole"] = smallest.role
     else:
         source["paneSource"] = "operatorOverride"
     if zoom is None:
@@ -1013,59 +1288,67 @@ def read_canvas_geometry(
     )
 
 
-def _animated_label(backend: AXBackend, slide_index: int) -> str | None:
-    """The slide's thumbnail title once it carries an animation, else None.
-
-    This is the acceptance gate for a target: the ribbon read-back says what the effect
-    is, but the thumbnail label is what says PowerPoint actually attached one.
-    """
-    label = thumbnail_label(backend, slide_index)
-    return label if has_animation(label) else None
-
-
 def capture_target(
     backend: AXBackend,
     target: dict[str, Any],
     settings: CaptureSettings,
     geometry: CanvasGeometry,
+    shape_name: str,
 ) -> dict[str, Any]:
-    """Drive one target end to end and return its record, successful or not."""
+    """Drive one target end to end and return its record, successful or not.
+
+    The order matters and is not the order it used to be. The press is followed by the
+    save, and only then by verification, because the verification **is** a read of the
+    saved package: the slide must have gained exactly one effect and that effect must
+    target the clicked shape. A save failure is therefore a rejected record rather than a
+    footnote on a passing one — without the save there is no evidence either way.
+    """
     timeout = settings.timeout
+    slide_index = target["slideIndex"]
+    carried: dict[str, Any] = {"shape_name": shape_name}
     try:
-        point = geometry.point_for(settings.document, target["slideIndex"], settings.shape_name)
-        select_slide(backend, target["slideIndex"], timeout=timeout)
-        select_shape(backend, point, target["guiPath"][1], timeout=timeout)
+        carried["shape_spid"] = spid = read_shape_spid(settings.document, slide_index, shape_name)
+        before = read_slide_effects(settings.document, slide_index)
+        carried["click_point"] = select_shape(
+            backend,
+            geometry,
+            settings.document,
+            slide_index,
+            shape_name,
+            target["guiPath"][1],
+            timeout=timeout,
+        )
         result = press_path(
             backend,
             target["guiPath"],
             timeout=timeout,
             alternatives=tuple(target.get("titleAlternatives", ())),
         )
-        label = wait_until(
-            backend,
-            lambda: _animated_label(backend, target["slideIndex"]),
-            timeout=timeout,
-            what=f"slide {target['slideIndex']}'s thumbnail to gain {HAS_ANIMATION!r}",
-        )
+        carried["matched_title"] = result.matched_title
+        carried["steps"] = result.as_dicts()
     except TargetFailure as exc:
-        return capture_record(target, rejected=True, error=exc.as_error())
+        return capture_record(target, rejected=True, error=exc.as_error(), **carried)
 
-    readback = ribbon_readback(backend)
-    saved, save_error = True, None
-    if settings.save_each:
-        try:
-            press_save(backend, settings.document, timeout=timeout)
-        except TargetFailure as exc:
-            saved, save_error = False, exc.as_error()
+    try:
+        press_save(backend, settings.document, timeout=timeout)
+    except TargetFailure as exc:
+        return capture_record(
+            target, rejected=True, error=exc.as_error(), save_error=exc.as_error(), **carried
+        )
+    carried["saved"] = True
+
+    try:
+        after = read_slide_effects(settings.document, slide_index)
+        carried["effect_count"] = (len(before), len(after))
+        carried["effect"] = attribute_new_effect(before, after, spid)
+    except TargetFailure as exc:
+        return capture_record(target, rejected=True, error=exc.as_error(), **carried)
+
     return capture_record(
         target,
         applied=" > ".join(target["guiPath"]),
-        matched_title=result.matched_title,
-        readback=readback,
-        thumbnail=label,
-        steps=result.as_dicts(),
-        saved=saved,
-        save_error=save_error,
+        readback=ribbon_readback(backend),
+        **carried,
     )
 
 
@@ -1078,6 +1361,7 @@ def run_capture(
 ) -> dict[str, Any]:
     """Run a whole plan. Returns the summary; writes the read-back incrementally."""
     targets = list(plan.get("targets", []))
+    shape_names = plan_shape_names(plan)
     settings.out_dir.mkdir(parents=True, exist_ok=True)
     existing = read_records(settings.readback_path)
     todo, skipped = split_plan(targets, existing, force=settings.force)
@@ -1105,7 +1389,7 @@ def run_capture(
 
         written: list[dict[str, Any]] = []
         for target in todo:
-            record = capture_target(backend, target, settings, geometry)
+            record = capture_target(backend, target, settings, geometry, shape_names[target["key"]])
             written.append(record)
             stream.write(json.dumps(record, ensure_ascii=False) + "\n")
             stream.flush()
@@ -1119,11 +1403,13 @@ def run_capture(
         "readback": str(settings.readback_path),
         "package": str(settings.package_path) if settings.package_path.exists() else None,
         "planned": len(targets),
+        "slides": sorted({target["slideIndex"] for target in targets}),
         "skippedAlreadyCaptured": len(skipped),
         "attempted": len(written),
         "captured": len(written) - len(failures),
         "failed": len(failures),
-        "saveFailures": sum(1 for record in written if not record["rejected"] and not record["saved"]),
+        "attributed": sum(1 for record in written if record["attributed"]),
+        "saveFailures": sum(1 for record in written if record["saveError"]),
         "retainedRecords": len(keep),
         "canvas": {
             "slideSizePt": list(geometry.slide_size_pt),
@@ -1132,7 +1418,14 @@ def run_capture(
             **geometry.source,
         },
         "failures": [
-            {"key": record["catalogKey"], "slideIndex": record["slideIndex"], "error": record["error"]}
+            {
+                "key": record["catalogKey"],
+                "slideIndex": record["slideIndex"],
+                "shapeName": record["shapeName"],
+                "shapeSpid": record["shapeSpid"],
+                "attributedSpid": record["attributedSpid"],
+                "error": record["error"],
+            }
             for record in failures
         ],
     }
@@ -1175,10 +1468,6 @@ class LiveAXNode:
         return True if value is None else bool(value)
 
     @property
-    def selected(self) -> bool:
-        return bool(self._attribute(self._ax.kAXSelectedAttribute))
-
-    @property
     def frame(self) -> Frame | None:
         position = self._attribute(self._ax.kAXPositionAttribute)
         size = self._attribute(self._ax.kAXSizeAttribute)
@@ -1200,13 +1489,9 @@ class LiveAXNode:
         if error:
             raise TargetFailure(f"AXPress on {self.title!r} ({self.role}) failed with AX error {error}")
 
-    def select(self) -> None:
-        error = self._ax.AXUIElementPerformAction(self._element, self._ax.kAXPressAction)
-        if not error:
-            return
-        error = self._ax.AXUIElementSetAttributeValue(self._element, self._ax.kAXSelectedAttribute, True)
-        if error:
-            raise TargetFailure(f"neither AXPress nor AXSelected worked on {self.title!r}: AX error {error}")
+    # There is deliberately no ``select``. The 2026-10-31 run proved ``kAXSelected`` never
+    # reads back true on this build's navigator cells, and nothing else here selects by
+    # attribute: a shape is selected by a click and verified from the saved package.
 
 
 class LiveAXBackend:
@@ -1284,13 +1569,15 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--out", type=Path, help="output directory for the read-back and the package")
     parser.add_argument("--document", type=Path, help="the already-saved capture deck PowerPoint has open")
     parser.add_argument("--expect-document", help="window title to require; defaults to the document's stem")
-    parser.add_argument(
-        "--shape-name",
-        help="name of the shape to click on each slide; defaults to the plan's own shapeName",
-    )
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT, help="bound on every wait, in seconds")
-    parser.add_argument("--force", action="store_true", help="re-capture targets that already have a record")
-    parser.add_argument("--no-save", action="store_true", help="skip the per-target Save (loses crash resilience)")
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help=(
+            "re-capture targets that already have a record; regenerate the deck first, because a "
+            "re-press replaces the shape's existing effect and the attribution needs a new one"
+        ),
+    )
     parser.add_argument("--pane-role", default=EDITOR_PANE_ROLE, help="AX role of the slide editor pane")
     parser.add_argument("--pane-frame", help="measured editor pane frame in screen points as x,y,w,h")
     parser.add_argument("--zoom", type=float, help="measured zoom factor, e.g. 0.92, when the status bar hides it")
@@ -1338,22 +1625,17 @@ def main(argv: Sequence[str] | None = None) -> int:
     except ValueError as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
         return 2
-    shape_name = args.shape_name or plan.get("shapeName")
-    if not shape_name:
-        print(
-            "FAIL: the plan carries no shapeName (it is settled by gui_capture_plan.py --generate); "
-            "pass --shape-name with the name the deck's shape actually has",
-            file=sys.stderr,
-        )
+    try:
+        plan_shape_names(plan)
+    except DriverRefusal as exc:
+        print(f"FAIL: {exc}", file=sys.stderr)
         return 2
     settings = CaptureSettings(
         out_dir=args.out,
         document=args.document,
         expect_document=args.expect_document,
-        shape_name=shape_name,
         timeout=args.timeout,
         force=args.force,
-        save_each=not args.no_save,
         pane_role=args.pane_role,
         pane=pane,
         zoom=args.zoom,

@@ -107,6 +107,8 @@ no addressable element.
 - **`computer_get_state` is reliable**, and the ribbon is fully enumerated:
   every gallery tile, the Duration incrementor, the Sound popup, the advance
   checkboxes, and each thumbnail's `Has Transition` / `Has Animation` state.
+  Enumerated is not the same as drivable: the thumbnails have titles and no
+  actions, which is the subject of "Why the driver does not select slides".
 - **`computer_perform_action` with `element_index` works**, including on
   main-window elements and on elements scrolled **outside** the visible band.
   Pressing a tile at window `x=1448` inside a 320-pixel-wide gallery applies
@@ -148,11 +150,16 @@ and never assume the first read enumerated the whole gallery.
 
 Both were measured, and together they rule out the obvious shortcuts.
 
-**A gallery press replaces the shape's effect; it does not add one.** There is
-no Add Animation button on this build. Pressing Lines, then Appear, then a
-third tile on one shape leaves **one** effect — the last. A batch therefore
-needs **one slide per value**, not one slide with a stack of them, and a
-saved package's `p:timing` for slide N is evidence about value N alone.
+**A gallery press replaces the effect of the selected shape; it does not add
+one.** There is no Add Animation button on this build. Pressing Lines, then
+Appear, then a third tile on one shape leaves **one** effect — the last. A batch
+therefore needs **one shape per value**, not one shape with a stack of them. It
+does *not* need one slide per value: what the press is scoped to is the
+selection, so one slide carrying many well-separated shapes works, and each
+effect in the saved `p:timing` says which shape it belongs to through
+`p:spTgt/@spid`. That is how the driver attributes a capture — see
+"Why the driver does not select slides" below for why it is also the only shape
+that works.
 
 **Indices shift as soon as a press scrolls the gallery.** `perform_action`
 keeps the state across consecutive actions, so several presses can share one
@@ -163,9 +170,10 @@ Checkerboard was Shape. A press aimed by a stale index applies the wrong
 effect and the record names the right one, which is worse than failing.
 **Re-read before every press.**
 
-So the real cost per value is four calls — select the slide, select the shape,
-read, press — of which the two clicks invalidate the state the press needs.
-Plan one save per deck, and size a batch by the number of slides in it.
+So the real cost per value is three calls — select the shape, read, press — of
+which the click invalidates the state the press needs. (It was four while a
+slide had to be selected too; that step is gone, and the next section says why.)
+Size a batch by the number of shapes in it.
 
 Set `max_tree_nodes: 1` before a run of presses when you do not need the tree:
 a press returns a refreshed tree at the budget of the last read, and the full
@@ -202,7 +210,50 @@ Other measured coordinates, window-relative (add the window origin):
 | Duration (read-back) | x=1204,y=78 78x24 | — |
 | Sound (read-back) | x=1180,y=109 102x26 | — |
 | Save (Quick Access) | x=221,y=5 30x30 | 236, 20 |
-| Thumbnail cell *n* | x=0,y=150+130(n-1) 250x118 | 125, 209+130(n-1) |
+
+The slide-navigator thumbnail geometry that used to sit in this table has been
+removed rather than corrected. It was never usable — see the next section.
+
+## Why the driver does not select slides
+
+Measured 2026-10-31 by a live run of the driver's first version, which selected
+a slide per target. Against a 76-target plan on a 76-slide deck it returned
+**76 records, 0 captured, 76 rejected**, with `steps` empty on every record:
+nothing reached a control. Two distinct causes, both inside slide selection.
+
+**The navigator's cells expose no actions.** `select_slide` pressed the cell,
+then set `kAXSelected`, then waited, bounded, for `AXSelected` to read back
+true. A manual read of the live tree showed
+`cell "Slide 1 of 17 Slides"` with **no `[AXPress]`** and no other action, and
+the attribute never became true, so slides 1 to 6 each ended in a 6-second
+timeout. The only thing that selected a slide by hand was a synthetic
+**global click on the cell's own frame** — which is a pointer takeover per
+target on top of the one the canvas already needs.
+
+**Only the cells scrolled into view exist.** The navigator publishes **6** of
+76 cells; the rest are not in the tree at all. Slides 7 to 76 were therefore
+rejected as `slide N is outside the 6 thumbnail cells read`. Position-indexing
+cannot reach a cell the application has not materialized, and reaching them
+would need scrollbar arithmetic plus title matching plus a status-bar
+cross-check — three more assumptions with no offline check.
+
+The fix was to stop needing slide selection. `gui_capture_plan.py` now builds
+**one slide carrying one named shape per target**, checked so that a click at
+any shape's centre cannot land on a neighbour, and `gui_capture.py` selects a
+target by clicking its own shape. Attribution got stronger rather than weaker:
+each effect in the saved `p:timing` carries `p:spTgt/@spid`, and the slide's
+`p:cNvPr/@id` and `@name` map that back to the shape and so to the target, which
+survives reordering and catches a mis-aimed click. "Slide N is target N" did
+neither.
+
+Two consequences worth keeping in mind for manual work in this file's other
+steps:
+
+- the `Has Animation` thumbnail marker is **not** per-target evidence on a
+  one-slide deck. It says the slide has an animation, which it does after the
+  first capture. Read `p:spTgt/@spid` instead.
+- a deck of 76 slides is still fine to *read* by hand; it is driving the
+  navigator that does not work.
 
 Effect Options opens as its own window titled `Effect Options`, whose items
 are `menubutton`s. Activate one with `computer_perform_action` + `AXPress`; a
@@ -221,11 +272,11 @@ uv run --with pyobjc-framework-ApplicationServices --with pyobjc-framework-Cocoa
   --with pyobjc-framework-Quartz python …
 ```
 
-So the four calls per value — select the slide, select the shape, read, press —
-are a loop inside one process rather than four agent turns, and the two rules
-that make the tool contract awkward (one explicit read per action, a popup being
-invisible to the read that opened it) stop being rules to remember: the driver
-re-reads before every press by construction.
+So the calls per value — select the shape, read, press, save — are a loop inside
+one process rather than that many agent turns, and the two rules that make the
+tool contract awkward (one explicit read per action, a popup being invisible to
+the read that opened it) stop being rules to remember: the driver re-reads before
+every press by construction.
 
 `scripts/animation_catalog/gui_capture.py` is that driver and
 `gui_capture_plan.py` derives its target list from the catalog's own
@@ -257,10 +308,12 @@ Each of these was needed to write the driver and was not here:
   screen (570.2, 373.4). This assumes the slide is **centred** in the pane,
   which holds when the canvas is not scrolled.
 - **sdpm names a shape from its geometry, not from the element id.** The capture
-  deck asks for an element called `target` and the package carries
-  `Rounded Rectangle 1`. The driver needs the name in the file, so
-  `gui_capture_plan.py --generate` reads it back out of the package and writes
-  it into the plan rather than either side assuming it.
+  deck asks for elements called `target001`… and the package carries
+  `Rounded Rectangle 1`, `Rounded Rectangle 3`, and so on — and that first shape's
+  **`p:cNvPr/@id` is `2`, not `1`**, so the name and the `spid` are two different
+  numbers and both have to be read. `gui_capture_plan.py --generate` matches each
+  target to the shape at the position the grid asked for and writes the name it
+  finds into the plan, rather than either side assuming one.
 - **A direction entry does not imply a GUI path.** The `Effect Options`
   direction labels depend on which effect is applied — Fly In offers
   `From Bottom`, Wheel offers `1 Spoke` — so Step 8's measurement is
@@ -282,9 +335,10 @@ guessing. Correct this section after the first run.
 | Assumption | If it is wrong |
 | --- | --- |
 | The slide editor pane is an `AXSplitGroup` with a frame | `--pane-role` or `--pane-frame` overrides it; a wrong pane makes the click miss and the gallery stay disabled, which is a recorded timeout |
-| Slide thumbnails are `AXRow` elements in slide order, selectable with `AXPress` or `kAXSelected` | the driver tries `AXPress` then the attribute and records which worked |
 | The status bar exposes the zoom as an element titled e.g. `92%` | `--zoom` takes a measured value |
-| A gallery is disabled until a shape is selected, so its becoming enabled confirms the canvas click | the confirmation is indirect; a selection that silently fails would press a disabled-looking but enabled gallery |
+| A click at a shape's centre selects that shape and nothing else, with the slide unscrolled and the 76 shapes 14 pt apart | the press lands on another shape, which the saved package then shows as an effect on the wrong `spid`: a rejected record naming both, not a wrong value |
+| PowerPoint writes one `p:cTn` with a `presetClass` per applied effect, with the target shape's `spid` beneath it | attribution reads nothing and every target is rejected as `effectNotAdded`, loudly and on the first target |
+| `Save` writes the new effect into the file before the next read | the attribution reads a stale package and rejects, rather than crediting the wrong effect |
 | The `Path Animation` window lists presets directly, without a `Basic` grouping level | an extra level in the path is tolerated and recorded as `groupAbsent` |
 | `Save` in the Quick Access toolbar overwrites in place with no Save As sheet | the driver waits, bounded, for the file to change and records a save failure per target |
 
