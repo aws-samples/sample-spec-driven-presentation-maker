@@ -38,8 +38,9 @@ Making that work would have needed scrollbar arithmetic, title matching and a st
 cross-check: three more assumptions nothing offline can check. So slide selection is
 **gone**, along with the thumbnail-position lookup and the ``Has Animation`` thumbnail
 check that depended on it. ``gui_capture_plan.py`` now puts every target's shape on **one
-slide**, and a target is selected by clicking its own shape. Do not reintroduce either
-function; ``tests/test_animation_gui_capture.py`` fails if their names come back.
+slide**, and a target is selected through that shape's own Selection Pane row. Do not
+reintroduce either function; ``tests/test_animation_gui_capture.py`` fails if their names
+come back.
 
 ## What it assumes, measured rather than guessed
 
@@ -47,7 +48,7 @@ Every mechanic below is recorded in ``computer-use.md`` and is not re-derived he
 
 - A gallery press **replaces** the effect of the **selected shape** rather than adding
   one. That is what makes one slide of many shapes work: each target owns a shape, and
-  each press lands on the shape the click selected.
+  each press lands on the shape whose row was selected.
 - Tile indices shift as soon as a press scrolls a gallery, and galleries lazily
   materialize tiles. Nothing positional is ever cached: the tree is re-read and every
   control re-resolved **by title** immediately before each press.
@@ -55,32 +56,113 @@ Every mechanic below is recorded in ``computer-use.md`` and is not re-derived he
   are ``AXMenuButton``s activated with ``AXPress``.
 - The ribbon exposes a read-back directly: the ``Start:`` popup's value and the
   ``Duration:`` incrementor's value. Both are recorded as evidence; neither is the gate.
-- Canvas shapes have **no AX element**. They are selected with a synthetic mouse event
-  at a point derived from the package geometry, the live editor-pane frame and the live
-  zoom — never a hardcoded coordinate.
+- Canvas shapes have **no AX element**, but their **Selection Pane rows do**, and a row
+  is how a shape is selected here. See the next section.
+
+## There is no coordinate click here either, and that is the second deletion
+
+Shape selection used to be a synthetic global mouse event at a point derived from the
+package geometry, the live editor-pane frame and the live zoom. It never became
+reliable. The operator watched a run and reported the pointer landing in the right place
+while the shape stayed unselected, and the same click by hand always working. Pacing the
+event — ``kCGMouseEventClickState``, a settle before the button-down, a hold, and a
+0.35 s settle after the up — improved it without fixing it: the last run of that version
+captured **2 of 12** attempted targets and recorded ``effectNotAdded`` with "no new
+effect appeared" for the other ten, which is the signature of a click that did not
+change the selection, so the gallery press replaced the *previously* selected shape's
+effect.
+
+The replacement needs no coordinates, no pointer and no timing. ``Home ▸ Arrange ▸
+Selection Pane...`` opens an ``AXOutline`` in the document window carrying one ``AXRow``
+per shape, in reverse z-order. A row's own ``title`` is ``None``; the shape's name is the
+``value`` of a descendant ``AXStaticText``. A row has no ``AXPress`` — its actions are
+``AXShowDefaultUI``, ``AXShowAlternateUI`` and a Rename — so it is selected by **setting
+``AXSelected``**, the standard outline-row mechanism, and the row is then read back to
+confirm.
+
+So ``read_canvas_geometry``, ``canvas_point``, ``read_shape_center_pt``, ``parse_zoom``,
+``parse_pane_frame``, ``window_frame_to_screen``, the ``Frame`` type, ``AXNode.frame``,
+``AXBackend.click``, ``EDITOR_PANE_ROLE``, ``EDITOR_PANE_TITLE_PREFIX`` and the
+``--pane-frame`` / ``--pane-role`` / ``--zoom`` options are **gone**, not deprecated.
+Nothing in the driver reads a frame or posts an event any more. Do not reintroduce a
+coordinate click: 2 of 12 is what it was worth, and
+``tests/test_animation_gui_capture.py`` fails if those names come back.
+
+## Cost is a correctness property here, and it was measured
+
+A run of the previous version captured **7 targets in 28 minutes** — about four minutes
+each, every one correct and attributed. The Selection Pane mechanism worked; it was far
+too slow to reach 76. Timed live against the real window, best of three:
+
+    find_all_by_title(window, "Save")   one full window walk    6.4 s
+    selection_outline(backend)                                 17.8 s
+    walking only the outline (762 nodes)                        4.1 s
+    row_names over 152 rows                                     4.3 s
+
+The document window is **907 nodes, 762 of them the Selection Pane's rows**, and every
+accessibility attribute read is an interprocess round trip, so a full walk is thousands
+of them. The dominant cost was full-tree walking, not saving, and two things made it
+worse than it had to be: ``document_window`` identified the ribbon-carrying window by
+calling ``find_all_by_title`` on **each** of PowerPoint's four or five same-titled
+windows — several full walks per call, from a function nearly every helper calls — and
+every other lookup started at the window, so resolving a ribbon control traversed all
+762 pane rows and resolving a row traversed the ribbon.
+
+Four changes, in descending order of what they were worth:
+
+1. **Lookups are scoped to a container.** ``Save`` is resolved in the window's
+   ``AXToolbar``, every ribbon tab, gallery and read-back in the ribbon ``AXTabGroup``,
+   and every pane row in the ``AXOutline``. A container is found by a search of the
+   window's top levels that **stops at every container boundary** rather than descending
+   through one, so it costs the window's structure instead of its contents. A scope that
+   cannot be identified **raises** — it never widens back to the window, because a
+   lookup that quietly walked everything is exactly what this removed.
+2. **``document_window`` reads two levels.** The ribbon tab group is a top-level child,
+   so the probe that tells the document window from its same-titled siblings is a
+   depth-2 container search instead of a full walk per candidate.
+3. **Containers are resolved once per stretch of work**, by :class:`Containers`, and
+   dropped at **every** press, every ``AXSelected`` write and every poll of a bounded
+   wait. The rule that a press is aimed by a title re-resolved immediately beforehand is
+   untouched; what changed is that the re-resolution happens inside the container.
+4. **One Save judges a batch of targets** rather than one. Worth the least of the four,
+   because saving was never the dominant cost, and the only thing it gives up is stated
+   in :func:`capture_batch` rather than implied.
 
 ## Attribution, not position, is the evidence
 
 Because every target shares one slide, "slide N is target N" is no longer available —
-and it was never worth much, since it survived no reordering and no mis-aimed click. In
-its place each target is verified against the package it just saved: the slide's effect
-count must have grown by **exactly one**, and that new effect's ``p:spTgt/@spid`` must be
-the ``p:cNvPr/@id`` of the shape the driver clicked. A new effect on another shape is a
+and it was never worth much, since it survived no reordering and no mis-selected shape.
+In its place each target is verified against the package it just saved: the slide must
+have gained at least one effect, and **every** new effect's ``p:spTgt/@spid`` must be the
+``p:cNvPr/@id`` of the shape the driver selected. A new effect on another shape is a
 ``rejected`` record naming **both** spids, not a pass; a press that added nothing is a
-recorded failure. The record carries the shape name, the expected spid, the attributed
-spid and the new effect's own ``p:cTn`` attributes, so merged evidence is per target even
-though ``--parse-oracle`` joins every record to the same slide.
+recorded failure. The record carries the shape name, the Selection Pane row it selected,
+how the selection was made, the expected spid, the attributed spid and the new effect's
+own ``p:cTn`` attributes, so merged evidence is per target even though ``--parse-oracle``
+joins every record to the same slide.
 
-This also makes the per-target save part of the measurement rather than only crash
-insurance, so it is no longer optional.
+This gate is unchanged by the move to the Selection Pane, deliberately: it is what
+proved the click unreliable, and it is the only thing that makes a capture evidence.
 
-## It moves the real pointer
+This also makes the save part of the measurement rather than only crash insurance, so it
+is no longer optional.
 
-Selecting a shape posts a global mouse event, so the **pointer physically moves** to
-the slide canvas and the click lands wherever the frontmost window is. That is the one
-part of the loop with no addressable element. The driver therefore refuses to start
-unless PowerPoint is frontmost and its document window is the expected capture deck, so
-it cannot click into the operator's own work. Do not use the machine during a run.
+A batch of targets shares one save, and each is still attributed by **its own** ``spid``
+against a real saved package: the batch adds the gate that no spid outside the batch may
+have gained an effect, and a target whose own spid gained nothing is rejected on its own
+with the rest of the batch still credited. What batching gives up is crash granularity
+and the ability to separate two targets **inside** one batch that swapped effects;
+``--batch-size 1`` gives both back at one save per target. :func:`capture_batch` says so
+in full.
+
+## It does not move the pointer
+
+Every action the driver sends is an ``AXPress`` or a single ``AXSelected`` write, so the
+**pointer is never moved and no mouse event is ever posted**. The operator's machine
+stays usable, and a stray window in front of PowerPoint cannot swallow a click, because
+there is no click. The frontmost-and-expected-document guard is still enforced before
+anything is sent: an ``AXPress`` goes to whichever window the title resolution found, and
+a wrong document would mean pressing ribbon controls over the operator's own work.
 
 ## Failure is recorded, never fatal and never silent
 
@@ -101,9 +183,17 @@ can be joined offline:
 Usage::
 
     uv run --with pyobjc-framework-ApplicationServices --with pyobjc-framework-Cocoa \\
-      --with pyobjc-framework-Quartz \\
+      --with lxml \\
       python scripts/animation_catalog/gui_capture.py \\
         --plan plan.json --out /abs/out --document /abs/capture-deck.pptx --drive-powerpoint
+
+Three dependencies, and that is the whole list. **Quartz is not among them**: the only
+binding that needed it was the mouse event, and it went when the coordinate click did.
+``lxml`` is: the package readers import it lazily inside the function, which keeps it off
+the import path of ``--help``, and a run outside this repository's environment then fails
+with ``ModuleNotFoundError: No module named 'lxml'`` at the first attribution unless the
+invocation asks for it. Inside the repository ``uv run`` already provides it; naming it
+costs nothing and makes the line correct anywhere.
 
 ``--help``, ``--emit-record-schema`` and every pure function here work without pyobjc;
 the accessibility bindings are imported lazily inside the live backend so importing this
@@ -115,13 +205,12 @@ from __future__ import annotations
 import argparse
 import json
 import plistlib
-import re
 import shutil
 import sys
 import time
 import zipfile
 from collections import Counter
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any, Callable, Iterator, Protocol, Sequence, runtime_checkable
@@ -162,11 +251,8 @@ EFFECT_MARKER_ATTRIBUTE = "presetClass"
 START_LABEL = "Start:"
 DURATION_LABEL = "Duration:"
 
-#: Quick Access toolbar button, pressed after every target so a crash costs one target.
+#: Quick Access toolbar button, pressed once per batch of targets.
 SAVE_LABEL = "Save"
-
-#: 914400 EMU per inch, 72 points per inch.
-EMU_PER_POINT = 12700
 
 #: Bounds on a tree scan. Exceeding either is an error rather than a "not found", so a
 #: truncated scan can never be mistaken for an absent control.
@@ -177,20 +263,99 @@ MAX_TREE_NODES = 60_000
 DEFAULT_TIMEOUT = 8.0
 POLL_INTERVAL = 0.2
 
-#: The editor pane's role and the status-bar zoom button's title form, both resolved from
-#: the live tree. ``computer-use.md``'s coordinate table is a fallback for a control with
-#: no element, not a source of these.
-EDITOR_PANE_ROLE = "AXSplitGroup"
+#: How many targets are pressed before one Save judges them all. See :func:`capture_batch`
+#: for what batching buys and what it gives up; ``--batch-size 1`` is the per-target save.
+DEFAULT_BATCH_SIZE = 10
 
-#: The slide editor area names itself, and its own frame is what the canvas mapping
-#: needs. Resolving it by title rather than by role-and-size is what keeps the mapping
-#: right when the ribbon collapses and the pane grows.
-EDITOR_PANE_TITLE_PREFIX = "Slide Editor Pane"
+# --- the window's containers, which is what a lookup is scoped to -----------
+# Measured live on 2026-11-01, best of three, against the real window:
+#
+#     find_all_by_title(window, "Save")   one full window walk    6.4 s
+#     selection_outline(backend)                                 17.8 s
+#     walking only the outline (762 nodes)                        4.1 s
+#     row_names over 152 rows                                     4.3 s
+#
+# The document window is 907 nodes and 762 of them are the Selection Pane's rows, and
+# every accessibility attribute read is an interprocess round trip, so a full walk is
+# thousands of them. A run of that driver captured 7 targets in 28 minutes — every one
+# correct and attributed, and four minutes each.
+#
+# The cost was never the saving. It was that every lookup walked the *whole* window:
+# resolving a ribbon control traversed all 762 pane rows, resolving a pane row traversed
+# the ribbon, and ``document_window`` walked each of PowerPoint's four or five
+# same-titled windows looking for the one carrying the ribbon — several full walks per
+# call, from a function nearly every helper calls.
+#
+# So a lookup now names the one container that is certain to hold what it wants, and a
+# container is found by a search of the window's top levels that never descends into a
+# container. A scope that is wrong raises; it never silently widens back to the window.
+
+#: Holds ``Save``.
+TOOLBAR_ROLE = "AXToolbar"
+
+#: Holds the ribbon: the tab strip, and the active tab's command galleries beneath it.
+RIBBON_ROLE = "AXTabGroup"
+
+#: Depth bound on a container search, as a backstop to the pruning above. The containers
+#: sit in the window's top few levels; a bound rather than no bound means a tree that is
+#: not shaped as measured fails loudly instead of walking everything.
+CONTAINER_DEPTH = 8
+
+#: Node bound on a container search. Smaller than :data:`MAX_TREE_NODES` on purpose: a
+#: container search that visits thousands of nodes has stopped being a container search,
+#: and finding that out is worth more than completing it.
+MAX_CONTAINER_NODES = 4_000
+
+#: Depth of the probe that tells the document window from PowerPoint's other same-titled
+#: windows. The ribbon tab group is a top-level child, so two levels is enough, and that
+#: is the whole point: this probe replaced a full walk of every candidate window.
+RIBBON_PROBE_DEPTH = 2
 
 #: A ribbon tab that is present whatever is selected and whatever tab is active. Used to
-#: tell PowerPoint's two same-titled windows apart: only one of them carries the ribbon.
+#: tell PowerPoint's two same-titled windows apart: only one of them carries the ribbon,
+#: and it is also the tab the Selection Pane is opened from.
 RIBBON_ANCHOR_TAB = "Home"
-ZOOM_TITLE_PATTERN = re.compile(r"^\s*\d+(?:\.\d+)?\s*%\s*$")
+
+#: ``Home ▸ Arrange`` is an ``AXMenuButton``; pressing it opens a window titled
+#: ``Arrange`` holding an ``AXMenuButton`` titled ``Selection Pane...``, and pressing
+#: *that* opens the pane inside the document window that carries the ribbon. Walked by
+#: :func:`press_path`, so each step is resolved by title against a fresh read.
+SELECTION_PANE_PATH = (RIBBON_ANCHOR_TAB, "Arrange", "Selection Pane...")
+
+#: The pane itself, and the row and label roles inside it. A row's own ``title`` is
+#: ``None``: the shape's name is the ``value`` of a descendant ``AXStaticText``. The
+#: outline is also the window's third container, and the large one: 762 of the live
+#: window's 907 nodes are inside it.
+SELECTION_PANE_ROLE = "AXOutline"
+SELECTION_ROW_ROLE = "AXRow"
+SELECTION_LABEL_ROLE = "AXStaticText"
+
+#: Every container role. A container search stops at each of these: the one it wants is
+#: returned without being descended into, and any other is pruned, because nothing above
+#: a container is reachable only through one. This is what keeps the search proportional
+#: to the window's structure rather than to its contents — it is the Selection Pane's
+#: 762 rows that make a full walk expensive, and they all sit inside one container.
+CONTAINER_ROLES = (TOOLBAR_ROLE, RIBBON_ROLE, SELECTION_PANE_ROLE)
+
+#: A child title that identifies the one container of a role worth having, for the roles
+#: that turn out not to be unique. The Selection Pane brings its own ``AXTabGroup`` with
+#: it, so the ribbon is the tab group carrying the ribbon's own first tab.
+CONTAINER_ANCHORS = {RIBBON_ROLE: RIBBON_ANCHOR_TAB}
+
+#: How many row names a "no such row" failure lists before truncating. The live pane
+#: carries one row per shape *and* one per label — 153 for a 76-target deck — so the
+#: whole list in a message would bury the name that is missing.
+MAX_REPORTED_ROW_NAMES = 12
+
+#: Recorded per target so a merged evidence file says how each capture was driven. The
+#: previous value of this field was a click point.
+SELECTED_BY = "selectionPaneRow"
+
+#: Windows that are **not** the document window. Each is a transient panel PowerPoint
+#: publishes as its own ``AXWindow``: two from the Animations tab, and the ``Arrange``
+#: menu the Selection Pane is opened from. Listing ``Arrange`` here keeps
+#: :func:`document_window` from mistaking it for the deck while it is open.
+POPUP_WINDOW_TITLES = frozenset({"Effect Options", "Path Animation", SELECTION_PANE_PATH[1]})
 
 
 # --- failures ---------------------------------------------------------------
@@ -231,6 +396,14 @@ class DriverTimeout(TargetFailure):
 
 
 class GeometryError(TargetFailure):
+    """A shape the package does not identify: no such name, or no ``p:cNvPr/@id``.
+
+    The name is historical — it covered screen geometry too, back when a shape's centre
+    was mapped to a click point. The kind is kept as it is because capture records
+    already carry it; what it means now is "the package cannot tell me which shape this
+    target is".
+    """
+
     kind = "geometryError"
 
 
@@ -251,47 +424,15 @@ class EffectNotAdded(TargetFailure):
 
 
 class EffectMisattributed(TargetFailure):
-    """The press added an effect, but to a shape other than the one that was clicked."""
+    """The press added an effect, but to a shape other than the one that was selected."""
 
     kind = "effectMisattributed"
 
 
-# --- geometry ---------------------------------------------------------------
-@dataclass(frozen=True)
-class Frame:
-    """A rectangle in points. Screen frames use the top-left origin AX reports."""
-
-    x: float
-    y: float
-    width: float
-    height: float
-
-    @property
-    def center(self) -> tuple[float, float]:
-        return (self.x + self.width / 2.0, self.y + self.height / 2.0)
-
-    def offset(self, dx: float, dy: float) -> Frame:
-        return Frame(self.x + dx, self.y + dy, self.width, self.height)
-
-
-def emu_to_points(value: int | str) -> float:
-    """Convert an OOXML EMU measurement to points."""
-    return int(value) / EMU_PER_POINT
-
-
-def read_slide_size_pt(package: Path) -> tuple[float, float]:
-    """Return the deck's slide size in points, read from ``ppt/presentation.xml``."""
-    from lxml import etree
-
-    parser = etree.XMLParser(resolve_entities=False, load_dtd=False, no_network=True)
-    with zipfile.ZipFile(package) as archive:
-        root = etree.fromstring(archive.read("ppt/presentation.xml"), parser=parser)
-    size = next((el for el in root.iter() if etree.QName(el).localname == "sldSz"), None)
-    if size is None:
-        raise GeometryError(f"{package.name} has no p:sldSz in ppt/presentation.xml")
-    return emu_to_points(size.get("cx")), emu_to_points(size.get("cy"))
-
-
+# --- what the package says about a shape ------------------------------------
+# There is deliberately no slide size, no EMU conversion and no shape centre here. The
+# driver no longer computes a point on the canvas; it selects a shape by name through its
+# Selection Pane row. See the module docstring for the 2-of-12 run that ended the click.
 def _read_slide_part(package: Path, slide_index: int) -> Any:
     """Parse one slide part, or fail naming the part that is not there."""
     from lxml import etree
@@ -307,13 +448,13 @@ def _read_slide_part(package: Path, slide_index: int) -> Any:
 
 
 def read_slide_shapes(package: Path, slide_index: int) -> list[dict[str, Any]]:
-    """Return every named shape on one slide, with its ``spid`` and its centre in points.
+    """Return every named shape on one slide with its ``spid``.
 
     The ``spid`` is the shape's own ``p:cNvPr/@id``, which is what PowerPoint writes into
-    ``p:spTgt`` when it animates that shape — so this one read supplies both the point to
-    click and the identity the capture is attributed to. The two are **not** the same
-    number: the generated deck's first shape is named ``Rounded Rectangle 1`` and carries
-    ``id="2"``.
+    ``p:spTgt`` when it animates that shape — so the name selects the shape in the
+    Selection Pane and the ``spid`` is the identity the capture is attributed to. The two
+    are **not** the same number: the generated deck's first shape is named ``Rounded
+    Rectangle 1`` and carries ``id="2"``.
     """
     from lxml import etree
 
@@ -332,29 +473,23 @@ def read_slide_shapes(package: Path, slide_index: int) -> list[dict[str, Any]]:
         )
         if props is None:
             continue
-        off = next((el for el in shape.iter() if etree.QName(el).localname == "off"), None)
-        ext = next((el for el in shape.iter() if etree.QName(el).localname == "ext"), None)
-        entry: dict[str, Any] = {"name": props.get("name"), "spid": props.get("id"), "center": None}
-        if off is not None and ext is not None:
-            x, y = emu_to_points(off.get("x")), emu_to_points(off.get("y"))
-            cx, cy = emu_to_points(ext.get("cx")), emu_to_points(ext.get("cy"))
-            entry["center"] = (x + cx / 2.0, y + cy / 2.0)
-        shapes.append(entry)
+        shapes.append({"name": props.get("name"), "spid": props.get("id")})
     return shapes
 
 
 def _shape_by_name(package: Path, slide_index: int, shape_name: str) -> dict[str, Any]:
     """Return one named shape, or fail listing the names the slide does carry.
 
-    A shape the driver cannot find by name is an error rather than an estimate, because
-    clicking an estimated point would select the wrong thing and the record would name
-    the right one.
+    A shape the driver cannot find by name is an error rather than a guess: the name is
+    both what the Selection Pane row is matched on and what the attribution's expected
+    ``spid`` is read from, so an approximate match would attribute one shape's effect to
+    another's record.
     """
     shapes = read_slide_shapes(package, slide_index)
     found = [shape for shape in shapes if shape["name"] == shape_name]
     if len(found) > 1:
         raise GeometryError(
-            f"slide {slide_index} has {len(found)} shapes named {shape_name!r}; a click could not "
+            f"slide {slide_index} has {len(found)} shapes named {shape_name!r}; a press could not "
             "be attributed to one of them"
         )
     if not found:
@@ -363,14 +498,6 @@ def _shape_by_name(package: Path, slide_index: int, shape_name: str) -> dict[str
             f"{sorted({shape['name'] for shape in shapes})}"
         )
     return found[0]
-
-
-def read_shape_center_pt(package: Path, slide_index: int, shape_name: str) -> tuple[float, float]:
-    """Return the named shape's centre on one slide, in points from the slide's top-left."""
-    shape = _shape_by_name(package, slide_index, shape_name)
-    if shape["center"] is None:
-        raise GeometryError(f"shape {shape_name!r} on slide {slide_index} has no a:off/a:ext")
-    return shape["center"]
 
 
 def read_shape_spid(package: Path, slide_index: int, shape_name: str) -> str:
@@ -431,122 +558,181 @@ def attribute_new_effect(
 
     This is the per-target acceptance gate, and it replaced a thumbnail label that only
     ever said *the slide* has an animation — which is not per-target evidence once every
-    target shares a slide. Two distinct failures, because they mean different things:
+    target shares a slide.
 
-    - the effect count did not grow by exactly one. A click that landed on a shape which
-      already carries an effect looks exactly like this, since a gallery press *replaces*
-      that shape's effect, and so does a press that applied nothing at all. It is also
-      what ``--force`` produces against a deck that has already been captured once, which
-      is why ``--force`` wants a freshly generated deck: a re-press on an animated shape
-      cannot produce the new effect this gate requires, and reporting it as a pass would
-      be crediting a target on the strength of a *previous* run's evidence;
-    - exactly one effect appeared but on another shape. The value was applied, just not
-      to this target, so the record names both spids and is rejected rather than
-      crediting the wrong key.
+    The rule is unchanged by the move from a canvas click to a Selection Pane row: **at
+    least one new effect, and every new effect on the shape that was selected**. It is
+    not "exactly one", because a compound value writes several
+    ``p:cTn`` nodes; a run rejected a correctly applied target reporting "0 before and 3
+    after, spids that appeared: ['2']". Two failures are still refused, and they mean
+    different things:
+
+    - **nothing new appeared.** A selection that did not take looks exactly like this,
+      because the press then *replaced* the previously selected shape's effect — which
+      is how the coordinate click was caught, 10 of 12 targets at a time. So does a
+      press that applied nothing. It is also what ``--force`` produces
+      against an already-captured deck, which is why ``--force`` wants a freshly
+      generated one: crediting that would rest on a *previous* run's evidence.
+    - **something appeared on another shape.** The value was applied, just not to this
+      target, so the record names both spids rather than crediting the wrong key.
     """
-    if len(after) != len(before) + 1:
-        appeared = sorted(str(spid) for spid in _spid_counts(after) - _spid_counts(before))
+    added = _spid_counts(after) - _spid_counts(before)
+    if not added:
         vanished = sorted(str(spid) for spid in _spid_counts(before) - _spid_counts(after))
         raise EffectNotAdded(
             f"the slide carried {len(before)} animation effects before the press and {len(after)} "
-            f"after it, so the press did not add exactly one; spids that appeared: "
-            f"{appeared or ['none']}, spids that vanished: {vanished or ['none']}. The clicked "
-            f"shape's spid is {expected_spid!r}",
+            f"after it, and no new effect appeared; spids that vanished: {vanished or ['none']}. "
+            f"The selected shape's spid is {expected_spid!r}, so either the selection did not "
+            "take and the press replaced another shape's effect, or the press applied nothing "
+            "at all",
             expectedSpid=expected_spid,
             effectsBefore=len(before),
             effectsAfter=len(after),
-            appearedSpids=appeared,
+            appearedSpids=[],
             vanishedSpids=vanished,
         )
-    added = _spid_counts(after) - _spid_counts(before)
-    if sum(added.values()) != 1:
-        raise EffectNotAdded(
-            f"the slide gained one effect but {sum(added.values())} spids changed, so no single new "
-            f"effect can be attributed; the clicked shape's spid is {expected_spid!r}",
-            expectedSpid=expected_spid,
-            effectsBefore=len(before),
-            effectsAfter=len(after),
-            appearedSpids=sorted(str(spid) for spid in added),
+    # A gallery press can write MORE than one effect node: a compound value such as an
+    # emphasis colour change arrives as several ``p:cTn`` carrying a ``presetClass``.
+    # Measured: a run reported "0 before and 3 after, spids that appeared: ['2']" and
+    # rejected a target whose value had in fact been applied to exactly the right shape.
+    # So the gate is not "exactly one more effect" — it is "at least one new effect, and
+    # every new effect belongs to the shape that was selected". That still refuses the two
+    # failures worth refusing: nothing appeared, or something appeared elsewhere.
+    # Compared as the values the package carries, not as strings: an effect whose
+    # ``p:spTgt`` names two shapes has ``spid`` ``None``, and stringifying it first loses
+    # the ability to find that effect again and so loses the spids it actually named.
+    foreign = sorted((spid for spid in added if spid != expected_spid), key=str)
+    if foreign:
+        effect = next(
+            (candidate for candidate in after if candidate["spid"] in set(foreign)), None
         )
-    spid = next(iter(added.elements()))
-    effect = next((candidate for candidate in after if candidate["spid"] == spid), None)
-    if spid != expected_spid:
+        spid = foreign[0]
         raise EffectMisattributed(
             f"the press added an effect targeting shape spid {spid!r} (p:spTgt spids "
-            f"{(effect or {}).get('spids')}), but the click was aimed at the shape with spid "
+            f"{(effect or {}).get('spids')}), but the driver selected the shape with spid "
             f"{expected_spid!r}; the effect belongs to another shape, so this target is not captured",
             attributedSpid=spid,
             expectedSpid=expected_spid,
             spTgtSpids=(effect or {}).get("spids"),
             effectCTn=(effect or {}).get("cTn"),
         )
-    if effect is None:  # pragma: no cover - the count arithmetic above makes this impossible
+    # Every new effect belongs to the selected shape. When a compound value wrote several,
+    # the first is returned as the representative and the count is carried so a reader
+    # knows the value is not a single node.
+    mine = [candidate for candidate in after if candidate["spid"] == expected_spid]
+    if not mine:  # pragma: no cover - `added` containing the spid makes this impossible
         raise EffectNotAdded(f"no effect in the saved slide targets spid {expected_spid!r}")
+    effect = dict(mine[0])
+    effect["newEffectCount"] = added[expected_spid]
     return effect
 
 
-def parse_zoom(title: str | None) -> float:
-    """Return the zoom factor from the status bar button's title, e.g. ``92%`` -> 0.92."""
-    match = re.search(r"(\d+(?:\.\d+)?)\s*%", title or "")
-    if not match:
-        raise GeometryError(f"no zoom percentage in status-bar title {title!r}")
-    return float(match.group(1)) / 100.0
+def attribute_batch(
+    before: Sequence[dict[str, Any]],
+    after: Sequence[dict[str, Any]],
+    expected_spids: Sequence[str],
+) -> dict[str, dict[str, Any]]:
+    """Attribute one save to every target in a batch, by each target's own ``spid``.
 
+    Returns ``spid -> effect`` for the targets that gained something. A target whose spid
+    is absent from the result gained nothing and is the caller's to reject **on its own**,
+    with the rest of the batch still credited.
 
-def canvas_point(
-    slide_size_pt: tuple[float, float],
-    shape_center_pt: tuple[float, float],
-    pane: Frame,
-    zoom: float,
-) -> tuple[float, float]:
-    """Return the screen point of a shape's centre on the slide canvas.
+    Raised failures are batch-level, and there is exactly one of them: an **added spid
+    that belongs to no target in the batch**. That is a press the driver cannot account
+    for — an effect on a shape nobody selected — and crediting the batch around it would
+    be asserting that the other presses landed correctly on the strength of a package
+    that says something else happened. The failure names the stray spid.
 
-    ``pane`` is the editor pane's frame in **screen** coordinates and ``zoom`` the live
-    zoom factor. The slide is taken to be centred in the pane, which is what the
-    2026-10-31 measurement showed: a 960x540 pt slide at 92% in a 1258x540 pane at
-    screen (254, 177) puts a shape centred at (140, 190) pt on screen (570.2, 373.4).
+    A batch of one delegates to :func:`attribute_new_effect`, deliberately rather than
+    coincidentally: ``--batch-size 1`` is then not a second code path that behaves
+    similarly, it **is** the per-target gate, with the same failures, the same messages
+    and the same ``detail``.
 
-    Deriving the point is the whole point: the shape has no AX element, so a wrong
-    constant would select nothing and the press would apply to no shape at all.
+    What a batch of n cannot do is separate two targets **inside** it that swapped
+    effects: if each of them gained one effect, the package cannot say whose value is
+    whose. Per-target saving could, which is what ``--batch-size 1`` is for. See
+    :func:`capture_batch` for why the trade is worth making.
     """
-    if zoom <= 0:
-        raise GeometryError(f"zoom must be positive, got {zoom!r}")
-    slide_w, slide_h = slide_size_pt
-    shown_w, shown_h = slide_w * zoom, slide_h * zoom
-    origin_x = pane.x + (pane.width - shown_w) / 2.0
-    origin_y = pane.y + (pane.height - shown_h) / 2.0
-    return (origin_x + shape_center_pt[0] * zoom, origin_y + shape_center_pt[1] * zoom)
+    unique = list(dict.fromkeys(expected_spids))
+    if not unique:
+        return {}
+    if len(unique) == 1:
+        return {unique[0]: attribute_new_effect(before, after, unique[0])}
+
+    added = _spid_counts(after) - _spid_counts(before)
+    expected = set(unique)
+    stray = sorted((spid for spid in added if spid not in expected), key=str)
+    if stray:
+        foreign = [
+            candidate
+            for candidate in after
+            if candidate["spid"] in set(stray) or (None in stray and candidate["spid"] is None)
+        ]
+        raise EffectMisattributed(
+            f"the batch's save added effects targeting shape spids {stray}, and no target in the "
+            f"batch selected any of them; the batch selected {sorted(expected)}. An effect on a "
+            "shape nobody selected means a press landed somewhere this run cannot account for, so "
+            "the whole batch is refused rather than credited around it",
+            attributedSpid=stray[0],
+            straySpids=stray,
+            expectedSpids=sorted(expected),
+            spTgtSpids=sorted({spid for effect in foreign for spid in effect["spids"]}),
+            strayEffectCTn=[effect["cTn"] for effect in foreign],
+        )
+
+    credited: dict[str, dict[str, Any]] = {}
+    for spid in unique:
+        if not added[spid]:
+            continue
+        mine = [candidate for candidate in after if candidate["spid"] == spid]
+        effect = dict(mine[0])
+        effect["newEffectCount"] = added[spid]
+        credited[spid] = effect
+    return credited
 
 
-def parse_pane_frame(text: str | None) -> Frame | None:
-    """Parse an operator-supplied ``x,y,w,h`` editor pane frame in screen points."""
-    if not text:
-        return None
-    parts = [part.strip() for part in text.split(",")]
-    if len(parts) != 4:
-        raise ValueError(f"--pane-frame needs four comma-separated numbers, got {text!r}")
-    try:
-        x, y, width, height = (float(part) for part in parts)
-    except ValueError as exc:
-        raise ValueError(f"--pane-frame is not numeric: {text!r}") from exc
-    if width <= 0 or height <= 0:
-        raise ValueError(f"--pane-frame needs a positive width and height, got {text!r}")
-    return Frame(x, y, width, height)
+def not_added_in_batch(
+    before: Sequence[dict[str, Any]],
+    after: Sequence[dict[str, Any]],
+    expected_spid: str,
+) -> EffectNotAdded:
+    """The failure for one target of a batch whose own spid gained nothing.
 
-
-def window_frame_to_screen(frame: Frame, window_origin: tuple[float, float]) -> Frame:
-    """Convert a window-relative frame to screen coordinates.
-
-    ``computer-use.md`` records the ribbon's frames window-relative, so this is how a
-    figure from that table is turned into something clickable.
+    Worded as :func:`attribute_new_effect` words it, because it means the same thing: the
+    press applied nothing, or it applied to a shape this target did not select. The
+    counts are the batch's, which is what a reader has to know to interpret them — the
+    slide went from n to n+k for k targets, and this target's own spid contributed none
+    of it.
     """
-    return frame.offset(window_origin[0], window_origin[1])
+    appeared = sorted(
+        str(spid) for spid in (_spid_counts(after) - _spid_counts(before)) if spid is not None
+    )
+    vanished = sorted(str(spid) for spid in (_spid_counts(before) - _spid_counts(after)))
+    return EffectNotAdded(
+        f"the slide carried {len(before)} animation effects before this batch and {len(after)} "
+        f"after its save, and no new effect appeared on spid {expected_spid!r}, which is the "
+        f"shape this target selected; spids that did gain an effect: {appeared or ['none']}, "
+        f"spids that vanished: {vanished or ['none']}. Either the press applied nothing or it "
+        "applied to a shape this target did not select",
+        expectedSpid=expected_spid,
+        effectsBefore=len(before),
+        effectsAfter=len(after),
+        appearedSpids=appeared,
+        vanishedSpids=vanished,
+    )
 
 
 # --- the accessibility layer, injectable ------------------------------------
 @runtime_checkable
 class AXNode(Protocol):
-    """One accessibility element. The live and fake implementations share this shape."""
+    """One accessibility element. The live and fake implementations share this shape.
+
+    There is no ``frame`` reader: nothing here needs a rectangle any more, and the one
+    thing that did — the canvas click — is gone. There is no general attribute setter
+    either. ``set_selected`` is the only write, because an outline row is selected by
+    setting ``AXSelected`` and that is the only attribute this driver ever writes.
+    """
 
     @property
     def role(self) -> str: ...
@@ -557,19 +743,22 @@ class AXNode(Protocol):
     @property
     def enabled(self) -> bool: ...
     @property
-    def frame(self) -> Frame | None: ...
+    def selected(self) -> bool: ...
     @property
     def children(self) -> Sequence[AXNode]: ...
     def press(self) -> None: ...
+    def set_selected(self, selected: bool) -> None: ...
 
 
 class AXBackend(Protocol):
-    """Everything the driver needs from the host. Tests supply a fake for all of it."""
+    """Everything the driver needs from the host. Tests supply a fake for all of it.
+
+    No ``click``: the driver posts no mouse events at all. See the module docstring.
+    """
 
     def trusted(self) -> bool: ...
     def frontmost_bundle_id(self) -> str | None: ...
     def windows(self) -> list[AXNode]: ...
-    def click(self, x: float, y: float) -> None: ...
     def now(self) -> float: ...
     def sleep(self, seconds: float) -> None: ...
 
@@ -594,13 +783,105 @@ def walk(root: AXNode, *, max_depth: int = MAX_TREE_DEPTH, max_nodes: int = MAX_
 
 
 def find_all_by_title(root: AXNode, title: str, roles: Sequence[str] | None = None) -> list[AXNode]:
-    """Return every element in ``root`` whose title matches ``title`` exactly."""
+    """Return every element in ``root`` whose title matches ``title`` exactly.
+
+    ``root`` is a **container**, not the window. Passing the window costs a full walk —
+    6.4 s and several thousand interprocess reads live — which is what made the previous
+    driver four minutes per target. See :func:`find_containers`.
+    """
     allowed = set(roles) if roles else None
     return [
         node
         for node in walk(root)
         if node.title == title and (allowed is None or node.role in allowed)
     ]
+
+
+def find_containers(
+    window: AXNode,
+    role: str,
+    *,
+    max_depth: int = CONTAINER_DEPTH,
+    max_nodes: int = MAX_CONTAINER_NODES,
+) -> list[AXNode]:
+    """Return the window's containers of one role, without ever looking inside one.
+
+    This is the search that replaced walking the window. It descends from the window's
+    own children, stops at every node whose role is in :data:`CONTAINER_ROLES` — keeping
+    the one it wants, pruning the rest — and is bounded in depth and node count as a
+    backstop. The cost is therefore the window's structure, a few dozen nodes, rather
+    than its contents: the Selection Pane's 762 rows are behind a container boundary and
+    are never crossed to find the ribbon or the toolbar.
+
+    Exceeding a bound raises, exactly as :func:`walk` does, so a window that is not
+    shaped as measured fails loudly rather than being reported as missing a container.
+    """
+    found: list[AXNode] = []
+    stack: list[tuple[AXNode, int]] = [(child, 1) for child in reversed(list(window.children))]
+    seen = 1
+    while stack:
+        node, depth = stack.pop()
+        seen += 1
+        if seen > max_nodes:
+            raise TreeTooLarge(
+                f"the search for a {role} in the window visited more than {max_nodes} nodes; the "
+                "window is not shaped as measured and a container search has become a tree walk"
+            )
+        node_role = node.role
+        if node_role == role:
+            found.append(node)
+            continue
+        if node_role in CONTAINER_ROLES or depth >= max_depth:
+            continue
+        stack.extend((child, depth + 1) for child in reversed(list(node.children)))
+    return found
+
+
+def window_container(
+    window: AXNode, role: str, *, what: str, absent: str | None = None
+) -> AXNode:
+    """Resolve the one container of a role, or fail saying which it is.
+
+    Absent and ambiguous are kept exactly as :func:`_resolve_in` keeps them, and for the
+    same reason: a scope that cannot be identified must raise rather than widen to the
+    window, because a lookup that quietly walked everything is the cost this whole
+    mechanism exists to remove and it would come back unnoticed.
+    """
+    found = find_containers(window, role)
+    if not found:
+        raise ControlNotFound(
+            absent
+            or (
+                f"the document window holds no {role}, so {what} cannot be looked up; the roles "
+                f"directly under the window are {sorted({child.role for child in window.children})}"
+            )
+        )
+    if len(found) > 1:
+        # Opening the Selection Pane adds a SECOND AXTabGroup to the window — measured
+        # as `Tab bar, 1 tabs`, holding 'Selection Pane' and 'Close Selection Pane' —
+        # so the role alone stopped identifying the ribbon and every target failed with
+        # ambiguousControl. A role that can appear twice names a child title that only
+        # the one we want carries; the ribbon's is its first tab.
+        anchor = CONTAINER_ANCHORS.get(role)
+        if anchor is not None:
+            anchored = [
+                node
+                for node in found
+                if any((child.title or "") == anchor for child in node.children)
+            ]
+            if len(anchored) == 1:
+                return anchored[0]
+        raise AmbiguousControl(
+            f"the document window holds {len(found)} {role} elements and "
+            + (
+                f"{'none' if not anchor else 'more than one'} of them has a child titled "
+                f"{anchor!r}"
+                if anchor is not None
+                else "no child title distinguishes them"
+            )
+            + f"; refusing to guess which one is {what}"
+        )
+    return found[0]
 
 
 def wait_until(
@@ -621,9 +902,17 @@ def wait_until(
     there. An :class:`AmbiguousControl` or a :class:`TreeTooLarge` propagates at once,
     because polling cannot make either of them true and reporting them as a timeout
     would hide what actually went wrong.
+
+    Every poll starts by dropping whatever the caller's :class:`Containers` holds. A
+    wait exists because the tree is expected to change, so reusing a previous poll's
+    window or container would make the poll ask the same question of the same read and
+    spin to the deadline. Within one poll the elements are still shared, which is where
+    the saving is: a predicate that tries several titles resolves its container once.
     """
+    view = held(backend)
     deadline = backend.now() + timeout
     while True:
+        view.stale()
         try:
             result = predicate()
         except swallow:
@@ -639,33 +928,136 @@ def document_window(backend: AXBackend) -> AXNode:
     """Return PowerPoint's document window from a fresh read.
 
     Popups (``Effect Options``, ``Path Animation``) are their own windows, so the
-    document window is identified by being none of them, and the result is never cached:
-    ``computer-use.md`` records that a popup is invisible to the read that opened it and
-    that element identity does not survive between reads.
+    document window is identified by being none of them. PowerPoint then publishes four
+    or five windows carrying the **same document title** and only one of them carries the
+    ribbon; taking the first non-popup picked them inconsistently, and one run reached
+    Save on its first target and then failed every later one with "no element titled
+    'Animations'".
+
+    How that one is identified is the change that matters most for cost. It used to be
+    ``find_all_by_title(window, "Home")`` **per candidate window** — several 6.4 s full
+    walks on every call, from a function nearly every helper calls. The ribbon tab group
+    is a top-level child, so the probe is now two levels deep and reads a few dozen
+    attributes per candidate instead of a few thousand.
+
+    The result is still not cached here: ``computer-use.md`` records that a popup is
+    invisible to the read that opened it and that element identity does not survive
+    between reads. :class:`Containers` is what holds it, for one stretch of work at a
+    time, and drops it at every action.
     """
     windows = backend.windows()
     if not windows:
         raise ControlNotFound("PowerPoint reports no windows")
-    popups = {"Effect Options", "Path Animation"}
-    candidates = [window for window in windows if (window.title or "") not in popups]
+    candidates = [window for window in windows if (window.title or "") not in POPUP_WINDOW_TITLES]
     if not candidates:
         raise ControlNotFound("every PowerPoint window is a popup; no document window")
-    # PowerPoint publishes TWO AXWindows with the SAME document title, and only one of
-    # them carries the ribbon. Taking the first non-popup picked them inconsistently:
-    # one run reached Save on its first target and then failed every later one with
-    # "no element titled 'Animations'". So the document window is the one that holds the
-    # ribbon tab strip, identified by a tab that is always present.
-    with_ribbon = [
-        window for window in candidates if find_all_by_title(window, RIBBON_ANCHOR_TAB)
-    ]
-    if with_ribbon:
-        return with_ribbon[0]
+    # Direct children first, and only then two levels. The tab group was measured as a
+    # top-level child, so the first pass almost always answers and costs one ``children``
+    # read plus one ``role`` read per child; the second exists so a window one level
+    # deeper than measured is still found rather than silently losing the ribbon.
+    for depth in (1, RIBBON_PROBE_DEPTH):
+        with_ribbon = [
+            window
+            for window in candidates
+            if find_containers(window, RIBBON_ROLE, max_depth=depth)
+        ]
+        if with_ribbon:
+            return with_ribbon[0]
     return candidates[0]
 
 
 def find_window(backend: AXBackend, title: str) -> AXNode | None:
     """Return the window titled ``title`` from a fresh read, or None."""
     return next((window for window in backend.windows() if window.title == title), None)
+
+
+class Containers:
+    """The document window and its containers, held for one stretch of work.
+
+    An element reference is usable for the read that produced it, and the lookups that
+    make up one step of a target's work — a reachability probe, the polls of a bounded
+    wait, a row resolution — all start from the same two or three elements. Resolving
+    them once and sharing them is what stops ``document_window`` and the container search
+    from being repeated a dozen times per target.
+
+    What it must not do is outlive an action. A press can scroll a gallery and renumber
+    its tiles, and PowerPoint rebuilds its elements between reads, so every press, every
+    ``AXSelected`` write and every poll of :func:`wait_until` calls :meth:`stale` and the
+    next lookup reads again. **The rule that a press is aimed by a title re-resolved
+    immediately beforehand is therefore intact**: a press's own resolution always follows
+    an invalidation. What got cheaper is where that re-resolution looks — inside the
+    container rather than across the window.
+
+    It satisfies :class:`AXBackend` by delegation, so every function here still takes a
+    backend and a caller holding one of these passes it straight through. :func:`held`
+    is how a function gets the caller's instance when there is one and its own when
+    there is not.
+    """
+
+    __slots__ = ("_backend", "_window", "_containers", "_named")
+
+    def __init__(self, backend: AXBackend) -> None:
+        self._backend = backend
+        self._window: AXNode | None = None
+        self._containers: dict[str, AXNode] = {}
+        self._named: dict[str, AXNode] = {}
+
+    # --- the backend protocol, delegated ---------------------------------
+    def trusted(self) -> bool:
+        return self._backend.trusted()
+
+    def frontmost_bundle_id(self) -> str | None:
+        return self._backend.frontmost_bundle_id()
+
+    def windows(self) -> list[AXNode]:
+        return self._backend.windows()
+
+    def now(self) -> float:
+        return self._backend.now()
+
+    def sleep(self, seconds: float) -> None:
+        self._backend.sleep(seconds)
+
+    # --- what it holds ----------------------------------------------------
+    def stale(self) -> None:
+        """Drop everything held. Called after every action and before every poll."""
+        self._window = None
+        self._containers.clear()
+        self._named.clear()
+
+    def window(self) -> AXNode:
+        if self._window is None:
+            self._window = document_window(self._backend)
+        return self._window
+
+    def named_window(self, title: str) -> AXNode:
+        held_window = self._named.get(title)
+        if held_window is None:
+            found = find_window(self._backend, title)
+            if found is None:
+                raise ControlNotFound(f"no window titled {title!r}")
+            self._named[title] = held_window = found
+        return held_window
+
+    def container(self, role: str, *, what: str, absent: str | None = None) -> AXNode:
+        found = self._containers.get(role)
+        if found is None:
+            # Only a success is held. A container that is absent must be looked for again
+            # on the next call, because "absent" is how an unopened Selection Pane reads
+            # and the whole point of opening it is that the answer changes.
+            found = window_container(self.window(), role, what=what, absent=absent)
+            self._containers[role] = found
+        return found
+
+
+def held(backend: AXBackend) -> Containers:
+    """Return the caller's :class:`Containers` if it has one, or a fresh one.
+
+    A function called with a raw backend gets its own, so nothing is shared further than
+    the caller meant; a function called with the caller's shares it, which is how one
+    target's work resolves the window and its containers once rather than per lookup.
+    """
+    return backend if isinstance(backend, Containers) else Containers(backend)
 
 
 # --- path resolution --------------------------------------------------------
@@ -692,26 +1084,51 @@ class PathResult:
 
 @dataclass(frozen=True)
 class Scope:
-    """Where to look, as titles rather than elements.
+    """Where to look: a window, the container inside it, then titles.
 
     A scope is re-resolved from a fresh read before every press, because PowerPoint
     rebuilds its accessibility elements between reads and a press can scroll a gallery
-    and renumber everything in it. Holding the scope as titles is what makes
-    "never cache a positional index" structural rather than a rule to remember.
+    and renumber everything in it. Holding the scope as a role and titles rather than as
+    elements is what makes "never cache a positional index" structural rather than a
+    rule to remember.
+
+    ``container_role`` is the part that made the driver fast enough to finish. Without
+    it a lookup starts at the window, and resolving a ribbon tile then traverses all 762
+    Selection Pane rows while resolving a row traverses the ribbon. With it a lookup
+    starts at the smallest container that is **certain** to hold the thing, and a
+    container that is absent or ambiguous raises rather than widening back to the window.
     """
 
     window_title: str | None = None
+    container_role: str | None = None
     descend: tuple[str, ...] = ()
 
     def inside(self, title: str) -> Scope:
-        return Scope(self.window_title, self.descend + (title,))
+        return Scope(self.window_title, self.container_role, self.descend + (title,))
 
     def in_window(self, title: str) -> Scope:
-        return Scope(title, ())
+        # A popup — ``Effect Options``, ``Path Animation``, ``Arrange`` — is a window of a
+        # handful of menu buttons, so it has no container to narrow to and needs none.
+        return Scope(title, None, ())
 
     def describe(self) -> str:
-        parts = [self.window_title or "document window", *self.descend]
-        return " > ".join(parts)
+        parts = [self.window_title or "document window", self.container_role, *self.descend]
+        return " > ".join(part for part in parts if part)
+
+
+#: The ribbon: every tab, and every gallery and labelled read-back on the active tab.
+RIBBON_SCOPE = Scope(container_role=RIBBON_ROLE)
+
+#: The Quick Access toolbar, which holds exactly one control this driver wants.
+TOOLBAR_SCOPE = Scope(container_role=TOOLBAR_ROLE)
+
+#: What each container is called in a failure message, so "no AXTabGroup" reads as a
+#: statement about PowerPoint rather than about a role name.
+CONTAINER_NAMES = {
+    TOOLBAR_ROLE: "the Quick Access toolbar",
+    RIBBON_ROLE: "the ribbon",
+    SELECTION_PANE_ROLE: "the Selection Pane",
+}
 
 
 #: When a title matches more than one element, these roles break the tie, in order. A
@@ -742,14 +1159,29 @@ def _resolve_in(scope_node: AXNode, title: str) -> AXNode:
 
 
 def resolve_scope(backend: AXBackend, scope: Scope) -> AXNode:
-    """Resolve a scope against a fresh read of the tree."""
+    """Resolve a scope, reusing whatever the caller's :class:`Containers` already holds.
+
+    The window and the container come from the caller's holder, which every action and
+    every poll invalidates; the titles beneath them are walked afresh each time. So a
+    press is still aimed by a title resolved immediately beforehand, and what it no
+    longer costs is a walk of the window to get to the container.
+    """
+    view = held(backend)
     if scope.window_title is None:
-        node = document_window(backend)
+        node = view.window()
+        if scope.container_role:
+            node = view.container(
+                scope.container_role,
+                what=CONTAINER_NAMES.get(scope.container_role, scope.container_role),
+            )
     else:
-        window = find_window(backend, scope.window_title)
-        if window is None:
-            raise ControlNotFound(f"no window titled {scope.window_title!r}")
-        node = window
+        node = view.named_window(scope.window_title)
+        if scope.container_role:
+            node = window_container(
+                node,
+                scope.container_role,
+                what=CONTAINER_NAMES.get(scope.container_role, scope.container_role),
+            )
     for title in scope.descend:
         node = _resolve_in(node, title)
     return node
@@ -799,8 +1231,13 @@ def press_path(
     if len(path) < 2:
         raise ControlNotFound(f"a GUI path needs a ribbon tab and a control, got {list(path)}")
 
+    # Rebound so the closures below share the caller's holder rather than each resolving
+    # the window again. ``held`` returns the caller's own when it has one.
+    backend = view = held(backend)
     steps: list[StepOutcome] = []
-    scope = Scope()
+    # Every step of a ribbon path — the tab, the gallery, the tile — is inside the ribbon
+    # tab group, so the walk never leaves it and never reaches the Selection Pane's rows.
+    scope = RIBBON_SCOPE
     final_titles = (path[-1], *alternatives)
 
     # Pressing a ribbon tab that is ALREADY active collapses the ribbon, which takes
@@ -818,6 +1255,7 @@ def press_path(
     else:
         tab_node = _resolve_in(resolve_scope(backend, scope), path[0])
         tab_node.press()
+        view.stale()
         steps.append(StepOutcome(path[0], "pressedTab", tab_node.role))
         wait_until(
             backend,
@@ -843,6 +1281,7 @@ def press_path(
             continue
         if node.role in PRESS_TO_OPEN_ROLES:
             node.press()
+            view.stale()
             window = wait_until(
                 backend,
                 lambda title=title: find_window(backend, title),
@@ -876,24 +1315,32 @@ def press_path(
         ) from exc
 
     # Re-resolved from one more fresh read: a press aimed by anything older can land on a
-    # tile that scrolled, which applies the wrong value and records the right one.
+    # tile that scrolled, which applies the wrong value and records the right one. The
+    # wait above invalidated the holder on its last poll, so this really is a fresh
+    # resolution — it is just a resolution inside the ribbon rather than across the
+    # window, which is the only thing that changed when the driver got fast.
+    view.stale()
     node = _resolve_in(resolve_scope(backend, scope), matched)
     if not node.enabled:
         raise ControlNotFound(f"{matched!r} is present but disabled in {scope.describe()}")
     node.press()
+    view.stale()
     steps.append(StepOutcome(matched, "pressed", node.role))
     return PathResult(matched, steps)
 
 
 # --- read-back --------------------------------------------------------------
-def read_labelled_value(window: AXNode, label: str) -> str | None:
-    """Return the value of the ribbon control titled ``label``, or None.
+def read_labelled_value(scope_node: AXNode, label: str) -> str | None:
+    """Return the value of the control titled ``label`` inside ``scope_node``, or None.
+
+    ``scope_node`` is the ribbon, not the window: both labels are ribbon controls, and a
+    read-back is not worth a walk of the Selection Pane.
 
     The read-back is recorded evidence, not an acceptance gate, so an absent or
     ambiguous control is reported as ``null`` rather than failing the target. The
     acceptance gate is :func:`attribute_new_effect`, which reads the saved package.
     """
-    found = find_all_by_title(window, label)
+    found = find_all_by_title(scope_node, label)
     if len(found) == 1:
         return found[0].value
     valued = [node for node in found if node.value not in (None, "")]
@@ -901,73 +1348,209 @@ def read_labelled_value(window: AXNode, label: str) -> str | None:
 
 
 def ribbon_readback(backend: AXBackend) -> dict[str, str | None]:
-    """Return the ``Start:`` and ``Duration:`` values the ribbon shows right now."""
-    window = document_window(backend)
+    """Return the ``Start:`` and ``Duration:`` values the ribbon shows right now.
+
+    Taken while the target's own shape is still the selected one. Under batching that
+    means it is read immediately after the press rather than after the batch's save: the
+    ribbon shows the **selected** shape's values, and the next target in the batch moves
+    the selection, so a read-back deferred to the save would record the last target's
+    values against every key in the batch.
+    """
+    ribbon = resolve_scope(backend, RIBBON_SCOPE)
     return {
-        "start": read_labelled_value(window, START_LABEL),
-        "duration": read_labelled_value(window, DURATION_LABEL),
+        "start": read_labelled_value(ribbon, START_LABEL),
+        "duration": read_labelled_value(ribbon, DURATION_LABEL),
     }
 
 
-# --- driving ----------------------------------------------------------------
-# There is deliberately no slide selection and no thumbnail lookup here. See the module
-# docstring: the live 2026-10-31 run rejected all 76 targets inside them, because the
-# navigator's cells expose no actions and only the handful scrolled into view is published
-# at all. Every target now lives on one slide and is reached by clicking its own shape.
+# --- the Selection Pane, which is how a shape is selected -------------------
+# There is deliberately no slide selection and no thumbnail lookup here, and no canvas
+# click either. See the module docstring: the live 2026-10-31 run rejected all 76 targets
+# inside slide selection, and the click that replaced it captured 2 of 12.
 
 
-def select_shape(
-    backend: AXBackend,
-    geometry: CanvasGeometry,
-    package: Path,
-    slide_index: int,
-    shape_name: str,
-    gate_title: str,
-    *,
-    timeout: float,
-) -> tuple[float, float]:
-    """Click one named shape and confirm something is selected. Returns the point clicked.
+def selection_outline(backend: AXBackend) -> AXNode:
+    """Return the Selection Pane's outline from a fresh read, or fail if it is closed.
 
-    The shape has **no accessibility element**, so the point is derived from the
-    package's own geometry for *this* shape plus the live editor-pane frame and zoom, and
-    posting it physically moves the pointer.
+    :class:`ControlNotFound` rather than a bool, so :func:`wait_until` can poll this
+    directly and so a closed pane reads the same as any other absent control.
 
-    Confirmation is weak by nature and weaker than it used to be: the gallery named by
-    the target's path is disabled until *some* shape is selected, so its becoming enabled
-    says a shape is selected — and after the first target of a run, one already is. It
-    is kept because it still catches a click that lands on empty canvas, which deselects.
-    What establishes that the click landed on the *right* shape is
-    :func:`attribute_new_effect`, after the press and the save.
+    This used to walk the whole document window looking for an ``AXOutline``, and it was
+    the single most expensive call in the driver at **17.8 s** — most of which was not
+    the outline at all but ``document_window`` walking each same-titled candidate window
+    to find the ribbon. It is now a container search that stops at the outline rather
+    than descending into its 762 rows.
     """
-    point = geometry.point_for(package, slide_index, shape_name)
-
-    def gate_enabled() -> bool:
-        return _resolve_in(document_window(backend), gate_title).enabled
-
-    backend.click(*point)
-    wait_until(
-        backend,
-        gate_enabled,
-        timeout=timeout,
-        what=(
-            f"{gate_title!r} to become enabled after clicking {shape_name!r} at "
-            f"{point[0]:.0f},{point[1]:.0f}"
+    return held(backend).container(
+        SELECTION_PANE_ROLE,
+        what=CONTAINER_NAMES[SELECTION_PANE_ROLE],
+        absent=(
+            f"the document window holds no {SELECTION_PANE_ROLE}; the Selection Pane is not open"
         ),
     )
-    return point
+
+
+def row_names(row: AXNode) -> list[str]:
+    """Return the shape names a Selection Pane row carries.
+
+    A row's own ``title`` is ``None``; the name is the ``value`` of a descendant
+    ``AXStaticText``. Every such value is returned rather than only the first, because
+    nothing offline can promise a row holds exactly one label, and matching against all
+    of them cannot invent a name the pane does not show.
+    """
+    return [
+        str(node.value)
+        for node in walk(row)
+        if node.role == SELECTION_LABEL_ROLE and node.value not in (None, "")
+    ]
+
+
+def selection_rows(backend: AXBackend) -> list[tuple[AXNode, list[str]]]:
+    """Return the pane's rows with their names, in pane order, from a fresh read.
+
+    Pane order is **reverse z-order**: the live pane's row 0 was ``TextBox 152`` and row
+    1 ``Rounded Rectangle 151``. Nothing here depends on that order — a row is found by
+    name — and that is the point: an index would be invalidated by the pane scrolling or
+    by the rows being rebuilt between reads, which is what every other element in this
+    application does.
+
+    The rows were measured as the outline's direct children, but they are collected with
+    a bounded walk rather than from ``children`` alone, so a row nested one level deeper
+    — a grouped shape's disclosure row — is found rather than reported missing.
+
+    One pass, not one pass per row. Walking the outline measured 4.1 s and calling
+    :func:`row_names` on each of 152 rows another 4.3 s, because the second pass visits
+    every row's subtree a second time. Here a row's labels are collected as the single
+    walk reaches them, which halves the only remaining large read in the driver. A nested
+    row becomes its own entry and owns the labels beneath it, so a grouped shape's
+    disclosure row is still addressable by its own name.
+    """
+    outline = selection_outline(backend)
+    rows: list[tuple[AXNode, list[str]]] = []
+    names_by_row: dict[int, list[str]] = {}
+    stack: list[tuple[AXNode, int, int]] = [
+        (child, 1, -1) for child in reversed(list(outline.children))
+    ]
+    seen = 1
+    while stack:
+        node, depth, owner = stack.pop()
+        seen += 1
+        if seen > MAX_TREE_NODES:
+            raise TreeTooLarge(f"tree scan exceeded {MAX_TREE_NODES} nodes")
+        role = node.role
+        if role == SELECTION_ROW_ROLE:
+            owner = len(rows)
+            names_by_row[owner] = []
+            rows.append((node, names_by_row[owner]))
+        elif role == SELECTION_LABEL_ROLE and owner >= 0:
+            value = node.value
+            if value not in (None, ""):
+                names_by_row[owner].append(str(value))
+        if depth >= MAX_TREE_DEPTH:
+            continue
+        stack.extend((child, depth + 1, owner) for child in reversed(list(node.children)))
+    return rows
+
+
+def open_selection_pane(backend: AXBackend, *, timeout: float) -> str:
+    """Make sure the Selection Pane is open, and say what that took. Once per run.
+
+    Pressing ``Selection Pane...`` while the pane is already open **closes** it — the
+    same "pressing an active thing toggles it" trap that collapsed the ribbon and took
+    every gallery out of the tree. So the pane's own presence is the test, read from the
+    tree rather than remembered: if the outline is there, nothing is pressed.
+
+    Opening it walks ``Home ▸ Arrange ▸ Selection Pane...`` through
+    :func:`press_path`, so each step is resolved by title against a fresh read and the
+    ``Arrange`` window is awaited rather than assumed.
+    """
+    view = held(backend)
+    try:
+        selection_outline(view)
+        return "alreadyOpen"
+    except ControlNotFound:
+        pass
+    press_path(view, SELECTION_PANE_PATH, timeout=timeout)
+    wait_until(
+        view,
+        lambda: _rows_present(view),
+        timeout=timeout,
+        what=f"the Selection Pane's {SELECTION_PANE_ROLE} to appear in the document window",
+    )
+    return "pressed"
+
+
+def _rows_present(backend: AXBackend) -> bool:
+    """Is the pane open with at least one row? Used as a bounded wait's predicate."""
+    return bool(selection_rows(backend))
+
+
+def select_shape(backend: AXBackend, shape_name: str, *, timeout: float) -> str:
+    """Select one named shape through its Selection Pane row. Returns the row's name.
+
+    The shape itself has no accessibility element, but its row does, and that removes
+    every moving part the click had: no coordinates, no pointer, no zoom, no editor-pane
+    frame, no window focus and no settling. A row exposes no ``AXPress`` — its actions
+    are ``AXShowDefaultUI``, ``AXShowAlternateUI`` and a Rename — so selection is a
+    **write of ``AXSelected``**, which is the standard outline-row mechanism, and the
+    row is read back to confirm it took.
+
+    The row is resolved **by name from a fresh read every time**, never held across a
+    read: rows are rebuilt like every other element here, and the pane scrolls. An
+    absent name is a :class:`ControlNotFound` naming the names the pane did show, and two
+    rows with one name is an :class:`AmbiguousControl` rather than a choice — selecting
+    the wrong one would apply the value to another shape while the record named this one.
+    """
+
+    def resolve_row() -> tuple[AXNode, str]:
+        rows = selection_rows(backend)
+        matching = [(row, name) for row, names in rows for name in names if name == shape_name]
+        if len(matching) > 1:
+            raise AmbiguousControl(
+                f"{len(matching)} Selection Pane rows are named {shape_name!r}; refusing to choose "
+                "which shape to select"
+            )
+        if not matching:
+            found = [name for _row, names in rows for name in names]
+            shown = sorted(found)[:MAX_REPORTED_ROW_NAMES]
+            more = f" and {len(found) - len(shown)} more" if len(found) > len(shown) else ""
+            raise ControlNotFound(
+                f"no Selection Pane row is named {shape_name!r}; the pane shows {len(found)} names, "
+                f"including {shown}{more}"
+            )
+        return matching[0]
+
+    view = held(backend)
+    row, matched = resolve_row()
+    row.set_selected(True)
+    view.stale()
+    wait_until(
+        view,
+        lambda: resolve_row()[0].selected,
+        timeout=timeout,
+        what=f"the Selection Pane row named {shape_name!r} to read back as selected",
+    )
+    return matched
 
 
 def press_save(backend: AXBackend, document: Path, *, timeout: float) -> None:
     """Press Save in the Quick Access toolbar and wait, bounded, for the file to change.
 
-    Incremental saving is what makes a crash cost one target rather than the run, and it
-    is now also the measurement: :func:`attribute_new_effect` reads the file this writes,
-    so there is no option to skip it. The document must already exist on disk so Save
-    overwrites in place and PowerPoint does not open a Save As sheet, which this driver
-    would not answer.
+    Saving is the measurement: :func:`attribute_new_effect` and :func:`attribute_batch`
+    read the file this writes, so there is no option to skip it. The document must
+    already exist on disk so Save overwrites in place and PowerPoint does not open a
+    Save As sheet, which this driver would not answer.
+
+    It is pressed once per **batch** rather than once per target. ``Save`` lives in the
+    window's toolbar and is resolved there: the lookup that found it used to walk the
+    window, which cost 6.4 s to reach a button sitting two levels from the root.
     """
+    # Rebound so everything below shares the caller's holder rather than resolving the
+    # window again. ``held`` returns the caller's own when it has one.
+    backend = view = held(backend)
     before = (document.stat().st_mtime_ns, document.stat().st_size) if document.exists() else None
-    _resolve_in(document_window(backend), SAVE_LABEL).press()
+    _resolve_in(resolve_scope(view, TOOLBAR_SCOPE), SAVE_LABEL).press()
+    view.stale()
     wait_until(
         backend,
         lambda: document.exists() and (document.stat().st_mtime_ns, document.stat().st_size) != before,
@@ -1001,8 +1584,11 @@ def normalise_document_title(title: str | None) -> str:
 def assert_ready(backend: AXBackend, expected_document: str) -> str:
     """Refuse to start unless the frontmost document is the expected capture deck.
 
-    The driver clicks with a global mouse event, so a wrong frontmost window means
-    clicking into the operator's own work. Nothing is pressed before this passes.
+    The driver no longer posts mouse events, so this is no longer about where a pointer
+    lands — but it is still load-bearing. An ``AXPress`` goes to whatever window the
+    title resolution found, and a wrong frontmost document would mean pressing ribbon
+    controls, opening the Selection Pane, and pressing ``Save`` on the operator's own
+    deck. Nothing is sent before this passes.
     """
     if not backend.trusted():
         raise DriverRefusal(
@@ -1012,7 +1598,7 @@ def assert_ready(backend: AXBackend, expected_document: str) -> str:
     frontmost = backend.frontmost_bundle_id()
     if frontmost != BUNDLE_ID:
         raise DriverRefusal(f"PowerPoint must be frontmost; the frontmost application is {frontmost!r}")
-    title = normalise_document_title(document_window(backend).title)
+    title = normalise_document_title(held(backend).window().title)
     if title != normalise_document_title(expected_document):
         raise DriverRefusal(
             f"the frontmost document is {title!r}, not the expected capture deck "
@@ -1044,9 +1630,10 @@ def capture_record(
     steps: Sequence[dict[str, Any]] = (),
     shape_name: str | None = None,
     shape_spid: str | None = None,
-    click_point: tuple[float, float] | None = None,
+    selection_row: str | None = None,
     effect: dict[str, Any] | None = None,
     effect_count: tuple[int, int] | None = None,
+    batch_index: int | None = None,
     saved: bool = False,
     rejected: bool = False,
     error: dict[str, Any] | None = None,
@@ -1063,10 +1650,22 @@ def capture_record(
 
     Every target now shares one slide, so that join puts the **whole slide's** OOXML
     beside every record. The per-target evidence therefore lives in the record itself:
-    ``shapeName`` and ``shapeSpid`` say which shape was aimed at, ``attributedSpid`` and
-    ``effectCTn`` say which effect the package gained and what it says, and
-    ``effectCount`` says the slide went from n to n+1. A merged view is read per target by
-    matching ``attributedSpid`` against the slide's ``p:spTgt/@spid``.
+    ``shapeName`` and ``shapeSpid`` say which shape was aimed at, ``selectionRow`` and
+    ``selectedBy`` say how it was selected, ``attributedSpid`` and ``effectCTn`` say which
+    effect the package gained and what it says, and ``effectCount`` says the slide went
+    from n to n+1. A merged view is read per target by matching ``attributedSpid`` against
+    the slide's ``p:spTgt/@spid``.
+
+    ``selectedBy`` replaced a ``clickPoint``, and the difference is the point: a merged
+    evidence file now says each capture was driven by a named Selection Pane row rather
+    than by a coordinate, so a record from this driver cannot be confused with one from
+    the click version that captured 2 of 12.
+
+    ``batchIndex`` says which Save judged this record, and ``effectCount`` is that
+    batch's before/after count for the slide rather than this target's own — with ten
+    targets per save the slide goes from n to n+10 and no single record owns the step.
+    What this record owns is ``newEffectCount``: how many ``p:cTn`` nodes appeared on
+    **its** ``shapeSpid``, which is the figure the attribution gate actually tested.
     """
     key = target["key"]
     attributed = bool(effect and shape_spid and effect.get("spid") == shape_spid)
@@ -1080,16 +1679,19 @@ def capture_record(
         "guiPath": list(target["guiPath"]),
         "shapeName": shape_name,
         "shapeSpid": shape_spid,
-        "clickPoint": [round(click_point[0], 1), round(click_point[1], 1)] if click_point else None,
+        "selectionRow": selection_row,
+        "selectedBy": SELECTED_BY if selection_row else None,
         "applied": applied,
         "matchedTitle": matched_title,
         "ribbonReadBack": readback or {"start": None, "duration": None},
         "attributedSpid": effect.get("spid") if effect else None,
         "effectCTn": effect.get("cTn") if effect else None,
+        "newEffectCount": effect.get("newEffectCount") if effect else None,
         "effectCount": {
             "before": effect_count[0] if effect_count else None,
             "after": effect_count[1] if effect_count else None,
         },
+        "batchIndex": batch_index,
         "attributed": attributed,
         "pathResolution": list(steps),
         "saved": saved,
@@ -1147,9 +1749,9 @@ def plan_shape_names(plan: dict[str, Any]) -> dict[str, str]:
 
     The names are settled by ``gui_capture_plan.py --generate``, which reads them back out
     of the package sdpm wrote; sdpm derives a shape's name from its geometry, so neither
-    side may assume one. A target with no name has nothing to click and nothing to
-    attribute an effect to, so this refuses the whole run rather than producing a record
-    per target that says the same thing.
+    side may assume one. A target with no name has no Selection Pane row to match and
+    nothing to attribute an effect to, so this refuses the whole run rather than
+    producing a record per target that says the same thing.
     """
     mapping = {str(key): str(name) for key, name in (plan.get("shapeNames") or {}).items() if name}
     missing: list[str] = []
@@ -1200,9 +1802,9 @@ class CaptureSettings:
     expect_document: str | None = None
     timeout: float = DEFAULT_TIMEOUT
     force: bool = False
-    pane_role: str = EDITOR_PANE_ROLE
-    pane: Frame | None = None
-    zoom: float | None = None
+    #: Targets pressed before one Save judges them all. ``1`` saves per target, which is
+    #: the strongest attribution available and the slowest; see :func:`capture_batch`.
+    batch_size: int = DEFAULT_BATCH_SIZE
 
     @property
     def expected_title(self) -> str:
@@ -1217,95 +1819,6 @@ class CaptureSettings:
         return self.out_dir / PACKAGE_NAME
 
 
-@dataclass
-class CanvasGeometry:
-    """How the driver turns a package and the live window into a clickable point."""
-
-    slide_size_pt: tuple[float, float]
-    pane: Frame
-    zoom: float
-    source: dict[str, Any] = field(default_factory=dict)
-
-    def point_for(self, package: Path, slide_index: int, shape_name: str) -> tuple[float, float]:
-        centre = read_shape_center_pt(package, slide_index, shape_name)
-        return canvas_point(self.slide_size_pt, centre, self.pane, self.zoom)
-
-
-def read_canvas_geometry(
-    backend: AXBackend,
-    package: Path,
-    *,
-    pane_role: str = EDITOR_PANE_ROLE,
-    pane: Frame | None = None,
-    zoom: float | None = None,
-) -> CanvasGeometry:
-    """Derive the canvas mapping from the package and the live window, not from constants.
-
-    The slide size comes from ``ppt/presentation.xml``, the editor pane's frame from the
-    accessibility tree, and the zoom from the status bar button's own title. The
-    2026-10-31 session got this 90 px wrong by estimating it, which is why none of it is
-    a literal here.
-
-    ``pane`` and ``zoom`` let an operator supply a measured value when this build does not
-    expose one; both are recorded in the summary as an override so a capture driven from
-    an override is distinguishable from a derived one. A *wrong* pane fails loudly rather
-    than quietly: the click lands off the shape, the gallery stays disabled, and
-    :func:`select_shape` records a timeout instead of pressing anything.
-    """
-    source: dict[str, Any] = {"paneRole": pane_role}
-    window = document_window(backend)
-    if pane is None:
-        # Identified by the editor area's OWN title, not by being the biggest pane of a
-        # role. Measured: picking the largest AXSplitGroup returns the outer split that
-        # also holds the navigator and the notes, which is 254 px too wide and 188 px too
-        # tall, so every click landed off its shape and all 76 targets timed out. The
-        # editor area is the only element whose title starts with this phrase, and its
-        # frame follows the ribbon being expanded or collapsed, which a constant cannot.
-        # The editor area names itself, but its OWN frame lags a ribbon expand or
-        # collapse — measured once as y=89 h=594 while its parent scroll area already
-        # reported the settled y=144 h=540. So the pane is the smallest framed container
-        # whose subtree holds that titled element: identified by the title, measured by
-        # the container that has re-laid out.
-        holders = [
-            node
-            for node in walk(window)
-            if node.frame is not None
-            and node.frame.width > 0
-            and node.frame.height > 0
-            and any(
-                (inner.title or "").startswith(EDITOR_PANE_TITLE_PREFIX)
-                for inner in walk(node)
-                if inner is not node
-            )
-        ]
-        if not holders:
-            raise GeometryError(
-                f"no framed container holds an element titled {EDITOR_PANE_TITLE_PREFIX!r}*; "
-                "pass --pane-frame with a measured x,y,w,h"
-            )
-        smallest = min(holders, key=lambda node: node.frame.width * node.frame.height)  # type: ignore[union-attr]
-        assert smallest.frame is not None
-        pane, source["paneSource"] = smallest.frame, "editorPaneContainer"
-        source["paneRole"] = smallest.role
-    else:
-        source["paneSource"] = "operatorOverride"
-    if zoom is None:
-        titles = [node.title for node in walk(window) if node.title and ZOOM_TITLE_PATTERN.match(node.title)]
-        if not titles:
-            raise GeometryError("no status-bar zoom percentage in the document window; pass --zoom")
-        if len({title.strip() for title in titles}) > 1:
-            raise GeometryError(f"ambiguous zoom percentages in the window: {sorted(set(titles))}")
-        zoom, source["zoomSource"], source["zoomTitle"] = parse_zoom(titles[0]), "statusBar", titles[0].strip()
-    else:
-        source["zoomSource"] = "operatorOverride"
-    return CanvasGeometry(
-        slide_size_pt=read_slide_size_pt(package),
-        pane=pane,
-        zoom=zoom,
-        source=source,
-    )
-
-
 def ensure_tab(backend: AXBackend, path: Sequence[str], *, timeout: float) -> str:
     """Make the ribbon tab named by ``path`` active, and return what it took.
 
@@ -1317,88 +1830,216 @@ def ensure_tab(backend: AXBackend, path: Sequence[str], *, timeout: float) -> st
     """
     if len(path) < 2:
         raise ControlNotFound(f"a GUI path needs a ribbon tab and a control, got {list(path)}")
-    scope = Scope()
-    if _reachable_any(resolve_scope(backend, scope), [path[1]]):
+    view = held(backend)
+    scope = RIBBON_SCOPE
+    if _reachable_any(resolve_scope(view, scope), [path[1]]):
         return "alreadyActive"
-    _resolve_in(resolve_scope(backend, scope), path[0]).press()
+    _resolve_in(resolve_scope(view, scope), path[0]).press()
+    view.stale()
     wait_until(
-        backend,
-        lambda: _reachable_any(resolve_scope(backend, scope), [path[1]]),
+        view,
+        lambda: _reachable_any(resolve_scope(view, scope), [path[1]]),
         timeout=timeout,
         what=f"{path[1]!r} after selecting the {path[0]!r} tab",
     )
     return "pressed"
 
 
-def capture_target(
+def press_target(
     backend: AXBackend,
     target: dict[str, Any],
     settings: CaptureSettings,
-    geometry: CanvasGeometry,
     shape_name: str,
-) -> dict[str, Any]:
-    """Drive one target end to end and return its record, successful or not.
+    carried: dict[str, Any],
+) -> None:
+    """Drive one target up to and including its press. No save and no attribution.
 
-    The order matters and is not the order it used to be. The press is followed by the
-    save, and only then by verification, because the verification **is** a read of the
-    saved package: the slide must have gained exactly one effect and that effect must
-    target the clicked shape. A save failure is therefore a rejected record rather than a
-    footnote on a passing one — without the save there is no evidence either way.
+    Fills ``carried`` as it goes, so a failure part-way leaves the record carrying what
+    had been measured by then — the shape's spid, the row it selected — rather than
+    nothing.
+
+    Raises :class:`TargetFailure`. The save and the verification belong to the batch,
+    because one save judges the whole batch.
     """
     timeout = settings.timeout
-    slide_index = target["slideIndex"]
-    carried: dict[str, Any] = {"shape_name": shape_name}
-    try:
-        carried["shape_spid"] = spid = read_shape_spid(settings.document, slide_index, shape_name)
-        before = read_slide_effects(settings.document, slide_index)
-        # The ribbon tab comes first, before the shape is clicked. ``select_shape``
-        # confirms the click by that tab's gallery becoming enabled, and a gallery on an
-        # inactive tab is not in the tree at all — so with the tab left for later, the
-        # confirmation waits for a control that does not exist. Measured: a freshly
-        # opened deck starts on Home and all 76 targets timed out on 'Emphasis Effects'
-        # before a single shape was clicked.
-        ensure_tab(backend, target["guiPath"], timeout=timeout)
-        carried["click_point"] = select_shape(
-            backend,
-            geometry,
-            settings.document,
-            slide_index,
-            shape_name,
-            target["guiPath"][1],
-            timeout=timeout,
-        )
-        result = press_path(
-            backend,
-            target["guiPath"],
-            timeout=timeout,
-            alternatives=tuple(target.get("titleAlternatives", ())),
-        )
-        carried["matched_title"] = result.matched_title
-        carried["steps"] = result.as_dicts()
-    except TargetFailure as exc:
-        return capture_record(target, rejected=True, error=exc.as_error(), **carried)
-
-    try:
-        press_save(backend, settings.document, timeout=timeout)
-    except TargetFailure as exc:
-        return capture_record(
-            target, rejected=True, error=exc.as_error(), save_error=exc.as_error(), **carried
-        )
-    carried["saved"] = True
-
-    try:
-        after = read_slide_effects(settings.document, slide_index)
-        carried["effect_count"] = (len(before), len(after))
-        carried["effect"] = attribute_new_effect(before, after, spid)
-    except TargetFailure as exc:
-        return capture_record(target, rejected=True, error=exc.as_error(), **carried)
-
-    return capture_record(
-        target,
-        applied=" > ".join(target["guiPath"]),
-        readback=ribbon_readback(backend),
-        **carried,
+    carried["shape_spid"] = read_shape_spid(settings.document, target["slideIndex"], shape_name)
+    # The shape is selected through its Selection Pane row, which does not depend on
+    # which ribbon tab is active — but the tab still comes first. Opening the pane
+    # leaves the ribbon on Home, and a gallery on an inactive tab is not in the tree
+    # at all, so making the target's own tab active here keeps the press that follows
+    # looking at a materialized gallery rather than waiting for one that cannot
+    # appear. Measured against an earlier version: a freshly opened deck starts on
+    # Home and all 76 targets timed out on 'Emphasis Effects'.
+    ensure_tab(backend, target["guiPath"], timeout=timeout)
+    carried["selection_row"] = select_shape(backend, shape_name, timeout=timeout)
+    result = press_path(
+        backend,
+        target["guiPath"],
+        timeout=timeout,
+        alternatives=tuple(target.get("titleAlternatives", ())),
     )
+    carried["matched_title"] = result.matched_title
+    carried["steps"] = result.as_dicts()
+    # Read here, not after the batch's save: the ribbon shows the SELECTED shape's values
+    # and the next target in the batch moves the selection.
+    carried["readback"] = ribbon_readback(backend)
+
+
+def capture_batch(
+    backend: AXBackend,
+    batch: Sequence[dict[str, Any]],
+    settings: CaptureSettings,
+    shape_names: dict[str, str],
+    *,
+    batch_index: int,
+) -> list[dict[str, Any]]:
+    """Press a batch of targets, save once, then attribute each by its own ``spid``.
+
+    Returns one record per target in the batch, in batch order, successful or not.
+
+    ## Why a batch
+
+    Saving was never the expensive part — the full-tree walking was — but a save is still
+    a save, and 76 of them are 76 more than one per ten targets. The order is the same as
+    it was per target and for the same reason: press, then save, then verify, because the
+    verification **is** a read of the saved package. A save that does not land therefore
+    rejects every target that was pressed into it rather than being a footnote on a
+    passing record — without the save there is no evidence either way.
+
+    ## What the evidence still is
+
+    Unchanged in kind, per target: the target's own ``spid`` must have gained at least one
+    effect in a package PowerPoint actually wrote, and that effect's own ``p:cTn`` is
+    recorded against this key. The batch adds one gate of its own — **no spid outside the
+    batch may have gained anything** — because an effect on a shape nobody selected means
+    a press landed somewhere the run cannot account for, and that fails the batch naming
+    the stray spid.
+
+    A target whose own spid gained nothing is rejected **individually**, and the rest of
+    the batch is still credited. One bad target does not cost nine good ones.
+
+    ## What a batch gives up, stated rather than implied
+
+    **Crash granularity.** A crash costs the presses since the last save rather than one.
+    They are not lost work in the accounting sense — a target with no record is
+    uncaptured, so a resumed run re-presses them — but they are lost time.
+
+    **Telling two targets inside one batch apart when they swap effects.** If target A's
+    press animated B's shape and B's animated A's, both spids gained one effect and no
+    spid outside the batch gained anything, so the package cannot say whose value is
+    whose. A save per target can, and ``--batch-size 1`` still does. This is a real
+    reduction and it is not covered by the stray-spid gate; what bounds it is that the
+    mechanism which used to cause it — a selection that did not take, so the press
+    replaced the previously selected shape's effect — is caught **before** any press by
+    :func:`select_shape`'s read-back of ``AXSelected``, and that a press landing on a
+    shape outside the batch is caught by the stray-spid gate.
+    """
+    if not batch:
+        return []
+    slide_index = batch[0]["slideIndex"]
+    records: dict[str, dict[str, Any]] = {}
+    pressed: list[tuple[dict[str, Any], dict[str, Any]]] = []
+
+    def reject(target: dict[str, Any], carried: dict[str, Any], exc: TargetFailure, **extra: Any) -> None:
+        records[target["key"]] = capture_record(
+            target, rejected=True, error=exc.as_error(), **extra, **carried
+        )
+
+    try:
+        before = read_slide_effects(settings.document, slide_index)
+    except TargetFailure as exc:
+        # The batch cannot be judged at all, so every target in it is rejected before a
+        # single press rather than pressed into evidence that cannot be read.
+        for target in batch:
+            reject(target, {"batch_index": batch_index}, exc)
+        return [records[target["key"]] for target in batch]
+
+    for target in batch:
+        carried: dict[str, Any] = {
+            "batch_index": batch_index,
+            "shape_name": shape_names[target["key"]],
+        }
+        try:
+            press_target(backend, target, settings, shape_names[target["key"]], carried)
+        except TargetFailure as exc:
+            reject(target, carried, exc)
+            continue
+        pressed.append((target, carried))
+
+    if pressed:
+        try:
+            press_save(backend, settings.document, timeout=settings.timeout)
+        except TargetFailure as exc:
+            for target, carried in pressed:
+                reject(target, carried, exc, save_error=exc.as_error())
+            return [records[target["key"]] for target in batch]
+        for _target, carried in pressed:
+            carried["saved"] = True
+
+        try:
+            after = read_slide_effects(settings.document, slide_index)
+        except TargetFailure as exc:
+            for target, carried in pressed:
+                reject(target, carried, exc)
+            return [records[target["key"]] for target in batch]
+
+        counts = (len(before), len(after))
+        try:
+            credited = attribute_batch(
+                before, after, [carried["shape_spid"] for _target, carried in pressed]
+            )
+        except TargetFailure as exc:
+            for target, carried in pressed:
+                reject(target, carried, exc, effect_count=counts)
+            return [records[target["key"]] for target in batch]
+
+        for target, carried in pressed:
+            effect = credited.get(carried["shape_spid"])
+            if effect is None:
+                reject(
+                    target,
+                    carried,
+                    not_added_in_batch(before, after, carried["shape_spid"]),
+                    effect_count=counts,
+                )
+                continue
+            records[target["key"]] = capture_record(
+                target,
+                applied=" > ".join(target["guiPath"]),
+                effect=effect,
+                effect_count=counts,
+                **carried,
+            )
+
+    return [records[target["key"]] for target in batch]
+
+
+def plan_batches(
+    todo: Sequence[dict[str, Any]], size: int
+) -> list[list[dict[str, Any]]]:
+    """Split the targets to run into batches, never mixing two slides in one.
+
+    One save judges one batch and the judgement reads one slide's effects, so a batch
+    spanning two slides could not be attributed. The plan puts all 76 targets on one
+    slide; a split plan simply produces more, smaller batches.
+    """
+    if size < 1:
+        raise DriverRefusal(f"a batch must hold at least one target, got {size}")
+    batches: list[list[dict[str, Any]]] = []
+    for target in todo:
+        if (
+            not batches
+            or len(batches[-1]) >= size
+            or batches[-1][0]["slideIndex"] != target["slideIndex"]
+        ):
+            batches.append([])
+        batches[-1].append(target)
+    return batches
+
+
+def report_to_stderr(message: str) -> None:
+    """Write one progress line where it cannot contaminate the summary on stdout."""
+    print(message, file=sys.stderr, flush=True)
 
 
 def run_capture(
@@ -1407,27 +2048,30 @@ def run_capture(
     backend: AXBackend,
     *,
     version: str | None = None,
+    progress: Callable[[str], None] = report_to_stderr,
 ) -> dict[str, Any]:
-    """Run a whole plan. Returns the summary; writes the read-back incrementally."""
+    """Run a whole plan. Returns the summary; writes the read-back incrementally.
+
+    A line per batch goes to ``progress`` — stderr by default, so stdout stays pure JSON.
+    A 76-target run takes long enough that an operator with no output would be looking at
+    something indistinguishable from a hang.
+    """
     targets = list(plan.get("targets", []))
     shape_names = plan_shape_names(plan)
     settings.out_dir.mkdir(parents=True, exist_ok=True)
     existing = read_records(settings.readback_path)
     todo, skipped = split_plan(targets, existing, force=settings.force)
+    batches = plan_batches(todo, settings.batch_size)
 
     title = assert_ready(backend, settings.expected_title)
     try:
-        geometry = read_canvas_geometry(
-            backend,
-            settings.document,
-            pane_role=settings.pane_role,
-            pane=settings.pane,
-            zoom=settings.zoom,
-        )
+        # Once per run, not per target: pressing ``Selection Pane...`` again would close
+        # the pane. A pane that cannot be opened is the whole run's precondition rather
+        # than one target's, so it refuses with an actionable message instead of
+        # producing 76 identical records.
+        selection_pane = open_selection_pane(backend, timeout=settings.timeout)
     except TargetFailure as exc:
-        # Geometry is the whole run's precondition, not one target's, so a failure here
-        # is a refusal with an actionable message rather than 76 identical records.
-        raise DriverRefusal(f"cannot derive the canvas mapping: {exc}") from exc
+        raise DriverRefusal(f"cannot open the Selection Pane: {exc}") from exc
 
     keep = retained_records(existing, todo)
     with settings.readback_path.open("w", encoding="utf-8") as stream:
@@ -1437,11 +2081,23 @@ def run_capture(
         stream.flush()
 
         written: list[dict[str, Any]] = []
-        for target in todo:
-            record = capture_target(backend, target, settings, geometry, shape_names[target["key"]])
-            written.append(record)
-            stream.write(json.dumps(record, ensure_ascii=False) + "\n")
+        started = backend.now()
+        for index, batch in enumerate(batches, start=1):
+            # One Containers per batch, dropped at every action inside it: the window and
+            # its containers are resolved once for a stretch of work rather than once per
+            # lookup, which is what removed several full window walks per target.
+            for record in capture_batch(
+                held(backend), batch, settings, shape_names, batch_index=index
+            ):
+                written.append(record)
+                stream.write(json.dumps(record, ensure_ascii=False) + "\n")
             stream.flush()
+            progress(
+                f"batch {index}/{len(batches)}: {len(batch)} targets attempted, "
+                f"{len(written)}/{len(todo)} done, "
+                f"{sum(1 for record in written if not record['rejected'])} captured, "
+                f"{backend.now() - started:.0f}s elapsed"
+            )
 
     if settings.document.exists():
         shutil.copy2(settings.document, settings.package_path)
@@ -1457,21 +2113,20 @@ def run_capture(
         "attempted": len(written),
         "captured": len(written) - len(failures),
         "failed": len(failures),
+        "batchSize": settings.batch_size,
+        "batches": len(batches),
         "attributed": sum(1 for record in written if record["attributed"]),
         "saveFailures": sum(1 for record in written if record["saveError"]),
         "retainedRecords": len(keep),
-        "canvas": {
-            "slideSizePt": list(geometry.slide_size_pt),
-            "paneFrame": [geometry.pane.x, geometry.pane.y, geometry.pane.width, geometry.pane.height],
-            "zoom": geometry.zoom,
-            **geometry.source,
-        },
+        "shapeSelection": {"mechanism": SELECTED_BY, "selectionPane": selection_pane},
         "failures": [
             {
                 "key": record["catalogKey"],
                 "slideIndex": record["slideIndex"],
+                "batchIndex": record["batchIndex"],
                 "shapeName": record["shapeName"],
                 "shapeSpid": record["shapeSpid"],
+                "selectionRow": record["selectionRow"],
                 "attributedSpid": record["attributedSpid"],
                 "error": record["error"],
             }
@@ -1484,12 +2139,11 @@ def run_capture(
 class LiveAXNode:
     """One live accessibility element. Every attribute is read on access, never cached."""
 
-    __slots__ = ("_element", "_ax", "_quartz")
+    __slots__ = ("_element", "_ax")
 
-    def __init__(self, element: Any, ax: Any, quartz: Any) -> None:
+    def __init__(self, element: Any, ax: Any) -> None:
         self._element = element
         self._ax = ax
-        self._quartz = quartz
 
     def _attribute(self, name: str) -> Any:
         error, value = self._ax.AXUIElementCopyAttributeValue(self._element, name, None)
@@ -1517,42 +2171,57 @@ class LiveAXNode:
         return True if value is None else bool(value)
 
     @property
-    def frame(self) -> Frame | None:
-        position = self._attribute(self._ax.kAXPositionAttribute)
-        size = self._attribute(self._ax.kAXSizeAttribute)
-        if position is None or size is None:
-            return None
-        ok_point, point = self._ax.AXValueGetValue(position, self._ax.kAXValueCGPointType, None)
-        ok_size, extent = self._ax.AXValueGetValue(size, self._ax.kAXValueCGSizeType, None)
-        if not ok_point or not ok_size:
-            return None
-        return Frame(float(point.x), float(point.y), float(extent.width), float(extent.height))
+    def selected(self) -> bool:
+        return bool(self._attribute(self._ax.kAXSelectedAttribute))
 
     @property
     def children(self) -> Sequence[AXNode]:
         kids = self._attribute(self._ax.kAXChildrenAttribute) or []
-        return [LiveAXNode(child, self._ax, self._quartz) for child in kids]
+        return [LiveAXNode(child, self._ax) for child in kids]
 
     def press(self) -> None:
         error = self._ax.AXUIElementPerformAction(self._element, self._ax.kAXPressAction)
         if error:
             raise TargetFailure(f"AXPress on {self.title!r} ({self.role}) failed with AX error {error}")
 
-    # There is deliberately no ``select``. The 2026-10-31 run proved ``kAXSelected`` never
-    # reads back true on this build's navigator cells, and nothing else here selects by
-    # attribute: a shape is selected by a click and verified from the saved package.
+    def set_selected(self, selected: bool) -> None:
+        """Write ``AXSelected``. The only attribute this driver ever sets.
+
+        A Selection Pane row has no ``AXPress`` — its actions are ``AXShowDefaultUI``,
+        ``AXShowAlternateUI`` and a Rename — so setting this attribute is how an outline
+        row is selected. It is deliberately **not** a general "set any attribute" method:
+        a narrow one cannot be reached for when something else looks like it might work,
+        which is how the 2026-10-31 run came to set ``kAXSelected`` on navigator cells
+        that never read it back.
+
+        There is still no slide selection here. That attribute never took on the
+        navigator's cells; it does take on an outline's rows, which is a different
+        element with a different mechanism, and this method's read-back is what says so
+        per target rather than assuming it.
+        """
+        error = self._ax.AXUIElementSetAttributeValue(
+            self._element, self._ax.kAXSelectedAttribute, bool(selected)
+        )
+        if error:
+            raise TargetFailure(
+                f"setting AXSelected on a {self.role} failed with AX error {error}; the row "
+                f"carries {[child.value for child in self.children if child.value]}"
+            )
 
 
 class LiveAXBackend:
-    """The real host. pyobjc is imported here so importing this module never needs it."""
+    """The real host. pyobjc is imported here so importing this module never needs it.
+
+    It posts no events of any kind, so **Quartz is no longer imported**: the only
+    binding that needed it was the mouse event, and the documented invocation lost a
+    ``--with`` with it.
+    """
 
     def __init__(self) -> None:
         import ApplicationServices as ax
-        import Quartz
         from AppKit import NSWorkspace
 
         self._ax = ax
-        self._quartz = Quartz
         self._workspace = NSWorkspace
         self._pid: int | None = None
 
@@ -1578,20 +2247,13 @@ class LiveAXBackend:
         error, windows = self._ax.AXUIElementCopyAttributeValue(element, self._ax.kAXWindowsAttribute, None)
         if error:
             raise ControlNotFound(f"reading PowerPoint's windows failed with AX error {error}")
-        return [LiveAXNode(window, self._ax, self._quartz) for window in (windows or [])]
+        return [LiveAXNode(window, self._ax) for window in (windows or [])]
 
-    def click(self, x: float, y: float) -> None:
-        """Post a global mouse click. This **moves the operator's pointer**."""
-        quartz = self._quartz
-        point = quartz.CGPointMake(x, y)
-        for event_type in (
-            quartz.kCGEventMouseMoved,
-            quartz.kCGEventLeftMouseDown,
-            quartz.kCGEventLeftMouseUp,
-        ):
-            event = quartz.CGEventCreateMouseEvent(None, event_type, point, quartz.kCGMouseButtonLeft)
-            quartz.CGEventPost(quartz.kCGHIDEventTap, event)
-            time.sleep(0.03)
+    # There is deliberately no ``click``. It posted a global mouse event at a derived
+    # canvas point, with a click state, a move settle, a button hold and a 0.35 s settle
+    # after the up, and its last live run captured 2 of 12 attempted targets: the pointer
+    # landed in the right place and the shape stayed unselected. Shape selection is a
+    # Selection Pane row now, so this backend posts no events at all.
 
     def now(self) -> float:
         return time.monotonic()
@@ -1606,8 +2268,9 @@ def build_parser() -> argparse.ArgumentParser:
         prog="gui_capture.py",
         description=(
             "Development-only accessibility capture driver for PowerPoint animation values. "
-            "It MOVES THE REAL POINTER to click the slide canvas and refuses to start unless "
-            "PowerPoint is frontmost showing the expected capture deck."
+            "It selects each shape by its Selection Pane row and presses ribbon controls by "
+            "title, so it never moves the pointer and posts no mouse events; it refuses to "
+            "start unless PowerPoint is frontmost showing the expected capture deck."
         ),
         epilog=(
             f"Sends nothing without {DRIVE_TOKEN}. sdpm's runtime, CLI, MCP servers and tests "
@@ -1620,6 +2283,17 @@ def build_parser() -> argparse.ArgumentParser:
     parser.add_argument("--expect-document", help="window title to require; defaults to the document's stem")
     parser.add_argument("--timeout", type=float, default=DEFAULT_TIMEOUT, help="bound on every wait, in seconds")
     parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=DEFAULT_BATCH_SIZE,
+        help=(
+            "targets pressed before one Save judges them all (default "
+            f"{DEFAULT_BATCH_SIZE}). Each target is still attributed by its own spid against "
+            "the saved package; 1 saves per target, which additionally separates two targets "
+            "that swapped effects, at one save each"
+        ),
+    )
+    parser.add_argument(
         "--force",
         action="store_true",
         help=(
@@ -1627,9 +2301,8 @@ def build_parser() -> argparse.ArgumentParser:
             "re-press replaces the shape's existing effect and the attribution needs a new one"
         ),
     )
-    parser.add_argument("--pane-role", default=EDITOR_PANE_ROLE, help="AX role of the slide editor pane")
-    parser.add_argument("--pane-frame", help="measured editor pane frame in screen points as x,y,w,h")
-    parser.add_argument("--zoom", type=float, help="measured zoom factor, e.g. 0.92, when the status bar hides it")
+    # There is no --pane-frame, --pane-role or --zoom. They existed to correct a canvas
+    # click's coordinate mapping, and there is no coordinate and no click any more.
     parser.add_argument(
         "--emit-record-schema",
         action="store_true",
@@ -1663,21 +2336,19 @@ def main(argv: Sequence[str] | None = None) -> int:
     if not args.consent:
         print(
             f"FAIL: refusing to drive PowerPoint without {DRIVE_TOKEN}. This driver presses ribbon "
-            "controls and moves the real pointer in the frontmost application.",
+            "controls and selects shapes in the frontmost application's Selection Pane.",
             file=sys.stderr,
         )
         return 2
 
     plan = json.loads(args.plan.read_text(encoding="utf-8"))
     try:
-        pane = parse_pane_frame(args.pane_frame)
-    except ValueError as exc:
-        print(f"FAIL: {exc}", file=sys.stderr)
-        return 2
-    try:
         plan_shape_names(plan)
     except DriverRefusal as exc:
         print(f"FAIL: {exc}", file=sys.stderr)
+        return 2
+    if args.batch_size < 1:
+        print(f"FAIL: --batch-size must be at least 1, got {args.batch_size}", file=sys.stderr)
         return 2
     settings = CaptureSettings(
         out_dir=args.out,
@@ -1685,9 +2356,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         expect_document=args.expect_document,
         timeout=args.timeout,
         force=args.force,
-        pane_role=args.pane_role,
-        pane=pane,
-        zoom=args.zoom,
+        batch_size=args.batch_size,
     )
     if not settings.document.exists():
         print(f"FAIL: no capture deck at {settings.document}", file=sys.stderr)
@@ -1699,7 +2368,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         print(
             f"FAIL: the accessibility bindings are unavailable ({exc}). Run with: uv run "
             "--with pyobjc-framework-ApplicationServices --with pyobjc-framework-Cocoa "
-            "--with pyobjc-framework-Quartz",
+            "--with lxml",
             file=sys.stderr,
         )
         return 1

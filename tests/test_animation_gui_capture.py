@@ -14,12 +14,19 @@ already consumes.
 The accessibility layer is injected, so every test here runs against a fake PowerPoint
 that re-renders its tree on each read — which is also how the "re-resolve by title before
 every press" rule gets exercised rather than assumed. The fake is hostile on purpose in
-three ways that each cost the driver a live run if it got them wrong:
+five ways that each cost the driver a live run if it got them wrong:
 
 - it has **no slide navigator at all**, so a reintroduced ``select_slide`` could not work
   against it;
-- its clicks are **hit-tested against the real package geometry**, so a click computed
-  from the wrong shape selects the wrong shape rather than being quietly forgiven;
+- it has **no clickable canvas and no frames**, so a reintroduced coordinate click would
+  have nothing to aim at — which is the point: the click version's last live run
+  captured 2 of 12 attempted targets;
+- its **Selection Pane rows are built from the package's own shape names**, in reverse
+  z-order, one row per shape *and* one per label, and a gallery press applies its effect
+  to **whichever row is selected** — so a driver that selected the wrong row, or none,
+  would move the effect onto another shape rather than being quietly forgiven;
+- only the controls of the **active ribbon tab** are in its tree, so opening the
+  Selection Pane from Home really does take the ribbon off Animations;
 - its Save **writes a real ``p:timing`` tree into the package** and renumbers every
   timing ``id`` while doing it, because nothing offline can promise PowerPoint does not.
 """
@@ -29,11 +36,10 @@ from __future__ import annotations
 import ast
 import copy
 import json
-import math
 import os
 import re
 import zipfile
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from itertools import count
 from pathlib import Path
 from typing import Any, Callable
@@ -52,18 +58,15 @@ from scripts.animation_catalog.generate import (
 REPO_ROOT = Path(__file__).resolve().parents[1]
 DRIVER_SOURCE = REPO_ROOT / "scripts" / "animation_catalog" / "gui_capture.py"
 
-#: The window-relative editor pane and window origin measured on 2026-10-31, with the
-#: screen point they produced for a shape centred at (140, 190) pt at 92% zoom. This is a
-#: pin on :func:`driver.canvas_point` itself, not on any deck's layout.
-MEASURED_PANE_WINDOW = driver.Frame(254, 144, 1258, 540)
-MEASURED_WINDOW_ORIGIN = (0.0, 33.0)
-MEASURED_ZOOM = 0.92
+#: The slide size the generated capture deck carries, in points. The driver no longer
+#: reads it — nothing maps a shape to a screen point any more — so this is a pin on the
+#: planner's reader and on the deck, not on the driver.
 MEASURED_SLIDE_PT = (960.0, 540.0)
-MEASURED_SHAPE_CENTRE = (140.0, 190.0)
-MEASURED_SCREEN_POINT = (570.2, 373.4)
 
-#: The title the live editor area carries, verbatim from a 2026-10-31 read.
-EDITOR_AREA_TITLE = "Slide Editor Pane, Slide 1 of 1 Slides"
+#: The names the live Selection Pane's first three rows carried on 2026-11-01, in pane
+#: order. Reverse z-order, and a label's row sits between two shapes' rows, which is why
+#: a row is found by name rather than by index.
+MEASURED_PANE_HEAD = ("TextBox 152", "Rounded Rectangle 151", "TextBox 150")
 
 #: The target count the checked-in catalog derives today, and the grid it fits on one
 #: slide. Both are asserted against the plan rather than trusted.
@@ -75,10 +78,6 @@ EXPECTED_TARGETS = 76
 #: cells and a one-line label take the short side to 43.5 pt.
 EXPECTED_GRID = (10, 8)
 EXPECTED_SHAPE_PX = (154, 87)
-
-
-def measured_pane() -> driver.Frame:
-    return driver.window_frame_to_screen(MEASURED_PANE_WINDOW, MEASURED_WINDOW_ORIGIN)
 
 
 # --- a package the fake can apply effects to --------------------------------
@@ -166,49 +165,126 @@ def write_effects(package: Path, slide_index: int, effects: dict[str, tuple[str,
             out.writestr(info, blob)
 
 
-def shape_rects_pt(package: Path, slide_index: int) -> dict[str, tuple[float, float, float, float]]:
-    """Return ``spid -> (x1, y1, x2, y2)`` in slide points for every shape on a slide.
+def shape_names_in_z_order(package: Path, slide_index: int) -> list[tuple[str, str]]:
+    """Return ``(name, spid)`` for every shape on a slide, in document order.
 
-    Read here with its own XML pass rather than through the driver, so the fake's
-    hit-testing is not the driver's own idea of where a shape is.
+    Document order is z-order, back to front, which is the order the Selection Pane
+    reverses. Read here with its own XML pass rather than through the driver, so the
+    fake's row names are not the driver's own idea of what the slide holds — and it keeps
+    the **labels** as well as the target shapes, because the live pane carries a row for
+    each (153 rows for 76 targets).
     """
     parser = etree.XMLParser(resolve_entities=False, load_dtd=False, no_network=True)
     with zipfile.ZipFile(package) as archive:
         root = etree.fromstring(archive.read(f"ppt/slides/slide{slide_index}.xml"), parser=parser)
-    rects: dict[str, tuple[float, float, float, float]] = {}
+    found: list[tuple[str, str]] = []
     for shape in root.iter():
         if etree.QName(shape).localname != "sp":
             continue
         props = next((el for el in shape.iter() if etree.QName(el).localname == "cNvPr"), None)
-        off = next((el for el in shape.iter() if etree.QName(el).localname == "off"), None)
-        ext = next((el for el in shape.iter() if etree.QName(el).localname == "ext"), None)
-        if props is None or off is None or ext is None:
+        if props is None or not props.get("name"):
             continue
-        x, y = int(off.get("x")) / 12700, int(off.get("y")) / 12700
-        cx, cy = int(ext.get("cx")) / 12700, int(ext.get("cy")) / 12700
-        rects[props.get("id")] = (x, y, x + cx, y + cy)
-    return rects
+        found.append((props.get("name"), props.get("id")))
+    return found
 
 
 # --- the fake accessibility host --------------------------------------------
 @dataclass
-class FakeNode:
-    """One element of a fake accessibility tree, matching :class:`driver.AXNode`."""
+class ReadCounter:
+    """Counts every accessibility attribute the driver reads.
 
-    role: str
-    title: str | None = None
-    value: str | None = None
-    enabled: bool = True
-    frame: driver.Frame | None = None
-    children: list[FakeNode] = field(default_factory=list)
-    on_press: Callable[[], None] | None = None
-    press_error: str | None = None
+    This is the only thing offline that can tell a scoped lookup from a full-window walk,
+    and cost is a correctness property for this driver: a version whose every lookup
+    walked the window captured **7 targets in 28 minutes**, every one correct and
+    attributed, and could not have reached 76. Live, one attribute read is one
+    interprocess round trip — a full walk of the 907-node document window measured
+    6.4 s — so a read count is a time estimate with the host's variance taken out.
+    """
+
+    reads: int = 0
+
+    def read(self) -> None:
+        self.reads += 1
+
+
+class FakeNode:
+    """One element of a fake accessibility tree, matching :class:`driver.AXNode`.
+
+    Every attribute is a counted property rather than a field, because an attribute read
+    is what the driver pays for and a dataclass field is free. A node given no counter
+    gets its own, so a node built directly by a test costs nothing to the fake's total.
+
+    There is no ``frame``: the driver reads no rectangles any more, so a fake that
+    published them would let a coordinate mapping come back unnoticed.
+    """
+
+    def __init__(
+        self,
+        role: str,
+        title: str | None = None,
+        value: str | None = None,
+        enabled: bool = True,
+        selected: bool = False,
+        children: list[FakeNode] | None = None,
+        on_press: Callable[[], None] | None = None,
+        on_set_selected: Callable[[bool], None] | None = None,
+        press_error: str | None = None,
+        select_error: str | None = None,
+        counter: ReadCounter | None = None,
+    ) -> None:
+        self._role = role
+        self._title = title
+        self._value = value
+        self._enabled = enabled
+        self._selected = selected
+        self._children = children if children is not None else []
+        self.on_press = on_press
+        self.on_set_selected = on_set_selected
+        self.press_error = press_error
+        self.select_error = select_error
+        self.counter = counter if counter is not None else ReadCounter()
+
+    @property
+    def role(self) -> str:
+        self.counter.read()
+        return self._role
+
+    @property
+    def title(self) -> str | None:
+        self.counter.read()
+        return self._title
+
+    @property
+    def value(self) -> str | None:
+        self.counter.read()
+        return self._value
+
+    @property
+    def enabled(self) -> bool:
+        self.counter.read()
+        return self._enabled
+
+    @property
+    def selected(self) -> bool:
+        self.counter.read()
+        return self._selected
+
+    @property
+    def children(self) -> list[FakeNode]:
+        self.counter.read()
+        return self._children
 
     def press(self) -> None:
         if self.press_error:
             raise driver.TargetFailure(self.press_error)
         if self.on_press is not None:
             self.on_press()
+
+    def set_selected(self, selected: bool) -> None:
+        if self.select_error:
+            raise driver.TargetFailure(self.select_error)
+        if self.on_set_selected is not None:
+            self.on_set_selected(selected)
 
 
 ENTRANCE_TILES = ("Fly In", "Fade", "Grow & Turn")
@@ -224,12 +300,30 @@ class FakePowerPoint:
 
     It has **no slide navigator**, because the live 2026-10-31 run established that the
     navigator is not drivable: its cells publish no actions and only the few scrolled into
-    view exist at all. A driver that still needed one would fail here.
+    view exist at all. It also has **no canvas and no frames**, because shape selection is
+    a Selection Pane row now and a coordinate click has nothing left to aim at.
 
-    A click is hit-tested against the package's own shape rectangles, mapped to the screen
-    with the same pane and zoom the tree advertises. ``pointer_offset`` shifts where the
-    click is taken to land, which is how a mis-aimed click is exercised; a click that hits
-    nothing deselects, exactly as clicking empty canvas does.
+    The Selection Pane is modelled the way it was measured: an ``AXOutline`` of one
+    ``AXRow`` per shape in **reverse z-order**, each row's name carried as a descendant
+    ``AXStaticText``'s ``value`` rather than as the row's title, and ``AXSelected``
+    settable with no ``AXPress``. A gallery press applies its effect to **whichever row
+    is selected**, so a driver that selected the wrong row would put the effect on the
+    wrong shape and the attribution gate would say so.
+
+    Only the active ribbon tab's controls are in the tree: ``Arrange`` exists on Home,
+    the galleries exist on Animations. That makes the ribbon switch the Selection Pane
+    costs real rather than free.
+
+    It is hostile about **cost** too, in the two ways the live application is:
+
+    - it publishes ``Save`` under an ``AXToolbar`` and the whole ribbon under one
+      ``AXTabGroup``, with the active tab's commands in a scroll area inside it, so a
+      lookup that walked the window instead of the container would be visible in the read
+      count rather than merely slower;
+    - it publishes four more windows carrying the **same document title**, none of them
+      holding the ribbon and each holding a subtree big enough to be worth not walking,
+      because ``document_window`` identifying the right one by walking each candidate is
+      half of what made a live run four minutes per target.
     """
 
     def __init__(
@@ -240,51 +334,100 @@ class FakePowerPoint:
         tiles: tuple[str, ...] = ENTRANCE_TILES,
         duplicate_tile: str | None = None,
         applies_effect: bool = True,
-        pointer_offset: tuple[float, float] = (0.0, 0.0),
+        selection_sticks: bool = True,
+        missing_rows: tuple[str, ...] = (),
+        duplicate_row: str | None = None,
+        selection_pane_open: bool = False,
+        active_tab: str = driver.RIBBON_ANCHOR_TAB,
+        decoy_windows: int = 4,
+        decoy_rows: int = 0,
     ) -> None:
         self.document = document
         self.slide_index = slide_index
         self.tiles = tiles
         self.duplicate_tile = duplicate_tile
         self.applies_effect = applies_effect
-        self.pointer_offset = pointer_offset
+        #: When false, writing ``AXSelected`` is accepted and does nothing — the shape
+        #: the driver asked for never reads back selected. This is the Selection Pane's
+        #: analogue of the click that left the shape unselected.
+        self.selection_sticks = selection_sticks
+        #: Rows the pane does not publish, by shape name.
+        self.missing_rows = set(missing_rows)
+        self.duplicate_row = duplicate_row
+        #: ``selected row -> shape the press actually animates``. The pane reports the
+        #: row the driver selected, and PowerPoint applies the effect elsewhere. With a
+        #: read-back-confirmed row selection this is the ONLY way the wrong shape can
+        #: still receive a press, and the attribution gate is what has to catch it.
+        self.applies_to_instead: dict[str, str] = {}
+        #: Shapes whose press applies no effect at all, by shape name. One target of a
+        #: batch gaining nothing while its siblings gain is what has to reject that one
+        #: and credit the rest.
+        self.applies_nothing_for: set[str] = set()
+        self.selection_pane_open = selection_pane_open
+        self.active_tab = active_tab
+        #: How many same-titled windows PowerPoint publishes that are NOT the document.
+        self.decoy_windows = decoy_windows
         self.trusted_flag = True
         self.frontmost = driver.BUNDLE_ID
         self.document_title = document.stem
         #: spid -> (presetID, presetClass), replaced per shape exactly as a gallery press
         #: replaces the selected shape's effect.
         self.effects: dict[str, tuple[str, str]] = {}
-        self.selected_spid: str | None = None
+        self.selected_name: str | None = None
         self.open_popup: str | None = None
+        self.arrange_open = False
         self.presses: list[tuple[str, str | None]] = []
-        self.clicks: list[tuple[float, float]] = []
+        self.selections: list[str] = []
+        self.selection_pane_presses = 0
         self.reads = 0
         self.saves = 0
         self.slept = 0.0
         self._now = 100.0
-        self._rects = shape_rects_pt(document, slide_index)
+        self.counter = ReadCounter()
+        #: ``(name, spid)`` in z-order, back to front, labels included.
+        self._shapes = shape_names_in_z_order(document, slide_index)
+        #: Rows the pane publishes that are not in the package at all, so the outline can
+        #: be inflated to the 152 rows the live pane carried without inventing shapes the
+        #: driver could press. They are never selected and never animated; they are there
+        #: to make a lookup that walks the pane expensive, as it is live.
+        self._shapes += [(f"Decoy {index}", f"9{index:03d}") for index in range(decoy_rows)]
+        self._spids = dict(self._shapes)
 
     # --- behaviour --------------------------------------------------------
     @property
     def shape_selected(self) -> bool:
-        return self.selected_spid is not None
+        return self.selected_name is not None
 
-    def spid_at(self, x: float, y: float) -> str | None:
-        """Which shape a click at this screen point lands on, topmost first."""
-        pane = measured_pane()
-        point = (x + self.pointer_offset[0], y + self.pointer_offset[1])
-        for spid in sorted(self._rects, key=int, reverse=True):
-            x1, y1, x2, y2 = self._rects[spid]
-            top_left = driver.canvas_point(MEASURED_SLIDE_PT, (x1, y1), pane, MEASURED_ZOOM)
-            bottom_right = driver.canvas_point(MEASURED_SLIDE_PT, (x2, y2), pane, MEASURED_ZOOM)
-            if top_left[0] <= point[0] <= bottom_right[0] and top_left[1] <= point[1] <= bottom_right[1]:
-                return spid
-        return None
+    @property
+    def selected_spid(self) -> str | None:
+        """The spid of whichever shape's row is selected, or None."""
+        return self._spids.get(self.selected_name) if self.selected_name else None
+
+    def select(self, name: str) -> None:
+        """Select a shape by name, as setting its row's ``AXSelected`` does."""
+        self.selected_name = name
+
+    def _row_names(self) -> list[str]:
+        """The names the pane publishes, in pane order: reverse z-order."""
+        names = [name for name, _spid in reversed(self._shapes) if name not in self.missing_rows]
+        if self.duplicate_row:
+            names.append(self.duplicate_row)
+        return names
+
+    def _set_row_selected(self, name: str, selected: bool) -> None:
+        self.selections.append(name)
+        if not self.selection_sticks:
+            return
+        self.selected_name = name if selected else None
 
     def _press_tile(self, title: str) -> None:
         self.presses.append((title, self.selected_spid))
-        if self.applies_effect and self.selected_spid is not None:
-            self.effects[self.selected_spid] = TILE_PRESETS.get(title, DEFAULT_PRESET)
+        if not self.applies_effect or self.selected_name is None:
+            return
+        if self.selected_name in self.applies_nothing_for:
+            return
+        animated = self.applies_to_instead.get(self.selected_name, self.selected_name)
+        self.effects[self._spids[animated]] = TILE_PRESETS.get(title, DEFAULT_PRESET)
 
     def _save(self) -> None:
         self.saves += 1
@@ -295,16 +438,20 @@ class FakePowerPoint:
         os.utime(self.document, (stamp, stamp))
 
     # --- the tree ---------------------------------------------------------
+    def _node(self, **fields: Any) -> FakeNode:
+        """Build a node that counts its attribute reads into this fake's counter."""
+        return FakeNode(counter=self.counter, **fields)
+
     def _gallery(self) -> FakeNode:
         titles = list(self.tiles)
         if self.duplicate_tile:
             titles.append(self.duplicate_tile)
-        return FakeNode(
+        return self._node(
             role="AXGroup",
             title="Entrance Effects",
             enabled=self.shape_selected,
             children=[
-                FakeNode(
+                self._node(
                     role="AXRadioButton",
                     title=title,
                     enabled=self.shape_selected,
@@ -315,70 +462,146 @@ class FakePowerPoint:
         )
 
     def _path_animation_button(self) -> FakeNode:
-        return FakeNode(
+        return self._node(
             role="AXMenuButton",
             title=planner.PATH_ANIMATION_CONTROL,
             enabled=self.shape_selected,
             on_press=lambda: setattr(self, "open_popup", planner.PATH_ANIMATION_CONTROL),
         )
 
-    def _document_window(self) -> FakeNode:
-        animated = self.selected_spid in self.effects
-        return FakeNode(
-            role="AXWindow",
-            title=self.document_title,
-            frame=driver.Frame(*MEASURED_WINDOW_ORIGIN, 1512, 900),
-            children=[
-                FakeNode(role="AXButton", title=driver.SAVE_LABEL, on_press=self._save),
-                FakeNode(
-                    role="AXTabGroup",
-                    children=[
-                        FakeNode(role="AXRadioButton", title="Transitions"),
-                        FakeNode(role="AXRadioButton", title=planner.ANIMATIONS_TAB),
-                    ],
-                ),
+    def _toolbar(self) -> FakeNode:
+        """The Quick Access toolbar, which is where ``Save`` lives.
+
+        Live, ``Save`` is under the window's ``AXToolbar``, and the driver resolves it
+        there rather than walking the window. Publishing it anywhere else here would let
+        a full-window walk come back without the read budget noticing.
+        """
+        return self._node(
+            role=driver.TOOLBAR_ROLE,
+            children=[self._node(role="AXButton", title=driver.SAVE_LABEL, on_press=self._save)],
+        )
+
+    def _ribbon(self) -> FakeNode:
+        """The ribbon: the tab strip, and the active tab's commands inside it.
+
+        One ``AXTabGroup`` holding both, with the commands a level deeper in a scroll
+        area, which is what the driver scopes every tab, gallery, tile and labelled
+        read-back to. Pressing a tab makes it the active one.
+        """
+        children = [
+            self._node(
+                role="AXRadioButton",
+                title=title,
+                on_press=lambda title=title: setattr(self, "active_tab", title),
+            )
+            for title in (driver.RIBBON_ANCHOR_TAB, "Transitions", planner.ANIMATIONS_TAB)
+        ]
+        commands: list[FakeNode] = []
+        if self.active_tab == driver.RIBBON_ANCHOR_TAB:
+            commands.append(self._arrange_button())
+        if self.active_tab == planner.ANIMATIONS_TAB:
+            animated = self.selected_spid in self.effects
+            commands += [
                 self._gallery(),
                 self._path_animation_button(),
-                FakeNode(
+                self._node(
                     role="AXPopUpButton",
                     title=driver.START_LABEL,
                     value="On Click" if animated else None,
                 ),
-                FakeNode(
+                self._node(
                     role="AXIncrementor",
                     title=driver.DURATION_LABEL,
                     value="05.00" if animated else None,
                 ),
-                # The real tree nests a titled editor area inside a framed scroll area,
-                # and the driver identifies the pane by that title rather than by being
-                # the largest pane of a role — picking the largest returned the outer
-                # split that also holds the navigator and the notes, which put every
-                # click off its shape. The inner area's own frame lags a ribbon
-                # expand/collapse, so the container is what gets measured.
-                FakeNode(
-                    role="AXScrollArea",
-                    frame=measured_pane(),
+            ]
+        children.append(self._node(role="AXScrollArea", children=commands))
+        return self._node(role=driver.RIBBON_ROLE, children=children)
+
+    def _arrange_button(self) -> FakeNode:
+        """``Home ▸ Arrange``, which opens the ``Arrange`` window when pressed."""
+        return self._node(
+            role="AXMenuButton",
+            title=driver.SELECTION_PANE_PATH[1],
+            on_press=lambda: setattr(self, "arrange_open", True),
+        )
+
+    def _arrange_window(self) -> FakeNode:
+        return self._node(
+            role="AXWindow",
+            title=driver.SELECTION_PANE_PATH[1],
+            children=[
+                self._node(
+                    role="AXMenuButton",
+                    title=driver.SELECTION_PANE_PATH[2],
+                    on_press=self._press_selection_pane_item,
+                )
+            ],
+        )
+
+    def _press_selection_pane_item(self) -> None:
+        """Toggle the pane, exactly as pressing an already-active control does."""
+        self.selection_pane_presses += 1
+        self.selection_pane_open = not self.selection_pane_open
+        self.arrange_open = False
+
+    def _selection_pane(self) -> FakeNode:
+        """The pane: one row per shape in reverse z-order, named by a descendant label.
+
+        A row carries **no title and no ``AXPress``** — only ``AXSelected`` — which is
+        what the live pane exposed, and is why the driver resolves a row by a descendant
+        static text's value and selects it by writing the attribute.
+        """
+        return self._node(
+            role=driver.SELECTION_PANE_ROLE,
+            children=[
+                self._node(
+                    role=driver.SELECTION_ROW_ROLE,
+                    selected=name == self.selected_name,
+                    on_set_selected=(
+                        lambda selected, name=name: self._set_row_selected(name, selected)
+                    ),
+                    children=[self._node(role=driver.SELECTION_LABEL_ROLE, value=name)],
+                )
+                for name in self._row_names()
+            ],
+        )
+
+    def _document_window(self) -> FakeNode:
+        children = [self._toolbar(), self._ribbon()]
+        if self.selection_pane_open:
+            children.append(self._selection_pane())
+        return self._node(role="AXWindow", title=self.document_title, children=children)
+
+    def _decoy_window(self, index: int) -> FakeNode:
+        """A window with the document's title, no ribbon, and a subtree worth skipping.
+
+        PowerPoint publishes four or five of these. ``document_window`` used to tell them
+        apart by walking each one looking for a ribbon tab, so each decoy here holds
+        enough nodes that doing it again would show up in the read budget.
+        """
+        return self._node(
+            role="AXWindow",
+            title=self.document_title,
+            children=[
+                self._node(
+                    role="AXGroup",
+                    title=f"decoy {index} group {outer}",
                     children=[
-                        FakeNode(
-                            role=driver.EDITOR_PANE_ROLE,
-                            # A literal, not the driver's own constant: a test that
-                            # changes the prefix the driver looks for must be able to
-                            # make the tree stop matching it.
-                            title=EDITOR_AREA_TITLE,
-                            frame=measured_pane(),
-                        )
+                        self._node(role="AXStaticText", value=f"decoy {index}.{outer}.{inner}")
+                        for inner in range(8)
                     ],
-                ),
-                FakeNode(role="AXButton", title=f"{int(MEASURED_ZOOM * 100)}%"),
+                )
+                for outer in range(4)
             ],
         )
 
     def _popup_window(self) -> FakeNode:
-        return FakeNode(
+        return self._node(
             role="AXWindow",
             title=planner.PATH_ANIMATION_CONTROL,
             children=[
-                FakeNode(
+                self._node(
                     role="AXMenuButton",
                     title=title,
                     on_press=lambda title=title: self._press_tile(title),
@@ -394,16 +617,22 @@ class FakePowerPoint:
     def frontmost_bundle_id(self) -> str | None:
         return self.frontmost
 
+    @property
+    def attribute_reads(self) -> int:
+        """How many accessibility attributes have been read since this fake was built."""
+        return self.counter.reads
+
     def windows(self) -> list[Any]:
         self.reads += 1
-        windows = [self._document_window()]
+        # The decoys come FIRST, so a driver that took the first window with the right
+        # title rather than the one carrying the ribbon would fail outright.
+        windows = [self._decoy_window(index) for index in range(self.decoy_windows)]
+        windows.append(self._document_window())
         if self.open_popup:
             windows.append(self._popup_window())
+        if self.arrange_open:
+            windows.append(self._arrange_window())
         return windows
-
-    def click(self, x: float, y: float) -> None:
-        self.clicks.append((x, y))
-        self.selected_spid = self.spid_at(x, y)
 
     def now(self) -> float:
         return self._now
@@ -713,7 +942,7 @@ class TestRecordShape:
             readback={"start": "On Click", "duration": "05.00"},
             shape_name="Rounded Rectangle 1",
             shape_spid="2",
-            click_point=(570.21, 373.44),
+            selection_row="Rounded Rectangle 1",
             effect={"spid": "2", "spids": ["2"], "cTn": {"presetID": "2", "presetClass": "entr"}},
             effect_count=(0, 1),
             steps=[{"title": "Fly In", "outcome": "pressed", "role": "AXRadioButton"}],
@@ -727,7 +956,11 @@ class TestRecordShape:
         assert record["attributed"] is True
         assert record["effectCTn"] == {"presetID": "2", "presetClass": "entr"}
         assert record["effectCount"] == {"before": 0, "after": 1}
-        assert record["clickPoint"] == [570.2, 373.4]
+        # How the shape was selected, not where a pointer went. A record with no row
+        # claims no mechanism, so a merged file cannot read a failed target as driven.
+        assert record["selectionRow"] == "Rounded Rectangle 1"
+        assert record["selectedBy"] == driver.SELECTED_BY == "selectionPaneRow"
+        assert "clickPoint" not in record
         assert record["ribbonReadBack"] == {"start": "On Click", "duration": "05.00"}
         assert record["rejected"] is False
         assert record["error"] is None
@@ -756,6 +989,8 @@ class TestRecordShape:
         assert record["error"] == {"kind": "controlNotFound", "message": "no element titled 'Whip'"}
         assert record["attributed"] is False
         assert record["attributedSpid"] is None
+        assert record["selectionRow"] is None
+        assert record["selectedBy"] is None
 
     def test_a_gui_record_has_no_scripting_code_it_did_not_measure(self):
         record = driver.capture_record(
@@ -917,8 +1152,39 @@ class TestEffectAttribution:
         assert driver.attribute_new_effect(before, after, "4")["spid"] == "4"
 
     def test_an_effect_targeting_two_shapes_attributes_to_neither(self):
+        """An effect whose p:spTgt names two shapes belongs to neither target.
+
+        ``spid`` is ``None`` for such an effect, which is not the clicked shape, so it
+        counts as foreign and the record names what the package actually held.
+        """
         after = [{"spid": None, "spids": ["2", "4"], "cTn": {"presetID": "2"}}]
         with pytest.raises(driver.EffectMisattributed, match=r"\['2', '4'\]"):
+            driver.attribute_new_effect([], after, "2")
+
+    def test_a_compound_value_writing_several_nodes_still_attributes(self):
+        """A compound value writes more than one p:cTn, and that is not a failure.
+
+        Measured: a run reported "0 before and 3 after, spids that appeared: ['2']" and
+        rejected a target whose value had been applied to exactly the right shape. The
+        count is carried so a reader knows the value is not a single node.
+        """
+        after = [
+            {"spid": "2", "spids": ["2"], "cTn": {"presetID": "18", "presetClass": "emph"}},
+            {"spid": "2", "spids": ["2"], "cTn": {"presetID": "18", "presetClass": "emph"}},
+            {"spid": "2", "spids": ["2"], "cTn": {"presetID": "18", "presetClass": "emph"}},
+        ]
+        effect = driver.attribute_new_effect([], after, "2")
+        assert effect["spid"] == "2"
+        assert effect["newEffectCount"] == 3
+
+    def test_a_compound_value_with_one_node_on_another_shape_is_still_refused(self):
+        """Relaxing the count must not let a stray effect through."""
+        after = [
+            {"spid": "2", "spids": ["2"], "cTn": {"presetID": "18"}},
+            {"spid": "2", "spids": ["2"], "cTn": {"presetID": "18"}},
+            {"spid": "9", "spids": ["9"], "cTn": {"presetID": "18"}},
+        ]
+        with pytest.raises(driver.EffectMisattributed, match="'9'"):
             driver.attribute_new_effect([], after, "2")
 
 
@@ -1046,19 +1312,39 @@ class TestFailureRecording:
         assert summary["failed"] == 3
         assert summary["captured"] == 0
         assert {failure["error"]["kind"] for failure in summary["failures"]} == {"effectNotAdded"}
-        assert "did not add exactly one" in summary["failures"][0]["error"]["message"]
+        # The gate is "at least one new effect", not "exactly one" — a compound value
+        # writes several p:cTn nodes — so what it reports here is that none appeared.
+        assert "no new effect appeared" in summary["failures"][0]["error"]["message"]
         # The presses did happen; what failed is the evidence, and it says so.
         assert len(session["fake"].presses) == 3
 
-    def test_a_click_that_lands_on_the_wrong_shape_is_rejected_naming_both_spids(self, session):
-        """A mis-aimed click selects the neighbour, so the effect is the neighbour's."""
-        geometry = driver.read_canvas_geometry(session["fake"], session["settings"].document)
-        targets = session["plan"]["targets"]
-        first = geometry.point_for(session["settings"].document, 1, targets[0]["shapeName"])
-        second = geometry.point_for(session["settings"].document, 1, targets[1]["shapeName"])
-        session["fake"].pointer_offset = (second[0] - first[0], second[1] - first[1])
+    def test_an_effect_that_lands_on_another_shape_is_rejected_naming_both_spids(self, session):
+        """A press whose effect belongs to another shape is refused, naming both spids.
 
-        summary = driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
+        The Selection Pane cannot put the effect on a neighbour by a few points of aim —
+        which is the whole reason it replaced the click — and a row that did not take is
+        caught by the read-back before anything is pressed. So what is injected here is
+        the one case left: the pane reports the right row and PowerPoint animates another
+        shape. The gate has to catch that, because it is the only thing standing between
+        a wrong press and a correctly-labelled catalog entry.
+
+        Driven at ``--batch-size 1``, and that is a statement about batching rather than
+        a convenience. What is injected here is a **rotation**: every target's effect
+        lands on the next target's shape. With one save per target the gate sees one
+        press put an effect on a shape this target did not select and refuses it. With
+        one save per batch every spid in the batch gained exactly one effect and none
+        outside it gained anything, so the package cannot say whose value is whose — a
+        rotation confined to a batch is the one thing batching cannot separate, which is
+        why the per-target save is still reachable and why
+        ``test_a_stray_spid_fails_the_whole_batch_naming_it`` covers the case that leaves
+        the batch, where the gate still bites.
+        """
+        fake = session["fake"]
+        targets = session["plan"]["targets"]
+        session["settings"].batch_size = 1
+        names = [target["shapeName"] for target in targets]
+        fake.applies_to_instead = {name: names[(index + 1) % len(names)] for index, name in enumerate(names)}
+        summary = driver.run_capture(session["plan"], session["settings"], fake, version="16.113.1")
         assert summary["captured"] == 0
         assert summary["attributed"] == 0
         failure = next(f for f in summary["failures"] if f["key"] == targets[0]["key"])
@@ -1081,12 +1367,57 @@ class TestFailureRecording:
         ]
         assert all(record["attributed"] is False for record in records)
 
-    def test_a_click_that_lands_on_no_shape_is_a_bounded_timeout(self, session):
-        session["fake"].pointer_offset = (5_000.0, 5_000.0)
+    def test_a_selection_that_does_not_take_is_a_bounded_timeout_before_any_press(self, session):
+        """The write is accepted and the row never reads back selected.
+
+        This is the Selection Pane's version of the failure that killed the click: the
+        action appears to succeed and the shape is not selected. The read-back is what
+        turns it into a recorded timeout **before** a press, rather than a press that
+        replaces some other shape's effect — which is how the click version lost ten of
+        twelve targets to ``effectNotAdded``.
+        """
+        session["fake"].selection_sticks = False
         summary = driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
         assert summary["failed"] == 3
         assert {failure["error"]["kind"] for failure in summary["failures"]} == {"timeout"}
         assert session["fake"].presses == []
+        assert session["fake"].selections, "the driver did try to select each row"
+
+    def test_a_shape_with_no_selection_pane_row_is_recorded_and_nothing_is_pressed(self, session):
+        """A missing row names the names the pane did show, and no press happens.
+
+        A press with the wrong shape selected is worse than a failure, because the value
+        is applied and the record names the intended target. So an unmatched name must
+        not fall through to the gallery: the previous target's shape is still selected,
+        and pressing would overwrite *its* effect.
+        """
+        fake = session["fake"]
+        targets = session["plan"]["targets"]
+        fake.missing_rows = {targets[1]["shapeName"]}
+        summary = driver.run_capture(session["plan"], session["settings"], fake, version="16.113.1")
+        assert (summary["captured"], summary["failed"]) == (2, 1)
+        failure = next(f for f in summary["failures"] if f["key"] == targets[1]["key"])
+        assert failure["error"]["kind"] == "controlNotFound"
+        assert targets[1]["shapeName"] in failure["error"]["message"]
+        assert targets[0]["shapeName"] in failure["error"]["message"], "it names what it did find"
+        assert failure["selectionRow"] is None
+        # The tile for the failed target was never pressed, on any shape.
+        assert targets[1]["guiPath"][-1] not in [title for title, _spid in fake.presses]
+        # And the two targets that did run each got their own shape's effect.
+        for target in (targets[0], targets[2]):
+            assert (target["guiPath"][-1], session["spids"][target["key"]]) in fake.presses
+
+    def test_two_rows_with_one_name_are_refused_rather_than_chosen_between(self, session):
+        fake = session["fake"]
+        duplicated = session["plan"]["targets"][0]["shapeName"]
+        fake.duplicate_row = duplicated
+        summary = driver.run_capture(session["plan"], session["settings"], fake, version="16.113.1")
+        failures = {failure["key"]: failure["error"] for failure in summary["failures"]}
+        assert failures[session["plan"]["targets"][0]["key"]]["kind"] == "ambiguousControl"
+        # Neither of the two rows was selected, and the ambiguity failed at once rather
+        # than being polled: picking one would apply the value to a shape of two.
+        assert duplicated not in fake.selections
+        assert fake.slept == 0.0
 
     def test_a_press_that_the_application_refuses_is_recorded(self, session, monkeypatch):
         original = FakePowerPoint._gallery
@@ -1154,12 +1485,38 @@ class TestSlideNavigationIsGone:
         forbidden = {"select_slide", "slide_thumbnail", "thumbnail_cells", "thumbnail_label", "has_animation"}
         assert not defined & forbidden, f"slide navigation is back: {sorted(defined & forbidden)}"
 
-    def test_the_driver_no_longer_selects_anything_by_accessibility_attribute(self):
+    def test_the_driver_selects_no_slide_and_reads_no_thumbnail_state(self):
         source = DRIVER_SOURCE.read_text(encoding="utf-8")
-        assert "kAXSelectedAttribute" not in source
         assert "HAS_ANIMATION" not in source
         assert not hasattr(driver, "HAS_ANIMATION")
         assert not hasattr(driver, "select_slide")
+
+    def test_the_only_attribute_the_driver_writes_is_a_rows_selection(self):
+        """``kAXSelectedAttribute`` is back, on outline rows, and nowhere else.
+
+        It never read back true on the navigator's cells, which is why slide selection is
+        gone; it does take on a Selection Pane row, which is a different element with a
+        different mechanism. The narrow method is the guard: there is no "set any
+        attribute" escape hatch to reach for the next time something looks selectable.
+        """
+        tree = ast.parse(DRIVER_SOURCE.read_text(encoding="utf-8"))
+        owners = {
+            function.name
+            for function in ast.walk(tree)
+            if isinstance(function, ast.FunctionDef)
+            for node in ast.walk(function)
+            if isinstance(node, ast.Attribute) and node.attr == "kAXSelectedAttribute"
+        }
+        assert owners == {"selected", "set_selected"}, owners
+        setters = {
+            function.name
+            for function in ast.walk(tree)
+            if isinstance(function, ast.FunctionDef)
+            for node in ast.walk(function)
+            if isinstance(node, ast.Attribute) and node.attr == "AXUIElementSetAttributeValue"
+        }
+        assert setters == {"set_selected"}, setters
+        assert not hasattr(driver.LiveAXNode, "set_attribute")
 
     def test_the_module_docstring_records_both_live_failures(self):
         doc = driver.__doc__ or ""
@@ -1168,108 +1525,255 @@ class TestSlideNavigationIsGone:
         assert "scrolled into view" in doc, "the 6-visible-cells limit is not recorded"
         assert "Do not reintroduce" in doc
 
-    def test_the_fake_powerpoint_has_no_navigator_to_fall_back_on(self, session):
-        window = driver.document_window(session["fake"])
-        roles = {node.role for node in driver.walk(window)}
-        assert not roles & {"AXRow", "AXCell", "AXOutline"}
 
+# --- the canvas click is gone too ------------------------------------------
+class TestTheCanvasClickIsGone:
+    """The click captured 2 of 12. Nothing here may grow a coordinate back."""
 
-# --- coordinate derivation --------------------------------------------------
-class TestCoordinateDerivation:
-    """The canvas click point is computed, because the shape has no AX element."""
+    #: Every name the click path owned. The module docstring names them as deleted, so
+    #: this is what makes that claim true rather than a note.
+    CLICK_PATH_NAMES = (
+        "read_canvas_geometry",
+        "canvas_point",
+        "read_shape_center_pt",
+        "parse_zoom",
+        "parse_pane_frame",
+        "window_frame_to_screen",
+        "read_slide_size_pt",
+        "emu_to_points",
+        "CanvasGeometry",
+        "Frame",
+    )
 
-    def test_the_measured_session_reproduces_its_own_screen_point(self):
-        point = driver.canvas_point(MEASURED_SLIDE_PT, MEASURED_SHAPE_CENTRE, measured_pane(), MEASURED_ZOOM)
-        assert point == pytest.approx(MEASURED_SCREEN_POINT, abs=0.05)
-
-    def test_a_window_relative_frame_converts_to_screen(self):
-        pane = measured_pane()
-        assert (pane.x, pane.y, pane.width, pane.height) == (254, 177, 1258, 540)
-
-    def test_zoom_changes_the_point_and_a_bad_zoom_is_refused(self):
-        pane = driver.Frame(0, 0, 1000, 1000)
-        at_half = driver.canvas_point((1000, 1000), (100, 100), pane, 0.5)
-        assert at_half == pytest.approx((300.0, 300.0))
-        with pytest.raises(driver.GeometryError):
-            driver.canvas_point((1000, 1000), (100, 100), pane, 0.0)
-
-    def test_the_zoom_comes_from_the_status_bar_title(self):
-        assert driver.parse_zoom("92%") == pytest.approx(0.92)
-        assert driver.parse_zoom(" 100 % ") == pytest.approx(1.0)
-        with pytest.raises(driver.GeometryError):
-            driver.parse_zoom("Fit to Window")
-
-    def test_the_slide_size_comes_from_the_package_and_both_readers_agree(self, built_deck):
-        assert driver.read_slide_size_pt(built_deck["package"]) == MEASURED_SLIDE_PT
-        assert planner.read_slide_size_pt(built_deck["package"]) == MEASURED_SLIDE_PT
-
-    def test_each_shape_centre_in_the_package_is_the_one_the_grid_asked_for(self, built_deck, small_plan):
-        slide_w, _slide_h = driver.read_slide_size_pt(built_deck["package"])
-        scale = slide_w / planner.DECK_BASIS_PX[0]
-        for target in small_plan["targets"]:
-            rect = planner.Rect(**target["shapeRectPx"])
-            wanted = (rect.center[0] * scale, rect.center[1] * scale)
-            centre = driver.read_shape_center_pt(
-                built_deck["package"], target["slideIndex"], built_deck["names"][target["key"]]
-            )
-            assert math.dist(centre, wanted) <= planner.MATCH_TOLERANCE_PT
-
-    def test_the_geometry_is_read_from_the_live_tree_and_the_package(self, session):
-        geometry = driver.read_canvas_geometry(session["fake"], session["settings"].document)
-        assert geometry.slide_size_pt == MEASURED_SLIDE_PT
-        assert geometry.zoom == pytest.approx(MEASURED_ZOOM)
-        # The pane is the framed container holding the titled editor area, so the role
-        # recorded is the container's and the source names how it was found. Measured:
-        # choosing the largest element of a fixed role returned the outer split that also
-        # holds the navigator and the notes, and every click then missed its shape.
-        assert geometry.source == {
-            "paneRole": "AXScrollArea",
-            "paneSource": "editorPaneContainer",
-            "zoomSource": "statusBar",
-            "zoomTitle": "92%",
+    def test_the_driver_defines_none_of_the_click_paths_names(self):
+        tree = ast.parse(DRIVER_SOURCE.read_text(encoding="utf-8"))
+        defined = {
+            node.name
+            for node in ast.walk(tree)
+            if isinstance(node, (ast.FunctionDef, ast.ClassDef))
         }
-        target = session["plan"]["targets"][0]
-        centre = driver.read_shape_center_pt(session["settings"].document, 1, target["shapeName"])
-        assert geometry.point_for(session["settings"].document, 1, target["shapeName"]) == pytest.approx(
-            driver.canvas_point(MEASURED_SLIDE_PT, centre, measured_pane(), MEASURED_ZOOM)
-        )
+        back = sorted(set(self.CLICK_PATH_NAMES) & defined)
+        assert not back, f"the coordinate click path is back: {back}"
+        assert not [name for name in self.CLICK_PATH_NAMES if hasattr(driver, name)]
 
-    def test_an_operator_override_is_recorded_as_an_override(self, session):
-        geometry = driver.read_canvas_geometry(
-            session["fake"],
-            session["settings"].document,
-            pane=driver.Frame(10, 20, 100, 100),
-            zoom=0.5,
-        )
-        assert geometry.source["paneSource"] == "operatorOverride"
-        assert geometry.source["zoomSource"] == "operatorOverride"
+    def test_the_driver_posts_no_mouse_events_and_needs_no_frames(self):
+        """Checked against the names the code *uses*, not against the prose.
 
-    def test_a_missing_editor_pane_is_an_actionable_refusal_not_a_guess(self, session, monkeypatch):
-        """No titled editor area means no mapping, and the run refuses rather than guessing.
-
-        A guessed pane is not a visible failure: the click lands on empty canvas, the
-        previously selected shape stays selected, and the next press silently overwrites
-        *its* effect. That is what a live run produced — 71 presses, five effects, one of
-        them an entrance class on a shape whose target was an emphasis value.
+        The docstrings say what was deleted and why, which means they name
+        ``CGEventPost``; a text search would read that as the code being back.
         """
-        monkeypatch.setattr(driver, "EDITOR_PANE_TITLE_PREFIX", "No Such Pane Title")
-        with pytest.raises(driver.DriverRefusal, match="--pane-frame"):
-            driver.run_capture(session["plan"], session["settings"], session["fake"])
+        tree = ast.parse(DRIVER_SOURCE.read_text(encoding="utf-8"))
+        used = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)} | {
+            node.id for node in ast.walk(tree) if isinstance(node, ast.Name)
+        }
+        forbidden = {
+            name
+            for name in used
+            if name.startswith(("CGEvent", "kCGMouse", "kCGEvent"))
+            or name in {"kAXPositionAttribute", "kAXSizeAttribute", "AXValueGetValue"}
+        }
+        assert not forbidden, f"the driver uses mouse or geometry bindings again: {sorted(forbidden)}"
+        assert not hasattr(driver.AXBackend, "click")
+        assert not hasattr(driver.LiveAXBackend, "click")
+        # The protocols themselves, so a reintroduced click would have to re-declare the
+        # host contract rather than quietly use a reader that was left lying around.
+        assert not hasattr(driver.AXNode, "frame")
+        assert not hasattr(driver.LiveAXNode, "frame")
+        assert sorted(driver.AXNode.__protocol_attrs__) == [
+            "children",
+            "enabled",
+            "press",
+            "role",
+            "selected",
+            "set_selected",
+            "title",
+            "value",
+        ]
 
-    def test_every_click_lands_on_its_own_target_shape(self, session):
-        summary = driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
+    def test_the_module_docstring_records_what_the_click_was_worth(self):
+        doc = driver.__doc__ or ""
+        assert "2 of 12" in doc, "the figure that ended the click is not recorded"
+        assert "Do not reintroduce a\ncoordinate click" in doc
+        for name in ("read_canvas_geometry", "canvas_point", "parse_zoom", "--pane-frame"):
+            assert name in doc, f"the docstring does not say {name} is gone"
+
+    def test_the_cli_offers_no_coordinate_overrides(self):
+        help_text = driver.build_parser().format_help()
+        for gone in ("--pane-frame", "--pane-role", "--zoom"):
+            assert gone not in help_text, f"{gone} is back"
+        assert "never moves the pointer" in help_text
+        settings = driver.CaptureSettings(out_dir=Path("."), document=Path("."))
+        for gone in ("pane", "pane_role", "zoom"):
+            assert not hasattr(settings, gone), gone
+
+    def test_the_fake_powerpoint_has_no_navigator_to_fall_back_on(self, session):
+        """No navigator cells — and the outline that *is* there is the Selection Pane.
+
+        This assertion used to be "no ``AXRow``, ``AXCell`` or ``AXOutline`` anywhere",
+        which was a fair statement of the tree while nothing was selected by attribute.
+        The Selection Pane is an ``AXOutline`` of ``AXRow``s, so the check is now the
+        narrower thing it was always for: no navigator, which means no cells and no
+        element titled like a thumbnail.
+        """
         fake = session["fake"]
-        assert len(fake.clicks) == summary["attempted"] == 3
-        assert len(set(fake.clicks)) == 3, "three targets on one slide must click three points"
-        for target, point in zip(session["plan"]["targets"], fake.clicks):
-            assert fake.spid_at(*point) == session["spids"][target["key"]]
+        fake.selection_pane_open = True
+        window = driver.document_window(fake)
+        nodes = list(driver.walk(window))
+        assert not any(node.role == "AXCell" for node in nodes)
+        assert not any(re.match(r"Slide \d+ of \d+ Slides", node.title or "") for node in nodes)
+        outlines = [node for node in nodes if node.role == driver.SELECTION_PANE_ROLE]
+        assert len(outlines) == 1, "the only outline in the tree is the Selection Pane"
+        assert all(row.role == driver.SELECTION_ROW_ROLE for row in outlines[0].children)
 
-    def test_pane_frame_parsing_refuses_anything_but_four_numbers(self):
-        assert driver.parse_pane_frame("1,2,3,4") == driver.Frame(1, 2, 3, 4)
-        assert driver.parse_pane_frame(None) is None
-        for bad in ("1,2,3", "a,b,c,d", "1,2,0,4"):
-            with pytest.raises(ValueError):
-                driver.parse_pane_frame(bad)
+
+# --- the Selection Pane -----------------------------------------------------
+class TestSelectionPane:
+    """A shape is selected by name, through its Selection Pane row."""
+
+    def test_the_pane_is_opened_once_per_run_and_not_once_per_target(self, session):
+        summary = driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
+        assert summary["attempted"] == 3
+        assert session["fake"].selection_pane_presses == 1
+        assert session["fake"].selection_pane_open is True
+        assert summary["shapeSelection"] == {
+            "mechanism": driver.SELECTED_BY,
+            "selectionPane": "pressed",
+        }
+
+    def test_an_already_open_pane_is_not_pressed_again(self, session):
+        """Pressing an active control toggles it, and that trap has been paid for once.
+
+        Pressing an already-selected ribbon tab collapsed the ribbon and failed all 76
+        targets of a live run. Pressing ``Selection Pane...`` with the pane open closes
+        it, which would take every row out of the tree, so the pane's presence is read
+        rather than remembered.
+        """
+        session["fake"].selection_pane_open = True
+        summary = driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
+        assert session["fake"].selection_pane_presses == 0
+        assert session["fake"].selection_pane_open is True
+        assert summary["shapeSelection"]["selectionPane"] == "alreadyOpen"
+        assert summary["captured"] == 3
+
+    def test_pressing_the_item_twice_would_close_the_pane_so_the_fake_says_so(self, session):
+        """The fake really does toggle, so "open once" is a property, not a convention."""
+        fake = session["fake"]
+        driver.open_selection_pane(fake, timeout=2.0)
+        assert fake.selection_pane_open is True
+        fake._press_selection_pane_item()
+        assert fake.selection_pane_open is False
+        with pytest.raises(driver.ControlNotFound, match="not open"):
+            driver.selection_outline(fake)
+
+    def test_the_pane_is_opened_through_home_arrange_by_title(self, session):
+        """The path is walked, not assumed: Home, then the Arrange window, then the item."""
+        fake = session["fake"]
+        assert driver.SELECTION_PANE_PATH == ("Home", "Arrange", "Selection Pane...")
+        fake.active_tab = planner.ANIMATIONS_TAB
+        assert driver.open_selection_pane(fake, timeout=2.0) == "pressed"
+        assert fake.active_tab == "Home", "Arrange lives on Home, so the tab is pressed"
+        assert fake.arrange_open is False, "the Arrange window closes behind the press"
+        assert driver.open_selection_pane(fake, timeout=2.0) == "alreadyOpen"
+
+    def test_a_pane_that_never_opens_refuses_the_whole_run_rather_than_every_target(self, session):
+        """No pane means no way to select a shape, so it is a refusal, not 76 records."""
+        monkey = session["fake"]
+        monkey._press_selection_pane_item = lambda: None
+        with pytest.raises(driver.DriverRefusal, match="Selection Pane"):
+            driver.run_capture(session["plan"], session["settings"], monkey)
+        assert monkey.presses == []
+
+    def test_a_row_is_named_by_a_descendant_static_text_not_by_its_title(self, session):
+        fake = session["fake"]
+        fake.selection_pane_open = True
+        rows = driver.selection_rows(fake)
+        assert rows, "the pane publishes rows"
+        for row, names in rows:
+            assert row.title is None, "a live row carries no title"
+            assert names, "and its name is a descendant static text's value"
+        assert driver.row_names(rows[0][0]) == [rows[0][1][0]]
+
+    def test_the_rows_are_in_reverse_z_order_and_carry_the_labels_too(self, session, built_deck):
+        """Reverse z-order, one row per shape and one per label — as measured.
+
+        The live pane held 153 rows for a 76-target deck: 76 shapes, 76 labels and one
+        more. Nothing in the driver depends on the order, which is the point; this pins
+        that the fake really is hostile about it, so an index-based lookup could not pass.
+        """
+        fake = session["fake"]
+        fake.selection_pane_open = True
+        names = [name for _row, row_names in driver.selection_rows(fake) for name in row_names]
+        z_order = [name for name, _spid in shape_names_in_z_order(session["settings"].document, 1)]
+        assert names == list(reversed(z_order))
+        targets = {target["shapeName"] for target in session["plan"]["targets"]}
+        assert targets < set(names), "the pane names more than the target shapes"
+        assert len(names) == 2 * len(targets), "one row per shape and one per label"
+        # The live pane's head alternated label, shape, label. The fake's does too, so
+        # "every other row is a target" is not a shortcut a lookup could rely on.
+        kinds = [name.split()[0] for name in names[: len(MEASURED_PANE_HEAD)]]
+        assert kinds == [name.split()[0] for name in MEASURED_PANE_HEAD]
+
+    def test_selecting_by_name_is_what_makes_the_right_shape_get_the_effect(self, session):
+        """Each press lands on the shape whose row was selected, and only that one."""
+        fake = session["fake"]
+        driver.open_selection_pane(fake, timeout=2.0)
+        names = [target["shapeName"] for target in session["plan"]["targets"]]
+        assert driver.select_shape(fake, names[1], timeout=2.0) == names[1]
+        assert fake.selected_name == names[1]
+        assert fake.selected_spid == session["spids"][session["plan"]["targets"][1]["key"]]
+        driver.ensure_tab(fake, [planner.ANIMATIONS_TAB, "Entrance Effects"], timeout=2.0)
+        driver.press_path(fake, [planner.ANIMATIONS_TAB, "Entrance Effects", "Fade"], timeout=2.0)
+        assert fake.effects == {fake.selected_spid: TILE_PRESETS["Fade"]}
+
+    def test_a_row_is_resolved_from_a_fresh_read_every_time(self, session):
+        """Rows are rebuilt between reads, so a held element would be stale.
+
+        Counted rather than asserted structurally: selecting one shape costs more reads
+        than one, because the row is resolved once to write the attribute and again to
+        confirm it. A driver holding the row across those two would read fewer.
+        """
+        fake = session["fake"]
+        driver.open_selection_pane(fake, timeout=2.0)
+        before = fake.reads
+        driver.select_shape(fake, session["plan"]["targets"][0]["shapeName"], timeout=2.0)
+        assert fake.reads - before >= 2
+
+    def test_a_name_the_pane_does_not_show_is_a_truncated_list_not_a_guess(self, session):
+        fake = session["fake"]
+        fake.selection_pane_open = True
+        with pytest.raises(driver.ControlNotFound) as raised:
+            driver.select_shape(fake, "No Such Shape", timeout=2.0)
+        message = str(raised.value)
+        assert "No Such Shape" in message
+        assert session["plan"]["targets"][0]["shapeName"] in message
+        assert fake.selections == [], "nothing was selected"
+        assert driver.MAX_REPORTED_ROW_NAMES == 12
+
+    def test_a_long_pane_truncates_the_names_it_reports(self, session):
+        """153 rows must not all end up in one failure message."""
+        fake = session["fake"]
+        fake._shapes = [(f"Shape {index}", str(index + 2)) for index in range(40)]
+        fake._spids = dict(fake._shapes)
+        fake.selection_pane_open = True
+        with pytest.raises(driver.ControlNotFound, match="and 28 more"):
+            driver.select_shape(fake, "No Such Shape", timeout=2.0)
+
+    def test_a_closed_pane_is_a_named_failure_rather_than_an_empty_row_list(self, session):
+        with pytest.raises(driver.ControlNotFound, match="Selection Pane is not open"):
+            driver.selection_outline(session["fake"])
+
+    def test_the_summary_says_how_every_shape_was_selected(self, session):
+        summary = driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
+        assert "canvas" not in summary, "there is no canvas mapping to report"
+        assert summary["shapeSelection"]["mechanism"] == "selectionPaneRow"
+        records = [
+            record
+            for record in driver.read_records(session["settings"].readback_path)
+            if record.get("record") == driver.RECORD_KIND
+        ]
+        for record in records:
+            assert record["selectionRow"] == record["shapeName"]
+            assert record["selectedBy"] == driver.SELECTED_BY
 
 
 # --- consent and refusal ----------------------------------------------------
@@ -1325,13 +1829,13 @@ class TestConsentAndRefusal:
         session["fake"].frontmost = "com.apple.Terminal"
         with pytest.raises(driver.DriverRefusal, match="frontmost"):
             driver.run_capture(session["plan"], session["settings"], session["fake"])
-        assert session["fake"].clicks == []
+        assert (session["fake"].selections, session["fake"].presses) == ([], [])
 
     def test_it_refuses_a_document_that_is_not_the_capture_deck(self, session):
         session["fake"].document_title = "Q3 Business Review"
         with pytest.raises(driver.DriverRefusal, match="not the expected capture deck"):
             driver.run_capture(session["plan"], session["settings"], session["fake"])
-        assert session["fake"].clicks == []
+        assert (session["fake"].selections, session["fake"].presses) == ([], [])
 
     def test_the_expected_title_tolerates_the_extension_but_not_a_different_deck(self):
         assert driver.normalise_document_title("capture-deck.pptx") == "capture-deck"
@@ -1350,7 +1854,7 @@ class TestConsentAndRefusal:
         session["plan"]["targets"][1]["shapeName"] = None
         with pytest.raises(driver.DriverRefusal, match="no shapeName"):
             driver.run_capture(session["plan"], session["settings"], session["fake"])
-        assert session["fake"].clicks == []
+        assert (session["fake"].selections, session["fake"].presses) == ([], [])
 
     def test_the_cli_refuses_a_plan_whose_shape_names_are_unsettled(self, tmp_path, capsys):
         plan = tmp_path / "plan.json"
@@ -1580,11 +2084,32 @@ class TestDrivingOneSlideManyShapes:
         assert len({record["attributedSpid"] for record in records}) == 3
         # Each target's effect is distinguishable by its own cTn, not only by its shape.
         assert {record["effectCTn"]["presetID"] for record in records} == {"2", "31", "0"}
+        # One save judged all three, so ``effectCount`` is the BATCH's step — the slide
+        # went from 0 to 3 — and no single record owns it. What each record owns is
+        # ``newEffectCount``: how many p:cTn nodes appeared on its OWN spid, which is the
+        # figure the gate tested. Asserting the batch count here rather than a per-target
+        # one is the honest reading of a batched run, not a relaxation: the per-target
+        # number is still asserted, it just moved to the field that means it.
+        assert [record["effectCount"] for record in records] == [{"before": 0, "after": 3}] * 3
+        assert [record["newEffectCount"] for record in records] == [1, 1, 1]
+        assert [record["batchIndex"] for record in records] == [1, 1, 1]
+
+    def test_at_batch_size_one_the_counts_are_per_target_again(self, session):
+        """``--batch-size 1`` restores the per-target before/after count exactly."""
+        session["settings"].batch_size = 1
+        driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
+        records = [
+            record
+            for record in driver.read_records(session["settings"].readback_path)
+            if record.get("record") == driver.RECORD_KIND
+        ]
         assert [record["effectCount"] for record in records] == [
             {"before": 0, "after": 1},
             {"before": 1, "after": 2},
             {"before": 2, "after": 3},
         ]
+        assert [record["batchIndex"] for record in records] == [1, 2, 3]
+        assert all(record["attributed"] for record in records)
 
     def test_each_press_lands_on_the_shape_the_target_names(self, session):
         driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
@@ -1618,7 +2143,7 @@ class TestDrivingOneSlideManyShapes:
         assert outcomes["Arcs"] == "pressed"
 
     def test_an_absent_grouping_level_is_recorded_rather_than_fatal(self, session):
-        session["fake"].selected_spid = "2"
+        session["fake"].select(session["plan"]["targets"][0]["shapeName"])
         result = driver.press_path(
             session["fake"],
             [planner.ANIMATIONS_TAB, planner.PATH_ANIMATION_CONTROL, "Basic", "Lines"],
@@ -1629,7 +2154,7 @@ class TestDrivingOneSlideManyShapes:
         assert outcomes["Lines"] == "pressed"
 
     def test_a_visible_gallery_is_scoped_into_rather_than_pressed(self, session):
-        session["fake"].selected_spid = "2"
+        session["fake"].select(session["plan"]["targets"][0]["shapeName"])
         result = driver.press_path(
             session["fake"], [planner.ANIMATIONS_TAB, "Entrance Effects", "Fly In"], timeout=2.0
         )
@@ -1638,7 +2163,7 @@ class TestDrivingOneSlideManyShapes:
         assert session["fake"].presses == [("Fly In", "2")]
 
     def test_an_alternative_title_is_tried_and_recorded(self, session):
-        session["fake"].selected_spid = "2"
+        session["fake"].select(session["plan"]["targets"][0]["shapeName"])
         session["fake"].tiles = ("Grow Turn",)
         result = driver.press_path(
             session["fake"],
@@ -1649,12 +2174,48 @@ class TestDrivingOneSlideManyShapes:
         assert result.matched_title == "Grow Turn"
         assert session["fake"].presses == [("Grow Turn", "2")]
 
-    def test_the_shape_is_selected_by_a_click_because_it_has_no_element(self, session):
-        summary = driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
-        assert len(session["fake"].clicks) == summary["attempted"]
+    def test_the_shape_is_selected_by_its_own_selection_pane_row(self, session):
+        """One row selection per target, by name, and no mouse event anywhere.
 
-    def test_save_is_pressed_once_per_target_so_a_crash_costs_one(self, session):
-        driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
+        The fake has no ``click`` to call and the backend protocol no longer declares
+        one, so this is a property of the shape of the thing as much as of the run.
+        """
+        summary = driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
+        assert session["fake"].selections == [
+            target["shapeName"] for target in session["plan"]["targets"]
+        ]
+        assert len(session["fake"].selections) == summary["attempted"] == 3
+        assert not hasattr(session["fake"], "click")
+        assert not hasattr(driver.AXBackend, "click")
+
+    def test_save_is_pressed_once_per_batch_and_once_per_target_at_batch_size_one(self, session):
+        """One save per batch, and ``--batch-size 1`` is still one per target.
+
+        This assertion used to be ``saves == 3`` for three targets, and it changed
+        because the behaviour did: the three targets are one batch now, so one Save
+        judges them. The figure that replaced it is not weaker — it is the same count
+        against the batches rather than the targets, and the per-target form is asserted
+        beside it so the old behaviour is still reachable and still checked.
+        """
+        summary = driver.run_capture(
+            session["plan"], session["settings"], session["fake"], version="16.113.1"
+        )
+        assert (summary["batchSize"], summary["batches"]) == (driver.DEFAULT_BATCH_SIZE, 1)
+        assert session["fake"].saves == 1
+
+        # A fresh output directory and a deck back to no effects, so the per-target half
+        # is three captures and three saves rather than three rejections that happen to
+        # have saved on the way.
+        write_effects(session["settings"].document, 1, {})
+        session["fake"].effects = {}
+        session["fake"].saves = 0
+        session["settings"].out_dir = session["settings"].out_dir.parent / "per-target"
+        session["settings"].batch_size = 1
+        per_target = driver.run_capture(
+            session["plan"], session["settings"], session["fake"], version="16.113.1"
+        )
+        assert (per_target["batchSize"], per_target["batches"]) == (1, 3)
+        assert per_target["captured"] == 3
         assert session["fake"].saves == 3
 
     def test_the_package_is_copied_where_parse_oracle_expects_it(self, session):
@@ -1685,11 +2246,528 @@ class TestDrivingOneSlideManyShapes:
         assert merged["unresolvedCandidates"] == []
         assert all(candidate["ooxml"]["timing"] for candidate in merged["candidates"])
 
-    def test_the_summary_reports_the_derived_canvas_mapping(self, session):
-        summary = driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
-        assert summary["canvas"]["slideSizePt"] == list(MEASURED_SLIDE_PT)
-        assert summary["canvas"]["zoom"] == pytest.approx(MEASURED_ZOOM)
-        assert summary["canvas"]["paneFrame"] == [254, 177, 1258, 540]
+    def test_the_ribbon_tab_is_made_active_before_the_gallery_is_pressed(self, session):
+        """Opening the pane leaves the ribbon on Home, and a press needs Animations.
+
+        Only the active tab's controls are in the fake's tree, as in the live one, so a
+        run that forgot this would wait for a gallery that cannot appear — which is
+        exactly what a live run did, timing out all 76 targets on 'Emphasis Effects'.
+        """
+        fake = session["fake"]
+        assert fake.active_tab == driver.RIBBON_ANCHOR_TAB, "a fresh deck starts on Home"
+        summary = driver.run_capture(session["plan"], session["settings"], fake, version="16.113.1")
+        assert summary["captured"] == 3
+        assert fake.active_tab == planner.ANIMATIONS_TAB
+
+
+# --- batching ---------------------------------------------------------------
+class TestBatching:
+    """One Save judges many targets, and each is still attributed by its own ``spid``.
+
+    The point of these is the boundary. A batch must not let one bad target cost the
+    good ones, must not credit a target whose own shape gained nothing, and must refuse
+    the whole batch when an effect appears on a shape nobody in it selected — which is
+    the signature of a press landing somewhere the run cannot account for.
+    """
+
+    def test_one_save_judges_the_whole_batch_and_each_target_by_its_own_spid(self, session):
+        summary = driver.run_capture(
+            session["plan"], session["settings"], session["fake"], version="16.113.1"
+        )
+        assert (summary["batches"], session["fake"].saves) == (1, 1)
+        assert summary["captured"] == summary["attributed"] == 3
+        records = [
+            record
+            for record in driver.read_records(session["settings"].readback_path)
+            if record.get("record") == driver.RECORD_KIND
+        ]
+        # Three records, one Save, and three different spids — the evidence is per target
+        # even though the package was read once.
+        assert len({record["attributedSpid"] for record in records}) == 3
+        for record in records:
+            assert record["attributedSpid"] == record["shapeSpid"] == session["spids"][record["catalogKey"]]
+            assert record["batchIndex"] == 1
+            assert record["saved"] is True
+
+    def test_a_target_that_gains_nothing_is_rejected_and_its_batch_mates_are_credited(
+        self, session
+    ):
+        """One bad target costs one record, not the batch. This is the instruction.
+
+        The press lands and PowerPoint attaches nothing to that shape, so its spid gains
+        nothing while its two batch mates gain one effect each. Rejecting the batch would
+        throw away two correct captures; crediting the empty one would invent evidence.
+        """
+        fake, targets = session["fake"], session["plan"]["targets"]
+        fake.applies_nothing_for = {targets[1]["shapeName"]}
+        summary = driver.run_capture(
+            session["plan"], session["settings"], fake, version="16.113.1"
+        )
+        assert (summary["batches"], fake.saves) == (1, 1)
+        assert (summary["captured"], summary["failed"]) == (2, 1)
+        failure = next(f for f in summary["failures"] if f["key"] == targets[1]["key"])
+        assert failure["error"]["kind"] == "effectNotAdded"
+        assert "no new effect appeared" in failure["error"]["message"]
+        detail = failure["error"]["detail"]
+        assert detail["expectedSpid"] == session["spids"][targets[1]["key"]]
+        # It says which spids DID gain, so a reader can see it was not a dead batch.
+        assert sorted(detail["appearedSpids"]) == sorted(
+            session["spids"][target["key"]] for target in (targets[0], targets[2])
+        )
+        # And the other two are credited, each to its own shape.
+        records = {
+            record["catalogKey"]: record
+            for record in driver.read_records(session["settings"].readback_path)
+            if record.get("record") == driver.RECORD_KIND
+        }
+        for target in (targets[0], targets[2]):
+            assert records[target["key"]]["attributed"] is True
+            assert records[target["key"]]["attributedSpid"] == session["spids"][target["key"]]
+            assert records[target["key"]]["newEffectCount"] == 1
+        assert records[targets[1]["key"]]["attributed"] is False
+        # Pressed, though: what failed is the evidence, and the record does not pretend
+        # the press never happened.
+        assert len(fake.presses) == 3
+
+    def test_a_stray_spid_fails_the_whole_batch_naming_it(self, session):
+        """An effect on a shape nobody in the batch selected refuses the batch.
+
+        This is the realistic shape of a mis-selection under batching: a press lands on
+        the previously selected shape instead of this one, and with a batch that shape is
+        often **outside** the batch — here one of the deck's own label text boxes. Then
+        the package shows an effect on a spid no target asked for, and the batch cannot be
+        credited around it: one of its presses demonstrably went somewhere else, and the
+        package cannot say which of the remaining credits is really that press's.
+        """
+        fake, targets = session["fake"], session["plan"]["targets"]
+        target_names = {target["shapeName"] for target in targets}
+        outsider = next(
+            name
+            for name, _spid in shape_names_in_z_order(session["settings"].document, 1)
+            if name not in target_names
+        )
+        outsider_spid = fake._spids[outsider]
+        assert outsider_spid not in set(session["spids"].values())
+        fake.applies_to_instead = {targets[0]["shapeName"]: outsider}
+
+        summary = driver.run_capture(
+            session["plan"], session["settings"], fake, version="16.113.1"
+        )
+        assert (summary["captured"], summary["attributed"]) == (0, 0)
+        assert summary["failed"] == 3, "the batch failed, not one target of it"
+        for failure in summary["failures"]:
+            assert failure["error"]["kind"] == "effectMisattributed"
+            assert outsider_spid in failure["error"]["message"]
+            detail = failure["error"]["detail"]
+            assert detail["straySpids"] == [outsider_spid]
+            assert detail["expectedSpids"] == sorted(session["spids"].values())
+            assert failure["attributedSpid"] is None
+        # Named as data as well as prose, so the evidence can be queried for it.
+        assert all(record["attributed"] is False for record in [
+            record
+            for record in driver.read_records(session["settings"].readback_path)
+            if record.get("record") == driver.RECORD_KIND
+        ])
+
+    def test_an_effect_on_two_shapes_is_a_stray_rather_than_a_credit(self):
+        """An effect whose ``p:spTgt`` names two shapes belongs to no target in a batch."""
+        after = [{"spid": None, "spids": ["2", "4"], "cTn": {"presetID": "2"}}]
+        with pytest.raises(driver.EffectMisattributed, match=r"\['2', '4'\]"):
+            driver.attribute_batch([], after, ["2", "4"])
+
+    def test_a_batch_of_one_is_the_per_target_gate_itself_not_a_lookalike(self):
+        """``--batch-size 1`` delegates, so its failures are identical rather than similar.
+
+        Asserted against :func:`attribute_new_effect` directly, because "behaves exactly
+        as before" has to mean the same exception type, the same message and the same
+        ``detail`` — not a batch-level failure that happens to name one target.
+        """
+        before = [{"spid": "2", "spids": ["2"], "cTn": {"presetID": "2"}}]
+        after = before + [{"spid": "4", "spids": ["4"], "cTn": {"presetID": "10"}}]
+        assert driver.attribute_batch(before, after, ["4"]) == {
+            "4": driver.attribute_new_effect(before, after, "4")
+        }
+
+        with pytest.raises(driver.EffectMisattributed) as batched:
+            driver.attribute_batch(before, after, ["6"])
+        with pytest.raises(driver.EffectMisattributed) as single:
+            driver.attribute_new_effect(before, after, "6")
+        assert str(batched.value) == str(single.value)
+        assert batched.value.as_error() == single.value.as_error()
+
+        with pytest.raises(driver.EffectNotAdded) as batched_none:
+            driver.attribute_batch(before, before, ["4"])
+        with pytest.raises(driver.EffectNotAdded) as single_none:
+            driver.attribute_new_effect(before, before, "4")
+        assert batched_none.value.as_error() == single_none.value.as_error()
+
+    def test_the_batches_are_the_size_asked_for_and_never_mix_two_slides(self):
+        targets = [{"key": str(index), "slideIndex": 1} for index in range(25)]
+        sizes = [len(batch) for batch in driver.plan_batches(targets, 10)]
+        assert sizes == [10, 10, 5]
+        assert driver.plan_batches(targets, 1) == [[target] for target in targets]
+        assert driver.plan_batches([], 10) == []
+        # One Save judges one batch and the judgement reads one slide, so a split plan
+        # produces more, smaller batches rather than a batch it could not attribute.
+        split = [{"key": "a", "slideIndex": 1}, {"key": "b", "slideIndex": 2}]
+        assert [len(batch) for batch in driver.plan_batches(split, 10)] == [1, 1]
+        assert {batch[0]["slideIndex"] for batch in driver.plan_batches(split, 10)} == {1, 2}
+
+    def test_a_batch_that_cannot_hold_a_target_is_refused(self):
+        with pytest.raises(driver.DriverRefusal, match="at least one target"):
+            driver.plan_batches([{"key": "a", "slideIndex": 1}], 0)
+
+    def test_the_cli_refuses_a_batch_size_below_one(self, tmp_path, capsys):
+        plan = tmp_path / "plan.json"
+        plan.write_text(json.dumps({"shapeNames": {}, "targets": []}), encoding="utf-8")
+        document = tmp_path / "deck.pptx"
+        document.write_bytes(b"x")
+        code = driver.main(
+            [
+                "--plan", str(plan), "--out", str(tmp_path), "--document", str(document),
+                "--batch-size", "0", driver.DRIVE_TOKEN,
+            ]
+        )
+        assert code == 2
+        assert "--batch-size must be at least 1" in capsys.readouterr().err
+
+    def test_a_save_that_never_lands_rejects_every_target_pressed_into_it(self, session, monkeypatch):
+        """The save is the evidence, so a batch without one credits nothing.
+
+        The difference batching makes is the count: one failed Save now rejects every
+        target of the batch rather than one. They are retried on the next run, because an
+        uncaptured target has no record.
+        """
+        monkeypatch.setattr(FakePowerPoint, "_save", lambda self: setattr(self, "saves", self.saves + 1))
+        summary = driver.run_capture(
+            session["plan"], session["settings"], session["fake"], version="16.113.1"
+        )
+        assert (summary["batches"], session["fake"].saves) == (1, 1)
+        assert summary["failed"] == summary["saveFailures"] == 3
+        assert summary["captured"] == 0
+
+    def test_a_resumed_run_restarts_at_the_first_uncaptured_target(self, session):
+        """A partially completed run picks up the targets with no record, in plan order.
+
+        Driven at ``--batch-size 2`` so the first run's batches do not line up with the
+        second's: the rejected target is the second half of batch 1, and the resumed run
+        has to find it rather than restart a batch boundary.
+        """
+        fake, targets = session["fake"], session["plan"]["targets"]
+        session["settings"].batch_size = 2
+        fake.applies_nothing_for = {targets[1]["shapeName"]}
+        first = driver.run_capture(session["plan"], session["settings"], fake, version="16.113.1")
+        assert (first["batches"], first["captured"], first["failed"]) == (2, 2, 1)
+
+        fake.applies_nothing_for = set()
+        fake.presses.clear()
+        resumed = driver.run_capture(session["plan"], session["settings"], fake, version="16.113.1")
+        assert resumed["skippedAlreadyCaptured"] == 2
+        assert resumed["attempted"] == resumed["captured"] == 1
+        assert resumed["batches"] == 1
+        # Exactly the uncaptured target was pressed, on its own shape.
+        assert fake.presses == [
+            (targets[1]["guiPath"][-1], session["spids"][targets[1]["key"]])
+        ]
+        records = [
+            record
+            for record in driver.read_records(session["settings"].readback_path)
+            if record.get("record") == driver.RECORD_KIND
+        ]
+        assert len(records) == 3, "one record per key, rewritten rather than appended"
+        assert all(record["attributed"] for record in records)
+
+    def test_a_progress_line_per_batch_goes_to_stderr_and_stdout_stays_clean(self, session, capsys):
+        """A 76-target run must not be indistinguishable from a hang.
+
+        stderr, not stdout: the summary on stdout is parsed as JSON.
+        """
+        session["settings"].batch_size = 2
+        summary = driver.run_capture(
+            session["plan"], session["settings"], session["fake"], version="16.113.1"
+        )
+        captured = capsys.readouterr()
+        assert captured.out == "", "stdout must stay pure JSON for the summary"
+        lines = captured.err.strip().splitlines()
+        assert len(lines) == summary["batches"] == 2
+        assert lines[0].startswith("batch 1/2:")
+        assert "2 targets attempted" in lines[0]
+        assert "2/3 done" in lines[0] and "2 captured" in lines[0]
+        assert "elapsed" in lines[0]
+        assert lines[1].startswith("batch 2/2:")
+        assert "3/3 done" in lines[1]
+
+    def test_progress_is_injectable_so_a_caller_can_route_it(self, session):
+        seen: list[str] = []
+        driver.run_capture(
+            session["plan"], session["settings"], session["fake"], progress=seen.append
+        )
+        assert len(seen) == 1 and seen[0].startswith("batch 1/1:")
+
+
+# --- cost, which is a correctness property here -----------------------------
+#: Attribute reads one target may cost, measured against :func:`big_pane_session` and
+#: pinned with headroom. The driver this replaced captured **7 targets in 28 minutes** —
+#: four minutes each, every one correct — because every lookup walked the whole 907-node
+#: document window, and live one attribute read is one interprocess round trip. Measured
+#: on this fake: 2,218 reads per target now against 19,826 before, 8.9x. The budget is
+#: 3,000, which is ~35% of headroom over what it costs and ~15% of what a full-window
+#: walk per lookup costs, so a lookup that quietly widened back to the window would
+#: break this and nothing else.
+#:
+#: Update it only when a read legitimately moved, and say which and why. Raising it to
+#: make a change fit is how the thing this guards against comes back.
+READ_BUDGET_PER_TARGET = 3_000
+
+#: How many full window walks one target may cost. The scale-free form of the same
+#: statement: every lookup used to cost one of these, and a target makes about ten
+#: lookups. This one adapts if the fake's tree changes size; the absolute budget above is
+#: the pin that notices if it does.
+WINDOW_WALKS_PER_TARGET = 5
+
+
+@pytest.fixture
+def big_pane_session(small_plan, built_deck, tmp_path):
+    """A session whose Selection Pane carries 156 rows, as the live one carried 153.
+
+    The proportions are what make a read count mean anything: the live document window
+    was 907 nodes and **762 of them were the pane's rows**, so a fake with six rows would
+    let a lookup walk the window for almost nothing and the budget would not bite.
+    """
+    document = tmp_path / f"{built_deck['package'].stem}.pptx"
+    document.write_bytes(built_deck["package"].read_bytes())
+    plan = copy.deepcopy(small_plan)
+    planner.apply_shape_names(plan, built_deck["names"])
+    fake = FakePowerPoint(document, decoy_rows=150)
+    settings = driver.CaptureSettings(out_dir=tmp_path / "out", document=document, timeout=2.0)
+    return {"plan": plan, "fake": fake, "settings": settings}
+
+
+def full_window_walk_reads(document: Path) -> int:
+    """What one ``find_all_by_title`` over the whole document window costs, in reads.
+
+    This is what **every** lookup cost before the containers: resolving a ribbon tile
+    traversed all the pane's rows, and resolving a row traversed the ribbon.
+    """
+    fake = FakePowerPoint(document, decoy_rows=150, selection_pane_open=True)
+    before = fake.attribute_reads
+    driver.find_all_by_title(driver.document_window(fake), driver.SAVE_LABEL)
+    return fake.attribute_reads - before
+
+
+class TestLookupCost:
+    """Counted, because the only thing wrong with the previous driver was its cost.
+
+    Nothing else here can catch a lookup that walks the window: it returns the right
+    element, every assertion about behaviour passes, and the run takes four minutes a
+    target instead of fifteen seconds. So the reads are counted and budgeted.
+    """
+
+    def test_capturing_a_batch_stays_inside_the_read_budget(self, big_pane_session):
+        fake, settings = big_pane_session["fake"], big_pane_session["settings"]
+        targets = big_pane_session["plan"]["targets"]
+        start = fake.attribute_reads
+        summary = driver.run_capture(
+            big_pane_session["plan"], settings, fake, version="16.113.1", progress=lambda _m: None
+        )
+        assert summary["captured"] == len(targets), "the budget means nothing if it failed"
+        reads = fake.attribute_reads - start
+        per_target = reads / len(targets)
+        assert per_target <= READ_BUDGET_PER_TARGET, (
+            f"{per_target:.0f} attribute reads per target, budget {READ_BUDGET_PER_TARGET}; a "
+            "lookup has gone back to walking the window"
+        )
+
+    def test_a_target_costs_less_than_a_handful_of_full_window_walks(self, big_pane_session):
+        """The budget restated against what a single unscoped lookup costs.
+
+        A full-window walk per lookup is not a hypothetical: it is what this driver did,
+        and it is why a live run could not reach 76 targets. One walk of this fake's
+        window costs what is measured here, a target makes about ten lookups, and the
+        whole target now costs fewer than five walks.
+        """
+        fake, settings = big_pane_session["fake"], big_pane_session["settings"]
+        targets = big_pane_session["plan"]["targets"]
+        walk = full_window_walk_reads(settings.document)
+        assert walk > 300, "the fake's window is too small for this comparison to mean anything"
+        start = fake.attribute_reads
+        driver.run_capture(
+            big_pane_session["plan"], settings, fake, version="16.113.1", progress=lambda _m: None
+        )
+        per_target = (fake.attribute_reads - start) / len(targets)
+        assert per_target <= WINDOW_WALKS_PER_TARGET * walk
+        # And the budget really is below what per-lookup walking would cost, so the
+        # absolute pin above is not generous enough to pass a regression.
+        assert READ_BUDGET_PER_TARGET < 10 * walk
+
+    def test_the_pane_is_what_the_cost_is_bounded_by_and_the_ribbon_is_not(
+        self, big_pane_session
+    ):
+        """Where the reads go, so a future change knows what is worth attacking.
+
+        Selecting one shape resolves its row twice — once to write ``AXSelected`` and
+        once to read it back — and each resolution walks the outline, because a row is
+        found by name and two rows with one name must be refusable. That is the floor.
+        Pressing a ribbon control is now an order of magnitude cheaper than that, which
+        is the inversion the containers bought: it used to be the same price, because
+        both walked the window.
+        """
+        fake = big_pane_session["fake"]
+        name = big_pane_session["plan"]["targets"][0]["shapeName"]
+        driver.open_selection_pane(fake, timeout=2.0)
+
+        start = fake.attribute_reads
+        driver.select_shape(fake, name, timeout=2.0)
+        selecting = fake.attribute_reads - start
+
+        driver.ensure_tab(fake, [planner.ANIMATIONS_TAB, "Entrance Effects"], timeout=2.0)
+        start = fake.attribute_reads
+        driver.press_path(
+            fake, [planner.ANIMATIONS_TAB, "Entrance Effects", "Fly In"], timeout=2.0
+        )
+        pressing = fake.attribute_reads - start
+
+        assert selecting > 5 * pressing, (
+            f"selecting a row cost {selecting} reads and pressing a tile {pressing}; the ribbon "
+            "press is no longer the cheap one, so something has gone back to walking the window"
+        )
+
+    def test_the_document_window_is_identified_without_walking_any_candidate(self, session):
+        """PowerPoint publishes five same-titled windows and only one has the ribbon.
+
+        Identifying it used to be ``find_all_by_title(window, "Home")`` per candidate —
+        several full walks, from a function nearly every helper calls. It is now a probe
+        of each candidate's direct children, so it costs about as much as reading their
+        children lists and no more.
+        """
+        fake = session["fake"]
+        assert fake.decoy_windows == 4, "the fake must publish the siblings the real one does"
+        start = fake.attribute_reads
+        window = driver.document_window(fake)
+        cost = fake.attribute_reads - start
+        assert window.title == fake.document_title
+        assert driver.find_containers(window, driver.RIBBON_ROLE), "it picked the one with the ribbon"
+        # Five windows, a title and a children list each, plus a role per direct child.
+        assert cost < 60, f"identifying the document window cost {cost} reads"
+
+    def test_a_container_search_never_descends_into_another_container(self, session):
+        """The pruning rule, stated against the tree rather than against a read count.
+
+        A search for the toolbar must not enter the outline, because the outline is where
+        762 of the live window's 907 nodes are. With the pane open, finding the toolbar
+        must therefore cost no more than finding it with the pane shut.
+        """
+        fake = session["fake"]
+        fake.selection_pane_open = False
+        start = fake.attribute_reads
+        driver.find_containers(driver.document_window(fake), driver.TOOLBAR_ROLE)
+        shut = fake.attribute_reads - start
+
+        fake.selection_pane_open = True
+        fake._shapes = [(f"Shape {index}", str(index + 2)) for index in range(200)]
+        fake._spids = dict(fake._shapes)
+        start = fake.attribute_reads
+        found = driver.find_containers(driver.document_window(fake), driver.TOOLBAR_ROLE)
+        wide_open = fake.attribute_reads - start
+
+        assert len(found) == 1
+        assert wide_open <= shut + 2, (
+            f"finding the toolbar cost {shut} reads with the pane shut and {wide_open} with 200 "
+            "rows open, so the search is descending into the Selection Pane"
+        )
+
+    def test_a_container_search_that_becomes_a_tree_walk_is_an_error(self, session):
+        """A window not shaped as measured fails loudly rather than walking everything.
+
+        Searched against one of the fake's decoy windows, because the document window is
+        two containers under a root and the pruning means a search of it visits three
+        nodes however large the pane is — which is the property, not a way to dodge the
+        bound. A window with a deep subtree and no container in it is what overruns.
+        """
+        decoy = session["fake"]._decoy_window(0)
+        assert len(driver.find_containers(decoy, driver.RIBBON_ROLE)) == 0
+        with pytest.raises(driver.TreeTooLarge, match="container search has become a tree walk"):
+            driver.find_containers(decoy, "AXNoSuchRole", max_nodes=5)
+
+
+class TestScopesRaiseRatherThanWiden:
+    """A scope that cannot be identified must fail, not fall back to the window.
+
+    This is the rule that keeps the cost gone. A lookup that widened to the window when
+    its container was missing would still find the control, still pass every behavioural
+    test, and put the four-minutes-a-target cost back where nobody would look for it.
+    """
+
+    def test_save_outside_the_toolbar_is_not_found_by_widening_to_the_window(self, session):
+        fake = session["fake"]
+        # Save still exists, directly under the window, exactly where the old lookup
+        # would have found it.
+        monkeypatched = FakeNode(
+            role="AXWindow",
+            title=fake.document_title,
+            children=[
+                FakeNode(role="AXButton", title=driver.SAVE_LABEL),
+                fake._ribbon(),
+            ],
+        )
+        with pytest.raises(driver.ControlNotFound, match=driver.TOOLBAR_ROLE):
+            driver.window_container(
+                monkeypatched, driver.TOOLBAR_ROLE, what=driver.CONTAINER_NAMES[driver.TOOLBAR_ROLE]
+            )
+
+    def test_an_absent_container_names_what_the_window_does_hold(self, session):
+        window = driver.document_window(session["fake"])
+        with pytest.raises(driver.ControlNotFound) as raised:
+            driver.window_container(window, "AXSplitGroup", what="the split view")
+        message = str(raised.value)
+        assert "the split view" in message
+        assert driver.TOOLBAR_ROLE in message and driver.RIBBON_ROLE in message
+
+    def test_two_containers_of_one_role_are_refused_rather_than_chosen_between(self, session):
+        fake = session["fake"]
+        doubled = FakeNode(
+            role="AXWindow",
+            title=fake.document_title,
+            children=[fake._toolbar(), fake._toolbar(), fake._ribbon()],
+        )
+        with pytest.raises(driver.AmbiguousControl, match="refusing to guess"):
+            driver.window_container(
+                doubled, driver.TOOLBAR_ROLE, what=driver.CONTAINER_NAMES[driver.TOOLBAR_ROLE]
+            )
+
+    def test_every_lookup_the_driver_makes_names_a_container(self):
+        """No scope in the driver starts at the bare window.
+
+        ``Scope()`` with no container is still constructible, because a popup window has
+        no container to narrow to and needs none — but nothing may use it against the
+        *document* window, which is the expensive case.
+        """
+        source = DRIVER_SOURCE.read_text(encoding="utf-8")
+        tree = ast.parse(source)
+        bare = [
+            function.name
+            for function in ast.walk(tree)
+            if isinstance(function, ast.FunctionDef)
+            for node in ast.walk(function)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "Scope"
+            and not node.args
+            and not node.keywords
+        ]
+        assert bare == [], f"these resolve against the whole document window: {bare}"
+        # And the window itself is only ever reached through the holder or by the two
+        # functions whose job is to find it.
+        callers = {
+            function.name
+            for function in ast.walk(tree)
+            if isinstance(function, ast.FunctionDef)
+            for node in ast.walk(function)
+            if isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Name)
+            and node.func.id == "document_window"
+        }
+        assert callers == {"window"}, f"document_window is called outside the holder: {callers}"
 
 
 # --- the docs that describe it ---------------------------------------------
@@ -1723,9 +2801,23 @@ class TestDocsMatchTheCode:
         ):
             assert token in readme, token
 
-    def test_the_readme_discloses_that_the_pointer_moves_and_the_guard(self, readme):
-        assert "moves the real pointer" in readme
+    def test_the_readme_says_the_pointer_is_not_moved_and_keeps_the_guard(self, readme):
+        """The disclosure inverted, because the behaviour did.
+
+        It used to require "moves the real pointer". The driver posts no mouse events
+        now, so a README that still warned about a pointer takeover would be describing a
+        tool that no longer exists — and the frontmost guard is still there, for a
+        different reason, which the README has to give.
+        """
+        assert "does not move the pointer" in readme
+        assert "moves the real pointer" not in readme
         assert "refuses to start" in readme and "frontmost" in readme
+
+    def test_the_readme_records_why_the_canvas_click_is_gone(self, readme):
+        assert "2 of 12" in readme
+        assert "Selection Pane" in readme
+        for gone in ("--pane-frame", "--zoom", "canvas_point"):
+            assert gone in readme, f"the README does not say {gone} is gone"
 
     def test_the_readme_describes_the_grid_the_plan_derives(self, readme, real_plan):
         deck = real_plan["deck"]
@@ -1742,9 +2834,32 @@ class TestDocsMatchTheCode:
         missing = sorted(control for control in controls if f"`{control}`" not in mechanics)
         assert not missing, f"control names the plan emits but computer-use.md does not record: {missing}"
 
-    def test_the_mechanics_record_the_canvas_formula_and_its_check(self, mechanics):
+    def test_the_mechanics_keep_the_canvas_formula_for_manual_work_only(self, mechanics):
+        """The formula is a measurement, so it stays — labelled as not the driver's.
+
+        ``computer-use.md`` documents what the application does, and an operator driving
+        it by hand still needs the mapping. What must not survive is the impression that
+        the driver uses it.
+        """
         for token in ("pane.x", "570.2, 373.4", "Assumptions only a live run can confirm"):
             assert token in mechanics, token
+        assert "The driver no longer uses it" in mechanics
+        assert "kept for **manual** work" in mechanics
+
+    def test_the_mechanics_record_the_selection_pane_as_the_way_a_shape_is_selected(self, mechanics):
+        assert "Why the driver selects shapes in the Selection Pane" in mechanics
+        for token in (
+            "2 of 12",
+            "`Selection Pane...`",
+            "`AXOutline`",
+            "153 rows",
+            "reverse z-order",
+            "`AXStaticText`",
+            "**No `AXPress`**",
+            "set `AXSelected`",
+            "no mouse events",
+        ):
+            assert token in mechanics, f"computer-use.md does not record {token}"
 
     def test_the_mechanics_record_the_navigator_as_not_drivable(self, mechanics):
         assert "Why the driver does not select slides" in mechanics
@@ -1757,3 +2872,68 @@ class TestDocsMatchTheCode:
 
     def test_the_mechanics_point_at_the_driver(self, mechanics):
         assert "gui_capture.py" in mechanics and "gui_capture_plan.py" in mechanics
+
+    def test_the_mechanics_record_what_a_read_costs_and_where_the_nodes_are(self, mechanics):
+        """The measurements that made the driver's shape necessary, in the file for them.
+
+        ``computer-use.md`` is what the application does, and "a full walk of the window
+        is 6.4 s because 762 of its 907 nodes are the Selection Pane" is a fact about the
+        application, not about the driver. An operator driving it by hand pays the same
+        price; without this they would rediscover it.
+        """
+        for token in (
+            "interprocess round trip",
+            "907 nodes",
+            "762",
+            "6.4 s",
+            "17.8 s",
+            "7 targets in 28 minutes",
+            "`AXToolbar`",
+            "`AXTabGroup`",
+            "top-level\n  child",
+            "same document\n  title",
+        ):
+            assert token in mechanics, f"computer-use.md does not record {token}"
+
+    def test_the_mechanics_name_every_dependency_the_driver_needs(self, mechanics):
+        assert "--with lxml" in mechanics
+        assert "Quartz\nis not needed" in mechanics
+
+    def test_the_readme_records_the_measured_cost_and_what_was_done_about_it(self, readme):
+        """The figures, not an adjective. A README that said "faster" would say nothing."""
+        for token in (
+            "7 targets in 28 minutes",
+            "6.4 s",
+            "17.8 s",
+            "907 nodes",
+            "2,218 attribute reads per target",
+            "19,826",
+            "8.9x",
+            "AXToolbar",
+            "AXTabGroup",
+            "stops at every container boundary",
+            "never widens back to the window",
+        ):
+            assert token in readme, f"the README does not record {token}"
+        assert str(READ_BUDGET_PER_TARGET) in readme.replace(",", ""), (
+            "the README does not state the read budget the tests enforce"
+        )
+
+    def test_the_readme_says_what_batching_gives_up(self, readme):
+        """A trade has to be stated as a trade, including the part that is a loss.
+
+        The framing this was built to said batching gives up only crash granularity. It
+        also gives up separating two targets inside one batch that swapped effects, and a
+        README that claimed otherwise would be overstating the evidence a capture carries.
+        """
+        assert "--batch-size" in readme
+        assert "One Save per batch" in readme
+        assert "crash granularity" in readme
+        assert "swap effects" in readme or "swapped effects" in readme
+        assert "no spid outside the batch may have gained an effect" in readme
+        assert "batchIndex" in readme and "newEffectCount" in readme
+
+    def test_the_readme_documents_every_dependency_and_the_progress_output(self, readme):
+        assert "--with lxml" in readme
+        assert "Quartz is not among them" in readme
+        assert "**stderr**" in readme and "stdout stays pure JSON" in readme

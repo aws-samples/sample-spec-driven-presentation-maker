@@ -214,7 +214,36 @@ Every remaining animation value has to be applied through the ribbon, and the ma
 | File | Role |
 | --- | --- |
 | `gui_capture_plan.py` | derives the target list from the catalog's own gaps, and builds the capture deck that list implies |
-| `gui_capture.py` | drives PowerPoint: click a target's own shape, press by title, save, attribute the new effect to that shape |
+| `gui_capture.py` | drives PowerPoint: select a target's own shape by its Selection Pane row, press by title, save, attribute the new effect to that shape |
+
+### It selects a shape by name, because clicking the canvas did not work
+
+A canvas shape has no accessibility element, so shape selection used to be a
+synthetic global mouse event at a point derived from the package geometry, the
+live editor-pane frame and the live zoom. It never became reliable: watching a
+run, the pointer landed in the right place and the shape stayed unselected,
+while the same click by hand always worked. Pacing the event — a click state, a
+settle before the button-down, a hold, and a 0.35 s settle after the up — helped
+without fixing it. The last run of that version captured **2 of 12** attempted
+targets; the other ten were rejected as `effectNotAdded` with "no new effect
+appeared", which is what a click that did not change the selection looks like,
+because the gallery press then replaced the *previously* selected shape's
+effect.
+
+Canvas shapes have no element, but **their Selection Pane rows do**. The driver
+opens `Home ▸ Arrange ▸ Selection Pane...` once per run and selects each target
+by **setting `AXSelected` on the row whose name matches the shape** — there is
+no `AXPress` on a row — then reads the row back to confirm. No coordinates, no
+pointer, no zoom, no editor-pane frame and no settling. A row is resolved by
+name from a fresh read every time, because the rows are rebuilt between reads
+and the pane scrolls; an absent name is a recorded failure naming the names the
+pane did show, and two rows with one name is a refusal rather than a choice.
+
+So `read_canvas_geometry`, `canvas_point`, `read_shape_center_pt`, `parse_zoom`
+and the `--pane-frame` / `--pane-role` / `--zoom` options are gone, along with
+the backend's `click`. `computer-use.md` records the measured pane mechanics
+under "Why the driver selects shapes in the Selection Pane", and keeps the
+canvas formula for manual work only.
 
 ### It does not select slides, because that is what failed
 
@@ -259,11 +288,16 @@ shape, built through `sdpm.api.generate` with **both motion switches off** — i
 every `p:timing` tree in the saved package came from PowerPoint.
 
 The grid was 8x10 with two-line labels, which left each shape 77x22 pt. A click's
-accuracy is bounded by the **short** side, and 22 pt was too small: a live run put
+accuracy was bounded by the **short** side, and 22 pt was too small: a live run put
 71 presses onto five shapes, because a click that lands on empty canvas leaves the
 previous shape selected and the next press overwrites **its** effect. Squarer cells
 and a one-line label take the short side to 43.5 pt. The key itself is not lost —
 it is in the plan, and each shape carries its ordinal.
+
+Shape size and separation are **no longer load-bearing**, because nothing is
+clicked: a shape is selected by name in the Selection Pane. The deck is kept as
+it is rather than regenerated, and the grid's separation checks stay, so a future
+reader is not left wondering whether a tighter grid would change a capture.
 
 ```bash
 uv run python scripts/animation_catalog/gui_capture_plan.py --emit-plan \
@@ -293,28 +327,47 @@ Open the generated deck in PowerPoint, leave it frontmost, then:
 
 ```bash
 uv run --with pyobjc-framework-ApplicationServices --with pyobjc-framework-Cocoa \
-  --with pyobjc-framework-Quartz \
+  --with lxml \
   python scripts/animation_catalog/gui_capture.py \
     --plan /abs/out/plan.json --out /abs/out --document /abs/out/capture-deck.pptx \
     --drive-powerpoint
 ```
 
-**It moves the real pointer.** Canvas shapes have no accessibility element, so selecting one posts a global mouse event at a point derived from the package geometry, the live editor-pane frame and the live zoom. Everything else is `AXPress` and leaves the pointer alone. Because that one click lands wherever the frontmost window is, the driver **refuses to start** unless PowerPoint is frontmost and its document window is the expected capture deck; it cannot type into the operator's own work. Do not use the machine during a run.
+Three dependencies, and that is the whole list. **Quartz is not among them** — the only
+binding that needed it was the mouse event, which went with the coordinate click.
+`lxml` is: the package readers import it lazily inside the function, which keeps `--help`
+working with nothing installed, and a run outside this repository's environment then
+fails with `ModuleNotFoundError: No module named 'lxml'` at the first attribution unless
+the invocation asks for it.
+
+A line per batch goes to **stderr** while it runs — batch index, targets attempted,
+captured so far, elapsed — so a 76-target run is distinguishable from a hang, while
+stdout stays pure JSON for the summary.
+
+**It does not move the pointer.** Every action is an `AXPress` or a single `AXSelected` write, so no mouse event is posted and the pointer is never taken over. The driver still **refuses to start** unless PowerPoint is frontmost and its document window is the expected capture deck: an `AXPress` goes to whatever window the title resolution found, and the wrong frontmost document would mean pressing ribbon controls and `Save` on the operator's own deck.
 
 Without `--drive-powerpoint` it sends nothing. `--help` and `--emit-record-schema` work with no accessibility bindings installed at all: pyobjc is imported inside the live backend, so importing the module never requires it and `tests/test_animation_gui_capture.py` runs against a fake.
 
 ### What it guarantees, and why each guarantee exists
 
-- **One shape per target, and every press attributed to its own shape.** A gallery press *replaces* the effect of the **selected shape** rather than adding one, so a target owns a shape rather than a slide. After the press and the save, the slide's effect count must have grown by exactly one and the new effect's `p:spTgt/@spid` must be the clicked shape's `p:cNvPr/@id`. An effect on another shape is a `rejected` record naming **both** spids; a press that added nothing is a recorded failure. That is stronger than "slide N is target N", which survived neither a reordering nor a mis-aimed click.
+- **One shape per target, and every press attributed to its own shape.** A gallery press *replaces* the effect of the **selected shape** rather than adding one, so a target owns a shape rather than a slide. After the press and the save, the slide must have gained at least one effect and **every** new effect's `p:spTgt/@spid` must be the selected shape's `p:cNvPr/@id`. (Not "exactly one": a compound value writes several `p:cTn` nodes, and the stricter form rejected a correctly applied target.) An effect on another shape is a `rejected` record naming **both** spids; a press that added nothing is a recorded failure. This gate is unchanged by the move to the Selection Pane, deliberately — it is what proved the click unreliable, and it is the only thing that makes a capture evidence.
 - **Re-read and re-resolve by title before every press.** A press scrolls the gallery and renumbers it; a press aimed by a stale index applies the wrong effect while the record names the right one. Scopes are held as titles, never as elements, and a title matching two controls is a refusal rather than a choice.
 - **A failure is recorded and the run continues.** A control that is absent, ambiguous, disabled, a verification that times out, or an effect that cannot be attributed becomes a `rejected` record with its error kind. The 2026-10-31 scripting run lost 357 applied candidates to one bad term because the failure propagated out before the save.
 - **Every wait is bounded.** There is one `while True` in the module, inside the bounded poll, and a timeout is a recorded failure rather than a hang. Nothing blocks on the GUI.
-- **Save after every target**, so a crash costs one target — and because the save is now the measurement. The attribution reads the file Save writes, so there is no switch to skip it and a save that does not land is a rejected record rather than a footnote.
-- **Resumable.** An output directory that already has records skips the targets already captured and retries the ones that failed; `--force` reruns everything. The read-back is rewritten rather than appended to, so there is exactly one record per key. **`--force` wants a freshly generated deck**, because a re-press on a shape that already carries an effect *replaces* it rather than adding one, and the attribution gate requires a new effect — a forced rerun against an already-captured deck is rejected per target rather than credited on the previous run's evidence.
+- **One Save per batch of targets**, because the save is the measurement: the attribution reads the file Save writes, so there is no switch to skip it and a save that does not land rejects every target pressed into it rather than being a footnote on a passing one. The default batch is 10 and `--batch-size` changes it; `1` is a save per target. Each target is still attributed by **its own** `spid` against the saved package, and the batch adds a gate of its own — **no spid outside the batch may have gained an effect**, which fails the batch naming the stray — while a target whose own spid gained nothing is rejected on its own with the rest of the batch still credited. Each record carries its `batchIndex`, and `effectCount` is then the batch's before/after for the slide while `newEffectCount` is the target's own.
+
+  What batching gives up, stated rather than implied: **crash granularity** (a crash costs the presses since the last save, which a resumed run re-presses because an uncaptured target has no record), and **telling two targets inside one batch apart when they swap effects** — if each gained one effect and nothing outside the batch did, the package cannot say whose value is whose. `--batch-size 1` gives both back. What bounds the second is that the mechanism which used to cause it, a selection that did not take, is caught by `select_shape`'s `AXSelected` read-back *before* any press, and a press landing outside the batch is caught by the stray-spid gate.
+- **Cost is a correctness property, and it is measured rather than assumed.** A run of the previous version captured **7 targets in 28 minutes** — about four minutes each, every one correct and attributed. The mechanism worked; it was far too slow to reach 76. Timed live against the real window, best of three: one `find_all_by_title` over the whole window **6.4 s**, `selection_outline` **17.8 s**, walking only the pane's outline (762 nodes) 4.1 s, reading 152 row names 4.3 s. The window is **907 nodes, 762 of them the Selection Pane's rows**, and every accessibility attribute read is an interprocess round trip.
+
+  The dominant cost was full-tree walking, not saving. Every lookup started at the window, so resolving a ribbon control traversed all 762 pane rows and resolving a row traversed the ribbon; and `document_window` identified the ribbon-carrying window by walking **each** of PowerPoint's four or five same-titled windows, from a function nearly every helper calls. Four changes, in descending order of what they were worth: lookups are **scoped to a container** (`Save` in the window's `AXToolbar`, tabs and galleries in the ribbon `AXTabGroup`, rows in the `AXOutline`), found by a search of the window's top levels that **stops at every container boundary** instead of descending through one; `document_window` probes each candidate's direct children; the window and its containers are resolved once per stretch of work and dropped at **every** press, every `AXSelected` write and every poll; and one Save judges a batch. A scope that cannot be identified **raises** — it never widens back to the window, because a lookup that quietly walked everything is exactly what this removed and nobody would look for it again.
+
+  Measured against the test fake, whose pane carries 156 rows and which publishes the same four same-titled sibling windows: **2,218 attribute reads per target, down from 19,826 — 8.9x.** `tests/test_animation_gui_capture.py` counts the reads and budgets them at 3,000 per target, so a lookup that goes back to walking the window fails a test rather than costing an operator an afternoon.
+
+- **Resumable.** An output directory that already has records skips the targets already captured and retries the ones that failed, restarting at the first uncaptured target whatever the batch boundaries were; `--force` reruns everything. The read-back is rewritten rather than appended to, so there is exactly one record per key. **`--force` wants a freshly generated deck**, because a re-press on a shape that already carries an effect *replaces* it rather than adding one, and the attribution gate requires a new effect — a forced rerun against an already-captured deck is rejected per target rather than credited on the previous run's evidence.
 
 ### Its output feeds `--parse-oracle`
 
-The driver writes `powerpoint-readback.jsonl` in the shape the generator already consumes — an `{"record": "application"}` first line naming the PowerPoint version and the driver, then one record per target with the catalog key, the slide index, the GUI path applied, the shape name and `spid` it aimed at, the point it clicked, the ribbon read-back (`Start:`, `Duration:`), the `spid` the new effect was attributed to with that effect's own `p:cTn` attributes, the before/after effect counts, whether it was rejected and any error — and copies the saved deck to `powerpoint-oracle.pptx` beside it, so the two join offline:
+The driver writes `powerpoint-readback.jsonl` in the shape the generator already consumes — an `{"record": "application"}` first line naming the PowerPoint version and the driver, then one record per target with the catalog key, the slide index, the GUI path applied, the shape name and `spid` it aimed at, the Selection Pane row it selected and that it selected by row rather than by click, the ribbon read-back (`Start:`, `Duration:`) taken while that shape was still the selected one, the `spid` the new effect was attributed to with that effect's own `p:cTn` attributes, how many `p:cTn` nodes appeared on that `spid`, the batch index whose Save judged it with that batch's before/after effect counts, whether it was rejected and any error — and copies the saved deck to `powerpoint-oracle.pptx` beside it, so the two join offline:
 
 ```bash
 uv run python scripts/animation_catalog/generate.py --parse-oracle /abs/out

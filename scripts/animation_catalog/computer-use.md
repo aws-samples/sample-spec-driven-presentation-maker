@@ -137,8 +137,10 @@ no addressable element.
   `click_method: "global"` does drive it, but it moves the real pointer, and
   after such a click the pointer rests on the control and macOS raises a
   tooltip there, so the **next** `global` click at the same point refuses with
-  `the topmost window there is 'Window Server'`. Reach for `global` only for a
-  target with no addressable element, such as a shape on the slide canvas.
+  `the topmost window there is 'Window Server'`. There is now **nothing in the
+  driver that needs it**: the one target with no addressable element, a shape
+  on the slide canvas, is reached through its Selection Pane row instead. See
+  "Why the driver selects shapes in the Selection Pane".
 
 A gallery **lazily materializes its tiles**: a first read of Entrance Effects
 returned 22, and after one tile was pressed the same read returned different
@@ -170,10 +172,9 @@ Checkerboard was Shape. A press aimed by a stale index applies the wrong
 effect and the record names the right one, which is worse than failing.
 **Re-read before every press.**
 
-So the real cost per value is three calls — select the shape, read, press — of
-which the click invalidates the state the press needs. (It was four while a
-slide had to be selected too; that step is gone, and the next section says why.)
-Size a batch by the number of shapes in it.
+So the real cost per value is three calls — select the shape's row, read, press.
+(It was four while a slide had to be selected too; that step is gone, and the
+next section says why.) Size a batch by the number of shapes in it.
 
 Set `max_tree_nodes: 1` before a run of presses when you do not need the tree:
 a press returns a refreshed tree at the budget of the last read, and the full
@@ -227,8 +228,8 @@ true. A manual read of the live tree showed
 `cell "Slide 1 of 17 Slides"` with **no `[AXPress]`** and no other action, and
 the attribute never became true, so slides 1 to 6 each ended in a 6-second
 timeout. The only thing that selected a slide by hand was a synthetic
-**global click on the cell's own frame** — which is a pointer takeover per
-target on top of the one the canvas already needs.
+**global click on the cell's own frame** — a pointer takeover per target, and
+the pointer is exactly what the next section stops needing.
 
 **Only the cells scrolled into view exist.** The navigator publishes **6** of
 76 cells; the rest are not in the tree at all. Slides 7 to 76 were therefore
@@ -238,9 +239,9 @@ would need scrollbar arithmetic plus title matching plus a status-bar
 cross-check — three more assumptions with no offline check.
 
 The fix was to stop needing slide selection. `gui_capture_plan.py` now builds
-**one slide carrying one named shape per target**, checked so that a click at
-any shape's centre cannot land on a neighbour, and `gui_capture.py` selects a
-target by clicking its own shape. Attribution got stronger rather than weaker:
+**one slide carrying one named shape per target**, and `gui_capture.py` selects
+a target by name through that shape's Selection Pane row. Attribution got
+stronger rather than weaker:
 each effect in the saved `p:timing` carries `p:spTgt/@spid`, and the slide's
 `p:cNvPr/@id` and `@name` map that back to the shape and so to the target, which
 survives reordering and catches a mis-aimed click. "Slide N is target N" did
@@ -254,6 +255,48 @@ steps:
   first capture. Read `p:spTgt/@spid` instead.
 - a deck of 76 slides is still fine to *read* by hand; it is driving the
   navigator that does not work.
+
+## Why the driver selects shapes in the Selection Pane
+
+Measured 2026-11-01. A canvas shape has **no accessibility element**, so for a
+while the driver selected one with a synthetic global mouse event at a point
+derived from the package geometry, the live editor-pane frame and the live zoom.
+That never became reliable. Watching a run, the pointer landed in the right
+place and the shape stayed unselected; the same click by hand always worked.
+Pacing the event helped and did not fix it — `kCGMouseEventClickState`, a settle
+before the button-down, a hold, and a 0.35 s settle after the up took the last
+run of that version to **2 of 12** attempted targets, with the other ten
+recorded as `effectNotAdded` / "no new effect appeared": the signature of a
+click that did not change the selection, so the gallery press replaced the
+*previously* selected shape's effect.
+
+Canvas shapes have no element. **Their Selection Pane rows do**, and that
+removes coordinates, the pointer, the zoom, the pane frame and the timing all at
+once. Measured live:
+
+| Fact | Value |
+| --- | --- |
+| `Home ▸ Arrange` | an `AXMenuButton`; pressing it opens a window titled `Arrange` |
+| the `Arrange` window | holds an `AXMenuButton` titled `Selection Pane...` |
+| pressing that | opens the pane **inside the document window that carries the ribbon** (PowerPoint publishes several same-titled windows) |
+| the pane | an `AXOutline` whose children are one `AXRow` per shape — 153 rows for a deck of 76 shapes plus 76 labels plus one |
+| row order | **reverse z-order**: row 0 `TextBox 152`, row 1 `Rounded Rectangle 151`, row 2 `TextBox 150` |
+| a row's `title` | `None`. The shape name is the **`value` of a descendant `AXStaticText`** |
+| a row's actions | `AXShowDefaultUI`, `AXShowAlternateUI` and a Rename. **No `AXPress`** |
+| selecting a row | **set `AXSelected`**, the standard outline-row mechanism, then read it back |
+
+So a shape is selected **by name**, with no coordinates, no keyboard focus and
+no timing dependency. Two cautions carried over from elsewhere in this file:
+pressing `Selection Pane...` while the pane is open **closes** it, the same trap
+as pressing an already-active ribbon tab, so read the pane's presence rather
+than remembering it; and rows are re-created between reads like every other
+element here, and the pane scrolls, so resolve a row by name from a fresh read
+every time.
+
+The coordinate table and the canvas formula below are kept for **manual** work
+through the Computer Use tools. `gui_capture.py` uses neither: it posts no mouse
+events at all, and the options that corrected the mapping (`--pane-frame`,
+`--pane-role`, `--zoom`) are gone with it.
 
 Effect Options opens as its own window titled `Effect Options`, whose items
 are `menubutton`s. Activate one with `computer_perform_action` + `AXPress`; a
@@ -269,14 +312,50 @@ returns PowerPoint's window, under
 
 ```bash
 uv run --with pyobjc-framework-ApplicationServices --with pyobjc-framework-Cocoa \
-  --with pyobjc-framework-Quartz python …
+  --with lxml \
+  python …
 ```
 
-So the calls per value — select the shape, read, press, save — are a loop inside
-one process rather than that many agent turns, and the two rules that make the
-tool contract awkward (one explicit read per action, a popup being invisible to
-the read that opened it) stop being rules to remember: the driver re-reads before
-every press by construction.
+(`lxml` because the package readers import it lazily, so a run outside the
+repository's own environment fails at the first attribution without it. **Quartz
+is not needed** — the only binding that wanted it was the mouse event.)
+
+So the calls per value — select the shape's row, read, press, save — are a loop
+inside one process rather than that many agent turns, and the two rules that make
+the tool contract awkward (one explicit read per action, a popup being invisible
+to the read that opened it) stop being rules to remember: the driver re-reads
+before every press by construction. It also posts **no mouse events**, so a run
+no longer takes the pointer over.
+
+### What a read costs, and where the window's nodes are
+
+Every accessibility attribute read is an **interprocess round trip**, and the
+document window is **907 nodes, 762 of them the Selection Pane's rows**. Timed
+live on 2026-11-01, best of three:
+
+| operation | cost |
+|---|---|
+| `find_all_by_title(window, "Save")` — one full window walk | **6.4 s** |
+| `selection_outline(backend)` | **17.8 s** |
+| walking only the pane's outline (762 nodes) | 4.1 s |
+| reading 152 rows' names | 4.3 s |
+
+Two consequences for anyone driving this by hand or by script:
+
+- **PowerPoint publishes four or five `AXWindow`s carrying the same document
+  title**, and only one of them holds the ribbon. Searching each by title to
+  find out costs a full walk per candidate.
+- **The window's controls live in three containers**, and each is the smallest
+  thing certain to hold what it holds: `Save` under the window's `AXToolbar`;
+  the tab strip and the active tab's command galleries under one `AXTabGroup`;
+  the shape rows under the pane's `AXOutline`. The tab group is a **top-level
+  child** of the window, which is what makes identifying the right window a
+  two-level look rather than a walk.
+
+So a lookup aimed at the whole window pays for the pane's rows even when it wants
+a ribbon tile, and vice versa. `gui_capture.py` scopes every lookup to one of the
+three containers for exactly that reason, and a run of it that did not captured
+**7 targets in 28 minutes**.
 
 `scripts/animation_catalog/gui_capture.py` is that driver and
 `gui_capture_plan.py` derives its target list from the catalog's own
@@ -294,8 +373,10 @@ Each of these was needed to write the driver and was not here:
   `Animations > Entrance Effects > Fly In`, and the `Animations` tab has to be
   pressed before any of them resolves.
 - **The canvas click point has a formula**, and only its worked example was
-  recorded. With the editor pane's frame in screen coordinates and the live zoom
-  `z`, a slide of `W x H` points showing a shape centred at `(sx, sy)` points:
+  recorded. The driver no longer uses it — see "Why the driver selects shapes in
+  the Selection Pane" — but it is the mapping to use for manual work. With the
+  editor pane's frame in screen coordinates and the live zoom `z`, a slide of
+  `W x H` points showing a shape centred at `(sx, sy)` points:
 
   ```
   shown     = (W * z, H * z)
@@ -334,9 +415,10 @@ guessing. Correct this section after the first run.
 
 | Assumption | If it is wrong |
 | --- | --- |
-| The slide editor pane is an `AXSplitGroup` with a frame | `--pane-role` or `--pane-frame` overrides it; a wrong pane makes the click miss and the gallery stay disabled, which is a recorded timeout |
-| The status bar exposes the zoom as an element titled e.g. `92%` | `--zoom` takes a measured value |
-| A click at a shape's centre selects that shape and nothing else, with the slide unscrolled and the 76 shapes 14 pt apart | the press lands on another shape, which the saved package then shows as an effect on the wrong `spid`: a rejected record naming both, not a wrong value |
+| The Selection Pane stays open, and keeps publishing rows, across a ribbon tab change and a `Save` | the next target's row lookup fails as `controlNotFound` and the run continues; it does not press on the previous shape |
+| Writing `AXSelected` on a row selects the shape, and the row then reads back selected | the read-back times out per target **before** any press, so a selection that does not take costs a record rather than another shape's effect |
+| The pane publishes every shape's row, including ones scrolled out of view — unlike the slide navigator, which published only 6 of 76 | the rows that are missing are recorded by name per target, with the names the pane did show |
+| A row's name is exactly the package's `p:cNvPr/@name`, so the plan's `shapeName` matches it verbatim | every target is `controlNotFound` naming what the pane showed, loudly and on the first target |
 | PowerPoint writes one `p:cTn` with a `presetClass` per applied effect, with the target shape's `spid` beneath it | attribution reads nothing and every target is rejected as `effectNotAdded`, loudly and on the first target |
 | `Save` writes the new effect into the file before the next read | the attribution reads a stale package and rejects, rather than crediting the wrong effect |
 | The `Path Animation` window lists presets directly, without a `Basic` grouping level | an extra level in the path is tolerated and recorded as `groupAbsent` |
