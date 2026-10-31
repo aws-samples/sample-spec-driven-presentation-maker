@@ -20,7 +20,7 @@ import re
 from typing import Iterable
 
 _WRITE_OPEN = ".document.write(`"
-_SCRIPT_RE = re.compile(r"<script\b[^>]*>(.*?)</script\s*>", re.IGNORECASE | re.DOTALL)
+_SCRIPT_RE = re.compile(r"<script\b[^>]*>(.*?)</script[^>]*>", re.IGNORECASE | re.DOTALL)
 _ESCAPE_RE = re.compile(r"\\(x[0-9A-Fa-f]{2}|u\{[0-9A-Fa-f]+\}|u[0-9A-Fa-f]{4}|\r\n|[\s\S])")
 _SIMPLE_ESCAPES = {"n": "\n", "t": "\t", "r": "\r", "b": "\b", "f": "\f", "v": "\v", "0": "\0"}
 
