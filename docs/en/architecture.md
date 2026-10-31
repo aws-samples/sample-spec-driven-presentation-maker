@@ -177,6 +177,10 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
 - Slide scripts can still navigate or open tabs: no CSP directive stops that. The static
   checks warn on `location`, `window.open`, `top.` and external URLs in slide scripts
   (`script-external`), and the deck always plays in the sandboxed iframe described below.
+  The checks also flag `RTCPeerConnection` and `stun:` / `turn:` URLs. In the cloud each
+  build keeps these findings (slide and kind: navigation, popup, external URL, WebRTC) on the
+  deck record (`htmlScriptExternal`); `GET /decks/{id}` returns them as `scriptWarnings`
+  and the deck page shows a warning next to Present / Download, on shared decks too.
 - After each build that changes slides, the browser check (`sdpm.engine.html.browser_check`)
   opens `output.html` in a browser over the DevTools protocol, shows each changed slide with
   every fragment and finished animations, measures placeholders, regions and blocks (layout
@@ -193,7 +197,16 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
   sources fail every `http(s)://` and `ws(s)://` request of the page, navigations included
   (the DevTools `Fetch` domain; `Network.setBlockedURLs` lets top-level navigations through
   in AgentCore Browser), and close pages the deck opens before they load; a browser that rejects the block fails the check before any slide
-  runs. The runtime role gets `bedrock-agentcore:StartBrowserSession`,
+  runs. WebRTC and WebTransport do not go through `Fetch`, so before any deck code runs a
+  guard (`Page.addScriptToEvaluateOnNewDocument`, also sent to every iframe target the page
+  attaches) removes the WebRTC constructors and `WebTransport` and makes `window.open`
+  return null. After the deck loads, a probe looks for those names in the page, a new
+  iframe, a `srcdoc` iframe and `window.open`; any name still reachable fails the check before any slide
+  runs. The result's `network_blocked` is true only when the `Fetch` block was accepted and
+  the probe passed. A canary run against AgentCore Browser in ap-northeast-1
+  (`scripts/verify_agentcore_browser_egress.py`) confirmed both: WebRTC was unavailable to
+  the slide and `network_blocked` was true. DNS resolution hints (`dns-prefetch`,
+  `preconnect`) are not proven blocked there; the canary did not test DNS egress. The runtime role gets `bedrock-agentcore:StartBrowserSession`,
   `StopBrowserSession` and `ConnectBrowserAutomationStream` on the
   `aws.browser.v1` ARN only. A check that is skipped, stopped by a slide that navigates the
   page away (the slide helper logs `pagehide`), or does not finish within
@@ -213,6 +226,21 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
 - The local Web UI serves `output.html` with `Content-Security-Policy: sandbox allow-scripts
   allow-popups allow-popups-to-escape-sandbox` and thumbnails with
   `Content-Security-Policy: sandbox`, both `nosniff`.
+
+Accepted risks:
+
+- The Present URL is a presigned bearer link valid for 4 hours. Anyone holding it can open
+  the deck until it expires, even after the deck is unshared or its permissions change.
+  4 hours is the shortest expiry that still covers a presentation; the in-app view and
+  downloads use 900 s.
+- All HTML decks are served from one origin, the deck bucket's regional host. This is
+  bounded by reads that each need their own signature, `connect-src 'none'` in every deck,
+  and the player iframe's sandbox without `allow-same-origin`, which gives each deck an
+  opaque origin.
+- In the cloud browser check (AgentCore Browser), DNS resolution hints (`dns-prefetch`,
+  `preconnect`) are not proven blocked; the egress canary does not test DNS. A slide's
+  script could leak a short value through a DNS lookup during the check. Every other
+  channel the canary probes is blocked, and a published deck keeps `connect-src 'none'`.
 
 ### Text Measurement
 

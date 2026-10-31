@@ -334,11 +334,12 @@ class TestLocalRunPythonHtml:
         assert "deck.css" not in snap and "specs/art-direction.html" not in snap
         assert "slides/stray.html" not in snap
 
-    def test_invalid_output_format_is_reported_and_built_as_pptx(self, deck_dir: Path, monkeypatch):
+    def test_invalid_output_format_stops_the_build(self, deck_dir: Path, monkeypatch):
         calls = self._patch_generate(monkeypatch)
-        out = self._run(deck_dir, 'write_json("deck.json", {"template": "t.pptx", "outputFormat": "pdf"})')
-        assert "outputFormat" in out["errors"]
-        assert calls and calls[0]["output_path"] == str(deck_dir / "output.pptx")
+        out = self._run(deck_dir, 'write_json("deck.json", {"template": "t.pptx", "outputFormat": "htlm"})')
+        assert "htlm" in out["errors"]["outputFormat"]
+        assert calls == []
+        assert not (deck_dir / "output.pptx").exists()
 
 
 # ---------------------------------------------------------------------------

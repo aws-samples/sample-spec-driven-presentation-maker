@@ -203,7 +203,7 @@ def test_get_deck_pptx_shape_unchanged(monkeypatch, index):
         "previews/d1/cover_100.webp": b"x",
     })
     result = index.get_deck("d1")
-    assert "outputFormat" not in result and "htmlUrl" not in result
+    assert "outputFormat" not in result and "htmlUrl" not in result and "scriptWarnings" not in result
     assert [s["slug"] for s in result["slides"]] == ["cover", "body"]
     assert result["slides"][0]["previewUrl"] == "https://app-origin.example/previews/d1/cover_100.webp"
     assert result["slides"][1]["previewUrl"] is None
@@ -229,3 +229,27 @@ def test_get_deck_html_uses_regional_presigns_only(monkeypatch, index):
     assert _regional(cover["previewUrl"])[0] == f"/{preview}"
     assert body["previewUrl"] is None
     assert result["isOwner"] is False and result["role"] == "viewer"
+    assert result["scriptWarnings"] == []
+
+
+def test_get_deck_html_script_warnings_keep_only_valid_entries(monkeypatch, index):
+    _setup(monkeypatch, index, deck={"htmlS3Key": HTML_KEY, "htmlScriptExternal": [
+        {"slug": "cover", "kinds": ["navigation", "external-url"]},
+        {"slug": "Bad Slug<script>", "kinds": ["popup"]},
+        {"slug": "body", "kinds": ["popup", "exfiltrate"]},
+        {"slug": "chart_2", "kinds": ["webrtc"]},
+        "not-a-dict",
+    ]}, objects={
+        "decks/d1/deck.json": json.dumps({"outputFormat": "html"}).encode(),
+        "decks/d1/specs/outline.md": _OUTLINE,
+    })
+    assert index.get_deck("d1")["scriptWarnings"] == [
+        {"slug": "cover", "kinds": ["navigation", "external-url"]},
+        {"slug": "chart_2", "kinds": ["webrtc"]},
+    ]
+
+
+def test_script_warnings_are_capped(index):
+    many = [{"slug": f"s{i}", "kinds": ["popup"]} for i in range(250)]
+    assert len(index._script_warnings(many)) == 200
+    assert index._script_warnings(None) == [] and index._script_warnings("x") == []

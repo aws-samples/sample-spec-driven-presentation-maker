@@ -255,7 +255,11 @@ def test_failed_render_is_not_cached_as_success(decorated_template: Path, tmp_pa
         result = load_template_html(decorated_template, cache_root=tmp_path / "c")
         assert result.decorations_status == failed
         assert result.svg_paths == {}
-    assert len(calls) == 1  # memoised for this process, never written as a success
+    assert len(calls) == 1  # memoised, never written as a success
+    later = template.time.monotonic() + template.FAILED_RENDER_RETRY_S + 1
+    monkeypatch.setattr(template.time, "monotonic", lambda: later)
+    assert load_template_html(decorated_template, cache_root=tmp_path / "c").decorations_status == failed
+    assert len(calls) == 2  # retried once the memo expired
 
 
 def test_cache_key_changes_with_converter_version(decorated_template: Path, monkeypatch) -> None:

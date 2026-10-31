@@ -35,7 +35,11 @@ Sources your slides need. Facts come from the brief and its sources.
   structure and say so in your summary. A card or node that names a concept carries an icon,
   placed as the style's icon rule says. Where the presenter operates the slide, build the
   operation with a slide script so it works while presenting, and make the state before any
-  operation the one that reads on its own (it is what prints). A slide whose claim is itself
+  operation the one that reads on its own (it is what prints): a field that a control fills
+  starts with content. Every text the audience sees on the slide (headings, labels, captions,
+  button text and the starting text of every field) names the content; a control is known by
+  its form and its label. Every sentence on how to operate the slide, what the presenter does
+  and what follows, is written only in `<aside class="notes">`. A slide whose claim is itself
   a sentence may stay text.
 - **Follow the style.** `specs/art-direction.html` is a short deck built in the style, about the
   style: its `Frame:` comments say what repeats on every slide, its `Component:` comments the
@@ -48,7 +52,10 @@ Sources your slides need. Facts come from the brief and its sources.
   (`write_text("slides/<slug>.html", …)`). Each write returns warnings — static checks,
   then the browser check's layout findings and JS errors — and a PNG of the slide
   (`preview_files` locally, `get_preview(deck_id, slugs=[…])` in the cloud). Apply the fix each
-  warning names, look at the PNG and fix what looks wrong, then go to the next slug. When a
+  warning names, look at the PNG and fix what looks wrong (each icon stands out from the
+  background it sits on: `search_assets` `theme_filter` picks the variant for a light or dark
+  background, and an SVG icon takes the colour you set with CSS `fill`), then go to
+  the next slug. When a
   warning says the browser check was skipped, stopped or did not finish, report the slides it
   names as not checked.
 
@@ -65,7 +72,8 @@ patterns: pick the `Pattern:` slide that fits each slide's `visual` and take its
 adapting only what the content needs. Derive all coordinates from one grid (margins, gutters;
 the `grid` tool computes them), so the same kind of expression gets the same region set
 across the deck. Also write `deck.css`: the component classes the deck repeats, from the
-style's `Component:` and `Pattern:` parts. The body (text, images, charts, tables,
+style's `Component:` and `Pattern:` parts. The frame, the regions and the `deck.css`
+components are for what the audience reads. The body (text, images, charts, tables,
 interaction) belongs to the content composers, and so do per-slide adjustments. Write
 `deck.css` and every slide in one `run_python` call: a few layout functions and a plan list,
 looped. Every assigned slug gets a file.

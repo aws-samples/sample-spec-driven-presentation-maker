@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { ToolCard, ToolCardCompact, TOOL_META, stripPrefix } from "./ToolCard"
+import { DeckFormatProvider } from "./DeckFormatContext"
 
 describe("ToolCard", () => {
   it("renders active state with cursor marker and agent name tag", () => {
@@ -156,5 +157,36 @@ describe("TOOL_META", () => {
     expect(TOOL_META.generate_pptx.category).toBe("produce")
     expect(TOOL_META.run_python.category).toBe("compute")
     expect(TOOL_META.hearing.category).toBe("hearing")
+  })
+})
+
+describe("generate_pptx label", () => {
+  it("says Finalizing HTML deck when the open deck is HTML", () => {
+    const { container } = renderWithIntl(
+      <DeckFormatProvider value="html"><ToolCard name="generate_pptx" input={{}} isActive /></DeckFormatProvider>
+    )
+    expect(container.textContent).toContain("Finalizing HTML deck")
+    const compact = renderWithIntl(
+      <DeckFormatProvider value="html"><ToolCardCompact name="generate_pptx" /></DeckFormatProvider>
+    )
+    expect(compact.container.textContent).toContain("Finalizing HTML deck")
+  })
+
+  it("says Finalizing HTML deck when the result is HTML", () => {
+    const { container } = renderWithIntl(
+      <ToolCard name="spec_driven_presentation_maker_generate_pptx" input={{}} status="success"
+        result={{ status: "completed", outputFormat: "html" }} />
+    )
+    expect(container.textContent).toContain("Finalizing HTML deck")
+  })
+
+  it("says Generating PPTX otherwise", () => {
+    const { container } = renderWithIntl(
+      <DeckFormatProvider value="pptx"><ToolCard name="generate_pptx" input={{}} isActive /></DeckFormatProvider>
+    )
+    expect(container.textContent).toContain("Generating PPTX")
+    expect(container.textContent).not.toContain("Finalizing HTML deck")
+    const plain = renderWithIntl(<ToolCardCompact name="generate_pptx" />)
+    expect(plain.container.textContent).toContain("Generating PPTX")
   })
 })

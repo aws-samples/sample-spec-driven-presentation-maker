@@ -13,6 +13,11 @@ into a tmpdir, uploads ``output.html``, the per-slide previews and the browser
 check's PNGs under ``html/`` (served through presigned URLs only, see
 shared/html_artifacts.py), keeps the deck record pointing at the newest artifact,
 and deletes superseded objects.
+
+Previews and PNGs of one build share one epoch: a per-build revision in
+milliseconds, strictly above every epoch already listed for the deck, so the
+newest build always wins the key map. A build that does not commit (a failed
+preview upload or record update) deletes its own previews and PNGs.
 """
 
 import json
@@ -117,7 +122,14 @@ def prepare_html_workspace(
         if assets:  # manifests are large; fetch them only when a slide names an asset
             materialize_assets(assets, storage, tmpdir)
 
-        template_path = materialize_template(deck_id, user_id, deck_meta, storage, tmpdir)
+        try:
+            template_path = materialize_template(deck_id, user_id, deck_meta, storage, tmpdir)
+        except ValueError as e:
+            raise ValueError(
+                f"deck.json template {deck_meta.get('template')!r} is not a template this deck can use: "
+                "an HTML deck is built on a template's layouts — set one with "
+                "apply_style(deck_id, style, template)"
+            ) from e
         built_meta = {**deck_meta, "template": template_path.name}
         (tmpdir / "deck.json").write_text(json.dumps(built_meta, ensure_ascii=False), encoding="utf-8")
         template_html_cache.restore(template_path, storage, cache_root)
@@ -190,8 +202,12 @@ def _publish(
     slide_count: int,
     thumbnail_key: str | None,
     set_thumbnail: bool,
+    script_external: list[dict] | None,
 ) -> str:
     """Upload output.html under a fresh key, point the record at it, delete the superseded one.
+
+    ``script_external`` (the build's ``[{slug, kinds}]``) becomes ``htmlScriptExternal``;
+    a clean build removes the attribute.
 
     Raises on upload / record failure after deleting the orphaned upload (best effort).
     """
@@ -201,6 +217,7 @@ def _publish(
         "htmlS3Key": new_key,
         "updatedAt": datetime.now(timezone.utc).isoformat(),
         "slideCount": slide_count,
+        "htmlScriptExternal": script_external or None,
     }
     if set_thumbnail:
         updates["thumbnailS3Key"] = thumbnail_key
@@ -221,6 +238,12 @@ _PREVIEW_EPOCH_RE = re.compile(r"/([a-z0-9][a-z0-9-_]*)_(\d+)\.html$")
 def _slug_epoch(key: str) -> tuple[str, int] | None:
     m = _PREVIEW_EPOCH_RE.search(key)
     return (m.group(1), int(m.group(2))) if m else None
+
+
+def _revision(listed_keys: list[str]) -> int:
+    """This build's epoch: now in ms, and above every listed preview / PNG epoch."""
+    epochs = [se[1] for k in listed_keys if (se := _slug_epoch(k) or png_slug_epoch(k))]
+    return max(time.time_ns() // 1_000_000, 1 + max(epochs, default=0))
 
 
 def _listed(storage: Storage, prefix: str) -> list[str]:
@@ -294,9 +317,11 @@ def refresh_html_deck(
     from sdpm.api import refresh_html
 
     cache_root = template_html_cache.resolve_root(cache_root)
-    epoch = int(time.time())
     try:
         tmpdir, _ = prepare_html_workspace(deck_id, user_id, storage, cache_root)
+    except ValueError as e:  # the deck or its template: the message says what to fix
+        logger.info("HTML workspace preparation failed for %s: %s", deck_id, e)
+        return {"html_error": f"HTML build failed — the deck's HTML is stale: {e}"}
     except Exception as e:
         logger.warning("HTML workspace preparation failed for %s", deck_id, exc_info=True)
         return {"html_error": f"HTML build failed — the deck's HTML is stale: {e}"}
@@ -308,15 +333,24 @@ def refresh_html_deck(
         order = _outline_order(tmpdir, previews)
 
         listed = _listed_previews(storage, deck_id)
+        listed_pngs = _listed(storage, png_prefix(deck_id))
+        epoch = _revision(listed + listed_pngs)
         existing = build_html_preview_key_map(listed)
         wanted = set(built.get("affected") or []) | set(measure_slides or [])
         checked = wanted & set(order) if "browser_check" in built else set()
         wanted |= {s for s in order if s not in existing}
-        uploaded = _upload_previews(deck_id, tmpdir, previews, [s for s in order if s in wanted], epoch, storage)
+        wanted_order = [s for s in order if s in wanted]
+        uploaded = _upload_previews(deck_id, tmpdir, previews, wanted_order, epoch, storage)
+        missing = [s for s in wanted_order if s not in uploaded]
+        if missing:
+            # This run's keys would win the preview key map without an output.html behind them.
+            _delete(storage, list(uploaded.values()))
+            return {"html_error": f"preview upload failed for {', '.join(missing)} — the deck's HTML is stale"}
         pngs = _upload_pngs(deck_id, built.get("preview_files") or [], epoch, storage)
 
         result: dict[str, Any] = {
-            k: v for k, v in built.items() if k not in ("html", "previews", "preview_files", "browser_check")
+            k: v for k, v in built.items()
+            if k not in ("html", "previews", "preview_files", "browser_check", "script_external")
         }
         if "browser_check" in built:
             browser = dict(built["browser_check"])
@@ -338,9 +372,11 @@ def refresh_html_deck(
         try:
             result["html"] = _publish(
                 deck_id, user_id, storage, Path(built["html"]), len(order), thumbnail, set_thumbnail,
+                built.get("script_external"),
             )
         except Exception as e:
             logger.warning("HTML artifact refresh failed for %s: %s", deck_id, e)
+            _delete(storage, list(uploaded.values()) + list(pngs.values()))
             result["html_error"] = (
                 f"HTML artifact refresh failed — the deck's HTML is stale. "
                 f"Run generate_pptx to refresh it. ({e})"
@@ -356,7 +392,7 @@ def refresh_html_deck(
                 k for k in listed
                 if (se := _slug_epoch(k))
                 and ((se[0] in uploaded and se[1] < epoch) or se[0] not in built_slugs)
-            ] + _stale_pngs(_listed(storage, png_prefix(deck_id)), pngs, checked, dropped, epoch))
+            ] + _stale_pngs(listed_pngs, pngs, checked, dropped, epoch))
         result["previews"] = uploaded
         result["png_previews"] = [s for s in order if s in pngs]
         template_html_cache.persist(tmpdir / "template.pptx", storage, cache_root)
@@ -399,18 +435,23 @@ def finalize_html_deck(
         gen = generate_html(tmpdir, template_cache=cache_root)
         previews: dict[str, str] = gen.get("previews") or {}
         order = _outline_order(tmpdir, previews)
-        epoch = int(time.time())
         before = _listed_previews(storage, deck_id)
+        epoch = _revision(before + _listed(storage, png_prefix(deck_id)))
         uploaded = _upload_previews(deck_id, tmpdir, previews, order, epoch, storage)
         missing = [s for s in order if s not in uploaded]
         if missing:
             # This run's keys would win the preview key map over the previous complete set.
             _delete(storage, list(uploaded.values()))
             raise RuntimeError(f"preview upload failed for {', '.join(missing)}")
-        _publish(
-            deck_id, user_id, storage, Path(gen["output_path"]), gen["slide_count"],
-            uploaded.get(order[0]) if order else None, True,
-        )
+        try:
+            _publish(
+                deck_id, user_id, storage, Path(gen["output_path"]), gen["slide_count"],
+                uploaded.get(order[0]) if order else None, True, gen.get("script_external"),
+            )
+        except Exception:
+            # Uncommitted: this run's previews must not win the key map over the record's output.
+            _delete(storage, list(uploaded.values()))
+            raise
         fresh = set(uploaded.values())
         deck_slugs = set(order)
         gone_pngs = [k for k in _listed(storage, png_prefix(deck_id))

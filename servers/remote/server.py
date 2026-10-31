@@ -340,18 +340,23 @@ _MATERIALIZE_SLIDE = re.compile(r"^slides/[A-Za-z0-9_-]+\.(?:json|html)$")
 
 
 def _deck_format(deck_id: str) -> str:
-    """deck.json outputFormat of an S3 deck; "pptx" when unreadable or invalid (built as PPTX).
+    """deck.json outputFormat of an S3 deck; "pptx" when deck.json is unreadable or not an object.
 
     The fallback keeps the PPTX path unchanged; it is logged because an HTML deck
-    whose deck.json cannot be read then fails with PPTX build errors.
+    whose deck.json cannot be read then fails with PPTX build errors. Raises
+    ValueError for an explicit invalid outputFormat, which stops every build.
     """
     from sdpm.engine.schema import deck_output_format
 
     try:
-        return deck_output_format(_storage.get_deck_json(deck_id))
+        deck_json = _storage.get_deck_json(deck_id)
     except Exception as e:
-        logger.warning("deck.json of %s unreadable or invalid, treating it as PPTX: %s", deck_id, e)
+        logger.warning("deck.json of %s unreadable, treating it as PPTX: %s", deck_id, e)
         return "pptx"
+    if not isinstance(deck_json, dict):
+        logger.warning("deck.json of %s is not an object, treating it as PPTX", deck_id)
+        return "pptx"
+    return deck_output_format(deck_json)
 
 
 def _template_html(deck_id: str, deck_json: dict, root: Path) -> dict | None:
@@ -685,7 +690,11 @@ def get_preview(
         return [{"type": "text", "text": "Error: slugs must not be empty"}]
     if quality not in ("low", "high"):
         quality = "high"
-    if _deck_format(deck_id) == "html":
+    try:
+        deck_format = _deck_format(deck_id)
+    except ValueError as e:
+        return [{"type": "text", "text": f"Error: {e}"}]
+    if deck_format == "html":
         return preview.get_html_preview(deck_id=deck_id, slugs=slugs, storage=_storage, quality=quality)
     _wait_for_pending_previews(deck_id)
     try:
@@ -1024,7 +1033,16 @@ def run_python(
 
     # HTML decks: rebuild output.html (+ thumbnails) on S3 instead of the PPTX
     # post-processing below. Read-only runs persist nothing, so they rebuild nothing.
-    if (changed_paths or measure_slides) and _deck_format(deck_id) == "html":
+    if changed_paths or measure_slides:
+        try:
+            deck_format = _deck_format(deck_id)
+        except ValueError as e:
+            # An explicit invalid outputFormat stops the build: no PPTX is produced.
+            result.setdefault("errors", {})["outputFormat"] = str(e)
+            return json.dumps(result, ensure_ascii=False)
+    else:
+        deck_format = None
+    if deck_format == "html":
         from sdpm.engine.schema import is_html_build_input
 
         if persist_writes and (any(is_html_build_input(p) for p in changed_paths) or measure_slides):

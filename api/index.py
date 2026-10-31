@@ -977,11 +977,35 @@ def _read_specs(deck_id: str) -> Dict[str, Any]:
     return specs
 
 
+_SCRIPT_WARNING_SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
+_SCRIPT_WARNING_KINDS = frozenset({"navigation", "popup", "external-url", "webrtc"})
+_SCRIPT_WARNINGS_MAX = 200
+
+
+def _script_warnings(raw: Any) -> List[Dict[str, Any]]:
+    """The record's htmlScriptExternal as ``[{slug, kinds}]``: at most 200 entries with a
+    slide slug and known kinds; anything else is dropped."""
+    out: List[Dict[str, Any]] = []
+    for entry in raw if isinstance(raw, list) else []:
+        if len(out) >= _SCRIPT_WARNINGS_MAX:
+            break
+        if not isinstance(entry, dict):
+            continue
+        slug, kinds = entry.get("slug"), entry.get("kinds")
+        if not isinstance(slug, str) or not _SCRIPT_WARNING_SLUG.match(slug):
+            continue
+        if not isinstance(kinds, list) or not all(isinstance(k, str) and k in _SCRIPT_WARNING_KINDS for k in kinds):
+            continue
+        out.append({"slug": slug, "kinds": list(kinds)})
+    return out
+
+
 def _get_html_deck(deck_id: str, decision: Any, deck_json: Dict[str, Any]) -> Dict[str, Any]:
     """get_deck response for an HTML deck (outputFormat "html").
 
     Slides are the outline slugs whose slides/{slug}.html exists; previews are
     the static per-slide HTML thumbnails. Every HTML URL is an S3 presign.
+    scriptWarnings lists the slides whose script can reach outside the deck.
     """
     deck = decision.deck
     resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/slides/")
@@ -1006,6 +1030,7 @@ def _get_html_deck(deck_id: str, decision: Any, deck_json: Dict[str, Any]) -> Di
         "pptxUrl": None,
         "outputFormat": "html",
         "htmlUrl": _html_presigned(html_key) if html_key else None,
+        "scriptWarnings": _script_warnings(deck.get("htmlScriptExternal")),
         "slideSize": slide_size(deck_json),
         "updatedAt": deck.get("updatedAt", ""),
         "chatSessionId": deck.get("chatSessionId"),

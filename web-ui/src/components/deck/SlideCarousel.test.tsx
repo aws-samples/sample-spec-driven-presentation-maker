@@ -63,4 +63,26 @@ describe("SlideCarousel — HTML decks", () => {
     await vi.waitFor(() => expect(onScrollComplete).toHaveBeenCalled())
     expect(screen.getByTitle(/HTML deck/).getAttribute("src")).toBe(`${HTML_URL}#/1`)
   })
+
+  it("warns next to Present when slide scripts reach outside the deck", () => {
+    renderCarousel({ scriptWarnings: [
+      { slug: "agenda", kinds: ["navigation"] },
+      { slug: "body", kinds: ["popup", "external-url"] },
+    ] })
+    const badge = screen.getByText("External access").closest("[title]")!
+    const title = badge.getAttribute("title")!
+    expect(title).toContain("agenda and body")
+    expect(title).toContain("page navigation, new tabs, and external URLs")
+    expect(badge.getAttribute("aria-label")).toBe(title)
+    const present = screen.getByRole("button", { name: "Present in a new tab" })
+    expect(badge.compareDocumentPosition(present) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+  })
+
+  it("shows no warning without script warnings", () => {
+    renderCarousel({ scriptWarnings: [] })
+    expect(screen.queryByText("External access")).toBeNull()
+    cleanup()
+    renderCarousel()
+    expect(screen.queryByText("External access")).toBeNull()
+  })
 })

@@ -128,6 +128,14 @@
     "presentAria": "Present in a new tab",
     "pdf": "PDF",
     "pdfAria": "Open the print view in a new tab to save as PDF",
+    "scriptWarning": "External access",
+    "scriptWarningDetail": "Slide scripts on {slugs} can send data outside the deck ({kinds}). They run in the Present tab and in the downloaded file.",
+    "scriptKind": {
+      "navigation": "page navigation",
+      "popup": "new tabs",
+      "externalUrl": "external URLs",
+      "webrtc": "WebRTC"
+    },
     "downloadHtml": "Download HTML",
     "open": "Open",
     "openHtml": "Open the HTML deck in your browser",
@@ -350,6 +358,7 @@
     "web_fetch": "Fetching page",
     "import_attachment": "Importing file",
     "generate_pptx": "Generating PPTX",
+    "generate_pptx_html": "Finalizing HTML deck",
     "generate_preview": "Generating preview",
     "start_presentation": "Loading role",
     "start_composing": "Loading role",

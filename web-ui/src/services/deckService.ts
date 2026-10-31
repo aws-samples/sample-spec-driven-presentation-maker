@@ -60,6 +60,16 @@ export interface DeckDetail {
   htmlUrl?: string | null
   /** HTML decks: canvas size in CSS px (default 1920x1080). */
   slideSize?: { width: number; height: number }
+  /** HTML decks: slides whose script can send data outside the deck (static check). */
+  scriptWarnings?: ScriptWarning[]
+}
+
+/** How a slide script can reach outside an HTML deck (static check `script-external`). */
+export type ScriptWarningKind = "navigation" | "popup" | "external-url" | "webrtc"
+
+export interface ScriptWarning {
+  slug: string
+  kinds: ScriptWarningKind[]
 }
 
 /** Why an HTML deck URL is requested: Present / PDF (inline, 4 hours) or Download (attachment). */

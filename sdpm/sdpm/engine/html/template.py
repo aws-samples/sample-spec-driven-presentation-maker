@@ -23,6 +23,7 @@ import os
 import re
 import shutil
 import tempfile
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
@@ -41,9 +42,10 @@ _JUSTIFY = {"top": "flex-start", "middle": "center", "bottom": "flex-end"}
 _AUTONUM = (("arabic", "decimal"), ("alphaLc", "lower-alpha"), ("alphaUc", "upper-alpha"),
             ("romanLc", "lower-roman"), ("romanUc", "upper-roman"))
 
-# Process-local memo of failed renders (cache dir → status) so a broken
-# LibreOffice conversion is attempted once per process, not on every build.
-_FAILED_RENDERS: dict[str, dict] = {}
+# Process-local memo of failed renders (cache dir → (time, status)): a failed LibreOffice
+# conversion is retried after FAILED_RENDER_RETRY_S, not on every build.
+FAILED_RENDER_RETRY_S = 600
+_FAILED_RENDERS: dict[str, tuple[float, dict]] = {}
 
 
 @dataclass
@@ -392,7 +394,8 @@ def _render_entries(info: dict) -> list[dict]:
             for i, layout in enumerate(info["layouts"]) if _needs_render(layout)]
 
 
-def _svgs_complete(info: dict, layouts_dir: Path) -> bool:
+def decorations_complete(info: dict, layouts_dir: Path) -> bool:
+    """True when every layout that needs a render has its SVGs in ``layouts_dir``."""
     for layout in info["layouts"]:
         if not _needs_render(layout):
             continue
@@ -421,8 +424,8 @@ def _result(directory: Path, info: dict, theme_css: str, status: dict | None, st
 def _render_into(template_path: Path, info: dict, cache_dir: Path) -> dict | None:
     """Render decoration SVGs into ``cache_dir/layouts``; returns the failure status or None."""
     memo = _FAILED_RENDERS.get(str(cache_dir))
-    if memo is not None:
-        return memo
+    if memo is not None and time.monotonic() - memo[0] < FAILED_RENDER_RETRY_S:
+        return memo[1]
     staging = Path(tempfile.mkdtemp(prefix=".render-", dir=cache_dir))
     try:
         rendered = _decorations.render_decoration_svgs(
@@ -430,7 +433,7 @@ def _render_into(template_path: Path, info: dict, cache_dir: Path) -> dict | Non
         if rendered["status"] is not None:
             if rendered["status"].get("missing"):
                 return rendered["status"]  # tools vanished: report, do not memoise
-            _FAILED_RENDERS[str(cache_dir)] = rendered["status"]
+            _FAILED_RENDERS[str(cache_dir)] = (time.monotonic(), rendered["status"])
             return rendered["status"]
         layouts_dir = cache_dir / "layouts"
         layouts_dir.mkdir(parents=True, exist_ok=True)
@@ -472,7 +475,7 @@ def load_template_html(
         _write_atomic(cache_dir / "template.json", template_json_text(info))
 
     status: dict | None = None
-    if decorations and not _svgs_complete(info, cache_dir / "layouts"):
+    if decorations and not decorations_complete(info, cache_dir / "layouts"):
         status = _decorations.decoration_tools_status()
         if status is None:
             status = _render_into(template_path, info, cache_dir)
@@ -485,6 +488,7 @@ __all__ = [
     "build_template_info",
     "build_theme_css",
     "cache_key",
+    "decorations_complete",
     "layout_file_name",
     "load_template_html",
     "template_json_text",

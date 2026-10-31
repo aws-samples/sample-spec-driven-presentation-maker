@@ -10,7 +10,7 @@ the check is done, whatever happened. The core never imports this module.
 
 # Security: AWS manages infrastructure security. You manage access control,
 # data classification, and IAM policies. See SECURITY.md for details.
-# The runtime role may call only the four browser actions on aws.browser.v1
+# The runtime role may call only the three browser actions on aws.browser.v1
 # (infra/lib/runtime-stack.ts).
 """
 

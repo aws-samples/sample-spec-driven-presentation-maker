@@ -27,6 +27,7 @@ import { SlideCarousel } from "@/components/deck/SlideCarousel"
 import { DeckActions } from "@/components/deck/DeckActions"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { ChatPanelShell } from "@/components/chat/ChatPanelShell"
+import { DeckFormatProvider } from "@/components/chat/DeckFormatContext"
 import { ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { updateVisibility, shareDeck } from "@/services/deckService"
 import { useIsMobile } from "@/hooks/UseMobile"
@@ -148,6 +149,7 @@ export default function DecksPage() {
               <div ref={isMobile ? swipeRef : undefined} className="h-full">
                 {isMobile && ws.canChat && activeTab === "chat" ? (
                   /* Mobile chat tab — ChatPanelShell renders inline on mobile */
+                  <DeckFormatProvider value={ws.deck?.outputFormat}>
                   <ChatPanelShell
                     open={true}
                     onClose={() => setActiveTab("preview")}
@@ -163,6 +165,7 @@ export default function DecksPage() {
                     onLoadingChange={setAgentIsLoading}
                     inline
                   />
+                  </DeckFormatProvider>
                 ) : (
                   // Local: defer SlideCarousel mount until deck data loads so
                   // hadSlidesOnMount captures the real slide count, not the
@@ -179,6 +182,7 @@ export default function DecksPage() {
                     outputFormat={ws.deck?.outputFormat}
                     htmlUrl={ws.deck?.htmlUrl}
                     slideSize={ws.deck?.slideSize}
+                    scriptWarnings={ws.deck?.scriptWarnings}
                     isLoading={ws.waitingForPng || false}
                     scrollToSlide={ws.scrollToSlide}
                     onScrollComplete={() => ws.setScrollToSlide("")}
@@ -264,6 +268,7 @@ export default function DecksPage() {
 
         {/* Chat Panel (persistent, desktop) — hidden on mobile workspace chat tab */}
         {!(isMobile && ws.isWorkspace && ws.canChat && activeTab === "chat") && (
+          <DeckFormatProvider value={ws.deck?.outputFormat}>
           <ChatPanelShell
             open={ws.chatOpen}
             onClose={() => ws.setChatOpen(false)}
@@ -278,6 +283,7 @@ export default function DecksPage() {
             onWorkflowPhase={setWorkflowPhase}
             onLoadingChange={setAgentIsLoading}
           />
+          </DeckFormatProvider>
         )}
       </div>
 
