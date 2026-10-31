@@ -406,6 +406,19 @@ def test_run_python_html_revision_beats_older_second_epochs(server, storage, mon
     assert build_html_preview_key_map([old, out["previews"]["cover"]])["cover"] == out["previews"]["cover"]
 
 
+def test_run_python_html_unresolved_template_says_how_to_fix(server, storage, monkeypatch):
+    _no_pptx(monkeypatch)
+    deck_json = storage.get_deck_json("d1")
+    deck_json["template"] = "none"
+    storage.put_deck_json("d1", deck_json)
+    _sandbox(monkeypatch, ["slides/cover.html"])
+
+    out = _run(server)
+
+    assert "'none'" in out["html_error"] and "apply_style" in out["html_error"], out
+    assert storage.html_keys() == [] and storage.preview_keys() == []
+
+
 def test_js_deck_reports_the_skipped_browser_check(server, storage, tmp_path, monkeypatch):
     """With SDPM_BROWSER=none (conftest), run_python of a deck carries the one-line skip
     note among the warnings the agent reads; generate_pptx (finalize) checks nothing."""

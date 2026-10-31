@@ -122,7 +122,14 @@ def prepare_html_workspace(
         if assets:  # manifests are large; fetch them only when a slide names an asset
             materialize_assets(assets, storage, tmpdir)
 
-        template_path = materialize_template(deck_id, user_id, deck_meta, storage, tmpdir)
+        try:
+            template_path = materialize_template(deck_id, user_id, deck_meta, storage, tmpdir)
+        except ValueError as e:
+            raise ValueError(
+                f"deck.json template {deck_meta.get('template')!r} is not a template this deck can use: "
+                "an HTML deck is built on a template's layouts — set one with "
+                "apply_style(deck_id, style, template)"
+            ) from e
         built_meta = {**deck_meta, "template": template_path.name}
         (tmpdir / "deck.json").write_text(json.dumps(built_meta, ensure_ascii=False), encoding="utf-8")
         template_html_cache.restore(template_path, storage, cache_root)
@@ -307,6 +314,9 @@ def refresh_html_deck(
     cache_root = template_html_cache.resolve_root(cache_root)
     try:
         tmpdir, _ = prepare_html_workspace(deck_id, user_id, storage, cache_root)
+    except ValueError as e:  # the deck or its template: the message says what to fix
+        logger.info("HTML workspace preparation failed for %s: %s", deck_id, e)
+        return {"html_error": f"HTML build failed — the deck's HTML is stale: {e}"}
     except Exception as e:
         logger.warning("HTML workspace preparation failed for %s", deck_id, exc_info=True)
         return {"html_error": f"HTML build failed — the deck's HTML is stale: {e}"}
