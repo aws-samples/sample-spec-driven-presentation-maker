@@ -90,6 +90,11 @@ export interface ReviewContextValue {
   track: (deckId: string, ids: string[]) => void
   refresh: () => void
   submit: (note: string) => Promise<string>
+  /** Requests whose chat message did not reach the agent; their card offers a retry. */
+  failed: ReadonlySet<string>
+  /** The chat send of request `id` failed; `retry` sends the same message again. */
+  markFailed: (id: string, retry: () => void) => void
+  retry: (id: string) => void
   /** A frame was moved or resized on screen (the card follows it). */
   notifyFrameMoved: () => void
   onFrameMoved: (listener: () => void) => () => void
@@ -161,6 +166,8 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
   const [core, setCore] = useState<Core>(() => initCore(undefined))
   const coreRef = useRef(core)
   const [hintSeen, setHintSeen] = useState(false)
+  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set())
+  const retries = useRef(new Map<string, () => void>())
 
   const size = useMemo<SlideSize>(() => (
     slideSize && slideSize.width > 0 && slideSize.height > 0 ? { width: slideSize.width, height: slideSize.height } : DEFAULT_SIZE
@@ -209,6 +216,8 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     if (refreshTimer.current) clearTimeout(refreshTimer.current)
     refreshTimer.current = null
     editorText.current = null
+    retries.current.clear()
+    setFailed(new Set())
     update(() => initCore(deckId))
   }, [deckId, update, clearUndo])
 
@@ -470,6 +479,23 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     return review.id
   }, [closeEditor, update])
 
+  const markFailed = useCallback((id: string, retry: () => void) => {
+    retries.current.set(id, retry)
+    setFailed(cur => new Set(cur).add(id))
+  }, [])
+
+  const retry = useCallback((id: string) => {
+    const fn = retries.current.get(id)
+    retries.current.delete(id)
+    setFailed(cur => {
+      if (!cur.has(id)) return cur
+      const next = new Set(cur)
+      next.delete(id)
+      return next
+    })
+    fn?.()
+  }, [])
+
   /* ── Canvas plumbing (no re-render) ── */
   const notifyFrameMoved = useCallback(() => { for (const l of moveListeners.current) l() }, [])
   const onFrameMoved = useCallback((listener: () => void) => {
@@ -486,11 +512,13 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     openSent, latestRequestId,
     setToolOn, toggleTool, addFrame, updateRect, commitText, deleteFrame, undoDelete, select, openEditor, closeEditor,
     setEditorText, setPeek, setHighlight, focusFrame, lookup, statusOf, track, refresh, submit,
+    failed, markFailed, retry,
     notifyFrameMoved, onFrameMoved, setDragging, isDragging,
   }), [
     enabled, deckId, stableSlugs, size, agentBusy, core, hintSeen, readyDrafts, openSent, latestRequestId,
     setToolOn, toggleTool, addFrame, updateRect, commitText, deleteFrame, undoDelete, select, openEditor, closeEditor,
     setEditorText, setPeek, setHighlight, focusFrame, lookup, statusOf, track, refresh, submit,
+    failed, markFailed, retry,
     notifyFrameMoved, onFrameMoved, setDragging, isDragging,
   ])
 

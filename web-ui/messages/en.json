@@ -630,6 +630,7 @@
     "complete": "Done",
     "loading": "Loading the change request…",
     "unreadable": "Couldn't read this change request",
-    "sendFailed": "Couldn't send the change request"
+    "sendFailed": "Couldn't send the change request",
+    "retry": "Retry"
   }
 }

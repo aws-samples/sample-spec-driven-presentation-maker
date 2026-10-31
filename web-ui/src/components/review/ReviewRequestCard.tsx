@@ -8,6 +8,7 @@
  * comment count and progress (`done / total`, or 完了), the note, and one row per comment
  * with its status and the agent's reply. A click on an open comment jumps to its frame.
  * Without a review state (or for another deck's chat) only the note is shown.
+ * When the chat message carrying the request did not reach the agent, a Retry row sends it again.
  */
 
 "use client"
@@ -161,6 +162,18 @@ export function ReviewRequestCard({ reviewId, note, deckId }: ReviewRequestCardP
         </p>
       )}
       <div className="px-1 py-1.5">{comments.map(row)}</div>
+      {review.failed.has(reviewId) && !review.agentBusy && (
+        <div className="flex items-center gap-2 border-t border-border px-3 py-2" data-review-failed>
+          <span className="flex-1 text-xs text-foreground-secondary">{t("sendFailed")}</span>
+          <button
+            type="button"
+            onClick={() => review.retry(reviewId)}
+            className="inline-flex h-7 items-center rounded-md border border-border-hover px-2.5 text-xs text-foreground transition-colors hover:bg-background-hover"
+          >
+            {t("retry")}
+          </button>
+        </div>
+      )}
     </Shell>
   )
 }

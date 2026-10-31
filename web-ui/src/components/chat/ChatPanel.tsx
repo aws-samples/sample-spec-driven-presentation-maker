@@ -285,8 +285,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     insertAtCursor(text: string) {
       chatInputRef.current?.insertAtCursor(text)
     },
-    sendMessage(text: string, options?: { displayContent?: string }) {
-      return stream.sendMessage(text, undefined, undefined, undefined, options)
+    async sendMessage(text: string, options?: { displayContent?: string }) {
+      await stream.sendMessage(text, undefined, undefined, undefined, options)
     },
   }), [stream.sendMessage])
 
@@ -502,8 +502,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     uploadedFiles: UploadedFile[],
     snippets: { label: string; text: string }[],
     attachments: { fileName: string; fileType: string }[],
-  ) => {
-    if (!configLoaded) return
+    hideUserMessage = false,
+  ): Promise<boolean> => {
+    if (!configLoaded) return Promise.resolve(false)
 
     let fullMessage = text
 
@@ -518,7 +519,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       fullMessage = `<!--sdpm:include_images=true-->\n${fullMessage}`
     }
 
-    stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments, { displayContent: text })
+    return stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments, { displayContent: text, hideUserMessage })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configLoaded, deckId, fetchWebImages, stream.sendMessage])
 
@@ -548,7 +549,15 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     }
     const marker = buildReviewMarker(id)
     const note = text.trim()
-    handleSend(note ? `${note}\n\n${marker}` : marker, uploadedFiles, snippets, attachments)
+    const message = note ? `${note}\n\n${marker}` : marker
+    // The review file exists once submit() returns: a send that does not reach the agent
+    // leaves the request open, so its card offers to send the same message again.
+    const send = (again: boolean) => {
+      void handleSend(message, uploadedFiles, snippets, attachments, again).then((ok) => {
+        if (!ok) r.markFailed(id, () => send(true))
+      })
+    }
+    send(false)
   }, [configLoaded, hasReviewDrafts, handleSend, tReview])
 
   // --- Compose in-flight detection (for stop tooltip) ---

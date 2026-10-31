@@ -66,7 +66,8 @@ export interface UseChatStreamReturn {
   messages: Message[]
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   isLoading: boolean
-  sendMessage: (text: string, uploadedFiles?: UploadedFile[], snippets?: { label: string; text: string }[], sentAttachments?: { fileName: string; fileType: string }[], options?: SendMessageOptions) => Promise<void>
+  /** Resolves false when the message was not sent or the turn failed (a stop is not a failure). */
+  sendMessage: (text: string, uploadedFiles?: UploadedFile[], snippets?: { label: string; text: string }[], sentAttachments?: { fileName: string; fileType: string }[], options?: SendMessageOptions) => Promise<boolean>
   stopGeneration: () => void
   /** Ref to current messages for external reads without re-render dependency. */
   messagesRef: React.MutableRefObject<Message[]>
@@ -130,17 +131,18 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     options?: SendMessageOptions,
   ) => {
     const hasContent = userMessage.trim() || uploadedFiles?.length || snippets?.length
-    if (!hasContent && !options?.continuedFrom) return
-    if (isLoading) return
-    if (isLoadingRef.current) return
+    if (!hasContent && !options?.continuedFrom) return false
+    if (isLoading) return false
+    if (isLoadingRef.current) return false
     isLoadingRef.current = true
 
     const accessToken = auth.user?.access_token
     const userId = auth.user?.profile?.sub
     if (!IS_LOCAL && (!accessToken || !userId)) {
       isLoadingRef.current = false
-      return
+      return false
     }
+    let ok = true
 
     const display = options?.displayContent ?? userMessage
     setMessages((prev) => [
@@ -292,6 +294,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
           setMessages([])
           throw err
         }
+        ok = false
         const errorMessage = err instanceof Error ? err.message : String(err)
         const code = classifyAgentError(errorMessage)
         // Transport-level failures don't carry raw model errors worth showing —
@@ -314,6 +317,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       setIsLoading(false)
       onSendComplete?.()
     }
+    return ok
   }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent, onSendComplete])
 
   return { messages, setMessages, isLoading, sendMessage, stopGeneration, messagesRef }

@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import type { ReviewRequest } from "@/lib/review/schema"
@@ -72,6 +72,20 @@ describe("ReviewRequestCard", () => {
     const { container } = withProvider(<ReviewRequestCard reviewId={ID} note="" />, true)
     await waitFor(() => expect(container.querySelector("[data-review-comment='B'] .animate-spin")).toBeTruthy())
     expect(container.querySelector("[data-review-comment='A'] .animate-spin")).toBeNull()
+  })
+
+  it("offers a retry when the request's chat message failed, and the retry resends it", async () => {
+    getReview.mockResolvedValue(request(["open"]))
+    const { container } = withProvider(<ReviewRequestCard reviewId={ID} note="" />)
+    await waitFor(() => expect(container.querySelector("[data-review-comment='A']")).toBeTruthy())
+    expect(container.querySelector("[data-review-failed]")).toBeNull()
+    const resend = vi.fn()
+    act(() => api!.markFailed(ID, resend))
+    await waitFor(() => expect(container.querySelector("[data-review-failed]")).toBeTruthy())
+    expect(screen.getByText("Couldn't send the change request")).toBeTruthy()
+    fireEvent.click(screen.getByRole("button", { name: "Retry" }))
+    expect(resend).toHaveBeenCalledTimes(1)
+    await waitFor(() => expect(container.querySelector("[data-review-failed]")).toBeNull())
   })
 
   it("shows Done when every comment is done", async () => {
