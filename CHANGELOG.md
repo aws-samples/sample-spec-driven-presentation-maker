@@ -12,92 +12,46 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
-- **HTML output mode (phase 4, browser check and PNG previews).** Each `run_python` that
-  writes or changes HTML slides opens those slides (and `measure_slides`) in a browser over
-  the DevTools protocol: locally headless Chrome or Edge (DevTools on 127.0.0.1 at a random
-  port, throwaway profile, networking off), in the cloud AWS AgentCore Browser
-  (`aws.browser.v1`). Both block http(s) / ws(s) requests from the page; a browser that
-  rejects the block fails the check before any slide runs. Every fragment is shown and animations are finished, then the slide is
-  measured and layout findings come back as warnings with new rules `overlap`, `overflow`,
-  `outside-region` and `decoration-overlap` (4 px tolerance), next to JS errors (`js-error`).
-  Each checked slide gets a PNG, 1280 px on the long edge: locally
-  `<deck>/preview/png/<slug>.png`, returned as `preview_files` like PPTX previews; in the
-  cloud `html/{deckId}/png/{slug}_{epoch}.png`, returned by `get_preview`, which now gives
-  images for HTML decks. A skipped, stopped or unfinished check adds a one-line
-  `output.html: Browser check …` warning and is never reported as clean. The CLI
-  `generate_html` checks every slide; `measure` / `preview` on an HTML deck run the check and
-  print the report / PNG paths. The cloud finalize (`generate_pptx`) runs no check. New
-  static-check rule `placeholder-unknown`: a `data-ph` key the slide's layout does not have.
-  New dependency: `websockets` (sync CDP client). The HTML composer document now follows
-  the PPTX flow (fix warnings, look at the PNG, then the next slug). Deploy: SdpmData,
-  SdpmRuntime, SdpmAgent.
-
-- **HTML output mode (phase 3, JavaScript).** HTML slides may contain inline `<script>`
-  elements. The assembler moves each one out of its section, wraps it and runs it once per
-  section element the first time the slide is shown (`section` is the slide's element); every
-  script is hashed into the deck's CSP, while `<script src>`, module scripts, `on*` handlers
-  and `javascript:` URLs stay blocked, and thumbnails run no script. `<section
-  data-libs="echarts d3">` embeds Apache ECharts 6.1.0 (Apache-2.0) and D3 7.9.0 (ISC),
-  vendored under `sdpm/vendor/`, only in decks whose slides declare them, each with its
-  license notice. New static-check rules: `script-external` (navigation, new tabs and
-  external URLs in a slide script), `library-unknown`, `library-undeclared`, `script-eval`
-  (calls that need eval, such as `d3.csvParse`) and `script-dom` (`getElementById`, load
-  waits). When Chrome or Edge is installed, a deck with scripts is opened headless after each
-  local build, with networking disabled, and JS errors come back as `<slug>: JS error: …`
-  warnings; the result's `js_check` reports the status. When the check is skipped (no
-  browser, or `SDPM_JS_CHECK=0`), stopped by a slide that navigates the page away, or times
-  out, a one-line `output.html: JS check …` warning says so. `SDPM_JS_CHECK=0` turns the
-  check off and `SDPM_BROWSER` picks the browser; the
-  cloud runtime image sets `SDPM_JS_CHECK=0`. The guide (`slide-html-spec`, section
-  Scripts) and the HTML composer document cover the rules with ECharts, D3 and click
-  examples. Decks without scripts are unchanged. Deploy: SdpmData, SdpmRuntime.
-- **HTML output mode (phase 2, cloud).** HTML decks now work on the AWS stack and in the
-  Web UI. On the first chat screen a **Build as HTML** pill (「HTML で作成」) under
-  Vibe / Spec adds `@format:html` to the message; the `/` picker has a matching **Format**
-  section, and the token shows as a removable "HTML" chip. Nothing is added for PPTX, which
-  stays the default. An HTML deck's page shows the deck in an in-app player (a sandboxed
-  iframe, `sandbox="allow-scripts allow-popups"`, no same-origin) with an "HTML" badge and
-  three buttons: **Present** opens the deck in a new tab, where `S` opens the speaker view
-  (the link is valid for 4 hours); **PDF** opens the print view (`#print-pdf`) in a new tab;
-  **HTML** (download icon) saves the single `output.html`. Sharing and public decks work as for
-  PPTX. Slide thumbnails in the deck page, the deck list and search are static per-slide
-  HTML files (`preview/<slug>.html`, no scripts, fragments shown) rendered in `sandbox=""`
-  iframes. The local Web UI shows the same player and thumbnails, with one **Open** button
-  that opens `output.html` in the default browser. `output.html` now carries a
-  Content-Security-Policy that allows only the engine's own scripts (by sha256 hash) and
-  `data:` images, fonts and media, plus `<meta name="referrer" content="no-referrer">`;
-  the thumbnails carry a CSP without scripts. New static checks flag `javascript:` in any item of an SVG animation `values` list,
-  `<use href>` pointing anywhere but a `#fragment`, and `data:` stylesheets (`<link>` and
-  `@import`), which the CSP blocks, and `<meta http-equiv>` in a slide (a `refresh` would
-  navigate the deck to another page, which no CSP directive stops). Remote MCP tools:
-  `init_deck_workspace(output_format)` and `start_composing(mode)` take the same arguments
-  as locally, `run_python` rebuilds the HTML deck and its thumbnails, `generate_pptx`
-  finalizes an HTML deck as HTML (full build, thumbnails, knowledge-base sync so
-  `search_slides` finds HTML slides), and `get_preview` returns a note instead of images for
-  HTML decks. The template's HTML conversion is cached on S3 (`template-html-cache/`,
-  expires after 30 days). HTML files live under `html/` in the deck bucket, which no
-  CloudFront path serves; the API hands out S3 presigned URLs only
-  (`GET /decks/{id}/html?purpose=present|download`). The local `generate_pptx` still
-  refuses HTML decks. The MCP tool count stays at 20 and PPTX behaviour is unchanged.
-  Deploy: SdpmData, SdpmRuntime, SdpmAgent, SdpmWebUi and the Web UI. The local Web UI dev
-  servers (`npm run dev`, `npm run dev:local`) now listen on 127.0.0.1 only.
-- **HTML output mode (phase 1, local).** A deck can be a browser presentation instead of a
-  PPTX: ask for an HTML / browser deck or write `@format:html`, and the deck is created with
-  `deck.json` `outputFormat: "html"` (`init_deck_workspace(name, output_format="html")`).
-  Composers are dispatched with `start_composing(deck_id, assigned_slugs, mode="html")`,
-  which returns the HTML composer document, the template's converted layouts and the deck's
-  shared `deck.css` (written by the layout pass). Each slide is an HTML fragment under
-  `slides/`; `run_python` assembles them into a single offline `<deck>/output.html` on
-  reveal.js 6 (vendored under `sdpm/vendor/revealjs/`, MIT) with speaker notes, and reports
-  static checks (structure, unknown layouts, scripts, external URLs, self-drawn slide numbers,
-  font sizes outside the style's tokens, `deck.css` rules). Every image is embedded in that
-  one file; an embedded file over 5 MB and an `output.html` over 25 MB are warned. Templates and styles are shared
-  with PPTX; template decorations are converted to SVG when LibreOffice and poppler are
-  installed. The CLI gains `generate_html <deck>`. Translation, PPTX import, hand-edit sync,
-  `code_to_slide` and `generate_pptx` refuse HTML decks with a message. There is no PNG
-  preview for HTML decks; phase 1 was local only, and phase 2 (above) adds the AWS (remote)
-  server and the Web UI. PPTX
-  behaviour is unchanged and the MCP tool count stays at 20.
+- **HTML output mode.** A deck can be a browser presentation instead of a PPTX, locally and
+  on the AWS stack. Ask for an HTML / browser deck, write `@format:html`, or use the
+  **Build as HTML** pill (「HTML で作成」) on the first chat screen (also in the `/` picker's
+  **Format** section; PPTX stays the default). The deck gets `deck.json`
+  `outputFormat: "html"` (`init_deck_workspace(name, output_format="html")`, which also
+  returns `format_notes`, the `html-deck` guide), and composers are dispatched with
+  `start_composing(deck_id, assigned_slugs, mode="html")`, which returns the HTML composer
+  document, the template's converted layouts and the deck's shared `deck.css`. HTML decks
+  choose a template and style as PPTX decks do (`apply_style(deck_id, style, template)`);
+  template decorations are converted to SVG when LibreOffice and poppler are installed.
+  Each slide is an HTML fragment under `slides/`; `run_python` assembles them into one
+  offline `output.html` on reveal.js 6 with speaker notes (`S` opens the speaker view), and
+  every image is embedded. Slides may run inline scripts, with Apache ECharts 6.1.0 and D3
+  7.9.0 embedded only in decks that declare them (`<section data-libs="echarts d3">`); all
+  three libraries are vendored under `sdpm/vendor/` with their licenses and a checksum
+  manifest checked in CI. `output.html` carries a Content-Security-Policy that allows only
+  the engine's scripts and each slide's inline scripts by sha256 hash, plus `data:` images,
+  fonts and media (`connect-src 'none'`, no-referrer), and every external link opens in a new
+  tab. Static checks cover structure, layouts and placeholders, fonts, `deck.css`, embedded
+  sizes, CSP-blocked constructs and scripts that reach outside the deck (`script-external`:
+  navigation, new tabs, external URLs, WebRTC). After each build that changes slides, the
+  browser check opens those slides in a browser (locally headless Chrome or Edge, in the
+  cloud AWS AgentCore Browser) with network requests blocked and WebRTC disabled before slide
+  code runs, reports layout findings (`overlap`, `overflow`, `outside-region`,
+  `decoration-overlap`) and JS errors as warnings (`browser_check` in the result;
+  `SDPM_BROWSER=none` turns it off), and leaves a PNG per slide (`preview_files` locally,
+  `get_preview` in the cloud). A skipped, stopped or unfinished check is reported as such,
+  never as clean. In the Web UI an HTML deck plays in a sandboxed in-app player with
+  **Present** (new tab, link valid for 4 hours), **PDF** (print view, template backgrounds
+  included) and **HTML** (download `output.html`); slides whose scripts reach outside the
+  deck are listed in a warning next to Present / Download, on shared decks too. Thumbnails
+  are static per-slide HTML in `sandbox=""` iframes; the local Web UI has one **Open**
+  button. Sharing and public decks work as for PPTX; HTML files live under `html/` in the
+  deck bucket and are served only through presigned URLs. The CLI gains `generate_html
+  <deck>`. Translation, PPTX import, hand-edit sync, `code_to_slide` and the local
+  `generate_pptx` refuse HTML decks with a message, and an invalid `deck.json`
+  `outputFormat` stops every build. New dependency: `websockets`. The local Web UI dev
+  servers (`npm run dev`, `npm run dev:local`) now listen on 127.0.0.1 only. PPTX behaviour
+  is unchanged and the MCP tool count stays at 20. Deploy: SdpmData, SdpmRuntime,
+  SdpmAgent, SdpmWebUi and the Web UI.
 - **Claude Haiku 5.5** is a selectable model (`global.anthropic.claude-haiku-5-5`) for
   both Chat and Create. It uses the extended-thinking profile (no `temperature`; Bedrock
   rejects 0.1 with "temperature is deprecated"), with prompt caching enabled, and is
@@ -106,18 +60,6 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
-- **HTML deck guidance, slimmer and format-neutral.** `init_deck_workspace(...,
-  output_format="html")` now also returns `format_notes` (the new `html-deck` guide: what an
-  HTML slide can do and how `visual` and the brief describe it); PPTX decks get no extra key.
-  The orchestrator document is format-neutral, the HTML composer document is procedure only,
-  and `slide-html-spec` keeps the sdpm-specific contract (its static-check and browser-check
-  tables are gone). Static-check, layout and CSP warnings now say what to change. Deploy:
-  SdpmData, SdpmRuntime.
-- **HTML decks: `js_check` is now `browser_check`.** The `run_python` / `generate_html`
-  result key `js_check` is replaced by `browser_check` (`status` `ok` / `issues` / `skipped`
-  / `navigated` / `timeout` / `failed`, plus `browser`, `seconds`, `slides`, `note`), and the
-  `output.html: JS check …` warnings by `output.html: Browser check …`. The HTML measure
-  report header is now `Checks:`. Decks without scripts are checked too (layout and PNG).
 - **AgentCore runtime role.** The MCP runtime role gains
   `bedrock-agentcore:StartBrowserSession`, `StopBrowserSession` and
   `ConnectBrowserAutomationStream` on `arn:aws:bedrock-agentcore:<region>:aws:browser/aws.browser.v1`
@@ -134,22 +76,6 @@ Entries before v0.5.0 were written retroactively as summaries.
   downloads a matching Python when the one on the machine is too old. Only setups that
   disable uv's Python downloads (`UV_PYTHON_DOWNLOADS=never`, offline machines) need a
   Python 3.11+ on the machine.
-- **`SDPM_JS_CHECK`.** The variable is gone, also from the cloud runtime image; use
-  `SDPM_BROWSER=none` to turn the browser check off.
-
-### Fixed
-
-- **HTML decks: external links open in a new tab.** Clicking a link in a slide used to
-  replace the deck (and inside the in-app player the site loaded sandboxed). The assembler
-  now gives every `<a href="http(s)://…">` `target="_blank" rel="noopener noreferrer"`;
-  in-deck `#…` links are unchanged. The in-app player and the local `output.html` route add
-  `allow-popups-to-escape-sandbox`, so the opened site works normally in its tab while the
-  deck stays sandboxed (still no `allow-same-origin` or `allow-top-navigation`).
-- **HTML decks: PDF export prints gradient and picture template backgrounds.** In the print
-  view (`#print-pdf` / `?print-pdf`) reveal.js moves each slide into a `.pdf-page`, which
-  the engine's slide-box rule did not match, so the slide collapsed to 1 px and only its
-  solid page colour printed. The rule now covers the print view too; layout-specific solid
-  grounds print in their own colour as well. Deploy: SdpmData, SdpmRuntime, Web UI.
 
 ### Security
 
