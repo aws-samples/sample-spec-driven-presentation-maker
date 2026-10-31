@@ -19,7 +19,7 @@ from sdpm.engine.html.csp import PREVIEW_CSP, deck_csp, script_hash, speaker_vie
 NOTES_JS = (VENDOR_DIR / "revealjs" / "plugin" / "notes.js").read_text(encoding="utf-8")
 REVEAL_VERSION = (VENDOR_DIR / "revealjs" / "VERSION").read_text(encoding="utf-8").strip()
 SPEAKER_VIEW_HASH_6_0_2 = "sha256-GzCveToXhSIzS3M5eQeRm3McVRB7cYneYKwTkzA3wDk="
-_SCRIPT_RE = re.compile(r"<script>(.*?)</script>", re.DOTALL)
+_SCRIPT_RE = re.compile(r"<script\b[^>]*>(.*?)</script[^>]*>", re.IGNORECASE | re.DOTALL)
 
 
 def _directives(policy: str) -> dict[str, list[str]]:
