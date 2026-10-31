@@ -595,5 +595,41 @@
     "useTemplateAria": "テンプレート {name} を使う",
     "currentLabel": "使用中: {name}",
     "custom": "カスタム"
+  },
+  "review": {
+    "tool": "コメント",
+    "toolTitle": "スライドにコメント (C)",
+    "ctaTitle": "このスライドにコメント (C)",
+    "hintDrag": "ドラッグで囲む",
+    "hintClick": "クリックで枠を置く",
+    "hintExit": "Esc で終了",
+    "placeholder": "どうしたいかを書く…  @ で他の枠を参照",
+    "footer": "Enter で保存 · Shift+Enter で改行",
+    "slide": "スライド {n}",
+    "status": {
+      "draft": "未送信",
+      "sent": "送信済み",
+      "working": "対応中",
+      "done": "対応済み"
+    },
+    "frameLabel": "コメント {name}",
+    "deleteLabel": "コメントを削除 (Delete)",
+    "closeLabel": "閉じる (Esc)",
+    "mentionList": "参照する枠",
+    "deleted": "{name} を削除しました",
+    "deletedReferenced": "{name} を削除しました（{refs} から参照されています）",
+    "undo": "元に戻す",
+    "draftTitle": "修正依頼",
+    "draftCount": "{count, plural, other {コメント # 件}}",
+    "showComments": "コメントを表示",
+    "hideComments": "コメントを隠す",
+    "send": "修正を依頼",
+    "busyHint": "エージェントの作業が終わると送信できます",
+    "notePlaceholder": "全体への一言（任意）  ⌘↵ で依頼",
+    "progress": "{done} / {total}",
+    "complete": "完了",
+    "loading": "修正依頼を読み込み中…",
+    "unreadable": "この修正依頼を読み込めませんでした",
+    "sendFailed": "修正依頼を送信できませんでした"
   }
 }

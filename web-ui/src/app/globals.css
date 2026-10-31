@@ -27,6 +27,9 @@
   --color-agent-data: var(--agent-data);
   --color-agent-decorator: var(--agent-decorator);
   --color-state-error: var(--state-error);
+  --color-human: var(--human);
+  --color-human-ink: var(--human-ink);
+  --color-human-text: var(--human-text);
   --color-ring: var(--ring);
   --color-input: var(--input);
   --color-border: var(--border);
@@ -83,6 +86,11 @@
 
   /* Red is reserved for real errors; normal workflow never borrows it. */
   --state-error: oklch(0.65 0.2 25);
+  /* The human's annotation colour (comment frames): not red, not one of the five agent hues.
+     --human-ink sits on a --human fill; --human-text is yellow text on the page background. */
+  --human: oklch(0.87 0.17 95);
+  --human-ink: oklch(0.24 0.04 95);
+  --human-text: oklch(0.87 0.17 95);
   --surface-subtle: oklch(1 0 0 / 3%);
   --surface-stage: oklch(0.13 0.006 260);
   --shadow-card: 0 1px 2px oklch(0 0 0 / 30%), 0 8px 24px oklch(0 0 0 / 25%);
@@ -134,6 +142,7 @@
   --agent-data: oklch(0.48 0.14 70);
   --agent-decorator: oklch(0.48 0.20 330);
   --agent-neutral: oklch(0.45 0 0);
+  --human-text: oklch(0.55 0.12 95);
   --entry-action-spectrum: conic-gradient(
     from var(--team-angle, 0deg),
     oklch(0.60 0.22 262) 0deg,
@@ -1534,4 +1543,120 @@ body {
   .storyboard-ghost,
   .storyboard-polish-toggle > span,
   .storyboard-polish-toggle i { transition: none; }
+}
+
+/* ── Comment tool: frames on the preview and the comment card (mock: region / #pop) ── */
+.review-tooling {
+  box-shadow: inset 0 0 0 2px color-mix(in oklch, var(--human) 35%, transparent);
+}
+.review-temp {
+  position: absolute;
+  border: 1.5px solid var(--human);
+  background: color-mix(in oklch, var(--human) 8%, transparent);
+  border-radius: 3px;
+  pointer-events: none;
+}
+.review-frame {
+  position: absolute;
+  border: 1.5px solid var(--human);
+  border-radius: 3px;
+  background: color-mix(in oklch, var(--human) 8%, transparent);
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+  transition: background 0.15s, box-shadow 0.15s;
+}
+.review-frame:hover { background: color-mix(in oklch, var(--human) 14%, transparent); }
+.review-frame[data-selected="true"] {
+  background: color-mix(in oklch, var(--human) 14%, transparent);
+  box-shadow: 0 0 0 3px color-mix(in oklch, var(--human) 35%, transparent);
+}
+.review-frame[data-highlight="true"] {
+  background: color-mix(in oklch, var(--human) 14%, transparent);
+  box-shadow: 0 0 0 4px color-mix(in oklch, var(--human) 35%, transparent);
+}
+.review-frame[data-kind="sent"] {
+  border-color: color-mix(in oklch, var(--human) 70%, transparent);
+  cursor: pointer;
+}
+.review-frame[data-working="true"] { animation: review-pulse 1.3s ease-in-out infinite; }
+@keyframes review-pulse {
+  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--human) 35%, transparent); }
+  50% { box-shadow: 0 0 0 6px color-mix(in oklch, var(--human) 0%, transparent); }
+}
+.review-tag {
+  position: absolute;
+  left: -1.5px;
+  top: 0;
+  transform: translateY(-100%);
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  height: 20px;
+  padding: 0 7px;
+  background: var(--human);
+  color: var(--human-ink);
+  border-radius: 5px 5px 0 0;
+  white-space: nowrap;
+  cursor: pointer;
+}
+/* Resize handles on the selected draft: four corners + four edges. */
+.review-hd { position: absolute; z-index: 2; }
+.review-hd-nw, .review-hd-ne, .review-hd-se, .review-hd-sw {
+  width: 9px; height: 9px; background: #fff; border: 1.5px solid var(--human); border-radius: 2px; z-index: 3;
+}
+.review-hd-nw { left: -5px; top: -5px; cursor: nwse-resize; }
+.review-hd-ne { right: -5px; top: -5px; cursor: nesw-resize; }
+.review-hd-se { right: -5px; bottom: -5px; cursor: nwse-resize; }
+.review-hd-sw { left: -5px; bottom: -5px; cursor: nesw-resize; }
+.review-hd-n, .review-hd-s { left: 6px; right: 6px; height: 10px; cursor: ns-resize; }
+.review-hd-n { top: -5px; }
+.review-hd-s { bottom: -5px; }
+.review-hd-e, .review-hd-w { top: 6px; bottom: 6px; width: 10px; cursor: ew-resize; }
+.review-hd-e { right: -5px; }
+.review-hd-w { left: -5px; }
+.review-hd-n::after, .review-hd-s::after, .review-hd-e::after, .review-hd-w::after {
+  content: ""; position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%);
+  background: #fff; border: 1.5px solid var(--human); border-radius: 3px;
+}
+.review-hd-n::after, .review-hd-s::after { width: 16px; height: 5px; }
+.review-hd-e::after, .review-hd-w::after { width: 5px; height: 16px; }
+
+/* One card for hover (peek) and editing; it changes mode in place. */
+.review-card {
+  position: fixed;
+  z-index: 60;
+  width: 300px;
+  background: var(--popover);
+  color: var(--popover-foreground);
+  border: 1px solid var(--border-hover);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px oklch(0 0 0 / 50%);
+  transition: box-shadow 0.22s ease, border-color 0.22s ease, height 0.2s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.review-card[data-mode="peek"] { pointer-events: none; box-shadow: 0 10px 28px oklch(0 0 0 / 40%); }
+/* Editing: the card takes on the frame's colour, so it reads as "this frame is open". */
+.review-card[data-mode="edit"], .review-card[data-mode="view"] {
+  border-color: color-mix(in oklch, var(--human) 45%, transparent);
+  box-shadow: 0 16px 48px oklch(0 0 0 / 50%), 0 0 0 3px color-mix(in oklch, var(--human) 10%, transparent);
+}
+.review-card[data-glide="true"] {
+  transition: box-shadow 0.22s ease, border-color 0.22s ease, height 0.2s cubic-bezier(0.2, 0.8, 0.2, 1),
+    left 0.18s cubic-bezier(0.2, 0.8, 0.2, 1), top 0.18s cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+.review-card[data-phase="enter"] { animation: review-card-in 0.14s ease-out; }
+.review-card[data-phase="leave"] { animation: review-card-out 0.11s ease-in forwards; pointer-events: none; }
+@keyframes review-card-in { from { opacity: 0; transform: translateY(4px); } }
+@keyframes review-card-out { to { opacity: 0; transform: translateY(3px); } }
+.review-reveal { animation: review-reveal 0.2s ease-out both; }
+.review-reveal-late { animation-delay: 0.05s; }
+@keyframes review-reveal { from { opacity: 0; transform: translateY(-3px); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .review-frame[data-working="true"],
+  .review-card[data-phase="enter"],
+  .review-card[data-phase="leave"],
+  .review-reveal { animation: none; }
+  .review-card[data-phase="leave"] { opacity: 0; }
+  .review-card, .review-card[data-glide="true"], .review-frame { transition: none; }
 }
