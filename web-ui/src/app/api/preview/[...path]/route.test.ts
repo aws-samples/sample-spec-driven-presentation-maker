@@ -20,7 +20,7 @@ let savedRoot: string | undefined
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
 
 function write(rel: string, data: string | Buffer) {
-  const file = path.join(root, rel)
+  const file = path.join(root, rel) // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
   fs.mkdirSync(path.dirname(file), { recursive: true })
   fs.writeFileSync(file, data)
 }
