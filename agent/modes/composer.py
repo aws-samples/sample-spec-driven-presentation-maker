@@ -160,7 +160,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         context=True,
         description=(
             "Dispatch composer agents for the groups given — one independent composer "
-            "per group, writing slides/<slug>.json. Runs only what you pass: the layout "
+            "per group, writing each slide's file (slides/<slug>.json, or .html in an "
+            "HTML deck). Runs only what you pass: the layout "
             "pass and the content pass are separate calls. "
             f"Up to {max_concurrency} groups run concurrently. "
             "Use this once outline.md is finalized.\n\n"
@@ -583,7 +584,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
             )
 
         if generated and mcp_client:
-            # Generate PPTX
+            # Finalize the deck (generate_pptx: PPTX, or output.html for an HTML deck)
             try:
                 build_result = call_tool_with_retry(
                     mcp_client,

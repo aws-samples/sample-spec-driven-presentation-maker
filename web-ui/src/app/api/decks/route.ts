@@ -54,7 +54,8 @@ export async function GET() {
       if (fs.existsSync(previewDir)) {
         const files = fs.readdirSync(previewDir).sort()
         const first = files.find(f => f.endsWith(".png"))
-        // HTML decks have no PNG previews: fall back to a static HTML preview, slide 1
+        // HTML decks keep their browser-check PNGs under preview/png/, not at the top level,
+        // so their thumbnail is a static HTML preview: slide 1
         // of the outline when it has one (as in cloud), else the first by name.
         const htmlPreviews = first ? [] : files.filter(f => /^[a-z0-9][a-z0-9_-]*\.html$/.test(f))
         const firstHtml = htmlPreviews.length === 0 ? undefined : (() => {
