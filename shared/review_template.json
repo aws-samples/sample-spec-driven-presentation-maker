@@ -1,0 +1,17 @@
+{
+  "_comment": "Texts of a change request from the Web UI comment tool, read by shared/review.py (Cloud API) and web-ui/src/lib/local/reviewTemplate.ts (Local API route). `message` is the chat message the server returns and the Web UI sends: its lines are joined with \\n and {id}, {path}, {count}, {slides} and {payload} are filled in one pass. The Web UI parses the message back into the chat card (web-ui/src/lib/review/marker.ts): keep the [review:{id}] marker and the ```json block holding {payload}. `guide` is written into reviews/<id>.json for the composers. After editing, regenerate the expected texts in tests/fixtures/review_submissions.json (message_case).",
+  "message": [
+    "[review:{id}]",
+    "Change request from the Web UI: the user drew {count} comment(s) on {slides} slide(s) of the preview. The request is saved in `{path}` and repeated below as JSON: `note` is the user's message for the whole request (null when empty), and `slides` lists each slide by slug with its comments, each with `name`, `rect` ([x, y, width, height] in slide px) and `text`. `@X` in a text refers to comment X.",
+    "",
+    "How to handle it:",
+    "- Leave `{path}` to the composers: everything you need is in this message.",
+    "- Dispatch one composer per slide in `slides`. Give each composer the file path `{path}`, its slide and the names of that slide's comments, and say that the file's `guide` explains how to read the file. Pass `note`, when set, to each composer as the user's message for the whole request.",
+    "- When the composers have finished, reply to the user in this chat with what changed for each comment, by name.",
+    "",
+    "```json",
+    "{payload}",
+    "```"
+  ],
+  "guide": "This file is a change request the user made by drawing comments on the slide previews in the Web UI. Each entry in `comments` has `name` (its letter), `slide` (the slide slug: slides/<slide>.json or slides/<slide>.html), `rect` ([x, y, width, height] in slide px: the same coordinates as the slide's elements, origin at the top-left of a slide of `slide_size` [width, height]) and `text` (what the user wants changed in that area). `@X` in a text or in `note` refers to comment X in this file, which may be on another slide: read its slide, rect and text here. `note` is the user's message for the whole request. Work on the comments the orchestrator assigned to you: identify the element under each rect from the slide's structure and the comment text, then make the change. In your return value, report to the orchestrator each assigned comment by name with what you changed, or why you left it unchanged."
+}

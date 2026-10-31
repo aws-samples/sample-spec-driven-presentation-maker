@@ -607,10 +607,7 @@
     "footer": "Enter to save · Shift+Enter for a new line",
     "slide": "Slide {n}",
     "status": {
-      "draft": "Not sent",
-      "sent": "Sent",
-      "working": "In progress",
-      "done": "Done"
+      "working": "In progress"
     },
     "frameLabel": "Comment {name}",
     "deleteLabel": "Delete comment (Delete)",
@@ -626,10 +623,7 @@
     "send": "Request changes",
     "busyHint": "You can send once the agent has finished",
     "notePlaceholder": "A note for the whole deck (optional)  ⌘↵ to request",
-    "progress": "{done} / {total}",
     "complete": "Done",
-    "loading": "Loading the change request…",
-    "unreadable": "Couldn't read this change request",
     "sendFailed": "Couldn't send the change request",
     "retry": "Retry"
   }

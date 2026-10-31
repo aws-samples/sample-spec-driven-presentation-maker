@@ -1,26 +1,31 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Review request files (``reviews/<id>.json``) — the authoritative contract.
+"""Change requests from the Web UI comment tool — the authoritative contract.
 
-A review request is one submission of positioned comments from the Web UI: each comment
-names a frame (``A``, ``B``, …) drawn on a slide, in slide px. The server (Cloud API Lambda,
-Local API route) validates the submission, picks the id and timestamp, computes ``refs``
-and writes the file; the orchestrator later sets ``status`` and ``reply``.
+A change request is one submission of positioned comments: each comment names a frame
+(``A``, ``B``, …) drawn on a slide, in slide px. The server (Cloud API Lambda, Local API
+route) validates the submission, picks the id, writes ``reviews/<id>.json`` for the
+composers and returns the chat message the Web UI sends to the orchestrator. The file is a
+disposable hand-off: nobody rewrites it after the POST.
 
-The Web UI mirror is ``web-ui/src/lib/review/schema.ts``. Both run the cases in
+Both texts — the message and the file's ``guide`` — come from ``review_template.json`` next
+to this module, which the Local route reads too. The Web UI mirror is
+``web-ui/src/lib/review/schema.ts``; both run the cases in
 ``tests/fixtures/review_submissions.json``, and ``tests/test_review_contract.py`` checks that
 the limits below match the TS source.
 """
 
 from __future__ import annotations
 
+import json
 import math
 import re
 import secrets
 from datetime import datetime, timezone
+from functools import lru_cache
+from pathlib import Path
 from typing import Any, Callable
 
-REVIEW_VERSION = 1
 MAX_COMMENTS = 100
 MAX_TEXT_CHARS = 2000
 MAX_NOTE_CHARS = 4000
@@ -32,13 +37,14 @@ DEFAULT_SLIDE_SIZE = (1920, 1080)
 REVIEW_ID_RE = re.compile(r"[0-9]{8}-[0-9]{6}-[0-9a-f]{4}")
 NAME_RE = re.compile(r"[A-Z]{1,3}")
 SLUG_RE = re.compile(r"[a-z0-9][a-z0-9_-]*")
-# No ``\b``: Python's ``\b`` is Unicode-aware, so ``@Bと`` would not match.
-MENTION_RE = re.compile(r"@([A-Z]{1,3})(?![A-Za-z0-9])")
+_PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
+_TEMPLATE_PATH = Path(__file__).with_name("review_template.json")
 
 
-def is_review_id(value: object) -> bool:
-    """True when ``value`` is a review id (safe to use in a path)."""
-    return isinstance(value, str) and REVIEW_ID_RE.fullmatch(value) is not None
+@lru_cache(maxsize=1)
+def review_template() -> dict[str, Any]:
+    """``{"message": [lines], "guide": str}`` from review_template.json."""
+    return json.loads(_TEMPLATE_PATH.read_text(encoding="utf-8"))
 
 
 def new_review_id(now: datetime) -> str:
@@ -46,23 +52,9 @@ def new_review_id(now: datetime) -> str:
     return f"{now.astimezone(timezone.utc).strftime('%Y%m%d-%H%M%S')}-{secrets.token_hex(2)}"
 
 
-def created_at_iso(now: datetime) -> str:
-    """``created_at`` value for a submission at ``now`` (UTC, seconds, ``Z`` suffix)."""
-    return now.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
-
-
-def extract_refs(text: str, names: set[str] | list[str], self_name: str) -> list[str]:
-    """Names mentioned as ``@X`` in ``text`` that belong to the same request, in order.
-
-    Each name appears once; the comment's own name and names outside the request are dropped.
-    """
-    known = set(names)
-    refs: list[str] = []
-    for match in MENTION_RE.finditer(text):
-        name = match.group(1)
-        if name in known and name != self_name and name not in refs:
-            refs.append(name)
-    return refs
+def review_path(review_id: str) -> str:
+    """Workspace path of a review file; ``review_id`` comes from ``new_review_id``."""
+    return f"reviews/{review_id}.json"
 
 
 def _is_int(value: object) -> bool:
@@ -114,12 +106,12 @@ def _validate_comment(
 def validate_review_submission(
     body: object, slide_size: tuple[int, int], slug_exists: Callable[[str], bool],
 ) -> tuple[dict | None, str | None]:
-    """Validate a review submission sent from the Web UI.
+    """Validate a change request sent from the Web UI.
 
     ``body`` is ``{"note": str | None, "comments": [{"name", "slide", "rect", "text"}]}``;
-    other keys (including any client ``refs`` / ``status``) are ignored. ``slide_size`` is
-    ``(width, height)`` in slide px, and ``slug_exists`` says whether ``slides/<slug>.json``
-    or ``slides/<slug>.html`` exists (it is only called with slugs that passed ``SLUG_RE``).
+    other keys are ignored. ``slide_size`` is ``(width, height)`` in slide px, and
+    ``slug_exists`` says whether ``slides/<slug>.json`` or ``slides/<slug>.html`` exists (it is
+    only called with slugs that passed ``SLUG_RE``).
 
     Returns ``(normalized, None)`` — ``{"note": str | None, "comments": [...]}`` with stripped
     text and an empty note as None — or ``(None, error message)``.
@@ -157,30 +149,60 @@ def validate_review_submission(
     return {"note": note, "comments": normalized}, None
 
 
-def build_review_file(
-    review_id: str, created_at: str, slide_size: tuple[int, int], normalized: dict,
-) -> dict[str, Any]:
-    """The review file for a validated submission: refs computed, every comment ``open``."""
-    names = [c["name"] for c in normalized["comments"]]
+def build_review_file(review_id: str, slide_size: tuple[int, int], normalized: dict) -> dict[str, Any]:
+    """The review file for a validated submission: what was sent plus the composers' guide."""
     return {
-        "version": REVIEW_VERSION,
         "id": review_id,
-        "created_at": created_at,
         "note": normalized["note"],
         "slide_size": [slide_size[0], slide_size[1]],
+        "guide": review_template()["guide"],
         "comments": [
-            {
-                "name": c["name"],
-                "slide": c["slide"],
-                "rect": list(c["rect"]),
-                "text": c["text"],
-                "refs": extract_refs(c["text"], names, c["name"]),
-                "status": "open",
-                "reply": None,
-            }
+            {"name": c["name"], "slide": c["slide"], "rect": list(c["rect"]), "text": c["text"]}
             for c in normalized["comments"]
         ],
     }
+
+
+def review_payload(normalized: dict) -> dict[str, Any]:
+    """The message's JSON block: the note and the comments grouped by slide, in sent order."""
+    slides: dict[str, list[dict]] = {}
+    for c in normalized["comments"]:
+        slides.setdefault(c["slide"], []).append({"name": c["name"], "rect": list(c["rect"]), "text": c["text"]})
+    return {
+        "note": normalized["note"],
+        "slides": [{"slide": slug, "comments": comments} for slug, comments in slides.items()],
+    }
+
+
+def _compact(value: object) -> str:
+    """Compact JSON, byte-identical to ``JSON.stringify(value)`` for strings, ints and None."""
+    return json.dumps(value, ensure_ascii=False, separators=(",", ":"))
+
+
+def format_review_payload(payload: dict) -> str:
+    """The payload as JSON with one line per comment (the TS mirror formats it the same way)."""
+    lines = [f'{{"note":{_compact(payload["note"])},"slides":[']
+    for i, slide in enumerate(payload["slides"]):
+        lines.append(f'  {{"slide":{_compact(slide["slide"])},"comments":[')
+        comments = slide["comments"]
+        lines.extend(f"    {_compact(c)}{',' if j < len(comments) - 1 else ''}" for j, c in enumerate(comments))
+        lines.append(f"  ]}}{',' if i < len(payload['slides']) - 1 else ''}")
+    lines.append("]}")
+    return "\n".join(lines)
+
+
+def build_review_message(review_id: str, normalized: dict) -> str:
+    """The chat message for a validated submission (the template filled in one pass)."""
+    payload = review_payload(normalized)
+    values = {
+        "id": review_id,
+        "path": review_path(review_id),
+        "count": str(len(normalized["comments"])),
+        "slides": str(len(payload["slides"])),
+        "payload": format_review_payload(payload),
+    }
+    template = "\n".join(review_template()["message"])
+    return _PLACEHOLDER_RE.sub(lambda m: values[m.group(1)], template)
 
 
 def slide_size_of(deck_json: object) -> tuple[int, int]:

@@ -83,23 +83,3 @@ have the files. To change a slide, afterwards or on any later request, dispatch 
 slug with an instruction describing what you observed.
 
 If a composer fails or is cancelled, stop and ask the user rather than retrying.
-
-## Review requests
-
-A user message carrying `[review:<id>]` is a review request the user drew on the slide
-previews in the Web UI. Read `reviews/<id>.json` with `run_python` (`read_json`). It holds
-`note` (the user's words for the whole deck, or null), `slide_size` (`[width, height]` in px)
-and `comments`; each comment has `name`, `slide` (the slug), `rect` (`[x, y, w, h]` in the
-slide's px), `text`, `refs` (names of the other comments its text points to), `status`
-(`open` or `done`) and `reply`.
-
-Handle the `open` comments. Dispatch one composer per slide that has them, all of that
-slide's comments going to the same composer; slides are grouped as in the content pass. Its
-`task_instruction` carries the note, each of that slide's comments (name, rect, text) and
-every comment a ref points to on another slide (name, slide, rect, text), so the composer
-can see what the user is pointing at.
-
-When the composers return, set each handled comment's `status` to `done` and its `reply` to
-one sentence in the user's language taken from the composer's report: what was changed, or
-why it was not. Write the whole file back with `write_json`, changing only `status` and
-`reply`; you are the only writer of review files. Then answer in chat briefly.

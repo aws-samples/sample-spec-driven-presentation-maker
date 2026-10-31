@@ -3074,5 +3074,94 @@
       },
       "valid": true
     }
-  ]
+  ],
+  "message_case": {
+    "id": "20261101-102000-a1b2",
+    "slide_size": [
+      1920,
+      1080
+    ],
+    "normalized": {
+      "note": "全体的に文字を減らして\n「」も揃えて",
+      "comments": [
+        {
+          "name": "A",
+          "slide": "sales",
+          "rect": [
+            1248,
+            238,
+            576,
+            400
+          ],
+          "text": "最新年の棒だけ @B と同じ色で"
+        },
+        {
+          "name": "B",
+          "slide": "intro",
+          "rect": [
+            0,
+            0,
+            10,
+            10
+          ],
+          "text": "見出しの \"色\" と ```code``` {path}"
+        },
+        {
+          "name": "C",
+          "slide": "sales",
+          "rect": [
+            10,
+            20,
+            30,
+            40
+          ],
+          "text": "2 行目\nも"
+        }
+      ]
+    },
+    "expected_message": "[review:20261101-102000-a1b2]\nChange request from the Web UI: the user drew 3 comment(s) on 2 slide(s) of the preview. The request is saved in `reviews/20261101-102000-a1b2.json` and repeated below as JSON: `note` is the user's message for the whole request (null when empty), and `slides` lists each slide by slug with its comments, each with `name`, `rect` ([x, y, width, height] in slide px) and `text`. `@X` in a text refers to comment X.\n\nHow to handle it:\n- Leave `reviews/20261101-102000-a1b2.json` to the composers: everything you need is in this message.\n- Dispatch one composer per slide in `slides`. Give each composer the file path `reviews/20261101-102000-a1b2.json`, its slide and the names of that slide's comments, and say that the file's `guide` explains how to read the file. Pass `note`, when set, to each composer as the user's message for the whole request.\n- When the composers have finished, reply to the user in this chat with what changed for each comment, by name.\n\n```json\n{\"note\":\"全体的に文字を減らして\\n「」も揃えて\",\"slides\":[\n  {\"slide\":\"sales\",\"comments\":[\n    {\"name\":\"A\",\"rect\":[1248,238,576,400],\"text\":\"最新年の棒だけ @B と同じ色で\"},\n    {\"name\":\"C\",\"rect\":[10,20,30,40],\"text\":\"2 行目\\nも\"}\n  ]},\n  {\"slide\":\"intro\",\"comments\":[\n    {\"name\":\"B\",\"rect\":[0,0,10,10],\"text\":\"見出しの \\\"色\\\" と ```code``` {path}\"}\n  ]}\n]}\n```",
+    "expected_file_without_guide": {
+      "id": "20261101-102000-a1b2",
+      "note": "全体的に文字を減らして\n「」も揃えて",
+      "slide_size": [
+        1920,
+        1080
+      ],
+      "comments": [
+        {
+          "name": "A",
+          "slide": "sales",
+          "rect": [
+            1248,
+            238,
+            576,
+            400
+          ],
+          "text": "最新年の棒だけ @B と同じ色で"
+        },
+        {
+          "name": "B",
+          "slide": "intro",
+          "rect": [
+            0,
+            0,
+            10,
+            10
+          ],
+          "text": "見出しの \"色\" と ```code``` {path}"
+        },
+        {
+          "name": "C",
+          "slide": "sales",
+          "rect": [
+            10,
+            20,
+            30,
+            40
+          ],
+          "text": "2 行目\nも"
+        }
+      ]
+    }
+  }
 }

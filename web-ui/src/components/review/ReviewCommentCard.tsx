@@ -197,11 +197,11 @@ export function ReviewCommentCard() {
   const isSent = shown.kind === "sent"
   const name = shown.frame.name
   const slideIndex = review.slugs.indexOf(shown.frame.slide)
-  const status = isSent ? review.statusOf(shown.frame.requestId) : null
+  // Sent frames are on the canvas only while the agent works on their request.
+  const status = isSent ? "working" : null
   const reveal = view.reveal ? "review-reveal" : ""
   const draftNames = new Set(review.drafts.filter(d => d.text.trim()).map(d => d.name))
-  const sentRequest = isSent ? review.requests.get(shown.frame.requestId) : undefined
-  const sentNames = new Set(typeof sentRequest === "object" ? sentRequest.comments.map(c => c.name) : [])
+  const sentNames = new Set(isSent ? (review.workingReview?.comments.map(c => c.name) ?? []) : [])
   const exists = (n: string) => (isSent ? sentNames.has(n) : draftNames.has(n))
   const keyFor = isSent ? (n: string) => sentFrameKey((shown.frame as { requestId: string }).requestId, n) : undefined
   const mode = view.mode

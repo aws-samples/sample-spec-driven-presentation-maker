@@ -23,14 +23,6 @@ and `existing_slides` (the HTML of your assigned slides, plus any prefix-group h
 `readonly`). These are current; the only thing left to fetch is the parts of the brief's
 Sources your slides need. Facts come from the brief and its sources.
 
-A `task_instruction` may carry review comments: each a name, a rect `[x, y, w, h]` in the
-slide's own px (the coordinates of the slide HTML) covering what the user saw in the
-preview, and the user's text. Identify the target from the elements whose boxes the rect
-overlaps — positions written in the slide HTML, `data-region` boxes and the layout's
-placeholders in `template_html`, and positions the browser lays out (flex, grid), which the
-PNG preview shows at the same scale — read together with the comment text. Change what the
-comment asks and keep the rest of the slide as it is.
-
 `slide_spec`, returned with this document, is the slide format and what a slide can use;
 `read_guides(["slide-html-spec"])` brings it back if it has left your context.
 
@@ -98,6 +90,5 @@ re-renders every slide.
 
 Slugs written / changed / untouched; remaining warnings (static checks, layout, JS errors,
 a skipped or unfinished browser check); shared components missing from `deck.css`; anything
-the specs did not cover that you had to decide. For review comments, one line per comment
-name with what was changed or why it was not changed. Say that the user should open
+the specs did not cover that you had to decide. Say that the user should open
 `<deck>/output.html` in a browser to see the slides.

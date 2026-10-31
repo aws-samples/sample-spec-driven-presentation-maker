@@ -4,14 +4,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
-import type { ReviewRequest } from "@/lib/review/schema"
+import type { SentReview } from "@/lib/review/marker"
 
-const { toastMock, createReview, getReview } = vi.hoisted(() => {
+const { toastMock, createReview } = vi.hoisted(() => {
   const toastMock = Object.assign(vi.fn((..._args: unknown[]) => "toast-1"), { dismiss: vi.fn() })
-  return { toastMock, createReview: vi.fn(), getReview: vi.fn() }
+  return { toastMock, createReview: vi.fn() }
 })
 vi.mock("sonner", () => ({ toast: toastMock }))
-vi.mock("@/services/deckService", () => ({ createReview, getReview }))
+vi.mock("@/services/deckService", () => ({ createReview }))
 
 import { ReviewProvider, useReview, type ReviewContextValue } from "./ReviewProvider"
 
@@ -32,11 +32,8 @@ function renderProvider(props: Partial<React.ComponentProps<typeof ReviewProvide
   )
 }
 
-function request(id: string, names: string[], status: "open" | "done" = "open"): ReviewRequest {
-  return {
-    version: 1, id, created_at: "2026-11-01T10:20:00Z", note: null, slide_size: [1920, 1080],
-    comments: names.map(name => ({ name, slide: "intro", rect: [0, 0, 100, 100], text: `fix ${name}`, refs: [], status, reply: null })),
-  }
+function sent(id: string, names: string[], slide = "intro"): SentReview {
+  return { id, note: null, comments: names.map(name => ({ name, slide, rect: [0, 0, 100, 100], text: `fix ${name}` })) }
 }
 
 /** Draw a frame and save its text, as the canvas and card do. */
@@ -130,15 +127,15 @@ describe("ReviewProvider", () => {
   })
 
   it("submit sends integer rects, clears the drafts, keeps the sequence and turns the tool off", async () => {
-    createReview.mockResolvedValue(request("20261101-102000-a1b2", ["A", "B"]))
+    createReview.mockResolvedValue({ id: "20261101-102000-a1b2", message: "[review:20261101-102000-a1b2] …" })
     renderProvider()
     act(() => { api.setToolOn(true) })
     addSaved("intro", "  bigger  ")
     addSaved("sales", "@A colour")
     addSaved("gone", "slide was deleted")
-    let id = ""
-    await act(async () => { id = await api.submit("  overall note ") })
-    expect(id).toBe("20261101-102000-a1b2")
+    let created = { id: "", message: "" }
+    await act(async () => { created = await api.submit("  overall note ") })
+    expect(created).toEqual({ id: "20261101-102000-a1b2", message: "[review:20261101-102000-a1b2] …" })
     expect(createReview).toHaveBeenCalledWith("d1", {
       note: "overall note",
       comments: [
@@ -148,8 +145,8 @@ describe("ReviewProvider", () => {
     }, "tok")
     expect(api.drafts).toEqual([])
     expect(api.toolOn).toBe(false)
-    expect(api.requests.get(id)).toMatchObject({ id })
-    expect(api.openSent.map(f => f.key)).toEqual([`${id}/A`, `${id}/B`])
+    // The frames come back from the chat message while its turn runs (setWorkingReview).
+    expect(api.openSent).toEqual([])
     expect(addSaved("intro", "after")).toBe("D")
   })
 
@@ -161,59 +158,26 @@ describe("ReviewProvider", () => {
     expect(api.drafts.map(d => d.text)).toEqual(["keep me"])
   })
 
-  it("track loads requests once and continues the sequence after their names", async () => {
-    getReview.mockResolvedValue(request("20261101-102000-a1b2", ["A", "B", "C"]))
+  it("shows the working request's frames on existing slides until the turn ends", () => {
     renderProvider()
-    await act(async () => { api.track("d1", ["20261101-102000-a1b2", "20261101-102000-a1b2", "bad id"]) })
-    await act(async () => {})
-    expect(getReview).toHaveBeenCalledTimes(1)
-    expect(getReview).toHaveBeenCalledWith("d1", "20261101-102000-a1b2", "tok")
-    expect(api.openSent).toHaveLength(3)
-    act(() => { api.track("other-deck", ["20261101-102001-0000"]) })
-    expect(getReview).toHaveBeenCalledTimes(1)
-    expect(addSaved("intro", "x")).toBe("D")
+    const id = "20261101-102000-a1b2"
+    const review = { ...sent(id, ["A"]), comments: [...sent(id, ["A"]).comments, ...sent(id, ["B"], "gone").comments] }
+    act(() => { api.setWorkingReview("d1", review) })
+    expect(api.workingReview).toBe(review)
+    expect(api.openSent).toEqual([{ key: `${id}/A`, requestId: id, name: "A", slide: "intro", rect: [0, 0, 100, 100], size: { width: 1920, height: 1080 }, text: "fix A" }])
+    expect(api.lookup(`${id}/A`)?.kind).toBe("sent")
+    act(() => { api.select(`${id}/A`); api.setPeek(`${id}/A`) })
+    act(() => { api.setWorkingReview("d1", null) })
+    expect(api.openSent).toEqual([])
+    expect(api.selected).toBeNull()
+    expect(api.peek).toBeNull()
   })
 
-  it("an unreadable request is marked as an error", async () => {
-    getReview.mockResolvedValue(null)
+  it("ignores a working request reported for another deck", () => {
     renderProvider()
-    await act(async () => { api.track("d1", ["20261101-102000-a1b2"]) })
-    await act(async () => {})
-    expect(api.requests.get("20261101-102000-a1b2")).toBe("error")
-  })
-
-  it("refresh re-reads only requests with open comments, at most every 1.5 s", async () => {
-    vi.useFakeTimers()
-    try {
-      getReview.mockImplementation(async (_d: string, id: string) => request(id, ["A"], id.endsWith("0000") ? "done" : "open"))
-      renderProvider()
-      await act(async () => { api.track("d1", ["20261101-102000-0000", "20261101-102000-1111"]) })
-      expect(getReview).toHaveBeenCalledTimes(2)
-      await act(async () => { api.refresh() })
-      expect(getReview).toHaveBeenCalledTimes(3)
-      expect(getReview).toHaveBeenLastCalledWith("d1", "20261101-102000-1111", "tok")
-      await act(async () => { api.refresh(); api.refresh() })
-      expect(getReview).toHaveBeenCalledTimes(3)
-      await act(async () => { vi.advanceTimersByTime(1600) })
-      expect(getReview).toHaveBeenCalledTimes(4)
-    } finally {
-      vi.useRealTimers()
-    }
-  })
-
-  it("statusOf shows 対応中 for the latest request only while the agent works", async () => {
-    getReview.mockImplementation(async (_d: string, id: string) => request(id, ["A"]))
-    const { rerender } = renderProvider({ agentBusy: true })
-    await act(async () => { api.track("d1", ["20261101-102000-a1b2", "20261102-090000-ffff"]) })
-    expect(api.latestRequestId).toBe("20261102-090000-ffff")
-    expect(api.statusOf("20261102-090000-ffff")).toBe("working")
-    expect(api.statusOf("20261101-102000-a1b2")).toBe("sent")
-    rerender(
-      <ReviewProvider deckId="d1" slugs={["intro", "sales"]} enabled agentBusy={false} openChat={openChat}>
-        <Capture />
-      </ReviewProvider>,
-    )
-    expect(api.statusOf("20261102-090000-ffff")).toBe("sent")
+    act(() => { api.setWorkingReview("d2", sent("20261101-102000-a1b2", ["A"])) })
+    expect(api.workingReview).toBeNull()
+    expect(api.openSent).toEqual([])
   })
 
   it("changing deck resets the tool and selection", () => {

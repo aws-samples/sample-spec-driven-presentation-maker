@@ -9,8 +9,10 @@
  *
  * State: tool on/off, unsent frames (persisted per deck in localStorage with a sequence that
  * only grows), selection, the open card, hover, mention highlight, one undo slot for the last
- * delete, and the review requests loaded from chat markers (status and replies). Pure rules
- * live in `@/lib/review/*`. Changing deck resets everything except whether the hint was seen.
+ * delete, and the change request the agent is working on (its frames stay on the canvas as
+ * 対応中 until the turn ends; the chat panel reports it from the message, see
+ * `setWorkingReview`). Pure rules live in `@/lib/review/*`. Changing deck resets everything
+ * except whether the hint was seen. Nothing here reads the review files.
  *
  * Frame keys: a draft is keyed by its name (`A`); a sent comment by `<requestId>/<name>`
  * (`sentFrameKey`), so names reused across browsers never collide on the canvas.
@@ -22,15 +24,12 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from "react"
 import { toast } from "sonner"
 import { useTranslations } from "next-intl"
-import { createReview, getReview } from "@/services/deckService"
+import { createReview } from "@/services/deckService"
 import { DEFAULT_SIZE, roundRect, type Rect, type SlideSize } from "@/lib/review/geometry"
 import { loadDrafts, saveDrafts, type DraftFrame } from "@/lib/review/drafts"
 import { frameName, nextSeq } from "@/lib/review/naming"
-import { MENTION_RE, isReviewId, type ReviewRequest, type ReviewSubmission } from "@/lib/review/schema"
-
-export type RequestEntry = ReviewRequest | "loading" | "error"
-/** Status of a sent comment that is still open: 対応中 while the agent works on the latest request. */
-export type SentStatus = "sent" | "working"
+import { MENTION_RE, type ReviewSubmission } from "@/lib/review/schema"
+import type { SentReview } from "@/lib/review/marker"
 
 export interface SentFrame {
   key: string
@@ -38,7 +37,7 @@ export interface SentFrame {
   name: string
   slide: string
   rect: Rect
-  /** Slide size the rect was written in (the request's `slide_size`). */
+  /** Slide size the rect was written in (the deck's). */
   size: SlideSize
   text: string
 }
@@ -67,9 +66,10 @@ export interface ReviewContextValue {
   peek: string | null
   highlight: string | null
   canUndo: boolean
-  requests: ReadonlyMap<string, RequestEntry>
+  /** The change request of the agent turn in progress (its comments are 対応中). */
+  workingReview: SentReview | null
+  /** Frames of `workingReview` on slides that exist. */
   openSent: SentFrame[]
-  latestRequestId: string | null
   setToolOn: (on: boolean) => void
   toggleTool: () => void
   addFrame: (slide: string, rect: Rect) => string
@@ -86,10 +86,10 @@ export interface ReviewContextValue {
   setHighlight: (key: string | null) => void
   focusFrame: (key: string) => void
   lookup: (key: string) => FrameLookup | null
-  statusOf: (requestId: string) => SentStatus
-  track: (deckId: string, ids: string[]) => void
-  refresh: () => void
-  submit: (note: string) => Promise<string>
+  /** The chat of `deckId` has a turn running for `review` (null: none); ignored for another deck. */
+  setWorkingReview: (deckId: string, review: SentReview | null) => void
+  /** Create the request from the ready drafts; resolves to the chat message to send. */
+  submit: (note: string) => Promise<{ id: string; message: string }>
   /** Requests whose chat message did not reach the agent; their card offers a retry. */
   failed: ReadonlySet<string>
   /** The chat send of request `id` failed; `retry` sends the same message again. */
@@ -135,19 +135,18 @@ interface Core {
   peek: string | null
   highlight: string | null
   undo: { frame: DraftFrame; index: number } | null
-  requests: Map<string, RequestEntry>
+  working: SentReview | null
 }
 
 function initCore(deckId: string | null | undefined): Core {
   const stored = deckId ? loadDrafts(deckId) : { seq: 0, frames: [] }
   return {
     deckId, seq: stored.seq, drafts: stored.frames, toolOn: false, selected: null, editor: null,
-    peek: null, highlight: null, undo: null, requests: new Map(),
+    peek: null, highlight: null, undo: null, working: null,
   }
 }
 
 const UNDO_MS = 5000
-const REFRESH_MS = 1500
 const FOCUS_OPEN_DELAY_MS = 380
 
 export interface ReviewProviderProps {
@@ -182,13 +181,10 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
   const editorText = useRef<string | null>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const undoToast = useRef<string | number | null>(null)
-  const refreshTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastRefresh = useRef(0)
   const moveListeners = useRef(new Set<() => void>())
   const dragging = useRef(false)
-  // Late-bound callbacks for the undo toast and the trailing refresh.
+  // Late-bound callback for the undo toast.
   const undoDeleteRef = useRef<() => void>(() => {})
-  const refreshRef = useRef<() => void>(() => {})
 
   /** Apply a state change synchronously (coreRef is always current) and persist drafts. */
   const update = useCallback((fn: (c: Core) => Core) => {
@@ -213,8 +209,6 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
   useEffect(() => {
     if (coreRef.current.deckId === deckId) return
     clearUndo()
-    if (refreshTimer.current) clearTimeout(refreshTimer.current)
-    refreshTimer.current = null
     editorText.current = null
     retries.current.clear()
     setFailed(new Set())
@@ -223,38 +217,22 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
 
   useEffect(() => () => {
     if (undoTimer.current) clearTimeout(undoTimer.current)
-    if (refreshTimer.current) clearTimeout(refreshTimer.current)
   }, [])
 
   /* ── Derived ── */
   const openSent = useMemo<SentFrame[]>(() => {
+    const working = core.working
+    if (!working) return []
     const slugSet = new Set(stableSlugs)
-    const out: SentFrame[] = []
-    for (const [requestId, entry] of core.requests) {
-      if (typeof entry !== "object") continue
-      const [w, h] = entry.slide_size
-      for (const c of entry.comments) {
-        if (c.status !== "open" || !slugSet.has(c.slide)) continue
-        out.push({ key: sentFrameKey(requestId, c.name), requestId, name: c.name, slide: c.slide, rect: c.rect, size: { width: w, height: h }, text: c.text })
-      }
-    }
-    return out
-  }, [core.requests, stableSlugs])
-
-  const latestRequestId = useMemo(() => {
-    let latest: string | null = null
-    for (const id of core.requests.keys()) if (!latest || id > latest) latest = id
-    return latest
-  }, [core.requests])
+    return working.comments
+      .filter(c => slugSet.has(c.slide))
+      .map(c => ({ key: sentFrameKey(working.id, c.name), requestId: working.id, name: c.name, slide: c.slide, rect: c.rect, size, text: c.text }))
+  }, [core.working, stableSlugs, size])
 
   const readyDrafts = useMemo(() => {
     const slugSet = new Set(stableSlugs)
     return core.drafts.filter(d => d.text.trim() && slugSet.has(d.slide))
   }, [core.drafts, stableSlugs])
-
-  const statusOf = useCallback((requestId: string): SentStatus => (
-    requestId === latestRequestId && agentBusy ? "working" : "sent"
-  ), [latestRequestId, agentBusy])
 
   const lookup = useCallback((key: string): FrameLookup | null => {
     const c = coreRef.current
@@ -403,54 +381,24 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     attempt(0)
   }, [closeEditor, setToolOn, select, openEditor])
 
-  /* ── Review requests ── */
-  const storeRequest = useCallback((forDeck: string, id: string, entry: RequestEntry, keepLoaded: boolean) => {
+  /* ── Change requests ── */
+  const setWorkingReview = useCallback((forDeck: string, working: SentReview | null) => {
     update(cur => {
-      if (cur.deckId !== forDeck) return cur
-      const prev = cur.requests.get(id)
-      if (keepLoaded && typeof entry !== "object" && typeof prev === "object") return cur
-      const requests = new Map(cur.requests).set(id, entry)
-      const seq = typeof entry === "object" ? Math.max(cur.seq, nextSeq(entry.comments.map(x => x.name))) : cur.seq
-      return { ...cur, requests, seq }
+      if (cur.deckId !== forDeck || cur.working === working) return cur
+      if (cur.working && working && cur.working.id === working.id) return cur
+      // The frames leave the canvas with the turn: drop any selection or card on them.
+      const gone = (key: string | null) => !!key && key.includes("/") && !(working && key.startsWith(`${working.id}/`))
+      return {
+        ...cur, working,
+        selected: gone(cur.selected) ? null : cur.selected,
+        peek: gone(cur.peek) ? null : cur.peek,
+        highlight: gone(cur.highlight) ? null : cur.highlight,
+        editor: cur.editor && gone(cur.editor.key) ? null : cur.editor,
+      }
     })
   }, [update])
 
-  const fetchRequest = useCallback((forDeck: string, id: string, keepLoaded: boolean) => {
-    getReview(forDeck, id, live.current.idToken ?? "").then(
-      (r) => storeRequest(forDeck, id, r ?? "error", keepLoaded),
-      () => storeRequest(forDeck, id, "error", keepLoaded),
-    )
-  }, [storeRequest])
-
-  const track = useCallback((forDeck: string, ids: string[]) => {
-    const c = coreRef.current
-    if (!c.deckId || forDeck !== c.deckId) return
-    const fresh = [...new Set(ids)].filter(id => isReviewId(id) && !c.requests.has(id))
-    if (!fresh.length) return
-    update(cur => {
-      const requests = new Map(cur.requests)
-      for (const id of fresh) requests.set(id, "loading")
-      return { ...cur, requests }
-    })
-    for (const id of fresh) fetchRequest(forDeck, id, false)
-  }, [update, fetchRequest])
-
-  const refresh = useCallback(() => {
-    const wait = lastRefresh.current + REFRESH_MS - Date.now()
-    if (wait > 0) {
-      if (!refreshTimer.current) refreshTimer.current = setTimeout(() => { refreshTimer.current = null; refreshRef.current() }, wait)
-      return
-    }
-    lastRefresh.current = Date.now()
-    const c = coreRef.current
-    if (!c.deckId) return
-    for (const [id, entry] of c.requests) {
-      if (typeof entry === "object" && entry.comments.some(x => x.status === "open")) fetchRequest(c.deckId, id, true)
-    }
-  }, [fetchRequest])
-  useEffect(() => { refreshRef.current = refresh }, [refresh])
-
-  const submit = useCallback(async (note: string): Promise<string> => {
+  const submit = useCallback(async (note: string): Promise<{ id: string; message: string }> => {
     closeEditor(true)
     const c = coreRef.current
     const forDeck = c.deckId
@@ -463,7 +411,7 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
       note: note.trim() || null,
       comments: frames.map(d => ({ name: d.name, slide: d.slide, rect: roundRect(d.rect, currentSize), text: d.text.trim() })),
     }
-    const review = await createReview(forDeck, submission, token ?? "")
+    const created = await createReview(forDeck, submission, token ?? "")
     const sent = new Set(frames.map(f => f.name))
     update(cur => {
       if (cur.deckId !== forDeck) return cur
@@ -473,10 +421,9 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
         drafts: cur.drafts.filter(d => !sent.has(d.name) && slugSet.has(d.slide)),
         seq: Math.max(cur.seq, nextSeq(sent)),
         selected: null, editor: null, peek: null, toolOn: false,
-        requests: new Map(cur.requests).set(review.id, review),
       }
     })
-    return review.id
+    return created
   }, [closeEditor, update])
 
   const markFailed = useCallback((id: string, retry: () => void) => {
@@ -508,16 +455,16 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
   const value = useMemo<ReviewContextValue>(() => ({
     enabled, deckId: deckId ?? null, slugs: stableSlugs, slideSize: size, agentBusy,
     toolOn: core.toolOn, hintSeen, drafts: core.drafts, readyDrafts, selected: core.selected, editor: core.editor,
-    peek: core.peek, highlight: core.highlight, canUndo: core.undo !== null, requests: core.requests,
-    openSent, latestRequestId,
+    peek: core.peek, highlight: core.highlight, canUndo: core.undo !== null,
+    workingReview: core.working, openSent,
     setToolOn, toggleTool, addFrame, updateRect, commitText, deleteFrame, undoDelete, select, openEditor, closeEditor,
-    setEditorText, setPeek, setHighlight, focusFrame, lookup, statusOf, track, refresh, submit,
+    setEditorText, setPeek, setHighlight, focusFrame, lookup, setWorkingReview, submit,
     failed, markFailed, retry,
     notifyFrameMoved, onFrameMoved, setDragging, isDragging,
   }), [
-    enabled, deckId, stableSlugs, size, agentBusy, core, hintSeen, readyDrafts, openSent, latestRequestId,
+    enabled, deckId, stableSlugs, size, agentBusy, core, hintSeen, readyDrafts, openSent,
     setToolOn, toggleTool, addFrame, updateRect, commitText, deleteFrame, undoDelete, select, openEditor, closeEditor,
-    setEditorText, setPeek, setHighlight, focusFrame, lookup, statusOf, track, refresh, submit,
+    setEditorText, setPeek, setHighlight, focusFrame, lookup, setWorkingReview, submit,
     failed, markFailed, retry,
     notifyFrameMoved, onFrameMoved, setDragging, isDragging,
   ])

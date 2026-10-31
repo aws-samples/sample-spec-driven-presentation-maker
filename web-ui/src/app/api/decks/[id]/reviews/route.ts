@@ -1,15 +1,17 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Local review request API — creates `reviews/<id>.json` for a deck on the filesystem.
- * Local mode only. Mirrors the cloud Lambda `POST /decks/{id}/reviews`.
+ * Local change request API — writes `reviews/<id>.json` for a deck on the filesystem and
+ * returns the chat message the Web UI sends. Local mode only. Mirrors the cloud Lambda
+ * `POST /decks/{id}/reviews`.
  */
 
 import fs from "fs"
 import path from "path"
 import { readSlideSize, resolveDeckDir } from "@/lib/local/deck-paths"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
-import { buildReviewFile, createdAtIso, MAX_BODY_BYTES, newReviewId, validateReviewSubmission } from "@/lib/review/schema"
+import { loadReviewTemplate } from "@/lib/local/reviewTemplate"
+import { buildReviewFile, buildReviewMessage, MAX_BODY_BYTES, newReviewId, validateReviewSubmission } from "@/lib/review/schema"
 
 function readDeckJson(dp: string): Record<string, unknown> {
   try {
@@ -48,16 +50,16 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const result = validateReviewSubmission(body, size, slugExists)
   if (!result.ok) return Response.json({ error: result.error }, { status: 400 })
 
+  const template = loadReviewTemplate()
   const reviewsDir = path.join(dp, "reviews") // nosemgrep: path-join-resolve-traversal — dp validated by resolveDeckDir
   fs.mkdirSync(reviewsDir, { recursive: true })
   for (let attempt = 0; attempt < 3; attempt++) {
-    const now = new Date()
-    const reviewId = newReviewId(now)
-    const file = buildReviewFile(reviewId, createdAtIso(now), size, result.value)
+    const reviewId = newReviewId(new Date())
+    const file = buildReviewFile(reviewId, size, result.value, template)
     try {
       // "wx" fails when the id is already taken, so an existing request is never overwritten.
       fs.writeFileSync(path.join(reviewsDir, `${reviewId}.json`), JSON.stringify(file, null, 2) + "\n", { encoding: "utf-8", flag: "wx" }) // nosemgrep: path-join-resolve-traversal — reviewId generated server-side
-      return Response.json(file)
+      return Response.json({ id: reviewId, message: buildReviewMessage(reviewId, result.value, template) })
     } catch (e) {
       if ((e as NodeJS.ErrnoException).code !== "EEXIST") throw e
     }

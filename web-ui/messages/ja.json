@@ -607,10 +607,7 @@
     "footer": "Enter で保存 · Shift+Enter で改行",
     "slide": "スライド {n}",
     "status": {
-      "draft": "未送信",
-      "sent": "送信済み",
-      "working": "対応中",
-      "done": "対応済み"
+      "working": "対応中"
     },
     "frameLabel": "コメント {name}",
     "deleteLabel": "コメントを削除 (Delete)",
@@ -626,10 +623,7 @@
     "send": "修正を依頼",
     "busyHint": "エージェントの作業が終わると送信できます",
     "notePlaceholder": "全体への一言（任意）  ⌘↵ で依頼",
-    "progress": "{done} / {total}",
     "complete": "完了",
-    "loading": "修正依頼を読み込み中…",
-    "unreadable": "この修正依頼を読み込めませんでした",
     "sendFailed": "修正依頼を送信できませんでした",
     "retry": "再試行"
   }

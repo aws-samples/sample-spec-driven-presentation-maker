@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Route-level tests for the review request endpoints of api/index.py.
+"""Route-level tests for the change request endpoint of api/index.py.
 
 Same harness as tests/test_api_html_routes.py: aws_lambda_powertools is replaced by a
 minimal stand-in, routes are called directly with a fake S3 client and a stubbed
@@ -18,7 +18,7 @@ from pathlib import Path
 import pytest
 
 from shared.authz import AccessDecision
-from shared.review import MAX_BODY_BYTES, is_review_id
+from shared.review import MAX_BODY_BYTES, REVIEW_ID_RE, review_template
 
 _API_DIR = Path(__file__).resolve().parent.parent / "api"
 _API_MODULES = ("index", "authz", "common", "chat_history", "html_presign")
@@ -155,7 +155,7 @@ def _submission(**overrides):
     body = {
         "note": "全体的に文字を減らして",
         "comments": [
-            {"name": "A", "slide": "sales", "rect": [100, 50, 400, 200], "text": "@B と同じ色で", "refs": ["Z"]},
+            {"name": "A", "slide": "sales", "rect": [100, 50, 400, 200], "text": "@B と同じ色で", "status": "done"},
             {"name": "B", "slide": "intro", "rect": [0, 0, 1280, 720], "text": "この見出し"},
         ],
     }
@@ -173,22 +173,30 @@ def test_create_denied_writes_nothing(monkeypatch, index):
     assert s3.puts == [] and s3.calls == []
 
 
-def test_create_writes_server_computed_file(monkeypatch, index):
+def test_create_writes_the_file_and_returns_the_message(monkeypatch, index):
     calls, s3 = _setup(monkeypatch, index, body=_submission())
-    review = index.create_review("d1")
+    result = index.create_review("d1")
     assert calls == [("u1", "d1", "edit_slide")]
-    assert is_review_id(review["id"])
-    key = f"decks/d1/reviews/{review['id']}.json"
+    review_id = result["id"]
+    assert REVIEW_ID_RE.fullmatch(review_id)
+    key = f"decks/d1/reviews/{review_id}.json"
     assert s3.puts == [{"Key": key, "ContentType": "application/json; charset=utf-8"}]
     stored = json.loads(s3.objects[key].decode("utf-8"))
-    assert stored == review
-    assert review["version"] == 1 and review["slide_size"] == [1280, 720]
-    assert review["note"] == "全体的に文字を減らして"
-    assert review["created_at"].endswith("Z")
-    a, b = review["comments"]
-    assert a == {"name": "A", "slide": "sales", "rect": [100, 50, 400, 200], "text": "@B と同じ色で",
-                 "refs": ["B"], "status": "open", "reply": None}
-    assert b["refs"] == [] and b["status"] == "open"
+    assert stored == {
+        "id": review_id,
+        "note": "全体的に文字を減らして",
+        "slide_size": [1280, 720],
+        "guide": review_template()["guide"],
+        "comments": [
+            {"name": "A", "slide": "sales", "rect": [100, 50, 400, 200], "text": "@B と同じ色で"},
+            {"name": "B", "slide": "intro", "rect": [0, 0, 1280, 720], "text": "この見出し"},
+        ],
+    }
+    message = result["message"]
+    assert message.startswith(f"[review:{review_id}]\n")
+    assert f"reviews/{review_id}.json" in message
+    assert '{"name":"A","rect":[100,50,400,200],"text":"@B と同じ色で"}' in message
+    assert '{"note":"全体的に文字を減らして","slides":[' in message
 
 
 @pytest.mark.parametrize("comments", [
@@ -222,39 +230,9 @@ def test_create_regenerates_an_existing_id(monkeypatch, index):
     ids = iter(["20261101-102000-aaaa", "20261101-102000-bbbb"])
     monkeypatch.setattr(index, "new_review_id", lambda now: next(ids))
     s3.objects["decks/d1/reviews/20261101-102000-aaaa.json"] = b"{}"
-    review = index.create_review("d1")
-    assert review["id"] == "20261101-102000-bbbb"
+    result = index.create_review("d1")
+    assert result["id"] == "20261101-102000-bbbb"
     assert s3.objects["decks/d1/reviews/20261101-102000-aaaa.json"] == b"{}"
-
-
-# --- GET /decks/{id}/reviews/{reviewId} -------------------------------------
-
-
-@pytest.mark.parametrize("review_id", ["../x", "20261101-102000-A1B2", "x.json"])
-def test_get_rejects_bad_id_before_any_access(monkeypatch, index, review_id):
-    calls, s3 = _setup(monkeypatch, index)
-    body, status = index.get_review("d1", review_id)
-    assert status == 400
-    assert calls == [] and s3.calls == []
-
-
-def test_get_denied(monkeypatch, index):
-    calls, s3 = _setup(monkeypatch, index, allowed=False)
-    assert index.get_review("d1", "20261101-102000-a1b2") == ({"error": "no access"}, 403)
-    assert calls == [("u1", "d1", "edit_slide")] and s3.calls == []
-
-
-def test_get_missing_or_not_an_object(monkeypatch, index):
-    _, s3 = _setup(monkeypatch, index)
-    assert index.get_review("d1", "20261101-102000-a1b2")[1] == 404
-    s3.objects["decks/d1/reviews/20261101-102000-a1b2.json"] = b"[1, 2]"
-    assert index.get_review("d1", "20261101-102000-a1b2")[1] == 404
-
-
-def test_get_round_trip(monkeypatch, index):
-    _, s3 = _setup(monkeypatch, index, body=_submission())
-    review = index.create_review("d1")
-    assert index.get_review("d1", review["id"]) == review
 
 
 # --- get_deck slideSize ------------------------------------------------------

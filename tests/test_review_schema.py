@@ -1,12 +1,15 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Review request contract (shared/review.py).
+"""Change request contract (shared/review.py).
 
-The submission cases live in tests/fixtures/review_submissions.json; the Web UI mirror
-(web-ui/src/lib/review/schema.test.ts) runs the same file.
+The submission cases and the expected message / file (``message_case``) live in
+tests/fixtures/review_submissions.json; the Web UI mirror (web-ui/src/lib/review/schema.test.ts)
+runs the same file. After editing shared/review_template.json, regenerate
+``message_case.expected_message`` with ``build_review_message``.
 """
 
 import json
+import re
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
@@ -15,10 +18,9 @@ import pytest
 from shared.review import (
     REVIEW_ID_RE,
     build_review_file,
-    created_at_iso,
-    extract_refs,
-    is_review_id,
+    build_review_message,
     new_review_id,
+    review_template,
     slide_size_of,
     validate_review_submission,
 )
@@ -59,44 +61,42 @@ def test_slug_exists_only_sees_valid_slugs():
     assert seen == []
 
 
-def test_extract_refs_ordered_deduped_known_names_only():
-    assert extract_refs("@B と @Bと同じ @Z", ["A", "B"], "A") == ["B"]
-    assert extract_refs("@C then @B, also @A", ["A", "B", "C"], "A") == ["C", "B"]
-    assert extract_refs("@BC1 and @Bx", ["B", "BC"], "A") == []
-
-
 def test_new_review_id_format():
     now = datetime(2026, 11, 1, 19, 20, 0, tzinfo=timezone(timedelta(hours=9)))
     review_id = new_review_id(now)
     assert review_id.startswith("20261101-102000-")
-    assert REVIEW_ID_RE.fullmatch(review_id) and is_review_id(review_id)
-    assert created_at_iso(now) == "2026-11-01T10:20:00Z"
+    assert REVIEW_ID_RE.fullmatch(review_id)
 
 
-@pytest.mark.parametrize("value", ["../x", "20261101-102000-A1B2", "20261101-102000-a1b2\n", "", None, 1])
-def test_is_review_id_rejects(value):
-    assert not is_review_id(value)
+_CASE = _FIXTURE["message_case"]
 
 
-def test_build_review_file_shape():
-    normalized = {"note": "全体的に", "comments": [
-        {"name": "A", "slide": "sales", "rect": [1248, 238, 576, 400], "text": "@B と同じ色で"},
-        {"name": "B", "slide": "intro", "rect": [0, 0, 10, 10], "text": "見出し @A @A"},
-    ]}
-    file = build_review_file("20261101-102000-a1b2", "2026-11-01T10:20:00Z", (1920, 1080), normalized)
-    assert file == {
-        "version": 1,
-        "id": "20261101-102000-a1b2",
-        "created_at": "2026-11-01T10:20:00Z",
-        "note": "全体的に",
-        "slide_size": [1920, 1080],
-        "comments": [
-            {"name": "A", "slide": "sales", "rect": [1248, 238, 576, 400], "text": "@B と同じ色で",
-             "refs": ["B"], "status": "open", "reply": None},
-            {"name": "B", "slide": "intro", "rect": [0, 0, 10, 10], "text": "見出し @A @A",
-             "refs": ["A"], "status": "open", "reply": None},
-        ],
-    }
+def test_build_review_file_holds_only_what_was_sent():
+    file = build_review_file(_CASE["id"], tuple(_CASE["slide_size"]), _CASE["normalized"])
+    assert file == {**_CASE["expected_file_without_guide"], "guide": review_template()["guide"]}
+    assert list(file) == ["id", "note", "slide_size", "guide", "comments"]
+
+
+def test_build_review_message_matches_fixture():
+    assert build_review_message(_CASE["id"], _CASE["normalized"]) == _CASE["expected_message"]
+
+
+def test_message_json_block_round_trips():
+    message = build_review_message(_CASE["id"], _CASE["normalized"])
+    assert message.startswith(f"[review:{_CASE['id']}]\n")
+    block = message.split("```json\n", 1)[1].split("\n```", 1)[0]
+    payload = json.loads(block)
+    assert payload["note"] == _CASE["normalized"]["note"]
+    flat = [{"slide": s["slide"], **c} for s in payload["slides"] for c in s["comments"]]
+    assert sorted(flat, key=lambda c: c["name"]) == sorted(_CASE["normalized"]["comments"], key=lambda c: c["name"])
+    assert [s["slide"] for s in payload["slides"]] == ["sales", "intro"]
+
+
+def test_template_placeholders_are_known():
+    used = set(re.findall(r"\{(\w+)\}", "\n".join(review_template()["message"])))
+    assert used == {"id", "path", "count", "slides", "payload"}
+    assert review_template()["message"][0] == "[review:{id}]"
+    assert isinstance(review_template()["guide"], str) and review_template()["guide"]
 
 
 @pytest.mark.parametrize("deck_json, expected", [

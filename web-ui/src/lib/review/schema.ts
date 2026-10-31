@@ -1,29 +1,27 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Review request files (`reviews/<id>.json`) — Web UI mirror of `shared/review.py`.
+ * Change requests from the comment tool — Web UI mirror of `shared/review.py`.
  *
- * The Local API route validates and builds the file with these functions; the UI uses the
- * types and `parseReviewFile` to read files the agent rewrote. Both sides run the cases in
+ * The Local API route validates the submission, writes `reviews/<id>.json` and returns the
+ * chat message with these functions; the texts come from `shared/review_template.json`
+ * (loaded by `@/lib/local/reviewTemplate`). Both sides run the cases in
  * `tests/fixtures/review_submissions.json`, and `tests/test_review_contract.py` checks the
  * limits below against the Python constants.
  */
 
-export const REVIEW_VERSION = 1
 export const MAX_COMMENTS = 100
 export const MAX_TEXT_CHARS = 2000
 export const MAX_NOTE_CHARS = 4000
 export const MAX_BODY_BYTES = 512 * 1024
 export const DEFAULT_SLIDE_SIZE: [number, number] = [1920, 1080]
 
-export const REVIEW_ID_RE = /^\d{8}-\d{6}-[0-9a-f]{4}$/
 export const NAME_RE = /^[A-Z]{1,3}$/
 export const SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/
-/** `@X` mentions. No `\b`, so `@Bと` matches the same way as in Python. */
+/** `@X` mentions. No `\b`, so `@Bと` matches. */
 export const MENTION_RE = /@([A-Z]{1,3})(?![A-Za-z0-9])/g
 
 export type ReviewRect = [number, number, number, number]
-export type ReviewStatus = "open" | "done"
 
 export interface ReviewComment {
   name: string
@@ -31,24 +29,33 @@ export interface ReviewComment {
   /** `[x, y, w, h]` in slide px. */
   rect: ReviewRect
   text: string
-  refs: string[]
-  status: ReviewStatus
-  reply: string | null
 }
 
-export interface ReviewRequest {
-  version: number
-  id: string
-  created_at: string
+/** What the client sends; the server adds the id and the slide size. */
+export interface ReviewSubmission {
   note: string | null
-  slide_size: [number, number]
   comments: ReviewComment[]
 }
 
-/** What the client sends; the server adds id, timestamp, slide size, refs and status. */
-export interface ReviewSubmission {
+/** `reviews/<id>.json`: what was sent plus the composers' guide. Nobody rewrites it. */
+export interface ReviewFile {
+  id: string
   note: string | null
-  comments: { name: string; slide: string; rect: ReviewRect; text: string }[]
+  slide_size: [number, number]
+  guide: string
+  comments: ReviewComment[]
+}
+
+/** The texts in `shared/review_template.json`. */
+export interface ReviewTemplate {
+  message: string[]
+  guide: string
+}
+
+/** The message's JSON block: the note and the comments grouped by slide. */
+export interface ReviewPayload {
+  note: string | null
+  slides: { slide: string; comments: { name: string; rect: ReviewRect; text: string }[] }[]
 }
 
 export type ValidationResult = { ok: true; value: ReviewSubmission } | { ok: false; error: string }
@@ -56,10 +63,6 @@ export type ValidationResult = { ok: true; value: ReviewSubmission } | { ok: fal
 /** Length in code points, as Python's `len()` counts it. */
 function charCount(s: string): number {
   return [...s].length
-}
-
-export function isReviewId(value: unknown): value is string {
-  return typeof value === "string" && REVIEW_ID_RE.test(value)
 }
 
 /** Review id for a submission at `now`: UTC `YYYYMMDD-HHMMSS-` plus 4 random hex digits. */
@@ -71,20 +74,9 @@ export function newReviewId(now: Date): string {
   return `${stamp}-${Array.from(bytes, b => b.toString(16).padStart(2, "0")).join("")}`
 }
 
-/** `created_at` value for a submission at `now` (UTC, seconds, `Z` suffix). */
-export function createdAtIso(now: Date): string {
-  return now.toISOString().replace(/\.\d{3}Z$/, "Z")
-}
-
-/** Names mentioned as `@X` that belong to the same request, in order, once each, never `selfName`. */
-export function extractRefs(text: string, names: Iterable<string>, selfName: string): string[] {
-  const known = new Set(names)
-  const refs: string[] = []
-  for (const m of text.matchAll(MENTION_RE)) {
-    const name = m[1]
-    if (known.has(name) && name !== selfName && !refs.includes(name)) refs.push(name)
-  }
-  return refs
+/** Workspace path of a review file; `reviewId` comes from `newReviewId`. */
+export function reviewPath(reviewId: string): string {
+  return `reviews/${reviewId}.json`
 }
 
 const isRecord = (v: unknown): v is Record<string, unknown> => typeof v === "object" && v !== null && !Array.isArray(v)
@@ -101,7 +93,7 @@ function validateRect(rect: unknown, [width, height]: [number, number]): string 
 }
 
 /**
- * Validate a review submission (same rules and order as `validate_review_submission` in Python).
+ * Validate a change request (same rules and order as `validate_review_submission` in Python).
  * `slugExists` is only called with slugs that passed `SLUG_RE`.
  */
 export function validateReviewSubmission(
@@ -123,7 +115,7 @@ export function validateReviewSubmission(
   if (!Array.isArray(comments)) return fail("comments must be a list")
   if (comments.length < 1 || comments.length > MAX_COMMENTS) return fail(`comments must hold 1-${MAX_COMMENTS} items`)
 
-  const out: ReviewSubmission["comments"] = []
+  const out: ReviewComment[] = []
   const seen = new Set<string>()
   for (const [i, c] of comments.entries()) {
     const where = `comments[${i}]`
@@ -145,60 +137,51 @@ export function validateReviewSubmission(
   return { ok: true, value: { note, comments: out } }
 }
 
-/** The review file for a validated submission: refs computed, every comment `open`. */
+/** The review file for a validated submission: what was sent plus the composers' guide. */
 export function buildReviewFile(
-  reviewId: string, createdAt: string, slideSize: [number, number], submission: ReviewSubmission,
-): ReviewRequest {
-  const names = submission.comments.map(c => c.name)
+  reviewId: string, slideSize: [number, number], submission: ReviewSubmission, template: ReviewTemplate,
+): ReviewFile {
   return {
-    version: REVIEW_VERSION,
     id: reviewId,
-    created_at: createdAt,
     note: submission.note,
     slide_size: [slideSize[0], slideSize[1]],
-    comments: submission.comments.map(c => ({
-      name: c.name,
-      slide: c.slide,
-      rect: [...c.rect] as ReviewRect,
-      text: c.text,
-      refs: extractRefs(c.text, names, c.name),
-      status: "open",
-      reply: null,
-    })),
+    guide: template.guide,
+    comments: submission.comments.map(c => ({ name: c.name, slide: c.slide, rect: [...c.rect] as ReviewRect, text: c.text })),
   }
 }
 
-const isFiniteNumber = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v)
+/** The message's JSON block: the note and the comments grouped by slide, in sent order. */
+export function reviewPayload(submission: ReviewSubmission): ReviewPayload {
+  const slides = new Map<string, ReviewPayload["slides"][number]["comments"]>()
+  for (const c of submission.comments) {
+    const list = slides.get(c.slide) ?? []
+    list.push({ name: c.name, rect: [...c.rect] as ReviewRect, text: c.text })
+    slides.set(c.slide, list)
+  }
+  return { note: submission.note, slides: [...slides].map(([slide, comments]) => ({ slide, comments })) }
+}
 
-/**
- * Tolerant reader for a review file (the orchestrator rewrites it): unknown status → "open",
- * non-string reply → null, malformed comments dropped. Null when `id` or `comments` is missing.
- */
-export function parseReviewFile(json: unknown): ReviewRequest | null {
-  if (!isRecord(json) || typeof json.id !== "string" || !Array.isArray(json.comments)) return null
-  const size = json.slide_size
-  const slideSize: [number, number] = Array.isArray(size) && size.length === 2 && size.every(isFiniteNumber)
-    ? [size[0], size[1]] : [...DEFAULT_SLIDE_SIZE]
-  const comments: ReviewComment[] = []
-  for (const c of json.comments) {
-    if (!isRecord(c) || typeof c.name !== "string" || typeof c.slide !== "string" || typeof c.text !== "string") continue
-    if (!Array.isArray(c.rect) || c.rect.length !== 4 || !c.rect.every(isFiniteNumber)) continue
-    comments.push({
-      name: c.name,
-      slide: c.slide,
-      rect: [...c.rect] as ReviewRect,
-      text: c.text,
-      refs: Array.isArray(c.refs) ? c.refs.filter((r): r is string => typeof r === "string") : [],
-      status: c.status === "done" ? "done" : "open",
-      reply: typeof c.reply === "string" ? c.reply : null,
-    })
+/** The payload as JSON with one line per comment (same text as `format_review_payload` in Python). */
+export function formatReviewPayload(payload: ReviewPayload): string {
+  const lines = [`{"note":${JSON.stringify(payload.note)},"slides":[`]
+  payload.slides.forEach((s, i) => {
+    lines.push(`  {"slide":${JSON.stringify(s.slide)},"comments":[`)
+    s.comments.forEach((c, j) => lines.push(`    ${JSON.stringify(c)}${j < s.comments.length - 1 ? "," : ""}`))
+    lines.push(`  ]}${i < payload.slides.length - 1 ? "," : ""}`)
+  })
+  lines.push("]}")
+  return lines.join("\n")
+}
+
+/** The chat message for a validated submission (the template filled in one pass). */
+export function buildReviewMessage(reviewId: string, submission: ReviewSubmission, template: ReviewTemplate): string {
+  const payload = reviewPayload(submission)
+  const values: Record<string, string> = {
+    id: reviewId,
+    path: reviewPath(reviewId),
+    count: String(submission.comments.length),
+    slides: String(payload.slides.length),
+    payload: formatReviewPayload(payload),
   }
-  return {
-    version: isFiniteNumber(json.version) ? json.version : REVIEW_VERSION,
-    id: json.id,
-    created_at: typeof json.created_at === "string" ? json.created_at : "",
-    note: typeof json.note === "string" ? json.note : null,
-    slide_size: slideSize,
-    comments,
-  }
+  return template.message.join("\n").replace(/\{(\w+)\}/g, (whole, key: string) => values[key] ?? whole)
 }

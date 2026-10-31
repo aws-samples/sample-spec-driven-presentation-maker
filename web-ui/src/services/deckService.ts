@@ -8,7 +8,7 @@
  */
 
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
-import { parseReviewFile, type ReviewRequest, type ReviewSubmission } from "@/lib/review/schema"
+import type { ReviewSubmission } from "@/lib/review/schema"
 
 export interface DeckSummary {
   deckId: string
@@ -228,17 +228,17 @@ async function responseError(response: Response): Promise<string> {
 }
 
 /**
- * Create a review request (`reviews/<id>.json`) from the comment tool's frames.
- * The server picks the id and computes refs and status. Same URL shape in cloud (Lambda)
- * and local (API Route) modes.
+ * Create a change request from the comment tool's frames: the server writes
+ * `reviews/<id>.json` for the composers and returns the chat message to send as-is.
+ * Same URL shape in cloud (Lambda) and local (API Route) modes.
  *
  * @param deckId - Deck identifier
  * @param submission - Note and comments (rects in slide px, integers)
  * @param idToken - Cognito ID token (ignored in local mode)
- * @returns The review file as written
+ * @returns The review id and the chat message
  * @throws Error with the server's message when the request is rejected
  */
-export async function createReview(deckId: string, submission: ReviewSubmission, idToken: string): Promise<ReviewRequest> {
+export async function createReview(deckId: string, submission: ReviewSubmission, idToken: string): Promise<{ id: string; message: string }> {
   const base = await getApiBaseUrl()
   const response = await fetch(`${base}decks/${deckId}/reviews`, {
     method: "POST",
@@ -246,28 +246,9 @@ export async function createReview(deckId: string, submission: ReviewSubmission,
     body: JSON.stringify(submission),
   })
   if (!response.ok) throw new Error(await responseError(response))
-  const review = parseReviewFile(await response.json())
-  if (!review) throw new Error("Invalid review response")
-  return review
-}
-
-/**
- * Read a review request (status and replies written back by the agent).
- *
- * @param deckId - Deck identifier
- * @param reviewId - Review id from the chat marker
- * @param idToken - Cognito ID token (ignored in local mode)
- * @returns The review, or null when it does not exist or is unreadable
- * @throws Error with the server's message on other failures
- */
-export async function getReview(deckId: string, reviewId: string, idToken: string): Promise<ReviewRequest | null> {
-  const base = await getApiBaseUrl()
-  const response = await fetch(`${base}decks/${deckId}/reviews/${encodeURIComponent(reviewId)}`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  })
-  if (response.status === 404) return null
-  if (!response.ok) throw new Error(await responseError(response))
-  return parseReviewFile(await response.json())
+  const data = (await response.json()) as { id?: unknown; message?: unknown }
+  if (typeof data.id !== "string" || typeof data.message !== "string") throw new Error("Invalid review response")
+  return { id: data.id, message: data.message }
 }
 
 /**

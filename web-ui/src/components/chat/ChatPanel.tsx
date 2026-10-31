@@ -38,7 +38,7 @@ import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsServic
 import type { ForkSessionPhase, KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
 import { useReview } from "@/components/review/ReviewProvider"
 import { ReviewDraftBar } from "@/components/review/ReviewDraftBar"
-import { buildReviewMarker, parseReviewMarkers } from "@/lib/review/marker"
+import { parseReviewMessage } from "@/lib/review/marker"
 
 interface ChatPanelProps {
   deckId: string
@@ -154,7 +154,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const review = useReview()
   const reviewActive = !!review?.enabled && review.deckId === deckId
   const hasReviewDrafts = reviewActive && (review?.readyDrafts.length ?? 0) > 0
-  // Read in callbacks that outlive a render (tool events, the reconnect stream).
+  // Read in callbacks that outlive a render.
   const reviewRef = useRef(review)
   useEffect(() => { reviewRef.current = review })
 
@@ -203,9 +203,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
     // Save after tool completed
     if (toolUseData?.completed) setTimeout(() => saveLocalChat(), 100)
-
-    // A finished tool may have written a review file's status/replies (write_json)
-    if (toolUseData?.completed) reviewRef.current?.refresh()
 
     // Save after tool started (ensures compose_slides is persisted)
     if (!toolUseData?.completed && !toolUseData?.stream) setTimeout(() => saveLocalChat(), 100)
@@ -441,7 +438,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 return updated
               })
               saveLocalChat()
-              reviewRef.current?.refresh()
             }
             if (toolUseData?.stream && toolUseData?.toolUseId) {
               const d = (toolUseData as Record<string, unknown>).data as Record<string, unknown> || {}
@@ -524,9 +520,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [configLoaded, deckId, fetchWebImages, stream.sendMessage])
 
   /**
-   * Send from the input. With comments waiting, write the review file first, then send the
-   * note with its `[review:<id>]` marker (also in the display text, which Local .chat.json keeps).
-   * A failed write keeps the comments and the typed note (`false` keeps the input).
+   * Send from the input. With comments waiting, the server first writes the review file and
+   * returns the chat message (note, comments, file path, instructions, `[review:<id>]`),
+   * which is sent as-is and also shown (Local .chat.json keeps the display text). A failed
+   * write keeps the comments and the typed note (`false` keeps the input).
    */
   const handleInputSend = useCallback(async (
     text: string,
@@ -541,15 +538,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       return
     }
     let id: string
+    let message: string
     try {
-      id = await r.submit(text)
+      ({ id, message } = await r.submit(text))
     } catch (err) {
       notifyError(tReview("sendFailed"), err)
       return false
     }
-    const marker = buildReviewMarker(id)
-    const note = text.trim()
-    const message = note ? `${note}\n\n${marker}` : marker
     // The review file exists once submit() returns: a send that does not reach the agent
     // leaves the request open, so its card offers to send the same message again.
     const send = (again: boolean) => {
@@ -589,22 +584,20 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     return () => onLoadingChange?.(false)
   }, [isLoading, onLoadingChange])
 
-  // Turn end (true → false): the agent may have finished a review request.
-  const wasLoadingRef = useRef(isLoading)
+  // The change request of the running turn: its frames stay on the canvas as 対応中 and
+  // leave with the turn. Derived from the chat, so a reconnected turn shows them too.
+  const lastUserIdx = stream.messages.findLastIndex((m) => m.role === "user")
+  const workingContent = isLoading && lastUserIdx >= 0 ? stream.messages[lastUserIdx].content : null
+  const workingReview = useMemo(() => (workingContent ? parseReviewMessage(workingContent) : null), [workingContent])
+  const setWorkingReview = review?.setWorkingReview
   useEffect(() => {
-    if (wasLoadingRef.current && !isLoading) reviewRef.current?.refresh()
-    wasLoadingRef.current = isLoading
-  }, [isLoading])
-
-  // Load the review requests referenced by this chat's messages (history and new sends).
-  // Also re-runs when the request map changes (the provider resets it on deck change); track() skips known ids.
-  const trackReviews = review?.track
-  const loadedReviews = review?.requests
+    if (!reviewActive || !setWorkingReview) return
+    setWorkingReview(deckId, workingReview)
+  }, [reviewActive, setWorkingReview, deckId, workingReview])
   useEffect(() => {
-    if (!reviewActive || !trackReviews) return
-    const ids = stream.messages.flatMap((m) => (m.role === "user" ? parseReviewMarkers(m.content) : []))
-    if (ids.length) trackReviews(deckId, ids)
-  }, [stream.messages, reviewActive, trackReviews, deckId, loadedReviews])
+    if (!reviewActive || !setWorkingReview) return
+    return () => setWorkingReview(deckId, null)
+  }, [reviewActive, setWorkingReview, deckId])
 
   const isInitial = stream.messages.length === 0 && !historyLoading
 
@@ -709,7 +702,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         ) : (
           <div className="space-y-4">
             {(() => {
-              const lastUserIdx = stream.messages.findLastIndex((m) => m.role === "user")
               return stream.messages.map((msg, i) => (
               <div key={i}>
                 {msg.mcpStatus && (
@@ -731,6 +723,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   onSend={(text: string) => handleSend(text, [], [], [])}
                   hearingDisabled={i < lastUserIdx}
                   deckId={deckId}
+                  reviewWorking={isLoading && i === lastUserIdx}
                 />
               </div>
             ))

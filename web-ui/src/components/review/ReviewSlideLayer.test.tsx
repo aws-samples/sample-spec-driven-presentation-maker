@@ -9,7 +9,7 @@ const { toastMock } = vi.hoisted(() => ({
   toastMock: Object.assign(vi.fn((..._args: unknown[]) => "toast-1"), { dismiss: vi.fn() }),
 }))
 vi.mock("sonner", () => ({ toast: toastMock }))
-vi.mock("@/services/deckService", () => ({ createReview: vi.fn(), getReview: vi.fn() }))
+vi.mock("@/services/deckService", () => ({ createReview: vi.fn() }))
 
 import { ReviewProvider, useReview, type ReviewContextValue } from "./ReviewProvider"
 import { ReviewSlideLayer } from "./ReviewSlideLayer"

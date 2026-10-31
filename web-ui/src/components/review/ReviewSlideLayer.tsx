@@ -172,7 +172,7 @@ export function ReviewSlideLayer({ slug, index }: ReviewSlideLayerProps) {
           size={f.size}
           selected={review.selected === f.key}
           highlight={review.highlight === f.key}
-          working={review.statusOf(f.requestId) === "working"}
+          working
           label={t("frameLabel", { name: f.name })}
           onPointerDown={(e) => onFrameDown(e, f.key, "sent")}
           onOpen={() => review.openEditor(f.key)}

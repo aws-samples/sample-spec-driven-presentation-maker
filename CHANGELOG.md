@@ -20,17 +20,21 @@ Entries before v0.5.0 were written retroactively as summaries.
   comments can reference with `@A`; frames can be moved, resized and deleted (with undo),
   hovering a frame shows its comment, and unsent comments survive a reload. The unsent
   comments collect above the chat input, where **Request changes** (「修正を依頼」) sends
-  them with an optional note for the whole deck: the Web UI writes `reviews/<id>.json` in the
-  deck (frames in slide pixels, comments, resolved `@` references) and sends the note with a
-  `[review:<id>]` marker. The orchestrator reads the file, dispatches each slide's comments to
-  its composer together with the referenced frames, and writes each comment's status and a
-  reply back. The chat shows the request as a card with progress (`done / total`, then
-  **Done**), per-comment replies and a jump to each open frame, restored from chat history
-  on both the AWS stack and locally. HTML decks show stacked static slide previews while the
-  tool is on, so frames and the agent see the same layout. New API routes
-  `POST /decks/{id}/reviews` and `GET /decks/{id}/reviews/{reviewId}` (edit permission,
-  validated frames, slugs and sizes) with matching local routes; `get_deck` now returns
-  `slideSize` for PPTX decks too, and the cloud sandbox syncs `reviews/`.
+  them with an optional note for the whole deck. The server writes `reviews/<id>.json` in the
+  deck — only what was sent (note, slide size, comments with frames in slide pixels) plus a
+  short guide for the composers — and returns the chat message the Web UI sends: the note and
+  the comments grouped by slide, the file path, how to dispatch them (one composer per slide,
+  given the file path and that slide's comment names) and a `[review:<id>]` marker. The
+  orchestrator works from the message alone; the composers read the file. Nobody rewrites the
+  file, and the role documents are unchanged (the feature is the Web UI's). The chat shows the
+  request as a card with its comments, **In progress** while the agent's turn for it runs and
+  **Done** after, built from the message so it restores from chat history on both the AWS
+  stack and locally; the sent frames stay on the slides as **In progress** until the turn
+  ends. HTML decks show stacked static slide previews while the tool is on, so frames and the
+  agent see the same layout. New API route `POST /decks/{id}/reviews` (edit permission,
+  validated frames, slugs and sizes) with a matching local route; the message and guide texts
+  live once in `shared/review_template.json`. `get_deck` now returns `slideSize` for PPTX
+  decks too, and the cloud sandbox syncs `reviews/`.
 
 ### Security
 
