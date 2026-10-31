@@ -113,6 +113,19 @@ no addressable element.
   it and scrolls it into view. So there is no coordinate arithmetic, no
   paging, no tooltip problem, and **no pointer takeover** — the operator's
   machine stays usable.
+- **One explicit `computer_get_state` per `perform_action`, and nothing in
+  between.** The indices come from that call alone. The tree a *click* returns
+  does not register, which the tool says plainly once you hit it:
+  `no state for 'com.microsoft.Powerpoint'. Call computer_get_state first.`
+  Until that error appears the symptom is the misleading
+  `element N is no longer present`, so a run of presses reads like PowerPoint
+  invalidating its elements when it is really a missing read. Send the two
+  calls in separate turns: issued together they race and the action loses.
+- **A popup's own window is only visible to an explicit read.** After a click
+  opens `Effect Options` or `Path Animation`, the click's refreshed tree still
+  shows the document window; the next `computer_get_state` reports
+  `Window: "Path Animation"` with the whole grid. Do not conclude a popup
+  failed to open from a click's own output.
 - **`computer_click` with `element_index` always fails** against the main
   window (`element … is no longer present`), because PowerPoint rebuilds its
   accessibility elements between queries. This is a limitation of that tool,

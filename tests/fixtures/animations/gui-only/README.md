@@ -12,6 +12,31 @@ tests and CI never invoke PowerPoint, AppleScript or Computer Use.
 | Key | Application | Date | Control path | Evidence |
 | --- | --- | --- | --- | --- |
 | `transition.gallery.box.fromRight` | PowerPoint for Mac 16.113.1 | 2026-10-31 | Transitions ▸ Transition Styles ▸ Box ▸ Effect Options ▸ From Right | `.pptx`, `.xml`, `powerpoint-readback.jsonl` |
+| `animation.gallery.motionPath.lines` | PowerPoint for Mac 16.113.1 | 2026-10-31 | Animations ▸ Path Animation ▸ Basic ▸ Lines | `.pptx`, `.xml`, `powerpoint-readback.jsonl` |
+
+### What the motion-path capture established
+
+`computer-use.md` Step 6 said every motion-path entry was
+`semanticPreservationOnly` because PowerPoint stores a preset path as literal
+path data that no available capture contained. It does now:
+
+```xml
+<p:cTn id="5" presetID="42" presetClass="path" presetSubtype="0"
+       accel="50000" decel="50000" fill="hold" grpId="0" nodeType="clickEffect">
+  <p:animMotion origin="layout" path="M 0 0 L 0 0.25 E"
+                pathEditMode="relative" ptsTypes=""/>
+```
+
+`@path`, `@origin` and `@pathEditMode` are the three Step 6 asked for.
+`presetID="42"`, `presetClass="path"` and `accel`/`decel` at 50000 came with
+them — the last two bear on `animation.timing.smoothStart` / `smoothEnd`,
+whose own captures have not been taken yet, so do not promote those from this
+entry alone.
+
+The Path Animation popup also enumerates the full preset grid in one read:
+Custom (Draw Curve, Draw Freeform, Draw Line, Draw Scribble), Basic (Arcs,
+Lines, Loops, Shapes, Turns) and Complex (Bounce, Inverted Shape, Special
+Curve, Special Shape, Spiral, Star, Waves).
 
 ## Known incompleteness of the pilot capture
 
