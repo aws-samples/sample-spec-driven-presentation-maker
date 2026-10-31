@@ -358,6 +358,7 @@
     "web_fetch": "Fetching page",
     "import_attachment": "Importing file",
     "generate_pptx": "Generating PPTX",
+    "generate_pptx_html": "Finalizing HTML deck",
     "generate_preview": "Generating preview",
     "start_presentation": "Loading role",
     "start_composing": "Loading role",

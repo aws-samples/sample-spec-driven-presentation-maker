@@ -358,6 +358,7 @@
     "web_fetch": "ページを取得中",
     "import_attachment": "ファイルを取込中",
     "generate_pptx": "PPTX を生成中",
+    "generate_pptx_html": "HTML デッキを仕上げ中",
     "generate_preview": "プレビューを生成中",
     "start_presentation": "役割を読込中",
     "start_composing": "役割を読込中",
