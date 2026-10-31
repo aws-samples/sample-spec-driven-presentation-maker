@@ -305,17 +305,20 @@ def test_temp_dir_failure_is_reported(tmp_path: Path, monkeypatch) -> None:
 # ── real browser (opt-in) ─────────────────────────────────────────────────
 
 real_browser = pytest.mark.skipif(
-    os.environ.get("SDPM_TEST_BROWSER") != "1" or find_browser() is None,
+    os.environ.get("SDPM_TEST_BROWSER") != "1",
     reason="real-browser check: set SDPM_TEST_BROWSER=1 with Chrome or Edge installed")
 
 
 @pytest.fixture
 def use_browser(monkeypatch):
-    """Undo conftest's SDPM_BROWSER=none: the environment's browser (or auto-detect)."""
+    """Undo conftest's SDPM_BROWSER=none: the environment's browser (or auto-detect).
+    Fails (not skips) without one, so a CI run that lost its browser is red."""
     if _ENV_BROWSER:
         monkeypatch.setenv("SDPM_BROWSER", _ENV_BROWSER)
     else:
         monkeypatch.delenv("SDPM_BROWSER", raising=False)
+    if find_browser() is None:
+        pytest.fail("SDPM_TEST_BROWSER=1 but no Chrome or Edge found (set SDPM_BROWSER to its path)")
 
 
 def _deck(tmp_path: Path, slides: dict[str, str]) -> Path:
@@ -475,3 +478,119 @@ def test_real_browser_devtools_listens_on_loopback_only(tmp_path: Path, use_brow
     result = api.refresh_html(deck, measure_slides=["clean"])
     assert result["browser_check"]["status"] == "ok", result
     assert listening and all(name.startswith("127.0.0.1:") for name in listening), listening
+
+
+@real_browser
+def test_real_browser_blocks_network_requests(tmp_path: Path, use_browser) -> None:
+    """Two layers: the deck CSP refuses the requests; without it, Fetch fails them."""
+    script = ("<script>\nnew Image().src = 'https://example.com/x.png';\n"
+              "fetch('https://example.com/y').catch(function(){});\n</script>")
+    deck = _deck(tmp_path, {"net": _slide("Net", script), "after": CLEAN})
+    result = api.refresh_html(deck, measure_slides=["net", "after"])
+    check = result["browser_check"]
+    assert check["status"] in ("ok", "issues"), check
+    assert check["slides"] == 2 and check["network_blocked"] is True
+    refused = [w for w in result["warnings"] if w.startswith("net: JS error: ") and "Content Security Policy" in w]
+    assert any("x.png" in w for w in refused) and any("example.com/y" in w for w in refused), result["warnings"]
+
+    html = (deck / "output.html").read_text(encoding="utf-8")
+    no_csp = tmp_path / "no-csp.html"
+    no_csp.write_text(re.sub(r'<meta http-equiv="Content-Security-Policy"[^>]*>', "", html), encoding="utf-8")
+    assert "Content-Security-Policy" not in no_csp.read_text(encoding="utf-8")
+    direct = check_deck(no_csp, ["net"], slide_size=(1920, 1080), line_map=[], layouts={}, decorations={})
+    assert direct["status"] in ("ok", "issues"), direct
+    assert direct["slides"] == 1 and direct["network_blocked"] is True
+    assert direct["blocked_requests"] >= 2, direct  # the image and the fetch, failed by the Fetch domain
+
+
+@real_browser
+def test_real_browser_closes_popups(tmp_path: Path, use_browser) -> None:
+    deck = _deck(tmp_path, {"pop": _slide("Pop", "<script>\nwindow.open('https://example.com/');\n</script>"),
+                            "after": CLEAN})
+    result = api.refresh_html(deck, measure_slides=["pop", "after"])
+    check = result["browser_check"]
+    assert check["status"] in ("ok", "issues"), check
+    assert check["slides"] == 2
+
+
+# Reports every window a slide can reach WebRTC from, then "probed N" once the srcdoc frame loaded.
+RTC_SCRIPT = """<script>
+(function(){
+var n = 0;
+function check(w, where){ n++;
+  if (w && typeof w.RTCPeerConnection !== 'undefined') console.error('sdpm slide rtc: available ' + where); }
+check(window, 'top');
+var f = document.createElement('iframe'); document.body.appendChild(f);
+check(window[window.length - 1], 'window[n]');
+check(f.contentWindow, 'iframe');
+var s = document.createElement('iframe'); document.body.appendChild(s);
+s.onload = function(){ check(window[window.length - 1], 'srcdoc window[n]'); check(s.contentWindow, 'srcdoc');
+  console.error('sdpm slide rtc: probed ' + n); };
+s.srcdoc = '<p>x</p>';
+})();
+</script>"""
+
+
+@real_browser
+def test_real_browser_webrtc_is_unavailable(tmp_path: Path, use_browser) -> None:
+    deck = _deck(tmp_path, {"rtc": _slide("RTC", RTC_SCRIPT), "after": CLEAN, "last": CLEAN})
+    result = api.refresh_html(deck, measure_slides=["rtc", "after", "last"])
+    check = result["browser_check"]
+    assert check["network_blocked"] is True, check
+    js = [w for w in result["warnings"] if w.startswith("rtc: JS error")]
+    assert js == ["rtc: JS error: sdpm slide rtc: probed 5"], result["warnings"]
+
+
+@real_browser
+def test_real_browser_reports_overflow_of_a_free_block(tmp_path: Path, use_browser) -> None:
+    free = ('<div style="position:absolute;left:96px;top:400px;width:400px;height:50px;overflow:hidden">'
+            '<div style="height:200px">x</div></div>')
+    deck = _deck(tmp_path, {"free": _slide("Free", free)})
+    result = api.refresh_html(deck, measure_slides=["free"])
+    assert any(w.startswith("free: overflow: ") for w in result["warnings"]), result["warnings"]
+
+
+def _wait(predicate, timeout: float = 5.0):
+    end = time.monotonic() + timeout
+    while True:
+        value = predicate()
+        if value or time.monotonic() > end:
+            return value
+        time.sleep(0.1)
+
+
+@real_browser
+def test_real_browser_speaker_view_runs_under_the_deck_csp(tmp_path: Path, use_browser) -> None:
+    """The notes plugin's popup inherits the deck CSP; its hashed script must run."""
+    from sdpm.engine.html.cdp import CdpConnection
+
+    deck = _deck(tmp_path, {"cover": _slide("Cover", '<aside class="notes">Say hello</aside>', layout="Title Slide")})
+    api.generate_html(deck)
+    output = (deck / "output.html").resolve()
+    with browser.local_browser(find_browser(), 1280, 720) as endpoint, \
+            CdpConnection(endpoint.url, endpoint.headers) as cdp:
+        targets = cdp.send("Target.getTargets")["targetInfos"]
+        page = next(t for t in targets if t.get("type") == "page")
+        session = cdp.send("Target.attachToTarget", {"targetId": page["targetId"], "flatten": True})["sessionId"]
+        cdp.send("Page.enable", session=session)
+        cdp.send("Runtime.enable", session=session)
+        cdp.send("Page.navigate", {"url": output.as_uri()}, session=session)
+        assert _wait(lambda: cdp.evaluate(session, "!!(window.Reveal&&Reveal.isReady&&Reveal.isReady())"))
+        cdp.send("Runtime.evaluate", {"expression": "Reveal.getPlugin('notes').open();0", "userGesture": True},
+                 session=session)
+
+        def notes_target():
+            return next((t for t in cdp.send("Target.getTargets")["targetInfos"]
+                         if t.get("type") == "page" and t["targetId"] != page["targetId"]), None)
+
+        popup = _wait(notes_target)
+        assert popup, "the speaker view did not open"
+        notes = cdp.send("Target.attachToTarget", {"targetId": popup["targetId"], "flatten": True})["sessionId"]
+        cdp.send("Runtime.enable", session=notes)
+        cdp.send("Log.enable", session=notes)
+        clock = _wait(lambda: cdp.evaluate(
+            notes, "(document.querySelector('.speaker-controls-time .clock-value')||{}).textContent||''"))
+        assert clock, "the speaker view script did not run"
+        csp = [e for e in cdp.take_events() if e.get("method") == "Log.entryAdded"
+               and e.get("sessionId") == notes and "Content Security Policy" in (e["params"]["entry"].get("text") or "")]
+        assert csp == []
