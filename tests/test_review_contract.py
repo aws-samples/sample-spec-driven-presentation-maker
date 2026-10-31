@@ -35,3 +35,27 @@ def test_limits_match(name):
 
 def test_marker_prefix():
     assert "[review:" in _MARKER_TS
+
+
+_WORKFLOWS = _ROOT / "sdpm" / "references" / "workflows"
+
+
+def _section(text: str, heading: str) -> str:
+    start = text.index(f"\n## {heading}\n")
+    end = text.find("\n## ", start + 1)
+    return text[start : end if end != -1 else len(text)]
+
+
+def test_orchestrator_handles_review_requests():
+    text = (_WORKFLOWS / "orchestrator.md").read_text(encoding="utf-8")
+    section = _section(text, "Review requests")
+    assert "[review:" in section
+    assert "reviews/" in section
+    assert "write_json" in section
+
+
+@pytest.mark.parametrize("doc", ["composer.md", "composer-html.md"])
+def test_composer_reports_each_review_comment(doc):
+    text = (_WORKFLOWS / doc).read_text(encoding="utf-8")
+    assert "review comments" in text
+    assert "one line per comment" in _section(text, "Return")

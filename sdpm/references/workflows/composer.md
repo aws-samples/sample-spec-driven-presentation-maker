@@ -23,6 +23,14 @@ the sources the brief points to are the only thing left to fetch — the parts y
 Treat `body` and `visual` as the intent to realise: choose the layout, dimensions and decoration,
 and refine wording as needed. Do not add facts that are not in the brief or its sources.
 
+A `task_instruction` may carry review comments: each a name, a rect `[x, y, w, h]` in the
+slide's own px (the coordinates slide elements use) covering what the user saw in the
+preview, and the user's text. Identify the target from the elements whose boxes the rect
+overlaps — positions written in the slide file, placeholder positions from the layout in
+`template_analysis`, and positions the build computes, which the preview shows at the same
+scale — read together with the comment text. Change what the comment asks and keep the rest
+of the slide as it is.
+
 ## What SDPM needs you to know
 
 - `slide_spec` (returned with this document) is the slide format; `read_guides(["slide-json-spec"])`
@@ -88,4 +96,5 @@ Anything else is an instruction to compose or fix the assigned slides.
 ## Return
 
 Slugs written / changed / untouched; remaining overflow or build issues; anything the specs
-did not cover that you had to decide.
+did not cover that you had to decide. For review comments, one line per comment name with
+what was changed or why it was not changed.
