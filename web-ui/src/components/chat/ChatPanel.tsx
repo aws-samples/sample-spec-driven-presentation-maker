@@ -36,6 +36,9 @@ import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./ch
 import { useLocale, useTranslations } from "next-intl"
 import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsService"
 import type { ForkSessionPhase, KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
+import { useReview } from "@/components/review/ReviewProvider"
+import { ReviewDraftBar } from "@/components/review/ReviewDraftBar"
+import { buildReviewMarker, parseReviewMarkers } from "@/lib/review/marker"
 
 interface ChatPanelProps {
   deckId: string
@@ -68,6 +71,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const t = useTranslations("chat")
   const tCompose = useTranslations("compose")
   const tSessionPicker = useTranslations("sessionPicker")
+  const tReview = useTranslations("review")
   const locale = useLocale()
   // --- Session ---
   const [sessionId, setSessionId] = useState(() => {
@@ -146,6 +150,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // Mirror of the chat input; the HTML pill derives its state from the text alone.
   const [inputText, setInputText] = useState("")
 
+  // --- Review comments (only the ChatPanel of the open deck shows and sends them) ---
+  const review = useReview()
+  const reviewActive = !!review?.enabled && review.deckId === deckId
+  const hasReviewDrafts = reviewActive && (review?.readyDrafts.length ?? 0) > 0
+  // Read in callbacks that outlive a render (tool events, the reconnect stream).
+  const reviewRef = useRef(review)
+  useEffect(() => { reviewRef.current = review })
+
   /** Persist chat messages to disk (Local mode only). */
   const saveLocalChat = useCallback((overrideDeckId?: string) => {
     const did = overrideDeckId || currentDeckId.current
@@ -191,6 +203,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
     // Save after tool completed
     if (toolUseData?.completed) setTimeout(() => saveLocalChat(), 100)
+
+    // A finished tool may have written a review file's status/replies (write_json)
+    if (toolUseData?.completed) reviewRef.current?.refresh()
 
     // Save after tool started (ensures compose_slides is persisted)
     if (!toolUseData?.completed && !toolUseData?.stream) setTimeout(() => saveLocalChat(), 100)
@@ -426,6 +441,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 return updated
               })
               saveLocalChat()
+              reviewRef.current?.refresh()
             }
             if (toolUseData?.stream && toolUseData?.toolUseId) {
               const d = (toolUseData as Record<string, unknown>).data as Record<string, unknown> || {}
@@ -506,6 +522,35 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configLoaded, deckId, fetchWebImages, stream.sendMessage])
 
+  /**
+   * Send from the input. With comments waiting, write the review file first, then send the
+   * note with its `[review:<id>]` marker (also in the display text, which Local .chat.json keeps).
+   * A failed write keeps the comments and the typed note (`false` keeps the input).
+   */
+  const handleInputSend = useCallback(async (
+    text: string,
+    uploadedFiles: UploadedFile[],
+    snippets: { label: string; text: string }[],
+    attachments: { fileName: string; fileType: string }[],
+  ): Promise<void | false> => {
+    if (!configLoaded) return false
+    const r = reviewRef.current
+    if (!hasReviewDrafts || !r) {
+      handleSend(text, uploadedFiles, snippets, attachments)
+      return
+    }
+    let id: string
+    try {
+      id = await r.submit(text)
+    } catch (err) {
+      notifyError(tReview("sendFailed"), err)
+      return false
+    }
+    const marker = buildReviewMarker(id)
+    const note = text.trim()
+    handleSend(note ? `${note}\n\n${marker}` : marker, uploadedFiles, snippets, attachments)
+  }, [configLoaded, hasReviewDrafts, handleSend, tReview])
+
   // --- Compose in-flight detection (for stop tooltip) ---
   const composeInFlight = useMemo(() => {
     if (!stream.isLoading) return false
@@ -534,6 +579,23 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     }
     return () => onLoadingChange?.(false)
   }, [isLoading, onLoadingChange])
+
+  // Turn end (true → false): the agent may have finished a review request.
+  const wasLoadingRef = useRef(isLoading)
+  useEffect(() => {
+    if (wasLoadingRef.current && !isLoading) reviewRef.current?.refresh()
+    wasLoadingRef.current = isLoading
+  }, [isLoading])
+
+  // Load the review requests referenced by this chat's messages (history and new sends).
+  // Also re-runs when the request map changes (the provider resets it on deck change); track() skips known ids.
+  const trackReviews = review?.track
+  const loadedReviews = review?.requests
+  useEffect(() => {
+    if (!reviewActive || !trackReviews) return
+    const ids = stream.messages.flatMap((m) => (m.role === "user" ? parseReviewMarkers(m.content) : []))
+    if (ids.length) trackReviews(deckId, ids)
+  }, [stream.messages, reviewActive, trackReviews, deckId, loadedReviews])
 
   const isInitial = stream.messages.length === 0 && !historyLoading
 
@@ -659,6 +721,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   sessionId={sessionId}
                   onSend={(text: string) => handleSend(text, [], [], [])}
                   hearingDisabled={i < lastUserIdx}
+                  deckId={deckId}
                 />
               </div>
             ))
@@ -671,11 +734,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       {/* Input area */}
       <ChatInput
           ref={chatInputRef}
-          onSend={handleSend}
+          onSend={handleInputSend}
           isLoading={isLoading}
           onStop={stream.stopGeneration}
           disabled={!configLoaded || reconnectLoading}
-          placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
+          placeholder={hasReviewDrafts ? tReview("notePlaceholder") : isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
+          topSlot={reviewActive ? <ReviewDraftBar /> : undefined}
+          sendOverride={hasReviewDrafts ? { label: tReview("send"), blocked: isLoading } : undefined}
           idToken={auth.user?.id_token}
           sessionId={sessionId}
           deckId={deckId}

@@ -34,8 +34,11 @@ import { SlashPickerPopup, slashOptionId } from "./SlashPickerPopup"
 import { SlashTokenReflection } from "./SlashTokenReflection"
 
 export interface ChatInputProps {
-  /** Called with the final message text, uploaded files, snippets, and attachment metadata. */
-  onSend: (text: string, uploadedFiles: UploadedFile[], snippets: { label: string; text: string }[], attachments: { fileName: string; fileType: string }[]) => void
+  /**
+   * Called with the final message text, uploaded files, snippets, and attachment metadata.
+   * Return (or resolve to) `false` to keep the input, attachments and snippets (e.g. the send failed).
+   */
+  onSend: (text: string, uploadedFiles: UploadedFile[], snippets: { label: string; text: string }[], attachments: { fileName: string; fileType: string }[]) => void | false | Promise<void | false>
   isLoading: boolean
   onStop: () => void
   disabled?: boolean
@@ -48,6 +51,13 @@ export interface ChatInputProps {
   deckId?: string
   /** Slot for additional UI above the textarea row (e.g., Options panel, @mentions overlay). */
   children?: ReactNode
+  /** Rendered first inside the input box, above attachments (e.g. the review draft bar). */
+  topSlot?: ReactNode
+  /**
+   * Replaces the icon send button with a labelled one that can send an empty input
+   * (the caller has something else to send); `blocked` disables it.
+   */
+  sendOverride?: { label: string; blocked: boolean }
   /** Opens the Local-only kiro session picker. */
   onContinueFromSession?: () => void
   /** Disabled once this chat already has messages. */
@@ -81,7 +91,7 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, onContinueFromSession, continueFromSessionDisabled, stopTitle, onInputChange, textareaOverlay, textareaClassName, slashItems, slashLoading, onSlashOpen, onTextareaFocus },
+  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, stopTitle, onInputChange, textareaOverlay, textareaClassName, slashItems, slashLoading, onSlashOpen, onTextareaFocus },
   ref,
 ) {
   const t = useTranslations("chatInput")
@@ -221,8 +231,11 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     })
   }, [input, updateInput])
 
+  const hasContent = !!input.trim() || attachments.length > 0 || snippets.length > 0
+  const canSend = sendOverride ? !sendOverride.blocked : hasContent
+
   const handleSend = async () => {
-    if ((!input.trim() && attachments.length === 0 && snippets.length === 0) || isLoading || disabled) return
+    if (!canSend || isLoading || disabled) return
 
     // Upload pending attachments
     const uploadedFiles: UploadedFile[] = []
@@ -254,7 +267,15 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     const sentSnippets = snippets.map((s) => ({ label: t("textSnippet"), text: s.text }))
     const sentAttachments = uploadedFiles.map((f) => ({ fileName: f.fileName, fileType: f.fileType }))
 
-    onSend(input, uploadedFiles, sentSnippets, sentAttachments)
+    // Await only an async onSend so a plain one keeps clearing the input in the same tick.
+    const sent = onSend(input, uploadedFiles, sentSnippets, sentAttachments)
+    const result = sent instanceof Promise ? await sent : sent
+    if (result === false) {
+      // Keep everything for a retry; files uploaded just now are uploaded again with it.
+      const uploadedIds = new Set(attachments.filter((a) => a.status === "pending").map((a) => a.id))
+      setAttachments((prev) => prev.map((a) => (uploadedIds.has(a.id) ? { ...a, status: "pending" as const, source: undefined } : a)))
+      return
+    }
     updateInput("")
     picker.close()
     setAttachments([])
@@ -269,7 +290,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (getIsComposing(e)) return
-    const canSendNow = input.trim() || attachments.length > 0 || snippets.length > 0
+    const canSendNow = canSend
     const sendWithEnter = (() => { try { return JSON.parse(localStorage.getItem("sdpm-prefs") || "{}").sendWithEnter ?? false } catch { return false } })()
 
     if (sendWithEnter) {
@@ -284,8 +305,6 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       }
     }
   }
-
-  const canSend = input.trim() || attachments.length > 0 || snippets.length > 0
 
   return (
     <FileDropZone onFiles={handleFiles} onLongTextPaste={handleSnippetConfirm} pasteDisabled={snippetOpen} disabled={isLoading} className="relative">
@@ -302,6 +321,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           className="rounded-xl border border-border bg-background-raised search-glow"
           data-landed={landed ? "" : undefined}
         >
+          {topSlot}
+
           <AttachmentPreview
             attachments={attachments}
             snippets={snippets}
@@ -365,6 +386,14 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 aria-label={stopTitle ?? t("stopGeneration")}
               >
                 <Square className="h-3 w-3 fill-current" />
+              </button>
+            ) : sendOverride ? (
+              <button
+                type="submit"
+                disabled={!canSend}
+                className="flex-none h-7 rounded-lg px-3 text-sm font-semibold whitespace-nowrap bg-human text-human-ink transition-opacity disabled:opacity-35 touch-target"
+              >
+                {sendOverride.label}
               </button>
             ) : (
               <button

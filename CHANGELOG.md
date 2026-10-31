@@ -10,6 +10,28 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Added
+
+- **Comments on the preview.** Mark what to change directly on the slides and send it as one
+  change request (修正依頼). Turn on the **Comment** tool from the preview header, with `C`,
+  or from the button that appears when hovering a slide. Drag to outline an area, or click
+  to place a frame when nothing is being edited (a click while a frame is selected only
+  confirms it). Every frame needs a comment and gets a letter name (A, B, …, AA) that other
+  comments can reference with `@A`; frames can be moved, resized and deleted (with undo),
+  hovering a frame shows its comment, and unsent comments survive a reload. The unsent
+  comments collect above the chat input, where **Request changes** (「修正を依頼」) sends
+  them with an optional note for the whole deck: the Web UI writes `reviews/<id>.json` in the
+  deck (frames in slide pixels, comments, resolved `@` references) and sends the note with a
+  `[review:<id>]` marker. The orchestrator reads the file, dispatches each slide's comments to
+  its composer together with the referenced frames, and writes each comment's status and a
+  reply back. The chat shows the request as a card with progress (`done / total`, then
+  **Done**), per-comment replies and a jump to each open frame, restored from chat history
+  on both the AWS stack and locally. HTML decks show stacked static slide previews while the
+  tool is on, so frames and the agent see the same layout. New API routes
+  `POST /decks/{id}/reviews` and `GET /decks/{id}/reviews/{reviewId}` (edit permission,
+  validated frames, slugs and sizes) with matching local routes; `get_deck` now returns
+  `slideSize` for PPTX decks too, and the cloud sandbox syncs `reviews/`.
+
 ## [0.11.0] - 2026-10-31
 
 ### Added
