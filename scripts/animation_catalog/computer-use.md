@@ -240,7 +240,7 @@ cross-check — three more assumptions with no offline check.
 
 The fix was to stop needing slide selection. `gui_capture_plan.py` now builds
 **one slide carrying one named shape per target**, and `gui_capture.py` selects
-a target by name through that shape's Selection Pane row. Attribution got
+a target through that shape's Selection Pane row. Attribution got
 stronger rather than weaker:
 each effect in the saved `p:timing` carries `p:spTgt/@spid`, and the slide's
 `p:cNvPr/@id` and `@name` map that back to the shape and so to the target, which
@@ -284,14 +284,24 @@ once. Measured live:
 | a row's `title` | `None`. The shape name is the **`value` of a descendant `AXStaticText`** |
 | a row's actions | `AXShowDefaultUI`, `AXShowAlternateUI` and a Rename. **No `AXPress`** |
 | selecting a row | **set `AXSelected`**, the standard outline-row mechanism, then read it back |
+| `AXRows` vs `AXChildren` | `AXRows` publishes all 152; `AXChildren` only the ~24 scrolled into view |
+| a row's **name**, during a run | published only for rows that have been scrolled into view. One run read **80** names, then **54**, from the same 152 rows |
+| row order against the package | reverse z-order, **152 of 152 agreeing, 0 mismatches, verified twice** |
 
-So a shape is selected **by name**, with no coordinates, no keyboard focus and
-no timing dependency. Two cautions carried over from elsewhere in this file:
-pressing `Selection Pane...` while the pane is open **closes** it, the same trap
-as pressing an already-active ribbon tab, so read the pane's presence rather
-than remembering it; and rows are re-created between reads like every other
-element here, and the pane scrolls, so resolve a row by name from a fresh read
-every time.
+So a shape is selected **by row index** — its position in reverse z-order, read
+offline from the package — with no coordinates, no keyboard focus and no timing
+dependency. The name is a *check* on that order when the pane publishes one, not
+the key: selecting by name rejected 11 targets as "no Selection Pane row is
+named ..." for rows that were there and selectable the whole time, because an
+unscrolled row carries no `AXStaticText` to read a name from. Scrolling the pane
+to materialize a name would be work done only to recover a key the package
+already has.
+
+Two cautions carried over from elsewhere in this file: pressing
+`Selection Pane...` while the pane is open **closes** it, the same trap as
+pressing an already-active ribbon tab, so read the pane's presence rather than
+remembering it; and rows are re-created between reads like every other element
+here, so re-resolve the row from a fresh read every time, index and all.
 
 The coordinate table and the canvas formula below are kept for **manual** work
 through the Computer Use tools. `gui_capture.py` uses neither: it posts no mouse
@@ -417,8 +427,9 @@ guessing. Correct this section after the first run.
 | --- | --- |
 | The Selection Pane stays open, and keeps publishing rows, across a ribbon tab change and a `Save` | the next target's row lookup fails as `controlNotFound` and the run continues; it does not press on the previous shape |
 | Writing `AXSelected` on a row selects the shape, and the row then reads back selected | the read-back times out per target **before** any press, so a selection that does not take costs a record rather than another shape's effect |
-| The pane publishes every shape's row, including ones scrolled out of view — unlike the slide navigator, which published only 6 of 76 | the rows that are missing are recorded by name per target, with the names the pane did show |
-| A row's name is exactly the package's `p:cNvPr/@name`, so the plan's `shapeName` matches it verbatim | every target is `controlNotFound` naming what the pane showed, loudly and on the first target |
+| `AXRows` publishes every shape's row, including ones scrolled out of view — unlike the slide navigator, which published only 6 of 76 | the row count disagrees with the slide's shape count and **every** target is `controlNotFound` saying both numbers, loudly and on the first target |
+| The pane's row order is the reverse of the slide part's shape order | the row at the derived index publishes a different name and that target is `controlNotFound` naming both — provided the row publishes a name at all |
+| A row's name, **when the pane publishes one**, is exactly the package's `p:cNvPr/@name` | the order check above misfires and reports a mismatch that is only a naming difference |
 | PowerPoint writes one `p:cTn` with a `presetClass` per applied effect, with the target shape's `spid` beneath it | attribution reads nothing and every target is rejected as `effectNotAdded`, loudly and on the first target |
 | `Save` writes the new effect into the file before the next read | the attribution reads a stale package and rejects, rather than crediting the wrong effect |
 | The `Path Animation` window lists presets directly, without a `Basic` grouping level | an extra level in the path is tolerated and recorded as `groupAbsent` |

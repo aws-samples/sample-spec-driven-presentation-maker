@@ -216,7 +216,7 @@ Every remaining animation value has to be applied through the ribbon, and the ma
 | `gui_capture_plan.py` | derives the target list from the catalog's own gaps, and builds the capture deck that list implies |
 | `gui_capture.py` | drives PowerPoint: select a target's own shape by its Selection Pane row, press by title, save, attribute the new effect to that shape |
 
-### It selects a shape by name, because clicking the canvas did not work
+### It selects a shape through its Selection Pane row, because clicking the canvas did not work
 
 A canvas shape has no accessibility element, so shape selection used to be a
 synthetic global mouse event at a point derived from the package geometry, the
@@ -232,12 +232,26 @@ effect.
 
 Canvas shapes have no element, but **their Selection Pane rows do**. The driver
 opens `Home ▸ Arrange ▸ Selection Pane...` once per run and selects each target
-by **setting `AXSelected` on the row whose name matches the shape** — there is
-no `AXPress` on a row — then reads the row back to confirm. No coordinates, no
-pointer, no zoom, no editor-pane frame and no settling. A row is resolved by
-name from a fresh read every time, because the rows are rebuilt between reads
-and the pane scrolls; an absent name is a recorded failure naming the names the
-pane did show, and two rows with one name is a refusal rather than a choice.
+by **setting `AXSelected` on that shape's row** — there is no `AXPress` on a row
+— then reads the row back to confirm. No coordinates, no pointer, no zoom, no
+editor-pane frame and no settling.
+
+A row is addressed by **index**, which is the shape's position in **reverse
+z-order**, read offline from the package. It was addressed by name first, and
+the name is still checked whenever the pane publishes one, but a name cannot be
+the key: a row's `title` is `None` and its name is the `value` of a descendant
+`AXStaticText` that **only exists once the row has been scrolled into view**. One
+run's batches read 80 names, then 54, from the same 152 rows, and 11 targets were
+rejected as "no Selection Pane row is named ..." for rows that were present and
+selectable throughout. The row order was verified against the package twice at
+152 rows with 0 mismatches.
+
+What guards the index is a count: the pane must publish exactly one row per shape
+on the slide or the selection refuses. That costs something and it is worth
+saying — a pane short one row now fails **every** target rather than that row's
+own, because one missing row shifts every index past it. The alternative is
+applying a value to the wrong shape under the right key, which no later gate can
+undo.
 
 So `read_canvas_geometry`, `canvas_point`, `read_shape_center_pt`, `parse_zoom`
 and the `--pane-frame` / `--pane-role` / `--zoom` options are gone, along with
@@ -295,7 +309,7 @@ and a one-line label take the short side to 43.5 pt. The key itself is not lost 
 it is in the plan, and each shape carries its ordinal.
 
 Shape size and separation are **no longer load-bearing**, because nothing is
-clicked: a shape is selected by name in the Selection Pane. The deck is kept as
+clicked: a shape is selected through its Selection Pane row. The deck is kept as
 it is rather than regenerated, and the grid's separation checks stay, so a future
 reader is not left wondering whether a tighter grid would change a capture.
 
