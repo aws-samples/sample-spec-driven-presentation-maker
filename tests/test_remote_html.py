@@ -693,6 +693,20 @@ def test_generate_pptx_partial_preview_upload_removes_this_runs_previews(server,
     assert storage.html_keys() == [] and "htmlS3Key" not in storage.record
 
 
+def test_generate_pptx_record_failure_removes_this_runs_previews(server, storage, monkeypatch):
+    previous = ["html/d1/preview/cover_1.html", "html/d1/preview/body_1.html"]
+    storage.objects.update({k: b"x" for k in previous})
+    storage.record["htmlS3Key"] = "html/d1/old.html"
+    storage.objects["html/d1/old.html"] = b"old"
+    monkeypatch.setattr(storage, "update_deck", MagicMock(side_effect=RuntimeError("DynamoDB down")))
+
+    result = json.loads(server.generate_pptx(deck_id="d1"))
+
+    assert "DynamoDB down" in result["error"]
+    assert storage.preview_keys() == sorted(previous)  # the older set stays the latest
+    assert storage.html_keys() == [] and storage.record["htmlS3Key"] == "html/d1/old.html"
+
+
 def test_generate_pptx_pptx_deck_takes_the_pptx_path(server, storage, monkeypatch):
     deck_json = storage.get_deck_json("d1")
     deck_json.pop("outputFormat")

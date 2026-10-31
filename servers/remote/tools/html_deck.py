@@ -443,10 +443,15 @@ def finalize_html_deck(
             # This run's keys would win the preview key map over the previous complete set.
             _delete(storage, list(uploaded.values()))
             raise RuntimeError(f"preview upload failed for {', '.join(missing)}")
-        _publish(
-            deck_id, user_id, storage, Path(gen["output_path"]), gen["slide_count"],
-            uploaded.get(order[0]) if order else None, True, gen.get("script_external"),
-        )
+        try:
+            _publish(
+                deck_id, user_id, storage, Path(gen["output_path"]), gen["slide_count"],
+                uploaded.get(order[0]) if order else None, True, gen.get("script_external"),
+            )
+        except Exception:
+            # Uncommitted: this run's previews must not win the key map over the record's output.
+            _delete(storage, list(uploaded.values()))
+            raise
         fresh = set(uploaded.values())
         deck_slugs = set(order)
         gone_pngs = [k for k in _listed(storage, png_prefix(deck_id))
