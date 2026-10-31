@@ -347,6 +347,7 @@ def test_run_python_html_non_build_change_does_nothing(server, storage, monkeypa
 
 def test_run_python_html_record_failure_reports_stale_html(server, storage, monkeypatch):
     _no_pptx(monkeypatch)
+    _fake_check(monkeypatch)  # the check writes PNGs, which must go with the previews
     _sandbox(monkeypatch, ["deck.css"])
     monkeypatch.setattr(storage, "update_deck", MagicMock(side_effect=RuntimeError("DynamoDB down")))
 
@@ -354,6 +355,55 @@ def test_run_python_html_record_failure_reports_stale_html(server, storage, monk
 
     assert "stale" in out["html_error"]
     assert storage.html_keys() == []  # the orphaned upload was deleted
+    assert storage.preview_keys() == []  # so were this run's previews and PNGs
+    assert not any(k.startswith("html/d1/png/") for k in storage.objects)
+
+
+def test_run_python_html_single_preview_upload_failure_publishes_nothing(server, storage, monkeypatch):
+    _no_pptx(monkeypatch)
+    storage.record["htmlS3Key"] = "html/d1/old.html"
+    storage.objects["html/d1/old.html"] = b"old"
+    upload = storage.upload_file
+
+    def flaky(key, data, content_type="", tagging=""):
+        if "/preview/body_" in key:
+            raise RuntimeError("S3 down")
+        upload(key, data, content_type, tagging)
+
+    monkeypatch.setattr(storage, "upload_file", flaky)
+    _sandbox(monkeypatch, ["deck.css"])
+
+    out = _run(server)
+
+    assert "body" in out["html_error"] and "stale" in out["html_error"]
+    assert not {"html", "previews", "png_previews"} & set(out)
+    assert storage.record["htmlS3Key"] == "html/d1/old.html" and storage.html_keys() == []
+    assert storage.preview_keys() == []
+
+
+def test_run_python_html_same_clock_writes_get_new_keys(server, storage, monkeypatch):
+    _no_pptx(monkeypatch)
+    monkeypatch.setattr(html_deck.time, "time_ns", lambda: 1_800_000_000_000 * 1_000_000)
+    _sandbox(monkeypatch, ["slides/cover.html"])
+
+    first = _run(server)["previews"]["cover"]
+    second = _run(server)["previews"]["cover"]
+
+    assert int(_PREVIEW_KEY.match(second).group(2)) > int(_PREVIEW_KEY.match(first).group(2))
+    assert first in storage.deleted and first not in storage.objects
+
+
+def test_run_python_html_revision_beats_older_second_epochs(server, storage, monkeypatch):
+    from shared.html_artifacts import build_html_preview_key_map
+
+    _no_pptx(monkeypatch)
+    old = "html/d1/preview/cover_1793374283.html"
+    storage.objects[old] = b"x"
+    _sandbox(monkeypatch, ["slides/cover.html"])
+
+    out = _run(server)
+
+    assert build_html_preview_key_map([old, out["previews"]["cover"]])["cover"] == out["previews"]["cover"]
 
 
 def test_js_deck_reports_the_skipped_browser_check(server, storage, tmp_path, monkeypatch):

@@ -13,6 +13,11 @@ into a tmpdir, uploads ``output.html``, the per-slide previews and the browser
 check's PNGs under ``html/`` (served through presigned URLs only, see
 shared/html_artifacts.py), keeps the deck record pointing at the newest artifact,
 and deletes superseded objects.
+
+Previews and PNGs of one build share one epoch: a per-build revision in
+milliseconds, strictly above every epoch already listed for the deck, so the
+newest build always wins the key map. A build that does not commit (a failed
+preview upload or record update) deletes its own previews and PNGs.
 """
 
 import json
@@ -223,6 +228,12 @@ def _slug_epoch(key: str) -> tuple[str, int] | None:
     return (m.group(1), int(m.group(2))) if m else None
 
 
+def _revision(listed_keys: list[str]) -> int:
+    """This build's epoch: now in ms, and above every listed preview / PNG epoch."""
+    epochs = [se[1] for k in listed_keys if (se := _slug_epoch(k) or png_slug_epoch(k))]
+    return max(time.time_ns() // 1_000_000, 1 + max(epochs, default=0))
+
+
 def _listed(storage: Storage, prefix: str) -> list[str]:
     try:
         return storage.list_files(prefix=prefix, bucket=storage.pptx_bucket)
@@ -294,7 +305,6 @@ def refresh_html_deck(
     from sdpm.api import refresh_html
 
     cache_root = template_html_cache.resolve_root(cache_root)
-    epoch = int(time.time())
     try:
         tmpdir, _ = prepare_html_workspace(deck_id, user_id, storage, cache_root)
     except Exception as e:
@@ -308,11 +318,19 @@ def refresh_html_deck(
         order = _outline_order(tmpdir, previews)
 
         listed = _listed_previews(storage, deck_id)
+        listed_pngs = _listed(storage, png_prefix(deck_id))
+        epoch = _revision(listed + listed_pngs)
         existing = build_html_preview_key_map(listed)
         wanted = set(built.get("affected") or []) | set(measure_slides or [])
         checked = wanted & set(order) if "browser_check" in built else set()
         wanted |= {s for s in order if s not in existing}
-        uploaded = _upload_previews(deck_id, tmpdir, previews, [s for s in order if s in wanted], epoch, storage)
+        wanted_order = [s for s in order if s in wanted]
+        uploaded = _upload_previews(deck_id, tmpdir, previews, wanted_order, epoch, storage)
+        missing = [s for s in wanted_order if s not in uploaded]
+        if missing:
+            # This run's keys would win the preview key map without an output.html behind them.
+            _delete(storage, list(uploaded.values()))
+            return {"html_error": f"preview upload failed for {', '.join(missing)} — the deck's HTML is stale"}
         pngs = _upload_pngs(deck_id, built.get("preview_files") or [], epoch, storage)
 
         result: dict[str, Any] = {
@@ -341,6 +359,7 @@ def refresh_html_deck(
             )
         except Exception as e:
             logger.warning("HTML artifact refresh failed for %s: %s", deck_id, e)
+            _delete(storage, list(uploaded.values()) + list(pngs.values()))
             result["html_error"] = (
                 f"HTML artifact refresh failed — the deck's HTML is stale. "
                 f"Run generate_pptx to refresh it. ({e})"
@@ -356,7 +375,7 @@ def refresh_html_deck(
                 k for k in listed
                 if (se := _slug_epoch(k))
                 and ((se[0] in uploaded and se[1] < epoch) or se[0] not in built_slugs)
-            ] + _stale_pngs(_listed(storage, png_prefix(deck_id)), pngs, checked, dropped, epoch))
+            ] + _stale_pngs(listed_pngs, pngs, checked, dropped, epoch))
         result["previews"] = uploaded
         result["png_previews"] = [s for s in order if s in pngs]
         template_html_cache.persist(tmpdir / "template.pptx", storage, cache_root)
@@ -399,8 +418,8 @@ def finalize_html_deck(
         gen = generate_html(tmpdir, template_cache=cache_root)
         previews: dict[str, str] = gen.get("previews") or {}
         order = _outline_order(tmpdir, previews)
-        epoch = int(time.time())
         before = _listed_previews(storage, deck_id)
+        epoch = _revision(before + _listed(storage, png_prefix(deck_id)))
         uploaded = _upload_previews(deck_id, tmpdir, previews, order, epoch, storage)
         missing = [s for s in order if s not in uploaded]
         if missing:
