@@ -12,6 +12,25 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Object animations and slide transitions, opt-in per deck.** A slide JSON file can now
+  carry `transition` (how that slide enters, including Morph by object / word / character)
+  and `animations` (a main sequence plus one interactive sequence per trigger shape), and
+  `deck.json` carries the two independent switches `animations.enabled` and
+  `transitions.enabled`. Both default to off, an absent switch is off, and a deck written
+  before this release builds byte-identically; `generate` / the CLI / both MCP servers also
+  take independent `animation_mode` / `transition_mode` overrides (`inherit` / `on` / `off`)
+  that never rewrite `deck.json`. Importing a PPTX derives each switch from what the file
+  actually contained, recovers transitions, sequences, triggers, timing and `morphId` as
+  editable JSON, and preserves anything it cannot decode semantically as raw XML in the
+  import bundle with a hashed dependency manifest, so a GUI-edited deck round-trips instead
+  of losing its motion. The authoring contract is a new optional guide,
+  `read_guides(["animations"])`: composers load it only when a switch is on or a slide
+  already carries those fields, so ordinary still decks pay no context for it. Authoring
+  coverage is deliberately partial and the guide says exactly where — 12 entrance and 12
+  exit effects, media play, all 53 transition effects and all three Morph variants are
+  generated today, while effect directions, emphasis and motion-path galleries,
+  after-animation effects, sounds and four timing options are preserved on import but
+  refused at generation by their catalog key rather than approximated.
 - **Claude Haiku 5.5** is a selectable model (`global.anthropic.claude-haiku-5-5`) for
   both Chat and Create. It uses the extended-thinking profile (no `temperature`; Bedrock
   rejects 0.1 with "temperature is deprecated"), with prompt caching enabled, and is

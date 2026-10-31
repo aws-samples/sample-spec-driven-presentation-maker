@@ -81,6 +81,12 @@ The tool converts the PPTX and commits an immutable bundle into the deck:
 - `attachments/imports/{importKey}/deck/deck.json` — fonts / defaultTextColor
 - `attachments/imports/{importKey}/deck/slides/slide-NN.json` — per-slide JSON
 - `attachments/imports/{importKey}/extracted/images/*` — extracted images
+- `attachments/imports/{importKey}/deck/animations/*` — only when the source carried
+  animations or transitions sdpm could not decode semantically: the preserved raw XML, the
+  package parts it depends on, and `animations/manifest.json` listing that closure with
+  hashes
+- `attachments/imports/{importKey}/deck/media/*` — only when a transition or effect
+  referenced an audio/media part: the copied asset, referenced by deck-relative path
 
 The returned JSON includes `importKey`, `bundlePath`, `deckJson`, and
 `files[]`. Keep `importKey` — Step 3 and Step 4 need it to locate the
@@ -144,6 +150,11 @@ imported = read_json(f"{bundle_path}/deck/deck.json")
 deck["template"] = f"{bundle_path}/deck/template.pptx"
 deck["fonts"] = imported.get("fonts", {})
 deck["defaultTextColor"] = imported.get("defaultTextColor")
+# Carry the motion switches the import derived from the source. Dropping them would
+# rebuild an animated deck as a still one.
+for feature in ("animations", "transitions"):
+    if feature in imported:
+        deck[feature] = imported[feature]
 write_json("deck.json", deck)
 
 def rewrite_image_refs(node):
@@ -170,6 +181,11 @@ for slug in slugs:
 print("activated:", slugs)
 ```
 
+Keep every `transition`, `animations`, `morphId`, `id`, `_rawTiming` and `_rawTransition`
+field exactly as the bundle wrote it — do not rewrite or strip them. If any slide carries
+`_rawTiming` / `_rawTransition`, also activate the preserved closure (next sub-section);
+without it the build fails rather than quietly dropping the animation.
+
 Call:
 
 ```text
@@ -185,6 +201,44 @@ Keep Step 4 in one call so Cloud writeback, build, preview, and measurement shar
 same execution. The active slide JSON may reference bundle images, but code must never
 write below `attachments/imports/`. Call `generate_pptx(deck_id=deck_id)` only at final
 handoff.
+
+### 4-1. Preserved animations (only when a slide has `_rawTiming` / `_rawTransition`)
+
+Animations and transitions the converter could decode are already plain JSON in the slide
+files and need nothing extra. Anything it could not decode was preserved as raw XML in the
+bundle, and the slide holds only a small reference:
+
+```json
+{"_rawTiming": {"sidecar": "animations/slide-003-timing.xml", "sha256": "…",
+                "manifest": "animations/manifest.json", "reason": "…"}}
+```
+
+Those paths are **deck-root relative**, and the build resolves them — and every path inside
+`animations/manifest.json` — against the active deck root. So the whole
+`attachments/imports/{importKey}/deck/animations/` subtree (plus `deck/media/` when the
+manifest declares assets) has to exist at the active deck root under the same names, with
+the same bytes: the manifest carries a SHA-256 per file and a mismatch fails generation.
+
+```python
+manifest = read_json(f"{bundle_path}/deck/animations/manifest.json")
+binary = (manifest.get("parts") or []) + (manifest.get("assets") or [])
+if binary:
+    print("REPORT: preserved animations depend on binary parts:",
+          [row["path"] for row in binary])
+else:
+    write_text("animations/manifest.json", read_text(f"{bundle_path}/deck/animations/manifest.json"))
+    for row in manifest.get("sidecars") or []:
+        for key in ("path", "mediaOnlyPath"):
+            path = row.get(key)
+            if path:
+                write_text(path, read_text(f"{bundle_path}/deck/{path}"))
+```
+
+`run_python` copies text only. A manifest with a non-empty `parts` or `assets` list depends
+on audio / video / image parts that cannot be copied this way — **report that to the user**
+and leave the deck at its Step 4 state. Do not delete the `_rawTiming` / `_rawTransition`
+reference, hand-edit a sidecar, or edit the manifest to make a build succeed: all three throw
+away a setting the source file actually carried.
 
 ---
 
@@ -498,6 +552,42 @@ After the user responds, return control to the normal edit loop
 Delegation to Composer section).
 
 ---
+
+## Animations and transitions
+
+The converter recovers motion as well as content. What it does, in order:
+
+1. **Switch derivation.** A new import writes `animations.enabled` and
+   `transitions.enabled` into the bundle's `deck.json` from what it actually found — `true`
+   when the source carried that kind of content, otherwise left out (an absent switch is
+   off, so an ordinary still deck imports exactly as it did before this feature existed).
+   Step 4 copies both switches into the active `deck.json`. Hand-edit sync is different: it
+   **preserves** a switch the user already set explicitly and derives only a missing one.
+2. **Semantic extraction.** A transition or timing tree is turned into plain slide JSON
+   (`transition`, `animations`, element `id` / `morphId`) only when every persisted
+   behaviour affecting playback is recognized — including the `mc:AlternateContent` form,
+   where the first satisfied `mc:Choice` wins and the `Fallback` is used otherwise. All
+   three Morph variants, catalogued transition options, duration, advance settings, the
+   authorable presets, sequences and their order, triggers and the writable timing values
+   come back as editable JSON with stable effect IDs.
+3. **Raw fallback.** A partially recognized tree is **not** trimmed down to the part sdpm
+   understands. The original XML, its retained Choice/Fallback branches, its namespaces, its
+   shape-reference → logical-ID mapping and the package parts it depends on go into
+   `animations/` in the immutable bundle, with `animations/manifest.json` declaring that
+   whole closure and a SHA-256 per file. The slide keeps a four-field reference whose
+   `reason` says why. On regeneration the replay remaps shape and relationship IDs; if a
+   part or target cannot be rebuilt, generation fails instead of emitting a dangling `rId`.
+4. **Verification.** After the Step 4 build, check the deck actually kept its motion: the
+   bundle `deck.json` switches are in the active `deck.json`; every slide that had a
+   `transition` / `animations` field still has it; `generate_pptx` returns without a
+   capability-gap error. A refusal naming a catalog key (`animation.*` / `transition.*`) is
+   the expected, honest outcome for a setting sdpm can preserve but not yet write — report
+   it; do not delete the field to make the build pass. Animated playback itself is not
+   verifiable here: previews are single frames.
+
+The authoring contract for editing any of this afterwards is
+`read_guides(["animations"])`. Do not load it when the imported deck turned both switches
+off and no slide carries those fields.
 
 ## Notes on lossy conversion
 
