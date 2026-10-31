@@ -1,0 +1,2 @@
+# Vendored files are checked against upstream SHA256SUMS; keep their bytes unchanged on checkout.
+sdpm/vendor/** -text

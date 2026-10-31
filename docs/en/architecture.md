@@ -237,6 +237,10 @@ Accepted risks:
   bounded by reads that each need their own signature, `connect-src 'none'` in every deck,
   and the player iframe's sandbox without `allow-same-origin`, which gives each deck an
   opaque origin.
+- In the cloud browser check (AgentCore Browser), DNS resolution hints (`dns-prefetch`,
+  `preconnect`) are not proven blocked; the egress canary does not test DNS. A slide's
+  script could leak a short value through a DNS lookup during the check. Every other
+  channel the canary probes is blocked, and a published deck keeps `connect-src 'none'`.
 
 ### Text Measurement
 

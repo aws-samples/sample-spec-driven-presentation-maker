@@ -42,8 +42,8 @@ _JUSTIFY = {"top": "flex-start", "middle": "center", "bottom": "flex-end"}
 _AUTONUM = (("arabic", "decimal"), ("alphaLc", "lower-alpha"), ("alphaUc", "upper-alpha"),
             ("romanLc", "lower-roman"), ("romanUc", "upper-roman"))
 
-# Process-local memo of failed renders (cache dir → status) so a broken
-# A failed LibreOffice conversion is retried after FAILED_RENDER_RETRY_S, not on every build.
+# Process-local memo of failed renders (cache dir → (time, status)): a failed LibreOffice
+# conversion is retried after FAILED_RENDER_RETRY_S, not on every build.
 FAILED_RENDER_RETRY_S = 600
 _FAILED_RENDERS: dict[str, tuple[float, dict]] = {}
 

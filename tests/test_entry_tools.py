@@ -324,6 +324,11 @@ class TestHtmlDeckGuards:
             tools.generate_pptx(str(deck))
         assert not (deck / "output.pptx").exists()
 
+    @pytest.mark.parametrize("payload", [[], "deck", 3])
+    def test_non_object_deck_json_is_not_html(self, deck: Path, payload):
+        (deck / "deck.json").write_text(json.dumps(payload), encoding="utf-8")
+        assert tools._is_html_deck(str(deck)) is False
+
 
 def test_local_server_binds_entry_tools_and_not_workflow_readers():
     src = (Path(__file__).resolve().parents[1] / "servers" / "local" / "server.py").read_text(encoding="utf-8")

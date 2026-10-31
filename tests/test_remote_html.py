@@ -747,6 +747,12 @@ def test_get_preview_invalid_output_format_returns_error(server, storage):
     assert item["type"] == "text" and "outputFormat" in item["text"]
 
 
+@pytest.mark.parametrize("payload", [[], "deck", 3])
+def test_deck_format_treats_a_non_object_deck_json_as_pptx(server, storage, monkeypatch, payload):
+    monkeypatch.setattr(storage, "get_deck_json", lambda deck_id: payload)
+    assert remote_server._deck_format("d1") == "pptx"
+
+
 # --- get_preview ---------------------------------------------------------------
 
 

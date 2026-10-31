@@ -340,7 +340,7 @@ _MATERIALIZE_SLIDE = re.compile(r"^slides/[A-Za-z0-9_-]+\.(?:json|html)$")
 
 
 def _deck_format(deck_id: str) -> str:
-    """deck.json outputFormat of an S3 deck; "pptx" when deck.json is unreadable.
+    """deck.json outputFormat of an S3 deck; "pptx" when deck.json is unreadable or not an object.
 
     The fallback keeps the PPTX path unchanged; it is logged because an HTML deck
     whose deck.json cannot be read then fails with PPTX build errors. Raises
@@ -352,6 +352,9 @@ def _deck_format(deck_id: str) -> str:
         deck_json = _storage.get_deck_json(deck_id)
     except Exception as e:
         logger.warning("deck.json of %s unreadable, treating it as PPTX: %s", deck_id, e)
+        return "pptx"
+    if not isinstance(deck_json, dict):
+        logger.warning("deck.json of %s is not an object, treating it as PPTX", deck_id)
         return "pptx"
     return deck_output_format(deck_json)
 
