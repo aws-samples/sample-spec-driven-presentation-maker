@@ -35,8 +35,9 @@ Sources your slides need. Facts come from the brief and its sources.
   structure and say so in your summary. A card or node that names a concept carries an icon,
   placed as the style's icon rule says. Where the presenter operates the slide, build the
   operation with a slide script so it works while presenting, and make the state before any
-  operation the one that reads on its own (it is what prints). A slide whose claim is itself
-  a sentence may stay text.
+  operation the one that reads on its own (it is what prints). The slide shows the controls
+  and what they change; the presenter's operating steps go in `<aside class="notes">`. A slide
+  whose claim is itself a sentence may stay text.
 - **Follow the style.** `specs/art-direction.html` is a short deck built in the style, about the
   style: its `Frame:` comments say what repeats on every slide, its `Component:` comments the
   parts slides are built from, its `Pattern:` slides how it builds each slide type and which
@@ -65,7 +66,8 @@ patterns: pick the `Pattern:` slide that fits each slide's `visual` and take its
 adapting only what the content needs. Derive all coordinates from one grid (margins, gutters;
 the `grid` tool computes them), so the same kind of expression gets the same region set
 across the deck. Also write `deck.css`: the component classes the deck repeats, from the
-style's `Component:` and `Pattern:` parts. The body (text, images, charts, tables,
+style's `Component:` and `Pattern:` parts. The frame, the regions and the `deck.css`
+components are for what the audience reads. The body (text, images, charts, tables,
 interaction) belongs to the content composers, and so do per-slide adjustments. Write
 `deck.css` and every slide in one `run_python` call: a few layout functions and a plan list,
 looped. Every assigned slug gets a file.

@@ -149,7 +149,8 @@ variables stay local to the slide.
 ## Icons and images
 
 - Icons: `search_assets` → `<img src="assets:<source>/<name>">`. SVG icons are inlined; `alt`
-  becomes the accessible label.
+  becomes the accessible label. Choose the icon variant (`search_assets` `theme_filter`) that
+  contrasts with the background it sits on.
 - Images: paths relative to the deck root (`images/photo.png`) or `attachments/…`, in `src`,
   `srcset`, `poster`, SVG `<image href>` and CSS `url(…)` / `image-set(…)`; each is embedded
   as a data URI. A deck SVG file stays an image; to style or animate an SVG, write the `<svg>`

@@ -12,8 +12,12 @@ presenting, with the bundled ECharts and D3 libraries; controls the presenter op
 slide. Everything the deck shows, data and images included, lives inside the deck and works
 offline.
 
-- **`visual`** names what the audience sees. When the presenter operates the slide, it also
-  names the operation and what it changes.
+- **Template** — an HTML deck is built on the template's layouts, placeholders and
+  decorations. Choose a template as for PPTX and pass it to `apply_style(deck_id, style,
+  template)`; `deck.json` keeps it.
+- **`visual`** names what the audience sees. For a slide the presenter operates, it names the
+  control and what it changes on screen; the steps to operate it are the presenter's and go in
+  the speaker notes.
 - **Brief** — when the user asks for interactivity, record it in the brief's constraints, so the
   outline and every composer carry it.
 - **Review** — each composer's browser check leaves a PNG per slide, `<deck>/preview/png/<slug>.png`
