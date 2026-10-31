@@ -103,3 +103,14 @@ node -p "require('./package/package.json').version" > "$dest/VERSION"
 After updating either library, update its version in `THIRD-PARTY-LICENSES` and run
 `SDPM_AUTO_INSTALL_ASSETS=0 uv run pytest tests/test_html_assemble.py tests/test_html_csp.py`
 from the repository root.
+
+## Checksums — `SHA256SUMS`
+
+`SHA256SUMS` holds the sha256 of every vendored file (all but this README and the manifest
+itself). CI checks it (`sha256sum -c SHA256SUMS`) and `tests/test_vendor_checksums.py`
+checks that it lists exactly the files on disk. After updating any library above,
+regenerate it from the repository root:
+
+```bash
+cd sdpm/vendor && find . -type f ! -name SHA256SUMS ! -name README.md | sort | xargs shasum -a 256 > SHA256SUMS
+```

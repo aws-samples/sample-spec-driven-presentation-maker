@@ -20,6 +20,8 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
       - name: Lint
         run: uv run ruff check sdpm/ servers/ shared/ api/ agent/
+      - name: Vendored files match the manifest
+        run: cd sdpm/vendor && sha256sum -c SHA256SUMS
       - name: Test
         run: uv run pytest tests/ -v --cov=sdpm --cov-report=term
 
