@@ -100,33 +100,43 @@ properties (`get version`) but every document-model access and every
 **Accessibility API** through KiroCrew's computer-use tools, which is a
 different mechanism and is not blocked.
 
-Three facts decide how a batch is written:
+**Use `computer_perform_action` with `AXPress`, not clicks.** This is the whole
+method; everything below about coordinates is a fallback for controls that have
+no addressable element.
 
 - **`computer_get_state` is reliable**, and the ribbon is fully enumerated:
   every gallery tile, the Duration incrementor, the Sound popup, the advance
-  checkboxes, and each thumbnail's `Has Transition` state.
+  checkboxes, and each thumbnail's `Has Transition` / `Has Animation` state.
+- **`computer_perform_action` with `element_index` works**, including on
+  main-window elements and on elements scrolled **outside** the visible band.
+  Pressing a tile at window `x=1448` inside a 320-pixel-wide gallery applies
+  it and scrolls it into view. So there is no coordinate arithmetic, no
+  paging, no tooltip problem, and **no pointer takeover** — the operator's
+  machine stays usable.
 - **`computer_click` with `element_index` always fails** against the main
   window (`element … is no longer present`), because PowerPoint rebuilds its
-  accessibility elements between queries. `computer_perform_action` with
-  `element_index` **does** work — use it for menu items.
+  accessibility elements between queries. This is a limitation of that tool,
+  not of the accessibility route.
 - **`click_method: "app_post"` is delivered but ignored** by the ribbon: it is
-  custom-drawn and does not process per-process synthetic mouse events. Only
-  `click_method: "global"`, which moves the real pointer, drives it.
+  custom-drawn and does not process per-process synthetic mouse events.
+  `click_method: "global"` does drive it, but it moves the real pointer, and
+  after such a click the pointer rests on the control and macOS raises a
+  tooltip there, so the **next** `global` click at the same point refuses with
+  `the topmost window there is 'Window Server'`. Reach for `global` only for a
+  target with no addressable element, such as a shape on the slide canvas.
 
-Consequences for an unattended batch:
+A gallery **lazily materializes its tiles**: a first read of Entrance Effects
+returned 22, and after one tile was pressed the same read returned different
+tiles (Rise Up, Spinner, Basic Zoom, Stretch, Boomerang) that had not been
+there. Re-read the tree after each press rather than caching an index list,
+and never assume the first read enumerated the whole gallery.
 
-- The machine's pointer is taken over for the length of the batch. PowerPoint
-  must hold the capture deck and nothing the operator cares about.
-- After a `global` click the pointer rests on the control and macOS raises a
-  tooltip there, which makes the **next** click at the same point refuse with
-  `the topmost window there is 'Window Server'`. Interleave an unrelated click
-  (selecting the slide thumbnail works and is needed anyway) between two
-  clicks on the same control.
-- Set `max_tree_nodes: 1` before a run of clicks. A click returns a refreshed
-  tree at the budget of the last read, and the full ribbon tree is large.
+Set `max_tree_nodes: 1` before a run of presses when you do not need the tree:
+a press returns a refreshed tree at the budget of the last read, and the full
+ribbon tree is large.
 
-The Transition Styles gallery is positioned arithmetically, verified against
-the tree:
+If you do fall back to coordinates, the Transition Styles gallery is positioned
+arithmetically, verified against the tree:
 
 ```
 tile x = 100 + 92 * i - 920 * page        visible band: x in [100, 1012]
