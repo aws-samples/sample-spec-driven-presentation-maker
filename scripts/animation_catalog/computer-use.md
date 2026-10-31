@@ -208,6 +208,86 @@ Effect Options opens as its own window titled `Effect Options`, whose items
 are `menubutton`s. Activate one with `computer_perform_action` + `AXPress`; a
 plain `global` click only focuses it and leaves the menu open.
 
+### The loop is a script now, not an agent round trip
+
+Everything above is still how PowerPoint behaves; what changed is who sends the
+calls. **The macOS Accessibility API is reachable from Python in this
+environment**, which the KiroCrew tool wrapper is not required for:
+`AXIsProcessTrusted()` returns true and `AXUIElementCreateApplication(pid)`
+returns PowerPoint's window, under
+
+```bash
+uv run --with pyobjc-framework-ApplicationServices --with pyobjc-framework-Cocoa \
+  --with pyobjc-framework-Quartz python …
+```
+
+So the four calls per value — select the slide, select the shape, read, press —
+are a loop inside one process rather than four agent turns, and the two rules
+that make the tool contract awkward (one explicit read per action, a popup being
+invisible to the read that opened it) stop being rules to remember: the driver
+re-reads before every press by construction.
+
+`scripts/animation_catalog/gui_capture.py` is that driver and
+`gui_capture_plan.py` derives its target list from the catalog's own
+`ooxml.requiresCapture` entries. See
+[the README](README.md#gui-capture-driver) for how to run them. Use this file
+for what the application does; use the driver for doing it.
+
+### Mechanics this file did not record, found while coding against it
+
+Each of these was needed to write the driver and was not here:
+
+- **The Animations galleries are three separate named controls**, not one
+  gallery with sections: `Entrance Effects`, `Emphasis Effects`,
+  `Exit Effects`, plus the `Path Animation` menu button. A path is therefore
+  `Animations > Entrance Effects > Fly In`, and the `Animations` tab has to be
+  pressed before any of them resolves.
+- **The canvas click point has a formula**, and only its worked example was
+  recorded. With the editor pane's frame in screen coordinates and the live zoom
+  `z`, a slide of `W x H` points showing a shape centred at `(sx, sy)` points:
+
+  ```
+  shown     = (W * z, H * z)
+  origin    = (pane.x + (pane.w - shown.w)/2, pane.y + (pane.h - shown.h)/2)
+  point     = (origin.x + sx * z, origin.y + sy * z)
+  ```
+
+  The 2026-10-31 measurement is the check: a 960x540 pt slide at 92% in a
+  1258x540 pane at screen (254, 177) puts a shape centred at (140, 190) pt on
+  screen (570.2, 373.4). This assumes the slide is **centred** in the pane,
+  which holds when the canvas is not scrolled.
+- **sdpm names a shape from its geometry, not from the element id.** The capture
+  deck asks for an element called `target` and the package carries
+  `Rounded Rectangle 1`. The driver needs the name in the file, so
+  `gui_capture_plan.py --generate` reads it back out of the package and writes
+  it into the plan rather than either side assuming it.
+- **A direction entry does not imply a GUI path.** The `Effect Options`
+  direction labels depend on which effect is applied — Fly In offers
+  `From Bottom`, Wheel offers `1 Spoke` — so Step 8's measurement is
+  *effect x label -> presetSubtype*, and the 45 `MsoAnimDirection` entries
+  cannot have a path derived from the entry alone. The driver can drive them
+  once a plan names the prerequisite effect; the derivation refuses to invent
+  one.
+- **A gallery tile's title is a name correspondence, not a measurement.** The
+  catalog key's last segment de-camel-cases to the label for all but three
+  tiles (`Grow/Shrink`, `Grow & Turn`, `Shrink & Turn`). The driver matches the
+  live title exactly and records a failure naming what it looked for, so a
+  wrong label costs one record instead of producing a mislabelled capture.
+
+### Assumptions only a live run can confirm
+
+The driver is written against these and fails loudly on each rather than
+guessing. Correct this section after the first run.
+
+| Assumption | If it is wrong |
+| --- | --- |
+| The slide editor pane is an `AXSplitGroup` with a frame | `--pane-role` or `--pane-frame` overrides it; a wrong pane makes the click miss and the gallery stay disabled, which is a recorded timeout |
+| Slide thumbnails are `AXRow` elements in slide order, selectable with `AXPress` or `kAXSelected` | the driver tries `AXPress` then the attribute and records which worked |
+| The status bar exposes the zoom as an element titled e.g. `92%` | `--zoom` takes a measured value |
+| A gallery is disabled until a shape is selected, so its becoming enabled confirms the canvas click | the confirmation is indirect; a selection that silently fails would press a disabled-looking but enabled gallery |
+| The `Path Animation` window lists presets directly, without a `Basic` grouping level | an extra level in the path is tolerated and recorded as `groupAbsent` |
+| `Save` in the Quick Access toolbar overwrites in place with no Save As sheet | the driver waits, bounded, for the file to change and records a save failure per target |
+
 ### What the GUI route cannot establish
 
 The AppleScript oracle applied a candidate **by its enumerator code**, so its
