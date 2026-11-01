@@ -598,13 +598,28 @@ the default. This closes `animation.timing.{rewind,smoothStart,smoothEnd,bounceE
 
 ## Step 6 — Motion paths
 
-Every motion-path entry is `semanticPreservationOnly` because PowerPoint stores
-preset paths as literal path data in `p:animMotion/@path`, which no available
-capture contains.
+**The five gallery groups are measured.** They were
+`semanticPreservationOnly` because PowerPoint stores a preset path as literal
+path data in `p:animMotion/@path` and no available capture contained it. The
+2026-11-01 GUI capture does, verbatim, all five at `origin="layout"`
+`pathEditMode="relative"` `ptsTypes=""` and `dur="2000"`:
 
-1. Apply each tile in **Animations ▸ gallery ▸ Motion Paths** (Lines, Arcs,
-   Turns, Shapes, Loops), then each entry in **Add Animation ▸ More Motion
-   Paths…**, one per slide.
+| Tile | `presetID` | `@path` |
+| --- | --- | --- |
+| Lines | 42 | `M 0 0 L 0 0.25 E` |
+| Turns | 50 | `M 0 0 L 0.125 0 C 0.181 0 0.25 0.069 0.25 0.125 L 0.25 0.25 E` |
+| Arcs | 37 | `M 0 0 L 0.067 0.04 C 0.081 0.049 0.102 0.054 0.124 0.054 C 0.149 0.054 0.169 0.049 0.183 0.04 L 0.25 0 E` |
+| Shapes | 1 | a closed circle: `M 0 0 C 0.069 0 0.125 0.056 0.125 0.125 C … Z` |
+| Loops | 26 | a closed figure-eight: `M 0 0 C 0 0.033 0.027 0.06 0.06 0.06 C … Z` |
+
+The full strings are in the capture's `merged-evidence.json`; the two closed
+paths are elided here only to keep the table readable, and the file is what the
+catalog reads.
+
+Still open: the entries behind **Add Animation ▸ More Motion Paths…**, which the
+gallery does not list. For those:
+
+1. Apply each entry, one per slide.
 2. Save once per group of slides and extract every `p:animMotion` verbatim.
 3. Record `@path`, `@origin`, `@pathEditMode`, `@rAng` and the `p:rCtr` child.
 
