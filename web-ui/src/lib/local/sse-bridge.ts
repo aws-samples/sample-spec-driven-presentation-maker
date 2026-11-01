@@ -12,6 +12,8 @@ import path from "path"
 import { DECK_ROOT } from "./deck-paths"
 import { basename } from "./pathUtils"
 
+const DECK_ROOT_ABS = path.resolve(DECK_ROOT)
+
 interface BridgeOptions {
   sessionId: string
   subscribe: (fn: (msg: Record<string, unknown>) => void) => () => void
@@ -183,8 +185,8 @@ export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onErro
               }
             } catch {}
             // A deck's output_dir is a child of DECK_ROOT; the root itself (start_presentation's
-            // output_dir) is not a deck.
-            if (result.output_dir && !result.deckId && path.resolve(result.output_dir as string) !== path.resolve(DECK_ROOT)) {
+            // output_dir) is not a deck. The server reports normalized absolute paths.
+            if (result.output_dir && !result.deckId && String(result.output_dir).replace(/[\\/]+$/, "") !== DECK_ROOT_ABS) {
               result.deckId = basename(result.output_dir as string)
             }
             if (result.deckId && onDeckId) onDeckId(result.deckId as string)
