@@ -2148,6 +2148,32 @@ def press_target(
     )
     carried["selection_row_index"] = selection.index
     carried["selection_row"] = selection.name
+
+    # A target whose control only exists once an effect is applied names the
+    # press that applies one. Measured: ``Effect Options`` and ``Trigger`` read
+    # `enabled=False` until a gallery tile has been pressed, exactly as
+    # ``Duration:`` did, so a direction cannot be reached without this.
+    #
+    # The attribution gate is unaffected, and that is why this is safe to add:
+    # the prerequisite applies the effect and the target's own press *modifies*
+    # that same effect, so the shape still gains exactly one ``p:cTn`` and the
+    # record is still credited by its own ``spid``. A prerequisite that landed
+    # on another shape would be caught by the stray-spid gate like any press.
+    prerequisite = target.get("prerequisite")
+    if prerequisite:
+        ensure_tab(backend, prerequisite, timeout=timeout)
+        before = press_path(
+            backend,
+            prerequisite,
+            timeout=timeout,
+            alternatives=tuple(target.get("prerequisiteAlternatives", ())),
+        )
+        carried["prerequisite"] = {
+            "guiPath": list(prerequisite),
+            "matchedTitle": before.matched_title,
+            "steps": before.as_dicts(),
+        }
+        ensure_tab(backend, target["guiPath"], timeout=timeout)
     result = press_path(
         backend,
         target["guiPath"],

@@ -1,0 +1,388 @@
+{
+ "Emphasis Effects": [
+  {
+   "key": "animation.gallery.emphasis.blink",
+   "label": "Blink"
+  },
+  {
+   "key": "animation.gallery.emphasis.boldFlash",
+   "label": "Bold Flash"
+  },
+  {
+   "key": "animation.gallery.emphasis.boldReveal",
+   "label": "Bold Reveal"
+  },
+  {
+   "key": "animation.gallery.emphasis.brushColor",
+   "label": "Brush Color"
+  },
+  {
+   "key": "animation.gallery.emphasis.colorPulse",
+   "label": "Color Pulse"
+  },
+  {
+   "key": "animation.gallery.emphasis.complementaryColor",
+   "label": "Complementary Color"
+  },
+  {
+   "key": "animation.gallery.emphasis.complementaryColor2",
+   "label": "Complementary Color 2"
+  },
+  {
+   "key": "animation.gallery.emphasis.contrastingColor",
+   "label": "Contrasting Color"
+  },
+  {
+   "key": "animation.gallery.emphasis.darken",
+   "label": "Darken"
+  },
+  {
+   "key": "animation.gallery.emphasis.desaturate",
+   "label": "Desaturate"
+  },
+  {
+   "key": "animation.gallery.emphasis.fillColor",
+   "label": "Fill Color"
+  },
+  {
+   "key": "animation.gallery.emphasis.fontColor",
+   "label": "Font Color"
+  },
+  {
+   "key": "animation.gallery.emphasis.growWithColor",
+   "label": "Grow With Color"
+  },
+  {
+   "key": "animation.gallery.emphasis.growShrink",
+   "label": "Grow/Shrink"
+  },
+  {
+   "key": "animation.gallery.emphasis.lighten",
+   "label": "Lighten"
+  },
+  {
+   "key": "animation.gallery.emphasis.lineColor",
+   "label": "Line Color"
+  },
+  {
+   "key": "animation.gallery.emphasis.objectColor",
+   "label": "Object Color"
+  },
+  {
+   "key": "animation.gallery.emphasis.pulse",
+   "label": "Pulse"
+  },
+  {
+   "key": "animation.gallery.emphasis.shimmer",
+   "label": "Shimmer"
+  },
+  {
+   "key": "animation.gallery.emphasis.spin",
+   "label": "Spin"
+  },
+  {
+   "key": "animation.gallery.emphasis.teeter",
+   "label": "Teeter"
+  },
+  {
+   "key": "animation.gallery.emphasis.transparency",
+   "label": "Transparency"
+  },
+  {
+   "key": "animation.gallery.emphasis.underline",
+   "label": "Underline"
+  },
+  {
+   "key": "animation.gallery.emphasis.wave",
+   "label": "Wave"
+  }
+ ],
+ "Entrance Effects": [
+  {
+   "key": "animation.gallery.entrance.appear",
+   "label": "Appear"
+  },
+  {
+   "key": "animation.gallery.entrance.basicSwivel",
+   "label": "Basic Swivel"
+  },
+  {
+   "key": "animation.gallery.entrance.basicZoom",
+   "label": "Basic Zoom"
+  },
+  {
+   "key": "animation.gallery.entrance.blinds",
+   "label": "Blinds"
+  },
+  {
+   "key": "animation.gallery.entrance.boomerang",
+   "label": "Boomerang"
+  },
+  {
+   "key": "animation.gallery.entrance.bounce",
+   "label": "Bounce"
+  },
+  {
+   "key": "animation.gallery.entrance.centerRevolve",
+   "label": "Center Revolve"
+  },
+  {
+   "key": "animation.gallery.entrance.checkerboard",
+   "label": "Checkerboard"
+  },
+  {
+   "key": "animation.gallery.entrance.credits",
+   "label": "Credits"
+  },
+  {
+   "key": "animation.gallery.entrance.curveUp",
+   "label": "Curve Up"
+  },
+  {
+   "key": "animation.gallery.entrance.dissolveIn",
+   "label": "Dissolve In"
+  },
+  {
+   "key": "animation.gallery.entrance.drop",
+   "label": "Drop"
+  },
+  {
+   "key": "animation.gallery.entrance.expand",
+   "label": "Expand"
+  },
+  {
+   "key": "animation.gallery.entrance.fade",
+   "label": "Fade"
+  },
+  {
+   "key": "animation.gallery.entrance.flip",
+   "label": "Flip"
+  },
+  {
+   "key": "animation.gallery.entrance.float",
+   "label": "Float"
+  },
+  {
+   "key": "animation.gallery.entrance.floatIn",
+   "label": "Float In"
+  },
+  {
+   "key": "animation.gallery.entrance.flyIn",
+   "label": "Fly In"
+  },
+  {
+   "key": "animation.gallery.entrance.growTurn",
+   "label": "Grow & Turn"
+  },
+  {
+   "key": "animation.gallery.entrance.peekIn",
+   "label": "Peek In"
+  },
+  {
+   "key": "animation.gallery.entrance.pinwheel",
+   "label": "Pinwheel"
+  },
+  {
+   "key": "animation.gallery.entrance.randomBars",
+   "label": "Random Bars"
+  },
+  {
+   "key": "animation.gallery.entrance.riseUp",
+   "label": "Rise Up"
+  },
+  {
+   "key": "animation.gallery.entrance.shape",
+   "label": "Shape"
+  },
+  {
+   "key": "animation.gallery.entrance.spinner",
+   "label": "Spinner"
+  },
+  {
+   "key": "animation.gallery.entrance.spiralIn",
+   "label": "Spiral In"
+  },
+  {
+   "key": "animation.gallery.entrance.split",
+   "label": "Split"
+  },
+  {
+   "key": "animation.gallery.entrance.stretch",
+   "label": "Stretch"
+  },
+  {
+   "key": "animation.gallery.entrance.strips",
+   "label": "Strips"
+  },
+  {
+   "key": "animation.gallery.entrance.swivel",
+   "label": "Swivel"
+  },
+  {
+   "key": "animation.gallery.entrance.wedge",
+   "label": "Wedge"
+  },
+  {
+   "key": "animation.gallery.entrance.wheel",
+   "label": "Wheel"
+  },
+  {
+   "key": "animation.gallery.entrance.whip",
+   "label": "Whip"
+  },
+  {
+   "key": "animation.gallery.entrance.wipe",
+   "label": "Wipe"
+  },
+  {
+   "key": "animation.gallery.entrance.zoom",
+   "label": "Zoom"
+  }
+ ],
+ "Exit Effects": [
+  {
+   "key": "animation.gallery.exit.basicSwivel",
+   "label": "Basic Swivel"
+  },
+  {
+   "key": "animation.gallery.exit.basicZoom",
+   "label": "Basic Zoom"
+  },
+  {
+   "key": "animation.gallery.exit.blinds",
+   "label": "Blinds"
+  },
+  {
+   "key": "animation.gallery.exit.boomerang",
+   "label": "Boomerang"
+  },
+  {
+   "key": "animation.gallery.exit.bounce",
+   "label": "Bounce"
+  },
+  {
+   "key": "animation.gallery.exit.centerRevolve",
+   "label": "Center Revolve"
+  },
+  {
+   "key": "animation.gallery.exit.checkerboard",
+   "label": "Checkerboard"
+  },
+  {
+   "key": "animation.gallery.exit.collapse",
+   "label": "Collapse"
+  },
+  {
+   "key": "animation.gallery.exit.contract",
+   "label": "Contract"
+  },
+  {
+   "key": "animation.gallery.exit.credits",
+   "label": "Credits"
+  },
+  {
+   "key": "animation.gallery.exit.curveDown",
+   "label": "Curve Down"
+  },
+  {
+   "key": "animation.gallery.exit.disappear",
+   "label": "Disappear"
+  },
+  {
+   "key": "animation.gallery.exit.dissolveOut",
+   "label": "Dissolve Out"
+  },
+  {
+   "key": "animation.gallery.exit.drop",
+   "label": "Drop"
+  },
+  {
+   "key": "animation.gallery.exit.fade",
+   "label": "Fade"
+  },
+  {
+   "key": "animation.gallery.exit.flip",
+   "label": "Flip"
+  },
+  {
+   "key": "animation.gallery.exit.float",
+   "label": "Float"
+  },
+  {
+   "key": "animation.gallery.exit.floatOut",
+   "label": "Float Out"
+  },
+  {
+   "key": "animation.gallery.exit.flyOut",
+   "label": "Fly Out"
+  },
+  {
+   "key": "animation.gallery.exit.peekOut",
+   "label": "Peek Out"
+  },
+  {
+   "key": "animation.gallery.exit.pinwheel",
+   "label": "Pinwheel"
+  },
+  {
+   "key": "animation.gallery.exit.randomBars",
+   "label": "Random Bars"
+  },
+  {
+   "key": "animation.gallery.exit.shape",
+   "label": "Shape"
+  },
+  {
+   "key": "animation.gallery.exit.shrinkTurn",
+   "label": "Shrink & Turn"
+  },
+  {
+   "key": "animation.gallery.exit.sinkDown",
+   "label": "Sink Down"
+  },
+  {
+   "key": "animation.gallery.exit.spinner",
+   "label": "Spinner"
+  },
+  {
+   "key": "animation.gallery.exit.spiralOut",
+   "label": "Spiral Out"
+  },
+  {
+   "key": "animation.gallery.exit.split",
+   "label": "Split"
+  },
+  {
+   "key": "animation.gallery.exit.stretchy",
+   "label": "Stretchy"
+  },
+  {
+   "key": "animation.gallery.exit.strips",
+   "label": "Strips"
+  },
+  {
+   "key": "animation.gallery.exit.swivel",
+   "label": "Swivel"
+  },
+  {
+   "key": "animation.gallery.exit.wedge",
+   "label": "Wedge"
+  },
+  {
+   "key": "animation.gallery.exit.wheel",
+   "label": "Wheel"
+  },
+  {
+   "key": "animation.gallery.exit.whip",
+   "label": "Whip"
+  },
+  {
+   "key": "animation.gallery.exit.wipe",
+   "label": "Wipe"
+  },
+  {
+   "key": "animation.gallery.exit.zoom",
+   "label": "Zoom"
+  }
+ ]
+}
