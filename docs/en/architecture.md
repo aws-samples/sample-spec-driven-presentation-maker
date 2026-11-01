@@ -1,5 +1,3 @@
-[EN](../en/architecture.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
-
 # Architecture
 
 This document describes spec-driven-presentation-maker's overall architecture, data flow, authentication and authorization model,
@@ -9,16 +7,49 @@ data model, CDK stack structure, and deployment patterns.
 
 ## 4-Layer Architecture
 
-spec-driven-presentation-maker consists of 4 layers.
-Each layer is a thin wrapper around the previous one — use only the layers you need.
+spec-driven-presentation-maker consists of 4 layers. The engine and the tool contract
+(`sdpm.tools`) sit in the middle. The local server (Layer 2) and the remote server
+(Layer 3) both bind that same contract; neither wraps the other. Layer 4 (agent, Web UI,
+API) uses the remote server. Use only the layers you need.
 
 ![4layer-architecture](../assets/4layer-architecture-en.png)
 
 ### Dependency Direction
 
-Dependencies always flow top-down.
+Python imports point inward: the servers import `sdpm.tools`, which imports the engine and
+knowledge. The core imports nothing from the servers or from `shared`.
 
 ![dependency-direction](../assets/dependency-direction-en.png)
+
+---
+
+## Entry tools, prompts and role documents
+
+```
+sdpm/        Engine (json <-> pptx) + Knowledge (references, assets, templates)
+             references/workflows/ — role documents (orchestrator, composer, style,
+             translate), delivered to any MCP client by the start_* entry tools
+servers/     local (stdio, no AWS) / remote (HTTP, S3 + DynamoDB) — thin binds of one tool contract
+             local/client_config.py wires the server into MCP clients (sdpm register)
+scripts/install/   installer + `sdpm` launcher for macOS / Linux / Windows; scripts/mcpb/ the Claude Desktop bundle
+agent/ api/ infra/ web-ui/   Optional AWS cloud stack (Strands Agent, REST API, CDK, React UI)
+```
+
+Each role (orchestrator, composer, style, translate) has one document in
+`sdpm/references/workflows/`. The composer has one per output format: `composer.md` (PPTX)
+and `composer-html.md` (HTML). A role's entry tool (`start_presentation`, `start_composing`,
+`start_style`, `start_translation`) returns that document plus what the role reads first,
+such as the style and template lists or the deck's specs.
+
+An agent does not need to pick a mode: asking for slides makes it call `start_presentation`
+and follow the document. The `sdpm-*` prompts (`sdpm-vibe`, `sdpm-spec`, `sdpm-style`,
+`sdpm-translate`) let a user choose explicitly. Each prompt only names its role's entry tool;
+the behaviour itself lives in `sdpm/references/workflows/`, in one place. The spawner
+chooses the composer's mode when it dispatches one: `start_composing(..., mode="pptx"|"html")`.
+
+Everything an agent needs (tools, workflows, guides, role behaviour) is served by the MCP
+server. Nothing lives on the client side: a client only holds the one line that starts the
+server, and `sdpm register` writes that line.
 
 ---
 
@@ -60,19 +91,18 @@ The same `sdpm.tools` contract bound to an HTTP transport, with storage swapped 
 
 ```
 MCP Client → AgentCore Runtime → MCP Server Container
-                                   ├── 20 MCP tools
+                                   ├── 20 MCP tools (21 with search_slides)
                                    ├── LibreOffice (PPTX → PDF/SVG)
                                    ├── DynamoDB (decks, templates)
                                    ├── S3 (PPTX, previews, references, assets)
-                                   └── Code Interpreter (optional)
+                                   └── Code Interpreter (run_python)
 ```
 
-Additional tools over Layer 2:
-- `read_attachment` — Read content from an attached file (PDF, DOCX, XLSX, PPTX, text, images) with byte-offset paging
-- `import_attachment` — Import attached files into the deck workspace
-- `apply_style` — Apply a named style preset to a deck
-- `run_python` — Execute Python in Amazon Bedrock AgentCore Code Interpreter sandbox (edit deck workspace, analyze data)
-- `search_slides` — Semantic slide search via Amazon Bedrock Knowledge Base (optional)
+Differences from Layer 2:
+- `get_preview` — returns the preview images of a deck's slides (remote only; the local server returns previews from `run_python` as `preview_files`)
+- `run_python` — runs in an Amazon Bedrock AgentCore Code Interpreter sandbox instead of a local process
+- `search_slides` — semantic slide search through an Amazon Bedrock Knowledge Base, registered only when one is configured
+- `start_translation` is not bound: the translate workflow runs scripts from a checkout
 
 HTML decks (`deck.json` `outputFormat: "html"`) use the same tools with these differences:
 
@@ -180,7 +210,7 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
   The checks also flag `RTCPeerConnection` and `stun:` / `turn:` URLs. In the cloud each
   build keeps these findings (slide and kind: navigation, popup, external URL, WebRTC) on the
   deck record (`htmlScriptExternal`); `GET /decks/{id}` returns them as `scriptWarnings`
-  and the deck page shows a warning next to Present / Download, on shared decks too.
+  and the deck page shows a warning next to Present / Download, on public decks too.
 - After each build that changes slides, the browser check (`sdpm.engine.html.browser_check`)
   opens `output.html` in a browser over the DevTools protocol, shows each changed slide with
   every fragment and finished animations, measures placeholders, regions and blocks (layout
@@ -230,7 +260,7 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
 Accepted risks:
 
 - The Present URL is a presigned bearer link valid for 4 hours. Anyone holding it can open
-  the deck until it expires, even after the deck is unshared or its permissions change.
+  the deck until it expires, even after the deck is made private or its permissions change.
   4 hours is the shortest expiry that still covers a presentation; the in-app view and
   downloads use 900 s.
 - All HTML decks are served from one origin, the deck bucket's regional host. This is
@@ -259,7 +289,7 @@ A reference implementation of a full-stack application.
 - **API** — Lambda-backed REST API (deck CRUD, file upload, chat history)
 - **Auth** — Amazon Cognito User Pool with hosted UI
 
-The agent's system prompt is minimal — workflow knowledge is dynamically retrieved from MCP Server Instructions, making the MCP Server the single source of truth.
+The agent fetches its role documents through the entry tools (`start_presentation`, `start_composing`, `start_style`) and places them in its system prompt, so the MCP server stays the single source of truth for workflow text. The agent itself has no `start_*` tools. Its `compose_slides` tool runs `check_specs` and then dispatches one composer agent per group it is given, up to 10 at a time. The agent calls it twice: once for the layout pass over all slides, then once for the content groups, which run in parallel.
 
 ---
 
@@ -272,13 +302,15 @@ The agent's system prompt is minimal — workflow knowledge is dynamically retri
 
 ### Slide Generation Steps
 
-1. User describes the presentation content via chat
-2. Agent calls MCP Server tools to create a deck (`init_deck_workspace`)
-3. Analyzes the template and retrieves available layouts (`analyze_template`)
-4. Following workflow files, designs briefing → art direction → outline (persisted to `specs/`)
-5. Builds slides (`run_python` to edit files in the workspace)
-6. Generates PPTX (`generate_pptx`) → saved to S3, previews generated synchronously
-7. Retrieves preview images for review (`get_preview`)
+1. The user describes the presentation in the chat, with attachments or URLs
+2. The agent creates a deck (`init_deck_workspace`, PPTX or HTML)
+3. Writes the brief (`specs/brief.md`)
+4. Applies a template and a style (`apply_style`, writes `specs/art-direction.html` and `deck.json`)
+5. Writes the outline (`specs/outline.md`)
+6. Validates the specs (`check_specs`)
+7. Composes the slides (`compose_slides`): a layout pass over all slides, then content groups in parallel
+8. Reviews the previews (`get_preview`) and dispatches a composer for any slide to change
+9. Finalizes the deck (`generate_pptx`), saved to S3 with previews
 
 ---
 
@@ -333,22 +365,23 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Prompts | `sdpm-vibe`, `sdpm-spec`, `sdpm-style`, `sdpm-translate` | User-invoked (slash-command) entry points; `vibe` / `spec` set the interaction mode |
 | Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate). `start_composing(mode="pptx"\|"html")` picks the composer document for the deck's output format |
 | Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template` | Create deck workspace (`output_format="pptx"\|"html"`), validate specs, apply style, analyze template |
-| Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview (local `generate_pptx` refuses HTML decks; `run_python` builds them) |
+| Generation | `generate_pptx` | Generate PPTX (local `generate_pptx` refuses HTML decks; `run_python` builds them) |
+| Attachments | `read_attachment`, `import_attachment` | Read an attached file (PDF, DOCX, XLSX, PPTX, text, images) with byte-offset paging; import it into the deck workspace |
+| Sandbox | `run_python`, `run_style_python` | Run Python against the deck workspace in a local process (edits, measuring, previews returned as `preview_files`); the style variant for the style workflow |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
-| References | `list_styles` | Bundled and user styles |
+| References | `list_styles` | Bundled and user styles (the local server also opens the browser style gallery) |
 | References | `read_guides` | Design rules, guides, and the slide JSON spec (`slide-json-spec`) |
-| Layout | `grid` | CSS Grid coordinate calculation |
+| Layout | `grid`, `arch_diagram` | CSS Grid coordinate calculation; architecture diagram layout |
 | Utility | `code_to_slide` | Code highlighting |
 
-### Layer 3 Additional Tools
+### Layer 3 Differences
 
 | Tool | Description |
 |------|-------------|
-| `read_attachment` | Read content from an attached file with byte-offset paging |
-| `import_attachment` | Import attached files into the deck workspace |
-| `apply_style` | Apply a named style preset to a deck |
-| `run_python` | Execute Python in Code Interpreter sandbox |
-| `search_slides` | Semantic slide search (optional, requires Amazon Bedrock KB) |
+| `get_preview` | Preview images of a deck's slides (remote only) |
+| `run_python` | Runs in an Amazon Bedrock AgentCore Code Interpreter sandbox |
+| `search_slides` | Semantic slide search; registered only when an Amazon Bedrock Knowledge Base is configured |
+| `start_translation` | Not bound: the translate workflow needs a checkout |
 
 ### Agent-Level Tools (Layer 4)
 
@@ -404,24 +437,25 @@ Deliberate asymmetries between surfaces — these are design decisions, not gaps
 
 Select which stacks to enable in `config.yaml` for incremental deployment.
 
-### Pattern 1: Layer 3 Only (MCP Server)
+### Pattern 1: MCP server only (Layer 3)
 
-Minimum deployment. Connect directly from MCP clients.
+Minimum deployment. Connect directly from MCP clients. Slide previews are built in the MCP
+server container, so agents can review slides visually. One-Click Deploy calls this
+`layer3`.
 
-### Pattern 2: Layer 3 + PNG Preview
+### Pattern 2: Full stack (Layer 4)
 
-Enables agents to visually review slides.
+Complete deployment including the Web UI. Create slides through the browser chat.
+One-Click Deploy calls this `layer4`.
 
-### Pattern 3: Full Stack (Layer 4)
-
-Complete deployment including Web UI. Create slides via browser chat.
-
-For `config.yaml` examples and deployment instructions, see [Getting Started — Layer 3](getting-started.md#layer-3-remote-mcp-server-aws).
+For `config.yaml` examples and deployment instructions, see the [Developer guide — Remote MCP server](developer-guide.md#remote-mcp-server-aws).
 
 ---
 
 ## Related Documents
 
-- [Getting Started](getting-started.md) — Setup and deployment instructions
+- [Getting Started](getting-started.md) — install and use SDPM (AI agent, Web UI, HTML decks)
+- [Developer guide](developer-guide.md) — checkout setup and CDK deployment
+- [Security](security.md) — what the AWS stack sets up and what to review
 - [Custom Templates](custom-template.md) — Adding templates and assets
 - [Connecting Agents](add-to-gateway.md) — MCP client connection guide

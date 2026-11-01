@@ -1,5 +1,3 @@
-[EN](../en/teams-slack-integration.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
-
 # Microsoft Teams & Slack Integration
 
 This guide explains how to use the Layer 4 Agent of Spec-Driven Presentation Maker directly from Microsoft Teams or Slack.
@@ -24,8 +22,8 @@ The Layer 4 Agent has workflow constraints (Phase 1 → 2 → 3), MCP tool conne
 
 ## Prerequisites
 
-- spec-driven-presentation-maker Layer 3 + Layer 4 deployed (see [Getting Started — Layer 4](getting-started.md#layer-4-full-stack-aws))
-- Authentication infrastructure capable of obtaining JWT tokens (see [Getting Started — Authentication Options](getting-started.md#authentication-options) for details)
+- spec-driven-presentation-maker Layer 3 + Layer 4 deployed (see [Developer guide — Full stack](developer-guide.md#full-stack-aws))
+- Authentication infrastructure capable of obtaining JWT tokens (see [Developer guide — Authentication options](developer-guide.md#authentication-options) for details)
 
 ---
 
@@ -288,6 +286,6 @@ Calling with the same session ID causes the Agent to respond while retaining the
 
 ## Related Documents
 
-- [Getting Started](getting-started.md) — Layer 3/4 setup and deployment
+- [Developer guide](developer-guide.md) — Layer 3/4 setup and CDK deployment
 - [Connecting Agents](add-to-gateway.md) — MCP client connection guide
 - [Architecture](architecture.md) — Authentication and authorization model details

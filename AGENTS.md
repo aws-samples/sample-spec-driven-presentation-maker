@@ -21,7 +21,7 @@ must print `OK: … 20 tools`. Tell the user how to start: Kiro CLI `kiro-cli ch
 other clients just ask for slides; browser `sdpm webui`.
 **Migrating an older setup** (Claude Code / Codex plugin, Kiro Power, `make install-kiro`,
 `skills/`, `uvx … sdpm-mcp` entries): all of these are gone — follow
-[Migration: onboarding](docs/en/migration-onboarding.md); `sdpm register` detects and offers
+[Migration: onboarding](docs/en/migration/onboarding.md); `sdpm register` detects and offers
 to remove the Kiro and Claude Code leftovers itself.
 
 **Using it to generate slides:**
@@ -105,14 +105,16 @@ See [Architecture](docs/en/architecture.md).
 ## Onboarding code — read before touching
 
 - `docs/en/getting-started.md` — the user contract (installer options, launcher, per-client registration)
-- `docs/en/migration-onboarding.md` — what was removed and why
+- `docs/en/migration/onboarding.md` — what was removed and why
 - `scripts/install/README.md` — build (`build.sh`, CI rejects drift) and the isolated-home smoke test
 - `servers/local/client_config.py` (+ `picker.py`, the checklist widget) + `tests/test_client_config.py` — the one implementation of client wiring and its guarded invariants (absolute paths, no launcher/PATH, CLI-based registration, marker-owned files)
 - `.github/workflows/installer.yml` — real install + MCP handshake on ubuntu / macos / windows
 
 ## Further Documentation
 
-- [Getting Started](docs/en/getting-started.md) — browser, local agent, manual, and AWS setup
+- [Getting Started](docs/en/getting-started.md) — install, AI agent, Web UI, HTML decks
+- [Developer guide](docs/en/developer-guide.md) — checkout setup and CDK deployment
+- [Security](docs/en/security.md) — what the AWS stack sets up and what to review
 - [Architecture](docs/en/architecture.md) — data flow, auth model, MCP tool reference
 - [Custom Templates & Assets](docs/en/custom-template.md)
 - [Connecting Agents](docs/en/add-to-gateway.md)

@@ -155,7 +155,7 @@ server; Kiro CLI holds it inside a generated `sdpm` agent (wiring only: no promp
   drift) and read `scripts/install/README.md` for the isolated-home smoke test.
 
 Read before touching onboarding: `docs/en/getting-started.md` (user contract),
-`docs/en/migration-onboarding.md` (what was removed and why), `scripts/install/README.md`
+`docs/en/migration/onboarding.md` (what was removed and why), `scripts/install/README.md`
 (build + smoke), `tests/test_client_config.py` (the guarded invariants).
 
 ## Remote server (`servers/remote/`) — Layer 3

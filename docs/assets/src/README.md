@@ -1,0 +1,86 @@
+# Diagram sources
+
+Each directory here is a one-slide sdpm deck that draws one diagram in `docs/assets/`.
+`render.py` builds the deck with this repository's own CLI and writes the PNG.
+
+| Directory | Output | Used by |
+|---|---|---|
+| `workflow/` | `workflow-en.png`, `workflow-ja.png` | `README.md`, `README_ja.md` |
+| `4layer-architecture/` | `4layer-architecture-en.png` | `docs/en/architecture.md` |
+| `dependency-direction/` | `dependency-direction-en.png` | `docs/en/architecture.md` |
+| `data-flow/` | `data-flow-en.png` | `docs/en/architecture.md` |
+| `cdk-dependencies/` | `cdk-dependencies.png` | `docs/en/architecture.md` |
+
+`jwt-auth-flow-en.png` / `jwt-auth-flow-ja.png` have no source here. They still match the code
+and were not redrawn.
+
+## Regenerate
+
+From the repository root:
+
+```bash
+uv run python docs/assets/src/render.py                # every diagram
+uv run python docs/assets/src/render.py workflow       # one or more by name
+uv run python docs/assets/src/render.py workflow --keep-pptx /tmp   # also keep the .pptx
+```
+
+Requirements: LibreOffice (`soffice`) and poppler (`pdftoppm`), the same tools the slide
+previews use, plus the fonts named in `strings.<lang>.json` (`_fonts`): Arial for English,
+Hiragino Sans for Japanese (macOS). With other fonts the text wraps differently, so check the
+result.
+
+## How a diagram is built
+
+- `deck.json` and `specs/outline.md` make the directory a deck (template `blank-light`).
+- `slides/<name>.json` holds the shapes, lines and icons with hand-placed coordinates on the
+  1920 × 1080 canvas. All visible text is a `{{key}}` placeholder.
+- `strings.<lang>.json` gives the text for each key. `_fonts` replaces the deck fonts for that
+  language.
+- `out.json` maps each language to its output PNG.
+
+`render.py` copies the deck to a temporary directory, fills in the strings, runs
+`pptx_builder.py generate_pptx`, exports a PDF through LibreOffice, rasterises it at 1920 px
+with `pdftoppm` and trims the white margin to 24 px.
+
+To add a language, add `strings.<lang>.json` and a line in `out.json`. To change a diagram,
+edit `slides/<name>.json` (geometry) or the strings (wording), render, and look at the PNG.
+
+## Checks before committing a diagram
+
+- No text is clipped or runs outside its box, and no boxes overlap.
+- Every arrow starts and ends on the box it connects.
+- Body text is at least 16 pt in the slide. The README shows the image about 880 px wide, so
+  16 pt is about 14.7 px on screen.
+- Each PNG stays under 300 KB.
+
+The step names, file names and tool names in the diagrams come from the role documents
+(`sdpm/references/workflows/`), `sdpm/sdpm/entry.py`, `sdpm/sdpm/tools/` and
+`infra/bin/infra.ts`. Check them against those files when the workflow or the stacks change.
+
+## Why hand-placed slides
+
+The `arch_diagram` layout engine draws icon labels at 11 pt and arrow labels at 9 pt, sized
+for a full-screen slide. At README width that text is too small to read, so these diagrams
+place their shapes by hand.
+
+## Screenshots
+
+`docs/assets/screenshots/` is not generated here. Those images are captures of a running Web
+UI and of real decks:
+
+- `example-pptx.png`: the six slides of a PPTX deck made in the Local Web UI on the Fast path
+  (prompt: a 6-slide introduction to event-driven architecture, `@template:blank-light
+  @style:aws-light`), rendered with `pptx_builder.py preview --no-grid` and tiled 3 × 2 with
+  `magick montage`.
+- `example-html.png`: three slides of an HTML deck made the same way with **Build as HTML**
+  (prompt: a 5-slide sourdough introduction with an interactive temperature chart,
+  `@style:prism-light`), from the deck's browser-check PNGs.
+- `webui-comments.png`, `webui-deck.png`, `webui-styles.png`: Playwright captures of the
+  Local Web UI at 1600 px wide, English locale, with a scratch deck folder and config
+  directory so no personal decks or styles appear.
+
+To retake them, run the Local Web UI from a checkout (`cd web-ui && npm run dev:local`) with
+`SDPM_DECK_ROOT` and `XDG_CONFIG_HOME` pointing at empty directories, and use generic topics.
+The slides use Calibri. On a machine without it the browser falls back to a wider font and long
+titles overflow, so the captures load LibreOffice's metric-compatible Carlito under the name
+Calibri, as LibreOffice does for the PNG previews.

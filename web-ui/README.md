@@ -5,7 +5,7 @@
 Layer 4 Web UI for [Spec-Driven Presentation Maker](../README.md).
 A React-based chat interface for creating presentations through conversational AI — design your spec, then let the agent build the slides.
 
-![Chat UI](readme-imgs/fast-chat-screenshot.png)
+![The deck page: the slides on the left, the chat with a change request and the agent's reply on the right](../docs/assets/screenshots/webui-deck.png)
 
 ---
 
@@ -16,7 +16,6 @@ A React-based chat interface for creating presentations through conversational A
 - **Tailwind CSS v4** / shadcn/ui / Radix UI
 - **react-oidc-context** — Cognito OIDC authentication
 - **react-markdown** + remark-gfm — Markdown rendering
-- **react-dropzone** — File upload
 - **sonner** — Toast notifications
 - **PWA** — Service Worker + Web App Manifest
 
@@ -242,9 +241,10 @@ OIDC authentication flow — `AuthProvider` wraps the Cognito OIDC context, `Aut
 
 | Document | Description |
 |---|---|
-| [Getting Started](../docs/en/getting-started.md) | Full setup guide for all layers |
+| [Getting Started](../docs/en/getting-started.md) | User guide: install, AI agent, Web UI, HTML decks |
+| [Developer guide](../docs/en/developer-guide.md) | Checkout setup and CDK deployment |
 | [Architecture](../docs/en/architecture.md) | 4-layer design, data flow, auth model |
-| [Recommended Deploy](../docs/en/deploy-cloudshell.md) | Recommended path for AWS deployments (CloudShell or local) |
+| [Deploy guide](../docs/en/deploy-cloudshell.md) | Recommended path for AWS deployments (CloudShell or local) |
 
 ---
 

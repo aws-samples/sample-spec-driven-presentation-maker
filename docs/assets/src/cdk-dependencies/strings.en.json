@@ -1,0 +1,27 @@
+{
+  "_fonts": {
+    "fullwidth": "Arial",
+    "halfwidth": "Arial"
+  },
+  "data_t": "SdpmData",
+  "data_d": "DynamoDB, S3 buckets, Knowledge Base",
+  "runtime_t": "SdpmRuntime",
+  "runtime_d": "MCP server on AgentCore Runtime",
+  "agent_t": "SdpmAgent",
+  "agent_d": "Strands agent and Memory. Optional: stacks.agent",
+  "webui_t": "SdpmWebUi",
+  "webui_d": "CloudFront, API, Lambda. Optional: stacks.webUi",
+  "auth_t": "SdpmAuth",
+  "auth_d": "Cognito. Created only without an external IdP",
+  "waf_t": "SdpmCloudFrontWaf",
+  "waf_d": "WAF in us-east-1. Only with waf.*",
+  "e1": "table, buckets, KB, vectors",
+  "e2": "runtimeArn",
+  "e3": "agentRuntimeArn, memoryId",
+  "e4": "table, deck bucket",
+  "e5": "table, buckets, KB, vectors",
+  "e6": "SSM parameters, explicit dependency",
+  "e7": "webAclArn",
+  "lg1": "Values passed as stack props",
+  "lg2": "SSM parameters + addDependency"
+}

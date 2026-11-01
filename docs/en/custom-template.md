@@ -1,4 +1,4 @@
-[EN](../en/custom-template.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
+[English](custom-template.md) | [日本語](../ja/custom-template.md)
 
 # Custom Templates, Styles, and Assets
 
@@ -121,7 +121,7 @@ The agent calls `analyze_template` automatically during the design phase. You ca
 
 ### Layer 3 (Remote)
 
-Templates are stored in S3 and registered in DynamoDB. The agent calls `list_templates` to see available templates, then `analyze_template` with the selected template ID.
+Templates are stored in S3 (DynamoDB caches their metadata). The agent calls `list_templates` to see available templates, then `analyze_template` with the selected template ID.
 
 ---
 
@@ -148,8 +148,8 @@ Included sample templates:
 
 ```
 sdpm/templates/
-├── sample_template_dark.pptx
-└── sample_template_light.pptx
+├── blank-dark.pptx
+└── blank-light.pptx
 ```
 
 #### User-local templates
@@ -432,5 +432,6 @@ uv run python scripts/upload_assets.py \
 
 ## Related Documents
 
-- [Getting Started](getting-started.md) — Setup and deployment instructions
+- [Getting Started](getting-started.md) — Install and use SDPM
+- [Developer guide](developer-guide.md) — CDK deployment, including the template upload step
 - [Architecture](architecture.md) — How the asset resolver works

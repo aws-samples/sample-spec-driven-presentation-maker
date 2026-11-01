@@ -148,6 +148,6 @@ docker run -p 8080:8080 sdpm-agent
 
 | ドキュメント | 説明 |
 |---|---|
-| [はじめに](../docs/en/getting-started.md) | Layer 1〜4 のセットアップ手順 |
+| [開発者ガイド](../docs/en/developer-guide.md) | checkout での開発と CDK デプロイ |
 | [アーキテクチャ](../docs/en/architecture.md) | 4 層設計、データフロー、認証モデル |
 | [エージェント接続](../docs/en/add-to-gateway.md) | AgentCore と MCP クライアントの設定 |

@@ -179,5 +179,5 @@ docker build -t sdpm-agent .
 | Document | Description |
 |---|---|
 | [Architecture](../docs/en/architecture.md) | 4-layer design, data flow, auth model |
-| [Getting Started](../docs/en/getting-started.md) | Setup and deployment for Layer 1–4 |
+| [Developer guide](../docs/en/developer-guide.md) | Checkout setup and CDK deployment |
 | [Connecting Agents](../docs/en/add-to-gateway.md) | AgentCore Gateway and MCP client configuration |
