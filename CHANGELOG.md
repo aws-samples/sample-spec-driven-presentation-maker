@@ -72,6 +72,14 @@ Entries before v0.5.0 were written retroactively as summaries.
   unchanged. Public / private visibility stays as it is: to show a deck to others, make it
   public (**Internal**) or download the PPTX / HTML.
 
+### Fixed
+
+- **Local Web UI no longer opens the deck folder as a deck.** Starting a new chat briefly
+  switched the view to a deck named after the deck folder (`SDPM-Presentations`), which the
+  local server answered with 404, and every new deck sent a `PATCH` the local server does not
+  have (405). The deck folder is no longer taken for a deck, and Local mode skips the `PATCH`
+  (it already links the chat session to the deck on its own).
+
 ### Security
 
 - **Local Web UI refuses cross-site POSTs.** Every POST route of the local server (`sdpm webui`,

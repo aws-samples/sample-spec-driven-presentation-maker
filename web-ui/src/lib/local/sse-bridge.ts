@@ -7,6 +7,9 @@
  * Returns a ReadableStream that the API route can return as a Response.
  */
 
+import path from "path"
+
+import { DECK_ROOT } from "./deck-paths"
 import { basename } from "./pathUtils"
 
 interface BridgeOptions {
@@ -179,7 +182,9 @@ export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onErro
                 if (content?.[0]?.text) result = JSON.parse(content[0].text as string)
               }
             } catch {}
-            if (result.output_dir && !result.deckId) {
+            // A deck's output_dir is a child of DECK_ROOT; the root itself (start_presentation's
+            // output_dir) is not a deck.
+            if (result.output_dir && !result.deckId && path.resolve(result.output_dir as string) !== path.resolve(DECK_ROOT)) {
               result.deckId = basename(result.output_dir as string)
             }
             if (result.deckId && onDeckId) onDeckId(result.deckId as string)
