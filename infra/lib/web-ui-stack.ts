@@ -244,32 +244,20 @@ function handler(event) {
       runtime: lambda.Runtime.PYTHON_3_13,
       handler: "index.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../.."), {
+        // scripts/bundle_api_lambda.sh is the one definition of the bundle
+        // (dependencies, api/, shared/, the sdpm engine); CI runs the same script.
         bundling: {
           image: lambda.Runtime.PYTHON_3_13.bundlingImage,
-          command: [
-            "bash", "-c",
-            "pip install -r /asset-input/api/requirements.txt -t /asset-output/ && " +
-            "cp -r /asset-input/api/* /asset-input/shared /asset-output/ && " +
-            "cp -r /asset-input/sdpm/sdpm /asset-output/sdpm",
-          ],
+          command: ["bash", "/asset-input/scripts/bundle_api_lambda.sh", "/asset-output"],
           local: {
             tryBundle(outputDir: string): boolean {
-              const { execSync } = require("child_process");
-              const root = path.join(__dirname, "../..");
+              const { execFileSync } = require("child_process");
+              const script = path.join(__dirname, "../..", "scripts", "bundle_api_lambda.sh");
               try {
-                execSync(
-                  `pip install -r ${root}/api/requirements.txt -t ${outputDir}/` +
-                  ` --platform manylinux2014_x86_64 --python-version 3.13 --only-binary=:all:`,
-                  { stdio: "inherit" },
-                );
+                execFileSync("bash", [script, outputDir], { stdio: "inherit" });
               } catch {
                 return false;  // fall back to docker bundling
               }
-              execSync(`cp -r ${root}/api/* ${outputDir}/`, { stdio: "inherit" });
-              execSync(`cp -r ${root}/shared ${outputDir}/shared`, { stdio: "inherit" });
-              // sdpm Engine — required by shared.ingest._convert_pptx for upload-time
-              // PPTX → deck conversion (deck.json + slides/*.json + template.pptx).
-              execSync(`cp -r ${root}/sdpm/sdpm ${outputDir}/sdpm`, { stdio: "inherit" });
               return true;
             },
           },
