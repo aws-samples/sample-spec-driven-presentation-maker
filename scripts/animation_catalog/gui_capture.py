@@ -310,6 +310,22 @@ RIBBON_ROLE = "AXTabGroup"
 #: not shaped as measured fails loudly instead of walking everything.
 CONTAINER_DEPTH = 8
 
+#: How many pages a gallery may be turned in each direction while looking for one tile.
+#: The Entrance gallery is 33 effects shown 25 at a time; eight each way is room for a
+#: gallery three times that and still a bound, so a tile that is genuinely absent costs a
+#: bounded number of presses rather than the whole timeout spent paging.
+MAX_GALLERY_PAGES = 8
+
+#: The ribbon's own gallery pagers, as titles. A gallery shows a window of its effects —
+#: the Entrance gallery published ``Appear`` through ``Whip`` while ``Grow  Turn``,
+#: ``Stretch`` and ``Zoom`` sat outside it — and these two buttons are what move it.
+#: ``AXScrollUpByPage`` / ``AXScrollDownByPage`` on the gallery's own ``AXScrollArea``
+#: are **accepted and do nothing**: a run paged 8 each way and the tiles never appeared,
+#: which is why the pagers are pressed by title instead. ``Previous`` is disabled at the
+#: top, which is how the paging knows it has reached it.
+GALLERY_PAGE_PREVIOUS = "Previous {gallery} gallery"
+GALLERY_PAGE_NEXT = "Next {gallery} gallery"
+
 #: Node bound on a container search. Smaller than :data:`MAX_TREE_NODES` on purpose: a
 #: container search that visits thousands of nodes has stopped being a container search,
 #: and finding that out is worth more than completing it.
@@ -1229,6 +1245,25 @@ def _reachable_any(scope_node: AXNode, titles: Sequence[str]) -> bool:
     return any(find_all_by_title(scope_node, title) for title in titles)
 
 
+def title_variants(title: str, alternatives: Sequence[str] = ()) -> tuple[str, ...]:
+    """Every spelling of a control's title worth trying, in order, without duplicates.
+
+    The plan's title first, then the alternatives it carries, then **the same titles with
+    every ``&`` removed**. That last one is not a guess at a synonym: the accessibility
+    layer drops the ampersand from a tile's own title and leaves the spaces around it, so
+    ``Grow & Turn`` is published as ``Grow  Turn`` with two spaces and ``Shrink & Turn``
+    as ``Shrink  Turn``. Two targets were reported absent for exactly that, from a
+    gallery that holds them, and ``str.replace("&", "")`` reproduces the live title
+    character for character.
+
+    It is a derived **alternative**, never a replacement: the exact title is tried first,
+    so a gallery that does publish the ampersand is matched on it.
+    """
+    stated = (title, *alternatives)
+    dropped = tuple(spelling.replace("&", "") for spelling in stated if "&" in spelling)
+    return tuple(dict.fromkeys(stated + dropped))
+
+
 #: Roles whose element opens its own window when pressed — the ``Effect Options`` and
 #: ``Path Animation`` openers. Anything else holding a step is a container to scope into.
 PRESS_TO_OPEN_ROLES = ("AXMenuButton", "AXButton", "AXPopUpButton")
@@ -1252,8 +1287,9 @@ def press_path(
     - an intermediate step whose subtree already contains the next step is a container
       (a visible gallery), so it is scoped into rather than pressed;
     - an intermediate step that is a pressable opener (:data:`PRESS_TO_OPEN_ROLES`) and
-      does not contain the next step is pressed, and the driver then waits, bounded, for
-      a window of that title — this is how ``Effect Options`` and ``Path Animation`` work;
+      does not contain the next step is pressed **unless a window of its title is already
+      open**, and the driver then waits, bounded, for that window — this is how
+      ``Effect Options``, ``Path Animation`` and a gallery's expanded palette work;
     - any other intermediate step is scoped into and the next step is awaited inside it,
       because a gallery **lazily materializes its tiles** and a first read is not the
       whole gallery;
@@ -1275,7 +1311,7 @@ def press_path(
     # Every step of a ribbon path — the tab, the gallery, the tile — is inside the ribbon
     # tab group, so the walk never leaves it and never reaches the Selection Pane's rows.
     scope = RIBBON_SCOPE
-    final_titles = (path[-1], *alternatives)
+    final_titles = title_variants(path[-1], alternatives)
 
     # Pressing a ribbon tab that is ALREADY active collapses the ribbon, which takes
     # every control on it out of the tree. Measured: a run against a deck whose
@@ -1317,21 +1353,74 @@ def press_path(
             steps.append(StepOutcome(title, "scoped", node.role))
             continue
         if node.role in PRESS_TO_OPEN_ROLES:
-            node.press()
-            view.stale()
-            window = wait_until(
-                backend,
-                lambda title=title: find_window(backend, title),
-                timeout=timeout,
-                what=f"the {title!r} window to open",
-            )
+            # Pressed only when its window is not already open. This is the third time
+            # the same trap has cost a run: pressing an active ribbon tab collapses the
+            # ribbon, pressing `Selection Pane...` while the pane is open closes the
+            # pane, and pressing a gallery whose palette window is already open closes
+            # that — which is how the last target failed, as `timed out waiting for the
+            # 'Exit Effects' window to open` right after something else had opened it. So
+            # the window's presence is read rather than assumed, as it is in both other
+            # places.
+            window = find_window(backend, title)
+            if window is None:
+                node.press()
+                view.stale()
+                window = wait_until(
+                    backend,
+                    lambda title=title: find_window(backend, title),
+                    timeout=timeout,
+                    what=f"the {title!r} window to open",
+                )
+                steps.append(StepOutcome(title, "openedWindow", node.role))
+            else:
+                steps.append(StepOutcome(title, "windowAlreadyOpen", node.role))
             scope = scope.in_window(window.title or title)
-            steps.append(StepOutcome(title, "openedWindow", node.role))
             continue
         scope = scope.inside(title)
         steps.append(StepOutcome(title, "scopedPendingTiles", node.role))
 
     tried = ", ".join(repr(title) for title in final_titles)
+
+    #: Pages scrolled while looking for the final step, in each direction. A gallery is
+    #: an ``AXScrollArea`` publishing only the tiles on its current page: the Entrance
+    #: gallery published 25 and neither ``Grow & Turn`` nor ``Stretch`` was among them,
+    #: while an earlier run had captured ``Zoom``, which was not among them either. So a
+    #: missing tile is paged for before it is reported missing — **up** first, because
+    #: the previous target left the gallery wherever it was and only the top is a known
+    #: starting point, then **down** through the whole list.
+    paged = {"up": 0, "down": 0}
+
+    def page_gallery() -> None:
+        """Turn the gallery one page, or do nothing once both directions are spent.
+
+        The pagers are the ribbon's own buttons, resolved by title in the ribbon rather
+        than inside the gallery, because that is where they sit. A pager that is absent
+        or disabled spends its direction: ``Previous`` is disabled at the top of the
+        list, so going up stops there rather than pressing a dead control eight times.
+        """
+        gallery = scope.descend[-1] if scope.descend else None
+        if gallery is None:
+            return
+        for direction, template in (
+            ("up", GALLERY_PAGE_PREVIOUS),
+            ("down", GALLERY_PAGE_NEXT),
+        ):
+            if paged[direction] >= MAX_GALLERY_PAGES:
+                continue
+            try:
+                pager = _resolve_in(
+                    resolve_scope(backend, RIBBON_SCOPE), template.format(gallery=gallery)
+                )
+            except TargetFailure:
+                paged[direction] = MAX_GALLERY_PAGES
+                continue
+            if not pager.enabled:
+                paged[direction] = MAX_GALLERY_PAGES
+                continue
+            pager.press()
+            view.stale()
+            paged[direction] += 1
+            return
 
     def present() -> str | None:
         scope_node = resolve_scope(backend, scope)
@@ -1341,6 +1430,7 @@ def press_path(
             except ControlNotFound:
                 continue
             return candidate
+        page_gallery()
         return None
 
     try:
@@ -1348,8 +1438,17 @@ def press_path(
     except DriverTimeout as exc:
         raise ControlNotFound(
             f"none of {tried} appeared in {scope.describe()} within {timeout:g}s; the tree was "
-            "re-read on every poll, so a lazily materialized tile had its chance"
+            "re-read on every poll, so a lazily materialized tile had its chance, and the "
+            f"gallery was paged {paged['up']} up then {paged['down']} down"
         ) from exc
+    if paged["up"] or paged["down"]:
+        steps.append(
+            StepOutcome(
+                scope.descend[-1] if scope.descend else path[1],
+                f"pagedGallery({paged['up']} up, {paged['down']} down)",
+                None,
+            )
+        )
 
     # Re-resolved from one more fresh read: a press aimed by anything older can land on a
     # tile that scrolled, which applies the wrong value and records the right one. The

@@ -359,7 +359,12 @@ class FakeNode:
             self.on_set_selected(selected)
 
 
-ENTRANCE_TILES = ("Fly In", "Fade", "Grow & Turn")
+#: Tiles the Entrance gallery holds, as **pages**. The live gallery is an
+#: ``AXScrollArea`` publishing only its current page: 25 tiles, with ``Grow & Turn``,
+#: ``Stretch`` and ``Zoom`` on another page — which is why three targets failed as "none
+#: of 'Grow & Turn', 'Grow Turn' appeared" against a gallery that holds it.
+ENTRANCE_PAGES = (("Fly In", "Fade"), ("Grow & Turn",))
+ENTRANCE_TILES = tuple(title for page in ENTRANCE_PAGES for title in page)
 PATH_PRESETS = ("Lines", "Arcs", "Turns")
 
 
@@ -403,7 +408,8 @@ class FakePowerPoint:
         document: Path,
         *,
         slide_index: int = 1,
-        tiles: tuple[str, ...] = ENTRANCE_TILES,
+        tile_pages: tuple[tuple[str, ...], ...] = ENTRANCE_PAGES,
+        page: int = 0,
         duplicate_tile: str | None = None,
         applies_effect: bool = True,
         selection_sticks: bool = True,
@@ -419,7 +425,13 @@ class FakePowerPoint:
     ) -> None:
         self.document = document
         self.slide_index = slide_index
-        self.tiles = tiles
+        #: The gallery's tiles, as pages. Only the current page is published.
+        self.tile_pages = tile_pages
+        #: Which page the gallery is showing. A press leaves it wherever it was, so the
+        #: next target starts from here — which is why the driver pages **up** first.
+        self.page = page
+        #: Every page the driver asked for, in order, as ``"up"`` / ``"down"``.
+        self.scrolls: list[str] = []
         self.duplicate_tile = duplicate_tile
         self.applies_effect = applies_effect
         #: When false, writing ``AXSelected`` is accepted and does nothing — the shape
@@ -548,23 +560,63 @@ class FakePowerPoint:
         return FakeNode(counter=self.counter, **fields)
 
     def _gallery(self) -> FakeNode:
-        titles = list(self.tiles)
+        """The Entrance gallery: a scroll area publishing only its current page.
+
+        ``tile_pages`` is what makes a tile unreachable by reading alone, which is the
+        live behaviour: the gallery published 25 tiles and the three targets that failed
+        last were effects on another page. Paging is an action on this element, so it
+        costs no pointer and no coordinates.
+        """
+        pages = [list(page) for page in self.tile_pages]
         if self.duplicate_tile:
-            titles.append(self.duplicate_tile)
+            pages[self.page][:] = [*pages[self.page], self.duplicate_tile]
         return self._node(
-            role="AXGroup",
+            role="AXScrollArea",
             title="Entrance Effects",
             enabled=self.shape_selected,
             children=[
                 self._node(
                     role="AXRadioButton",
-                    title=title,
+                    # The accessibility layer drops the ampersand and leaves the spaces
+                    # around it: 'Grow & Turn' is published as 'Grow  Turn'. Two targets
+                    # were reported absent for that, from a gallery that holds them.
+                    title=title.replace("&", ""),
                     enabled=self.shape_selected,
                     on_press=lambda title=title: self._press_tile(title),
                 )
-                for title in titles
+                for title in pages[self.page]
             ],
         )
+
+    def _pagers(self) -> list[FakeNode]:
+        """The ribbon's own ``Previous``/``Next`` gallery buttons.
+
+        These are what move a gallery. The gallery's own ``AXScrollUpByPage`` /
+        ``AXScrollDownByPage`` are accepted and do nothing — measured: a run paged 8 each
+        way and no tile appeared — so the fake does not offer them at all, and a driver
+        that went back to them would find nothing to scroll.
+        """
+        return [
+            self._node(
+                role="AXButton",
+                title=driver.GALLERY_PAGE_PREVIOUS.format(gallery="Entrance Effects"),
+                enabled=self.page > 0,
+                on_press=lambda: self._page_gallery(down=False),
+            ),
+            self._node(
+                role="AXButton",
+                title=driver.GALLERY_PAGE_NEXT.format(gallery="Entrance Effects"),
+                enabled=self.page < len(self.tile_pages) - 1,
+                on_press=lambda: self._page_gallery(down=True),
+            ),
+        ]
+
+    def _page_gallery(self, *, down: bool) -> None:
+        """Turn the gallery one page, as pressing a pager does."""
+        self.scrolls.append("down" if down else "up")
+        target = self.page + (1 if down else -1)
+        if 0 <= target < len(self.tile_pages):
+            self.page = target
 
     def _path_animation_button(self) -> FakeNode:
         return self._node(
@@ -608,6 +660,7 @@ class FakePowerPoint:
             animated = self.selected_spid in self.effects
             commands += [
                 self._gallery(),
+                *self._pagers(),
                 self._path_animation_button(),
                 self._node(
                     role="AXPopUpButton",
@@ -2424,6 +2477,28 @@ class TestDrivingOneSlideManyShapes:
         driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
         assert session["fake"].reads > len(session["fake"].presses) * 2
 
+    def test_an_opener_whose_window_is_already_open_is_not_pressed_again(self, session):
+        """Pressing it again **closes** the window, which is how one target failed.
+
+        The third appearance of one trap: pressing an active ribbon tab collapses the
+        ribbon, pressing ``Selection Pane...`` while the pane is open closes the pane,
+        and pressing a gallery whose palette window is open closes that — reported as
+        ``timed out waiting for the 'Path Animation' window to open`` right after
+        something else had opened it. So the window's presence is read, not assumed.
+        """
+        fake = session["fake"]
+        fake.select(session["plan"]["targets"][0]["shapeName"])
+        fake.open_popup = planner.PATH_ANIMATION_CONTROL
+        result = driver.press_path(
+            fake,
+            [planner.ANIMATIONS_TAB, planner.PATH_ANIMATION_CONTROL, "Lines"],
+            timeout=2.0,
+        )
+        assert result.matched_title == "Lines"
+        outcomes = {step["title"]: step["outcome"] for step in result.as_dicts()}
+        assert outcomes[planner.PATH_ANIMATION_CONTROL] == "windowAlreadyOpen"
+        assert planner.PATH_ANIMATION_CONTROL not in [title for title, _spid in fake.presses]
+
     def test_the_motion_path_press_happens_in_the_popup_window(self, session):
         driver.run_capture(session["plan"], session["settings"], session["fake"], version="16.113.1")
         assert session["fake"].open_popup == planner.PATH_ANIMATION_CONTROL
@@ -2434,7 +2509,10 @@ class TestDrivingOneSlideManyShapes:
         )
         assert result.matched_title == "Arcs"
         outcomes = {step.title: step.outcome for step in result.steps}
-        assert outcomes[planner.PATH_ANIMATION_CONTROL] == "openedWindow"
+        # The run before this left the popup open, so the opener is not pressed again —
+        # pressing it would close the window the tile lives in. Either outcome puts the
+        # scope in that window, which is what this test is about.
+        assert outcomes[planner.PATH_ANIMATION_CONTROL] == "windowAlreadyOpen"
         assert outcomes["Arcs"] == "pressed"
 
     def test_an_absent_grouping_level_is_recorded_rather_than_fatal(self, session):
@@ -2457,9 +2535,78 @@ class TestDrivingOneSlideManyShapes:
         assert outcomes["Entrance Effects"] == "scoped"
         assert session["fake"].presses == [("Fly In", "2")]
 
+    def test_a_tile_on_another_page_is_paged_to_rather_than_reported_missing(self, session):
+        """A gallery publishes one page of tiles, so a missing tile is paged for.
+
+        Measured live: the Entrance gallery published 25 tiles and the last three
+        failures were effects on another page — "none of 'Grow & Turn', 'Grow Turn'
+        appeared" against a gallery that holds it. The pagers are ribbon buttons, so this
+        costs no pointer and no coordinates.
+        """
+        fake = session["fake"]
+        fake.select(session["plan"]["targets"][0]["shapeName"])
+        assert "Grow & Turn" not in fake.tile_pages[fake.page], "the tile starts off-page"
+        result = driver.press_path(
+            fake, [planner.ANIMATIONS_TAB, "Entrance Effects", "Grow & Turn"], timeout=2.0
+        )
+        assert result.matched_title == "Grow  Turn", "the live title drops the ampersand"
+        assert fake.presses[-1][0] == "Grow & Turn"
+        assert "down" in fake.scrolls, "it never paged the gallery"
+        paged = [step for step in result.as_dicts() if step["outcome"].startswith("pagedGallery")]
+        assert len(paged) == 1, "the record does not say the gallery was paged"
+
+    def test_the_gallery_is_paged_up_before_down_because_a_press_leaves_it_anywhere(
+        self, session
+    ):
+        """The top is the only known starting point, so it goes there first.
+
+        A press leaves the gallery on whatever page it was on, so the next target starts
+        from there and a tile **above** it would never be found by paging down. Here the
+        tile is on the first page and the gallery starts on the second.
+        """
+        fake = session["fake"]
+        fake.select(session["plan"]["targets"][0]["shapeName"])
+        fake.page = len(fake.tile_pages) - 1
+        result = driver.press_path(
+            fake, [planner.ANIMATIONS_TAB, "Entrance Effects", "Fly In"], timeout=2.0
+        )
+        assert result.matched_title == "Fly In"
+        assert fake.scrolls[0] == "up", "it paged down first, which cannot reach a tile above"
+
+    def test_a_tile_that_is_on_no_page_is_a_bounded_failure_naming_the_paging(self, session):
+        """Paging is bounded in both directions and says what it tried."""
+        fake = session["fake"]
+        fake.select(session["plan"]["targets"][0]["shapeName"])
+        with pytest.raises(driver.ControlNotFound) as raised:
+            driver.press_path(
+                fake, [planner.ANIMATIONS_TAB, "Entrance Effects", "No Such Tile"], timeout=2.0
+            )
+        assert "paged" in str(raised.value)
+        assert len(fake.scrolls) <= 2 * driver.MAX_GALLERY_PAGES
+        assert driver.MAX_GALLERY_PAGES == 8
+
+    def test_an_ampersand_is_dropped_from_the_live_title_and_tried_that_way(self):
+        """``Grow & Turn`` is published as ``Grow  Turn``, with the spaces kept.
+
+        Measured on the live gallery, which lists ``Grow  Turn`` and ``Shrink  Turn``.
+        Two targets were reported absent for this and nothing else. The exact title is
+        still tried first, so a gallery that does publish the ampersand is matched on it.
+        """
+        assert driver.title_variants("Grow & Turn") == ("Grow & Turn", "Grow  Turn")
+        assert driver.title_variants("Shrink & Turn", ("Shrink Turn",)) == (
+            "Shrink & Turn",
+            "Shrink Turn",
+            "Shrink  Turn",
+        )
+        assert driver.title_variants("Fly In") == ("Fly In",), "no variant where none is needed"
+        assert driver.title_variants("Grow & Turn", ("Grow  Turn",)) == (
+            "Grow & Turn",
+            "Grow  Turn",
+        ), "a variant that is already an alternative is not repeated"
+
     def test_an_alternative_title_is_tried_and_recorded(self, session):
         session["fake"].select(session["plan"]["targets"][0]["shapeName"])
-        session["fake"].tiles = ("Grow Turn",)
+        session["fake"].tile_pages = (("Grow Turn",),)
         result = driver.press_path(
             session["fake"],
             [planner.ANIMATIONS_TAB, "Entrance Effects", "Grow & Turn"],
