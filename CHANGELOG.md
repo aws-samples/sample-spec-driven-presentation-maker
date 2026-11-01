@@ -91,6 +91,13 @@ Entries before v0.5.0 were written retroactively as summaries.
   local server answered with 404, and every new deck sent a `PATCH` the local server does not
   have (405). The deck folder is no longer taken for a deck, and Local mode skips the `PATCH`
   (it already links the chat session to the deck on its own). (#480)
+- **Cloud `read_attachment` works again.** Since 2026-10-08 every call failed with
+  `validation error for read_attachmentOutput — Input should be a valid string`: the remote
+  server declared the tool as returning a string while it returns the result object, and the
+  MCP output check rejected it. Agents fell back to `import_attachment`, so attachments still
+  arrived, but without the paged read first. The tool now returns the same object as the
+  local server, and a test checks every remote tool's declared return type against what it
+  returns.
 
 ### Security
 
