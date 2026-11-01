@@ -17,7 +17,7 @@ import { useEffect, useState, useCallback, useRef } from "react"
 import { IS_LOCAL } from "@/lib/mode"
 import {
   listDecks, DeckSummary,
-  listPublicDecks, listSharedDecks, listFavorites,
+  listPublicDecks, listFavorites,
   updateVisibility, deleteDeck, toggleFavorite,
   searchSlides, SlideSearchResult,
 } from "@/services/deckService"
@@ -43,10 +43,9 @@ export function useDeckList(
 ) {
   const [decks, setDecks] = useState<DeckSummary[]>([])
   const [publicDecks, setPublicDecks] = useState<DeckSummary[]>([])
-  const [sharedDecks, setSharedDecks] = useState<DeckSummary[]>([])
   const [favoriteDecks, setFavoriteDecks] = useState<DeckSummary[]>([])
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
-  const [activeListTab, setActiveListTab] = useState<"mine" | "favorites" | "public" | "shared">("mine")
+  const [activeListTab, setActiveListTab] = useState<"mine" | "favorites" | "public">("mine")
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [deleteTarget, setDeleteTarget] = useState<DeckSummary | null>(null)
@@ -69,10 +68,9 @@ export function useDeckList(
 
     async function load() {
       try {
-        const [myData, pubDecks, shDecks, favDecks] = await Promise.all([
+        const [myData, pubDecks, favDecks] = await Promise.all([
           listDecks(idToken!),
           listPublicDecks(idToken!),
-          listSharedDecks(idToken!),
           listFavorites(idToken!),
         ])
         // Merge: preserve existing thumbnailUrl if deckId matches to avoid image flicker
@@ -89,7 +87,6 @@ export function useDeckList(
         listFetchedAt.current = Date.now()
         setFavoriteIds(new Set(myData.favoriteIds))
         setPublicDecks(pubDecks)
-        setSharedDecks(shDecks)
         setFavoriteDecks(favDecks)
       } catch (err) {
         if (!initialLoadDone.current) {
@@ -123,7 +120,7 @@ export function useDeckList(
   }, [searchQuery, idToken])
 
   /** Re-sign HTML thumbnails before they expire (cloud; only while any are listed). */
-  const listHasHtml = [decks, publicDecks, sharedDecks, favoriteDecks]
+  const listHasHtml = [decks, publicDecks, favoriteDecks]
     .some((list) => list.some((d) => isHtmlPreview(d.thumbnailUrl)))
   const searchHasHtml = searchResults.some((r) => isHtmlPreview(r.previewUrl))
   useEffect(() => {
@@ -260,8 +257,7 @@ export function useDeckList(
   /** Decks for the currently active list tab. */
   const tabDecks = activeListTab === "mine" ? decks
     : activeListTab === "favorites" ? favoriteDecks
-    : activeListTab === "public" ? publicDecks
-    : sharedDecks
+    : publicDecks
 
   return {
     decks, tabDecks, favoriteIds, activeListTab, setActiveListTab,

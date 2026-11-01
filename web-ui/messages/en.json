@@ -32,7 +32,6 @@
     "tabs": {
       "mine": "My Decks",
       "favorites": "Favorites",
-      "shared": "Shared",
       "public": "Internal"
     },
     "emptyMineTitle": "No decks yet",
@@ -72,31 +71,18 @@
     "downloadPptx": "Download PPTX",
     "makePrivate": "Make Private",
     "makeInternal": "Make Internal",
-    "share": "Share",
     "delete": "Delete",
     "previewAlt": "Preview of {name}",
     "internal": "Internal",
     "private": "Private",
     "selectDeck": "Select {name}"
   },
-  "workspace": {
-    "slideCount": "{count, plural, one {# slide} other {# slides}}",
-    "lastEdited": "Last edited {date}",
-    "share": "Share",
-    "slideAlt": "Slide {number}",
-    "noSlides": "No slides yet. Use the chat to create slides."
-  },
   "deckActions": {
     "internal": "Internal",
     "private": "Private",
     "share": "Share",
     "shareInternallyTitle": "Share internally?",
-    "shareInternallyDescription": "This deck will be discoverable by everyone in the organization.",
-    "shareThisDeck": "Share this deck",
-    "searchByAlias": "Search by alias…",
-    "collaborators": "Collaborators",
-    "removeCollaborator": "Remove {name}",
-    "noCollaborators": "No collaborators yet"
+    "shareInternallyDescription": "This deck will be discoverable by everyone in the organization."
   },
   "search": {
     "searching": "Searching slides across the organization…",
@@ -265,8 +251,6 @@
     "placeholderMobile": "Ask anything…",
     "placeholderDesktop": "Ask anything…  / template · style  ⌘↵ send",
     "forceStop": "Force stop — partial report may be lost",
-    "mentionSuggestions": "Mention suggestions",
-    "errorSwitchModel": "Failed to switch model",
     "slidePreview": "Slide preview",
     "options": "Options",
     "fetchWebImages": "Fetch web images",

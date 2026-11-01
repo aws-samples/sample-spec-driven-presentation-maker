@@ -63,8 +63,11 @@ export class AgentStack extends cdk.Stack {
     super(scope, id, props);
 
     // --- Docker image ---
+    // Root context: the image installs from the workspace uv.lock. The root
+    // .dockerignore (allowlist) keeps the context to what agent/Dockerfile COPYs.
     const image = new ecr_assets.DockerImageAsset(this, "AgentImage", {
-      directory: path.join(__dirname, "../../agent"),
+      directory: path.join(__dirname, "../.."),
+      file: "agent/Dockerfile",
       platform: ecr_assets.Platform.LINUX_ARM64,
     });
 

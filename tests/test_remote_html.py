@@ -864,25 +864,94 @@ def test_remote_tool_count_unchanged():
 # --- container image -----------------------------------------------------------------
 
 
+def _dockerignore_excludes(rel: str) -> bool:
+    """Whether the root .dockerignore keeps ``rel`` out of the build context.
+
+    Docker semantics: a pattern matches the path or any of its parent directories,
+    ``*`` / ``?`` stay within one path segment, ``**`` spans segments, and the last
+    matching pattern wins (``!`` re-includes).
+    """
+    def regex(pattern: str) -> re.Pattern[str]:
+        out, i = "", 0
+        while i < len(pattern):
+            if pattern.startswith("**/", i):
+                out, i = out + "(?:.*/)?", i + 3
+            elif pattern.startswith("**", i):
+                out, i = out + ".*", i + 2
+            elif pattern[i] == "*":
+                out, i = out + "[^/]*", i + 1
+            elif pattern[i] == "?":
+                out, i = out + "[^/]", i + 1
+            else:
+                out, i = out + re.escape(pattern[i]), i + 1
+        return re.compile(out + r"\Z")
+
+    parts = rel.split("/")
+    candidates = ["/".join(parts[:i]) for i in range(1, len(parts) + 1)]
+    excluded = False
+    for line in (_ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#"):
+            continue
+        negated = line.startswith("!")
+        pattern = regex(line.lstrip("!").strip("/"))
+        if any(pattern.match(c) for c in candidates):
+            excluded = not negated
+    return excluded
+
+
+def _copy_sources(dockerfile: str) -> list[str]:
+    """Context paths a Dockerfile COPYs (``COPY --from=…`` copies from an image, not the context)."""
+    text = (_ROOT / dockerfile).read_text(encoding="utf-8").replace("\\\n", " ")
+    sources = []
+    for line in re.findall(r"^COPY\s+(?!--from=)(.+)$", text, flags=re.MULTILINE):
+        sources += line.split()[:-1]
+    return sources
+
+
+@pytest.mark.parametrize("dockerfile", ["servers/remote/Dockerfile", "agent/Dockerfile"])
+def test_runtime_image_context_holds_every_copy_source(dockerfile):
+    """Both images build from the repo root through one allowlist .dockerignore; every
+    file a Dockerfile COPYs, and the Dockerfile itself (CDK stages the context through
+    the same file), is in the context."""
+    for source in [*_copy_sources(dockerfile), dockerfile]:
+        paths = [source] if (_ROOT / source).is_file() else [
+            str(p.relative_to(_ROOT)) for p in (_ROOT / source).rglob("*")
+            if p.is_file() and "__pycache__" not in p.parts]
+        assert paths, f"{dockerfile}: COPY source {source} does not exist"
+        for path in paths:
+            assert not _dockerignore_excludes(path), f"{dockerfile}: .dockerignore excludes {path}"
+
+
+def test_runtime_image_context_leaves_out_the_rest():
+    """The allowlist keeps everything else out of both images' context (and asset hash)."""
+    for path in ("web-ui/package.json", "tests/test_remote_html.py", "docs/en/architecture.md",
+                 "servers/local/server.py", "sdpm/scripts/download_aws_icons.py", ".venv/bin/python",
+                 "sdpm/sdpm/__pycache__/x.pyc", "infra/package.json"):
+        assert _dockerignore_excludes(path), path
+
+
 def test_runtime_image_copies_bundled_html_data():
     """The remote image ships every bundled-data dir the HTML engine reads (SDPM_SKILL_ROOT).
 
     reveal.js under sdpm/vendor/ is inlined into every HTML deck; without it in the
     image, generate_pptx fails for every HTML deck on the deployed server.
     """
-    dockerfile = (_ROOT / "servers" / "remote" / "Dockerfile").read_text(encoding="utf-8")
-    copies = set(re.findall(r"^COPY\s+(\S+)", dockerfile, flags=re.MULTILINE))
+    copies = set(_copy_sources("servers/remote/Dockerfile"))
     for data_dir in ("sdpm/references/", "sdpm/templates/", "sdpm/vendor/"):
         assert data_dir in copies, data_dir
-    ignored = (_ROOT / ".dockerignore").read_text(encoding="utf-8").split()
-    assert not any(entry.rstrip("/") in ("sdpm/vendor", "sdpm") for entry in ignored)
 
 
-def test_runtime_image_pins_websockets():
-    """The browser check's only new dependency is pinned for the runtime image, and the
-    image no longer turns the check off (AgentCore Browser runs it)."""
-    constraints = (_ROOT / "servers" / "remote" / "constraints.txt").read_text(encoding="utf-8")
-    assert re.search(r"^websockets==\d+", constraints, flags=re.MULTILINE)
+def test_runtime_image_locks_websockets():
+    """The browser check's only new dependency reaches the runtime image through the
+    workspace lock, and the image no longer turns the check off (AgentCore Browser runs it)."""
+    import tomllib
+
+    lock = tomllib.loads((_ROOT / "uv.lock").read_text(encoding="utf-8"))
+    packages = {p["name"]: p for p in lock["package"]}
+    assert "websockets" in packages
+    assert "websockets" in {d["name"] for d in packages["sdpm-skill"]["dependencies"]}
+    assert "sdpm-skill" in {d["name"] for d in packages["sdpm-mcp-server"]["dependencies"]}
     dockerfile = (_ROOT / "servers" / "remote" / "Dockerfile").read_text(encoding="utf-8")
     # Neither the new switch (SDPM_BROWSER) nor the removed phase-3 one may be set.
     assert not re.search(r"^ENV\s+SDPM_(BROWSER|JS_CHECK)\b", dockerfile, flags=re.MULTILINE)
@@ -891,22 +960,13 @@ def test_runtime_image_pins_websockets():
 def test_runtime_image_ships_vendored_libraries():
     """Every vendored file the HTML engine inlines (reveal.js, ECharts, D3 and their
     license files) exists and no .dockerignore entry keeps it out of the image."""
-    import fnmatch
-
     from sdpm.engine.html.slide_js import LIBRARIES
 
     files = [path for paths in LIBRARIES.values() for path in paths]
     files += ["revealjs/reveal.js", "revealjs/reveal.css", "revealjs/reset.css",
               "revealjs/plugin/notes.js", "revealjs/LICENSE", "revealjs/VERSION",
               "echarts/VERSION", "d3/VERSION"]
-    entries = [line.strip().rstrip("/") for line in
-               (_ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
-               if line.strip() and not line.lstrip().startswith("#")]
     for name in files:
         rel = f"sdpm/vendor/{name}"
         assert (_ROOT / rel).is_file(), rel
-        parts = rel.split("/")
-        candidates = ["/".join(parts[:i]) for i in range(1, len(parts) + 1)]
-        for entry in entries:
-            matched = [c for c in candidates if fnmatch.fnmatch(c, entry)]
-            assert not matched, f".dockerignore entry {entry!r} excludes {matched[0]}"
+        assert not _dockerignore_excludes(rel), f".dockerignore excludes {rel}"

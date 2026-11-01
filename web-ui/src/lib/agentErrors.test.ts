@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import { describe, it, expect } from "vitest"
-import { classifyAgentError, agentErrorMessage, isRetryableAgentError } from "./agentErrors"
+import { classifyAgentError, agentErrorMessage } from "./agentErrors"
 
 describe("classifyAgentError", () => {
   it.each([
@@ -37,17 +37,5 @@ describe("agentErrorMessage", () => {
 
   it("ignores unknown codes and falls back to classification", () => {
     expect(agentErrorMessage("timed out waiting", "future_code")).toMatch(/took too long/)
-  })
-})
-
-describe("isRetryableAgentError", () => {
-  it("marks throttling and timeouts retryable", () => {
-    expect(isRetryableAgentError("", "throttled")).toBe(true)
-    expect(isRetryableAgentError("timed out")).toBe(true)
-  })
-
-  it("marks auth and conversation-limit not retryable", () => {
-    expect(isRetryableAgentError("", "auth")).toBe(false)
-    expect(isRetryableAgentError("Too much media")).toBe(false)
   })
 })

@@ -85,9 +85,9 @@ HTML decks (`deck.json` `outputFormat: "html"`) use the same tools with these di
 | `get_preview` | Returns the PNGs the browser check made (`html/{deckId}/png/{slug}_{epoch}.png`); a slug without one gets a text line |
 
 The remote build reads and updates the deck record under the caller's user id, as the PPTX
-build does. Only the deck owner's `run_python` / `generate_pptx` therefore rebuild an HTML
-deck on S3; a collaborator's run reports `html_error` (`generate_pptx` returns an error)
-and the published HTML stays as the owner last built it.
+build does. `run_python` / `generate_pptx` need the owner role (see
+[Authorization](#authorization-role-based-access-control)), so only the deck owner rebuilds an
+HTML deck on S3.
 ### Storage
 
 ```
@@ -134,7 +134,7 @@ includes/           — code block JSON files
 - JWT Bearer authentication via Amazon Bedrock AgentCore Runtime's `customJwtAuthorizer`
 - Default is Amazon Cognito User Pool; supports any OIDC-compliant IdP
 - User identity: JWT `sub` claim propagated through the entire stack
-- Authorization: role-based per deck (owner / collaborator / viewer)
+- Authorization: role-based per deck (owner / viewer)
 
 ### Preview Generation
 
@@ -303,22 +303,21 @@ Access is controlled per deck (presentation).
 
 ```
 1. Is the user the deck creator?     → owner
-2. Is there a sharing record?        → collaborator
-3. Is the deck set to public?        → viewer
-4. None of the above                 → none (access denied)
+2. Is the deck set to public?        → viewer
+3. None of the above                 → none (access denied)
 ```
 
 #### Permission Matrix
 
-| Action | owner | collaborator | viewer | none |
-|---|:---:|:---:|:---:|:---:|
-| read (view deck info) | ✅ | ✅ | ✅ | — |
-| preview (get preview images) | ✅ | ✅ | ✅ | — |
-| edit_slide (edit slides) | ✅ | ✅ | — | — |
-| generate_pptx (generate PPTX) | ✅ | ✅ | — | — |
-| update (update deck info) | ✅ | — | — | — |
-| delete_deck (delete deck) | ✅ | — | — | — |
-| change_visibility (change public setting) | ✅ | — | — | — |
+| Action | owner | viewer | none |
+|---|:---:|:---:|:---:|
+| read (view deck info) | ✅ | ✅ | — |
+| preview (get preview images) | ✅ | ✅ | — |
+| edit_slide (edit slides) | ✅ | — | — |
+| generate_pptx (generate PPTX) | ✅ | — | — |
+| update (update deck info) | ✅ | — | — |
+| delete_deck (delete deck) | ✅ | — | — |
+| change_visibility (change public setting) | ✅ | — | — |
 
 Authorization logic is centralized in `shared/authz.py`, used by both the API and MCP Server.
 To add custom roles (e.g., team-based access), modify the `resolve_role` function.

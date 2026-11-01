@@ -158,8 +158,8 @@ buttons:
 - **PDF** opens the print view in a new tab; print it from the browser to save a PDF.
 - **HTML** (download icon) saves the single `output.html`, which works offline.
 
-Sharing and public decks work as for PPTX decks: anyone who can view the deck can present
-and download it. In the local Web UI the header has one **Open** button, which opens
+Public decks work as for PPTX decks: anyone who can view the deck can present and download
+it. In the local Web UI the header has one **Open** button, which opens
 `output.html` in your default browser.
 
 ## Your browser (Web UI)
@@ -168,6 +168,13 @@ and download it. In the local Web UI the header has one **Open** button, which o
 Kiro CLI over ACP — and opens it. Run `kiro-cli login` once before the first use. The
 installer also creates a desktop shortcut. An MCP-only install adds the Web UI later with
 `sdpm update --with-webui`. Details: [Web UI Local mode](../../web-ui/README.md#local-mode).
+
+To ask for changes on specific parts of a slide, turn on the **Comment** tool in the preview
+header (or press `C`). Drag to outline an area, or click to place a frame, then write a comment
+for it; type `@` to reference another frame (frames are named A, B, …). The frames collect
+above the chat input, and **Request changes** sends them all as one change request together
+with whatever you typed in the chat input. The Comment tool is available on desktop only, in
+Local mode and on the AWS stack.
 
 ## AWS deployment
 
@@ -187,7 +194,6 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
 cd sample-spec-driven-presentation-maker
 uv sync
-(cd servers/local && uv sync)
 uv run python3 sdpm/scripts/download_aws_icons.py
 uv run python3 sdpm/scripts/download_material_icons.py
 make smoke        # tools/list + start_presentation against the local server

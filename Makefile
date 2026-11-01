@@ -3,13 +3,13 @@
 all: lint test
 
 lint:
-	ruff check sdpm/ servers/ shared/ api/ agent/
+	uv run ruff check sdpm/ servers/ shared/ api/ agent/
 
 format:
-	ruff format sdpm/ servers/ shared/ api/ agent/
+	uv run ruff format sdpm/ servers/ shared/ api/ agent/
 
 test:
-	python -m pytest tests/ -v
+	uv run pytest tests/ -v
 
 check: lint test
 	@echo "All checks passed"
@@ -32,13 +32,8 @@ register-dev:
 mcp-config-dev:
 	uv run --directory servers/local python client_config.py --checkout "$(CURDIR)" --agent-name $(AGENT) print --all
 
-# Regenerate container dependency locks (agent + servers/remote).
-# Both images build for linux/arm64 + Python 3.13 (AgentCore Runtime).
+# Re-resolve the workspace lock (uv.lock) after editing any member's pyproject.toml.
+# One universal lock covers every surface: servers/local on any OS, both runtime images
+# (linux/arm64, Python 3.13) and the API Lambda (x86_64, Python 3.13).
 lock:
-	uv pip compile agent/requirements.txt \
-		--python-version 3.13 --python-platform aarch64-unknown-linux-gnu \
-		--no-header -o agent/requirements.lock
-	uv pip compile servers/remote/pyproject.toml \
-		--python-version 3.13 --python-platform aarch64-unknown-linux-gnu \
-		--no-header --no-emit-package sdpm-skill \
-		-o servers/remote/constraints.txt
+	uv lock

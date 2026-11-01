@@ -30,21 +30,14 @@ class TestResolveRole:
         role, deck = resolve_role(user_id="u1", deck_id="d1", table=mock_table)
         assert role == "none"
 
-    def test_collaborator(self, mock_table):
-        """Collaborator check: SHARED#{user_id}/DECK#{deck_id} exists."""
-        def get_item_side_effect(Key):
-            if Key["PK"] == "USER#u2":
-                return {}  # Not owner
-            if Key["PK"] == "SHARED#u2":
-                return {"Item": {"PK": "SHARED#u2", "SK": "DECK#d1", "ownerUserId": "u1"}}
-            if Key["PK"] == "USER#u1":
-                return {"Item": {"PK": "USER#u1", "SK": "DECK#d1", "name": "Test"}}
-            return {}
-
-        mock_table.get_item.side_effect = get_item_side_effect
+    def test_public_deck_resolves_viewer(self, mock_table):
+        """A non-owner of a public deck is a viewer; only the owner key is looked up."""
+        mock_table.get_item.return_value = {}
+        mock_table.query.return_value = {"Items": [{"PK": "USER#u1", "SK": "DECK#d1", "name": "Test"}]}
         role, deck = resolve_role(user_id="u2", deck_id="d1", table=mock_table)
-        assert role == "collaborator"
+        assert role == "viewer"
         assert deck["name"] == "Test"
+        mock_table.get_item.assert_called_once_with(Key={"PK": "USER#u2", "SK": "DECK#d1"})
 
     def test_no_access(self, mock_table):
         """No access when no records match."""
@@ -67,8 +60,12 @@ class TestCheckPermission:
     def test_viewer_can_read(self):
         assert check_permission(role="viewer", action="read") is True
 
-    def test_collaborator_can_edit(self):
-        assert check_permission(role="collaborator", action="edit_slide") is True
+    @pytest.mark.parametrize("action", ["edit_slide", "generate_pptx", "update", "delete_deck", "change_visibility"])
+    def test_viewer_cannot_write(self, action):
+        assert check_permission(role="viewer", action=action) is False
+
+    def test_collaborator_role_is_gone(self):
+        assert check_permission(role="collaborator", action="read") is False
 
     def test_unknown_action_raises(self):
         with pytest.raises(ValueError, match="Unknown action"):
@@ -92,6 +89,23 @@ class TestAuthorize:
         decision = authorize(user_id="u2", deck_id="d1", action="delete_deck", table=mock_table)
         assert decision.allowed is False
         assert decision.role == "none"
+
+    def test_non_owner_can_read_public_deck(self, mock_table):
+        """A public deck is readable by a non-owner."""
+        mock_table.get_item.return_value = {}
+        mock_table.query.return_value = {"Items": [{"PK": "USER#u1", "SK": "DECK#d1"}]}
+        decision = authorize(user_id="u2", deck_id="d1", action="read", table=mock_table)
+        assert decision.allowed is True
+        assert decision.role == "viewer"
+
+    def test_non_owner_cannot_read_private_deck(self, mock_table):
+        """A private deck (not in the PublicDecks GSI) is not readable by a non-owner."""
+        mock_table.get_item.return_value = {}
+        mock_table.query.return_value = {"Items": []}
+        decision = authorize(user_id="u2", deck_id="d1", action="read", table=mock_table)
+        assert decision.allowed is False
+        assert decision.role == "none"
+        assert decision.deck is None
 
     def test_viewer_can_preview(self, mock_table):
         """Viewer (public deck) can preview."""

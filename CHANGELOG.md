@@ -37,7 +37,60 @@ Entries before v0.5.0 were written retroactively as summaries.
   agent see the same layout. New API route `POST /decks/{id}/reviews` (edit permission,
   validated frames, slugs and sizes) with a matching local route; the message and guide texts
   live once in `shared/review_template.json`. `get_deck` now returns `slideSize` for PPTX
-  decks too, and the cloud sandbox syncs `reviews/`.
+  decks too, and the cloud sandbox syncs `reviews/`. (#473)
+
+### Changed
+
+- **One Python lock for everything.** The repository root is now a uv workspace (`sdpm`,
+  `servers/local`, `servers/remote`, `agent`, `api`) with a single `uv.lock`. The MCP Runtime
+  and Agent Runtime images and the API Lambda bundle install exactly the locked versions,
+  hash-checked, and never resolve dependencies at build time. The tests run against the same
+  lock. Removed: `sdpm/uv.lock`, `servers/local/uv.lock`, `servers/remote/constraints.txt`,
+  `agent/requirements.txt`, `agent/requirements.lock`, `api/requirements.txt`. To change a
+  dependency, edit the member's `pyproject.toml` and run `make lock` (`uv lock`). (#475)
+  - **Local installs:** `sdpm update` keeps working unchanged. The MCP server's environment
+    moves from `~/.sdpm/checkout/servers/local/.venv` to `~/.sdpm/checkout/.venv`. You can
+    delete the old `servers/local/.venv` and `sdpm/.venv` directories in the checkout.
+  - **AWS deploys:** the Agent Runtime image now builds from the repository root (both images
+    share the root `.dockerignore`, now an allowlist). The API Lambda bundle targets
+    `manylinux_2_34` (the python3.13 runtime's Amazon Linux 2023) and is built by
+    `scripts/bundle_api_lambda.sh`.
+- **CI builds and starts what a deploy ships.** Both runtime images are built on linux/arm64
+  and started (MCP `initialize` + `tools/list`, Agent `/ping`), and the API Lambda bundle is
+  imported in the Lambda runtime image. This replaces the `container-deps` dry runs. The
+  Python tests run on 3.13, the version the images ship, and the local smoke test runs on
+  3.11, the oldest supported version, with only the local server's dependencies. (#474)
+- **Dependabot's minor and patch updates for uv and GitHub Actions merge on their own** once
+  the required CI checks pass (`.github/workflows/dependabot-auto-merge.yml`). Major updates
+  and npm updates (`web-ui`, `infra`) are still merged by hand. (#476)
+- **Upload conversion moved into the core.** The PDF / DOCX / XLSX / PPTX conversion of
+  attachments now lives in `sdpm.tools.attachment.ingest` (formerly `shared.ingest`), so
+  `sdpm-skill` now depends on `pypdf>=6.15.0`, `pdfplumber`, `python-docx` and `openpyxl`.
+  Conversion results are unchanged. (#477)
+
+### Removed
+
+- **Deck sharing with specific users and the `collaborator` role (breaking).** The Share dialog (user
+  search, collaborator list), the deck card's Share menu item and collaborator badge, and the
+  **Shared** tab of the deck list are gone, together with `GET /decks/shared` and the
+  `SHARED#` lookup in `shared/authz.py`. The feature never worked: nothing wrote `SHARED#`
+  records, and the `/decks/{id}/share` and `/users/search` routes the dialog called did not
+  exist. Deck roles are now owner / viewer / none with the permission matrix otherwise
+  unchanged. Public / private visibility stays as it is: to show a deck to others, make it
+  public (**Internal**) or download the PPTX / HTML. (#479)
+  **Migration:** use public / private visibility, or download the PPTX / HTML and send the file.
+- **Unused code.** Web UI components, helpers and dependencies that nothing called are gone,
+  together with the `include=slideJson` option of `GET /decks/{id}` (now ignored), the local
+  Web UI's `/api/agent/config` route and the API Lambda's direct document-parser
+  dependencies. The Web UI used none of them. (#478)
+
+### Fixed
+
+- **Local Web UI no longer opens the deck folder as a deck.** Starting a new chat briefly
+  switched the view to a deck named after the deck folder (`SDPM-Presentations`), which the
+  local server answered with 404, and every new deck sent a `PATCH` the local server does not
+  have (405). The deck folder is no longer taken for a deck, and Local mode skips the `PATCH`
+  (it already links the chat session to the deck on its own). (#480)
 
 ### Security
 
@@ -45,7 +98,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   `npm run dev:local`) now answers 403 when the browser's `Origin` is another site, so a page
   open in the same browser can no longer drive the local agent, upload files or change styles
   and templates through `127.0.0.1`. Requests without an `Origin` header (scripts, curl) are
-  unaffected.
+  unaffected. (#473)
 
 ## [0.11.0] - 2026-10-31
 

@@ -42,7 +42,6 @@ from sdpm.engine.layout import (  # noqa: F401
     optimize_order,
 )
 from sdpm.engine.layout.render import render_architecture
-from sdpm.engine.preview.backend import _is_wsl
 from sdpm.utils.effects import apply_effects  # noqa: F401
 from sdpm.utils.image import apply_image_effects, resolve_image_path  # noqa: F401
 from sdpm.utils.io import read_json, write_json
@@ -415,30 +414,6 @@ def cmd_guides(args):
                 print()
         except FileNotFoundError as e:
             print(f"# {e}", file=sys.stderr)
-
-
-def _get_documents_dir():
-    """Get output base directory from config, with WSL fallback."""
-    try:
-        from sdpm.config import get_output_dir
-        return get_output_dir()
-    except Exception:
-        pass
-    import subprocess
-    if _is_wsl():
-        try:
-            result = subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                ["/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe", "-Command",
-                 "[Environment]::GetFolderPath('MyDocuments')"],
-                capture_output=True, timeout=10)
-            win_path = result.stdout.decode("cp932", errors="replace").strip()
-            if win_path:
-                wsl = subprocess.run(["wslpath", win_path], capture_output=True, text=True)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                if wsl.returncode == 0:
-                    return Path(wsl.stdout.strip()) / "SDPM-Presentations"
-        except Exception:
-            pass
-    return Path.home() / "Documents" / "SDPM-Presentations"
 
 
 def cmd_init(args):

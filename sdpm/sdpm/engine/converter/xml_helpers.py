@@ -4,12 +4,8 @@
 import defusedxml
 defusedxml.defuse_stdlib()
 
-import xml.etree.ElementTree as ET
-
-
-
 from .constants import _NS, _hex, get_emu_per_px
-from .color import _resolve_scheme_color, _resolve_color_with_transforms, apply_color_transforms
+from .color import _resolve_scheme_color, _resolve_color_with_transforms
 
 
 def _sys_hex(solid):
@@ -479,59 +475,6 @@ def _extract_line_from_xml(sp_pr, theme_colors=None, color_mapping=None):
         if ln.find('a:noFill', _NS) is not None:
             result["line"] = "none"
     return result
-
-def parse_gradient_from_style(fill_style_xml, theme_colors, placeholder_color=None):
-    """Parse gradient from theme fill style XML."""
-    if not fill_style_xml:
-        return None
-    try:
-        fill_elem = ET.fromstring(fill_style_xml)
-        
-        if fill_elem.tag.endswith('gradFill'):
-            grad_fill = fill_elem
-        else:
-            grad_fill = fill_elem.find('.//a:gradFill', _NS)
-        
-        if grad_fill is None:
-            return None
-        
-        gradient = {"stops": [], "angle": 0}
-        
-        gs_lst = grad_fill.find('.//a:gsLst', _NS)
-        if gs_lst is not None:
-            for gs in gs_lst.findall('.//a:gs', _NS):
-                pos = int(gs.get('pos', 0)) / 100000.0
-                
-                color = "#000000"
-                scheme_clr = gs.find('.//a:schemeClr', _NS)
-                if scheme_clr is not None:
-                    clr_val = scheme_clr.get('val')
-                    if clr_val == 'phClr':
-                        if placeholder_color and placeholder_color in theme_colors:
-                            color = theme_colors[placeholder_color]
-                        else:
-                            color = theme_colors.get('dk1', '#000000')
-                    elif clr_val in theme_colors:
-                        color = theme_colors[clr_val]
-                    
-                    transforms = {}
-                    transform_order = ['lumMod', 'lumOff', 'satMod', 'satOff', 'tint', 'shade']
-                    for tag_name in transform_order:
-                        for child in scheme_clr:
-                            tag = child.tag.split('}')[-1]
-                            if tag == tag_name:
-                                transforms[tag] = child.get('val')
-                                break
-                    
-                    if transforms:
-                        color = apply_color_transforms(color, transforms)
-                
-                gradient["stops"].append({"position": pos, "color": color})
-        
-        return gradient
-    except (ET.ParseError, Exception):
-        return None
-
 
 def _extract_visual_effects(sp_pr, theme_colors=None, color_mapping=None):
     """Extract effects + 3D from spPr. Returns merged dict."""

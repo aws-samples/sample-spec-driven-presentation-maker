@@ -10,14 +10,19 @@ permissions:
   contents: read
 
 jobs:
+  # The whole workspace (every member) on the Python the runtime images ship.
   python:
     runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.13"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.13"
       - uses: astral-sh/setup-uv@v10.3.2
+      - name: uv.lock matches every member's pyproject.toml
+        run: uv lock --check
       - name: Lint
         run: uv run ruff check sdpm/ servers/ shared/ api/ agent/
       - name: Vendored files match the manifest
@@ -28,17 +33,21 @@ jobs:
   # Local-surface guard: boots servers/local over real stdio (no mocks) and
   # exercises filesystem-anchored resolution (templates, workflows). The unit
   # suite mocks this surface, so regressions here used to slip through.
+  # Runs what an installed user gets: only the sdpm-mcp-local member's
+  # dependencies, on the oldest supported Python.
   local-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      UV_PYTHON: "3.11"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.11"
       - uses: astral-sh/setup-uv@v10.3.2
       - name: Smoke test local MCP server
-        run: uv run python scripts/smoke_local.py
+        run: uv run --package sdpm-mcp-local python scripts/smoke_local.py
 
   # The HTML browser check against a real Chrome: network block, popups, WebRTC
   # removal, layout measurement and the speaker view under the deck CSP. The
@@ -46,11 +55,13 @@ jobs:
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      UV_PYTHON: "3.13"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.13"
       - uses: astral-sh/setup-uv@v10.3.2
       - name: Allow Chrome's sandbox (Ubuntu 24.04 restricts unprivileged user namespaces)
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
@@ -137,31 +148,97 @@ jobs:
           npx cdk synth --quiet
         working-directory: infra
 
-  # Deploy-surface guard: the runtime docker builds resolve Python deps with
-  # pip against committed lockfiles. CI has no docker build, so a lockfile
-  # that pip cannot satisfy (e.g. a Dependabot bump contradicting a
-  # transitive hard pin — cachetools/protobuf under aws-opentelemetry-distro,
-  # 2026-08-02) used to surface only at deploy time. Reproduce the exact
-  # docker-side installs as dry runs here.
-  container-deps:
+  # Deploy-surface guards: build each deployed artifact the way the CDK deploy
+  # builds it (same Dockerfile / script, same context, same platform), start it
+  # and talk to it. Unsatisfiable dependency pins, missing system packages and
+  # import-time errors used to surface only at deploy time (2026-08-02
+  # cachetools/protobuf under aws-opentelemetry-distro, #271 pydantic-core).
+  # The smoke checks run inside the container (`docker exec`): no published
+  # ports, and BedrockAgentCoreApp binds to localhost outside AgentCore.
+
+  # MCP Runtime image (infra/lib/runtime-stack.ts): linux/arm64, root context.
+  remote-image:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: servers/remote/Dockerfile
+          platforms: linux/arm64
+          tags: sdpm-remote:ci
+          load: true
+          cache-from: type=gha,scope=remote-image
+          cache-to: type=gha,mode=max,scope=remote-image
+      - name: Start
+        # Placeholder AWS settings: startup only checks they are set; no AWS call
+        # happens until a tool runs.
+        run: |
+          docker run -d --name remote \
+            -e AWS_DEFAULT_REGION=us-east-1 -e AWS_ACCESS_KEY_ID=ci -e AWS_SECRET_ACCESS_KEY=ci \
+            -e DECKS_TABLE=ci -e PPTX_BUCKET=ci -e RESOURCE_BUCKET=ci \
+            -e OTEL_SDK_DISABLED=true \
+            sdpm-remote:ci
+      - name: MCP initialize + tools/list
+        run: docker exec -i remote python3.13 - mcp http://localhost:8000/mcp < scripts/ci/container_smoke.py
+      - name: LibreOffice and poppler are on PATH
+        run: docker exec remote sh -c 'command -v soffice && command -v pdftoppm'
+      - name: Container logs
+        if: always()
+        run: docker logs remote || true
+
+  # Agent Runtime image (infra/lib/agent-stack.ts): linux/arm64, root context.
+  agent-image:
+    runs-on: ubuntu-24.04-arm
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: docker/setup-buildx-action@v4
+      - name: Build
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          file: agent/Dockerfile
+          platforms: linux/arm64
+          tags: sdpm-agent:ci
+          load: true
+          cache-from: type=gha,scope=agent-image
+          cache-to: type=gha,mode=max,scope=agent-image
+      - name: Start
+        run: |
+          docker run -d --name agent \
+            -e AWS_REGION=us-east-1 -e AWS_ACCESS_KEY_ID=ci -e AWS_SECRET_ACCESS_KEY=ci \
+            -e OTEL_SDK_DISABLED=true \
+            sdpm-agent:ci
+      - name: GET /ping
+        run: docker exec -i agent python - ping http://localhost:8080/ping < scripts/ci/container_smoke.py
+      - name: Container logs
+        if: always()
+        run: docker logs agent || true
+
+  # REST API Lambda (infra/lib/web-ui-stack.ts): x86_64 wheels, Python 3.13.
+  api-lambda:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
           python-version: "3.13"
       - uses: astral-sh/setup-uv@v10.3.2
-      - name: Remote server image deps resolve (mirrors servers/remote/Dockerfile)
+      - name: Bundle
+        run: bash scripts/bundle_api_lambda.sh "$RUNNER_TEMP/api-bundle"
+      - name: Handler imports from the bundle alone, in the Lambda runtime image
+        # -I -S: no site-packages, so nothing outside the bundle can satisfy an import.
         run: |
-          uv venv /tmp/remote-check --python 3.13
-          VIRTUAL_ENV=/tmp/remote-check uv pip install --dry-run \
-            -c servers/remote/constraints.txt ./sdpm ./servers/remote
-      - name: Agent image deps resolve (mirrors agent/Dockerfile)
-        run: |
-          uv venv /tmp/agent-check --python 3.13
-          VIRTUAL_ENV=/tmp/agent-check uv pip install --dry-run \
-            -r agent/requirements.lock
+          docker run --rm --entrypoint /var/lang/bin/python3 \
+            -v "$RUNNER_TEMP/api-bundle:/var/task:ro" \
+            -e TABLE_NAME=ci -e PPTX_BUCKET=ci -e AWS_DEFAULT_REGION=us-east-1 \
+            public.ecr.aws/lambda/python:3.13 \
+            -I -S -c "import sys; sys.path.insert(0, '/var/task'); import index, sdpm.api"
 
   guard:
     runs-on: ubuntu-latest

@@ -136,8 +136,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ...(sessionOrigin ? { sessionOrigin } : {}),
     visibility: "private",
     isOwner: true,
-    collaborators: [],
-    collaboratorAliases: {},
     slideSize: readSlideSize(deckJson),
     ...(isHtml ? {
       outputFormat: "html",

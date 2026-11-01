@@ -148,7 +148,7 @@ HTML デッキのページには「HTML」バッジが付き、ページ内で�
 - **PDF**: 新しいタブで印刷画面を開きます。ブラウザから印刷して PDF に保存します。
 - **HTML**（ダウンロードアイコン）: オフラインで開ける `output.html` の 1 ファイルを保存します。
 
-共有と公開デッキは PPTX と同じように使えます。デッキを閲覧できる人は発表とダウンロードもできます。
+公開デッキは PPTX と同じように使えます。デッキを閲覧できる人は発表とダウンロードもできます。
 ローカルの Web UI では見出しのボタンは **開く** の 1 つで、既定のブラウザで `output.html` を開きます。
 
 ## ブラウザから使う（Web UI）
@@ -157,6 +157,12 @@ HTML デッキのページには「HTML」バッジが付き、ページ内で�
 Kiro CLI と ACP で話します。初回の前に `kiro-cli login` を 1 度実行してください。インストーラーは
 デスクトップショートカットも作ります。MCP のみ構成に Web UI を後から足すには
 `sdpm update --with-webui`。詳細: [Web UI ローカルモード](../../web-ui/README_ja.md#local-mode)。
+
+スライドの特定の箇所に修正を頼むには、プレビューの見出しで **コメント** ツールをオンにします（`C` キーでも可）。
+ドラッグで範囲を囲むかクリックで枠を置き、枠ごとにコメントを書きます。`@` で他の枠を参照できます（枠には
+A、B、… と名前が付きます）。枠はチャット入力欄の上にまとまり、**修正を依頼** を押すと、チャット入力欄に書いた
+メッセージと一緒にすべてを 1 つの修正依頼として送ります。コメントツールはデスクトップでのみ使えます
+（ローカルモードと AWS 構成の両方）。
 
 ## AWS にデプロイする
 
@@ -176,7 +182,6 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
 cd sample-spec-driven-presentation-maker
 uv sync
-(cd servers/local && uv sync)
 uv run python3 sdpm/scripts/download_aws_icons.py
 uv run python3 sdpm/scripts/download_material_icons.py
 make smoke        # ローカルサーバーに tools/list + start_presentation

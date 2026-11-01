@@ -32,7 +32,6 @@
     "tabs": {
       "mine": "マイデッキ",
       "favorites": "お気に入り",
-      "shared": "共有",
       "public": "社内公開"
     },
     "emptyMineTitle": "デッキはまだありません",
@@ -72,31 +71,18 @@
     "downloadPptx": "PPTX をダウンロード",
     "makePrivate": "非公開にする",
     "makeInternal": "社内公開にする",
-    "share": "共有",
     "delete": "削除",
     "previewAlt": "{name} のプレビュー",
     "internal": "社内公開",
     "private": "非公開",
     "selectDeck": "{name} を選択"
   },
-  "workspace": {
-    "slideCount": "{count, plural, other {# 枚のスライド}}",
-    "lastEdited": "最終編集 {date}",
-    "share": "共有",
-    "slideAlt": "スライド {number}",
-    "noSlides": "スライドはまだありません。チャットから作成できます。"
-  },
   "deckActions": {
     "internal": "社内公開",
     "private": "非公開",
     "share": "共有",
     "shareInternallyTitle": "社内に公開しますか?",
-    "shareInternallyDescription": "このデッキは組織内の全員が検索・閲覧できるようになります。",
-    "shareThisDeck": "このデッキを共有",
-    "searchByAlias": "エイリアスで検索…",
-    "collaborators": "共同編集者",
-    "removeCollaborator": "{name} を削除",
-    "noCollaborators": "共同編集者はまだいません"
+    "shareInternallyDescription": "このデッキは組織内の全員が検索・閲覧できるようになります。"
   },
   "search": {
     "searching": "組織全体のスライドを検索中…",
@@ -265,8 +251,6 @@
     "placeholderMobile": "なんでも聞いてください…",
     "placeholderDesktop": "なんでも聞いてください…  / でテンプレート・スタイル  ⌘↵ で送信",
     "forceStop": "強制停止 — 進行中のレポートが失われる可能性があります",
-    "mentionSuggestions": "メンション候補",
-    "errorSwitchModel": "モデルを切り替えられませんでした",
     "slidePreview": "スライドプレビュー",
     "options": "オプション",
     "fetchWebImages": "Web 画像を取得",

@@ -327,6 +327,20 @@ global_settings:
         ECR Public Gallery. This is the official Python image mirror on ECR.
       expiration: "2027-03-29"
 
+    # --- uv workspace members: dependency cooldown lives in Dependabot ---
+    # Members declare `[tool.uv] package = false` (applications, not libraries), which
+    # trips the uv cooldown rule. A uv-level `exclude-newer` applies to every resolution,
+    # including security fixes: on 2026-11-01 it would have moved pypdf back from 6.21.4
+    # to the vulnerable 6.21.2. The cooldown is enforced where it can tell the two apart:
+    # .github/dependabot.yml (cooldown 7 days for version updates; security updates skip it).
+
+    - rule_id: "package_managers.uv.uv-missing-dependency-cooldown.uv-missing-dependency-cooldown"
+      path: "**/pyproject.toml"
+      reason: >
+        Cooldown is Dependabot's (7 days, version updates only) so security fixes are
+        never held back; uv exclude-newer would block them for every resolution.
+      expiration: "2027-11-01"
+
     # --- GitHub Actions workflow_dispatch inputs ---
     # blog-draft.yml requires user-provided PR numbers to select which PRs
     # to generate a blog draft from. This is by design, not a supply chain risk.

@@ -2,19 +2,9 @@
 """Tests for agent/cost_logger.py — per-user usage attribution (issue #326)."""
 import json
 import logging
-import sys
-from types import ModuleType, SimpleNamespace
+from types import SimpleNamespace
 
-strands = ModuleType("strands")
-hooks = ModuleType("strands.hooks")
-events = ModuleType("strands.hooks.events")
-events.AfterInvocationEvent = object
-events.AfterToolCallEvent = object
-sys.modules.setdefault("strands", strands)
-sys.modules.setdefault("strands.hooks", hooks)
-sys.modules.setdefault("strands.hooks.events", events)
-
-from agent.cost_logger import log_slides_composed, log_usage  # noqa: E402
+from agent.cost_logger import log_slides_composed, log_usage
 
 
 def _event(trace_attributes: dict, usage: dict):

@@ -40,18 +40,6 @@ def deck_sk(deck_id: str) -> str:
     return f"DECK#{deck_id}"
 
 
-def shared_pk(user_id: str) -> str:
-    """Partition key for shared deck access records.
-
-    Args:
-        user_id: User identifier of the collaborator.
-
-    Returns:
-        PK string in format SHARED#{user_id}.
-    """
-    return f"SHARED#{user_id}"
-
-
 def fav_sk(deck_id: str) -> str:
     """Sort key for a favorite record.
 
@@ -64,25 +52,12 @@ def fav_sk(deck_id: str) -> str:
     return f"FAV#{deck_id}"
 
 
-def template_pk(template_id: str) -> str:
-    """Partition key for a template record.
-
-    Args:
-        template_id: Template identifier.
-
-    Returns:
-        PK string in format TEMPLATE#{template_id}.
-    """
-    return f"TEMPLATE#{template_id}"
-
-
 # ---------------------------------------------------------------------------
 # Key prefix constants (for begins_with queries)
 # ---------------------------------------------------------------------------
 
 DECK_SK_PREFIX = "DECK#"
 FAV_SK_PREFIX = "FAV#"
-TEMPLATE_PK_PREFIX = "TEMPLATE#"
 
 
 # ---------------------------------------------------------------------------
@@ -140,8 +115,8 @@ def extract_fav_id(sk: str) -> str:
 def theme_hints_ddb_item(theme_hints: dict | None) -> dict:
     """Build the DynamoDB ``themeHints`` attribute from a ConversionResult.
 
-    Tolerates ``theme_hints=None`` (shared.ingest continues with a warning
-    when theme extraction fails) so a successful conversion is never
+    Tolerates ``theme_hints=None`` (sdpm.tools.attachment.ingest continues
+    with a warning when theme extraction fails) so a successful conversion is never
     reported as failed. DynamoDB rejects native floats, so
     ``backgroundLuminance`` is round-tripped via ``str(Decimal)``.
 

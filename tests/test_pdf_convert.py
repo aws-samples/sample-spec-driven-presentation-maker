@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Tests for shared/ingest._convert_pdf image extraction.
+"""Tests for sdpm/tools/attachment/ingest._convert_pdf image extraction.
 
 Regression for the shared-resource-dict pathology: some producers (e.g.
 LibreOffice PDF export) put every image of the document into ONE resource
@@ -17,7 +17,6 @@ The converter must:
 from __future__ import annotations
 
 import io
-import sys
 from pathlib import Path
 
 import pytest
@@ -25,10 +24,7 @@ import pytest
 pytest.importorskip("pypdf", reason="PDF conversion deps not installed in this environment")
 pytest.importorskip("pdfplumber", reason="PDF conversion deps not installed in this environment")
 
-_REPO_ROOT = Path(__file__).resolve().parent.parent
-sys.path.insert(0, str(_REPO_ROOT))
-
-from shared.ingest import convert_file  # noqa: E402
+from sdpm.tools.attachment.ingest import convert_file  # noqa: E402
 
 
 def _jpeg_bytes(color: tuple[int, int, int]) -> bytes:

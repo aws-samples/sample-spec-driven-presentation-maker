@@ -9,9 +9,8 @@ Used by both api/ and servers/remote/ for Deck-level authorization.
 
 Role resolution order:
   1. USER#{user_id} + DECK#{deck_id} exists → owner
-  2. SHARED#{user_id} + DECK#{deck_id} exists → collaborator
-  3. Deck visibility=public → viewer
-  4. None of the above → none (access denied)
+  2. Deck visibility=public → viewer
+  3. None of the above → none (access denied)
 
 Permission matrix: action × role determines allowed/denied.
 
@@ -27,7 +26,6 @@ from typing import Any, Dict, Optional, Set
 from shared.schema import (
     deck_pk,
     deck_sk,
-    shared_pk,
     GSI_PUBLIC_DECKS,
     public_gsi1pk,
 )
@@ -39,7 +37,7 @@ class AccessDecision:
 
     Attributes:
         allowed: Whether the action is permitted.
-        role: Resolved role — "owner", "collaborator", "viewer", or "none".
+        role: Resolved role — "owner", "viewer", or "none".
         deck: The Deck DynamoDB record if access is granted, None otherwise.
         reason: Human-readable denial reason when allowed=False.
     """
@@ -53,12 +51,12 @@ class AccessDecision:
 # action → set of roles that can perform it
 DEFAULT_PERMISSIONS: Dict[str, Set[str]] = {
     # Read operations
-    "read": {"owner", "collaborator", "viewer"},
-    "preview": {"owner", "collaborator", "viewer"},
+    "read": {"owner", "viewer"},
+    "preview": {"owner", "viewer"},
     # Write operations
-    "edit_slide": {"owner", "collaborator"},
+    "edit_slide": {"owner"},
     # Generation
-    "generate_pptx": {"owner", "collaborator"},
+    "generate_pptx": {"owner"},
     # Deck management
     "update": {"owner"},
     "delete_deck": {"owner"},
@@ -73,7 +71,7 @@ def resolve_role(
 ) -> tuple[str, Optional[Dict[str, Any]]]:
     """Resolve the user's role for a given Deck.
 
-    Queries DynamoDB to determine ownership, shared access, or public visibility.
+    Queries DynamoDB to determine ownership or public visibility.
     This is the single function to modify for custom role resolution
     (e.g. team-based access, external IdP groups).
 
@@ -83,8 +81,8 @@ def resolve_role(
         table: boto3 DynamoDB Table resource.
 
     Returns:
-        Tuple of (role, deck_record). role is one of "owner", "collaborator",
-        "viewer", "none". deck_record is the DDB item or None.
+        Tuple of (role, deck_record). role is one of "owner", "viewer", "none".
+        deck_record is the DDB item or None.
     """
     # 1. Owner check
     resp = table.get_item(Key={"PK": deck_pk(user_id), "SK": deck_sk(deck_id)})
@@ -92,21 +90,7 @@ def resolve_role(
     if deck and "deletedAt" not in deck:
         return "owner", deck
 
-    # 2. Collaborator check
-    shared = table.get_item(
-        Key={"PK": shared_pk(user_id), "SK": deck_sk(deck_id)}
-    ).get("Item")
-    if shared:
-        owner_id = shared.get("ownerUserId")
-        if owner_id:
-            owner_resp = table.get_item(
-                Key={"PK": deck_pk(owner_id), "SK": deck_sk(deck_id)}
-            )
-            deck = owner_resp.get("Item")
-            if deck and "deletedAt" not in deck:
-                return "collaborator", deck
-
-    # 3. Public viewer check (GSI query)
+    # 2. Public viewer check (GSI query)
     from boto3.dynamodb.conditions import Key
 
     gsi_resp = table.query(
@@ -119,7 +103,7 @@ def resolve_role(
     if items:
         return "viewer", items[0]
 
-    # 4. No access
+    # 3. No access
     return "none", None
 
 

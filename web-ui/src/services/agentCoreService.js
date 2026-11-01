@@ -287,31 +287,3 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
 
   return completion;
 }
-
-/**
- * Reconnect to a running background session using EventSource.
- * Supports Last-Event-ID for seamless resume after disconnect.
- * Returns a cleanup function, or null if no session is running.
- */
-export const reconnectLocalSession = (sessionId, onStreamUpdate, onToolUse) => {
-  if (!IS_LOCAL) return null;
-
-  const url = `/api/agent/stream?sessionId=${encodeURIComponent(sessionId)}`;
-  const es = new EventSource(url);
-  let completion = '';
-  if (parser.resetParserState) parser.resetParserState();
-
-  es.onmessage = (event) => {
-    const line = `data: ${event.data}`;
-    completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
-  };
-
-  es.onerror = () => {
-    // EventSource auto-reconnects with Last-Event-ID
-    // If server returns non-SSE (session ended), close
-    es.close();
-  };
-
-  // Return cleanup function
-  return () => es.close();
-};
