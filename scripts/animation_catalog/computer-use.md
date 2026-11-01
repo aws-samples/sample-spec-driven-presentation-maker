@@ -665,18 +665,101 @@ Automation permission: it applies a named `MsoAnimEffect` constant and reads bac
 the saved `presetID`. Use Computer Use only to confirm that the resulting
 Animation Pane entry shows the expected gallery name.
 
-## Step 8 — Direction codes (`presetSubtype`)
+## Step 8 — Effect options, directions included — **MEASURED**
 
-Every `MsoAnimDirection` candidate is `semanticPreservationOnly`: the available
-evidence binds `presetSubtype` codes to gallery tiles, not to direction names
-(see `provenance.presetSubtypeEvidence`).
+This step asked for the `direction name → presetSubtype` table. The capture
+that answered it covers more than direction: **133 values across 6 settings**
+(Direction 87, Amount 12, Zoom 12, Spokes 10, Shapes 8, Vanishing Point 4) on
+33 of the 95 gallery tiles — the other 62 tiles expose only `Sequence`, which
+is the text-unit setting and already writable.
 
-For each effect that offers directions — Fly In, Peek In, Wipe, Blinds,
-Checkerboard, Random Bars, Split, Strips, Wheel, Shape, Zoom, Swivel, Stretch —
-apply every entry in **Effect Options ▸ Direction**, one per slide, and record
-`p:cTn/@presetSubtype` plus the `p:animEffect/@filter` argument. Build the
-`direction name → presetSubtype` table from the result, then set
-`ooxml.presetSubtype` on the matching candidates.
+Evidence: `effect-options-capture-2026-11-02/merged-effect-options.json`,
+merged from one full pass plus five targeted re-measurements by
+`effect_options_merge.py`. Reproduce with `discover_effect_options.py` →
+`effect_options_plan.py` → `gui_capture.py` → `effect_options_resolve.py` →
+`effect_options_merge.py --check`.
+
+### The setting is not always in `presetSubtype`
+
+The step assumed a subtype code per direction name. That is wrong for 7 of the
+35 (effect, setting) groups, where **`presetSubtype` does not move at all** and
+the setting lives entirely in the behaviour payload:
+
+| Group | What carries the value |
+| --- | --- |
+| `emphasis.spin` Direction | sign of `p:animRot/@by` (±21600000) |
+| `emphasis.spin` Amount | magnitude of `p:animRot/@by` (5400000 / 10800000 / 21600000 / 43200000) |
+| `emphasis.growShrink` Direction | `p:animScale/p:by` x vs y (150000/100000) |
+| `emphasis.growShrink` Amount | `p:animScale/p:by` x=y (25000 / 50000 / 150000 / 400000) |
+| `emphasis.transparency` Amount | `p:animEffect/@prLst` `opacity: 1 − amount` |
+| `entrance.floatIn` / `exit.floatOut` Direction | keyframe sign in `p:anim` |
+| `entrance.shape` / `exit.shape` Shapes | `p:animEffect/@filter` |
+
+In the remaining 28 groups the subtype and the behaviours **both** vary. No
+group varies the subtype alone, so the behaviour payload is always the ground
+truth and a variant cannot be expressed as a subtype number.
+
+Direction numbering, where it is used, is shared across effects: From Top 1,
+From Right 2, From Top-Right 3, From Bottom 4, From Bottom-Right 6, From Left
+8, From Top-Left 9, From Bottom-Left 12, Across 10.
+
+### The press inside `Effect Options` is intermittent
+
+An `AXPress` on a value inside the `Effect Options` window reaches the control
+and PowerPoint does not always act on it. The ribbon's own presses do not
+behave this way. The failure is silent and indistinguishable from success,
+because what it leaves behind is the effect's default — so the value reads as
+a plausible measurement.
+
+Measured attempt counts, each on a freshly generated single-target deck:
+
+| Value | Took on attempt |
+| --- | --- |
+| `emphasis.spin` Half Spin | 2 |
+| `emphasis.spin` Quarter Spin | 3 |
+| `entrance.flyIn` From Right | 3 |
+| `emphasis.transparency` 25% | 3 |
+| `entrance.stretch` From Top | **4** |
+
+Three values reached `resolved.json` wrong before this was understood:
+
+| Value | Recorded | Measured |
+| --- | --- | --- |
+| `entrance.flyIn` From Right | `presetSubtype` 4 (From Bottom's) | `presetSubtype` 2 |
+| `entrance.stretch` From Top | `presetSubtype` 10 (Across's) | `presetSubtype` 1 |
+| `emphasis.transparency` 25% | `opacity: 0.5` (50%'s) | `opacity: 0.75` |
+
+**Do not capture an effect option without the gate.** Put `verifyChange: true`
+on the target (`effect_options_plan.py --verify-change`) and the driver saves
+before the press, compares the shape's effects after it, and retries up to
+`--value-press-attempts` (default 8) before refusing the target outright. The
+comparison covers the behaviours, not just `p:cTn`: Grow/Shrink's `Huge` and
+its default carry identical preset attributes and differ only in
+`p:animScale/p:by`.
+
+Two further conditions matter, both measured:
+
+- **Generate a fresh deck.** `From Right` failed 4 of 4 attempts on a deck
+  earlier presses had already touched, and took on the third on a new one.
+- **One target per deck helps.** `transparency` 25% failed 4 of 4 on a
+  two-target deck and took on the third alone.
+
+`effect_options_merge.py --check` is the standing guard, and
+`test_every_effect_option_is_measured_and_no_two_values_agree` runs it: two
+values of one setting cannot produce the same OOXML, so a collision means a
+press did not take. That check is what found all three errors above.
+
+### Close the decks between runs
+
+PowerPoint keeps every capture deck open. Eight accumulated during this work.
+Only the active document publishes a ribbon, so `document_window` still
+resolved correctly and `assert_ready` would have refused a wrong one — but the
+decks are what "a deck earlier presses had already touched" means, and the
+`Effect Options` window is resolved **by name**, not per document. Close them.
+`osascript` and `agent-desktop close-app` are both unavailable under the
+gateway sandbox; close each window through its title-bar `Close` button ref and
+verify by re-listing, because PowerPoint answers that click with
+`APP_UNRESPONSIVE` even when the window does close.
 
 ## Step 9 — SmartArt and chart builds
 

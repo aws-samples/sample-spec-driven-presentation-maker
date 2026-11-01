@@ -561,11 +561,15 @@ def shape_row_index(package: Path, slide_index: int, shape_name: str) -> tuple[i
 
 
 #: How many times a value press is retried when the package says it changed
-#: nothing. Measured: ``Half Spin`` took on the second attempt, ``Quarter Spin``
-#: on the third, and ``From Right`` had not taken in three separate runs — a
-#: press inside the ``Effect Options`` window is intermittent in a way the
-#: ribbon's own presses are not. Four is one more than the worst seen.
-MAX_VALUE_PRESS_ATTEMPTS = 4
+#: nothing. A press inside the ``Effect Options`` window is intermittent in a
+#: way the ribbon's own presses are not, and the worst case keeps rising as
+#: more values are measured: ``Half Spin`` took on the second attempt,
+#: ``Quarter Spin`` and ``From Right`` on the third, and ``Stretch``'s
+#: ``From Top`` on the **fourth** — which was the cap at the time and so came
+#: within one attempt of being recorded as a failure. Raised to 8 for that
+#: reason, and overridable per run, because this is a bound on an observed
+#: flake rate rather than a measured property of the application.
+DEFAULT_VALUE_PRESS_ATTEMPTS = 8
 
 
 def effect_signatures(package: Path, slide_index: int, spid: str) -> list[str]:
@@ -2190,6 +2194,10 @@ class CaptureSettings:
     #: Targets pressed before one Save judges them all. ``1`` saves per target, which is
     #: the strongest attribution available and the slowest; see :func:`capture_batch`.
     batch_size: int = DEFAULT_BATCH_SIZE
+    #: How many times a target carrying ``verifyChange`` re-presses its value while
+    #: the package says nothing changed. Costs two saves per attempt, so it only
+    #: applies to those targets.
+    value_press_attempts: int = DEFAULT_VALUE_PRESS_ATTEMPTS
 
     @property
     def expected_title(self) -> str:
@@ -2328,7 +2336,7 @@ def press_target(
         press_save(backend, settings.document, timeout=timeout)
         before = effect_signatures(settings.document, target["slideIndex"], carried["shape_spid"])
         attempts: list[dict[str, Any]] = []
-        for attempt in range(1, MAX_VALUE_PRESS_ATTEMPTS + 1):
+        for attempt in range(1, settings.value_press_attempts + 1):
             result = press_path(
                 backend,
                 target["guiPath"],
@@ -2352,7 +2360,8 @@ def press_target(
             raise EffectNotAdded(
                 f"the value press left the shape's effects byte-identical to what the "
                 f"prerequisite wrote, after {len(attempts)} attempt(s); the press reaches the "
-                "control and the application does not act on it, so this value is not measured",
+                "control and the application does not act on it, so this value is not "
+                "measured. Raise --value-press-attempts if a higher flake rate is plausible",
                 expectedSpid=carried["shape_spid"],
                 attempts=len(attempts),
                 effectsBefore=len(before),
@@ -2789,7 +2798,8 @@ def build_parser() -> argparse.ArgumentParser:
             "Development-only accessibility capture driver for PowerPoint animation values. "
             "It selects each shape by its Selection Pane row and presses ribbon controls by "
             "title, so it never moves the pointer and posts no mouse events; it refuses to "
-            "start unless PowerPoint is frontmost showing the expected capture deck."
+            "start unless PowerPoint has the expected capture deck as its document window. "
+            "It does not require PowerPoint to be frontmost: see assert_ready."
         ),
         epilog=(
             f"Sends nothing without {DRIVE_TOKEN}. sdpm's runtime, CLI, MCP servers and tests "
@@ -2810,6 +2820,16 @@ def build_parser() -> argparse.ArgumentParser:
             f"{DEFAULT_BATCH_SIZE}). Each target is still attributed by its own spid against "
             "the saved package; 1 saves per target, which additionally separates two targets "
             "that swapped effects, at one save each"
+        ),
+    )
+    parser.add_argument(
+        "--value-press-attempts",
+        type=int,
+        default=DEFAULT_VALUE_PRESS_ATTEMPTS,
+        help=(
+            "how many times a target carrying verifyChange re-presses its value while the "
+            f"package says nothing changed (default {DEFAULT_VALUE_PRESS_ATTEMPTS}). Two "
+            "saves per attempt, so it costs nothing on targets without the flag"
         ),
     )
     parser.add_argument(
@@ -2876,6 +2896,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         timeout=args.timeout,
         force=args.force,
         batch_size=args.batch_size,
+        value_press_attempts=args.value_press_attempts,
     )
     if not settings.document.exists():
         print(f"FAIL: no capture deck at {settings.document}", file=sys.stderr)

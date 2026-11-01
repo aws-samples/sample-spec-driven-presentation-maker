@@ -1512,3 +1512,108 @@ def test_the_scrub_empties_the_identity_and_leaves_the_evidence(tmp_path):
     after = parse_gui_capture_package(package)
     assert set(after) == set(before), "the scrub changed which shapes carry effects"
     assert after == before, "the scrub changed a measured effect"
+
+# --- an effect option must be measured, not defaulted ----------------------
+def test_every_effect_option_is_measured_and_no_two_values_agree():
+    """All 133 effect-option values are measured, and each is distinguishable.
+
+    A press inside PowerPoint's `Effect Options` window is intermittent: it
+    reaches the control and the application does not always act on it, leaving
+    the effect at its default. The capture could not tell that apart from a
+    value that genuinely equals the default, so three values read wrong for a
+    while — `flyIn` From Right as `presetSubtype` 4 (From Bottom's),
+    `stretch` From Top as 10 (Across's), and `transparency` 25% as
+    `opacity: 0.5` (50%'s).
+
+    Two values of one setting cannot produce the same OOXML, so a collision is
+    the signal. This is the guard against a defaulted reading reaching the
+    catalog, which is the only place the error would be invisible.
+    """
+    from scripts.animation_catalog.effect_options_merge import (
+        DEFAULT_PLAN,
+        DEFAULT_RESOLVED,
+        build,
+    )
+
+    captures = [path for path in DEFAULT_RESOLVED if path.exists()]
+    assert captures, "no effect-option captures found, so this guard checks nothing"
+    document = build(DEFAULT_PLAN, captures)
+
+    assert document["missing"] == [], (
+        "effect-option values were planned but never measured; re-capture them with "
+        "--only and --verify-change"
+    )
+    assert document["collisions"] == [], (
+        "two values of one setting produced identical OOXML, so at least one press did "
+        f"not take: {document['collisions']}"
+    )
+    assert document["counts"]["measured"] == document["counts"]["planned"] == 133
+
+
+def test_the_merge_rejects_a_value_equal_to_its_sibling():
+    """The collision check has to fail when a press did not take.
+
+    Asserting only on the clean fixtures would pass just as well if the check
+    were `return []`, so this feeds it a known-bad pair: one value rewritten to
+    carry its sibling's OOXML, which is exactly what a press that did not take
+    leaves behind.
+    """
+    from scripts.animation_catalog.effect_options_merge import collisions
+
+    fly_in = {
+        "effectKey": "animation.gallery.entrance.flyIn",
+        "setting": "Direction",
+        "effectAttributes": {"presetID": "2", "presetSubtype": "4"},
+        "behaviors": [{"element": "p:anim", "attrNames": ["ppt_y"]}],
+    }
+    merged = {
+        "fromBottom": {**fly_in, "value": "From Bottom"},
+        # The defaulted reading: a different direction, identical OOXML.
+        "fromRight": {**fly_in, "value": "From Right"},
+        # A different setting of the same effect must not be dragged in.
+        "across": {
+            **fly_in,
+            "effectKey": "animation.gallery.entrance.stretch",
+            "value": "Across",
+        },
+    }
+    found = collisions(merged)
+    assert len(found) == 1, found
+    assert found[0]["values"] == ["From Bottom", "From Right"]
+    assert found[0]["effectKey"] == "animation.gallery.entrance.flyIn"
+
+
+def test_spin_direction_is_measured_even_though_its_subtype_does_not_move():
+    """Some settings live in the behaviours, so the check cannot read presets alone.
+
+    `Spin`'s Clockwise and Counterclockwise both carry `presetSubtype 0` and
+    differ only in the sign of `p:animRot/@by`. A collision check comparing
+    preset attributes would call this pair a failed press when it is measured
+    correctly, which is why the signature covers the behaviours too.
+    """
+    from scripts.animation_catalog.effect_options_merge import (
+        DEFAULT_PLAN,
+        DEFAULT_RESOLVED,
+        build,
+    )
+
+    document = build(DEFAULT_PLAN, [p for p in DEFAULT_RESOLVED if p.exists()])
+    spin = {
+        target["value"]: target
+        for target in document["targets"]
+        if target["effectKey"] == "animation.gallery.emphasis.spin"
+        and target["setting"] == "Direction"
+    }
+    assert set(spin) == {"Clockwise", "Counterclockwise"}
+    subtypes = {t["effectAttributes"].get("presetSubtype") for t in spin.values()}
+    assert subtypes == {"0"}, f"expected the subtype not to carry direction, got {subtypes}"
+
+    def rotation(target):
+        return [
+            behaviour["attributes"]["by"]
+            for behaviour in target["behaviors"]
+            if behaviour["element"] == "p:animRot"
+        ]
+
+    assert rotation(spin["Clockwise"]) == ["21600000"]
+    assert rotation(spin["Counterclockwise"]) == ["-21600000"]

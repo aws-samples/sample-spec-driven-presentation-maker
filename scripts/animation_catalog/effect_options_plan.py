@@ -27,11 +27,26 @@ presses the tile, and its own path presses the value inside the window the
 control opens. The driver supports both; what it needs from here is for the
 pair to be named.
 
+## Re-measuring a subset
+
+A press inside the ``Effect Options`` window is intermittent, so some values
+come back equal to their effect's default and have to be measured again on a
+deck of their own. ``--only`` builds a plan for just those keys and
+``--verify-change`` arms the driver's verify-and-retry gate, so a value that
+still does not take is refused rather than recorded. Both exist because the
+first such re-measurement was done with a plan hand-written outside the
+repository, which is not a thing a later reader can re-run.
+
 Usage::
 
     uv run python scripts/animation_catalog/effect_options_plan.py \\
       --discovery /abs/effect-options.json --out /abs/plan.json \\
       --build-deck /abs/deck --generate /abs/capture-deck.pptx
+
+    uv run python scripts/animation_catalog/effect_options_plan.py \\
+      --discovery /abs/effect-options.json --out /abs/plan.json \\
+      --only animation.effectOptions.direction.entrance.stretch.fromTop \\
+      --verify-change --build-deck /abs/deck --generate /abs/deck.pptx
 """
 
 from __future__ import annotations
@@ -128,9 +143,36 @@ def build_targets(discovery: dict[str, Any]) -> list[dict[str, Any]]:
     return targets
 
 
-def build_plan(discovery: dict[str, Any]) -> dict[str, Any]:
-    """Return the whole plan, laid out on as few slides as the grid allows."""
+def build_plan(
+    discovery: dict[str, Any],
+    *,
+    only: tuple[str, ...] = (),
+    verify_change: bool = False,
+) -> dict[str, Any]:
+    """Return the plan, laid out on as few slides as the grid allows.
+
+    ``only`` keeps the named keys and nothing else. An unknown key raises
+    rather than yielding a smaller plan than asked for: a re-measurement that
+    silently skipped its target would read as a pass.
+    """
     targets = build_targets(discovery)
+    if only:
+        known = {target["key"] for target in targets}
+        unknown = [key for key in only if key not in known]
+        if unknown:
+            raise KeyError(
+                "no target in the discovery carries "
+                + ", ".join(sorted(unknown))
+                + "; the key has to match one the plan derives"
+            )
+        wanted = set(only)
+        targets = [target for target in targets if target["key"] in wanted]
+    if verify_change:
+        for target in targets:
+            # Read by `press_target`, which saves before the value press and
+            # compares the shape's effects after it. Costs one extra save per
+            # target, so it is opt-in rather than always on.
+            target["verifyChange"] = True
     grid = planner.assign_cells(targets)
     return {
         "plan": PLAN_NAME,
@@ -161,10 +203,27 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--out", type=Path, required=True)
     parser.add_argument("--build-deck", type=Path, help="write the capture deck's JSON here")
     parser.add_argument("--generate", type=Path, help="generate the deck package here")
+    parser.add_argument(
+        "--only",
+        action="append",
+        default=[],
+        metavar="KEY",
+        help="keep only this target key; repeatable, for re-measuring a subset",
+    )
+    parser.add_argument(
+        "--verify-change",
+        action="store_true",
+        help="arm the driver's verify-and-retry gate on every target",
+    )
     args = parser.parse_args(argv)
 
     discovery = json.loads(args.discovery.read_text(encoding="utf-8"))
-    plan = build_plan(discovery)
+    try:
+        plan = build_plan(
+            discovery, only=tuple(args.only), verify_change=args.verify_change
+        )
+    except KeyError as error:
+        parser.error(str(error.args[0]))
     args.out.parent.mkdir(parents=True, exist_ok=True)
     args.out.write_text(json.dumps(plan, indent=2, ensure_ascii=False), encoding="utf-8")
 

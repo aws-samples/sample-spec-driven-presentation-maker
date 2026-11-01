@@ -16,6 +16,39 @@ tests and CI never invoke PowerPoint, AppleScript or Computer Use.
 | 9 animation values | PowerPoint for Mac 16.113.1 | 2026-10-31 | Animations ▸ gallery ▸ tile | `batch-2026-10-31/` |
 | 43 animation values | PowerPoint for Mac 16.113.1 | 2026-11-01 | Animations ▸ gallery ▸ tile | `batch-2026-11-01/` |
 | **all 76 animation values** | PowerPoint for Mac 16.113.1 | 2026-11-01 | Animations ▸ gallery ▸ tile | `batch-2026-11-01-complete/` |
+| 95 tiles' Effect Options windows read | PowerPoint for Mac 16.113.1 | 2026-11-01 | Animations ▸ Effect Options | `effect-options-2026-11-01/` |
+| **all 133 effect-option values** | PowerPoint for Mac 16.113.1 | 2026-11-02 | Animations ▸ tile ▸ Effect Options ▸ value | `effect-options-capture-2026-11-02/` + `effect-options-remeasure-2026-11-02/` |
+
+### The effect-option captures
+
+`effect-options-2026-11-01/` is the discovery pass: every titled element of
+every gallery tile's `Effect Options` window, recorded without interpretation.
+33 of the 95 tiles carry a setting; the other 62 expose only `Sequence`.
+
+`effect-options-capture-2026-11-02/` is the measurement, and
+`merged-effect-options.json` is the authoritative result:
+**133 of 133 values measured, 0 missing, 0 collisions**, across 33 effects and
+6 settings (Direction 87, Amount 12, Zoom 12, Spokes 10, Shapes 8, Vanishing
+Point 4). It is produced by `effect_options_merge.py` from that batch's
+`resolved.json` plus the five targeted re-measurements in
+`effect-options-remeasure-2026-11-02/`, and 11 of the 133 values come from
+those re-runs.
+
+They exist because **a press inside the `Effect Options` window is
+intermittent**: it reaches the control and PowerPoint does not always act on
+it, leaving the effect's default behind, which reads as a plausible
+measurement. Three values were wrong until they were measured again —
+`flyIn` From Right, `stretch` From Top and `transparency` 25% each carried a
+sibling's OOXML. `effect_options_merge.py --check` is the standing guard: two
+values of one setting cannot produce the same OOXML, and that check is what
+found them. The measurement procedure and the attempt counts are in
+`scripts/animation_catalog/computer-use.md` Step 8.
+
+Sub-directories of `effect-options-remeasure-2026-11-02/` are each one value on
+a freshly generated deck: `from-right/`, `stretch-from-top/`,
+`transparency-25/`. `stretch-from-top/` also holds the record of a **refused**
+target — `transparency` 25% failing 4 of 4 attempts on a two-target deck — kept
+because the gate declining to record a default is the behaviour under test.
 
 ### The complete run
 
