@@ -45,6 +45,22 @@ ORACLE_EVIDENCE_MERGED = "merged-evidence.json"
 ORACLE_EVIDENCE_PACKAGE = "powerpoint-oracle.pptx"
 ORACLE_EVIDENCE_READBACK = "powerpoint-readback.jsonl"
 
+#: The checked-in GUI capture: every animation value the ribbon can reach,
+#: applied through the accessibility driver and read back out of the package
+#: PowerPoint saved. It closes a different gap from the scripting oracle's.
+#: The oracle could not apply an animation at all — ``add effect`` is declared
+#: in the dictionary and unimplemented in this build — and the catalog's
+#: animation presets therefore came from captured native fixtures, which
+#: record **which** behaviour children a tile writes but not **what they say**.
+#: This capture's package records both, so the payload gap that kept 71 tiles
+#: capture-required is measured here rather than inferred.
+DEFAULT_GUI_CAPTURE_EVIDENCE = (
+    REPO_ROOT / "tests/fixtures/animations/gui-only/batch-2026-11-01-complete"
+)
+GUI_CAPTURE_MERGED = "merged-evidence.json"
+GUI_CAPTURE_PACKAGE = "powerpoint-oracle.pptx"
+GUI_CAPTURE_READBACK = "powerpoint-readback.jsonl"
+
 CATALOG_SCHEMA_VERSION = 1
 BASELINE_APPLICATION = "Microsoft PowerPoint"
 BASELINE_VERSION = "16.113.1"
@@ -3168,6 +3184,290 @@ def merge_oracle_readback(records: list[dict[str, Any]], package: dict[str, Any]
     }
 
 
+# --- the GUI capture: animation effects measured through the ribbon ---------
+GUI_CAPTURE_RECORD = "guiCapture"
+GUI_CAPTURE_SOURCE = "sdpm GUI capture"
+GUI_CAPTURE_DATE = "2026-11-01"
+GUI_CAPTURE_DRIVER = "macOS accessibility API; no Apple Events and no Visual Basic"
+#: Written into a promoted entry's ``verification``. Deliberately distinct from
+#: the scripting oracle's and from ``nativeCapture``: an entry says which of the
+#: three measured it, and the three reached different parts of the surface.
+GUI_CAPTURE_VERIFICATION = "guiCapture"
+
+#: The behaviour elements a preset effect writes beneath its ``p:cTn``. The same
+#: set the native captures summarise by name — what is new here is each one's
+#: payload.
+GUI_BEHAVIOR_ELEMENTS = ORACLE_BEHAVIOR_ELEMENTS
+
+#: Depth and node bounds on the payload dump of one behaviour. A behaviour's
+#: subtree is shallow (``p:cBhvr`` ▸ ``p:cTn`` ▸ ``p:stCondLst`` ▸ ``p:cond`` is
+#: the deepest path), so a tree deeper than this is not the shape measured and
+#: failing loudly beats recording something else.
+GUI_PAYLOAD_MAX_DEPTH = 8
+GUI_PAYLOAD_MAX_NODES = 400
+
+
+def _xml_subtree(element: Any, *, depth: int = 0) -> dict[str, Any]:
+    """Return one element as ``{element, attributes, children}``, bounded.
+
+    Deliberately generic. The alternative was a reader per OOXML value shape —
+    ``p:to/p:strVal/@val`` for a visibility set, ``p:to/a:srgbClr/@val`` for a
+    colour, ``@x``/``@y`` on a ``CT_TLPoint`` for a scale — and enumerating
+    those would be me deciding in advance what PowerPoint writes. A faithful
+    dump cannot omit a shape nobody anticipated, and the merged evidence file is
+    where fidelity belongs; the catalog gets the normalised view built from it.
+    """
+    if depth > GUI_PAYLOAD_MAX_DEPTH:
+        raise ValueError(
+            f"a behaviour subtree is deeper than {GUI_PAYLOAD_MAX_DEPTH} at "
+            f"{_oracle_qname(element)}; the measured shape is shallower, so this is not it"
+        )
+    return {
+        "element": _oracle_qname(element),
+        "attributes": _oracle_attributes(element),
+        "children": [_xml_subtree(child, depth=depth + 1) for child in element],
+    }
+
+
+def _behavior_timing(behavior: Any) -> dict[str, Any]:
+    """Return the timing ``p:cBhvr/p:cTn`` gives one behaviour, flattened.
+
+    The delay lives one level further down, in ``p:stCondLst/p:cond/@delay``,
+    and it is the one attribute that distinguishes the two halves of a Wave
+    (``p:animRot by="1500000"`` at delay 0, then ``by="-1500000"`` at delay
+    125), so it is lifted to the same level as the duration rather than left
+    inside a nested condition list.
+    """
+    timing: dict[str, Any] = {}
+    for child in behavior:
+        if _oracle_local(child) != "cBhvr":
+            continue
+        for inner in child:
+            if _oracle_local(inner) != "cTn":
+                continue
+            timing.update(_oracle_attributes(inner))
+            timing.pop("id", None)
+            for condition in inner.iter():
+                if _oracle_local(condition) == "cond" and condition.get("delay") is not None:
+                    timing.setdefault("delay", condition.get("delay"))
+    return timing
+
+
+def _behavior_attr_names(behavior: Any) -> list[str]:
+    """Return the animated attribute names, in document order.
+
+    ``p:attrNameLst`` is what the payload gap meant by "the animated attribute
+    name". A Wave's motion names ``ppt_x`` and ``ppt_y``; its rotations name
+    ``r``; an emphasis ``p:set`` names the font attribute the catalog refused
+    those tiles for not knowing.
+    """
+    return [
+        (element.text or "").strip()
+        for element in behavior.iter()
+        if _oracle_local(element) == "attrName" and (element.text or "").strip()
+    ]
+
+
+#: The payload children of a behaviour. ``p:to``/``p:from``/``p:by`` carry a
+#: single target value; ``p:tavLst`` carries a keyframe list instead, and it is
+#: where a ``p:anim`` keeps everything it says — Fly In's ``p:anim`` has no
+#: ``p:to`` at all and would have been recorded as payload-less without it.
+GUI_VALUE_ELEMENTS = ("to", "from", "by", "tavLst")
+
+
+def _behavior_values(behavior: Any) -> dict[str, Any]:
+    """Return the value payloads of one behaviour, as subtrees.
+
+    Subtrees rather than scalars because the value is not one thing: a colour
+    ``p:to`` holds an ``a:srgbClr`` or an ``a:schemeClr``, a scale ``p:to``
+    carries ``@x``/``@y`` on itself, a visibility ``p:to`` holds a ``p:strVal``,
+    and a ``p:anim`` has no ``p:to`` but a ``p:tavLst`` of keyframes. Flattening
+    those to a string would lose which of them it was.
+    """
+    values: dict[str, Any] = {}
+    for child in behavior:
+        local = _oracle_local(child)
+        if local in GUI_VALUE_ELEMENTS:
+            values[local] = _xml_subtree(child)
+    return values
+
+
+def _behavior_carrier(behavior: Any) -> dict[str, Any]:
+    """Return ``p:cBhvr``'s own attributes: how the behaviour combines, not when.
+
+    ``@additive`` is the one that changes what the effect does — Fly In's
+    ``p:anim`` is ``additive="base"``, so its keyframes are relative to the
+    shape's own position rather than absolute — and it is neither timing nor a
+    value, so it is recorded on its own rather than merged into either.
+    """
+    for child in behavior:
+        if _oracle_local(child) == "cBhvr":
+            return _oracle_attributes(child)
+    return {}
+
+
+def effect_behaviors(ctn: Any) -> list[dict[str, Any]]:
+    """Return every behaviour child of one preset effect, in document order.
+
+    Document order matters and is preserved: the two ``p:animRot`` halves of a
+    Wave differ only in their ``by`` and their delay, so a set would collapse
+    them and a sort would make the pair's order an accident of attribute values.
+    """
+    behaviors: list[dict[str, Any]] = []
+    seen = 0
+    for element in ctn.iter():
+        if _oracle_local(element) not in GUI_BEHAVIOR_ELEMENTS:
+            continue
+        seen += 1
+        if seen > GUI_PAYLOAD_MAX_NODES:
+            raise ValueError(
+                f"one effect published more than {GUI_PAYLOAD_MAX_NODES} behaviours; that is not "
+                "the shape measured"
+            )
+        behaviors.append(
+            {
+                "element": _oracle_qname(element),
+                "attributes": _oracle_attributes(element),
+                "carrier": _behavior_carrier(element),
+                "timing": _behavior_timing(element),
+                "attrNames": _behavior_attr_names(element),
+                "values": _behavior_values(element),
+            }
+        )
+    return behaviors
+
+
+def parse_gui_capture_package(package: Path) -> dict[str, dict[str, Any]]:
+    """Return every preset effect in a captured package, keyed by its target spid.
+
+    One slide carries all 76 effects, and each is identified by the
+    ``p:spTgt/@spid`` of the shape it animates — which is exactly how the driver
+    attributed it. An effect targeting more than one spid is **not** keyed: that
+    would be an effect the capture cannot attribute to one shape, so it is
+    reported unattributable rather than assigned to the first spid it names.
+    """
+    from lxml import etree
+
+    parser = etree.XMLParser(resolve_entities=False, load_dtd=False, no_network=True)
+    by_spid: dict[str, dict[str, Any]] = {}
+    collisions: set[str] = set()
+    with zipfile.ZipFile(package) as archive:
+        for name in sorted(archive.namelist()):
+            if not ORACLE_SLIDE_PART.fullmatch(name):
+                continue
+            root = etree.fromstring(archive.read(name), parser=parser)
+            for element in root.iter():
+                if _oracle_local(element) != "cTn" or element.get("presetID") is None:
+                    continue
+                spids = sorted({
+                    target.get("spid")
+                    for target in element.iter()
+                    if _oracle_local(target) == "spTgt" and target.get("spid")
+                })
+                attributes = _oracle_attributes(element)
+                attributes.pop("id", None)
+                effect = {
+                    "part": name,
+                    "attributes": attributes,
+                    "spids": spids,
+                    "behaviors": effect_behaviors(element),
+                }
+                if len(spids) != 1:
+                    continue
+                spid = spids[0]
+                if spid in by_spid:
+                    collisions.add(spid)
+                by_spid[spid] = effect
+    for spid in collisions:
+        by_spid[spid]["ambiguous"] = (
+            "more than one preset effect on this slide targets this spid, so the package cannot "
+            "say which of them belongs to the record"
+        )
+    return by_spid
+
+
+def merge_gui_capture(records: list[dict[str, Any]],
+                      effects: dict[str, dict[str, Any]]) -> dict[str, Any]:
+    """Join the driver's read-back with the effects its saved package holds.
+
+    The join is on ``attributedSpid`` — the spid the driver verified the effect
+    landed on — never on slide or record order, because every record shares one
+    slide and order survives nothing.
+
+    A record whose spid the package does not carry, or carries twice, lands in
+    ``unresolved`` with the reason. Nothing is guessed into place: the catalog
+    reads this file, so an unresolved record must stay visible rather than
+    become an entry promoted on a joined-by-position effect.
+    """
+    merged: list[dict[str, Any]] = []
+    unresolved: list[dict[str, Any]] = []
+    for record in records:
+        if record.get("record") != GUI_CAPTURE_RECORD:
+            continue
+        key = record.get("catalogKey")
+        spid = record.get("attributedSpid")
+        effect = effects.get(str(spid)) if spid else None
+        entry: dict[str, Any] = {
+            "key": key,
+            "catalogKey": key,
+            "slideIndex": record.get("slideIndex"),
+            "guiPath": record.get("guiPath"),
+            "matchedTitle": record.get("matchedTitle"),
+            "shapeName": record.get("shapeName"),
+            "shapeSpid": record.get("shapeSpid"),
+            "attributedSpid": spid,
+            "selectionRowIndex": record.get("selectionRowIndex"),
+            "selectedBy": record.get("selectedBy"),
+            "ribbonReadBack": record.get("ribbonReadBack"),
+            "rejected": bool(record.get("rejected")),
+            "capturedAt": record.get("capturedAt"),
+        }
+        if record.get("rejected"):
+            entry["error"] = record.get("error")
+            unresolved.append({"key": key, "reason": "the driver rejected this target"})
+        elif effect is None:
+            unresolved.append(
+                {"key": key, "reason": f"the package carries no preset effect targeting spid {spid!r}"}
+            )
+        elif "ambiguous" in effect:
+            unresolved.append({"key": key, "reason": effect["ambiguous"]})
+        else:
+            entry["effect"] = effect
+        merged.append(entry)
+    merged.sort(key=lambda entry: str(entry["key"]))
+    unresolved.sort(key=lambda row: str(row["key"]))
+    return {
+        "source": GUI_CAPTURE_SOURCE,
+        "application": BASELINE_APPLICATION,
+        "version": BASELINE_VERSION,
+        "capturedAt": GUI_CAPTURE_DATE,
+        "driver": GUI_CAPTURE_DRIVER,
+        "package": GUI_CAPTURE_PACKAGE,
+        "readBack": GUI_CAPTURE_READBACK,
+        "captureRecords": len(merged),
+        "effectsInPackage": len(effects),
+        "resolved": sum(1 for entry in merged if "effect" in entry),
+        "unresolved": unresolved,
+        "captures": merged,
+    }
+
+
+def analyse_gui_capture(out_dir: Path) -> int:
+    """Analyse a GUI capture directory and print the merged evidence."""
+    package = out_dir / GUI_CAPTURE_PACKAGE
+    readback = out_dir / GUI_CAPTURE_READBACK
+    if not package.exists():
+        print(f"FAIL: no captured package at {package}", file=sys.stderr)
+        return 1
+    if not readback.exists():
+        print(f"FAIL: no read-back at {readback}", file=sys.stderr)
+        return 1
+    effects = parse_gui_capture_package(package)
+    records = read_oracle_readback(readback)
+    print(json.dumps(merge_gui_capture(records, effects), indent=2, ensure_ascii=False))
+    return 0
+
+
 def analyse_oracle_output(out_dir: Path) -> int:
     """Analyse an oracle output directory and print the merged evidence."""
     package = out_dir / "powerpoint-oracle.pptx"
@@ -3193,17 +3493,23 @@ def main(argv: list[str] | None = None) -> int:
                         help="regenerate the catalog and the oracle's candidate arrays deterministically")
     parser.add_argument("--parse-oracle", type=Path, metavar="DIR",
                         help="analyse a saved oracle output directory offline and print the merged evidence")
+    parser.add_argument("--parse-gui-capture", type=Path, metavar="DIR",
+                        help="analyse a saved GUI capture directory offline and print the merged evidence")
     parser.add_argument("--sdef", type=Path, default=DEFAULT_SDEF)
     parser.add_argument("--manifest", type=Path, default=DEFAULT_MANIFEST)
     parser.add_argument("--catalog", type=Path, default=DEFAULT_CATALOG)
     parser.add_argument("--oracle", type=Path, default=DEFAULT_ORACLE)
     parser.add_argument("--require-sdef", action="store_true", help="fail when the local sdef is unavailable")
     args = parser.parse_args(argv)
-    if not args.check and not args.write and args.parse_oracle is None:
-        parser.error("pass --check, --write or --parse-oracle")
+    if (not args.check and not args.write and args.parse_oracle is None
+            and args.parse_gui_capture is None):
+        parser.error("pass --check, --write, --parse-oracle or --parse-gui-capture")
 
     if args.parse_oracle is not None:
         return analyse_oracle_output(args.parse_oracle)
+
+    if args.parse_gui_capture is not None:
+        return analyse_gui_capture(args.parse_gui_capture)
 
     manifest = load_json(args.manifest)
     sdef_enums = read_sdef(args.sdef) if args.sdef.exists() else None
