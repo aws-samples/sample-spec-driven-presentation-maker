@@ -254,7 +254,9 @@
     "slidePreview": "Slide preview",
     "options": "Options",
     "fetchWebImages": "Fetch web images",
-    "fetchWebImagesDescription": "Include images from websites in presentations"
+    "fetchWebImagesDescription": "Include images from websites in presentations",
+    "sessionBusy": "This chat is still answering in another tab or panel. Wait for it to finish, then send again.",
+    "sessionLocked": "This chat is in use by another kiro-cli process, such as a terminal session. Close it there, then send again."
   },
   "snippet": {
     "title": "Text Snippet",

@@ -254,7 +254,9 @@
     "slidePreview": "スライドプレビュー",
     "options": "オプション",
     "fetchWebImages": "Web 画像を取得",
-    "fetchWebImagesDescription": "Web サイトの画像をプレゼンテーションに取り込みます"
+    "fetchWebImagesDescription": "Web サイトの画像をプレゼンテーションに取り込みます",
+    "sessionBusy": "このチャットは別のタブまたはパネルで応答中です。応答が終わってから、もう一度送信してください。",
+    "sessionLocked": "このチャットは別の kiro-cli プロセス（ターミナルなど）で使用中です。そちらを終了してから、もう一度送信してください。"
   },
   "snippet": {
     "title": "テキストスニペット",

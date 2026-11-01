@@ -2,6 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * Local ACP Agent Invoke — sends prompt to sessionId-keyed kiro-cli process.
+ * A session conflict (turn still running, or the session locked by another
+ * kiro-cli process) is answered with 409 and a SessionConflict body.
  */
 import {
   sendPrompt,
@@ -16,6 +18,7 @@ import { createSSEStream } from "@/lib/local/sse-bridge"
 import { withContinuedFrom, withInteractionMode } from "@/lib/local/interaction-mode"
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
+import { sessionConflict } from "@/lib/local/sessionErrors"
 
 const MODE_TO_AGENT: Record<string, string> = {
   vibe: "sdpm-orchestrator",
@@ -55,25 +58,33 @@ export async function POST(req: Request) {
   let isFirstPrompt = Boolean(continuedFrom)
   if (clientSessionId && continuedFrom) pendingOrigins.set(clientSessionId, continuedFrom)
 
-  // Ensure a process exists for this clientSessionId
-  if (clientSessionId && !hasProcess(clientSessionId)) {
-    if (continuedFrom) {
-      // A fork must restore the copied history even if its preloaded process was evicted.
-      await getOrCreateProcess(clientSessionId, agentName, { setMode: true })
-    } else if (deckId && deckId !== "new") {
-      // Existing deck reopened after evict — restore via session/load
-      await getOrCreateProcess(clientSessionId, agentName)
-    } else {
-      // Fresh session — spawn new process, register under client's sessionId
-      await createNewProcessFor(clientSessionId, agentName)
-      isFirstPrompt = true
+  let prompted: Awaited<ReturnType<typeof sendPrompt>>
+  try {
+    // Ensure a process exists for this clientSessionId
+    if (clientSessionId && !hasProcess(clientSessionId)) {
+      if (continuedFrom) {
+        // A fork must restore the copied history even if its preloaded process was evicted.
+        await getOrCreateProcess(clientSessionId, agentName, { setMode: true })
+      } else if (deckId && deckId !== "new") {
+        // Existing deck reopened after evict — restore via session/load
+        await getOrCreateProcess(clientSessionId, agentName)
+      } else {
+        // Fresh session — spawn new process, register under client's sessionId
+        await createNewProcessFor(clientSessionId, agentName)
+        isFirstPrompt = true
+      }
     }
-  }
 
-  // Spec / Vibe and continuation facts are attached only to the first prompt.
-  const continuedPrompt = withContinuedFrom(query, continuedFrom, isFirstPrompt)
-  const prompt = withInteractionMode(continuedPrompt, mode, isFirstPrompt)
-  const { sessionId, subscribe, send } = await sendPrompt(clientSessionId!, prompt, agentName)
+    // Spec / Vibe and continuation facts are attached only to the first prompt.
+    const continuedPrompt = withContinuedFrom(query, continuedFrom, isFirstPrompt)
+    const prompt = withInteractionMode(continuedPrompt, mode, isFirstPrompt)
+    prompted = await sendPrompt(clientSessionId!, prompt, agentName)
+  } catch (error) {
+    const conflict = sessionConflict(error)
+    if (conflict) return Response.json(conflict, { status: 409 })
+    throw error
+  }
+  const { sessionId, subscribe, send } = prompted
 
   const stream = createSSEStream({
     sessionId,

@@ -5,6 +5,11 @@
  * keyed by sessionId. Enables background processing: switching decks
  * does not interrupt running agents.
  *
+ * A new chat's process is registered under the client-generated id and under
+ * its kiro session id (the one saved to the deck's `.session`), so reopening the
+ * deck reuses the live process instead of loading the session into a second
+ * kiro-cli, which the first one still locks.
+ *
  * Max MAX_PROCESSES concurrent processes. Idle processes are evicted LRU.
  */
 import { spawn, type ChildProcess } from "child_process"
@@ -14,6 +19,7 @@ import { getActiveAgent, type AgentConfig } from "./acp-adapter"
 import { syncToAgentsDir } from "./agents-sync"
 import type { ForkSessionPhase, ForkSessionPhaseDetail, SessionOrigin } from "./kiro-sessions.types"
 import { watchMcpServerReady } from "./mcp-ready"
+import { SessionBusyError } from "./sessionErrors"
 
 export { DECK_ROOT }
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
@@ -44,13 +50,15 @@ interface ProcessState {
   listeners: Set<NotifyListener>
   lineBuffer: string
   running: boolean
+  /** A session/prompt request has been sent and has not been answered yet. */
+  promptInFlight: boolean
   notifications: { id: number; msg: Record<string, unknown> }[]
   eventIdCounter: number
   lastActivity: number
   subSessionIds: Set<string>
 }
 
-/** Map keyed by sessionId */
+/** Map keyed by sessionId; one process may sit under several keys (client id and kiro session id). */
 const processes = new Map<string, ProcessState>()
 export const pendingOrigins = new Map<string, SessionOrigin>()
 
@@ -168,7 +176,7 @@ async function spawnProcess(
   const ps: ProcessState = {
     child, deckId: "", sessionId: null, agentName,
     requestId: 0, pending: new Map(), listeners: new Set(),
-    lineBuffer: "", running: false, notifications: [], eventIdCounter: 0,
+    lineBuffer: "", running: false, promptInFlight: false, notifications: [], eventIdCounter: 0,
     lastActivity: Date.now(), subSessionIds: new Set(),
   }
 
@@ -187,7 +195,7 @@ async function spawnProcess(
     console.log("[acp close] sessionId=%s code=%s", ps.sessionId, code)
     for (const pending of ps.pending.values()) pending.reject(new Error(`ACP process exited with code ${code}`))
     ps.pending.clear()
-    if (ps.sessionId) processes.delete(ps.sessionId)
+    forgetProcess(ps)
   })
 
   try {
@@ -287,16 +295,24 @@ async function spawnProcess(
   }
 }
 
+/** Remove every map key that refers to a process. */
+function forgetProcess(ps: ProcessState): void {
+  for (const [key, candidate] of processes) {
+    if (candidate === ps) processes.delete(key)
+  }
+}
+
 async function evictIfNeeded(): Promise<void> {
-  if (processes.size < MAX_PROCESSES) return
+  const live = new Set(processes.values())
+  if (live.size < MAX_PROCESSES) return
   let oldest: ProcessState | null = null
-  for (const ps of processes.values()) {
+  for (const ps of live) {
     if (ps.running) continue
     if (!oldest || ps.lastActivity < oldest.lastActivity) oldest = ps
   }
   if (oldest) {
     oldest.child.kill()
-    if (oldest.sessionId) processes.delete(oldest.sessionId)
+    forgetProcess(oldest)
     await new Promise(r => setTimeout(r, 500))
   }
 }
@@ -313,9 +329,7 @@ export function terminateProcess(sessionId: string): void {
   const ps = processes.get(sessionId)
     ?? Array.from(processes.values()).find((candidate) => candidate.sessionId === sessionId)
   if (!ps) return
-  for (const [key, candidate] of processes) {
-    if (candidate === ps) processes.delete(key)
-  }
+  forgetProcess(ps)
   ps.child.kill()
 }
 
@@ -345,17 +359,24 @@ export async function createNewProcess(agentName: string = "sdpm-orchestrator"):
   return ps
 }
 
-/** Spawn a new process and register it under a client-provided key. */
+/** Spawn a new process and register it under a client-provided key and its kiro session id. */
 export async function createNewProcessFor(clientSessionId: string, agentName: string = "sdpm-orchestrator"): Promise<ProcessState> {
   await evictIfNeeded()
   const ps = await spawnProcess(agentName)
   processes.set(clientSessionId, ps)
+  processes.set(ps.sessionId!, ps)
   return ps
 }
 
-/** Send a prompt to a session's process. */
+/**
+ * Send a prompt to a session's process.
+ * Throws SessionBusyError while the process is still answering an earlier prompt
+ * (the same session open in two panels or tabs); prompts are not queued.
+ */
 export async function sendPrompt(sessionId: string, text: string, agentName?: string): Promise<{ sessionId: string; subscribe: (fn: NotifyListener) => () => void; send: () => void }> {
   const ps = await getOrCreateProcess(sessionId, agentName || "sdpm-orchestrator")
+  if (ps.promptInFlight) throw new SessionBusyError()
+  ps.promptInFlight = true
   ps.running = true
   ps.notifications = []; ps.eventIdCounter = 0
   ps.lastActivity = Date.now()
@@ -372,7 +393,7 @@ export async function sendPrompt(sessionId: string, text: string, agentName?: st
         prompt: [{ type: "text", text }],
       }).catch(() => {
         // handleLine forwards the same JSON-RPC error to the subscribed SSE bridge.
-      })
+      }).finally(() => { ps.promptInFlight = false })
     },
   }
 }
