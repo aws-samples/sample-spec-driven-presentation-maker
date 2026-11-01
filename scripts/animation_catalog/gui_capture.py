@@ -1802,6 +1802,37 @@ def select_shape(
     return RowSelection(row_index, shape_name if shape_name in row.names else None)
 
 
+def close_window(backend: AXBackend, title: str, *, timeout: float) -> str:
+    """Close one of PowerPoint's popup windows by pressing its ribbon opener again.
+
+    The opener **toggles**, which is the trap that has cost three runs: pressing
+    it while the window is open closes it. Here that is the intent, so the
+    window's presence is read first and nothing is pressed when it is already
+    shut — the same discipline, used the other way round.
+
+    Returns what it did, so a record says whether a window had been held over.
+    """
+    view = held(backend)
+    if find_window(view, title) is None:
+        return "alreadyClosed"
+    opener = _resolve_in(resolve_scope(view, RIBBON_SCOPE), title)
+    if not opener.enabled:
+        raise ControlNotFound(
+            f"the {title!r} window is open but its ribbon control is disabled, so it cannot "
+            "be closed from here"
+        )
+    opener.press()
+    view.stale()
+    wait_until(
+        view,
+        lambda: find_window(view, title) is None,
+        timeout=timeout,
+        swallow=(),
+        what=f"the {title!r} window to close",
+    )
+    return "closed"
+
+
 def press_save(backend: AXBackend, document: Path, *, timeout: float) -> None:
     """Press Save in the Quick Access toolbar and wait, bounded, for the file to change.
 
@@ -2193,6 +2224,21 @@ def press_target(
             "matchedTitle": before.matched_title,
             "steps": before.as_dicts(),
         }
+        # Close the window the target's own path will open, when the target asks
+        # for it. Measured: three Spin amounts and one Fly In direction wrote the
+        # effect's **default** instead of the value pressed — `Half Spin` and
+        # `Quarter Spin` both landed on `by="21600000"`, which is `Full Spin`,
+        # and `From Right` came out byte-identical to `From Bottom`. The press
+        # reaches the control and the application does not act on it, which is
+        # the signature of a window held over from the previous target: reusing
+        # it is what :func:`press_path`'s ``windowAlreadyOpen`` branch does, and
+        # it exists to avoid the opposite trap of pressing an open window's
+        # control shut. Opt-in per target rather than always, so the 76 motion
+        # paths and transitions that this path already captured keep the exact
+        # sequence they were measured with.
+        if target.get("reopenWindow"):
+            closed = close_window(backend, target["guiPath"][1], timeout=timeout)
+            carried["prerequisite"]["reopenedWindow"] = closed
         # **Do not re-select the shape here.** It was tried, to stop the value
         # press adding a second effect instead of editing the first, and it
         # breaks the route outright: selecting the shape in the Selection Pane

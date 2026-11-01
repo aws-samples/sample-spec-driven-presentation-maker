@@ -1,0 +1,228 @@
+{
+  "source": "sdpm GUI capture",
+  "application": "Microsoft PowerPoint",
+  "version": "16.113.1",
+  "package": "powerpoint-oracle.pptx",
+  "counts": {
+    "resolved": 2
+  },
+  "targets": [
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.quarterSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Quarter Spin",
+      "shapeSpid": "2",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "8",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:animRot",
+          "attributes": {
+            "by": "5400000"
+          },
+          "carrier": {},
+          "timing": {
+            "dur": "2000",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "r"
+          ],
+          "values": {}
+        }
+      ]
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromRight",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Right",
+      "shapeSpid": "4",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "entr",
+        "presetID": "2",
+        "presetSubtype": "4"
+      },
+      "behaviors": [
+        {
+          "element": "p:set",
+          "attributes": {},
+          "carrier": {},
+          "timing": {
+            "dur": "1",
+            "fill": "hold",
+            "delay": "0"
+          },
+          "attrNames": [
+            "style.visibility"
+          ],
+          "values": {
+            "to": {
+              "element": "p:to",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:strVal",
+                  "attributes": {
+                    "val": "visible"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "element": "p:anim",
+          "attributes": {
+            "calcmode": "lin",
+            "valueType": "num"
+          },
+          "carrier": {
+            "additive": "base"
+          },
+          "timing": {
+            "dur": "500",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "ppt_x"
+          ],
+          "values": {
+            "tavLst": {
+              "element": "p:tavLst",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "0"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_x"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "100000"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_x"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "element": "p:anim",
+          "attributes": {
+            "calcmode": "lin",
+            "valueType": "num"
+          },
+          "carrier": {
+            "additive": "base"
+          },
+          "timing": {
+            "dur": "500",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "ppt_y"
+          ],
+          "values": {
+            "tavLst": {
+              "element": "p:tavLst",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "0"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "1+#ppt_h/2"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "100000"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_y"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    }
+  ]
+}
