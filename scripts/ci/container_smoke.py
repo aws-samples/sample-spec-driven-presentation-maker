@@ -13,29 +13,35 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import http.client
 import sys
 import time
-import urllib.request
+from urllib.parse import urlsplit
 
 
 async def _mcp(url: str) -> str:
     from mcp import ClientSession
     from mcp.client.streamable_http import streamablehttp_client
 
-    async with streamablehttp_client(url) as (read, write, _):
-        async with ClientSession(read, write) as session:
-            init = await session.initialize()
-            tools = await session.list_tools()
+    async with streamablehttp_client(url) as (read, write, _), ClientSession(read, write) as session:
+        init = await session.initialize()
+        tools = await session.list_tools()
     if not tools.tools:
         raise RuntimeError("tools/list returned no tools")
     return f"{init.serverInfo.name}: {len(tools.tools)} tools"
 
 
 def _ping(url: str) -> str:
-    with urllib.request.urlopen(url, timeout=5) as resp:  # noqa: S310 — CI-local URL
-        if resp.status != 200:
-            raise RuntimeError(f"HTTP {resp.status}")
-        return f"HTTP {resp.status}"
+    parts = urlsplit(url)
+    conn = http.client.HTTPConnection(parts.hostname, parts.port or 80, timeout=5)
+    try:
+        conn.request("GET", parts.path or "/")
+        status = conn.getresponse().status
+    finally:
+        conn.close()
+    if status != 200:
+        raise RuntimeError(f"HTTP {status}")
+    return f"HTTP {status}"
 
 
 def main() -> int:
@@ -44,6 +50,9 @@ def main() -> int:
     parser.add_argument("url")
     parser.add_argument("--timeout", type=float, default=120.0)
     args = parser.parse_args()
+    parts = urlsplit(args.url)
+    if parts.scheme != "http" or not parts.hostname:
+        parser.error(f"expected an http:// URL, got {args.url!r}")
 
     deadline = time.monotonic() + args.timeout
     last: Exception | None = None
