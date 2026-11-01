@@ -1897,6 +1897,7 @@ def capture_record(
     shape_spid: str | None = None,
     selection_row: str | None = None,
     selection_row_index: int | None = None,
+    prerequisite: dict[str, Any] | None = None,
     effect: dict[str, Any] | None = None,
     effect_count: tuple[int, int] | None = None,
     batch_index: int | None = None,
@@ -1952,6 +1953,10 @@ def capture_record(
         "selectionRow": selection_row,
         "selectionRowIndex": selection_row_index,
         "selectedBy": SELECTED_BY if selection_row_index is not None else None,
+        # Which press made the target's control exist. A value behind an effect
+        # is meaningless without it: `From Bottom` is a direction *of Fly In*,
+        # and a record that did not say so could be read as a global setting.
+        "prerequisite": prerequisite,
         "applied": applied,
         "matchedTitle": matched_title,
         "ribbonReadBack": readback or {"start": None, "duration": None},
