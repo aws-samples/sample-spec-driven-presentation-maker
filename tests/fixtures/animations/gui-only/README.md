@@ -13,6 +13,29 @@ tests and CI never invoke PowerPoint, AppleScript or Computer Use.
 | --- | --- | --- | --- | --- |
 | `transition.gallery.box.fromRight` | PowerPoint for Mac 16.113.1 | 2026-10-31 | Transitions ▸ Transition Styles ▸ Box ▸ Effect Options ▸ From Right | `.pptx`, `.xml`, `powerpoint-readback.jsonl` |
 | `animation.gallery.motionPath.lines` | PowerPoint for Mac 16.113.1 | 2026-10-31 | Animations ▸ Path Animation ▸ Basic ▸ Lines | `.pptx`, `.xml`, `powerpoint-readback.jsonl` |
+| 9 animation values | PowerPoint for Mac 16.113.1 | 2026-10-31 | Animations ▸ gallery ▸ tile | `batch-2026-10-31/` |
+| 43 animation values | PowerPoint for Mac 16.113.1 | 2026-11-01 | Animations ▸ gallery ▸ tile | `batch-2026-11-01/` |
+| **all 76 animation values** | PowerPoint for Mac 16.113.1 | 2026-11-01 | Animations ▸ gallery ▸ tile | `batch-2026-11-01-complete/` |
+
+### The complete run
+
+`batch-2026-11-01-complete/` is the whole GUI-addressable animation surface the
+plan derives from the catalog's gaps: **76 of 76 captured, 76 attributed, 0
+`spid` mismatches** — 23 entrance, 24 exit, 24 emphasis and 5 motion paths. Each
+record carries the shape it aimed at, the Selection Pane row index it selected,
+the `p:spTgt/@spid` the effect landed on, and that effect's own `p:cTn`
+attributes, so a value is read per target even though every target shares one
+slide. `powerpoint-oracle.pptx` is the package those records were read from.
+
+It supersedes the two earlier batches rather than replacing them: the earlier
+runs are what the mechanism was corrected against, and
+`scripts/animation_catalog/computer-use.md` cites their failure counts.
+
+**These captures are not in the catalog yet.** Promoting them is a separate step
+through `generate.py`, which today ingests transition captures only — the
+animation ingest does not exist. Until it does, the catalog's animation presets
+remain what the evidence tables say and these files are the measurement that
+would confirm or correct them.
 
 ### What the motion-path capture established
 
