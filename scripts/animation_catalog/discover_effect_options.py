@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
 """Read, per gallery tile, the settings its ``Effect Options`` window offers.
 
 A direction persists as ``p:cTn/@presetSubtype`` and 45 of them are open in the

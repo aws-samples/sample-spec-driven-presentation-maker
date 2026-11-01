@@ -676,6 +676,15 @@ def attribute_new_effect(
         raise EffectNotAdded(f"no effect in the saved slide targets spid {expected_spid!r}")
     effect = dict(mine[0])
     effect["newEffectCount"] = added[expected_spid]
+    # Every one of the shape's effects, not only the representative. A target
+    # with a prerequisite leaves **two**: the tile's default and a second one
+    # carrying the pressed value, which is the application's behaviour and not a
+    # selection bug (re-selecting the shape to avoid it disables the control
+    # outright). The driver cannot say which is which — measured: Grow/Shrink's
+    # Huge and its default have *identical* ``p:cTn``, and differ only in
+    # ``p:by`` — so it records both and the offline side, which holds every
+    # tile's measured default already, tells them apart.
+    effect["allCTns"] = [dict(candidate["cTn"]) for candidate in mine]
     return effect
 
 
@@ -740,6 +749,7 @@ def attribute_batch(
         mine = [candidate for candidate in after if candidate["spid"] == spid]
         effect = dict(mine[0])
         effect["newEffectCount"] = added[spid]
+        effect["allCTns"] = [dict(candidate["cTn"]) for candidate in mine]
         credited[spid] = effect
     return credited
 
@@ -1962,6 +1972,11 @@ def capture_record(
         "ribbonReadBack": readback or {"start": None, "duration": None},
         "attributedSpid": effect.get("spid") if effect else None,
         "effectCTn": effect.get("cTn") if effect else None,
+        # All of the shape's effects when the press left more than one, which a
+        # target with a prerequisite always does. ``effectCTn`` above is the
+        # representative; this is what lets the offline side pick the one
+        # carrying the pressed value rather than the tile's default.
+        "effectCTns": effect.get("allCTns") if effect else None,
         "newEffectCount": effect.get("newEffectCount") if effect else None,
         "effectCount": {
             "before": effect_count[0] if effect_count else None,

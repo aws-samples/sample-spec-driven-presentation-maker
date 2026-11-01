@@ -4,7 +4,7 @@ Development-only tools in this directory create native PowerPoint evidence used 
 
 ## Morph spike
 
-Run from `/Users/naohitoa/dev/sdpm-animations`:
+Run from the repository root:
 
 ```bash
 uv run python scripts/animation_catalog/morph_probe.py --verify-package

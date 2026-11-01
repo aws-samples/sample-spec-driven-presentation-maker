@@ -1435,3 +1435,80 @@ def test_the_measured_motion_paths_are_the_five_gallery_groups(catalog, gui_capt
         == "p:animMotion"
         for group in ("lines", "arcs", "turns", "shapes", "loops")
     )
+
+
+# --- the fixtures are published, so they must name nobody -------------------
+def test_no_captured_package_names_a_person():
+    """Every `.pptx` fixture was saved by PowerPoint, which records who saved it.
+
+    This repository is public. An audit before the first push found **all seven**
+    committed packages carrying `cp:lastModifiedBy`, and two carrying
+    `dc:creator`, with a maintainer's full name in both. The packages are
+    evidence and are kept; the authorship metadata is not.
+
+    This test is the guard, not the fix: a fixture added from a fresh capture
+    arrives unscrubbed, so without it the name comes back on the next batch.
+    Run `scripts/animation_catalog/scrub_evidence.py --write` to clear it.
+    """
+    from scripts.animation_catalog.scrub_evidence import (
+        DEFAULT_ROOT,
+        identities_in,
+        packages,
+    )
+
+    found = packages(DEFAULT_ROOT)
+    assert found, "no captured packages found, so this guard is checking nothing"
+    carrying = {
+        path.relative_to(REPO_ROOT).as_posix(): identities_in(path) for path in found
+    }
+    named = {path: fields for path, fields in carrying.items() if fields}
+    assert not named, (
+        "captured packages name a person; run "
+        f"scripts/animation_catalog/scrub_evidence.py --write: {named}"
+    )
+
+
+def test_the_scrub_empties_the_identity_and_leaves_the_evidence(tmp_path):
+    """Scrubbing must not touch the OOXML the capture measured.
+
+    A scrub that changed more than authorship would quietly corrupt a
+    measurement, which is worse than the leak it fixes — so the effects are
+    counted before and after, and the identity is checked gone.
+    """
+    import shutil
+
+    from scripts.animation_catalog.generate import parse_gui_capture_package
+    from scripts.animation_catalog.scrub_evidence import identities_in, scrub
+
+    source = (
+        REPO_ROOT / "tests" / "fixtures" / "animations" / "gui-only"
+        / "batch-2026-11-01-complete" / "powerpoint-oracle.pptx"
+    )
+    package = tmp_path / "copy.pptx"
+    shutil.copy2(source, package)
+    before = parse_gui_capture_package(package)
+
+    # Put an identity back, so the scrub has something to remove even though the
+    # committed fixture is already clean.
+    import re
+    import zipfile
+
+    with zipfile.ZipFile(package) as archive:
+        entries = [(info, archive.read(info.filename)) for info in archive.infolist()]
+    with zipfile.ZipFile(package, "w", zipfile.ZIP_DEFLATED) as out:
+        for info, blob in entries:
+            if info.filename == "docProps/core.xml":
+                blob = re.sub(
+                    r"<cp:lastModifiedBy></cp:lastModifiedBy>",
+                    "<cp:lastModifiedBy>Someone Real</cp:lastModifiedBy>",
+                    blob.decode("utf-8"),
+                ).encode("utf-8")
+            out.writestr(info, blob)
+    assert identities_in(package) == {"cp:lastModifiedBy": "Someone Real"}
+
+    removed = scrub(package)
+    assert removed == {"cp:lastModifiedBy": "Someone Real"}
+    assert identities_in(package) == {}
+    after = parse_gui_capture_package(package)
+    assert set(after) == set(before), "the scrub changed which shapes carry effects"
+    assert after == before, "the scrub changed a measured effect"

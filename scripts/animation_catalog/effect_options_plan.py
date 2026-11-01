@@ -1,4 +1,6 @@
 #!/usr/bin/env python3
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
 """Derive the capture plan for every effect-option value the discovery pass found.
 
 ``discover_effect_options.py`` recorded, per gallery tile, every titled element
