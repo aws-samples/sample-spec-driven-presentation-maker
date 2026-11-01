@@ -4,6 +4,7 @@ version = "1.0.0"
 description = "spec-driven-presentation-maker Local MCP Server — stdio transport for Kiro CLI, Claude Desktop, etc. (Layer 2)"
 requires-python = ">=3.11"
 dependencies = [
+    # <2: mcp 2.0 removes mcp.server.fastmcp (FastMCP); migration tracked in #301.
     "mcp[cli]>=1.28.1,<2",
     "sdpm-skill",
     "pdfplumber>=0.11.0",
@@ -12,14 +13,12 @@ dependencies = [
     "openpyxl>=3.1.0",
 ]
 
-[tool.uv.sources]
-sdpm-skill = { path = "../../sdpm" }
+# An application, not a library: uv installs its dependencies, never builds it.
+[tool.uv]
+package = false
 
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "ruff",
-]
+[tool.uv.sources]
+sdpm-skill = { workspace = true }
 
 [tool.ruff]
 line-length = 120

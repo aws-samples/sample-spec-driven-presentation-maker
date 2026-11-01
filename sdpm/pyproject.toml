@@ -19,12 +19,6 @@ include = ["sdpm*"]
 [tool.setuptools.dynamic]
 version = {attr = "sdpm.__version__"}
 
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "ruff",
-]
-
 [tool.ruff]
 line-length = 120
 

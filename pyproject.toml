@@ -5,25 +5,31 @@ description = "AI-powered PowerPoint generation toolkit — from local CLI to fu
 requires-python = ">=3.11"
 dependencies = []
 
+# One workspace, one lock (uv.lock here) for every Python surface. Each artifact
+# installs exactly these versions: servers/local via `uv run --directory servers/local`,
+# the two runtime images and the API Lambda via `uv export --package <member>`.
+# Tests run against the same lock, so what CI tests is what ships.
+[tool.uv.workspace]
+members = ["sdpm", "servers/local", "servers/remote", "agent", "api"]
+
 [tool.uv.sources]
-sdpm-skill = { path = "sdpm", editable = true }
+sdpm-skill = { workspace = true }
+sdpm-agent = { workspace = true }
+sdpm-api = { workspace = true }
+sdpm-mcp-local = { workspace = true }
+sdpm-mcp-server = { workspace = true }
 
 [dependency-groups]
+# Every member (so tests import any surface with its shipped dependencies) + tooling.
 dev = [
     "sdpm-skill",
+    "sdpm-agent",
+    "sdpm-api",
+    "sdpm-mcp-local",
+    "sdpm-mcp-server",
     "pytest>=9.0.2",
-    "ruff",
-    "python-pptx",
-    "lxml",
-    "Pillow",
-    "qrcode",
-    "pygments>=2.19.2",
-    "mcp[cli]>=1.28.1,<2",
-    "boto3",
     "pytest-cov>=7.1.0",
-    # shared/ingest PDF conversion (tests/test_pdf_convert.py)
-    "pypdf>=4.0.0",
-    "pdfplumber>=0.11.0",
+    "ruff",
 ]
 
 [tool.ruff]
@@ -32,6 +38,8 @@ src = ["sdpm", "servers/local", "servers/remote"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
+# pytest-asyncio arrives as a runtime dependency of awslabs.aws-pricing-mcp-server (agent).
+asyncio_default_fixture_loop_scope = "function"
 filterwarnings = [
     # Our own code must never emit FutureWarning (e.g. lxml element truth-testing)
     "error::FutureWarning",

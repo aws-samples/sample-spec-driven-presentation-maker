@@ -32,19 +32,27 @@ if str(AGENT_DIR) not in sys.path:
 
 
 def _factory():
-    """Import agent/factory.py, skipping unless its runtime deps are present.
+    """Import agent/factory.py with agent's own top-level ``tools`` package.
 
-    Mirrors tests/test_message_hooks.py: a bare importorskip on `strands` is not
-    enough, because a stale editable install can leave it importable as an empty
-    namespace package. The module also pulls html2text via tools.web_tools. CI
-    installs agent/requirements.lock, so these tests run there; a bare local
-    `python` may not have them.
+    The workspace lock installs the agent's dependencies into the test environment,
+    so these tests always run. agent/ and servers/remote/ both have a top-level
+    ``tools`` package; when another test imported servers/remote's first, it sits in
+    sys.modules and ``factory``'s ``from tools.… import`` would hit it. Set it aside
+    for the import and put it back afterwards (factory keeps its bound names).
     """
-    strands = pytest.importorskip("strands")
-    if not hasattr(strands, "Agent"):
-        pytest.skip("strands does not provide Agent (stale install)")
-    pytest.importorskip("html2text")
-    return pytest.importorskip("factory")
+    if "factory" in sys.modules:
+        return sys.modules["factory"]
+    other = {name: sys.modules.pop(name) for name in list(sys.modules)
+             if name == "tools" or name.startswith("tools.")}
+    sys.path.insert(0, str(AGENT_DIR))
+    try:
+        import factory
+    finally:
+        sys.path.remove(str(AGENT_DIR))
+        for name in [n for n in sys.modules if n == "tools" or n.startswith("tools.")]:
+            del sys.modules[name]
+        sys.modules.update(other)
+    return factory
 
 
 class _FakeClient:

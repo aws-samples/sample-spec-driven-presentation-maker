@@ -10,14 +10,19 @@ permissions:
   contents: read
 
 jobs:
+  # The whole workspace (every member) on the Python the runtime images ship.
   python:
     runs-on: ubuntu-latest
+    env:
+      UV_PYTHON: "3.13"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.13"
       - uses: astral-sh/setup-uv@v10.3.2
+      - name: uv.lock matches every member's pyproject.toml
+        run: uv lock --check
       - name: Lint
         run: uv run ruff check sdpm/ servers/ shared/ api/ agent/
       - name: Vendored files match the manifest
@@ -28,17 +33,21 @@ jobs:
   # Local-surface guard: boots servers/local over real stdio (no mocks) and
   # exercises filesystem-anchored resolution (templates, workflows). The unit
   # suite mocks this surface, so regressions here used to slip through.
+  # Runs what an installed user gets: only the sdpm-mcp-local member's
+  # dependencies, on the oldest supported Python.
   local-smoke:
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    env:
+      UV_PYTHON: "3.11"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.11"
       - uses: astral-sh/setup-uv@v10.3.2
       - name: Smoke test local MCP server
-        run: uv run python scripts/smoke_local.py
+        run: uv run --package sdpm-mcp-local python scripts/smoke_local.py
 
   # The HTML browser check against a real Chrome: network block, popups, WebRTC
   # removal, layout measurement and the speaker view under the deck CSP. The
@@ -46,11 +55,13 @@ jobs:
   browser:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    env:
+      UV_PYTHON: "3.13"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
         with:
-          python-version: "3.12"
+          python-version: "3.13"
       - uses: astral-sh/setup-uv@v10.3.2
       - name: Allow Chrome's sandbox (Ubuntu 24.04 restricts unprivileged user namespaces)
         run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
@@ -179,7 +190,7 @@ jobs:
         if: always()
         run: docker logs remote || true
 
-  # Agent Runtime image (infra/lib/agent-stack.ts): linux/arm64, agent/ context.
+  # Agent Runtime image (infra/lib/agent-stack.ts): linux/arm64, root context.
   agent-image:
     runs-on: ubuntu-24.04-arm
     timeout-minutes: 20
@@ -189,7 +200,8 @@ jobs:
       - name: Build
         uses: docker/build-push-action@v7
         with:
-          context: agent
+          context: .
+          file: agent/Dockerfile
           platforms: linux/arm64
           tags: sdpm-agent:ci
           load: true
