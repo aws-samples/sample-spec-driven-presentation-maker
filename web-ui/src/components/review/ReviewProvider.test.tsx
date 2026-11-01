@@ -13,7 +13,7 @@ const { toastMock, createReview } = vi.hoisted(() => {
 vi.mock("sonner", () => ({ toast: toastMock }))
 vi.mock("@/services/deckService", () => ({ createReview }))
 
-import { ReviewProvider, useReview, type ReviewContextValue } from "./ReviewProvider"
+import { ReviewProvider, useReview, type ReviewContextValue, type SubmittedReview } from "./ReviewProvider"
 
 let api: ReviewContextValue
 const setApi = (value: ReviewContextValue | null) => { api = value as ReviewContextValue }
@@ -133,9 +133,9 @@ describe("ReviewProvider", () => {
     addSaved("intro", "  bigger  ")
     addSaved("sales", "@A colour")
     addSaved("gone", "slide was deleted")
-    let created = { id: "", message: "" }
+    let created: SubmittedReview | null = null
     await act(async () => { created = await api.submit("  overall note ") })
-    expect(created).toEqual({ id: "20261101-102000-a1b2", message: "[review:20261101-102000-a1b2] …" })
+    expect(created).toMatchObject({ id: "20261101-102000-a1b2", message: "[review:20261101-102000-a1b2] …" })
     expect(createReview).toHaveBeenCalledWith("d1", {
       note: "overall note",
       comments: [
@@ -148,6 +148,40 @@ describe("ReviewProvider", () => {
     // The frames come back from the chat message while its turn runs (setWorkingReview).
     expect(api.openSent).toEqual([])
     expect(addSaved("intro", "after")).toBe("D")
+  })
+
+  it("restore puts the sent frames back in front of frames drawn since, once", async () => {
+    createReview.mockResolvedValue({ id: "20261101-102000-a1b2", message: "m" })
+    renderProvider()
+    addSaved("intro", "first")
+    addSaved("sales", "second")
+    let created: SubmittedReview | null = null
+    await act(async () => { created = await api.submit("") })
+    addSaved("intro", "drawn while sending")
+    act(() => { created!.restore() })
+    expect(api.drafts.map(d => [d.name, d.text])).toEqual([["A", "first"], ["B", "second"], ["C", "drawn while sending"]])
+    expect(api.drafts[0].rect).toEqual([10.4, 20.6, 300.2, 200.7])
+    act(() => { created!.restore() })
+    expect(api.drafts).toHaveLength(3)
+    expect(api.readyDrafts).toHaveLength(3)
+  })
+
+  it("restore writes the frames back to their deck's drafts when another deck is open", async () => {
+    createReview.mockResolvedValue({ id: "20261101-102000-a1b2", message: "m" })
+    const { rerender } = renderProvider()
+    addSaved("intro", "first")
+    let created: SubmittedReview | null = null
+    await act(async () => { created = await api.submit("") })
+    const other = (deckId: string) => (
+      <ReviewProvider deckId={deckId} slugs={["intro", "sales"]} enabled agentBusy={false} openChat={openChat}>
+        <Capture />
+      </ReviewProvider>
+    )
+    rerender(other("d2"))
+    act(() => { created!.restore() })
+    expect(api.drafts).toEqual([])
+    rerender(other("d1"))
+    expect(api.drafts.map(d => d.text)).toEqual(["first"])
   })
 
   it("submit failure keeps the drafts", async () => {

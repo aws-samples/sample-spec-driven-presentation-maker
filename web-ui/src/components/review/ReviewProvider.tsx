@@ -88,18 +88,23 @@ export interface ReviewContextValue {
   lookup: (key: string) => FrameLookup | null
   /** The chat of `deckId` has a turn running for `review` (null: none); ignored for another deck. */
   setWorkingReview: (deckId: string, review: SentReview | null) => void
-  /** Create the request from the ready drafts; resolves to the chat message to send. */
-  submit: (note: string) => Promise<{ id: string; message: string }>
-  /** Requests whose chat message did not reach the agent; their card offers a retry. */
-  failed: ReadonlySet<string>
-  /** The chat send of request `id` failed; `retry` sends the same message again. */
-  markFailed: (id: string, retry: () => void) => void
-  retry: (id: string) => void
+  /**
+   * Create the request from the ready drafts (they leave the drafts); resolves to the chat
+   * message to send and `restore`, which puts the sent frames back into the drafts when the
+   * chat send fails.
+   */
+  submit: (note: string) => Promise<SubmittedReview>
   /** A frame was moved or resized on screen (the card follows it). */
   notifyFrameMoved: () => void
   onFrameMoved: (listener: () => void) => () => void
   setDragging: (dragging: boolean) => void
   isDragging: () => boolean
+}
+
+export interface SubmittedReview {
+  id: string
+  message: string
+  restore: () => void
 }
 
 export function sentFrameKey(requestId: string, name: string): string {
@@ -165,8 +170,6 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
   const [core, setCore] = useState<Core>(() => initCore(undefined))
   const coreRef = useRef(core)
   const [hintSeen, setHintSeen] = useState(false)
-  const [failed, setFailed] = useState<ReadonlySet<string>>(() => new Set())
-  const retries = useRef(new Map<string, () => void>())
 
   const size = useMemo<SlideSize>(() => (
     slideSize && slideSize.width > 0 && slideSize.height > 0 ? { width: slideSize.width, height: slideSize.height } : DEFAULT_SIZE
@@ -210,8 +213,6 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     if (coreRef.current.deckId === deckId) return
     clearUndo()
     editorText.current = null
-    retries.current.clear()
-    setFailed(new Set())
     update(() => initCore(deckId))
   }, [deckId, update, clearUndo])
 
@@ -398,7 +399,7 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     })
   }, [update])
 
-  const submit = useCallback(async (note: string): Promise<{ id: string; message: string }> => {
+  const submit = useCallback(async (note: string): Promise<SubmittedReview> => {
     closeEditor(true)
     const c = coreRef.current
     const forDeck = c.deckId
@@ -423,25 +424,21 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
         selected: null, editor: null, peek: null, toolOn: false,
       }
     })
-    return created
+    // Back in front of any frame drawn since (names are never reused, so none collide).
+    const back = (drafts: DraftFrame[]) => {
+      const names = new Set(drafts.map(d => d.name))
+      return [...frames.filter(f => !names.has(f.name)), ...drafts]
+    }
+    const restore = () => {
+      if (coreRef.current.deckId === forDeck) {
+        update(cur => ({ ...cur, drafts: back(cur.drafts) }))
+        return
+      }
+      const stored = loadDrafts(forDeck)
+      saveDrafts(forDeck, { seq: stored.seq, frames: back(stored.frames) })
+    }
+    return { ...created, restore }
   }, [closeEditor, update])
-
-  const markFailed = useCallback((id: string, retry: () => void) => {
-    retries.current.set(id, retry)
-    setFailed(cur => new Set(cur).add(id))
-  }, [])
-
-  const retry = useCallback((id: string) => {
-    const fn = retries.current.get(id)
-    retries.current.delete(id)
-    setFailed(cur => {
-      if (!cur.has(id)) return cur
-      const next = new Set(cur)
-      next.delete(id)
-      return next
-    })
-    fn?.()
-  }, [])
 
   /* ── Canvas plumbing (no re-render) ── */
   const notifyFrameMoved = useCallback(() => { for (const l of moveListeners.current) l() }, [])
@@ -459,13 +456,11 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     workingReview: core.working, openSent,
     setToolOn, toggleTool, addFrame, updateRect, commitText, deleteFrame, undoDelete, select, openEditor, closeEditor,
     setEditorText, setPeek, setHighlight, focusFrame, lookup, setWorkingReview, submit,
-    failed, markFailed, retry,
     notifyFrameMoved, onFrameMoved, setDragging, isDragging,
   }), [
     enabled, deckId, stableSlugs, size, agentBusy, core, hintSeen, readyDrafts, openSent,
     setToolOn, toggleTool, addFrame, updateRect, commitText, deleteFrame, undoDelete, select, openEditor, closeEditor,
     setEditorText, setPeek, setHighlight, focusFrame, lookup, setWorkingReview, submit,
-    failed, markFailed, retry,
     notifyFrameMoved, onFrameMoved, setDragging, isDragging,
   ])
 

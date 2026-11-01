@@ -6,9 +6,9 @@
  *
  * Built from the message itself (`parseReviewMessage`), so it restores from chat history:
  * header with the comment count and 対応中 while the agent turn for this message runs, 完了
- * after it; the note; one row per comment. While the request is in progress a click on a
- * comment jumps to its frame. When the chat message did not reach the agent, a Retry row
- * sends it again instead of the status.
+ * after it, or 未完了 when the turn failed (the comments went back to the drafts, see
+ * ChatPanel); the note; one row per comment. While the request is in progress a click on a
+ * comment jumps to its frame.
  */
 
 "use client"
@@ -24,22 +24,23 @@ interface ReviewRequestCardProps {
   request: SentReview
   /** The agent turn for this message is running. */
   working: boolean
+  /** The agent turn for this message failed (the message carries the flag, so it restores). */
+  failed?: boolean
   /** Deck of the chat this message belongs to; defaults to the open deck. */
   deckId?: string
 }
 
-export function ReviewRequestCard({ request, working, deckId }: ReviewRequestCardProps) {
+export function ReviewRequestCard({ request, working, failed = false, deckId }: ReviewRequestCardProps) {
   const t = useTranslations("review")
   const review = useReview()
   const forDeck = deckId ?? review?.deckId ?? null
-  // The open deck's state: slide numbers, frames on the canvas, a failed send.
+  // The open deck's state: slide numbers, frames on the canvas.
   const live = review && forDeck && forDeck === review.deckId ? review : null
   const { id, note, comments } = request
 
   const names = new Set(comments.map(c => c.name))
   const exists = (n: string) => names.has(n)
   const keyFor = (n: string) => sentFrameKey(id, n)
-  const failed = !!live?.failed.has(id) && !live.agentBusy
   const slideLabel = (slug: string) => {
     const i = live ? live.slugs.indexOf(slug) : -1
     return i >= 0 ? t("slide", { n: i + 1 }) : slug
@@ -74,16 +75,18 @@ export function ReviewRequestCard({ request, working, deckId }: ReviewRequestCar
     )
   }
 
-  let status: ReactNode = null
-  if (!failed) {
-    status = working ? (
+  let status: ReactNode
+  if (working) {
+    status = (
       <span className="flex items-center gap-1 text-xs text-foreground-secondary" data-review-status="working">
         <Loader2 className="h-2.5 w-2.5 animate-spin" aria-hidden />
         {t("status.working")}
       </span>
-    ) : (
-      <span className="text-xs text-foreground-secondary" data-review-status="done">{t("complete")}</span>
     )
+  } else if (failed) {
+    status = <span className="text-xs text-foreground-secondary" data-review-status="failed">{t("status.failed")}</span>
+  } else {
+    status = <span className="text-xs text-foreground-secondary" data-review-status="done">{t("complete")}</span>
   }
 
   return (
@@ -100,18 +103,6 @@ export function ReviewRequestCard({ request, working, deckId }: ReviewRequestCar
         </p>
       )}
       <div className="px-1 py-1.5">{comments.map(row)}</div>
-      {failed && (
-        <div className="flex items-center gap-2 border-t border-border px-3 py-2" data-review-failed>
-          <span className="flex-1 text-xs text-foreground-secondary">{t("sendFailed")}</span>
-          <button
-            type="button"
-            onClick={() => live?.retry(id)}
-            className="inline-flex h-7 items-center rounded-md border border-border-hover px-2.5 text-xs text-foreground transition-colors hover:bg-background-hover"
-          >
-            {t("retry")}
-          </button>
-        </div>
-      )}
     </div>
   )
 }

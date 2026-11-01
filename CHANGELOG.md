@@ -26,11 +26,13 @@ Entries before v0.5.0 were written retroactively as summaries.
   the comments grouped by slide, the file path, how to dispatch them (one composer per slide,
   given the file path and that slide's comment names) and a `[review:<id>]` marker. The
   orchestrator works from the message alone; the composers read the file. Nobody rewrites the
-  file, and the role documents are unchanged (the feature is the Web UI's). The chat shows the
-  request as a card with its comments, **In progress** while the agent's turn for it runs and
-  **Done** after, built from the message so it restores from chat history on both the AWS
-  stack and locally; the sent frames stay on the slides as **In progress** until the turn
-  ends. HTML decks show stacked static slide previews while the tool is on, so frames and the
+  file, each new request replaces the deck's previous one, and the role documents are
+  unchanged (the feature is the Web UI's). The chat shows the request as a card with its
+  comments, **In progress** while the agent's turn for it runs and **Done** after, built from
+  the message so it restores from chat history on both the AWS stack and locally; the sent
+  frames stay on the slides as **In progress** until the turn ends. When the turn fails, the
+  comments and the note go back to the drafts and the input to be sent again, and the card
+  shows **Not completed**, also after a reload. HTML decks show stacked static slide previews while the tool is on, so frames and the
   agent see the same layout. New API route `POST /decks/{id}/reviews` (edit permission,
   validated frames, slugs and sizes) with a matching local route; the message and guide texts
   live once in `shared/review_template.json`. `get_deck` now returns `slideSize` for PPTX

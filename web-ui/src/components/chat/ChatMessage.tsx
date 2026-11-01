@@ -187,9 +187,11 @@ interface ChatMessageProps {
   deckId?: string
   /** The agent turn for this (user) message is running: a change request card shows 対応中. */
   reviewWorking?: boolean
+  /** The agent turn for this (user) message failed: a change request card shows 未完了. */
+  failed?: boolean
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, sessionId, accessToken, onSend, hearingDisabled = false, deckId, reviewWorking = false }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, sessionId, accessToken, onSend, hearingDisabled = false, deckId, reviewWorking = false, failed = false }: ChatMessageProps) {
   const t = useTranslations("chat")
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
@@ -285,7 +287,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 ))}
               </div>
             )}
-            <ReviewRequestCard request={reviewRequest} working={reviewWorking} deckId={deckId} />
+            <ReviewRequestCard request={reviewRequest} working={reviewWorking} failed={failed} deckId={deckId} />
           </div>
         ) : isUser ? (
           /* User bubble */

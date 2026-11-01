@@ -607,7 +607,8 @@
     "footer": "Enter で保存 · Shift+Enter で改行",
     "slide": "スライド {n}",
     "status": {
-      "working": "対応中"
+      "working": "対応中",
+      "failed": "未完了"
     },
     "frameLabel": "コメント {name}",
     "deleteLabel": "コメントを削除 (Delete)",
@@ -624,7 +625,6 @@
     "busyHint": "エージェントの作業が終わると送信できます",
     "notePlaceholder": "全体への一言（任意）  ⌘↵ で依頼",
     "complete": "完了",
-    "sendFailed": "修正依頼を送信できませんでした",
-    "retry": "再試行"
+    "sendFailed": "修正依頼を送信できませんでした"
   }
 }

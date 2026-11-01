@@ -36,7 +36,7 @@ import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./ch
 import { useLocale, useTranslations } from "next-intl"
 import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsService"
 import type { ForkSessionPhase, KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
-import { useReview } from "@/components/review/ReviewProvider"
+import { useReview, type SubmittedReview } from "@/components/review/ReviewProvider"
 import { ReviewDraftBar } from "@/components/review/ReviewDraftBar"
 import { parseReviewMessage } from "@/lib/review/marker"
 
@@ -498,7 +498,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     uploadedFiles: UploadedFile[],
     snippets: { label: string; text: string }[],
     attachments: { fileName: string; fileType: string }[],
-    hideUserMessage = false,
   ): Promise<boolean> => {
     if (!configLoaded) return Promise.resolve(false)
 
@@ -515,7 +514,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       fullMessage = `<!--sdpm:include_images=true-->\n${fullMessage}`
     }
 
-    return stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments, { displayContent: text, hideUserMessage })
+    return stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments, { displayContent: text })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configLoaded, deckId, fetchWebImages, stream.sendMessage])
 
@@ -523,7 +522,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    * Send from the input. With comments waiting, the server first writes the review file and
    * returns the chat message (note, comments, file path, instructions, `[review:<id>]`),
    * which is sent as-is and also shown (Local .chat.json keeps the display text). A failed
-   * write keeps the comments and the typed note (`false` keeps the input).
+   * write keeps the comments and the typed note (`false` keeps the input). A failed send
+   * puts the comments back into the drafts and the note back into an empty input, so the
+   * request can be sent again; its message is flagged `failed`, so its card shows 未完了.
    */
   const handleInputSend = useCallback(async (
     text: string,
@@ -537,23 +538,25 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       handleSend(text, uploadedFiles, snippets, attachments)
       return
     }
-    let id: string
-    let message: string
+    let created: SubmittedReview
     try {
-      ({ id, message } = await r.submit(text))
+      created = await r.submit(text)
     } catch (err) {
       notifyError(tReview("sendFailed"), err)
       return false
     }
-    // The review file exists once submit() returns: a send that does not reach the agent
-    // leaves the request open, so its card offers to send the same message again.
-    const send = (again: boolean) => {
-      void handleSend(message, uploadedFiles, snippets, attachments, again).then((ok) => {
-        if (!ok) r.markFailed(id, () => send(true))
-      })
-    }
-    send(false)
-  }, [configLoaded, hasReviewDrafts, handleSend, tReview])
+    void handleSend(created.message, uploadedFiles, snippets, attachments).then((ok) => {
+      if (ok) return
+      created.restore()
+      // Later than ChatInput clearing the input after this send, and than the failed flag
+      // rendering (the save in onSendComplete runs before it).
+      setTimeout(() => {
+        const input = chatInputRef.current
+        if (text.trim() && input && !input.textareaRef.current?.value.trim()) input.replaceText(text)
+        saveLocalChat()
+      }, 100)
+    })
+  }, [configLoaded, hasReviewDrafts, handleSend, saveLocalChat, tReview])
 
   // --- Compose in-flight detection (for stop tooltip) ---
   const composeInFlight = useMemo(() => {
@@ -724,6 +727,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   hearingDisabled={i < lastUserIdx}
                   deckId={deckId}
                   reviewWorking={isLoading && i === lastUserIdx}
+                  failed={msg.failed}
                 />
               </div>
             ))

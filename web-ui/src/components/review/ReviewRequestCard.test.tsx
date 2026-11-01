@@ -3,7 +3,7 @@
 /**
  * The 修正依頼 card in the chat is built from the change request message itself (the
  * server's message for the shared fixture), restores from Local and Cloud history, and shows
- * 対応中 while the turn for that message runs, 完了 after.
+ * 対応中 while the turn for that message runs, 完了 after, 未完了 when the turn failed.
  */
 
 import fs from "fs"
@@ -82,17 +82,11 @@ describe("ReviewRequestCard", () => {
     expect(api?.toolOn).toBe(true)
   })
 
-  it("offers a retry instead of the status when the message failed, and the retry resends it", () => {
-    const { container } = withProvider(<ReviewRequestCard request={REQUEST} working={false} />)
-    expect(container.querySelector("[data-review-failed]")).toBeNull()
-    const resend = vi.fn()
-    act(() => api!.markFailed(ID, resend))
-    expect(container.querySelector("[data-review-failed]")).toBeTruthy()
-    expect(container.querySelector("[data-review-status]")).toBeNull()
-    expect(screen.getByText("Couldn't send the change request")).toBeTruthy()
-    fireEvent.click(screen.getByRole("button", { name: "Retry" }))
-    expect(resend).toHaveBeenCalledTimes(1)
-    expect(container.querySelector("[data-review-failed]")).toBeNull()
+  it("shows 未完了 instead of 完了 when the turn for the message failed", () => {
+    const { container } = withProvider(<ReviewRequestCard request={REQUEST} working={false} failed />)
+    expect(container.querySelector("[data-review-status]")?.getAttribute("data-review-status")).toBe("failed")
+    expect(screen.getByText("Not completed")).toBeTruthy()
+    expect(screen.queryByText("Done")).toBeNull()
   })
 
   it("renders without a provider, with slugs for slide labels", () => {
@@ -127,6 +121,30 @@ describe("ChatMessage with a change request", () => {
     expect(container.querySelector("[data-review-request-card]")).toBeTruthy()
     expect(screen.getByText("3 comments")).toBeTruthy()
     expect(container.textContent).not.toContain("[review:")
+  })
+
+  it("restores a failed send from Local history as 未完了", () => {
+    const [msg] = parseLocalHistory([
+      { role: "user", content: MESSAGE, toolUses: [], failed: true },
+      { role: "assistant", content: "Sorry, something went wrong. Please try again.", toolUses: [] },
+    ] as unknown as HistoryMessage[])
+    expect(msg.failed).toBe(true)
+    const { container } = withProvider(<ChatMessage role={msg.role} content={msg.content} failed={msg.failed} />)
+    expect(container.querySelector("[data-review-status]")?.getAttribute("data-review-status")).toBe("failed")
+    expect(screen.queryByText("Done")).toBeNull()
+  })
+
+  it("restores a request the agent never answered from Cloud history as 未完了", () => {
+    const history = [
+      { role: "user", content: [{ text: MESSAGE }] },
+      { role: "user", content: [{ text: "hello?" }] },
+      { role: "assistant", content: [{ text: "Hi" }] },
+    ] as unknown as HistoryMessage[]
+    const [unanswered, answered] = parseCloudHistory(history)
+    expect(unanswered.failed).toBe(true)
+    expect(answered.failed).toBeUndefined()
+    const { container } = withProvider(<ChatMessage role={unanswered.role} content={unanswered.content} failed={unanswered.failed} />)
+    expect(container.querySelector("[data-review-status]")?.getAttribute("data-review-status")).toBe("failed")
   })
 
   it("shows 対応中 while the turn for the message runs", () => {

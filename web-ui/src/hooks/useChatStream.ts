@@ -39,6 +39,8 @@ export interface Message {
   snippets?: { label: string; text: string }[]
   attachments?: { fileName: string; fileType: string }[]
   mcpStatus?: McpServerStatus[]
+  /** User message whose turn failed (saved in Local .chat.json): a change request card shows 未完了. */
+  failed?: boolean
 }
 
 /** Shape of tool-use callback data from the agent streaming API. */
@@ -308,6 +310,8 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
             ...updated[updated.length - 1],
             content: displayMessage,
           }
+          const sent = updated.length - 2
+          if (!options?.hideUserMessage && updated[sent]?.role === "user") updated[sent] = { ...updated[sent], failed: true }
           return updated
         })
       }
