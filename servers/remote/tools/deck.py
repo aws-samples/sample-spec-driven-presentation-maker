@@ -3,7 +3,7 @@
 """Deck CRUD operations via Storage ABC.
 
 Access control is enforced at the storage layer — users can only access their own decks
-or decks explicitly shared with them. See shared/authz.py for authorization logic.
+or public decks. See shared/authz.py for authorization logic.
 
 # Security: AWS manages infrastructure security. You manage access control,
 # data classification, and IAM policies. See SECURITY.md for details.

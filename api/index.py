@@ -53,7 +53,7 @@ from shared.review import (
     validate_review_submission,
 )
 from shared.schema import (
-    deck_pk, deck_sk, shared_pk, fav_sk,
+    deck_pk, deck_sk, fav_sk,
     DECK_SK_PREFIX, FAV_SK_PREFIX,
     extract_deck_id, extract_fav_id,
     GSI_PUBLIC_DECKS, public_gsi1pk,
@@ -887,30 +887,6 @@ def list_favorites() -> Dict[str, Any]:
     return {"decks": result}
 
 
-@app.get("/decks/shared")
-def list_shared() -> Dict[str, Any]:
-    """List decks shared with the current user."""
-    user_id = get_user_id(app.current_event)
-    resp = table.query(
-        KeyConditionExpression=Key("PK").eq(shared_pk(user_id)) & Key("SK").begins_with(DECK_SK_PREFIX),
-    )
-    deck_items = []
-    for item in resp.get("Items", []):
-        deck_id = extract_deck_id(item["SK"])
-        owner_id = item.get("ownerUserId", "")
-        if not owner_id:
-            continue
-        owner_resp = table.get_item(Key={"PK": deck_pk(owner_id), "SK": deck_sk(deck_id)})
-        owner_deck = owner_resp.get("Item")
-        if owner_deck and "deletedAt" not in owner_deck:
-            deck_items.append(owner_deck)
-
-    extras = _get_deck_extras(deck_items)
-    decks = [_deck_summary(item, extras) for item in deck_items]
-    decks.sort(key=lambda d: d["updatedAt"], reverse=True)
-    return {"decks": decks}
-
-
 @app.get("/decks/public")
 def list_public() -> Dict[str, Any]:
     """List public decks via PublicDecks GSI."""
@@ -1057,8 +1033,7 @@ def get_deck_html(deck_id: str) -> Any:
     Query params:
         purpose: "present" (inline, 4 h) or "download" (attachment, 15 min).
 
-    Same read permission as get_deck (owner, collaborator, viewer of a public
-    deck). The URL is on the S3 regional endpoint, never CloudFront.
+    Same read permission as get_deck (owner, or viewer of a public deck). The URL is on the S3 regional endpoint, never CloudFront.
 
     Returns:
         Dict with url and expiresIn (seconds).
@@ -1278,7 +1253,7 @@ def put_outline(deck_id: str) -> Dict[str, Any]:
 
     Unconditional overwrite by design: the editor tells the agent what changed in the same
     turn (a user message carrying the diff), so the agent — not the API — reconciles its own
-    context. Owners and collaborators may write (same permission as editing slides).
+    context. Only the owner may write (same permission as editing slides).
 
     Args:
         deck_id: Deck identifier.
@@ -1360,8 +1335,8 @@ def create_review(deck_id: str) -> Any:
     ``reviews/<id>.json`` (what was sent plus the composers' guide; nobody rewrites it) and
     returns the chat message the Web UI sends to the orchestrator. The server picks the
     id and takes slide_size from deck.json; the client sends only
-    ``{note, comments: [{name, slide, rect, text}]}``. Owners and collaborators may write
-    (same permission as editing slides).
+    ``{note, comments: [{name, slide, rect, text}]}``. Only the owner may write (same
+    permission as editing slides).
 
     Args:
         deck_id: Deck identifier.

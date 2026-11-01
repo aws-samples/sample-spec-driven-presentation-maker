@@ -163,7 +163,7 @@ def test_html_refuses_a_non_html_key(monkeypatch, index):
     assert index.get_deck_html("d1")[1] == 404
 
 
-@pytest.mark.parametrize("role", ["owner", "collaborator", "viewer"])
+@pytest.mark.parametrize("role", ["owner", "viewer"])
 def test_html_present_is_a_regional_inline_presign(monkeypatch, index, role):
     _setup(monkeypatch, index, role=role, deck={"htmlS3Key": HTML_KEY}, query={"purpose": "present"})
     result = index.get_deck_html("d1")

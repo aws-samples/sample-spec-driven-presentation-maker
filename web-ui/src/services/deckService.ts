@@ -18,7 +18,6 @@ export interface DeckSummary {
   thumbnailUrl: string | null
   owner?: string
   visibility?: "public" | "private"
-  collaborators?: string[]
   pptxUrl?: string | null
 }
 
@@ -50,10 +49,8 @@ export interface DeckDetail {
   sessionOrigin?: SessionOrigin
   visibility?: "public" | "private"
   isOwner?: boolean
-  role?: "owner" | "collaborator" | "viewer"
+  role?: "owner" | "viewer"
   ownerAlias?: string
-  collaborators?: string[]
-  collaboratorAliases?: Record<string, string>
   /** deck.json `outputFormat`; PPTX responses omit it, so a missing value means "pptx". */
   outputFormat?: "pptx" | "html"
   /** HTML decks: in-app view URL of output.html (cloud: 15-minute presigned URL), null until built. */
@@ -354,69 +351,6 @@ export async function listPublicDecks(idToken: string): Promise<DeckSummary[]> {
   const data = await response.json()
   return data.decks
 }
-
-/**
- * Share or unshare a deck with a collaborator.
- *
- * @param deckId - Deck identifier
- * @param collaboratorId - User sub to share with
- * @param idToken - Cognito ID token
- * @param action - "add" or "remove"
- * @returns Updated collaborators list
- */
-export async function shareDeck(deckId: string, collaboratorId: string, idToken: string, action: "add" | "remove" = "add", collaboratorAlias?: string): Promise<{collaborators: string[], collaboratorAliases: Record<string, string>}> {
-  const base = await getApiBaseUrl()
-  const resp = await fetch(`${base}decks/${deckId}/share`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ collaboratorId, action, collaboratorAlias }),
-  })
-  if (!resp.ok) return { collaborators: [], collaboratorAliases: {} }
-  const data = await resp.json()
-  return { collaborators: data.collaborators || [], collaboratorAliases: data.collaboratorAliases || {} }
-}
-
-/**
- * List decks shared with the current user.
- *
- * @param idToken - Cognito ID token
- * @returns Array of shared deck summaries
- */
-export async function listSharedDecks(idToken: string): Promise<DeckSummary[]> {
-  if (IS_LOCAL) return []
-  const base = await getApiBaseUrl()
-  const response = await fetch(`${base}decks/shared`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  })
-  if (!response.ok) return []
-  const data = await response.json()
-  return data.decks
-}
-
-export interface UserSearchResult {
-  sub: string
-  alias: string
-  email: string
-}
-
-/**
- * Search users by alias/email prefix for share autocomplete.
- *
- * @param query - Search query (min 2 chars)
- * @param idToken - Cognito ID token
- * @returns Array of matching users
- */
-export async function searchUsers(query: string, idToken: string): Promise<UserSearchResult[]> {
-  if (query.length < 2) return []
-  const base = await getApiBaseUrl()
-  const response = await fetch(`${base}users/search?q=${encodeURIComponent(query)}`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  })
-  if (!response.ok) return []
-  const data = await response.json()
-  return data.users || []
-}
-
 
 /**
  * Soft-delete a deck.

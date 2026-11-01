@@ -61,6 +61,17 @@ Entries before v0.5.0 were written retroactively as summaries.
   Python tests run on 3.13, the version the images ship, and the local smoke test runs on
   3.11, the oldest supported version, with only the local server's dependencies.
 
+### Removed
+
+- **Deck sharing with specific users and the `collaborator` role.** The Share dialog (user
+  search, collaborator list), the deck card's Share menu item and collaborator badge, and the
+  **Shared** tab of the deck list are gone, together with `GET /decks/shared` and the
+  `SHARED#` lookup in `shared/authz.py`. The feature never worked: nothing wrote `SHARED#`
+  records, and the `/decks/{id}/share` and `/users/search` routes the dialog called did not
+  exist. Deck roles are now owner / viewer / none with the permission matrix otherwise
+  unchanged. Public / private visibility stays as it is: to show a deck to others, make it
+  public (**Internal**) or download the PPTX / HTML.
+
 ### Security
 
 - **Local Web UI refuses cross-site POSTs.** Every POST route of the local server (`sdpm webui`,

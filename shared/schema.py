@@ -40,18 +40,6 @@ def deck_sk(deck_id: str) -> str:
     return f"DECK#{deck_id}"
 
 
-def shared_pk(user_id: str) -> str:
-    """Partition key for shared deck access records.
-
-    Args:
-        user_id: User identifier of the collaborator.
-
-    Returns:
-        PK string in format SHARED#{user_id}.
-    """
-    return f"SHARED#{user_id}"
-
-
 def fav_sk(deck_id: str) -> str:
     """Sort key for a favorite record.
 

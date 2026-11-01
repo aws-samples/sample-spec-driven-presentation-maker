@@ -32,7 +32,6 @@
     "tabs": {
       "mine": "My Decks",
       "favorites": "Favorites",
-      "shared": "Shared",
       "public": "Internal"
     },
     "emptyMineTitle": "No decks yet",
@@ -72,7 +71,6 @@
     "downloadPptx": "Download PPTX",
     "makePrivate": "Make Private",
     "makeInternal": "Make Internal",
-    "share": "Share",
     "delete": "Delete",
     "previewAlt": "Preview of {name}",
     "internal": "Internal",
@@ -84,12 +82,7 @@
     "private": "Private",
     "share": "Share",
     "shareInternallyTitle": "Share internally?",
-    "shareInternallyDescription": "This deck will be discoverable by everyone in the organization.",
-    "shareThisDeck": "Share this deck",
-    "searchByAlias": "Search by alias…",
-    "collaborators": "Collaborators",
-    "removeCollaborator": "Remove {name}",
-    "noCollaborators": "No collaborators yet"
+    "shareInternallyDescription": "This deck will be discoverable by everyone in the organization."
   },
   "search": {
     "searching": "Searching slides across the organization…",

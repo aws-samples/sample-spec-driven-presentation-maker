@@ -158,8 +158,8 @@ buttons:
 - **PDF** opens the print view in a new tab; print it from the browser to save a PDF.
 - **HTML** (download icon) saves the single `output.html`, which works offline.
 
-Sharing and public decks work as for PPTX decks: anyone who can view the deck can present
-and download it. In the local Web UI the header has one **Open** button, which opens
+Public decks work as for PPTX decks: anyone who can view the deck can present and download
+it. In the local Web UI the header has one **Open** button, which opens
 `output.html` in your default browser.
 
 ## Your browser (Web UI)
