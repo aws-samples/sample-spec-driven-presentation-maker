@@ -43,6 +43,8 @@ automatically — just describe what you want:
 | "I hand-edited the PPTX, continue from it" | Syncs your PowerPoint edits back into the deck |
 | "Create a style like …" | Builds a reusable style guide (colors, typography, decoration) |
 | "Translate this deck to English" | Creates a language-variant deck next to the original (source deck untouched) |
+| "Make it an HTML deck" (or `@format:html`) | Builds the deck as an interactive single-file HTML presentation (reveal.js) instead of a PPTX; PPTX stays the default |
+| Comment on the slide preview (Web UI) | Draw frames on the slides, comment on each, and send them all as one change request |
 
 ---
 

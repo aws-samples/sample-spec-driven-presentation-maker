@@ -169,6 +169,13 @@ Kiro CLI over ACP — and opens it. Run `kiro-cli login` once before the first u
 installer also creates a desktop shortcut. An MCP-only install adds the Web UI later with
 `sdpm update --with-webui`. Details: [Web UI Local mode](../../web-ui/README.md#local-mode).
 
+To ask for changes on specific parts of a slide, turn on the **Comment** tool in the preview
+header (or press `C`). Drag to outline an area, or click to place a frame, then write a comment
+for it; type `@` to reference another frame (frames are named A, B, …). The frames collect
+above the chat input, and **Request changes** sends them all as one change request together
+with whatever you typed in the chat input. The Comment tool is available on desktop only, in
+Local mode and on the AWS stack.
+
 ## AWS deployment
 
 For a shared remote MCP server or hosted Web UI, use the
