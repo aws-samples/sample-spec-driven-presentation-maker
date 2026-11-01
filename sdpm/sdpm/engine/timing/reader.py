@@ -45,6 +45,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass, field
+from fractions import Fraction
 from functools import lru_cache
 from typing import Any, Iterable, Mapping, Sequence
 
@@ -1122,10 +1123,13 @@ class _TimingReader:
         preset: Mapping[str, Any],
         sequence: str,
     ) -> tuple[str, int | None]:
-        expected = sorted(str(tag) for tag in entry.ooxml.get("behaviorChildren") or ())
         found = [
             f"p:{_local(child)}" for child in children if isinstance(child.tag, str)
         ]
+        measured = entry.ooxml.get("behaviors")
+        if isinstance(measured, (list, tuple)) and measured:
+            return self._read_measured_behaviors(children, entry, measured, found, sequence)
+        expected = sorted(str(tag) for tag in entry.ooxml.get("behaviorChildren") or ())
         if sorted(found) != expected:
             raise _Unsupported(
                 f"{sequence} effect writes behaviors {sorted(found)} but catalog entry "
@@ -1162,6 +1166,64 @@ class _TimingReader:
                 f"{sequence} effect animates {len(targets)} different shapes in one effect"
             )
         return targets.pop(), duration
+
+    def _read_measured_behaviors(
+        self,
+        children: etree._Element,
+        entry: Any,
+        measured: Sequence[Mapping[str, Any]],
+        found: Sequence[str],
+        sequence: str,
+    ) -> tuple[str, int | None]:
+        """Read back an effect whose behaviours the GUI capture measured.
+
+        The general path above compares the written children against the
+        entry's distinct ``behaviorChildren`` and then checks each one against
+        the catalog's general rules. Neither works for a measured effect: **57
+        of the 76 repeat an element**, so a distinct comparison rejects a
+        correct effect, and an emphasis ``p:set`` animates a font attribute
+        rather than the visibility the general rule insists on.
+
+        What replaces both is a stricter statement: the written elements must be
+        the measured ones, **in the measured order**. The duration is recovered
+        by inverting the one thing the writer is allowed to change — the
+        proportional scale — using the first behaviour whose measured duration
+        is a number the writer scales.
+        """
+        expected = [str(behavior.get("element")) for behavior in measured]
+        if list(found) != expected:
+            raise _Unsupported(
+                f"{sequence} effect writes behaviors {list(found)} but catalog entry "
+                f"{entry.key!r} measured {expected}"
+            )
+        targets: set[str] = set()
+        scale: Fraction | None = None
+        for node, behavior in zip(children, measured):
+            tag = f"p:{_local(node)}"
+            carrier = _child(node, "cBhvr")
+            if carrier is None:
+                raise _Unsupported(f"{sequence} behavior {tag} has no p:cBhvr")
+            _only_children(carrier, {"cTn", "tgtEl", "attrNameLst"}, f"{tag}/p:cBhvr")
+            carrier_ctn = _child(carrier, "cTn")
+            if carrier_ctn is None:
+                raise _Unsupported(f"{tag}/p:cBhvr has no p:cTn")
+            targets.add(self._read_target(carrier, allow_range=True))
+            written = carrier_ctn.get("dur")
+            source = behavior.get("durMs")
+            if scale is None and written is not None and source and written.isdigit():
+                # The visibility p:set is skipped as a scale source on purpose:
+                # its duration is 1 ms at every effect duration, so a ratio
+                # taken from it would always read back as 1 ms.
+                if not (tag == "p:set" and int(source) == 1):
+                    scale = Fraction(int(written), int(source))
+        if len(targets) != 1:
+            raise _Unsupported(
+                f"{sequence} effect animates {len(targets)} different shapes in one effect"
+            )
+        measured_duration = entry.ooxml.get("measuredDurationMs")
+        if scale is None or measured_duration is None:
+            return targets.pop(), None
+        return targets.pop(), int(round(int(measured_duration) * scale))
 
     def _check_visibility_set(
         self,

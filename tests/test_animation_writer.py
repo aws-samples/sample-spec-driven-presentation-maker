@@ -67,54 +67,76 @@ NS = {
 #:
 #: The scripting-oracle capture under
 #: ``tests/fixtures/animations/oracle-16.113.1`` moved 59 transition candidates
-#: from refused to generated and emptied ``generatedDespiteGap``: ``flashbulb``
-#: used to be written off a same-shaped tile while its own enum→element mapping
-#: stayed open, and PowerPoint has now written ``p14:flash`` for it directly.
-#: Every remaining refusal but one is animation-side, where the dictionary
-#: cannot author anything at all (``add effect`` is not implemented in
-#: 16.113.1); the exception is the reversed Clock variant, whose element is
-#: measured but which sdpm's parameter-keyed JSON cannot select.
+#: from refused to generated: ``flashbulb`` used to be written off a same-shaped
+#: tile while its own enum→element mapping stayed open, and PowerPoint has now
+#: written ``p14:flash`` for it directly.
+#:
+#: The GUI capture under
+#: ``tests/fixtures/animations/gui-only/batch-2026-11-01-complete`` then moved
+#: 113 more entries from refused to generated, and that is the animation side
+#: opening up. It measured all 76 GUI-addressable animation values **with their
+#: behaviour payloads**, which is what the 71 payload-refused gallery tiles were
+#: missing: the native fixtures recorded *which* children a tile writes, never
+#: what they say. **All 95 entrance, exit and emphasis tiles are now generated
+#: and none is refused**, and ``payloadRefusals`` has no ``guiItems`` left in it.
+#:
+#: ``generatedDespiteGap`` is no longer empty, and it is not a regression. Each
+#: of its 39 entries is an ``MsoAnimEffect`` candidate whose own enumerator →
+#: OOXML mapping the dictionary could not establish (``add effect`` is not
+#: implemented in 16.113.1), which resolves by ``presetClass`` + ``presetID`` to
+#: a gallery tile the GUI capture measured. The test below checks that
+#: resolution per entry rather than taking the list on trust.
 CATALOG_COVERAGE = {
     "total": 667,
     "generated": {
-        "total": 343,
-        "guiItems": 142,
-        "candidates": 201,
-        "animation": 126,
+        "total": 458,
+        "guiItems": 218,
+        "candidates": 240,
+        "animation": 241,
         "transition": 217,
     },
     "refused": {
-        "total": 324,
-        "guiItems": 138,
-        "candidates": 186,
-        "animation": 321,
+        "total": 209,
+        "guiItems": 62,
+        "candidates": 147,
+        "animation": 206,
         "transition": 3,
     },
-    "generatedDespiteGap": [],
+    "generatedDespiteGap": [
+        f"MsoAnimEffect.animation type {name}"
+        for name in (
+            "bold flash", "bold reveal", "boomerang", "bounce", "brush on color",
+            "brush on underline", "center revolve", "change fill color", "change font color",
+            "change line color", "complementary color", "complementary color 2",
+            "constrasting color", "credits", "darken", "desaturate", "expand", "flash bulb",
+            "flicker", "flip", "float", "fly", "grow and turn", "grow shrink", "grow with color",
+            "lighten", "peek", "pinwheel", "rise up", "spin", "spinner", "spiral", "stretch",
+            "swivel", "teeter", "transparency", "wave", "whip", "zoom",
+        )
+    ],
     #: The two numbers Task 8 has to drive to zero, as slices of the same pass:
     #: refusals whose OOXML *mapping* was never captured, and refusals whose
-    #: behavior *payload* was never captured (the 71 gallery tiles plus the 50
-    #: enum candidates that mirror them).
-    "captureRequiredRefusals": 203,
-    "payloadRefusals": {"total": 121, "guiItems": 71, "candidates": 50},
+    #: behavior *payload* was never captured. The payload slice is down from 121
+    #: to 11 and holds no gallery tile at all — only enum candidates whose own
+    #: mapping is open, so they resolve to no measured tile.
+    "captureRequiredRefusals": 198,
+    "payloadRefusals": {"total": 11, "guiItems": 0, "candidates": 11},
 }
 
 #: The gallery capture recorded which behavior children PowerPoint wrote, not
 #: the values inside them, so only 24 of the 95 entrance/emphasis/exit tiles
 #: can be reproduced. The other 71 record the unresolved payload in the
 #: catalog and must be refused, never approximated.
+#: Was 24 reproducible and 71 refused, with the refusals naming 92 unresolved
+#: behaviour children. The GUI capture measured every one of those payloads, so
+#: the whole gallery is reproducible and the dict is empty. It is kept rather
+#: than deleted because a tile sliding back into "refused" is exactly the
+#: regression worth noticing, and an empty expectation states that plainly.
 GALLERY_PAYLOADS = {
     "tiles": 95,
-    "reproducible": 24,
-    "refused": 71,
-    "unresolvedElements": {
-        "p:anim": 49,
-        "p:set": 15,
-        "p:animClr": 12,
-        "p:animScale": 7,
-        "p:animRot": 6,
-        "p:animMotion": 3,
-    },
+    "reproducible": 95,
+    "refused": 0,
+    "unresolvedElements": {},
 }
 
 #: A fully captured entrance tile: presetID 10, ``p:animEffect`` filter "fade"
@@ -895,15 +917,38 @@ def test_unknown_effect_lists_the_supported_effects():
         _build(slide_def)
 
 
-def test_motion_path_presets_are_refused_until_their_geometry_is_captured():
+def test_a_motion_path_preset_writes_the_path_powerpoint_wrote():
+    """Measured, not re-derived. This test used to assert the opposite.
+
+    Every motion-path preset was capture-required because PowerPoint stores a
+    preset path as literal path data and no available capture contained it. The
+    2026-11-01 GUI capture does, so the writer now transcribes the measured
+    geometry — and the assertion is the path string itself, because a Bézier
+    that is close is wrong.
+    """
     slide_def = _slide(
         animations={
-            "mainSequence": [_effect("fx", "hero", preset={"category": "motionPath", "effect": "arcs"})],
+            "mainSequence": [
+                _effect(
+                    "fx", "hero",
+                    preset={"category": "motionPath", "effect": "arcs", "variant": None},
+                    timing={"durationMs": 2000},
+                )
+            ],
             "interactiveSequences": [],
         }
     )
-    with pytest.raises(CapabilityGapError, match="animMotion|motionPath|path"):
-        _build(slide_def)
+    _, slide = _build(slide_def)
+    motions = _timing(slide).findall(".//{%s}animMotion" % NS["p"])
+    assert len(motions) == 1
+    assert motions[0].get("path") == (
+        "M 0 0 L 0.067 0.04 C 0.081 0.049 0.102 0.054 0.124 0.054 "
+        "C 0.149 0.054 0.169 0.049 0.183 0.04 L 0.25 0 E"
+    )
+    assert motions[0].get("origin") == "layout"
+    assert motions[0].get("pathEditMode") == "relative"
+    names = [node.text for node in motions[0].findall(".//{%s}attrName" % NS["p"])]
+    assert names == ["ppt_x", "ppt_y"]
 
 
 # --- presets and behaviors -------------------------------------------------
@@ -1041,10 +1086,16 @@ def test_media_play_preset_writes_the_captured_command():
     assert (cmd.get("type"), cmd.get("cmd")) == ("call", "playFrom(0.0)")
 
 
-def test_a_preset_with_an_unresolved_behavior_payload_is_refused_not_approximated():
-    """Fly In records ``p:anim`` plus the visibility ``p:set``, but not the
-    value formula inside ``p:anim``. Emitting the node without its payload
-    would be a silent approximation, so the whole preset is refused."""
+def test_a_presets_measured_payload_is_transcribed_rather_than_approximated():
+    """Fly In's ``p:anim`` has no ``p:to`` at all: its payload is a keyframe list.
+
+    This test used to assert the preset was refused, because the native capture
+    recorded *which* children Fly In writes and not what they say. The GUI
+    capture says: two ``p:anim`` of ``calcmode="lin" valueType="num"``,
+    ``additive="base"`` on the carrier, each with a ``p:tavLst`` of two
+    keyframes holding ``#ppt_x`` and ``#ppt_y``. A writer that synthesised a
+    ``p:to`` here would have produced a plausible animation that is not this one.
+    """
     slide_def = _slide(
         animations={
             "mainSequence": [
@@ -1053,14 +1104,136 @@ def test_a_preset_with_an_unresolved_behavior_payload_is_refused_not_approximate
             "interactiveSequences": [],
         }
     )
-    with pytest.raises(CapabilityGapError) as error:
+    _, slide = _build(slide_def)
+    timing = _timing(slide)
+    anims = timing.findall(".//{%s}anim" % NS["p"])
+    assert len(anims) == 2
+    assert [node.get("valueType") for node in anims] == ["num", "num"]
+    carriers = [node.find("{%s}cBhvr" % NS["p"]) for node in anims]
+    assert [node.get("additive") for node in carriers] == ["base", "base"]
+    assert [
+        [inner.text for inner in node.findall(".//{%s}attrName" % NS["p"])] for node in anims
+    ] == [["ppt_x"], ["ppt_y"]]
+    keyframes = anims[0].findall(".//{%s}tav" % NS["p"])
+    assert [node.get("tm") for node in keyframes] == ["0", "100000"]
+    assert [
+        node.find(".//{%s}strVal" % NS["p"]).get("val") for node in keyframes
+    ] == ["#ppt_x", "#ppt_x"]
+
+
+def test_a_longer_duration_scales_every_measured_behaviour_in_proportion():
+    """Measured: Duration 0.50 → 1.00 doubled all five of Wave's behaviours.
+
+    The motion went 250 → 500 and the four rotations 125 → 250 at delays 0,
+    250, 500 and 750, while ``@path`` and ``@by`` did not move at all. Those
+    are the numbers PowerPoint wrote, so they are the numbers asserted.
+    """
+    slide_def = _slide(
+        animations={
+            "mainSequence": [
+                _effect(
+                    "fx", "hero",
+                    preset={"category": "emphasis", "effect": "wave", "variant": None},
+                    timing={"durationMs": 1000},
+                )
+            ],
+            "interactiveSequences": [],
+        }
+    )
+    _, slide = _build(slide_def)
+    timing = _timing(slide)
+    motion = timing.find(".//{%s}animMotion" % NS["p"])
+    assert motion.find("{%s}cBhvr/{%s}cTn" % (NS["p"], NS["p"])).get("dur") == "500"
+    assert motion.get("path") == "M 0.0 0.0 L 0.0 -0.07213", "geometry does not scale"
+    rotations = timing.findall(".//{%s}animRot" % NS["p"])
+    assert [node.get("by") for node in rotations] == [
+        "1500000", "-1500000", "-1500000", "1500000",
+    ]
+    carriers = [node.find("{%s}cBhvr/{%s}cTn" % (NS["p"], NS["p"])) for node in rotations]
+    assert [node.get("dur") for node in carriers] == ["250"] * 4
+    assert [
+        node.find(".//{%s}cond" % NS["p"]).get("delay") for node in carriers
+    ] == ["0", "250", "500", "750"]
+
+
+def test_the_visibility_toggle_is_exempt_from_the_scaling_and_recomputed():
+    """Measured: Fly Out hides the shape at 499 ms of 500 and at 999 of 1000.
+
+    Scaling 499 would give 998. It is 999, so the delay is recomputed from the
+    effect duration rather than scaled, and the 1 ms duration does not scale at
+    all — it stayed 1 while every animated behaviour doubled.
+    """
+    def build(duration):
+        slide_def = _slide(
+            animations={
+                "mainSequence": [
+                    _effect(
+                        "fx", "hero",
+                        preset={"category": "exit", "effect": "flyOut", "variant": None},
+                        timing={"durationMs": duration},
+                    )
+                ],
+                "interactiveSequences": [],
+            }
+        )
+        _, slide = _build(slide_def)
+        node = _timing(slide).find(".//{%s}set" % NS["p"])
+        ctn = node.find("{%s}cBhvr/{%s}cTn" % (NS["p"], NS["p"]))
+        return ctn.get("dur"), ctn.find(".//{%s}cond" % NS["p"]).get("delay")
+
+    assert build(500) == ("1", "499")
+    assert build(1000) == ("1", "999"), "998 would be the scaled value, and it is not what PowerPoint writes"
+
+
+def test_an_effect_with_no_numeric_duration_refuses_one_rather_than_ignoring_it():
+    """Bold Reveal's Duration reads ``Auto`` and its behaviour is ``indefinite``.
+
+    There is nothing to scale from, so a caller's explicit duration cannot be
+    honoured. Refusing says so; ignoring it would drop the request silently.
+    """
+    slide_def = _slide(
+        animations={
+            "mainSequence": [
+                _effect(
+                    "fx", "hero",
+                    preset={"category": "emphasis", "effect": "boldReveal", "variant": None},
+                    timing={"durationMs": 1000},
+                )
+            ],
+            "interactiveSequences": [],
+        }
+    )
+    with pytest.raises(TimingWriteError, match="no scalable duration"):
         _build(slide_def)
-    assert error.value.key == "animation.gallery.entrance.flyIn"
-    assert error.value.elements == ("p:anim",)
-    assert "refuses to approximate" in str(error.value)
 
 
-def test_an_emphasis_set_is_refused_because_its_attribute_is_not_captured():
+def test_an_effect_with_no_numeric_duration_writes_its_measured_form():
+    """Omit the duration and the measured form is written as it stands."""
+    slide_def = _slide(
+        animations={
+            "mainSequence": [
+                _effect(
+                    "fx", "hero",
+                    preset={"category": "emphasis", "effect": "boldReveal", "variant": None},
+                    timing={"durationMs": None},
+                )
+            ],
+            "interactiveSequences": [],
+        }
+    )
+    _, slide = _build(slide_def)
+    ctn = _timing(slide).find(".//{%s}set/{%s}cBhvr/{%s}cTn" % (NS["p"], NS["p"], NS["p"]))
+    assert ctn.get("dur") == "indefinite"
+
+
+def test_an_emphasis_set_writes_the_font_attribute_the_capture_names():
+    """The attribute name this entry was refused for not knowing, now measured.
+
+    ``BEHAVIOR_PAYLOADS`` says of the emphasis ``p:set`` children that they
+    "set a font attribute whose name is not captured, so those tiles are
+    refused". Underline's is ``style.textDecorationUnderline``, set to the
+    string ``true``.
+    """
     slide_def = _slide(
         animations={
             "mainSequence": [
@@ -1069,10 +1242,12 @@ def test_an_emphasis_set_is_refused_because_its_attribute_is_not_captured():
             "interactiveSequences": [],
         }
     )
-    with pytest.raises(CapabilityGapError) as error:
-        _build(slide_def)
-    assert error.value.elements == ("p:set",)
-    assert "behaviorPayloads.unresolved" in str(error.value)
+    _, slide = _build(slide_def)
+    sets = _timing(slide).findall(".//{%s}set" % NS["p"])
+    assert len(sets) == 1
+    names = [node.text for node in sets[0].findall(".//{%s}attrName" % NS["p"])]
+    assert names == ["style.textDecorationUnderline"]
+    assert sets[0].find(".//{%s}strVal" % NS["p"]).get("val") == "true"
 
 
 def test_the_writer_refuses_an_unresolved_payload_even_without_a_catalog_gap(registry, index):
@@ -2447,10 +2622,17 @@ def test_entries_generated_despite_their_own_gap_resolve_to_a_captured_equivalen
 
 
 def test_the_unresolved_behavior_payload_surface_is_counted_and_refused(coverage, index):
-    """The capture lists which behavior children PowerPoint wrote, not their
-    values. 24 of the 95 gallery tiles are therefore reproducible today; the
-    other 71 record the unresolved payload in the catalog and are refused.
-    Closing them needs the Task 8 PowerPoint oracle.
+    """All 95 gallery tiles are reproducible, and this test used to say 24 were.
+
+    The native fixtures listed which behaviour children PowerPoint wrote and not
+    what they said, so 71 tiles recorded an unresolved payload and were refused.
+    The 2026-11-01 GUI capture measured all of them from the package PowerPoint
+    saved, so none is refused and no tile names an unresolved child.
+
+    ``behavior_payloads`` still lists ``p:anim`` and friends as unresolved, and
+    that is not a contradiction: it is the **general** rule for an entry with no
+    measured behaviours of its own, which is what the 11 remaining enum
+    candidates fall back on.
     """
     tiles = [
         record
@@ -2481,30 +2663,66 @@ def test_the_unresolved_behavior_payload_surface_is_counted_and_refused(coverage
     assert "only when every behavior child it records appears under resolved" in payloads["writerRule"]
 
 
-def test_no_refused_gallery_preset_leaves_a_partial_node_behind(registry, index):
+def test_no_refused_preset_leaves_a_partial_node_behind(registry, index):
     """A refusal happens before anything is attached to the slide, so a
-    half-written behavior can never reach the package."""
-    catalog = json.loads(CATALOG_PATH.read_text(encoding="utf-8"))
-    refused = [
-        entry
-        for entry in catalog["guiItems"]
-        if entry["key"].startswith("animation.gallery.") and entry["ooxml"].get("unresolvedPayloads")
-    ]
-    assert refused
-    for entry in refused[:10]:
-        prs = Presentation()
-        slide = prs.slides.add_slide(prs.slide_layouts[6])
-        shape = slide.shapes.add_textbox(Emu(0), Emu(0), Emu(914400), Emu(914400))
-        local = ShapeIdentityRegistry("catalog")
-        local.register("catalogTarget", [shape._element], source_path="elements[0]")
-        with pytest.raises(CapabilityGapError):
-            write_slide_timing(
-                slide._element,
-                {"id": "catalog", **entry["semanticJson"]},
-                local,
-                index=index,
-            )
-        assert slide._element.xpath(".//*[local-name()='timing']") == []
+    half-written behavior can never reach the package.
+
+    No catalog entry reaches this path any more: the GUI capture measured all
+    95 gallery tiles, and the 11 enum candidates that still record an
+    unresolved payload resolve by preset identity to one of those measured
+    tiles, so writing their semantic JSON succeeds. The mechanism is still
+    there and still has to be covered — an entry can go back to being
+    payload-refused — so it is exercised against a fabricated entry rather than
+    against a catalog key that no longer refuses, which would have made this
+    test pass by writing something.
+    """
+    import copy
+
+    patched = copy.copy(index)
+    patched.items = dict(index.items)
+    patched.items["animation.gallery.entrance.flyIn"] = CapabilityEntry(
+        key="animation.gallery.entrance.flyIn",
+        status="accepted",
+        level="nativeTemplate",
+        ooxml={
+            "strategy": "preset",
+            "element": "p:cTn",
+            "presetClass": "entr",
+            "presetId": 2,
+            "presetSubtype": 4,
+            # The measured behaviours are gone, which is what a payload refusal
+            # is: the children are known and their values are not.
+            "behaviorChildren": ["p:anim", "p:set"],
+            "unresolvedPayloads": ["p:anim"],
+            "requiresCapture": True,
+            "gap": "the value payload of p:anim is not captured",
+        },
+        semantic={},
+        group="guiItems",
+    )
+    prs = Presentation()
+    slide = prs.slides.add_slide(prs.slide_layouts[6])
+    shape = slide.shapes.add_textbox(Emu(0), Emu(0), Emu(914400), Emu(914400))
+    local = ShapeIdentityRegistry("catalog")
+    local.register("hero", [shape._element], source_path="elements[0]")
+    with pytest.raises(CapabilityGapError):
+        write_slide_timing(
+            slide._element,
+            {
+                "id": "catalog",
+                "animations": {
+                    "mainSequence": [
+                        _effect("fx", "hero", preset={
+                            "category": "entrance", "effect": "flyIn", "variant": None,
+                        })
+                    ],
+                    "interactiveSequences": [],
+                },
+            },
+            local,
+            index=patched,
+        )
+    assert slide._element.xpath(".//*[local-name()='timing']") == []
 
 
 def test_every_accepted_animation_preset_resolves_to_a_captured_identifier(index):
@@ -2782,16 +3000,19 @@ def test_generate_fails_on_a_capability_gap_instead_of_warning(tmp_path):
 
     deck = _deck(tmp_path, animations=True, transitions=False)
     slide = json.loads((deck / "slides" / "motion.json").read_text(encoding="utf-8"))
+    # Was Fly In, which the GUI capture measured and the writer now emits. A
+    # custom motion path is still capture-required — its geometry comes from the
+    # author, not from a preset — so it is what the refusal is tested through.
     slide["animations"]["mainSequence"][0]["preset"] = {
-        "category": "entrance",
-        "effect": "flyIn",
+        "category": "motionPath",
+        "effect": "custom",
         "variant": None,
     }
     (deck / "slides" / "motion.json").write_text(json.dumps(slide), encoding="utf-8")
     output = tmp_path / "gapped.pptx"
     with pytest.raises(CapabilityGapError) as error:
         generate(deck, output_path=output)
-    assert error.value.key == "animation.gallery.entrance.flyIn"
+    assert error.value.key == "animation.gallery.motionPath.custom"
     assert not output.exists(), "no package is published for a refused effect"
 
 

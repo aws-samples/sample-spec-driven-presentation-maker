@@ -92,6 +92,7 @@ from __future__ import annotations
 import json
 import re
 from dataclasses import dataclass, field
+from fractions import Fraction
 from functools import lru_cache
 from pathlib import Path
 from typing import Any, Iterable, Mapping, Sequence
@@ -616,6 +617,53 @@ def first_effect(semantic: Mapping[str, Any]) -> Mapping[str, Any] | None:
             if effects and isinstance(effects[0], Mapping):
                 return effects[0]
     return None
+
+
+def _subtree_element(node: Mapping[str, Any]) -> etree._Element:
+    """Rebuild a measured ``{element, attributes, children}`` subtree verbatim.
+
+    The capture records a behaviour's value as a subtree rather than a scalar
+    because it is not always one — ``p:to`` holds a ``p:strVal`` for a
+    visibility, an ``a:schemeClr`` for a colour and nothing but ``@x``/``@y``
+    for a scale, and a ``p:anim`` has a ``p:tavLst`` of keyframes instead. This
+    writes whichever of those was measured, without a reader per shape.
+    """
+    built = element(str(node["element"]))
+    set_attrs(built, {str(k): v for k, v in (node.get("attributes") or {}).items()})
+    for child in node.get("children") or ():
+        built.append(_subtree_element(child))
+    return built
+
+
+def _is_visibility_set(behavior: Mapping[str, Any]) -> bool:
+    """Is this the discrete visibility toggle the duration rule exempts?
+
+    Matched on both the element and the attribute it names, not on the element
+    alone: an emphasis ``p:set`` animates a font attribute — Underline sets
+    ``style.textDecorationUnderline`` — and those are ordinary behaviours that
+    scale. Only ``style.visibility`` measured as exempt.
+    """
+    if str(behavior.get("element")) != "p:set":
+        return False
+    return VISIBILITY_ATTR in [str(name) for name in behavior.get("attrNames") or ()]
+
+
+def _scaled(value: int, scale: Fraction) -> int:
+    """Scale a measured millisecond value, rounding halves up.
+
+    The rounding is where this writer's output can differ from PowerPoint's, and
+    the difference is bounded and measured rather than assumed. At a fractional
+    ratio every product that was not an exact half matched PowerPoint exactly;
+    the six that were split both ways — 580 → 652 down and 1324 → 1490 up at the
+    same ratio — which is PowerPoint's internal float precision and not a rule
+    that can be restated in integers. So a scaled value may be 1 ms from what
+    PowerPoint writes, and only on a half. At an effect's measured duration the
+    scale is one and the output is the measured integer.
+    """
+    if scale == 1:
+        return value
+    exact = Fraction(value) * scale
+    return int(exact + Fraction(1, 2))
 
 
 def _int(value: Any, name: str) -> int:
@@ -1297,6 +1345,10 @@ class TimingWriter:
         label: str,
     ) -> None:
         category = str(preset.get("category"))
+        measured = entry.ooxml.get("behaviors")
+        if isinstance(measured, (list, tuple)) and measured:
+            self._measured_behaviors(parent, entry, measured, spid, duration, target, label)
+            return
         gaps = preset_payload_gaps(entry, category, self.index.behavior_payloads)
         if gaps:
             raise BehaviorPayloadGapError(
@@ -1304,6 +1356,111 @@ class TimingWriter:
             )
         for tag in entry.ooxml.get("behaviorChildren") or ():
             self._preset_behavior(parent, str(tag), entry, category, spid, duration, target, label)
+
+    def _measured_behaviors(
+        self,
+        parent: etree._Element,
+        entry: CapabilityEntry,
+        measured: Sequence[Mapping[str, Any]],
+        spid: int,
+        duration: int | None,
+        target: Mapping[str, Any],
+        label: str,
+    ) -> None:
+        """Write the behaviours PowerPoint wrote for this effect, as it wrote them.
+
+        This is the path for an entry the GUI capture measured, and it replaces
+        inference with transcription. The synthesised path below it builds one
+        behaviour per distinct element name and fills each payload from the
+        general ``BEHAVIOR_PAYLOADS`` rules; that could not express **57 of the
+        76 measured effects**, which repeat an element — entrance Bounce has
+        eight ``p:animScale`` differing only in duration and delay — and for the
+        rest it would be writing a plausible value rather than the measured one.
+
+        Only the timings move, and only by the measured rule: every animated
+        behaviour's duration and delay scale in proportion to the effect
+        duration, while the visibility ``p:set`` keeps ``dur="1"`` and has its
+        delay recomputed rather than scaled. Nothing else is touched, because
+        nothing else changed when the duration did — not ``@path``, not ``@by``,
+        not ``@filter``, not the count or the order.
+        """
+        scale = self._duration_scale(entry, duration, label)
+        for behavior in measured:
+            tag = str(behavior.get("element"))
+            node = sub(parent, tag)
+            set_attrs(node, {str(k): v for k, v in (behavior.get("attributes") or {}).items()})
+            carrier = sub(node, "p:cBhvr")
+            set_attrs(carrier, {str(k): v for k, v in (behavior.get("carrier") or {}).items()})
+            timing: dict[str, Any] = {"id": self._id()}
+            timing.update({str(k): v for k, v in (behavior.get("timingAttributes") or {}).items()})
+            dur_ms, delay_ms = self._measured_timing(behavior, scale, duration)
+            if dur_ms is not None:
+                timing["dur"] = dur_ms
+            ctn = sub(carrier, "p:cTn", **timing)
+            if delay_ms is not None:
+                st_cond = sub(ctn, "p:stCondLst")
+                sub(st_cond, "p:cond", delay=delay_ms)
+            self._target(carrier, spid, target)
+            names = [str(name) for name in behavior.get("attrNames") or ()]
+            if names:
+                attr_lst = sub(carrier, "p:attrNameLst")
+                for name in names:
+                    sub(attr_lst, "p:attrName").text = name
+            for key in ("to", "from", "by", "tavLst"):
+                payload = (behavior.get("values") or {}).get(key)
+                if payload is not None:
+                    node.append(_subtree_element(payload))
+
+    def _duration_scale(
+        self, entry: CapabilityEntry, duration: int | None, label: str
+    ) -> Fraction:
+        """Return the factor the measured timings scale by. One when they do not.
+
+        ``measuredDurationMs`` is the duration the measured integers belong to.
+        An effect the ribbon reports as ``Auto`` has none — its behaviours carry
+        ``dur="indefinite"`` — so there is nothing to scale against, and asking
+        for a different duration is refused rather than silently ignored.
+        """
+        measured = entry.ooxml.get("measuredDurationMs")
+        if duration is None or measured is None or int(duration) == int(measured):
+            if duration is not None and measured is None:
+                scaling = entry.ooxml.get("durationScaling") or {}
+                if scaling.get("rule") == "notScalable":
+                    raise TimingWriteError(
+                        f"slide {self.slide_slug!r}: {label} preset {entry.key!r} has no scalable "
+                        f"duration ({scaling.get('reason')}), so timing.durationMs "
+                        f"{duration} cannot be honoured; omit it to write the measured form"
+                    )
+            return Fraction(1)
+        if int(measured) <= 0:
+            raise TimingWriteError(
+                f"slide {self.slide_slug!r}: {label} preset {entry.key!r} records "
+                f"measuredDurationMs {measured!r}, which cannot be scaled from"
+            )
+        return Fraction(int(duration), int(measured))
+
+    def _measured_timing(
+        self, behavior: Mapping[str, Any], scale: Fraction, duration: int | None
+    ) -> tuple[int | None, int | None]:
+        """Return one behaviour's duration and delay at the requested duration.
+
+        The visibility ``p:set`` is the measured exception and it is exempt in
+        both fields. Its duration stayed at 1 ms while every animated behaviour
+        doubled, and its delay is **recomputed** from the effect duration rather
+        than scaled: Fly Out hides the shape at 499 ms of a 500 ms effect and at
+        **999** of a 1000 ms one, where scaling 499 would have given 998.
+        """
+        dur_ms = behavior.get("durMs")
+        delay_ms = behavior.get("delayMs")
+        if _is_visibility_set(behavior):
+            if delay_ms is not None and int(delay_ms) > 0 and duration is not None:
+                delay_ms = max(int(duration) - 1, 0)
+            return (None if dur_ms is None else int(dur_ms),
+                    None if delay_ms is None else int(delay_ms))
+        return (
+            None if dur_ms is None else _scaled(int(dur_ms), scale),
+            None if delay_ms is None else _scaled(int(delay_ms), scale),
+        )
 
     def _preset_behavior(
         self,

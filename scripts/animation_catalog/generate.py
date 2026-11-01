@@ -2434,6 +2434,263 @@ def promote_oracle_capture(entry: dict[str, Any], record: dict[str, Any],
     return entry
 
 
+def load_gui_capture_evidence(directory: Path | None = None) -> dict[str, dict[str, Any]]:
+    """Return the checked-in GUI capture, keyed by catalog key.
+
+    Reads the merged join rather than re-deriving it from the package, for the
+    same reason the scripting oracle's loader does: ``--write`` stays free of a
+    zip parse while the merge itself stays reproducible from the two artefacts
+    beside it with ``--parse-gui-capture``.
+    """
+    directory = directory or DEFAULT_GUI_CAPTURE_EVIDENCE
+    path = directory / GUI_CAPTURE_MERGED
+    if not path.exists():
+        return {}
+    document = json.loads(path.read_text(encoding="utf-8"))
+    records: dict[str, dict[str, Any]] = {}
+    for record in document.get("captures", []):
+        key = record.get("catalogKey")
+        if isinstance(key, str) and "effect" in record:
+            records[key] = record
+    return records
+
+
+def ribbon_duration_ms(value: Any) -> int | None:
+    """Return the ribbon's ``Duration`` read-back in milliseconds, or None.
+
+    The field reads ``00.50`` for half a second and **``Auto``** for an effect
+    with no finite duration — measured on Bold Reveal and Transparency, whose
+    behaviours carry ``dur="indefinite"``. ``None`` means "this effect has no
+    numeric duration", which is why it cannot be scaled, and it must not be
+    confused with zero.
+    """
+    if not isinstance(value, str) or not value.strip():
+        return None
+    try:
+        return int(round(float(value) * 1000))
+    except ValueError:
+        return None
+
+
+def measured_behavior(behavior: dict[str, Any]) -> dict[str, Any]:
+    """Normalise one measured behaviour into the form the writer emits from.
+
+    ``dur`` and ``delay`` are lifted out of the timing attributes as integers,
+    because they are the two the duration rule scales and the writer has to do
+    arithmetic on them. Everything else is kept verbatim as strings: the
+    measured values are what makes the output byte-exact, and re-deriving any of
+    them would be the inference this capture exists to remove.
+
+    A ``dur`` of ``indefinite`` stays a string under ``attributes``. It is not a
+    number and PowerPoint does not scale it.
+    """
+    timing = dict(behavior.get("timing") or {})
+    duration = timing.pop("dur", None)
+    delay = timing.pop("delay", None)
+    measured: dict[str, Any] = {
+        "element": behavior["element"],
+        "attributes": dict(behavior.get("attributes") or {}),
+        "attrNames": list(behavior.get("attrNames") or []),
+    }
+    if duration is not None:
+        try:
+            measured["durMs"] = int(duration)
+        except ValueError:
+            timing["dur"] = duration
+    if delay is not None:
+        measured["delayMs"] = int(delay)
+    if timing:
+        measured["timingAttributes"] = timing
+    if behavior.get("carrier"):
+        measured["carrier"] = dict(behavior["carrier"])
+    if behavior.get("values"):
+        measured["values"] = behavior["values"]
+    return measured
+
+
+def gui_capture_block(record: dict[str, Any]) -> dict[str, Any]:
+    """Return the per-entry provenance block for one GUI-captured value."""
+    fixture = DEFAULT_GUI_CAPTURE_EVIDENCE.relative_to(REPO_ROOT).as_posix()
+    return {
+        "source": GUI_CAPTURE_SOURCE,
+        "application": BASELINE_APPLICATION,
+        "version": BASELINE_VERSION,
+        "capturedAt": GUI_CAPTURE_DATE,
+        "driver": GUI_CAPTURE_DRIVER,
+        "fixture": f"{fixture}/{GUI_CAPTURE_PACKAGE}",
+        "readBack": f"{fixture}/{GUI_CAPTURE_READBACK}",
+        "merged": f"{fixture}/{GUI_CAPTURE_MERGED}",
+        "guiPath": list(record.get("guiPath") or []),
+        "matchedTitle": record.get("matchedTitle"),
+        "slideIndex": record.get("slideIndex"),
+        "shapeName": record.get("shapeName"),
+        "shapeSpid": record.get("shapeSpid"),
+        "attributedSpid": record.get("attributedSpid"),
+        "selectionRowIndex": record.get("selectionRowIndex"),
+        "selectedBy": record.get("selectedBy"),
+        "ribbonReadBack": record.get("ribbonReadBack"),
+    }
+
+
+def promote_gui_capture(entry: dict[str, Any], record: dict[str, Any]) -> dict[str, Any]:
+    """Fold one GUI-captured animation effect into its catalog entry.
+
+    What this closes is the **payload** gap, not the identifier one. The native
+    fixtures already gave 71 of these entries a ``presetId`` — read correctly,
+    every one of the 71 agrees with what the ribbon wrote — and recorded *which*
+    behaviour children a tile writes. What they did not record is what those
+    children say, so the entries stayed ``requiresCapture`` and the writer
+    refused them. This capture measures the payloads, so the refusal is lifted
+    for the entries it covers and for no others.
+
+    Three things are written:
+
+    * ``ooxml.behaviors`` — the measured behaviours **in document order, with
+      duplicates**. 57 of the 76 effects repeat an element (entrance Bounce has
+      eight ``p:animScale``), so a set keyed by element name cannot express
+      them and the writer emits from this list instead of from
+      ``behaviorChildren``. ``behaviorChildren`` is kept as the distinct names
+      so the reader's existing cross-check still works against it.
+    * ``ooxml.measuredDurationMs`` — the duration the measured timings belong
+      to, read off the ribbon. ``null`` for an effect the field reports as
+      ``Auto``; those carry ``dur="indefinite"`` and cannot be scaled at all.
+    * ``ooxml.durationScaling`` — the measured rule for writing the effect at
+      another duration, including its one-millisecond limit. Stated per entry
+      rather than only in the provenance, because it is the entry's own
+      accuracy claim.
+
+    A measured ``presetId`` that disagrees with the catalogued one **replaces**
+    it and the difference is recorded, exactly as the transition capture does.
+    """
+    effect = record.get("effect") or {}
+    attributes = dict(effect.get("attributes") or {})
+    ooxml = entry.get("ooxml")
+    entry["capture"] = gui_capture_block(record)
+    if not isinstance(ooxml, dict) or entry.get("status") != "accepted":
+        return entry
+
+    measured_class = attributes.get("presetClass")
+    measured_id = int(attributes["presetID"]) if attributes.get("presetID") else None
+    measured_subtype = int(attributes.get("presetSubtype") or 0)
+    catalogued = (ooxml.get("presetClass"), ooxml.get("presetId"), ooxml.get("presetSubtype"))
+    if catalogued[1] is None:
+        entry["capture"]["identifierRelation"] = "measuredWhereNoneWasRecorded"
+    elif catalogued == (measured_class, measured_id, measured_subtype):
+        entry["capture"]["identifierRelation"] = "confirmsCatalogued"
+    else:
+        entry["capture"]["identifierRelation"] = "replacesCatalogued"
+        entry["capture"]["supersededIdentifier"] = {
+            "presetClass": catalogued[0], "presetId": catalogued[1], "presetSubtype": catalogued[2],
+        }
+
+    behaviors = [measured_behavior(behavior) for behavior in effect.get("behaviors") or []]
+    duration_ms = ribbon_duration_ms((record.get("ribbonReadBack") or {}).get("duration"))
+    ooxml["strategy"] = "preset"
+    ooxml["element"] = "p:cTn"
+    ooxml["presetClass"] = measured_class
+    ooxml["presetId"] = measured_id
+    ooxml["presetSubtype"] = measured_subtype
+    ooxml["nodeType"] = attributes.get("nodeType")
+    ooxml["effectAttributes"] = {
+        name: value for name, value in attributes.items()
+        if name not in ("presetClass", "presetID", "presetSubtype")
+    }
+    if effect.get("iterate"):
+        ooxml["iterate"] = effect["iterate"]
+    ooxml["behaviors"] = behaviors
+    ooxml["behaviorChildren"] = sorted({behavior["element"] for behavior in behaviors})
+    ooxml["measuredDurationMs"] = duration_ms
+    ooxml["durationScaling"] = GUI_DURATION_SCALING if duration_ms is not None else GUI_DURATION_FIXED
+    ooxml.pop("unresolvedPayloads", None)
+    ooxml.pop("requiresCapture", None)
+    ooxml.pop("gap", None)
+    ooxml.pop("pathAttribute", None)
+    # Replaced by measuredDurationMs, which is the duration the measured timings
+    # belong to rather than one child's observed duration. Leaving it would also
+    # misfire: the writer falls back to it when the JSON names no duration, and
+    # for the two effects whose duration is 'Auto' that fallback would request a
+    # duration the effect cannot have.
+    ooxml.pop("observedChildDurationMs", None)
+    # The entry's own authoring example now asks for exactly what was measured,
+    # so following the catalog produces the measured bytes. ``None`` for an
+    # effect with no numeric duration, which is a statement rather than an
+    # omission: its behaviours are 'indefinite'.
+    effects = ((entry.get("semanticJson") or {}).get("animations") or {}).get("mainSequence") or []
+    if effects and isinstance(effects[0], dict) and isinstance(effects[0].get("timing"), dict):
+        effects[0]["timing"]["durationMs"] = duration_ms
+
+    entry["capabilityLevel"] = NATIVE
+    entry["verification"] = GUI_CAPTURE_VERIFICATION
+    entry["evidence"] = {
+        "source": GUI_CAPTURE_SOURCE,
+        "commit": None,
+        "fixture": entry["capture"]["fixture"],
+        "capturedApplicationVersion": BASELINE_VERSION,
+        "slideIndex": record.get("slideIndex"),
+    }
+    return entry
+
+
+def promote_gui_captures(items: list[dict[str, Any]],
+                         evidence: dict[str, dict[str, Any]]) -> list[dict[str, Any]]:
+    """Fold every GUI capture into the item it names. Unmatched keys are an error.
+
+    A capture whose key no entry carries is a refusal rather than a shrug: the
+    key is how the measurement reaches the catalog, so a typo or a renamed entry
+    would otherwise silently leave the measurement out and the entry
+    capture-required with nobody the wiser.
+    """
+    by_key = {entry["key"]: entry for entry in items}
+    missing = sorted(key for key in evidence if key not in by_key)
+    if missing:
+        raise SystemExit(
+            f"FAIL: the GUI capture names {len(missing)} key(s) no catalog item carries: {missing}"
+        )
+    for key, record in evidence.items():
+        promote_gui_capture(by_key[key], record)
+    return items
+
+
+def align_candidate_durations(candidates: list[dict[str, Any]],
+                              items: list[dict[str, Any]]) -> list[dict[str, Any]]:
+    """Drop the example duration of a candidate that mirrors a non-scalable tile.
+
+    A candidate whose own enumerator → OOXML mapping the dictionary could not
+    establish is still writable, because it resolves by ``presetClass`` +
+    ``presetID`` to a gallery tile the GUI capture measured. Two of those tiles
+    — Bold Reveal and Transparency — have **no numeric duration**: the ribbon
+    reports ``Auto`` and their behaviours carry ``dur="indefinite"``. A
+    candidate still claiming a duration would therefore ask the writer for
+    something the effect cannot have, and the writer rightly refuses it.
+
+    So the candidate's example is corrected to match the tile it resolves to.
+    The alternative was to let the writer ignore a duration it cannot honour,
+    which would mean a caller's explicit request disappearing silently.
+    """
+    fixed = {
+        (entry["ooxml"].get("presetClass"), entry["ooxml"].get("presetId"))
+        for entry in items
+        if isinstance(entry.get("ooxml"), dict)
+        and entry["ooxml"].get("measuredDurationMs") is None
+        and (entry["ooxml"].get("durationScaling") or {}).get("rule") == "notScalable"
+    }
+    for entry in candidates:
+        ooxml = entry.get("ooxml")
+        if not isinstance(ooxml, dict):
+            continue
+        # Some candidate mappings record a LIST of presetIDs — one enumerator
+        # covering several tiles — which cannot identify a single tile and is
+        # skipped rather than coerced into one.
+        identity = (ooxml.get("presetClass"), ooxml.get("presetId"))
+        scalar = (int, str, type(None))
+        if not all(isinstance(part, scalar) for part in identity) or identity not in fixed:
+            continue
+        effects = ((entry.get("semanticJson") or {}).get("animations") or {}).get("mainSequence") or []
+        if effects and isinstance(effects[0], dict) and isinstance(effects[0].get("timing"), dict):
+            effects[0]["timing"]["durationMs"] = None
+    return candidates
+
+
 def candidate_entries(sdef_enums: dict[str, list[tuple[str, str]]],
                       evidence: dict[str, dict[str, Any]] | None = None) -> list[dict[str, Any]]:
     """Account for every candidate in the eight required sdef enumerations."""
@@ -2543,9 +2800,11 @@ def build_catalog(manifest: dict[str, Any], sdef_enums: dict[str, list[tuple[str
     """Build the full catalog from the evidence tables, the sdef and the capture."""
     if evidence is None:
         evidence = load_oracle_evidence()
-    items = gui_items() + enum_value_items(sdef_enums)
+    items = promote_gui_captures(
+        gui_items() + enum_value_items(sdef_enums), load_gui_capture_evidence()
+    )
     items.sort(key=lambda entry: entry["key"])
-    candidates = candidate_entries(sdef_enums, evidence)
+    candidates = align_candidate_durations(candidate_entries(sdef_enums, evidence), items)
     candidates.sort(key=lambda entry: entry["key"])
     capture_counts = {
         "probed": sum(1 for entry in candidates if "capture" in entry),
@@ -3194,6 +3453,45 @@ GUI_CAPTURE_DRIVER = "macOS accessibility API; no Apple Events and no Visual Bas
 #: three measured it, and the three reached different parts of the surface.
 GUI_CAPTURE_VERIFICATION = "guiCapture"
 
+#: What writing a measured effect at a duration other than the measured one
+#: does, and what it costs. Measured 2026-11-01 over 4 effects and 41
+#: behaviours at ratios x2, x3/2 and x9/8; the numbers are in
+#: ``scripts/animation_catalog/computer-use.md``.
+GUI_DURATION_SCALING = {
+    "rule": "proportional",
+    "scales": ["durMs", "delayMs"],
+    "exempt": {
+        "element": "p:set",
+        "attrName": "style.visibility",
+        "durMs": 1,
+        "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled",
+    },
+    "unchanged": [
+        "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+        "presetClass, presetId, presetSubtype",
+        "the behaviour count and their order",
+    ],
+    "accuracy": (
+        "byte-exact at measuredDurationMs, because the measured integers are written as they "
+        "stand. At another duration the product may land on an exact half, and PowerPoint's own "
+        "float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the "
+        "same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated."
+    ),
+    "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'",
+}
+
+#: For an effect the ribbon reports as ``Auto``. Its behaviours carry
+#: ``dur="indefinite"``, so there is nothing to scale and nothing to scale it
+#: against; the measured form is the only form.
+GUI_DURATION_FIXED = {
+    "rule": "notScalable",
+    "reason": (
+        "the ribbon reports this effect's Duration as 'Auto' and its behaviours carry "
+        "dur=\"indefinite\"; there is no numeric duration to scale from or to"
+    ),
+    "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'",
+}
+
 #: The behaviour elements a preset effect writes beneath its ``p:cTn``. The same
 #: set the native captures summarise by name — what is new here is each one's
 #: payload.
@@ -3306,6 +3604,26 @@ def _behavior_carrier(behavior: Any) -> dict[str, Any]:
     return {}
 
 
+def _effect_iterate(ctn: Any) -> dict[str, Any] | None:
+    """Return the effect's ``p:iterate``, or None when it has none.
+
+    12 of the 76 captured effects carry one, and it is not decoration: it is
+    what makes an effect play per letter or per word instead of once for the
+    shape, and it sits on the effect node rather than on a behaviour. Measured
+    forms are ``type="lt"`` with ``p:tmPct`` 10000, 4000 or 50000, and one with
+    ``p:tmAbs`` 25. An effect written without it animates the whole shape at
+    once, which is a different animation.
+    """
+    for child in ctn:
+        if _oracle_local(child) != "iterate":
+            continue
+        return {
+            "attributes": _oracle_attributes(child),
+            "children": [_xml_subtree(inner) for inner in child],
+        }
+    return None
+
+
 def effect_behaviors(ctn: Any) -> list[dict[str, Any]]:
     """Return every behaviour child of one preset effect, in document order.
 
@@ -3370,6 +3688,7 @@ def parse_gui_capture_package(package: Path) -> dict[str, dict[str, Any]]:
                     "part": name,
                     "attributes": attributes,
                     "spids": spids,
+                    "iterate": _effect_iterate(element),
                     "behaviors": effect_behaviors(element),
                 }
                 if len(spids) != 1:

@@ -303,27 +303,49 @@ slides.
 
 | Category | Authorable effects |
 |---|---|
-| `entrance` | `appear`, `blinds`, `checkerboard`, `dissolveIn`, `fade`, `randomBars`, `shape`, `split`, `strips`, `wedge`, `wheel`, `wipe` |
-| `exit` | `blinds`, `checkerboard`, `disappear`, `dissolveOut`, `fade`, `randomBars`, `shape`, `split`, `strips`, `wedge`, `wheel`, `wipe` |
+| `entrance` | `appear`, `basicSwivel`, `basicZoom`, `blinds`, `boomerang`, `bounce`, `centerRevolve`, `checkerboard`, `credits`, `curveUp`, `dissolveIn`, `drop`, `expand`, `fade`, `flip`, `float`, `floatIn`, `flyIn`, `growTurn`, `peekIn`, `pinwheel`, `randomBars`, `riseUp`, `shape`, `spinner`, `spiralIn`, `split`, `stretch`, `strips`, `swivel`, `wedge`, `wheel`, `whip`, `wipe`, `zoom` |
+| `exit` | `basicSwivel`, `basicZoom`, `blinds`, `boomerang`, `bounce`, `centerRevolve`, `checkerboard`, `collapse`, `contract`, `credits`, `curveDown`, `disappear`, `dissolveOut`, `drop`, `fade`, `flip`, `float`, `floatOut`, `flyOut`, `peekOut`, `pinwheel`, `randomBars`, `shape`, `shrinkTurn`, `sinkDown`, `spinner`, `spiralOut`, `split`, `stretchy`, `strips`, `swivel`, `wedge`, `wheel`, `whip`, `wipe`, `zoom` |
+| `emphasis` | `blink`, `boldFlash`, `boldReveal`, `brushColor`, `colorPulse`, `complementaryColor`, `complementaryColor2`, `contrastingColor`, `darken`, `desaturate`, `fillColor`, `fontColor`, `growShrink`, `growWithColor`, `lighten`, `lineColor`, `objectColor`, `pulse`, `shimmer`, `spin`, `teeter`, `transparency`, `underline`, `wave` |
+| `motionPath` | `arcs`, `lines`, `loops`, `shapes`, `turns` |
 | `media` | `mediaPlay` |
-| `emphasis` | none yet |
-| `motionPath` | none yet |
 | `custom` | none ever |
 
-`emphasis` and `motionPath` have no authorable effect at all: every tile in both galleries is
-still waiting for its PowerPoint capture. `custom` is not a gallery — it is the advanced form,
-written with a `behaviors` list; a custom motion path is a `motion` behavior.
+That is the whole Animations ribbon: 35 entrance, 36 exit, 24 emphasis and the 5 motion-path
+groups. `emphasis` and `motionPath` used to have none at all, and the gallery tiles were
+refused by name, because the available evidence recorded *which* behaviour children each tile
+writes and not what they say. A capture of every GUI-addressable value on 2026-11-01 measured
+the payloads from the package PowerPoint saved, so each of these effects is now written as
+PowerPoint writes it — including the motion-path geometry, which is transcribed rather than
+re-derived.
 
-The catalog knows far more effects than the table lists (58 entrance tiles, 36 exit, 32
-emphasis, 70 motion paths). The rest are recorded with their PowerPoint evidence but without
-an established OOXML form, so the writer refuses them by name instead of substituting a
-lookalike. Asking for one fails with its catalog key:
+`custom` is not a gallery — it is the advanced form, written with a `behaviors` list; a custom
+motion path is a `motion` behavior.
+
+A `media` command other than `mediaPlay`, and a custom motion path, are still refused by name
+rather than approximated. Asking for one fails with its catalog key:
 
 ```
-entrance effect 'flyIn' cannot be generated: catalog entry
-'animation.gallery.entrance.flyIn' is semantic-preservation-only (<recorded gap>).
+motionPath effect 'custom' cannot be generated: catalog entry
+'animation.gallery.motionPath.custom' is semantic-preservation-only (<recorded gap>).
 Capture it with the PowerPoint oracle (Task 8); sdpm refuses to approximate it.
 ```
+
+### `timing.durationMs` on a gallery preset
+
+A preset's behaviours are measured at one duration, and the catalog says which:
+`ooxml.measuredDurationMs`. Leave `durationMs` out and that duration is written, byte for byte
+as PowerPoint wrote it. Give a different one and every animated behaviour's duration and delay
+is scaled in proportion, which is what PowerPoint itself does — measured over 41 behaviours at
+three ratios. Two details come with it:
+
+- the discrete visibility toggle does not scale: it stays at 1 ms, and on an exit it is placed
+  at `durationMs - 1`, which is how PowerPoint places it at every duration;
+- a scaled value can differ from PowerPoint's by **1 ms**, and only where the exact product
+  lands on a half. PowerPoint rounds those with its own internal float precision, which is not
+  reproducible from the integers; every other value matches exactly.
+
+`boldReveal` and `transparency` have no numeric duration at all — PowerPoint shows `Auto` and
+writes `indefinite` — so a `durationMs` on either is **refused** rather than ignored. Omit it.
 
 `preset.variant` (a direction such as `fromLeft`) is validated against the catalog's 45
 direction names and then **refused for every value**: a direction persists as the preset's

@@ -858,9 +858,52 @@ class FakePowerPoint:
 # --- fixtures ---------------------------------------------------------------
 @pytest.fixture(scope="module")
 def real_plan() -> dict[str, Any]:
-    """The plan derived from the checked-in catalog and manifest."""
+    """The plan derived from the checked-in catalog and manifest.
+
+    **Empty today**, and that is the point of the whole exercise: the plan is
+    the catalog's own open gaps, and the 2026-11-01 capture closed every
+    GUI-addressable animation gap there was. A test that needs targets uses
+    :func:`reopened_plan` instead.
+    """
     return planner.build_plan(
         planner.load_json(planner.DEFAULT_CATALOG), planner.load_json(planner.DEFAULT_MANIFEST)
+    )
+
+
+def reopen_gallery_gaps(catalog: dict[str, Any]) -> dict[str, Any]:
+    """Return the catalog with the gallery payload gaps put back, in place.
+
+    The planner and the deck builder are the machinery for the **next** gap, and
+    with none open they would go uncovered — a derivation that produced nothing
+    would pass every assertion about what it produces. So the tests that check
+    the machinery run it against the state the catalog was in before the
+    capture: every gallery tile capture-required for its behaviour payloads.
+
+    This reconstructs that state rather than pinning a copy of the old catalog,
+    so it keeps following the real entries: a tile added to the gallery tables
+    appears here too.
+    """
+    for entry in catalog["guiItems"]:
+        ooxml = entry.get("ooxml")
+        if not isinstance(ooxml, dict) or not entry["key"].startswith("animation.gallery."):
+            continue
+        if entry["key"].startswith("animation.gallery.media."):
+            continue
+        children = ooxml.pop("behaviors", None)
+        if children is None:
+            continue
+        ooxml["requiresCapture"] = True
+        ooxml["unresolvedPayloads"] = sorted({child["element"] for child in children})
+        ooxml["gap"] = "reopened by the test suite to exercise the plan derivation"
+    return catalog
+
+
+@pytest.fixture(scope="module")
+def reopened_plan() -> dict[str, Any]:
+    """The plan the checked-in catalog derived before its gaps were closed."""
+    return planner.build_plan(
+        reopen_gallery_gaps(planner.load_json(planner.DEFAULT_CATALOG)),
+        planner.load_json(planner.DEFAULT_MANIFEST),
     )
 
 
@@ -924,7 +967,20 @@ def session(small_plan, built_deck, tmp_path):
 class TestPlanDerivation:
     """The target list is read out of the catalog's gaps, not typed into a file."""
 
-    def test_the_plan_has_targets_and_names_what_it_was_derived_from(self, real_plan):
+    def test_the_plan_is_empty_because_every_gui_gap_is_closed(self, real_plan):
+        """Nothing left to capture. This test used to assert the opposite.
+
+        The plan is the catalog's open gaps, so an empty plan is the statement
+        that the GUI-addressable animation surface is measured — all 76 of it.
+        What remains is 51 deferred entries, which are not reachable from the
+        ribbon at all, and 185 scripting enumerators set aside for a decision.
+        """
+        assert real_plan["counts"]["targets"] == 0
+        assert real_plan["counts"]["deferredTargets"] > 0
+        assert real_plan["targets"] == []
+
+    def test_the_plan_has_targets_and_names_what_it_was_derived_from(self, reopened_plan):
+        real_plan = reopened_plan
         assert real_plan["counts"]["targets"] > 0
         source = real_plan["generatedFrom"]
         assert source["catalog"].endswith("powerpoint-animation-catalog.json")
@@ -957,23 +1013,23 @@ class TestPlanDerivation:
         for name, count_ in real_plan["counts"].items():
             assert len(real_plan[name]) == count_, name
 
-    def test_a_gallery_target_names_the_tab_the_gallery_and_the_tile(self, real_plan):
-        by_key = {target["key"]: target for target in real_plan["targets"]}
+    def test_a_gallery_target_names_the_tab_the_gallery_and_the_tile(self, reopened_plan):
+        by_key = {target["key"]: target for target in reopened_plan["targets"]}
         target = by_key["animation.gallery.entrance.flyIn"]
         assert target["guiPath"] == [planner.ANIMATIONS_TAB, "Entrance Effects", "Fly In"]
         assert by_key["animation.gallery.exit.flyOut"]["guiPath"][1] == "Exit Effects"
         assert by_key["animation.gallery.emphasis.pulse"]["guiPath"][1] == "Emphasis Effects"
 
-    def test_a_motion_path_goes_through_the_path_animation_window(self, real_plan):
-        by_key = {target["key"]: target for target in real_plan["targets"]}
+    def test_a_motion_path_goes_through_the_path_animation_window(self, reopened_plan):
+        by_key = {target["key"]: target for target in reopened_plan["targets"]}
         assert by_key["animation.gallery.motionPath.lines"]["guiPath"] == [
             planner.ANIMATIONS_TAB,
             planner.PATH_ANIMATION_CONTROL,
             "Lines",
         ]
 
-    def test_an_irregular_label_comes_from_the_table_and_keeps_the_derived_form(self, real_plan):
-        by_key = {target["key"]: target for target in real_plan["targets"]}
+    def test_an_irregular_label_comes_from_the_table_and_keeps_the_derived_form(self, reopened_plan):
+        by_key = {target["key"]: target for target in reopened_plan["targets"]}
         grow = by_key["animation.gallery.emphasis.growShrink"]
         assert grow["title"] == "Grow/Shrink"
         assert grow["titleSource"] == "labelTable"
@@ -1021,7 +1077,7 @@ class TestPlanDerivation:
             planner.build_plan(catalog, manifest)
 
     def test_the_plan_shrinks_when_a_gap_closes(self):
-        catalog = planner.load_json(planner.DEFAULT_CATALOG)
+        catalog = reopen_gallery_gaps(planner.load_json(planner.DEFAULT_CATALOG))
         manifest = planner.load_json(planner.DEFAULT_MANIFEST)
         before = planner.build_plan(catalog, manifest)["counts"]["targets"]
         for entry in catalog["guiItems"]:
@@ -1036,9 +1092,9 @@ class TestPlanDerivation:
 class TestShapeGrid:
     """One slide of many shapes, with a layout that is checked rather than eyeballed."""
 
-    def test_the_whole_catalog_fits_one_slide(self, real_plan):
-        assert real_plan["counts"]["targets"] == EXPECTED_TARGETS
-        deck = real_plan["deck"]
+    def test_the_whole_catalog_fits_one_slide(self, reopened_plan):
+        assert reopened_plan["counts"]["targets"] == EXPECTED_TARGETS
+        deck = reopened_plan["deck"]
         assert deck["slides"] == 1
         assert deck["split"] is False
         assert (deck["columns"], deck["rows"]) == EXPECTED_GRID
@@ -1046,18 +1102,18 @@ class TestShapeGrid:
         # The short side is what bounds a click. 87 px is 43.5 pt, double the 22 pt that
         # made a live run land 71 presses on five shapes.
         assert min(deck["shapePx"]) / 2 >= 40, "the short side is back under 40 pt"
-        assert {target["slideIndex"] for target in real_plan["targets"]} == {1}
+        assert {target["slideIndex"] for target in reopened_plan["targets"]} == {1}
 
-    def test_every_target_gets_its_own_cell_in_plan_order(self, real_plan):
-        cells = [(target["slideIndex"], target["cellIndex"]) for target in real_plan["targets"]]
+    def test_every_target_gets_its_own_cell_in_plan_order(self, reopened_plan):
+        cells = [(target["slideIndex"], target["cellIndex"]) for target in reopened_plan["targets"]]
         assert len(set(cells)) == len(cells)
-        assert [target["targetIndex"] for target in real_plan["targets"]] == list(
-            range(1, len(real_plan["targets"]) + 1)
+        assert [target["targetIndex"] for target in reopened_plan["targets"]] == list(
+            range(1, len(reopened_plan["targets"]) + 1)
         )
         assert [cell for _slide, cell in cells] == list(range(1, len(cells) + 1))
 
-    def test_no_two_shapes_overlap_and_no_shape_leaves_the_slide(self, real_plan):
-        rects = [planner.Rect(**target["shapeRectPx"]) for target in real_plan["targets"]]
+    def test_no_two_shapes_overlap_and_no_shape_leaves_the_slide(self, reopened_plan):
+        rects = [planner.Rect(**target["shapeRectPx"]) for target in reopened_plan["targets"]]
         for first in range(len(rects)):
             for second in range(first + 1, len(rects)):
                 assert not rects[first].overlaps(rects[second]), (first, second)
@@ -1123,8 +1179,8 @@ class TestShapeGrid:
         with pytest.raises(ValueError, match="at least one target"):
             planner.grid_layout(0)
 
-    def test_the_grid_reports_the_basis_it_was_computed_in(self, real_plan):
-        deck = real_plan["deck"]
+    def test_the_grid_reports_the_basis_it_was_computed_in(self, reopened_plan):
+        deck = reopened_plan["deck"]
         assert deck["basisPx"] == list(planner.DECK_BASIS_PX)
         assert deck["clickMarginPx"] == planner.CLICK_MARGIN_PX
         assert deck["neighbourClearancePx"] == planner.NEIGHBOUR_CLEARANCE_PX
@@ -2302,7 +2358,7 @@ class TestCaptureDeck:
             assert (label["x"], label["y"]) == (rect.x, rect.y + rect.height)
             assert label["width"] == rect.width
 
-    def test_a_label_is_one_line_that_fits_its_box(self, real_plan):
+    def test_a_label_is_one_line_that_fits_its_box(self, reopened_plan):
         """Every label is a single line inside its box, for every target in the catalog.
 
         One line is the point: two lines needed 34 px of cell height, which left the
@@ -2310,8 +2366,8 @@ class TestCaptureDeck:
         shapes. The key itself is not lost — it is in the plan, and the shape's ordinal
         ties the label back to it.
         """
-        width_pt = real_plan["deck"]["shapePx"][0] / 2
-        for target in real_plan["targets"]:
+        width_pt = reopened_plan["deck"]["shapePx"][0] / 2
+        for target in reopened_plan["targets"]:
             label = planner.label_text(target["key"])
             assert "\n" not in label
             assert target["key"].endswith(label)
@@ -3314,8 +3370,8 @@ class TestDocsMatchTheCode:
         for gone in ("--pane-frame", "--zoom", "canvas_point"):
             assert gone in readme, f"the README does not say {gone} is gone"
 
-    def test_the_readme_describes_the_grid_the_plan_derives(self, readme, real_plan):
-        deck = real_plan["deck"]
+    def test_the_readme_describes_the_grid_the_plan_derives(self, readme, reopened_plan):
+        deck = reopened_plan["deck"]
         assert f"{deck['columns']}x{deck['rows']}" in readme, "the README does not state the derived grid"
         assert "one slide" in readme
         assert "spid" in readme
@@ -3324,8 +3380,8 @@ class TestDocsMatchTheCode:
         assert "76 rejected" in readme
         assert "scrolled into view" in readme
 
-    def test_the_mechanics_name_every_gallery_control_the_plan_emits(self, mechanics, real_plan):
-        controls = {target["guiPath"][1] for target in real_plan["targets"]}
+    def test_the_mechanics_name_every_gallery_control_the_plan_emits(self, mechanics, reopened_plan):
+        controls = {target["guiPath"][1] for target in reopened_plan["targets"]}
         missing = sorted(control for control in controls if f"`{control}`" not in mechanics)
         assert not missing, f"control names the plan emits but computer-use.md does not record: {missing}"
 

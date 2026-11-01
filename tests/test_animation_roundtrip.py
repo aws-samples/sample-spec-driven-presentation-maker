@@ -46,7 +46,12 @@ A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 #: ``tests/fixtures/animations/oracle-16.113.1`` closed the last transition
 #: gaps: an entry with no established element form has no inverse mapping
 #: either, so closing the gap makes it reversible in both directions.
-BIDIRECTIONAL_COVERAGE = {"transitions": 147, "presets": 25}
+#: Presets went from 25 to 101 when the 2026-11-01 GUI capture measured the
+#: behaviour payloads of every GUI-addressable animation value. The 76 it
+#: covered are the difference: 24 emphasis tiles and 5 motion-path groups that
+#: had no writable form at all, plus 47 entrance and exit tiles that were
+#: refused for their payloads.
+BIDIRECTIONAL_COVERAGE = {"transitions": 147, "presets": 101}
 
 FADE = {"category": "entrance", "effect": "fade", "variant": None}
 

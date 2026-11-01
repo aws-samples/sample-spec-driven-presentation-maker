@@ -1335,3 +1335,103 @@ def test_check_detects_a_catalog_that_drifts_from_the_capture(manifest, catalog)
     if sdef_enums is None:
         pytest.skip("PowerPoint 16.113.1 is not installed")
     assert any("deterministic regeneration" in finding for finding in check(manifest, broken, sdef_enums))
+
+
+# --- the GUI capture of the animation surface ------------------------------
+@pytest.fixture(scope="module")
+def gui_capture() -> dict:
+    from scripts.animation_catalog.generate import load_gui_capture_evidence
+
+    return load_gui_capture_evidence()
+
+
+def test_the_gui_capture_covers_every_gui_addressable_animation_value(gui_capture):
+    """76 values, each joined to its effect by the spid the driver verified."""
+    assert len(gui_capture) == 76
+    assert all("effect" in record for record in gui_capture.values())
+    assert all(
+        record["attributedSpid"] == record["shapeSpid"] for record in gui_capture.values()
+    ), "a record joined to an effect on another shape"
+    assert {key.split(".")[2] for key in gui_capture} == {
+        "entrance", "exit", "emphasis", "motionPath",
+    }
+
+
+def test_every_captured_value_is_promoted_with_its_measured_behaviours(catalog, gui_capture):
+    """The payload gap is closed by transcription, not by inference.
+
+    Each promoted entry carries the behaviours **in document order with
+    duplicates**, because 57 of the 76 effects repeat an element and a set keyed
+    by element name cannot express them.
+    """
+    entries = {entry["key"]: entry for entry in catalog["guiItems"]}
+    repeated = 0
+    for key, record in gui_capture.items():
+        ooxml = entries[key]["ooxml"]
+        assert entries[key]["verification"] == "guiCapture", key
+        assert "requiresCapture" not in ooxml and "gap" not in ooxml, key
+        assert "unresolvedPayloads" not in ooxml, key
+        measured = [behavior["element"] for behavior in record["effect"]["behaviors"]]
+        assert [behavior["element"] for behavior in ooxml["behaviors"]] == measured, key
+        assert ooxml["behaviorChildren"] == sorted(set(measured)), key
+        if len(measured) != len(set(measured)):
+            repeated += 1
+    assert repeated == 57, "the ordered list is what these entries need"
+
+
+def test_a_promoted_entry_states_the_duration_its_timings_belong_to(catalog, gui_capture):
+    """And whether they can be scaled, which two of them cannot."""
+    entries = {entry["key"]: entry for entry in catalog["guiItems"]}
+    scalable = [
+        key for key in gui_capture
+        if entries[key]["ooxml"]["durationScaling"]["rule"] == "proportional"
+    ]
+    fixed = [
+        key for key in gui_capture
+        if entries[key]["ooxml"]["durationScaling"]["rule"] == "notScalable"
+    ]
+    assert len(scalable) + len(fixed) == 76
+    assert sorted(fixed) == [
+        "animation.gallery.emphasis.boldReveal",
+        "animation.gallery.emphasis.transparency",
+    ]
+    for key in scalable:
+        ooxml = entries[key]["ooxml"]
+        assert isinstance(ooxml["measuredDurationMs"], int) and ooxml["measuredDurationMs"] > 0
+        # The entry's own example asks for exactly what was measured, so
+        # following the catalog reproduces the measured bytes.
+        effect = entries[key]["semanticJson"]["animations"]["mainSequence"][0]
+        assert effect["timing"]["durationMs"] == ooxml["measuredDurationMs"], key
+        assert "1 ms" in ooxml["durationScaling"]["accuracy"]
+    for key in fixed:
+        assert entries[key]["ooxml"]["measuredDurationMs"] is None
+        effect = entries[key]["semanticJson"]["animations"]["mainSequence"][0]
+        assert effect["timing"]["durationMs"] is None
+
+
+def test_the_capture_confirms_the_identifiers_rather_than_replacing_them(catalog, gui_capture):
+    """71 agree with the catalog; the 5 motion paths had no presetId at all.
+
+    Worth pinning because the first reading of this comparison was wrong: it
+    read ``ooxml.attributes.presetID``, which animation entries do not carry,
+    and reported all 76 as filling an empty field.
+    """
+    entries = {entry["key"]: entry for entry in catalog["guiItems"]}
+    relations: dict[str, int] = {}
+    for key in gui_capture:
+        relation = entries[key]["capture"]["identifierRelation"]
+        relations[relation] = relations.get(relation, 0) + 1
+    assert relations == {"confirmsCatalogued": 71, "measuredWhereNoneWasRecorded": 5}
+
+
+def test_the_measured_motion_paths_are_the_five_gallery_groups(catalog, gui_capture):
+    entries = {entry["key"]: entry for entry in catalog["guiItems"]}
+    lines = entries["animation.gallery.motionPath.lines"]["ooxml"]
+    assert lines["presetId"] == 42 and lines["presetClass"] == "path"
+    assert lines["behaviors"][0]["attributes"]["path"] == "M 0 0 L 0 0.25 E"
+    assert lines["behaviors"][0]["attrNames"] == ["ppt_x", "ppt_y"]
+    assert all(
+        entries[f"animation.gallery.motionPath.{group}"]["ooxml"]["behaviors"][0]["element"]
+        == "p:animMotion"
+        for group in ("lines", "arcs", "turns", "shapes", "loops")
+    )

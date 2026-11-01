@@ -291,7 +291,7 @@ Four lists come out, because "not in the plan" has four different meanings and n
 
 | List | Count today | What it is |
 | --- | --- | --- |
-| `targets` | 76 | GUI-addressable and resolvable by title in one press — 71 gallery tiles plus 5 motion-path presets |
+| `targets` | 0 | GUI-addressable and resolvable by title in one press. **Empty, because all 76 were captured on 2026-11-01** — 71 gallery tiles plus 5 motion-path presets — and the plan is the catalog's own open gaps. A tile added to the gallery tables, or a gap reopened, appears here again |
 | `deferredTargets` | 51 | GUI-addressable namespace whose metadata implies no pressable path: the 45 `Effect Options` directions (their labels depend on which effect is applied), 3 After animation values (a dialog behind a prerequisite effect), 2 Media tiles (need a media object on the slide), and the custom motion path (drawn on the canvas) |
 | `setAsideScriptingEnumerators` | 185 | the `MsoAnim*` candidates. The GUI applies by **label**; a scripting enumerator is a different identity, so closing one here would state a name correspondence rather than measure a value |
 | `gapsWithoutCaptureFlag` | 8 | GUI-addressable entries carrying an `ooxml.gap` and `powerPointReadBackRequired` but no `requiresCapture` flag — `computer-use.md` Steps 3 to 5. Listed so the selection rule's edge is visible rather than looking like coverage |
