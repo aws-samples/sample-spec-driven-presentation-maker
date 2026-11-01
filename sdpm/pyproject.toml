@@ -20,7 +20,8 @@ include = ["sdpm*"]
 version = {attr = "sdpm.__version__"}
 
 [tool.ruff]
-line-length = 120
+# Rule set and line length come from the workspace root.
+extend = "../pyproject.toml"
 
 [tool.ruff.lint.per-file-ignores]
 "sdpm/engine/converter/color.py" = ["E402"]

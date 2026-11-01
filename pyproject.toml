@@ -36,6 +36,11 @@ dev = [
 line-length = 120
 src = ["sdpm", "servers/local", "servers/remote"]
 
+[tool.ruff.lint]
+# Explicit, so a ruff upgrade through uv.lock never changes the rule set (ruff 0.17
+# widened its defaults). These are ruff's long-standing defaults.
+select = ["E4", "E7", "E9", "F"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 # pytest-asyncio arrives as a runtime dependency of awslabs.aws-pricing-mcp-server (agent).

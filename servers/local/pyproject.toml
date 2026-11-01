@@ -21,4 +21,5 @@ package = false
 sdpm-skill = { workspace = true }
 
 [tool.ruff]
-line-length = 120
+# Rule set and line length come from the workspace root.
+extend = "../../pyproject.toml"

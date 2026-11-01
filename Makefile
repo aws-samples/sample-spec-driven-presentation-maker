@@ -3,13 +3,13 @@
 all: lint test
 
 lint:
-	ruff check sdpm/ servers/ shared/ api/ agent/
+	uv run ruff check sdpm/ servers/ shared/ api/ agent/
 
 format:
-	ruff format sdpm/ servers/ shared/ api/ agent/
+	uv run ruff format sdpm/ servers/ shared/ api/ agent/
 
 test:
-	python -m pytest tests/ -v
+	uv run pytest tests/ -v
 
 check: lint test
 	@echo "All checks passed"
