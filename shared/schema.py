@@ -140,8 +140,8 @@ def extract_fav_id(sk: str) -> str:
 def theme_hints_ddb_item(theme_hints: dict | None) -> dict:
     """Build the DynamoDB ``themeHints`` attribute from a ConversionResult.
 
-    Tolerates ``theme_hints=None`` (shared.ingest continues with a warning
-    when theme extraction fails) so a successful conversion is never
+    Tolerates ``theme_hints=None`` (sdpm.tools.attachment.ingest continues
+    with a warning when theme extraction fails) so a successful conversion is never
     reported as failed. DynamoDB rejects native floats, so
     ``backgroundLuminance`` is round-tripped via ``str(Decimal)``.
 
