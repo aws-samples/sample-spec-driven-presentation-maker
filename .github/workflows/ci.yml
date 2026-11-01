@@ -238,7 +238,7 @@ jobs:
             -v "$RUNNER_TEMP/api-bundle:/var/task:ro" \
             -e TABLE_NAME=ci -e PPTX_BUCKET=ci -e AWS_DEFAULT_REGION=us-east-1 \
             public.ecr.aws/lambda/python:3.13 \
-            -I -S -c "import sys; sys.path.insert(0, '/var/task'); import index, shared.ingest, sdpm.api"
+            -I -S -c "import sys; sys.path.insert(0, '/var/task'); import index, sdpm.api"
 
   guard:
     runs-on: ubuntu-latest

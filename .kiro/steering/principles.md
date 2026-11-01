@@ -87,13 +87,11 @@ Rules that follow from this:
 
 Known debt against this philosophy:
 - `api/index.py` has no test coverage (tracked for v0.5.x).
-- `sdpm.tools.attachment.pipeline` imports the repository-level `shared` package,
-  so the core currently depends outward on shared application code. Harmless while the
-  server always runs from a checkout; move the required attachment logic inward before
-  the core is ever packaged on its own.
 
 (v0.5.2 resolved: `converter/elements.py` monolith → `converter/elements/`
-package with an enforced dependency DAG; scale state → ContextVar scope.)
+package with an enforced dependency DAG; scale state → ContextVar scope.
+Resolved after v0.11.0: `shared/ingest.py` → `sdpm.tools.attachment.ingest`, removing
+the core → `shared` → core import cycle.)
 
 ## Engine & Knowledge (`sdpm/sdpm/`)
 

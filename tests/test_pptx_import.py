@@ -4,7 +4,7 @@
 
 Covers:
 - pptx_to_json output: deck.json + slides/slide-NN.json
-- shared/ingest._convert_pptx: ConversionResult with deck_structure / theme_hints
+- sdpm/tools/attachment/ingest._convert_pptx: ConversionResult with deck_structure / theme_hints
 - pptx_builder.py CLI: accepts deck directory
 - Engine deck_text_summary: slide-by-slide text extraction
 - Non-regression: PDF/DOCX/XLSX import unchanged
@@ -124,7 +124,7 @@ class TestPptxToJsonDeckStructure:
 
 
 # ---------------------------------------------------------------------------
-# T2: shared/ingest._convert_pptx + _extract_theme_hints
+# T2: sdpm/tools/attachment/ingest._convert_pptx + _extract_theme_hints
 # ---------------------------------------------------------------------------
 
 
@@ -132,7 +132,7 @@ class TestConvertPptxThemeHints:
     """_convert_pptx must populate deck_structure, slide_count, theme_hints, suggested_name."""
 
     def test_convert_pptx_populates_new_fields(self, fixture_pptx: Path, tmp_path: Path) -> None:
-        from shared.ingest import convert_file
+        from sdpm.tools.attachment.ingest import convert_file
 
         out_dir = tmp_path / "out"
         result = convert_file(fixture_pptx, out_dir)
@@ -145,7 +145,7 @@ class TestConvertPptxThemeHints:
 
     def test_convert_pptx_theme_hints_keys(self, fixture_pptx: Path, tmp_path: Path) -> None:
         """theme_hints uses unified keys: backgroundLuminance / accentColors / fonts."""
-        from shared.ingest import convert_file
+        from sdpm.tools.attachment.ingest import convert_file
 
         out_dir = tmp_path / "out"
         result = convert_file(fixture_pptx, out_dir)
@@ -175,7 +175,7 @@ class TestConvertPptxThemeHints:
         If the fixture doesn't have explicit bg, we fall back to template-derived luminance
         — both paths must yield a valid number.
         """
-        from shared.ingest import convert_file
+        from sdpm.tools.attachment.ingest import convert_file
 
         out_dir = tmp_path / "out"
         result = convert_file(fixture_pptx, out_dir)
@@ -189,7 +189,7 @@ class TestConvertPptxThemeHints:
 class TestThemeHintsDdbItem:
     """theme_hints_ddb_item must tolerate theme_hints=None (PR #215 follow-up, R2).
 
-    shared.ingest._convert_pptx returns theme_hints=None (with deck_structure=True)
+    sdpm.tools.attachment.ingest._convert_pptx returns theme_hints=None (with deck_structure=True)
     when theme extraction fails; the Cloud upload path once crashed with
     AttributeError on ``None.get`` — turning a successful conversion into
     "Conversion failed".
@@ -455,7 +455,7 @@ class TestExtractPlaceholderTemplate:
 
 
 # ---------------------------------------------------------------------------
-# T17: shared/ingest._convert_pptx integrates placeholder template extraction
+# T17: sdpm/tools/attachment/ingest._convert_pptx integrates placeholder template extraction
 # ---------------------------------------------------------------------------
 
 
@@ -465,7 +465,7 @@ class TestConvertPptxOutputsTemplate:
     def test_convert_pptx_outputs_template(
         self, fixture_pptx: Path, tmp_path: Path
     ) -> None:
-        from shared.ingest import convert_file
+        from sdpm.tools.attachment.ingest import convert_file
 
         out_dir = tmp_path / "out"
         result = convert_file(fixture_pptx, out_dir)
@@ -478,7 +478,7 @@ class TestConvertPptxOutputsTemplate:
         self, fixture_pptx: Path, tmp_path: Path
     ) -> None:
         """E2E: convert PPTX → use derived template.pptx → pptx_builder generate succeeds."""
-        from shared.ingest import convert_file
+        from sdpm.tools.attachment.ingest import convert_file
 
         deck_dir = tmp_path / "deck"
         result = convert_file(fixture_pptx, deck_dir)
@@ -529,7 +529,7 @@ class TestNonRegression:
             pytest.skip("python-docx not available")
 
         from docx import Document
-        from shared.ingest import convert_file
+        from sdpm.tools.attachment.ingest import convert_file
 
         src = tmp_path / "simple.docx"
         doc = Document()

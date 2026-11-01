@@ -1,8 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Upload file conversion pipeline (Cloud/Local shared).
+"""Attachment file conversion (PDF/DOCX/XLSX/PPTX → Markdown/JSON).
 
-Converts uploaded binary files to agent-readable formats at upload time.
+Called by :mod:`sdpm.tools.attachment.pipeline` when a document is imported.
+Converts binary files to agent-readable formats.
 Pure function: takes file path + output dir, writes converted files, returns result.
 No I/O dependencies (S3, DynamoDB) — callers handle storage.
 

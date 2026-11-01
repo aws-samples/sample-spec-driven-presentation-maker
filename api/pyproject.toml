@@ -4,8 +4,11 @@ version = "1.0.0"
 description = "spec-driven-presentation-maker REST API Lambda (Layer 4)"
 requires-python = ">=3.11"
 # Versions are locked in the workspace uv.lock (root); scripts/bundle_api_lambda.sh
-# bundles from it. sdpm-skill brings the engine's own dependencies (python-pptx, lxml, …)
-# for shared.ingest's upload-time PPTX conversion; the bundle copies sdpm/sdpm itself.
+# bundles from it. sdpm-skill brings the engine's dependencies for sdpm.engine.analyzer
+# (template listing and uploaded-template analysis in api/index.py); the bundle copies
+# sdpm/sdpm itself. The four document parsers below are no longer used by api/
+# (upload-time conversion moved to sdpm.tools.attachment.ingest); kept so the Lambda
+# bundle stays as it was; trimming them is a separate change.
 dependencies = [
     "sdpm-skill",
     "aws-lambda-powertools[all]>=2.0.0",
