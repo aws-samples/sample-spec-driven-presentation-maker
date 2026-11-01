@@ -23,6 +23,7 @@ import { useCompositionSafe } from "@/hooks/useCompositionSafe"
 import { MentionText } from "@/components/review/MentionText"
 import { frameElement, sentFrameKey, useReview, type ReviewContextValue } from "@/components/review/ReviewProvider"
 import type { DraftFrame } from "@/lib/review/drafts"
+import { stripWhitespace } from "@/lib/review/schema"
 
 const CARD_WIDTH = 300
 const GAP = 12
@@ -200,7 +201,7 @@ export function ReviewCommentCard() {
   // Sent frames are on the canvas only while the agent works on their request.
   const status = isSent ? "working" : null
   const reveal = view.reveal ? "review-reveal" : ""
-  const draftNames = new Set(review.drafts.filter(d => d.text.trim()).map(d => d.name))
+  const draftNames = new Set(review.drafts.filter(d => stripWhitespace(d.text)).map(d => d.name))
   const sentNames = new Set(isSent ? (review.workingReview?.comments.map(c => c.name) ?? []) : [])
   const exists = (n: string) => (isSent ? sentNames.has(n) : draftNames.has(n))
   const keyFor = isSent ? (n: string) => sentFrameKey((shown.frame as { requestId: string }).requestId, n) : undefined
@@ -289,7 +290,7 @@ function CardEditor({ review, frame, reveal, onResize }: CardEditorProps) {
 
   const query = value.slice(0, caret).match(/@([A-Za-z]*)$/)
   const candidates = query
-    ? review.drafts.filter(d => d.name !== frame.name && d.text.trim() && d.name.startsWith(query[1].toUpperCase()))
+    ? review.drafts.filter(d => d.name !== frame.name && stripWhitespace(d.text) && d.name.startsWith(query[1].toUpperCase()))
     : []
   const active = Math.min(mi, Math.max(0, candidates.length - 1))
 

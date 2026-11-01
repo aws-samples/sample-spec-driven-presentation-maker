@@ -100,6 +100,15 @@ describe("ReviewProvider", () => {
     expect(toastMock).toHaveBeenCalledTimes(1)
   })
 
+  it("a comment of only the whitespace the servers strip (U+001C, U+0085) counts as empty", () => {
+    renderProvider()
+    act(() => { api.addFrame("intro", [0, 0, 100, 100]) })
+    act(() => { api.setEditorText("\u001c\u0085 ") })
+    act(() => { api.closeEditor(true) })
+    expect(api.drafts).toEqual([])
+    expect(api.readyDrafts).toEqual([])
+  })
+
   it("cancel keeps the saved text", () => {
     renderProvider()
     addSaved("intro", "original")
@@ -130,11 +139,11 @@ describe("ReviewProvider", () => {
     createReview.mockResolvedValue({ id: "20261101-102000-a1b2", message: "[review:20261101-102000-a1b2] …" })
     renderProvider()
     act(() => { api.setToolOn(true) })
-    addSaved("intro", "  bigger  ")
+    addSaved("intro", "\u0085 bigger \u001c")
     addSaved("sales", "@A colour")
     addSaved("gone", "slide was deleted")
     let created: SubmittedReview | null = null
-    await act(async () => { created = await api.submit("  overall note ") })
+    await act(async () => { created = await api.submit("\u001f overall note \u0085") })
     expect(created).toMatchObject({ id: "20261101-102000-a1b2", message: "[review:20261101-102000-a1b2] …" })
     expect(createReview).toHaveBeenCalledWith("d1", {
       note: "overall note",

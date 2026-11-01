@@ -28,7 +28,7 @@ import { createReview } from "@/services/deckService"
 import { DEFAULT_SIZE, roundRect, type Rect, type SlideSize } from "@/lib/review/geometry"
 import { loadDrafts, saveDrafts, type DraftFrame } from "@/lib/review/drafts"
 import { frameName, nextSeq } from "@/lib/review/naming"
-import { MENTION_RE, type ReviewSubmission } from "@/lib/review/schema"
+import { MENTION_RE, stripWhitespace, type ReviewSubmission } from "@/lib/review/schema"
 import type { SentReview } from "@/lib/review/marker"
 
 export interface SentFrame {
@@ -232,7 +232,7 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
 
   const readyDrafts = useMemo(() => {
     const slugSet = new Set(stableSlugs)
-    return core.drafts.filter(d => d.text.trim() && slugSet.has(d.slide))
+    return core.drafts.filter(d => stripWhitespace(d.text) && slugSet.has(d.slide))
   }, [core.drafts, stableSlugs])
 
   const lookup = useCallback((key: string): FrameLookup | null => {
@@ -295,12 +295,12 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     const c = coreRef.current
     const frame = c.drafts.find(d => d.name === name)
     if (!frame) return
-    const value = text.trim()
+    const value = stripWhitespace(text)
     if (value) {
       if (value !== frame.text) update(cur => ({ ...cur, drafts: cur.drafts.map(d => (d.name === name ? { ...d, text: value } : d)) }))
       return
     }
-    if (!frame.text.trim()) {
+    if (!stripWhitespace(frame.text)) {
       update(cur => ({
         ...cur, drafts: cur.drafts.filter(d => d.name !== name),
         selected: cur.selected === name ? null : cur.selected,
@@ -406,11 +406,11 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     if (!forDeck) throw new Error("No deck is open")
     const { slugs: currentSlugs, size: currentSize, idToken: token } = live.current
     const slugSet = new Set(currentSlugs)
-    const frames = c.drafts.filter(d => d.text.trim() && slugSet.has(d.slide))
+    const frames = c.drafts.filter(d => stripWhitespace(d.text) && slugSet.has(d.slide))
     if (!frames.length) throw new Error("No comments to send")
     const submission: ReviewSubmission = {
-      note: note.trim() || null,
-      comments: frames.map(d => ({ name: d.name, slide: d.slide, rect: roundRect(d.rect, currentSize), text: d.text.trim() })),
+      note: stripWhitespace(note) || null,
+      comments: frames.map(d => ({ name: d.name, slide: d.slide, rect: roundRect(d.rect, currentSize), text: stripWhitespace(d.text) })),
     }
     const created = await createReview(forDeck, submission, token ?? "")
     const sent = new Set(frames.map(f => f.name))
