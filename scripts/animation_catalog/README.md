@@ -342,7 +342,8 @@ and the driver reads both.
 
 ### Running it
 
-Open the generated deck in PowerPoint, leave it frontmost, then:
+Open the generated deck in PowerPoint. It does **not** have to stay frontmost — a run
+drives an occluded window and takes no focus, so keep working while it goes:
 
 ```bash
 uv run --with pyobjc-framework-ApplicationServices --with pyobjc-framework-Cocoa \
@@ -363,7 +364,7 @@ A line per batch goes to **stderr** while it runs — batch index, targets attem
 captured so far, elapsed — so a 76-target run is distinguishable from a hang, while
 stdout stays pure JSON for the summary.
 
-**It does not move the pointer.** Every action is an `AXPress` or a single `AXSelected` write, so no mouse event is posted and the pointer is never taken over. The driver still **refuses to start** unless PowerPoint is frontmost and its document window is the expected capture deck: an `AXPress` goes to whatever window the title resolution found, and the wrong frontmost document would mean pressing ribbon controls and `Save` on the operator's own deck.
+**It does not move the pointer**, and it **does not need PowerPoint to be frontmost**. Every action is an `AXPress` or a single `AXSelected` write addressed to a named element, so no mouse event is posted, the pointer is never taken over, and an occluded window is still reached — the operator keeps the keyboard and the screen while a run proceeds. The driver still **refuses to start** unless PowerPoint's document window is the expected capture deck: an `AXPress` goes to whatever window the title resolution found, and the wrong document would mean pressing ribbon controls and `Save` on the operator's own deck.
 
 Without `--drive-powerpoint` it sends nothing. `--help` and `--emit-record-schema` work with no accessibility bindings installed at all: pyobjc is imported inside the live backend, so importing the module never requires it and `tests/test_animation_gui_capture.py` runs against a fake.
 

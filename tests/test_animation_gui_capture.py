@@ -2229,11 +2229,26 @@ class TestConsentAndRefusal:
             driver.run_capture(session["plan"], session["settings"], session["fake"])
         assert session["fake"].presses == []
 
-    def test_it_refuses_when_powerpoint_is_not_frontmost(self, session):
+    def test_it_runs_while_another_application_is_frontmost(self, session):
+        """A run does not need the operator's screen, and this test inverted.
+
+        It used to require PowerPoint to be frontmost and assert the refusal.
+        Every action here is an accessibility press or attribute write addressed
+        to a named element, so it reaches an occluded window and takes no focus
+        — which is why the driver posts no mouse events at all. Requiring
+        frontmost bought nothing the document check does not already cover, and
+        it cost two things that matter for a long run: it could not be started
+        without taking the screen, and any app coming forward mid-run aborted it.
+
+        What still guards the operator's own work is the **document** check
+        below: the deck being driven has to be the capture deck.
+        """
         session["fake"].frontmost = "com.apple.Terminal"
-        with pytest.raises(driver.DriverRefusal, match="frontmost"):
-            driver.run_capture(session["plan"], session["settings"], session["fake"])
-        assert (session["fake"].selections, session["fake"].presses) == ([], [])
+        summary = driver.run_capture(
+            session["plan"], session["settings"], session["fake"], version="16.113.1"
+        )
+        assert summary["captured"] == len(session["plan"]["targets"])
+        assert session["fake"].presses, "it drove PowerPoint from the background"
 
     def test_it_refuses_a_document_that_is_not_the_capture_deck(self, session):
         session["fake"].document_title = "Q3 Business Review"
@@ -3357,12 +3372,13 @@ class TestDocsMatchTheCode:
 
         It used to require "moves the real pointer". The driver posts no mouse events
         now, so a README that still warned about a pointer takeover would be describing a
-        tool that no longer exists — and the frontmost guard is still there, for a
+        tool that no longer exists — and the document guard is still there, for a
         different reason, which the README has to give.
         """
         assert "does not move the pointer" in readme
         assert "moves the real pointer" not in readme
-        assert "refuses to start" in readme and "frontmost" in readme
+        assert "refuses to start" in readme and "capture deck" in readme
+        assert "does not need PowerPoint to be frontmost" in readme
 
     def test_the_readme_records_why_the_canvas_click_is_gone(self, readme):
         assert "2 of 12" in readme

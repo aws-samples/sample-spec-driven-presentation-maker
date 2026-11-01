@@ -169,7 +169,8 @@ in full.
 Every action the driver sends is an ``AXPress`` or a single ``AXSelected`` write, so the
 **pointer is never moved and no mouse event is ever posted**. The operator's machine
 stays usable, and a stray window in front of PowerPoint cannot swallow a click, because
-there is no click. The frontmost-and-expected-document guard is still enforced before
+there is no click, and a run needs neither focus nor the frontmost application, so the
+operator keeps the screen while it works. The expected-document guard is enforced before
 anything is sent: an ``AXPress`` goes to whichever window the title resolution found, and
 a wrong document would mean pressing ribbon controls over the operator's own work.
 
@@ -1840,26 +1841,32 @@ def normalise_document_title(title: str | None) -> str:
 
 
 def assert_ready(backend: AXBackend, expected_document: str) -> str:
-    """Refuse to start unless the frontmost document is the expected capture deck.
+    """Refuse to start unless PowerPoint's document window is the expected capture deck.
 
-    The driver no longer posts mouse events, so this is no longer about where a pointer
-    lands — but it is still load-bearing. An ``AXPress`` goes to whatever window the
-    title resolution found, and a wrong frontmost document would mean pressing ribbon
-    controls, opening the Selection Pane, and pressing ``Save`` on the operator's own
-    deck. Nothing is sent before this passes.
+    An ``AXPress`` goes to whatever window the title resolution found, and the wrong
+    document would mean pressing ribbon controls, opening the Selection Pane and
+    pressing ``Save`` on the operator's own deck. **That** is what this guard is for, and
+    the document check is what enforces it. Nothing is sent before this passes.
+
+    It does **not** require PowerPoint to be frontmost, and that is a deliberate change
+    rather than a relaxation of the guard. Every action here is an accessibility
+    ``AXPress`` or attribute write addressed to a specific element, so it reaches an
+    occluded window and takes no focus — which is why the driver posts no mouse events
+    in the first place. Requiring frontmost bought nothing the document check does not
+    already cover, and it cost something real: a run of this length could not be started
+    without taking the operator's screen, and a stray app coming forward mid-run would
+    have aborted it. The document window is still resolved by title from a fresh read,
+    so a second deck opening in front changes nothing about which window is driven.
     """
     if not backend.trusted():
         raise DriverRefusal(
             "this process does not hold the Accessibility grant; add the terminal running it "
             "to System Settings > Privacy & Security > Accessibility"
         )
-    frontmost = backend.frontmost_bundle_id()
-    if frontmost != BUNDLE_ID:
-        raise DriverRefusal(f"PowerPoint must be frontmost; the frontmost application is {frontmost!r}")
     title = normalise_document_title(held(backend).window().title)
     if title != normalise_document_title(expected_document):
         raise DriverRefusal(
-            f"the frontmost document is {title!r}, not the expected capture deck "
+            f"PowerPoint's document window is {title!r}, not the expected capture deck "
             f"{normalise_document_title(expected_document)!r}; refusing to drive it"
         )
     return title

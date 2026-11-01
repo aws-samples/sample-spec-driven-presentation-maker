@@ -539,6 +539,35 @@ float precision rather than a tie rule that can be restated here. So:
   from PowerPoint on a `.5` boundary. That limit is a measurement, not an
   estimate, and it belongs in the catalog beside the scaled values.
 
+## The route to a direction — **MEASURED, not yet captured**
+
+Measured 2026-11-01. A direction persists as `p:cTn/@presetSubtype`, and 45 of
+them are open. The route exists and it is the same shape as the Duration one:
+
+1. select the shape through its Selection Pane row;
+2. press the effect's gallery tile — this is what **selects the effect**, and
+   `Effect Options` is `enabled=False` until it is, exactly as `Duration:` was;
+3. press `Effect Options`, which opens a **window titled `Effect Options`**;
+4. press the direction, save, read `presetSubtype` off the effect's `p:cTn`.
+
+For Fly In the window published 14 titled items in two groups:
+
+| Group | Items |
+| --- | --- |
+| `Direction` | `From Bottom`, `From Bottom-Left`, `From Left`, `From Top-Left`, `From Top`, `From Top-Right`, `From Right`, `From Bottom-Right` |
+| `Sequence` | `As One Object`, `All at Once`, `By Paragraph` |
+
+Two things follow for the plan. **The direction labels are per effect** — Fly In
+offers eight compass directions, a Wipe offers four, a Wheel offers spoke counts
+— so the plan is one target per (effect, direction) pair that the applied effect
+actually offers, read from the window rather than from the catalog's 45 names.
+And the `Sequence` group is the text-unit setting, which is already writable; it
+is in the same window, so it costs nothing to confirm while there.
+
+This probe ran with PowerPoint **not frontmost**, which is the other half of the
+change: see the README. A capture of this size has to be able to run while the
+operator works.
+
 ## Step 1 — transition directions on extension elements — **CLOSED**
 
 Closed on 2026-10-31 by the scripting oracle, not from here. It applied all 207
