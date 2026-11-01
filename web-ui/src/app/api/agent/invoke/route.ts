@@ -15,6 +15,7 @@ import {
 import { createSSEStream } from "@/lib/local/sse-bridge"
 import { withContinuedFrom, withInteractionMode } from "@/lib/local/interaction-mode"
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
+import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 const MODE_TO_AGENT: Record<string, string> = {
   vibe: "sdpm-orchestrator",
@@ -26,6 +27,8 @@ const MODE_TO_AGENT: Record<string, string> = {
 export const dynamic = 'force-dynamic'
 
 export async function POST(req: Request) {
+  const refused = rejectCrossSite(req)
+  if (refused) return refused
   let body: {
     query?: unknown
     mode?: string

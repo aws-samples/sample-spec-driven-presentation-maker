@@ -16,7 +16,7 @@
 
 "use client"
 
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type ReactNode } from "react"
 import { useTranslations } from "next-intl"
 import { previewIdentity } from "@/lib/preview"
 
@@ -37,6 +37,14 @@ interface HtmlDeckPlayerProps {
   deckName?: string
   /** Slide to show (thumbnail click, search jump). */
   slide?: HtmlPlayerSlide | null
+  /** Drawn over the player (inside its box, which carries `group/slide`). */
+  overlay?: ReactNode
+  /**
+   * Sets `data-hover` on the box. The page gets no pointer events while the pointer is over the
+   * sandboxed deck (an out-of-process frame), so `:hover` never applies to the box; the caller
+   * tracks the pointer around the player instead.
+   */
+  hovered?: boolean
 }
 
 function withoutFragment(url: string): string {
@@ -51,7 +59,7 @@ export function deckUrlAtSlide(url: string, index: number | undefined): string {
   return index ? `${withoutFragment(url)}#/${index}` : withoutFragment(url)
 }
 
-export function HtmlDeckPlayer({ htmlUrl, slideSize, deckName, slide }: HtmlDeckPlayerProps) {
+export function HtmlDeckPlayer({ htmlUrl, slideSize, deckName, slide, overlay, hovered }: HtmlDeckPlayerProps) {
   const t = useTranslations("carousel")
   const width = slideSize?.width ?? 1920
   const height = slideSize?.height ?? 1080
@@ -89,8 +97,9 @@ export function HtmlDeckPlayer({ htmlUrl, slideSize, deckName, slide }: HtmlDeck
 
   return (
     <div
-      className="slide-shadow mx-auto w-full overflow-hidden rounded-lg bg-black"
+      className="group/slide slide-shadow relative mx-auto w-full overflow-hidden rounded-lg bg-black"
       style={{ aspectRatio: `${width}/${height}`, maxWidth: `calc((100vh - 170px) * ${width / height})` }}
+      data-hover={hovered ? "" : undefined}
     >
       <iframe
         ref={frameRef}
@@ -102,6 +111,7 @@ export function HtmlDeckPlayer({ htmlUrl, slideSize, deckName, slide }: HtmlDeck
         onLoad={() => { loadedRef.current = true }}
         className="h-full w-full border-0"
       />
+      {overlay}
     </div>
   )
 }

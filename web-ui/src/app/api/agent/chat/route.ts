@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: MIT-0
 /** Local Chat Save/Load — persists chat messages to deck's .chat.json. */
 import { saveChatToDeck, readChatFromDeck } from "@/lib/local/acp-process"
+import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 export async function POST(req: Request) {
+  const refused = rejectCrossSite(req)
+  if (refused) return refused
   const { deckId, messages } = await req.json()
   if (!deckId || !messages) return Response.json({ error: "deckId and messages required" }, { status: 400 })
   saveChatToDeck(deckId, messages)

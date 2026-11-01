@@ -595,5 +595,32 @@
     "useTemplateAria": "Use the {name} template",
     "currentLabel": "In use: {name}",
     "custom": "Custom"
+  },
+  "review": {
+    "tool": "Comment",
+    "toolTitle": "Comment on the slides (C)",
+    "ctaTitle": "Comment on this slide (C)",
+    "hintDrag": "Drag to outline",
+    "hintClick": "Click to place a frame",
+    "hintExit": "Esc to exit",
+    "placeholder": "Describe the change…  @ to reference another frame",
+    "footer": "Enter to save · Shift+Enter for a new line",
+    "slide": "Slide {n}",
+    "frameLabel": "Frame {name}",
+    "deleteLabel": "Delete frame (Delete)",
+    "closeLabel": "Close (Esc)",
+    "mentionList": "Frames to reference",
+    "deleted": "Deleted {name}",
+    "deletedReferenced": "Deleted {name} (referenced by {refs})",
+    "undo": "Undo",
+    "draftTitle": "Change request",
+    "draftCount": "{count, plural, one {# frame} other {# frames}}",
+    "showComments": "Show frames",
+    "hideComments": "Hide frames",
+    "send": "Request changes",
+    "busyHint": "You can send once the agent has finished",
+    "needsTextHint": "Add a comment or a message to send",
+    "sendFailed": "Couldn't send the change request",
+    "noComment": "No comment"
   }
 }

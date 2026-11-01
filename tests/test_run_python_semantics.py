@@ -121,6 +121,23 @@ class TestLocalRunPython:
         assert calls == []
         assert "pptx" not in out
 
+    def test_reads_a_review_file_without_building(self, deck_dir: Path, monkeypatch):
+        """Composers read the Web UI's change request (reviews/<id>.json) like any deck file."""
+        calls = self._patch_generate(monkeypatch)
+        (deck_dir / "reviews").mkdir()
+        (deck_dir / "reviews" / "20261101-102000-a1b2.json").write_text(
+            json.dumps({"id": "20261101-102000-a1b2", "comments": [{"name": "A", "slide": "title"}]})
+        )
+        out = json.loads(
+            sandbox_tools.run_python(
+                purpose="read change request",
+                code='print(read_json("reviews/20261101-102000-a1b2.json")["comments"][0]["name"])',
+                deck_id=str(deck_dir),
+            )
+        )
+        assert out["output"].strip() == "A"
+        assert calls == []
+
     def test_non_build_write_persists_without_build(self, deck_dir: Path, monkeypatch):
         calls = self._patch_generate(monkeypatch)
         json.loads(

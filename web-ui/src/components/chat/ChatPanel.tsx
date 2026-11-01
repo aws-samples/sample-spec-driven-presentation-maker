@@ -36,6 +36,9 @@ import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./ch
 import { useLocale, useTranslations } from "next-intl"
 import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsService"
 import type { ForkSessionPhase, KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
+import { useReview, type SubmittedReview } from "@/components/review/ReviewProvider"
+import { ReviewDraftBar } from "@/components/review/ReviewDraftBar"
+import { stripWhitespace } from "@/lib/review/schema"
 
 interface ChatPanelProps {
   deckId: string
@@ -68,6 +71,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const t = useTranslations("chat")
   const tCompose = useTranslations("compose")
   const tSessionPicker = useTranslations("sessionPicker")
+  const tReview = useTranslations("review")
   const locale = useLocale()
   // --- Session ---
   const [sessionId, setSessionId] = useState(() => {
@@ -145,6 +149,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const slashPickerItems = useSlashPickerItems(auth.user?.id_token)
   // Mirror of the chat input; the HTML pill derives its state from the text alone.
   const [inputText, setInputText] = useState("")
+
+  // --- Review comments (only the ChatPanel of the open deck shows and sends them) ---
+  const review = useReview()
+  const reviewActive = !!review?.enabled && review.deckId === deckId
+  const hasReviewDrafts = reviewActive && (review?.readyDrafts.length ?? 0) > 0
+  // Read in callbacks that outlive a render.
+  const reviewRef = useRef(review)
+  useEffect(() => { reviewRef.current = review })
 
   /** Persist chat messages to disk (Local mode only). */
   const saveLocalChat = useCallback((overrideDeckId?: string) => {
@@ -270,8 +282,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     insertAtCursor(text: string) {
       chatInputRef.current?.insertAtCursor(text)
     },
-    sendMessage(text: string, options?: { displayContent?: string }) {
-      return stream.sendMessage(text, undefined, undefined, undefined, options)
+    async sendMessage(text: string, options?: { displayContent?: string }) {
+      await stream.sendMessage(text, undefined, undefined, undefined, options)
     },
   }), [stream.sendMessage])
 
@@ -486,8 +498,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     uploadedFiles: UploadedFile[],
     snippets: { label: string; text: string }[],
     attachments: { fileName: string; fileType: string }[],
-  ) => {
-    if (!configLoaded) return
+  ): Promise<boolean> => {
+    if (!configLoaded) return Promise.resolve(false)
 
     let fullMessage = text
 
@@ -502,9 +514,47 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       fullMessage = `<!--sdpm:include_images=true-->\n${fullMessage}`
     }
 
-    stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments, { displayContent: text })
+    return stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments, { displayContent: text })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configLoaded, deckId, fetchWebImages, stream.sendMessage])
+
+  /**
+   * Send from the input. With comments waiting, the server first writes the review file and
+   * returns the chat message (the typed text as `note`, comments, file path, instructions,
+   * `[review:<id>]`), which is sent as-is and also shown (Local .chat.json keeps the display
+   * text). A failed write keeps the comments and the typed text (`false` keeps the input). A
+   * failed send puts the frames back into the drafts and the text back into an empty input, so the
+   * request can be sent again (the chat shows the error).
+   */
+  const handleInputSend = useCallback(async (
+    text: string,
+    uploadedFiles: UploadedFile[],
+    snippets: { label: string; text: string }[],
+    attachments: { fileName: string; fileType: string }[],
+  ): Promise<void | false> => {
+    if (!configLoaded) return false
+    const r = reviewRef.current
+    if (!hasReviewDrafts || !r) {
+      handleSend(text, uploadedFiles, snippets, attachments)
+      return
+    }
+    let created: SubmittedReview
+    try {
+      created = await r.submit(text)
+    } catch (err) {
+      notifyError(tReview("sendFailed"), err)
+      return false
+    }
+    void handleSend(created.message, uploadedFiles, snippets, attachments).then((ok) => {
+      if (ok) return
+      created.restore()
+      // Later than ChatInput clearing the input after this send.
+      setTimeout(() => {
+        const input = chatInputRef.current
+        if (text.trim() && input && !input.textareaRef.current?.value.trim()) input.replaceText(text)
+      }, 100)
+    })
+  }, [configLoaded, hasReviewDrafts, handleSend, tReview])
 
   // --- Compose in-flight detection (for stop tooltip) ---
   const composeInFlight = useMemo(() => {
@@ -536,6 +586,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [isLoading, onLoadingChange])
 
   const isInitial = stream.messages.length === 0 && !historyLoading
+  // Only the initial screen shows the pill, so only it keeps the text: a long chat skips the
+  // per-keystroke re-render (the draft bar's blank flag only re-renders when it flips).
+  const [inputBlank, setInputBlank] = useState(true)
+  const handleInputChange = useCallback((value: string) => {
+    if (isInitial) setInputText(value)
+    setInputBlank(!stripWhitespace(value))
+  }, [isInitial])
 
   return (
     <>
@@ -659,6 +716,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   sessionId={sessionId}
                   onSend={(text: string) => handleSend(text, [], [], [])}
                   hearingDisabled={i < lastUserIdx}
+                  deckId={deckId}
                 />
               </div>
             ))
@@ -671,11 +729,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       {/* Input area */}
       <ChatInput
           ref={chatInputRef}
-          onSend={handleSend}
+          onSend={handleInputSend}
           isLoading={isLoading}
           onStop={stream.stopGeneration}
           disabled={!configLoaded || reconnectLoading}
           placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
+          topSlot={reviewActive ? <ReviewDraftBar inputBlank={inputBlank} /> : undefined}
+          sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading, canSend: review.canSubmit } : undefined}
           idToken={auth.user?.id_token}
           sessionId={sessionId}
           deckId={deckId}
@@ -686,8 +746,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           slashLoading={slashPickerItems.loading}
           onSlashOpen={slashPickerItems.ensure}
           onTextareaFocus={slashPickerItems.ensure}
-          // Only the initial screen shows the pill; skip the per-keystroke re-render of a long chat.
-          onInputChange={isInitial ? setInputText : undefined}
+          onInputChange={handleInputChange}
         >
           {/* Options expander — the only option (web images) is cloud-only */}
           {!IS_LOCAL && (

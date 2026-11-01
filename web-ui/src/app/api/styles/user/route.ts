@@ -4,8 +4,11 @@
 import fs from "fs"
 import path from "path"
 import { getUserStylesDir } from "@/lib/local/sdpmPaths"
+import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 export async function POST(req: Request) {
+  const refused = rejectCrossSite(req)
+  if (refused) return refused
   const { name, html } = await req.json() as { name: string; html: string }
   if (!name || !html) {
     return Response.json({ error: "name and html required" }, { status: 400 })
