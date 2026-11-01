@@ -59,7 +59,7 @@ function Capture() {
   return null
 }
 
-const fetchMock = vi.fn(async (..._args: unknown[]) => new Response("{}", { headers: { "content-type": "application/json" } }))
+const fetchMock = vi.fn<(...args: unknown[]) => Promise<Response>>(async () => new Response("{}", { headers: { "content-type": "application/json" } }))
 
 async function renderPanel() {
   const view = renderWithIntl(

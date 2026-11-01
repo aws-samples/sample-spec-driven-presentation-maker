@@ -6,7 +6,7 @@ import { act, cleanup } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 
 const { toastMock, createReview } = vi.hoisted(() => {
-  const toastMock = Object.assign(vi.fn((..._args: unknown[]) => "toast-1"), { dismiss: vi.fn() })
+  const toastMock = Object.assign(vi.fn<(...args: unknown[]) => string>(() => "toast-1"), { dismiss: vi.fn() })
   return { toastMock, createReview: vi.fn() }
 })
 vi.mock("sonner", () => ({ toast: toastMock }))
