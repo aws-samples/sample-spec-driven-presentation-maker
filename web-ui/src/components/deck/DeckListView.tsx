@@ -29,7 +29,7 @@ import { DeckCard } from "@/components/deck/DeckCard"
 import { EmptyState } from "@/components/deck/EmptyState"
 import { SearchResultsGrid } from "@/components/deck/SearchResultsGrid"
 import { SelectionBar } from "@/components/deck/SelectionBar"
-import { Search, X, Plus, Lock, Star, Users, Building2, Sparkles, CheckSquare } from "lucide-react"
+import { Search, X, Plus, Lock, Star, Building2, Sparkles, CheckSquare } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { IS_LOCAL } from "@/lib/mode"
 import { useTranslations } from "next-intl"
@@ -37,7 +37,7 @@ import { useTranslations } from "next-intl"
 /** Tab definition for the list view. labelKey resolves via deckList.tabs.* */
 interface Tab {
   key: string
-  labelKey: "mine" | "favorites" | "shared" | "public"
+  labelKey: "mine" | "favorites" | "public"
   icon: typeof Lock
 }
 
@@ -45,7 +45,6 @@ interface Tab {
 const TABS: Tab[] = IS_LOCAL ? [] : [
   { key: "mine", labelKey: "mine", icon: Lock },
   { key: "favorites", labelKey: "favorites", icon: Star },
-  { key: "shared", labelKey: "shared", icon: Users },
   { key: "public", labelKey: "public", icon: Building2 },
 ]
 
@@ -63,7 +62,6 @@ interface DeckListViewProps {
   onToggleFavorite: (deckId: string, action: "add" | "remove") => void
   onDelete: (deckId: string) => void
   onToggleVisibility?: (deckId: string, visibility: "public" | "private") => void
-  onShare?: (deckId: string) => void
   onDownload?: (deckId: string) => void
   onOpenFolder?: (deckId: string) => void
   loading: boolean
@@ -93,7 +91,7 @@ export function visibleDecks(decks: DeckSummary[], searchQuery: string): DeckSum
 export function DeckListView({
   decks, activeTab, onTabChange, searchQuery, onSearchChange,
   searchResults, searching, onDeckOpen, onNewDeck, favoriteIds,
-  onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, onOpenFolder, loading,
+  onToggleFavorite, onDelete, onToggleVisibility, onDownload, onOpenFolder, loading,
   selection,
 }: DeckListViewProps) {
   const t = useTranslations("deckList")
@@ -225,7 +223,6 @@ export function DeckListView({
                   onToggleFavorite={onToggleFavorite}
                   onDelete={onDelete}
                   onToggleVisibility={onToggleVisibility}
-                  onShare={onShare}
                   onDownload={onDownload}
                   onOpenFolder={onOpenFolder}
                   selectable={canSelect}

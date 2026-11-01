@@ -32,7 +32,6 @@
     "tabs": {
       "mine": "マイデッキ",
       "favorites": "お気に入り",
-      "shared": "共有",
       "public": "社内公開"
     },
     "emptyMineTitle": "デッキはまだありません",
@@ -72,7 +71,6 @@
     "downloadPptx": "PPTX をダウンロード",
     "makePrivate": "非公開にする",
     "makeInternal": "社内公開にする",
-    "share": "共有",
     "delete": "削除",
     "previewAlt": "{name} のプレビュー",
     "internal": "社内公開",
@@ -84,12 +82,7 @@
     "private": "非公開",
     "share": "共有",
     "shareInternallyTitle": "社内に公開しますか?",
-    "shareInternallyDescription": "このデッキは組織内の全員が検索・閲覧できるようになります。",
-    "shareThisDeck": "このデッキを共有",
-    "searchByAlias": "エイリアスで検索…",
-    "collaborators": "共同編集者",
-    "removeCollaborator": "{name} を削除",
-    "noCollaborators": "共同編集者はまだいません"
+    "shareInternallyDescription": "このデッキは組織内の全員が検索・閲覧できるようになります。"
   },
   "search": {
     "searching": "組織全体のスライドを検索中…",

@@ -29,7 +29,7 @@ import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { ChatPanelShell } from "@/components/chat/ChatPanelShell"
 import { DeckFormatProvider } from "@/components/chat/DeckFormatContext"
 import { ChatPanelHandle } from "@/components/chat/ChatPanel"
-import { updateVisibility, shareDeck } from "@/services/deckService"
+import { updateVisibility } from "@/services/deckService"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { useSwipe } from "@/hooks/useSwipe"
 import { useDeckList } from "@/hooks/useDeckList"
@@ -235,15 +235,6 @@ export default function DecksPage() {
                                 await updateVisibility(ws.activeDeckId, v, idToken)
                                 ws.setDeck({ ...ws.deck, visibility: v })
                               }}
-                              onShare={async (sub, action, alias) => {
-                                if (!idToken || !ws.activeDeckId) return { collaborators: [], collaboratorAliases: {} }
-                                const result = await shareDeck(ws.activeDeckId, sub, idToken, action, alias)
-                                if (ws.deck) ws.setDeck({ ...ws.deck, collaborators: result.collaborators, collaboratorAliases: result.collaboratorAliases })
-                                return result
-                              }}
-                              idToken={idToken}
-                              collaborators={ws.deck?.collaborators}
-                              collaboratorAliases={ws.deck?.collaboratorAliases}
                             />
                           )}
                         </div>

@@ -24,7 +24,7 @@ import { DeckSummary } from "@/services/deckService"
 import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { Layers, Star, MoreHorizontal, Trash2, Building2, Lock, Share2, Download, Users, Link, FolderOpen, Check } from "lucide-react"
+import { Layers, Star, MoreHorizontal, Trash2, Building2, Lock, Download, Link, FolderOpen, Check } from "lucide-react"
 import { CloudOnly, IS_LOCAL } from "@/lib/mode"
 import { formatDate, meshGradient } from "@/lib/utils"
 import { useTranslations } from "next-intl"
@@ -42,7 +42,6 @@ interface DeckCardProps {
   onToggleFavorite?: (deckId: string, action: "add" | "remove") => void
   onDelete?: (deckId: string) => void
   onToggleVisibility?: (deckId: string, visibility: "public" | "private") => void
-  onShare?: (deckId: string) => void
   onDownload?: (deckId: string) => void
   onOpenFolder?: (deckId: string) => void
   /** Show the hover checkbox and allow this card to join a selection. */
@@ -54,7 +53,7 @@ interface DeckCardProps {
 }
 
 export function DeckCard({
-  deck, index, isFavorite = false, isOwner = true, onOpen, onToggleFavorite, onDelete, onToggleVisibility, onShare, onDownload, onOpenFolder,
+  deck, index, isFavorite = false, isOwner = true, onOpen, onToggleFavorite, onDelete, onToggleVisibility, onDownload, onOpenFolder,
   selectable = false, selectionMode = false, selected = false, onSelectToggle,
 }: DeckCardProps) {
   const t = useTranslations("deckCard")
@@ -180,12 +179,6 @@ export function DeckCard({
                 </DropdownMenuItem>
               </>
             )}
-            {isOwner && onShare && (
-              <DropdownMenuItem onClick={() => onShare(deck.deckId)}>
-                <Share2 className="h-3.5 w-3.5" />
-                {t("share")}
-              </DropdownMenuItem>
-            )}
             </CloudOnly>
             {isOwner && onDelete && (
               <>
@@ -247,15 +240,6 @@ export function DeckCard({
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-foreground-secondary bg-black/50 backdrop-blur-md">
               <Lock className="h-2.5 w-2.5" />
               {t("private")}
-            </div>
-          )}
-          {deck.collaborators && deck.collaborators.length > 0 && (
-            <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium backdrop-blur-md"
-              style={{ background: "oklch(0.55 0.12 220 / 0.35)", color: "oklch(0.9 0.08 220)" }}
-              title={deck.collaborators.join(", ")}
-            >
-              <Users className="h-2.5 w-2.5" />
-              {deck.collaborators.length}
             </div>
           )}
           </CloudOnly>

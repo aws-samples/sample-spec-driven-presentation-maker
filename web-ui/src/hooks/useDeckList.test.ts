@@ -9,7 +9,6 @@ vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
 vi.mock("@/services/deckService", () => ({
   listDecks: vi.fn(),
   listPublicDecks: vi.fn(),
-  listSharedDecks: vi.fn(),
   listFavorites: vi.fn(),
   searchSlides: vi.fn(),
   updateVisibility: vi.fn(),
@@ -34,7 +33,6 @@ describe("useDeckList — HTML preview URL re-signing", () => {
     vi.useFakeTimers()
     api.listDecks.mockResolvedValue({ decks: [], favoriteIds: [] } as never)
     api.listPublicDecks.mockResolvedValue([] as never)
-    api.listSharedDecks.mockResolvedValue([] as never)
     api.listFavorites.mockResolvedValue([] as never)
     api.searchSlides.mockResolvedValue([
       { deckId: "d1", slug: "cover", previewUrl: "https://bucket.s3.amazonaws.com/html/d1/preview/cover_1.html?X-Amz-Signature=a" },
