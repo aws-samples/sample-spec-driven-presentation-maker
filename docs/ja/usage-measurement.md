@@ -1,3 +1,5 @@
+[English](../en/usage-measurement.md) | [日本語](usage-measurement.md)
+
 # 使用量の計測（ユーザー別トークン数・スライド作成数）
 
 PoC 運営者向けに、ユーザーごとの Bedrock トークン消費量とスライド作成数を計測する

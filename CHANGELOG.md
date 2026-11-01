@@ -41,6 +41,12 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **Documentation reorganized for first-time readers.** The README now shows example output
+  and the three ways to use SDPM (your AI agent, the Web UI on your computer, a team server
+  on AWS). `docs/en/getting-started.md` is the user guide; checkout setup and CDK deployment
+  moved to `docs/en/developer-guide.md`, security notes to `docs/en/security.md`, and the
+  migration guides to `docs/en/migration/`. The workflow and architecture diagrams are redrawn
+  from the current code. New Japanese translations: custom templates and uninstall.
 - **One Python lock for everything.** The repository root is now a uv workspace (`sdpm`,
   `servers/local`, `servers/remote`, `agent`, `api`) with a single `uv.lock`. The MCP Runtime
   and Agent Runtime images and the API Lambda bundle install exactly the locked versions,
@@ -704,7 +710,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   `code-block` → `code_to_slide`, `layout` → `arch_diagram`,
   `diff` → `diff_pptx`. Workflow/guide text now reads identically whether
   called as an MCP tool or a CLI subcommand. No aliases for the old names.
-  See [Migration: role workflows](docs/en/migration-role-workflows.md) for the full table.
+  See [Migration: role workflows](docs/en/migration/role-workflows.md) for the full table.
 - **`slide-json-spec` moved to `sdpm/references/spec/`** — it is a fact
   document, not a role document; still resolved by `read_workflows` for
   backward compatibility. **`hand-edit-sync` moved to
@@ -721,7 +727,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   needed again, express it directly in slide JSON per
   `read_workflows(["slide-json-spec"])`.
 
-> **Migrating from v0.5?** See [Migration: role workflows](docs/en/migration-role-workflows.md)
+> **Migrating from v0.5?** See [Migration: role workflows](docs/en/migration/role-workflows.md)
 > for the full breaking-change list and upgrade steps per environment.
 
 ## [0.8.2] - 2026-09-21
@@ -1280,7 +1286,7 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 Breaking architecture cleanup. No changes to the slide JSON schema — existing
 decks and cloud data keep working. See the
-[migration guide](docs/en/migration-v0.5.md) for upgrade steps.
+[migration guide](docs/en/migration/v0.5.md) for upgrade steps.
 
 ### Changed (breaking)
 

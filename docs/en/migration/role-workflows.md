@@ -76,7 +76,7 @@ AWS_DEFAULT_REGION=<region> bash scripts/deploy_webui.sh
 ### GenU AgentBuilder integration
 
 Drop the `personas/` copy step — see the updated
-[Connecting Agents](add-to-gateway.md#step-1-copy-sdpm-files-into-the-genu-agentcore-runtime-directory)
+[Connecting Agents](../add-to-gateway.md#step-1-copy-sdpm-files-into-the-genu-agentcore-runtime-directory)
 instructions; role documents now ship inside `sdpm/references/workflows/`.
 
 ## Web UI behaviour

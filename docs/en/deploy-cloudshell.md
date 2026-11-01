@@ -1,5 +1,3 @@
-[EN](../en/deploy-cloudshell.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
-
 # spec-driven-presentation-maker Deploy Guide
 
 ## About spec-driven-presentation-maker
@@ -287,7 +285,8 @@ See [Cost Estimates](cost.md) for a full breakdown and optimization tips.
 
 ## Related Documents
 
-- [Getting Started](getting-started.md) — Setup instructions for Layer 1–4 (including local CDK deployment)
+- [Developer guide](developer-guide.md) — Local CDK deployment and checkout setup
+- [Security](security.md) — What the AWS stack sets up and what to review
 - [Architecture](architecture.md) — 4-layer design, data flow, auth model, MCP tool reference
 - [Custom Templates](custom-template.md) — Adding templates and assets
 - [Connecting Agents](add-to-gateway.md) — MCP client connection guide

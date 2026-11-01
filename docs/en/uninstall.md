@@ -1,4 +1,4 @@
-[EN](../en/uninstall.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
+[English](uninstall.md) | [日本語](../ja/uninstall.md)
 
 # Uninstall Guide
 

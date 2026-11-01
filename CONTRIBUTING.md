@@ -34,6 +34,8 @@ make format   # ruff format (write changes)
 
 For web-ui / infra TypeScript changes, use `npm ci` in the respective directory.
 
+The [Developer guide](docs/en/developer-guide.md) covers working from a checkout next to an installed release (`make register-dev`, `npm run dev:local`) and deploying with the CDK.
+
 ## Security scanning
 
 Before opening a PR, run the [AWS Automated Security Helper](https://github.com/awslabs/automated-security-helper) locally to catch findings early:

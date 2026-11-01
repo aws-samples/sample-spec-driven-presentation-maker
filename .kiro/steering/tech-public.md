@@ -74,7 +74,7 @@ the lock back to npm-11 format (this exact mistake shipped once in #254).
 | Claude Desktop bundle | `scripts/mcpb/`, `scripts/build_mcpb.sh`, `release.yml` |
 | Preview dependency reporting | `sdpm/sdpm/engine/preview/environment.py` |
 | Icon catalog auto-install | `sdpm/sdpm/knowledge/assets/download.py` (`ensure_assets_installed_async`) |
-| User-facing contract | `docs/en/getting-started.md`, `docs/en/migration-onboarding.md` |
+| User-facing contract | `docs/en/getting-started.md`, `docs/en/migration/onboarding.md` |
 
 State the installer leaves in `~/.sdpm`: `checkout/`, `.profile` (full \| mcp), `.uv-path`,
 `.agent-name`. Local smoke: see `scripts/install/README.md` (isolated `SDPM_HOME`, local

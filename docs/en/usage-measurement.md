@@ -1,3 +1,5 @@
+[English](usage-measurement.md) | [日本語](../ja/usage-measurement.md)
+
 # Measuring Usage (Per-User Tokens & Slide Counts)
 
 For PoC operators who want to measure how much each user consumes — Bedrock

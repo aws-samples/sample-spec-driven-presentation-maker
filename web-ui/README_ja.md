@@ -16,7 +16,7 @@ Spec-Driven Presentation Maker の Layer 4 Web UI コンポーネント。
 | フレームワーク | Next.js 16 (Turbopack) / React 19 / TypeScript 5 |
 | スタイリング | Tailwind CSS v4 / shadcn/ui / Radix UI |
 | 認証 | react-oidc-context (Cognito User Pool) |
-| その他 | react-markdown, react-dropzone, Lucide React, sonner |
+| その他 | react-markdown, Lucide React, sonner |
 | ビルド | Static export (`output: "export"`, `distDir: "build"`) |
 
 ---
@@ -229,9 +229,10 @@ Cognito OIDC 認証フロー。
 
 | ドキュメント | 説明 |
 |---|---|
-| [セットアップガイド](../docs/ja/getting-started.md) | Layer 1〜4 の構築手順 |
-| [アーキテクチャ](../docs/en/architecture.md) | 4層設計、データフロー、認証モデル |
-| [推奨デプロイ手順](../docs/en/deploy-cloudshell.md) | AWS デプロイの推奨手順（CloudShell・ローカル対応） |
+| [はじめに](../docs/ja/getting-started.md) | 利用ガイド: インストール、AI エージェント、Web UI、HTML デッキ |
+| [開発者ガイド](../docs/en/developer-guide.md) | checkout での開発と CDK デプロイ（英語） |
+| [アーキテクチャ](../docs/en/architecture.md) | 4 層設計、データフロー、認証モデル（英語） |
+| [デプロイガイド](../docs/en/deploy-cloudshell.md) | AWS デプロイの推奨手順（CloudShell・ローカル対応、英語） |
 
 ---
 
