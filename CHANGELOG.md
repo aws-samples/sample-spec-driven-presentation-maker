@@ -111,6 +111,13 @@ Entries before v0.5.0 were written retroactively as summaries.
   (`sdpm.engine.preview.compose`), which carries the remote fix for this and the local
   removal of `textLength` / `lengthAdjust` (WebKit squashed glyphs to fit them), so the
   cloud live preview strips those too.
+- **Previews no longer add a shadow to shapes and lines on light templates.** Shapes and
+  connectors built from slide JSON kept python-pptx's default `<p:style>`, whose effect
+  reference points at the template theme's shadow. The builder wrote an empty `<a:effectLst/>`
+  to cancel it, which PowerPoint honours but LibreOffice ignores, so preview PNGs and the
+  Web UI live preview drew a shadow under every rectangle (visible on `blank-light`). The
+  effect reference now points at no theme effect (`idx="0"`), so an element has a shadow only
+  when its JSON asks for one, as the slide JSON spec says.
 
 ### Security
 
