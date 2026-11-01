@@ -1127,7 +1127,20 @@ class TimingWriter:
         entry = self._preset_entry(preset, label) if preset is not None else None
         duration = timing.get("durationMs")
         if duration is None and entry is not None:
-            duration = entry.ooxml.get("observedChildDurationMs")
+            # ``measuredDurationMs`` first: for an entry the GUI capture
+            # measured it is the duration PowerPoint itself applied, and it is
+            # what the measured behaviour timings belong to.
+            #
+            # This fallback is load-bearing beyond the behaviours. The value
+            # returned from here is how far the effect advances the timeline, so
+            # an ``afterPrevious`` group's delay is the sum of what came before
+            # it. Without it a slide of "click, then after the previous" wrote a
+            # second start group at delay 0 while its first effect ran for
+            # 500 ms, and the reader rightly refused the result as a timeline it
+            # could not express.
+            duration = entry.ooxml.get("measuredDurationMs")
+            if duration is None:
+                duration = entry.ooxml.get("observedChildDurationMs")
         if duration is not None:
             duration = _int(duration, f"{label}.timing.durationMs")
         delay = _int(start.get("delayMs") or 0, f"{label}.start.delayMs")

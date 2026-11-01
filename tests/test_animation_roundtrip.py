@@ -289,3 +289,94 @@ class TestCatalogBidirectionalCoverage:
 
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])
+
+
+# --- sequencing without an authored duration --------------------------------
+SEQUENCED_SLIDE = {
+    "layout": "Blank",
+    "elements": [
+        {"id": "hero", "type": "textbox", "text": "Hero", "x": 10, "y": 10,
+         "width": 300, "height": 60},
+        {"id": "aside", "type": "shape", "shape": "rectangle", "x": 10, "y": 120,
+         "width": 200, "height": 80, "fill": "#333333"},
+        {"id": "btn", "type": "shape", "shape": "rectangle", "x": 10, "y": 220,
+         "width": 120, "height": 40, "fill": "#444444"},
+    ],
+    "animations": {
+        "mainSequence": [
+            # One shape animated three times across two click groups, with a
+            # sibling joining the second group, and NO durationMs anywhere.
+            _effect("in", timing={},
+                    preset={"category": "entrance", "effect": "flyIn", "variant": None}),
+            _effect("stress", timing={}, start={"type": "afterPrevious", "delayMs": 0},
+                    preset={"category": "emphasis", "effect": "wave", "variant": None}),
+            _effect("join", element="aside", timing={},
+                    start={"type": "withPrevious", "delayMs": 0},
+                    preset={"category": "entrance", "effect": "fade", "variant": None}),
+            _effect("out", timing={}, start={"type": "onPageClick", "delayMs": 500},
+                    preset={"category": "exit", "effect": "flyOut", "variant": None}),
+        ],
+        "interactiveSequences": [{
+            "id": "interactive-0",
+            "trigger": {"type": "onShapeClick", "target": "btn", "delayMs": 0},
+            "effects": [_effect("spin", element="aside", timing={},
+                                preset={"category": "emphasis", "effect": "spin",
+                                        "variant": None})],
+        }],
+    },
+}
+
+
+class TestSequencingWithoutAnAuthoredDuration:
+    """An omitted ``durationMs`` must not flatten the timeline.
+
+    The value the writer falls back to is not only the behaviours' duration: it
+    is how far the effect advances the timeline, so an ``afterPrevious`` group's
+    delay is the sum of what came before it. Promoting the GUI capture removed
+    ``observedChildDurationMs`` from every measured entry, and for a slide that
+    named no duration that left the second start group at delay 0 while the
+    first effect ran 500 ms — which the reader refused as a timeline it could
+    not express, falling back to raw. ``measuredDurationMs`` is the fallback now.
+    """
+
+    def test_the_timeline_round_trips_with_no_duration_authored(self, tmp_path):
+        slide = _round_trip(tmp_path, dict(SEQUENCED_SLIDE), name="sequenced")
+        animations = slide.get("animations")
+        assert animations, "the slide fell back to raw instead of semantic JSON"
+        assert "rawTiming" not in slide, "the reader could not express the timeline"
+        starts = [
+            (effect["target"]["element"], effect["preset"]["effect"],
+             effect["start"]["type"], effect["start"]["delayMs"])
+            for effect in animations["mainSequence"]
+        ]
+        assert starts == [
+            ("hero", "flyIn", "onPageClick", 0),
+            ("hero", "wave", "afterPrevious", 0),
+            ("aside", "fade", "withPrevious", 0),
+            ("hero", "flyOut", "onPageClick", 500),
+        ]
+        # Each effect reads back the duration PowerPoint measured for it.
+        assert [e["timing"]["durationMs"] for e in animations["mainSequence"]] == [500] * 4
+        sequences = animations["interactiveSequences"]
+        assert [s["trigger"]["target"] for s in sequences] == ["btn"]
+        assert [e["preset"]["effect"] for e in sequences[0]["effects"]] == ["spin"]
+
+    def test_one_shape_animated_three_times_gets_three_group_ids(self, tmp_path):
+        """PowerPoint numbers each effect on a shape, and so does the writer."""
+        import zipfile
+
+        deck = _deck(tmp_path, dict(SEQUENCED_SLIDE), name="grouped")
+        package = tmp_path / "grouped.pptx"
+        generate(deck, output_path=package)
+        with zipfile.ZipFile(package) as archive:
+            root = etree.fromstring(archive.read("ppt/slides/slide1.xml"))
+        effects = [
+            node for node in root.iter()
+            if etree.QName(node).localname == "cTn" and node.get("presetID")
+        ]
+        by_group: dict[str, list[str]] = {}
+        for node in effects:
+            by_group.setdefault(node.get("grpId"), []).append(node.get("nodeType"))
+        # hero carries three effects, so its three group ids are 0, 1 and 2.
+        assert {"0", "1", "2"} <= set(by_group), sorted(by_group)
+        assert len(effects) == 5, "four main-sequence effects plus the triggered one"
