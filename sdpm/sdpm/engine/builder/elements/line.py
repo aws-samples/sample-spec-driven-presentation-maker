@@ -139,9 +139,10 @@ class LineMixin:
         )
 
         # Effects are explicit: apply_effects pins an empty effectLst when the
-        # JSON asks for none, so the theme shadow behind python-pptx's default
-        # <p:style effectRef> never paints under a plain line. Imported lines
-        # (_noEffects) additionally drop the <p:style> itself.
+        # JSON asks for none and points <p:style effectRef> at no theme effect,
+        # so the theme shadow never paints under a plain line (LibreOffice
+        # ignores an empty effectLst). Imported lines (_noEffects)
+        # additionally drop the <p:style> itself.
         if elem.get("_noEffects"):
             from pptx.oxml.ns import qn as _qn_ne
             for style in connector._element.findall(_qn_ne('p:style')):
