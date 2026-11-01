@@ -21,22 +21,29 @@ ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 mkdir -p "$OUT"
 
 UV="$(command -v uv || true)"
+UV_DIR=""
 if [ -z "$UV" ]; then
   UV_DIR="$(mktemp -d)"
-  trap 'rm -rf "$UV_DIR"' EXIT
   python3 -m pip install --quiet --disable-pip-version-check --no-cache-dir --target "$UV_DIR" "uv==$UV_VERSION"
   UV="$UV_DIR/bin/uv"
 fi
 
+REQS="$(mktemp)"
+trap 'rm -rf "$REQS" ${UV_DIR:+"$UV_DIR"}' EXIT
+# Exactly the locked versions (uv.lock at the repo root), hash-checked; nothing resolves here.
+"$UV" export --frozen --directory "$ROOT" --package sdpm-api --no-dev --no-emit-workspace \
+  --quiet -o "$REQS"
 "$UV" pip install \
   --target "$OUT" \
   --python-platform x86_64-manylinux_2_34 \
   --python-version 3.13 \
   --only-binary :all: \
+  --require-hashes \
+  --no-deps \
   --no-cache \
-  -r "$ROOT/api/requirements.txt"
+  -r "$REQS"
 
-cp -r "$ROOT"/api/* "$OUT"/
+cp -r "$ROOT"/api/*.py "$OUT"/
 cp -r "$ROOT/shared" "$OUT/shared"
 # sdpm Engine — required by shared.ingest._convert_pptx for upload-time
 # PPTX → deck conversion (deck.json + slides/*.json + template.pptx).

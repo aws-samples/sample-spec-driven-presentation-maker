@@ -176,7 +176,6 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
 git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
 cd sample-spec-driven-presentation-maker
 uv sync
-(cd servers/local && uv sync)
 uv run python3 sdpm/scripts/download_aws_icons.py
 uv run python3 sdpm/scripts/download_material_icons.py
 make smoke        # ローカルサーバーに tools/list + start_presentation

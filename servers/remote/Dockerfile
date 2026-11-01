@@ -18,14 +18,26 @@ RUN dnf install -y --setopt=install_weak_deps=False \
 
 WORKDIR /app
 
-# constraints.txt pins the full dependency tree for reproducible image builds
-# (see the mcp 2.0 breakage). Regenerate with `make lock` after editing pyproject.toml.
-COPY servers/remote/constraints.txt servers/remote/constraints.txt
+# uv only exports the locked versions; pip installs them. Pinned by version and digest.
+COPY --from=ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 /uv /usr/local/bin/uv
 
-# Install skill (engine) first for layer caching
-COPY sdpm/pyproject.toml sdpm/pyproject.toml
+# Dependencies come only from the workspace lock (uv.lock at the repo root): the image
+# never resolves. uv needs every member's pyproject.toml to read the workspace.
+# --require-hashes + --no-deps: exactly the locked files, nothing pulled in on the side.
+COPY pyproject.toml uv.lock /tmp/workspace/
+COPY sdpm/pyproject.toml /tmp/workspace/sdpm/pyproject.toml
+COPY servers/local/pyproject.toml /tmp/workspace/servers/local/pyproject.toml
+COPY servers/remote/pyproject.toml /tmp/workspace/servers/remote/pyproject.toml
+COPY agent/pyproject.toml /tmp/workspace/agent/pyproject.toml
+COPY api/pyproject.toml /tmp/workspace/api/pyproject.toml
+RUN uv export --frozen --directory /tmp/workspace --package sdpm-mcp-server --no-dev --no-emit-workspace \
+        -o /tmp/requirements.txt \
+    && python3.13 -m pip install --no-cache-dir --require-hashes --no-deps -r /tmp/requirements.txt \
+    && rm -rf /tmp/workspace /tmp/requirements.txt
+
+# Skill (engine): imported from source via PYTHONPATH below, like the API Lambda bundle.
+# Not pip-installed, so the build fetches nothing outside the lock (no build backend).
 COPY sdpm/sdpm/ sdpm/sdpm/
-RUN python3.13 -m pip install --no-cache-dir -c servers/remote/constraints.txt ./sdpm
 
 # Bundled knowledge data (references / templates) — served by the shared tool
 # contract via SDPM_SKILL_ROOT. Assets stay on S3 (user-extensible, 36MB).
@@ -36,17 +48,18 @@ COPY sdpm/templates/ sdpm/templates/
 COPY sdpm/vendor/ sdpm/vendor/
 ENV SDPM_SKILL_ROOT=/app/sdpm
 
-# Install remote server
+# Remote server code. Not installed as a package: it runs from the file with
+# PYTHONPATH=/app (shared/), and its directory on sys.path (tools/, storage/).
 COPY shared/ shared/
-COPY servers/remote/pyproject.toml servers/remote/pyproject.toml
 COPY servers/remote/tools/ servers/remote/tools/
 COPY servers/remote/storage/ servers/remote/storage/
 COPY servers/remote/server.py servers/remote/server.py
 COPY servers/remote/server_utils.py servers/remote/server_utils.py
 COPY servers/remote/boto_config.py servers/remote/boto_config.py
-RUN python3.13 -m pip install --no-cache-dir -c servers/remote/constraints.txt ./servers/remote
 
-ENV PYTHONPATH=/app
+# /app: shared/. /app/sdpm: the sdpm package (a regular package, so it wins over the
+# /app/sdpm namespace directory).
+ENV PYTHONPATH=/app:/app/sdpm
 
 RUN echo "mcp:x:1000:1000::/home/mcp:/bin/bash" >> /etc/passwd && \
     mkdir -p /home/mcp && chown 1000:1000 /home/mcp

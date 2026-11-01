@@ -117,7 +117,7 @@ agent/
 ├── basic_agent.py          # メインエージェント（エントリポイント）
 ├── tools/
 │   └── web_tools.py        # web_fetch
-├── requirements.txt
+├── pyproject.toml          # 依存（ルートの uv.lock で固定）
 ├── Dockerfile
 └── __init__.py
 ```

@@ -1,30 +1,42 @@
-.git
-.gitignore
-.dockerignore
-.DS_Store
-.ruff_cache
-.pytest_cache
-.venv
-__pycache__
-*.pyc
-*.egg-info
+# Build context of both runtime images (repo root): servers/remote/Dockerfile
+# (infra/lib/runtime-stack.ts) and agent/Dockerfile (infra/lib/agent-stack.ts).
+# Allowlist: everything is excluded, then only what a Dockerfile COPYs comes back.
+# docker (CI) and CDK (deploy) both read this file, so it is the one definition.
+*
 
-# CDK
-infra/cdk.out
-infra/node_modules
+# The Dockerfiles themselves: CDK stages the context through this file and only
+# re-adds a root-level Dockerfile on its own.
+!servers/remote/Dockerfile
+!agent/Dockerfile
 
-# Layers not needed in the remote MCP server image
-servers/local/
-agent/
-web-ui/
-docs/
-tests/
-scripts/
-.kiro/
+# Workspace lock + every member's pyproject.toml (uv export reads the workspace)
+!pyproject.toml
+!uv.lock
+!sdpm/pyproject.toml
+!servers/local/pyproject.toml
+!servers/remote/pyproject.toml
+!agent/pyproject.toml
+!api/pyproject.toml
 
-# Skill distribution: exclude everything the remote Dockerfile does not COPY.
-# NOTE: sdpm/references/ and sdpm/templates/ are COPY'd — keep them in context.
-sdpm/assets/
-sdpm/.venv
-sdpm/.ruff_cache
-sdpm/scripts/
+# MCP Runtime: engine + bundled knowledge data, shared helpers, server code
+!sdpm/sdpm
+!sdpm/references
+!sdpm/templates
+!sdpm/vendor
+!shared
+!servers/remote/server.py
+!servers/remote/server_utils.py
+!servers/remote/boto_config.py
+!servers/remote/tools
+!servers/remote/storage
+
+# Agent Runtime: agent code
+!agent/*.py
+!agent/prompts
+!agent/modes
+!agent/tools
+
+# Never, even inside an allowed directory
+**/__pycache__
+**/*.pyc
+**/.DS_Store

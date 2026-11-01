@@ -1,24 +1,36 @@
+# AgentCore Runtime Agent container. Build context: the repository root
+# (infra/lib/agent-stack.ts), because the dependencies come from the workspace lock.
 FROM public.ecr.aws/docker/library/python:3.13-slim-bookworm
 
-RUN pip install --no-cache-dir uv
+# Pinned by version and digest.
+COPY --from=ghcr.io/astral-sh/uv:0.13.6@sha256:af22a52f5eafef3d78e551599d405c02df61919d18028f0cea8eda93bc9986d0 /uv /usr/local/bin/uv
 
 WORKDIR /app
 
 ENV UV_SYSTEM_PYTHON=1 \
     UV_COMPILE_BYTECODE=1
 
-# requirements.lock pins the full dependency tree for reproducible image builds
-# (see the mcp 2.0 breakage). Regenerate with `make lock` after editing requirements.txt.
-COPY requirements.lock .
-RUN uv pip install --no-cache -r requirements.lock
+# Dependencies come only from the workspace lock (uv.lock at the repo root): the image
+# never resolves. uv needs every member's pyproject.toml to read the workspace.
+# --require-hashes + --no-deps: exactly the locked files, nothing pulled in on the side.
+COPY pyproject.toml uv.lock /tmp/workspace/
+COPY sdpm/pyproject.toml /tmp/workspace/sdpm/pyproject.toml
+COPY servers/local/pyproject.toml /tmp/workspace/servers/local/pyproject.toml
+COPY servers/remote/pyproject.toml /tmp/workspace/servers/remote/pyproject.toml
+COPY agent/pyproject.toml /tmp/workspace/agent/pyproject.toml
+COPY api/pyproject.toml /tmp/workspace/api/pyproject.toml
+RUN uv export --frozen --directory /tmp/workspace --package sdpm-agent --no-dev --no-emit-workspace \
+        -o /tmp/requirements.txt \
+    && uv pip install --no-cache --require-hashes --no-deps -r /tmp/requirements.txt \
+    && rm -rf /tmp/workspace /tmp/requirements.txt
 
 RUN useradd -m -u 1000 bedrock_agentcore
 USER bedrock_agentcore
 
-COPY basic_agent.py cost_logger.py errors.py factory.py composition.py mcp_clients.py message_hooks.py model_profiles.py resilience.py session.py streaming.py ./
-COPY prompts/ prompts/
-COPY modes/ modes/
-COPY tools/ tools/
+COPY agent/basic_agent.py agent/cost_logger.py agent/errors.py agent/factory.py agent/composition.py agent/mcp_clients.py agent/message_hooks.py agent/model_profiles.py agent/resilience.py agent/session.py agent/streaming.py ./
+COPY agent/prompts/ prompts/
+COPY agent/modes/ modes/
+COPY agent/tools/ tools/
 
 EXPOSE 8080
 
