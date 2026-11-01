@@ -12,7 +12,7 @@
 
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
 import { invokeAgentCore, stopRuntimeSession } from "@/services/agentCoreService"
@@ -60,7 +60,10 @@ export interface UseChatStreamOptions {
   deckId?: string
   /** Called on every tool event (start, complete, stream). Panel handles side effects. */
   onToolEvent?: (toolName: string, data: ToolUseCallbackData | undefined) => void
-  /** Called after each send completes (success or abort). */
+  /**
+   * Called after each send completes (success, failure or abort), once the final messages
+   * (error text, `failed` flag) have rendered, so `messagesRef` already holds them.
+   */
   onSendComplete?: () => void
 }
 
@@ -114,6 +117,14 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const messagesRef = useRef(messages)
   messagesRef.current = messages
   const auth = useAuth()
+  // Counts finished sends; onSendComplete runs from an effect after the render that carries
+  // the final messages (the updates queued in catch have not rendered yet in finally).
+  const [completedSends, setCompletedSends] = useState(0)
+  const onSendCompleteRef = useRef(onSendComplete)
+  onSendCompleteRef.current = onSendComplete
+  useEffect(() => {
+    if (completedSends > 0) onSendCompleteRef.current?.()
+  }, [completedSends])
 
   const stopGeneration = useCallback(() => {
     abortControllerRef.current?.abort()
@@ -319,10 +330,10 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       abortControllerRef.current = null
       isLoadingRef.current = false
       setIsLoading(false)
-      onSendComplete?.()
+      setCompletedSends((n) => n + 1)
     }
     return ok
-  }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent, onSendComplete])
+  }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent])
 
   return { messages, setMessages, isLoading, sendMessage, stopGeneration, messagesRef }
 }

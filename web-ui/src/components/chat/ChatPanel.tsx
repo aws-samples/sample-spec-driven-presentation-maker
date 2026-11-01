@@ -548,15 +548,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     void handleSend(created.message, uploadedFiles, snippets, attachments).then((ok) => {
       if (ok) return
       created.restore()
-      // Later than ChatInput clearing the input after this send, and than the failed flag
-      // rendering (the save in onSendComplete runs before it).
+      // Later than ChatInput clearing the input after this send.
       setTimeout(() => {
         const input = chatInputRef.current
         if (text.trim() && input && !input.textareaRef.current?.value.trim()) input.replaceText(text)
-        saveLocalChat()
       }, 100)
     })
-  }, [configLoaded, hasReviewDrafts, handleSend, saveLocalChat, tReview])
+  }, [configLoaded, hasReviewDrafts, handleSend, tReview])
 
   // --- Compose in-flight detection (for stop tooltip) ---
   const composeInFlight = useMemo(() => {

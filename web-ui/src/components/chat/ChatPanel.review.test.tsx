@@ -146,10 +146,8 @@ describe("ChatPanel change request", () => {
     expect(status(container)).toBe("failed")
     expect(screen.queryByText("Done")).toBeNull()
     await waitFor(() => expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("overall"))
-    // The saved chat (.chat.json) carries the flag, so the card restores as 未完了.
-    await waitFor(() => {
-      const last = savedChats().at(-1)
-      expect(last?.messages.find(m => m.role === "user")?.failed).toBe(true)
-    })
+    // The one save at the end of the turn (.chat.json) carries the flag, so the card restores as 未完了.
+    expect(savedChats()).toHaveLength(1)
+    expect(savedChats()[0].messages.find(m => m.role === "user")?.failed).toBe(true)
   })
 })
