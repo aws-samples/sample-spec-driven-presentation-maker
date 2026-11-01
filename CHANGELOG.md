@@ -104,6 +104,13 @@ Entries before v0.5.0 were written retroactively as summaries.
   arrived, but without the paged read first. The tool now returns the same object as the
   local server, and a test checks every remote tool's declared return type against what it
   returns.
+- **Local live preview keeps cut-outs in icons and shapes.** LibreOffice sets `fill-rule="evenodd"`
+  (and the default stroke width and join) once on the root `<svg>`; the local server dropped
+  it when splitting the slide into fragments, so shapes with holes rendered filled in the
+  Web UI's live preview. The local and remote servers now share one compose module
+  (`sdpm.engine.preview.compose`), which carries the remote fix for this and the local
+  removal of `textLength` / `lengthAdjust` (WebKit squashed glyphs to fit them), so the
+  cloud live preview strips those too.
 
 ### Security
 

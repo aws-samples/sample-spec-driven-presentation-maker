@@ -805,7 +805,7 @@ def test_remote_compose_output_includes_regions(remote_rig, monkeypatch, tmp_pat
         ],
     }
 
-    import tools.compose as compose_mod
+    import sdpm.engine.preview.compose as compose_mod
     import tools.generate as generate_mod
 
     def fake_prepare(deck_id, user_id, storage):
@@ -857,7 +857,7 @@ def test_remote_compose_is_deferred_until_background_task_runs(remote_rig, monke
         ],
     }
 
-    import tools.compose as compose_mod
+    import sdpm.engine.preview.compose as compose_mod
     import tools.generate as generate_mod
 
     def fake_prepare(deck_id, user_id, storage):

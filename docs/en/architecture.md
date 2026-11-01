@@ -184,7 +184,7 @@ generate_pptx:
 
 The agent uses `get_preview` to retrieve preview images and visually review slides.
 
-The compose pipeline (step 6–7) extracts optimized SVG components per slide and uploads them as JSON to S3. The Web UI uses these to render animated slide transitions without re-fetching full preview images.
+The compose pipeline (step 6–7) extracts optimized SVG components per slide and uploads them as JSON to S3. The Web UI uses these to render animated slide transitions without re-fetching full preview images. The extraction and the per-component change marking live in `sdpm.engine.preview.compose` and are shared by both servers; the local server writes the same JSON to `compose/` in the deck directory.
 
 Compose data and preview images follow the change, not the measure list: after `run_python`,
 every slide the written files can alter is re-rendered — the edited `slides/<slug>.json`, slides
