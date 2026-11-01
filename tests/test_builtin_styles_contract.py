@@ -28,7 +28,7 @@ EXPECTED_NAMES = {
     "report", "briefing", "aws-light", "aws-dark",
     # concept tier — chosen by look
     "neo-brutalist", "typographic", "signal", "racing",
-    "bento", "newspaper", "swiss-poster", "duotone",
+    "bento", "newspaper", "swiss-poster", "duotone", "agent-spectrum",
     # gradient tier — the gradient is a pointer, everything else is flat
     "prism-dark", "prism-light",
     # product-UI tier — the deck looks like the AWS Management Console

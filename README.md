@@ -74,7 +74,7 @@ sends one composer per slide to make the changes and replies to each comment.
 
 ### Styles and templates
 
-SDPM comes with 15 styles and 2 blank templates. You can use your own `.pptx` as a template,
+SDPM comes with 16 styles and 2 blank templates. You can use your own `.pptx` as a template,
 and create new styles with AI in the Web UI or by asking your agent. See
 [Custom templates, styles and assets](docs/en/custom-template.md).
 

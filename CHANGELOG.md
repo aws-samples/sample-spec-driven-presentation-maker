@@ -12,6 +12,12 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **`agent-spectrum` style.** A bundled concept style made to be watched rather than presented
+  (screen recordings, animated previews, README stills): a flat near-black ground, light type,
+  and the Web UI's five builder colours (blue, teal, violet, amber, pink) in a fixed order, used
+  only to tell the parts of a figure apart. Every slide carries a five-segment stripe; labels and
+  tags are monospaced at 16pt so they stay legible when a slide is shown at README width. The
+  README key visual is built in it.
 - **Comments on the preview.** Mark what to change directly on the slides and send it as one
   change request (修正依頼). Turn on the **Comment** tool from the preview header, with `C`,
   or from the button that appears when hovering a slide. Drag to outline an area, or click
