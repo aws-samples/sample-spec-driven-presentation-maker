@@ -8,10 +8,10 @@
   {
    "type": "shape",
    "shape": "rounded_rectangle",
-   "x": 30,
+   "x": 14,
    "y": 160,
-   "width": 280,
-   "height": 210,
+   "width": 308,
+   "height": 514,
    "fill": "#F3F4F6",
    "line": "#9CA3AF",
    "lineWidth": 1.5,
@@ -41,10 +41,10 @@
   {
    "type": "shape",
    "shape": "rounded_rectangle",
-   "x": 30,
-   "y": 400,
-   "width": 280,
-   "height": 130,
+   "x": 22,
+   "y": 420,
+   "width": 292,
+   "height": 132,
    "fill": "#FFFFFF",
    "line": "#9CA3AF",
    "lineWidth": 1.5,
@@ -64,9 +64,9 @@
   {
    "type": "shape",
    "shape": "rounded_rectangle",
-   "x": 30,
-   "y": 560,
-   "width": 280,
+   "x": 22,
+   "y": 564,
+   "width": 292,
    "height": 90,
    "fill": "#FFFFFF",
    "line": "#9CA3AF",
@@ -83,6 +83,19 @@
    "marginLeft": 2,
    "marginRight": 2,
    "text": "{{badge_format}}"
+  },
+  {
+   "type": "textbox",
+   "x": 24,
+   "y": 360,
+   "width": 292,
+   "height": 36,
+   "fontSize": 16,
+   "fontColor": "#4B5563",
+   "align": "left",
+   "marginLeft": 4,
+   "marginRight": 0,
+   "text": "{{in_choose}}"
   },
   {
    "type": "shape",
@@ -266,16 +279,6 @@
    "text": "{{g_spec_note}}"
   },
   {
-   "type": "textbox",
-   "x": 358,
-   "y": 866,
-   "width": 384,
-   "height": 40,
-   "fontSize": 16,
-   "fontColor": "#4B5563",
-   "text": "{{g_entry_spec}}"
-  },
-  {
    "type": "shape",
    "shape": "rounded_rectangle",
    "x": 960,
@@ -445,16 +448,6 @@
    "text": "{{lane3}}"
   },
   {
-   "type": "textbox",
-   "x": 978,
-   "y": 866,
-   "width": 394,
-   "height": 40,
-   "fontSize": 16,
-   "fontColor": "#4B5563",
-   "text": "{{g_entry_comp}}"
-  },
-  {
    "type": "shape",
    "shape": "rounded_rectangle",
    "x": 1440,
@@ -599,7 +592,7 @@
   },
   {
    "type": "line",
-   "x1": 310,
+   "x1": 322,
    "y1": 265,
    "x2": 340,
    "y2": 265,
@@ -620,15 +613,17 @@
   {
    "type": "textbox",
    "x": 760,
-   "y": 402,
+   "y": 346,
    "width": 200,
-   "height": 44,
+   "height": 100,
    "fontSize": 16,
    "fontColor": "#4B5563",
    "align": "center",
    "marginLeft": 0,
    "marginRight": 0,
-   "text": "{{gate}}"
+   "text": "{{gate}}",
+   "verticalAlign": "bottom",
+   "marginBottom": 4
   },
   {
    "type": "line",

@@ -6,7 +6,7 @@
   "u1_t": "Agents without MCP",
   "u1_d": "Read SKILL.md and run the CLI",
   "u2_t": "Your AI agent (MCP client)",
-  "u2_d": "Kiro CLI, Claude Code, Codex and others; the local Web UI through Kiro CLI",
+  "u2_d": "Kiro CLI, Claude Code, Codex, etc.\nLocal Web UI: through Kiro CLI",
   "l4_t": "Layer 4: agent/, web-ui/, api/",
   "l4_d": "Strands agent, Web UI and REST API on AWS",
   "l1_t": "Layer 1: CLI + SKILL.md",
