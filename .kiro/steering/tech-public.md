@@ -44,6 +44,23 @@ the lock back to npm-11 format (this exact mistake shipped once in #254).
 - Known-blocked majors are pinned in `.github/dependabot.yml` `ignore:` with
   re-evaluation triggers in the comment
 
+## Python Dependency Management
+
+- One uv workspace at the root (`sdpm`, `servers/local`, `servers/remote`, `agent`,
+  `api`), one `uv.lock`. Edit a member's `pyproject.toml`, then `make lock` and commit
+  `uv.lock`; CI fails on drift (`uv lock --check`)
+- `pyproject.toml` holds supported ranges, `uv.lock` the exact versions. A deliberate
+  cap (e.g. `mcp <2`, #301) goes in the range with a comment — not in a Dependabot ignore
+- Artifacts never resolve: the runtime images and the API Lambda bundle install
+  `uv export --package <member>` hash-checked. CI builds and starts each of them
+  (`remote-image`, `agent-image`, `api-lambda`), so a green PR is a deployable lock
+- Both images build from the repo root through one allowlist `.dockerignore`; a new
+  `COPY` source needs a `!` line there (tests/test_remote_html.py checks this)
+- Dependency cooldown is Dependabot's (7 days, version updates only); no uv
+  `exclude-newer`, which would also hold back security fixes
+- Dependabot minor/patch PRs for uv and GitHub Actions auto-merge once the required
+  checks pass (`.github/workflows/dependabot-auto-merge.yml`). Majors and npm stay manual
+
 ## Onboarding surfaces — where things live
 
 | Concern | File |

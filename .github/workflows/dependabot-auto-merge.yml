@@ -1,0 +1,38 @@
+name: Dependabot auto-merge
+
+# Turns on auto-merge for Dependabot's minor / patch PRs in the ecosystems whose
+# changes CI checks end to end: Python (one uv.lock; CI builds and starts every
+# deployed artifact from it) and GitHub Actions. GitHub merges the PR once the
+# required checks on main pass (repository ruleset), so a red PR stays open.
+#
+# Not auto-merged:
+# - majors (`python-majors` and the npm `*-majors` groups): a human reads the changelog
+# - npm (web-ui / infra): CI does not yet check that Dependabot's package-lock.json
+#   passes `npm ci` on the deploy CodeBuild's npm 10 (see the tech-public steering)
+
+on: pull_request
+
+permissions:
+  contents: read
+
+jobs:
+  auto-merge:
+    if: >-
+      github.event.pull_request.user.login == 'dependabot[bot]'
+      && github.actor == 'dependabot[bot]'
+      && github.repository == 'aws-samples/sample-spec-driven-presentation-maker'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - id: meta
+        uses: dependabot/fetch-metadata@25dd0e34f4fe68f24cc83900b1fe3fe149efef98 # v3.1.0
+      - name: Enable auto-merge (minor / patch, uv or GitHub Actions)
+        if: >-
+          steps.meta.outputs.update-type != 'version-update:semver-major'
+          && contains(fromJSON('["uv", "github_actions", "github-actions"]'), steps.meta.outputs.package-ecosystem)
+        env:
+          PR_URL: ${{ github.event.pull_request.html_url }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: gh pr merge --auto --squash "$PR_URL"
