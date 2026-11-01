@@ -250,7 +250,10 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[invokeLocal] error:', errorText);
-    throw new Error(`Local agent error: ${response.status}: ${errorText}`);
+    const error = new Error(`Local agent error: ${response.status}: ${errorText}`);
+    // 409 session conflicts carry a stable `code` (lib/local/sessionErrors.ts) the chat UI translates.
+    try { error.code = JSON.parse(errorText).code; } catch { /* non-JSON body */ }
+    throw error;
   }
 
   let completion = '';

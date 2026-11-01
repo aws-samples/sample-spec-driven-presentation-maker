@@ -13,6 +13,7 @@
 "use client"
 
 import { useState, useRef, useCallback } from "react"
+import { useTranslations } from "next-intl"
 import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
 import { invokeAgentCore, stopRuntimeSession } from "@/services/agentCoreService"
@@ -22,6 +23,7 @@ import type { UploadedFile } from "@/services/uploadService"
 import { notifyError } from "@/lib/errors"
 import { agentErrorMessage, classifyAgentError } from "@/lib/agentErrors"
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
+import { isSessionConflictCode } from "@/lib/local/sessionErrors"
 
 export interface SendMessageOptions {
   displayContent?: string
@@ -112,6 +114,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const messagesRef = useRef(messages)
   messagesRef.current = messages
   const auth = useAuth()
+  const t = useTranslations("chat")
 
   const stopGeneration = useCallback(() => {
     abortControllerRef.current?.abort()
@@ -297,11 +300,14 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
         ok = false
         const errorMessage = err instanceof Error ? err.message : String(err)
         const code = classifyAgentError(errorMessage)
+        const conflictCode = (err as { code?: unknown }).code
         // Transport-level failures don't carry raw model errors worth showing —
         // always use the friendly classified message here.
-        const displayMessage = code === "internal"
-          ? "Sorry, something went wrong. Please try again."
-          : agentErrorMessage(errorMessage, code)
+        const displayMessage = isSessionConflictCode(conflictCode)
+          ? t(conflictCode === "session_busy" ? "sessionBusy" : "sessionLocked")
+          : code === "internal"
+            ? "Sorry, something went wrong. Please try again."
+            : agentErrorMessage(errorMessage, code)
         setMessages((prev) => {
           const updated = [...prev]
           updated[updated.length - 1] = {
@@ -318,7 +324,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       onSendComplete?.()
     }
     return ok
-  }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent, onSendComplete])
+  }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent, onSendComplete, t])
 
   return { messages, setMessages, isLoading, sendMessage, stopGeneration, messagesRef }
 }
