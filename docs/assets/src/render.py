@@ -16,8 +16,17 @@ filled in, generate_pptx builds the deck, and LibreOffice (the preview backend) 
 to PDF. pdftoppm rasterises the page at 1920 px and the white margin is trimmed to a 24 px
 border.
 
+A subdirectory that holds a gallery.json instead is a contact sheet of full slides taken
+from other decks under docs/assets/src/:
+
+    <name>/gallery.json   {"out": "docs/assets/<file>.png", "columns": N, "tile_width": px,
+                           "tiles": [{"deck": "<dir under src>", "slug": "...", "label": "..."}]}
+
+Each tile's deck is built with only that slide in its outline, rendered the same way (no
+trim), scaled to tile_width and placed in rows of `columns`, with its label underneath.
+
 Usage (from the repository root):
-    uv run python docs/assets/src/render.py            # all diagrams
+    uv run python docs/assets/src/render.py            # all diagrams and galleries
     uv run python docs/assets/src/render.py workflow   # one or more by name
 """
 
@@ -32,7 +41,7 @@ import sys
 import tempfile
 from pathlib import Path
 
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageDraw, ImageFont
 
 SRC = Path(__file__).resolve().parent
 REPO = SRC.parents[2]
@@ -45,8 +54,8 @@ sys.path.insert(0, str(REPO / "sdpm"))
 
 
 def diagrams() -> list[str]:
-    """Names of all diagram source directories."""
-    return sorted(p.name for p in SRC.iterdir() if (p / "out.json").is_file())
+    """Names of all diagram and gallery source directories."""
+    return sorted(p.name for p in SRC.iterdir() if (p / "out.json").is_file() or (p / "gallery.json").is_file())
 
 
 def fill(text: str, strings: dict[str, str], where: str, as_json: bool) -> str:
@@ -95,6 +104,9 @@ def render(name: str, keep: str | None = None) -> None:
     from sdpm.engine.preview import export_pdf
 
     src = SRC / name
+    if (src / "gallery.json").is_file():
+        render_gallery(name, keep)
+        return
     targets = json.loads((src / "out.json").read_text(encoding="utf-8"))
     for lang, target in targets.items():
         strings = json.loads((src / f"strings.{lang}.json").read_text(encoding="utf-8"))
@@ -127,13 +139,91 @@ def render(name: str, keep: str | None = None) -> None:
         print(f"{name}/{lang} -> {target} ({out.stat().st_size // 1024} KB)")
 
 
+def one_slide(outline: str, slug: str) -> str:
+    """The outline entry of one slug (its `- [slug]` line and the indented lines under it)."""
+    lines, keep = [], False
+    for line in outline.splitlines():
+        if line.startswith("- ["):
+            keep = line.startswith(f"- [{slug}]")
+        if keep:
+            lines.append(line)
+    if not lines:
+        raise SystemExit(f"outline has no slide [{slug}]")
+    return "\n".join(lines) + "\n"
+
+
+def slide_png(deck_src: Path, slug: str, tmp: Path, keep: str | None, keep_name: str) -> Image.Image:
+    """Build one slide of a deck and return it as a 1920 px wide image."""
+    from sdpm.engine.preview import export_pdf
+
+    deck = tmp / deck_src.name
+    shutil.copytree(
+        deck_src, deck, ignore=shutil.ignore_patterns("compose", "preview", "_work", "output.pptx", "README.md")
+    )
+    outline = deck / "specs" / "outline.md"
+    outline.write_text(one_slide(outline.read_text(encoding="utf-8"), slug), encoding="utf-8")
+    pptx = tmp / "out.pptx"
+    for line in run([sys.executable, str(BUILDER), "generate_pptx", str(deck), "-o", str(pptx)]).splitlines():
+        skip = ("Generated:", "page01", "Layout bias", "MUST FIX unless")
+        if line.strip() and not any(k in line for k in skip):
+            print(f"  {keep_name} generate_pptx: {line.strip()}")
+    pdf = tmp / "out.pdf"
+    if not export_pdf(pptx, pdf, work_dir=tmp):
+        raise SystemExit("PDF export failed: LibreOffice (soffice) is required")
+    run(["pdftoppm", "-png", "-singlefile", "-scale-to", str(WIDTH), str(pdf), str(tmp / "page")])
+    if keep:
+        shutil.copy(pptx, Path(keep) / f"{keep_name}.pptx")
+    return Image.open(tmp / "page.png").convert("RGB")
+
+
+def label_font(size: int) -> ImageFont.FreeTypeFont | ImageFont.ImageFont:
+    """A monospace font for the tile labels, falling back to Pillow's built-in font."""
+    for name in ("Menlo.ttc", "DejaVuSansMono.ttf", "consola.ttf", "LiberationMono-Regular.ttf"):
+        try:
+            return ImageFont.truetype(name, size)
+        except OSError:
+            continue
+    return ImageFont.load_default(size)
+
+
+def render_gallery(name: str, keep: str | None = None) -> None:
+    spec = json.loads((SRC / name / "gallery.json").read_text(encoding="utf-8"))
+    cols, tw = spec["columns"], spec["tile_width"]
+    gap, label_h = 40, 56
+    tiles = []
+    for tile in spec["tiles"]:
+        with tempfile.TemporaryDirectory(prefix=f"sdpm-gallery-{name}-") as tmp:
+            img = slide_png(SRC / tile["deck"], tile["slug"], Path(tmp), keep, f"{name}-{tile['label']}")
+        tiles.append((img.resize((tw, round(img.height * tw / img.width)), Image.Resampling.LANCZOS), tile["label"]))
+    th = tiles[0][0].height
+    rows = [tiles[i : i + cols] for i in range(0, len(tiles), cols)]
+    width = cols * tw + (cols + 1) * gap
+    sheet = Image.new("RGB", (width, len(rows) * (th + label_h) + (len(rows) + 1) * gap - gap // 2), "#FFFFFF")
+    draw = ImageDraw.Draw(sheet)
+    font = label_font(28)
+    for r, row in enumerate(rows):
+        # A short last row is centred.
+        x0 = (width - (len(row) * tw + (len(row) - 1) * gap)) // 2
+        y = gap + r * (th + label_h + gap)
+        for c, (img, label) in enumerate(row):
+            x = x0 + c * (tw + gap)
+            sheet.paste(img, (x, y))
+            # A hairline keeps white and light slides apart from the white sheet.
+            draw.rectangle((x - 1, y - 1, x + tw, y + th), outline="#D0D7DE", width=1)
+            draw.text((x + tw // 2, y + th + label_h // 2 + 2), label, fill="#57606A", font=font, anchor="mm")
+    out = REPO / spec["out"]
+    out.parent.mkdir(parents=True, exist_ok=True)
+    sheet.quantize(colors=256, method=Image.Quantize.MEDIANCUT, dither=Image.Dither.NONE).save(out, optimize=True)
+    print(f"{name} -> {spec['out']} ({sheet.width}x{sheet.height}, {out.stat().st_size // 1024} KB)")
+
+
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     parser.add_argument("names", nargs="*", help=f"diagrams to render (default: all of {diagrams()})")
     parser.add_argument("--keep-pptx", metavar="DIR", help="also copy each built .pptx into DIR")
     args = parser.parse_args()
     for name in args.names or diagrams():
-        if not (SRC / name / "out.json").is_file():
+        if name not in diagrams():
             raise SystemExit(f"unknown diagram: {name} (have {diagrams()})")
         render(name, args.keep_pptx)
 

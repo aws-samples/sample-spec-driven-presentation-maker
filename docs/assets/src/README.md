@@ -10,6 +10,7 @@ Each directory here is a one-slide sdpm deck that draws one diagram in `docs/ass
 | `dependency-direction/` | `dependency-direction-en.png` | `docs/en/architecture.md` |
 | `data-flow/` | `data-flow-en.png` | `docs/en/architecture.md` |
 | `cdk-dependencies/` | `cdk-dependencies.png` | `docs/en/architecture.md` |
+| `style-gallery/` | `style-gallery-en.png` | `README.md`, `README_ja.md` |
 
 `jwt-auth-flow-en.png` / `jwt-auth-flow-ja.png` have no source here. They still match the code
 and were not redrawn.
@@ -44,6 +45,23 @@ with `pdftoppm` and trims the white margin to 24 px.
 
 To add a language, add `strings.<lang>.json` and a line in `out.json`. To change a diagram,
 edit `slides/<name>.json` (geometry) or the strings (wording), render, and look at the PNG.
+
+## Style gallery
+
+`style-gallery/` is a gallery, not a diagram: `gallery.json` lists full slides taken from
+decks under this directory, and `render.py` lays them out in rows with the style name under
+each one. It shows slide 3 of the key visual deck (`hero/deck-en`, style `agent-spectrum`)
+next to the same slide in six bundled styles. Each of `style-gallery/<style>/` is a one-slide
+sdpm deck made with the local MCP server: `apply_style` with that style (`blank-dark` for
+`aws-dark` and `duotone`, `blank-light` for the rest), the font of the style in
+`deck.json`, then a composer wrote `slides/spec-first.json` from the style's process and
+column patterns with the hero slide's wording. `specs/art-direction.html` is the bundled
+style as `apply_style` copied it.
+
+`render.py` builds each tile's deck with only that slide in the outline, scales the 1920 px
+render to `tile_width` and centres a short last row. The labels use Menlo (macOS) or another
+monospace font found on the machine. The 16 pt rule below does not apply: the gallery shows
+how each style looks, and the full slides are one click away.
 
 ## Checks before committing a diagram
 

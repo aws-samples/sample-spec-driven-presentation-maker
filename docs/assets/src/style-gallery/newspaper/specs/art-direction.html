@@ -1,0 +1,346 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>newspaper — A broadsheet reading system for decks that are circulated and read rather than watched, and for audiences who want the argument in prose; the design decision is print composition, so an aged-paper ground carries near-black serif ink, one heavy masthead rule over hairline structure, a small-caps kicker above a heavy serif headline, justified two- or three-column body, a single drop cap, and at most one job-bearing red selection per page.</title>
+<style>
+:root {
+  --color-text: #151515; /* primary prose, headlines, figures, and both rule weights */
+  --color-bg: #F5F1E8; /* aged-paper ground and the only prose surface */
+  --color-surface: #ECE6D8; /* one native-table header band only */
+  --color-border: #151515; /* every structural rule; never grey */
+  --color-muted: #5C574C; /* captions, folios, and the weaker state */
+  --accent: #B3261E; /* at most one job-bearing red selection per page: figure, chart mark, cap, or label */
+  --color-on-accent: #F5F1E8; /* paper text if a red fill is essential */
+  --font-family: Georgia, "Times New Roman", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif; /* headlines, prose, figures, tables, and caps */
+  --font-sans: "Helvetica Neue", Arial, "Hiragino Sans", "Yu Gothic", sans-serif; /* kickers and folios only */
+  --fs-cover-title: 58pt; /* cover, divider, and closing display; two lines */
+  --fs-slide-title: 32pt; /* sentence headline; two lines maximum */
+  --fs-dropcap: 48pt; /* one opening letter in the first column */
+  --fs-metric: 76pt; /* one dominant figure */
+  --fs-metric-sm: 34pt; /* supporting figure or numbered step */
+  --fs-deck: 20pt; /* italic sentence beneath the headline */
+  --fs-subhead: 17pt; /* column heading or takeaway */
+  --fs-body: 15pt; /* justified reading copy; keep within the permitted range */
+  --fs-table: 13pt; /* exact values in native tables */
+  --fs-caption: 12pt; /* source, scope, comparator, or exclusion */
+  --fs-kicker: 11pt; /* uppercase page kind; four words maximum */
+  --fs-byline: 10pt; /* folio, period, or supplied source */
+  --margin-x: 120px; /* side inset beyond five percent */
+  --content-w: 1680px; /* full measure between side margins */
+  --content-top: 350px; /* content begins after the fixed headline reserve */
+  --masthead-rule: 3px; /* sole heavy structural weight */
+  --hairline: 1px; /* every other structural rule */
+  --column-gap: 48px; /* fixed gap for every legal split */
+  --col-3: 528px; /* each measure in a three-column spread */
+  --col-2: 816px; /* each measure in an equal two-column spread */
+  --col-lead: 1104px; /* wide argument in a lead-sidebar split */
+  --col-side: 528px; /* related facts beside a wide lead */
+  --radius: 0px; /* square print geometry */
+  --border-thin: 1px; /* native-table rows and quiet structure */
+  --shadow: none; /* flat paper has no elevation */
+}
+* { box-sizing: border-box; }
+body { margin: 0; padding: 40px; background: #DCD6C8; font-family: var(--font-family); zoom: 0.7; color: var(--color-text); }
+.slide { position: relative; width: 1920px; height: 1080px; margin: 0 auto 40px; overflow: hidden; background: var(--color-bg); color: var(--color-text); }
+.el { position: absolute; }
+.cover-title { font-size: calc(var(--fs-cover-title) * 1.5); line-height: 1.04; font-weight: 700; letter-spacing: -1.1pt; }
+.headline { font-size: calc(var(--fs-slide-title) * 1.5); line-height: 1.12; font-weight: 700; letter-spacing: -.35pt; }
+.subhead { font-size: calc(var(--fs-subhead) * 1.5); line-height: 1.24; font-weight: 700; }
+.dropcap { font-size: calc(var(--fs-dropcap) * 1.5); line-height: .84; font-weight: 700; }
+.metric { font-size: calc(var(--fs-metric) * 1.5); line-height: .92; font-weight: 700; letter-spacing: -2.2pt; }
+.metric-sm { font-size: calc(var(--fs-metric-sm) * 1.5); line-height: 1; font-weight: 700; }
+.deck-line { font-size: calc(var(--fs-deck) * 1.5); line-height: 1.42; font-style: italic; }
+.col { font-size: calc(var(--fs-body) * 1.5); line-height: 1.58; text-align: justify; }
+.col-flush { font-size: calc(var(--fs-body) * 1.5); line-height: 1.58; }
+.caption { font-size: calc(var(--fs-caption) * 1.5); line-height: 1.44; font-style: italic; color: var(--color-muted); }
+.table-text { font-size: calc(var(--fs-table) * 1.5); line-height: 1.3; }
+.kicker { font-family: var(--font-sans); font-size: calc(var(--fs-kicker) * 1.5); line-height: 1.2; font-weight: 700; letter-spacing: 1.8pt; text-transform: uppercase; }
+.byline { font-family: var(--font-sans); font-size: calc(var(--fs-byline) * 1.5); line-height: 1.3; letter-spacing: .9pt; text-transform: uppercase; color: var(--color-muted); }
+.muted { color: var(--color-muted); }
+.red { color: var(--accent); }
+.right { text-align: right; }
+.rule { background: var(--color-border); }
+.zone { border-top: var(--hairline) solid var(--color-border); padding-top: 18px; }
+.takeaway { border-top: var(--hairline) solid var(--color-border); padding-top: 20px; }
+.step { border-top: var(--hairline) solid var(--color-border); display: grid; grid-template-columns: 90px 630px 1fr; gap: 24px; padding-top: 18px; }
+.step-num { font-size: calc(var(--fs-metric-sm) * 1.5); line-height: 1; font-weight: 700; }
+.compare { border-top: var(--hairline) solid var(--color-border); padding-top: 18px; }
+.np-table { width: 100%; border-collapse: collapse; table-layout: fixed; font-size: calc(var(--fs-table) * 1.5); }
+.np-table th { font-family: var(--font-sans); font-size: calc(var(--fs-kicker) * 1.5); letter-spacing: 1.2pt; text-transform: uppercase; text-align: right; padding: 14px 18px; background: var(--color-surface); border-top: var(--masthead-rule) solid var(--color-border); border-bottom: var(--hairline) solid var(--color-border); }
+.np-table td { text-align: right; padding: 15px 18px; border-bottom: var(--hairline) solid var(--color-border); }
+.np-table th:first-child, .np-table td:first-child { text-align: left; }
+.np-table .total td { border-top: var(--masthead-rule) solid var(--color-border); border-bottom: 0; font-weight: 700; }
+.np-table .fig-red { color: var(--accent); font-weight: 700; }
+.chart-specimen { border-bottom: var(--hairline) solid var(--color-border); }
+.chart-specimen svg { overflow: visible; }
+.icon { width: 76px; height: 76px; display: block; margin: 0 0 24px; fill: var(--color-text); }
+.diagram-node .icon { margin-left: auto; margin-right: auto; }
+.diagram-root { border-top: var(--hairline) solid var(--color-border); border-bottom: var(--hairline) solid var(--color-border); padding: 18px 24px; display: grid; grid-template-columns: 120px 1fr; gap: 26px; align-items: center; }
+.diagram-node { border-top: var(--hairline) solid var(--color-border); padding-top: 18px; text-align: center; }
+.diagram-link { background: var(--color-border); }
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/newspaper" viewBox="0 -960 960 960"><path d="M140-120q-24.75 0-42.37-17.63Q80-155.25 80-180v-660l67 67 66-67 67 67 67-67 66 67 67-67 67 67 66-67 67 67 67-67 66 67 67-67v660q0 24.75-17.62 42.37Q844.75-120 820-120H140Zm0-60h310v-280H140v280Zm370 0h310v-110H510v110Zm0-170h310v-110H510v110ZM140-520h680v-120H140v120Z"/></symbol><symbol id="material/search" viewBox="0 -960 960 960"><path d="M796-121 533-384q-30 26-70 40.5T378-329q-108 0-183-75t-75-181q0-106 75-181t182-75q106 0 180.5 75T632-585q0 43-14 83t-42 75l264 262-44 44ZM377-389q81 0 138-57.5T572-585q0-81-57-138.5T377-781q-82 0-139.5 57.5T180-585q0 81 57.5 138.5T377-389Z"/></symbol><symbol id="material/notes" viewBox="0 -960 960 960"><path d="M120-240v-60h480v60H120Zm0-210v-60h720v60H120Zm0-210v-60h720v60H120Z"/></symbol><symbol id="material/task" viewBox="0 -960 960 960"><path d="m434-255 229-229-39-39-190 190-103-103-39 39 142 142ZM220-80q-24 0-42-18t-18-42v-680q0-24 18-42t42-18h361l219 219v521q0 24-18 42t-42 18H220Zm331-554v-186H220v680h520v-494H551ZM220-820v186-186 680-680Z"/></symbol></svg>
+
+<!-- Part: Cover -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:120px;width:1680px;height:3px"></div>
+<!-- Component: tag (.kicker) — category or page-kind label in four uppercase words or fewer; may vary: wording; may not: repeat the headline or become a filled badge. -->
+<div class="el kicker" style="left:120px;top:142px;width:1080px;height:28px">Style guide edition</div>
+<div class="el byline right" style="left:1300px;top:144px;width:500px;height:26px">Broadsheet / reading copy</div>
+<div class="el rule" style="left:120px;top:188px;width:1680px;height:1px"></div>
+<div class="el cover-title" style="left:120px;top:226px;width:1560px;height:250px">The deck is written<br>to be read</div>
+<div class="el deck-line" style="left:120px;top:516px;width:1440px;height:120px">Fixed measures turn prose into a composed page; order and weight carry emphasis.</div>
+<div class="el rule" style="left:120px;top:676px;width:1680px;height:1px"></div>
+<div class="el col" style="left:120px;top:700px;width:528px;height:246px">The headline makes one claim. A short italic line tells the reader how the columns support it.</div>
+<div class="el col" style="left:696px;top:700px;width:528px;height:246px">Each column is a separate text box. Read down, then across, without cards or decorative panels.</div>
+<div class="el col" style="left:1272px;top:700px;width:528px;height:246px">Paper is the surface. Ink, hairlines, and measured space hold the composition together.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+<div class="el byline" style="left:120px;top:984px;width:1680px;height:28px">Paper / ink / hairlines</div>
+</div>
+
+<!-- Part: Rules -->
+<!-- Frame: content — repeat the 3px masthead at y70, hairline at y126, two-line headline at y150, content rule at y322, content at y350–946, and clear foot from y966; wording may vary, coordinates and weights may not. -->
+<!-- The deck is circulated, printed, and read alone. Print composition governs the page: fixed measure, serif hierarchy, and straight rules make prose navigable without ornamental marks. Contrast stays at least 4.5:1, or 3:1 for type at least 18pt. Red on paper selects one fact or member, but colour never carries sign or category. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Rules / decision</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Read alone</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">Print composition makes prose<br>the primary evidence</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<div class="el deck-line" style="left:120px;top:350px;width:1560px;height:100px">A circulated deck must carry its reasoning without a presenter.</div>
+<!-- Component: container (.zone) — group prose by fixed measure, whitespace, and a straight hairline instead of a box; may vary: two or three zones and copy; may not: add fill, radius, shadow, or variable gaps. -->
+<div class="el zone" style="left:120px;top:500px;width:816px;height:320px"><div class="kicker">Do</div><div class="subhead">Let measure create order</div><div class="col-flush">Use sentence headlines, justified columns, direct labels, and straight rules. Keep margins beyond five per cent.</div></div>
+<div class="el zone" style="left:1000px;top:500px;width:800px;height:320px"><div class="kicker">Do not</div><div class="subhead">Add a second visual system</div><div class="col-flush">Keep prose off filled cards and shadows; preserve fixed measures, straight rules, and flat reading order.</div></div>
+<!-- Component: takeaway (.takeaway) — one consequence the evidence cannot carry alone; may vary: one sentence; may not: repeat the headline or exceed two lines. -->
+<div class="el takeaway subhead" style="left:120px;top:860px;width:1680px;height:86px">If a page argues twice, split it before changing the type or grid.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+<div class="el byline" style="left:120px;top:984px;width:1680px;height:28px">One claim / one composition</div>
+</div>
+
+<!-- Body stays 14–16pt. Illustration stays editorial and sparse: use 76px monochrome Material icons at column or diagram-node heads to identify the idea or member, ink by default and red only on the selected member; favour hierarchy, matched comparison, numbered process, and native charts; cap a relationship diagram at five nodes. Keep icons out of reading columns so prose retains an uninterrupted measure. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Rules / illustration</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Draw selectively</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">Illustration stays sparse enough<br>to read like news</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<!-- Component: icon (.icon) — identify the idea or member at a column or diagram-node head; 76px without a backing shape; ink or one selected red; Material family; may vary: concept and selected member; may not: sit inside reading prose, mix families, or replace a named relationship. -->
+<div class="el zone" style="left:120px;top:370px;width:528px;height:430px"><svg class="icon"><use href="#material/newspaper"/></svg><div class="kicker">Place</div><div class="subhead">Head the idea</div><div class="col-flush">Pair one icon with a short label, never a paragraph.</div></div>
+<div class="el zone" style="left:696px;top:370px;width:528px;height:430px"><svg class="icon"><use href="#material/notes"/></svg><div class="kicker">Ink</div><div class="subhead">Stay monochrome</div><div class="col-flush">Use near-black; reserve red for one selected member.</div></div>
+<div class="el zone" style="left:1272px;top:370px;width:528px;height:430px"><svg class="icon"><use href="#material/task"/></svg><div class="kicker">Form</div><div class="subhead">Draw the relation</div><div class="col-flush">Favour hierarchy and exact figures; stop at five nodes.</div></div>
+<div class="el takeaway subhead" style="left:120px;top:850px;width:1680px;height:90px">If the drawing needs a legend, it is too dense for this paper.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+<div class="el byline" style="left:120px;top:984px;width:1680px;height:28px">One family / one red / five nodes maximum</div>
+</div>
+
+<!-- Part: Message & Outline -->
+<!-- Density: 120 -->
+<!-- The default is a 60–120-word reading page; the 15–30-word limit applies only to its italic deck line, while a figure page may fall to 25 as the sparse exception. The original prose range excludes kicker, folio, and table cells; this file's Density marker still caps all visible words, labels included, at 120. Add pages before reducing body size or tightening the fixed measure. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Message / grammar</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Headline first</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">A declarative headline states<br>the page’s one claim</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<div class="el deck-line" style="left:120px;top:350px;width:1560px;height:110px">Use six to fourteen words across at most two lines, then a fifteen- to thirty-word italic deck line explaining what follows.</div>
+<div class="el zone" style="left:120px;top:520px;width:816px;height:250px"><div class="kicker">Write this</div><div class="subhead">The second measure rose while the first held</div><div class="col-flush">Specific subject, direction, and boundary.</div></div>
+<div class="el zone" style="left:1000px;top:520px;width:800px;height:250px"><div class="kicker muted">Avoid this</div><div class="subhead muted">Measure overview</div><div class="col-flush">A topic label leaves the claim to the reader.</div></div>
+<div class="el takeaway subhead" style="left:120px;top:830px;width:1680px;height:100px">Numbers support the headline; even a figure page needs its deck line.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+<div class="el byline" style="left:120px;top:984px;width:1680px;height:28px">Kicker names the page / never repeats the headline</div>
+</div>
+
+<!-- Deck length follows the brief and material. There is no mandatory chapter template: open on the argument, sequence evidence as needed, ask for hierarchy diagrams, icon-led columns, numbered processes, matched comparisons, exact tables, and native charts where the material has that shape; use dividers only at genuine turns, and close with a restatement plus a decision, owner, and date. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Outline / reading order</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Brief sets length</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">The argument chooses the<br>number and order of pages</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<div class="el zone" style="left:120px;top:370px;width:528px;height:390px"><svg class="icon"><use href="#material/newspaper"/></svg><div class="kicker">Open</div><div class="subhead">State the strongest claim</div><div class="col-flush">Use prose when reasoning is evidence.</div></div>
+<div class="el zone" style="left:696px;top:370px;width:528px;height:390px"><svg class="icon"><use href="#material/search"/></svg><div class="kicker">Develop</div><div class="subhead">Choose the honest form</div><div class="col-flush">Draw hierarchy, process, comparison, table, or chart when the evidence has that shape.</div></div>
+<div class="el zone" style="left:1272px;top:370px;width:528px;height:390px"><svg class="icon"><use href="#material/task"/></svg><div class="kicker">Close</div><div class="subhead">Leave a specific answer</div><div class="col-flush">Name the decision, owner, and date without a new argument.</div></div>
+<div class="el takeaway subhead" style="left:120px;top:820px;width:1680px;height:110px">A page is a reading page or a figure page; its kicker tells the reader which.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+<div class="el byline" style="left:120px;top:984px;width:1680px;height:28px">Sequence follows evidence / not a template</div>
+</div>
+
+<!-- Part: Patterns -->
+<!-- Frame: divider — retain the masthead, then use one large question, one italic preview, and deliberate whitespace; wording may vary, but evidence and a second claim may not enter. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Patterns / page forms</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Section turn</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el cover-title" style="left:120px;top:316px;width:1500px;height:250px">How does each page<br>carry its argument?</div>
+<div class="el rule" style="left:120px;top:660px;width:1680px;height:1px"></div>
+<div class="el deck-line" style="left:120px;top:700px;width:1320px;height:120px">Every following page demonstrates the pattern it explains.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+</div>
+
+<!-- Pattern: comparison — for: two matched options or states; regions: left, right, takeaway; components: container ×2 + selected + takeaway; may vary: labels, evidence, and selected side; may not: change measure, period, scope, depth, geometry, or highlight both sides. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Pattern / comparison</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Same scope</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">Equal measures make one<br>difference credible</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<div class="el rule" style="left:960px;top:350px;width:1px;height:496px"></div>
+<div class="el compare" style="left:120px;top:350px;width:816px;height:460px"><div class="kicker muted">Baseline</div><div class="metric muted">24</div><div class="subhead muted">Days / prior state</div><div class="col-flush">State the same period, scope, and evidence depth.</div></div>
+<!-- Component: selected (.red) — mark the one figure named by the headline; may vary: side and value; may not: colour both states, imply favourable direction, or alter geometry. -->
+<div class="el compare" style="left:1000px;top:350px;width:800px;height:460px"><div class="kicker">Current</div><div class="metric red">18</div><div class="subhead">Days / current state</div><div class="col-flush">Write the signed change explicitly: six days lower.</div></div>
+<div class="el takeaway subhead" style="left:120px;top:860px;width:1680px;height:80px">Colour identifies the selected state; words and signs explain direction.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+</div>
+
+<!-- Pattern: columns — for: parallel arguments; regions: col-1, col-2, col-3, takeaway; components: container ×3 + selected + takeaway; may vary: two or three columns, copy, selected column; may not: fourth column, unequal measure, gaps, depth, or fills. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Pattern / columns</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Three equal measures</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">Parallel arguments share one<br>measure and reading rhythm</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<div class="el zone" style="left:120px;top:370px;width:528px;height:430px"><div class="kicker">First</div><div class="subhead">Name one parallel idea</div><div class="col">Give it one proof at a fixed measure. Keep the paragraph depth matched to its peers.</div></div>
+<div class="el zone" style="left:696px;top:370px;width:528px;height:430px"><div class="kicker red">Second</div><div class="subhead">Repeat the structure</div><div class="col">Use the same sequence of heading, evidence, and qualification.</div></div>
+<div class="el zone" style="left:1272px;top:370px;width:528px;height:430px"><div class="kicker">Third</div><div class="subhead">Finish at equal depth</div><div class="col">If one idea needs more room, promote it to a separate page.</div></div>
+<div class="el takeaway subhead" style="left:120px;top:850px;width:1680px;height:90px">One red label may select a column; words still explain why it matters.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+</div>
+
+<!-- Pattern: process — for: prose sequence; regions: step-1, step-2, step-3, step-4; components: step ×4 + numbered ×4 + selected; may vary: three to five steps and one final red numeral; may not: noun-only stages, arrows, boxes, connectors, tilted rules, or unmatched depth. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Pattern / process</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Numbered prose</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">A sequence is explained in<br>paragraphs, not arrows</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<!-- This process uses no connector: ordered steps are joined by reading order, matched rows, and straight hairlines, never arrows or decorative links. -->
+<!-- Component: step (.step) — one verb-led stage with its hand-off; may vary: three to five rows; may not: become a box, arrow, or noun-only label. -->
+<!-- Component: numbered (.step-num) — meaningful order for a process or finding; may vary: numeral and final red emphasis; may not: number peer facts or detach from its statement. -->
+<div class="el step" style="left:120px;top:360px;width:1680px;height:130px"><div class="step-num">1</div><div class="subhead">Frame the claim</div><div class="col-flush">Name the output handed down.</div></div>
+<div class="el step" style="left:120px;top:510px;width:1680px;height:130px"><div class="step-num">2</div><div class="subhead">Set the measure</div><div class="col-flush">Keep each row at matched depth.</div></div>
+<div class="el step" style="left:120px;top:660px;width:1680px;height:130px"><div class="step-num">3</div><div class="subhead">Test the evidence</div><div class="col-flush">State the condition for moving on.</div></div>
+<div class="el step" style="left:120px;top:810px;width:1680px;height:130px"><div class="step-num red">4</div><div class="subhead">Name the outcome</div><div class="col-flush">The red numeral marks the final hand-off.</div></div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+</div>
+
+<!-- Pattern: metric — for: one quantitative claim with compact context; regions: left, chart, takeaway; components: metric + chart + takeaway; may vary: figure, two supporting values, and three to five chart marks; may not: omit unit, period, scope, comparator, or exclusion, or use more than one red fact. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Pattern / metric</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Figure page</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">One figure carries the page<br>and its caption qualifies it</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<!-- Component: metric (.metric) — dominant figure with unit, period, scope, comparator, and exclusion nearby; may vary: value and whether the figure takes red; may not: float without context or compete with another red fact. -->
+<div class="el metric red" style="left:120px;top:400px;width:760px;height:170px">42%</div>
+<div class="el caption" style="left:120px;top:620px;width:760px;height:100px">Illustrative share, current period, agreed scope; twelve points above baseline.</div>
+<div class="el rule" style="left:960px;top:370px;width:1px;height:470px"></div>
+<div class="el zone" style="left:1000px;top:370px;width:360px;height:200px"><div class="kicker">Context</div><div class="metric-sm">1,240</div><div class="caption">Same unit and window.</div></div>
+<div class="el zone" style="left:1400px;top:370px;width:400px;height:200px"><div class="kicker">Comparator</div><div class="metric-sm">+12 pts</div><div class="caption">Direction stated in words.</div></div>
+<div class="el chart-specimen" style="left:1000px;top:620px;width:800px;height:200px"><svg viewBox="0 0 800 200" width="800" height="200" aria-label="Illustrative three-period context chart"><rect x="90" y="70" width="120" height="128" fill="#151515"/><rect x="340" y="45" width="120" height="153" fill="#151515"/><rect x="590" y="20" width="120" height="178" fill="#151515"/><g fill="#151515" font-family="Georgia" font-size="24"><text x="120" y="60">32</text><text x="370" y="35">37</text><text x="620" y="18">42</text></g></svg></div>
+<div class="el takeaway subhead" style="left:120px;top:870px;width:1680px;height:70px">A figure page may be sparse; it is never unexplained.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+</div>
+
+<!-- Pattern: table — for: auditable exact values; regions: table, takeaway; components: table + selected + takeaway; may vary: three to seven rows, three to six columns, and one red figure; may not: add vertical rules, zebra fill, left-aligned figures, multiple header bands, or lose the heavy total rule. -->
+<!-- Native tables inherit the template font. Units belong in the header or caption, and arithmetic signs remain explicit. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Pattern / table</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Exact values</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">A table is ruled across,<br>never boxed in</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<div class="el deck-line" style="left:120px;top:350px;width:1560px;height:100px">Figures align right, labels left, with one tinted header and no vertical rules.</div>
+<!-- Component: table (.np-table) — native table for exact values with horizontal hairlines and a heavy total rule; may vary: legal row and column counts; may not: use cards, zebra fill, or hide signs. -->
+<div class="el table-text" style="left:120px;top:450px;width:1680px;height:360px"><table class="np-table"><thead><tr><th>Line item</th><th>Prior</th><th>Current</th><th>Change</th></tr></thead><tbody><tr><td>Primary item</td><td>72.0</td><td>81.4</td><td>+9.4</td></tr><tr><td>Secondary item</td><td>28.0</td><td>30.6</td><td>+2.6</td></tr><tr class="total"><td>Total</td><td>100.0</td><td class="fig-red">112.0</td><td>+12.0</td></tr></tbody></table></div>
+<div class="el takeaway subhead" style="left:120px;top:860px;width:1680px;height:80px">Red marks only the exact figure named by the headline.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+</div>
+
+<!-- Pattern: chart — for: trend, ranking, or comparison; regions: chart, takeaway; components: chart + takeaway; may vary: native bar or line chart, four to seven marks, and one labelled reference; may not: draw production charts with shapes, add empty grids or avoidable legends, lose the common baseline, or use more than one red mark. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Pattern / chart</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Illustrative values</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">Direct labels and one red<br>mark remove chart furniture</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<div class="el deck-line" style="left:120px;top:350px;width:1320px;height:100px">Build the deck with a native chart; this simple specimen only demonstrates the ink.</div>
+<!-- Component: chart (.chart-specimen) — native chart with ink context, one red mark, direct values, and one common baseline; may vary: bar or line and one reference; may not: use shape-built production marks, empty grids, legends when labels fit, or a second colour. -->
+<div class="el chart-specimen" style="left:220px;top:440px;width:1480px;height:420px"><svg viewBox="0 0 1480 420" width="1480" height="420" aria-label="Illustrative four-period bar chart"><rect x="150" y="170" width="180" height="208" fill="#151515"/><rect x="500" y="130" width="180" height="248" fill="#151515"/><rect x="850" y="95" width="180" height="283" fill="#151515"/><rect x="1200" y="45" width="180" height="333" fill="#B3261E"/><g fill="#151515" font-family="Georgia" font-size="26"><text x="210" y="152">64</text><text x="560" y="112">72</text><text x="910" y="77">81</text><text x="1260" y="28">94</text><text x="180" y="410">One</text><text x="530" y="410">Two</text><text x="880" y="410">Three</text><text x="1220" y="410">Current</text></g></svg></div>
+<div class="el takeaway subhead" style="left:120px;top:870px;width:1680px;height:70px">Label values in ink; let the headline explain why current matters.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+</div>
+
+<!-- Pattern: reading — for: reasoning that must stand without narration; regions: col-1, col-2, col-3; components: lead ×3; may vary: two or three columns and cap colour; may not: exceed 120 words, add a second cap, cap a sidebar, change the fixed measure, or fill behind prose. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Pattern / reading spread</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Signature page</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">One drop cap opens prose<br>that must stand alone</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<div class="el deck-line" style="left:120px;top:350px;width:1560px;height:100px">Build the opening from three boxes: letter, three inset lines, then full measure below.</div>
+<!-- Component: lead (.col) — justified argument in an unfilled fixed measure; may vary: two or three columns and sixty to 120 total words; may not: use a fourth column, card, or body size outside the permitted range. -->
+<div class="el dropcap red" style="left:120px;top:452px;width:84px;height:130px">P</div>
+<div class="el col" style="left:212px;top:458px;width:436px;height:146px">rose begins beside one cap for exactly three lines.</div>
+<div class="el col" style="left:120px;top:608px;width:528px;height:310px">The first column then resumes at full measure. Its job is to establish the terms and evidence the next columns develop.</div>
+<div class="el rule" style="left:672px;top:452px;width:1px;height:466px"></div>
+<div class="el col" style="left:696px;top:452px;width:528px;height:466px">The second column advances the same argument at matched density. It gets no second cap and no visual detour.</div>
+<div class="el rule" style="left:1248px;top:452px;width:1px;height:466px"></div>
+<div class="el col" style="left:1272px;top:452px;width:528px;height:466px">The last column closes the reasoning and names the consequence. A second claim begins on another page.</div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+</div>
+
+<!-- Pattern: diagram — for: one claim governing three kinds of support; regions: body, col-1, col-2, col-3; components: hierarchy + connector ×5 + icon ×4; may vary: two to four equal children and labels; may not: exceed five nodes, bend or tilt rules, leave the relation unnamed, change sibling measures, or put icons beside prose. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Pattern / diagram</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">One to three</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el headline" style="left:120px;top:150px;width:1500px;height:156px">One claim gathers evidence,<br>context, and action</div>
+<div class="el rule" style="left:120px;top:322px;width:1680px;height:1px"></div>
+<!-- Component: hierarchy (.diagram-root + .diagram-node) — one named parent over two to four equal children; may vary: child count and wording; may not: use cards, unequal siblings, or geometry as evidence. -->
+<div class="el diagram-root" style="left:650px;top:350px;width:620px;height:150px"><svg class="icon"><use href="#material/newspaper"/></svg><div><div class="kicker">Claim</div><div class="subhead">One sentence governs the page</div></div></div>
+<!-- Component: connector (.diagram-link) — straight near-black hairline from node edge to node edge; may vary: branch count; may not: use arrows without direction, cross labels, stop in gaps, or change weight. -->
+<div class="el diagram-link" style="left:960px;top:500px;width:1px;height:80px"></div>
+<div class="el diagram-link" style="left:384px;top:580px;width:1152px;height:1px"></div>
+<div class="el diagram-link" style="left:384px;top:580px;width:1px;height:50px"></div>
+<div class="el diagram-link" style="left:960px;top:580px;width:1px;height:50px"></div>
+<div class="el diagram-link" style="left:1536px;top:580px;width:1px;height:50px"></div>
+<div class="el diagram-node" style="left:120px;top:630px;width:528px;height:290px"><svg class="icon"><use href="#material/search"/></svg><div class="kicker">Evidence</div><div class="subhead">What proves it</div></div>
+<div class="el diagram-node" style="left:696px;top:630px;width:528px;height:290px"><svg class="icon"><use href="#material/notes"/></svg><div class="kicker">Context</div><div class="subhead">Where it holds</div></div>
+<div class="el diagram-node" style="left:1272px;top:630px;width:528px;height:290px"><svg class="icon"><use href="#material/task"/></svg><div class="kicker">Action</div><div class="subhead">What follows</div></div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+</div>
+
+<!-- Part: Closing -->
+<!-- Frame: closing — retain the masthead, restate one claim in display type, then name what holds and what follows; wording may vary, but no new argument, second red mark, or appendix may follow, and decision, owner, and date remain explicit. -->
+<div class="slide">
+<div class="el rule" style="left:120px;top:70px;width:1680px;height:3px"></div>
+<div class="el kicker" style="left:120px;top:88px;width:900px;height:28px">Closing page</div>
+<div class="el byline right" style="left:1400px;top:90px;width:400px;height:26px">Last page</div>
+<div class="el rule" style="left:120px;top:126px;width:1680px;height:1px"></div>
+<div class="el cover-title" style="left:120px;top:220px;width:1500px;height:250px">Write the claim so<br>it can be repeated</div>
+<div class="el deck-line" style="left:120px;top:510px;width:1320px;height:110px">The page ends as it began: one sentence, one measured answer, one specific next move.</div>
+<div class="el rule" style="left:120px;top:646px;width:1680px;height:1px"></div>
+<div class="el zone" style="left:120px;top:690px;width:816px;height:230px"><div class="kicker">What holds</div><div class="col">Restate the argument in words the reader can carry away. Only this page may echo the cover.</div></div>
+<div class="el zone" style="left:1000px;top:690px;width:800px;height:230px"><div class="kicker">What follows</div><div class="col">Name the decision, owner, and date. Leave the reader something specific to answer.</div></div>
+<div class="el rule" style="left:120px;top:966px;width:1680px;height:1px"></div>
+<div class="el byline" style="left:120px;top:984px;width:1680px;height:28px">End of paper</div>
+</div>
+
+</body>
+</html>
