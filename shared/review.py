@@ -31,6 +31,14 @@ MAX_TEXT_CHARS = 2000
 MAX_NOTE_CHARS = 4000
 MAX_BODY_BYTES = 512 * 1024
 DEFAULT_SLIDE_SIZE = (1920, 1080)
+# What a note and a comment text are stripped of, and what counts as empty: Python's
+# ``str.isspace`` set plus U+FEFF, which JS ``trim()`` also strips. ``str.strip()`` and
+# ``trim()`` disagree on U+001C-U+001F, U+0085 and U+FEFF, so both sides use this set.
+WHITESPACE = (
+    "\u0009\u000a\u000b\u000c\u000d\u001c\u001d\u001e\u001f\u0020\u0085\u00a0\u1680"
+    "\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a"
+    "\u2028\u2029\u202f\u205f\u3000\ufeff"
+)
 
 # Always used with fullmatch: ``$`` alone would accept a trailing newline, and ``\d`` would
 # accept non-ASCII digits.
@@ -97,7 +105,7 @@ def _validate_comment(
         return None, f"{where}.text must be a string"
     if "\x00" in text:
         return None, f"{where}.text must not contain NUL"
-    text = text.strip()
+    text = text.strip(WHITESPACE)
     if not 1 <= len(text) <= MAX_TEXT_CHARS:
         return None, f"{where}.text must be 1-{MAX_TEXT_CHARS} characters"
     return {"name": name, "slide": slide, "rect": list(comment["rect"]), "text": text}, None
@@ -113,8 +121,8 @@ def validate_review_submission(
     ``slug_exists`` says whether ``slides/<slug>.json`` or ``slides/<slug>.html`` exists (it is
     only called with slugs that passed ``SLUG_RE``).
 
-    Returns ``(normalized, None)`` — ``{"note": str | None, "comments": [...]}`` with stripped
-    text and an empty note as None — or ``(None, error message)``.
+    Returns ``(normalized, None)`` — ``{"note": str | None, "comments": [...]}`` with text
+    stripped of ``WHITESPACE`` and an empty note as None — or ``(None, error message)``.
     """
     if not isinstance(body, dict):
         return None, "body must be an object"
@@ -125,7 +133,7 @@ def validate_review_submission(
             return None, "note must be a string or null"
         if "\x00" in note:
             return None, "note must not contain NUL"
-        note = note.strip()
+        note = note.strip(WHITESPACE)
         if len(note) > MAX_NOTE_CHARS:
             return None, f"note exceeds {MAX_NOTE_CHARS} characters"
         note = note or None

@@ -17,6 +17,7 @@ import pytest
 
 from shared.review import (
     REVIEW_ID_RE,
+    WHITESPACE,
     build_review_file,
     build_review_message,
     new_review_id,
@@ -37,6 +38,8 @@ def test_fixture_case(case):
     normalized, error = validate_review_submission(case["body"], _SIZE, lambda s: s in _SLUGS)
     if case["valid"]:
         assert error is None and normalized is not None
+        if "normalized" in case:
+            assert normalized == case["normalized"]
     else:
         assert normalized is None and isinstance(error, str) and error
 
@@ -52,6 +55,11 @@ def test_normalizes_note_and_text():
     assert error is None
     assert normalized == {"note": None, "comments": [{"name": "A", "slide": "intro", "rect": [0, 0, 10, 10],
                                                       "text": "直して"}]}
+
+
+def test_whitespace_covers_str_isspace():
+    """The shared set strips at least what ``str.strip()`` strips (the TS test checks ``trim()``)."""
+    assert {chr(i) for i in range(0x110000) if chr(i).isspace()} <= set(WHITESPACE)
 
 
 def test_slug_exists_only_sees_valid_slugs():

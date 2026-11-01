@@ -2997,6 +2997,134 @@
       "valid": false
     },
     {
+      "name": "text of U+FEFF only",
+      "body": {
+        "comments": [
+          {
+            "name": "A",
+            "slide": "sales",
+            "rect": [
+              1248,
+              238,
+              576,
+              400
+            ],
+            "text": "\ufeff"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "text of U+001C-U+001F only",
+      "body": {
+        "comments": [
+          {
+            "name": "A",
+            "slide": "sales",
+            "rect": [
+              1248,
+              238,
+              576,
+              400
+            ],
+            "text": "\u001c\u001d\u001e\u001f"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "text of U+0085 only",
+      "body": {
+        "comments": [
+          {
+            "name": "A",
+            "slide": "sales",
+            "rect": [
+              1248,
+              238,
+              576,
+              400
+            ],
+            "text": "\u0085"
+          }
+        ]
+      },
+      "valid": false
+    },
+    {
+      "name": "text wrapped in U+FEFF, U+001C, U+0085 and U+3000",
+      "body": {
+        "comments": [
+          {
+            "name": "A",
+            "slide": "sales",
+            "rect": [
+              1248,
+              238,
+              576,
+              400
+            ],
+            "text": "\ufeff\u001c 直して\u0085\u3000"
+          }
+        ]
+      },
+      "valid": true,
+      "normalized": {
+        "note": null,
+        "comments": [
+          {
+            "name": "A",
+            "slide": "sales",
+            "rect": [
+              1248,
+              238,
+              576,
+              400
+            ],
+            "text": "直して"
+          }
+        ]
+      }
+    },
+    {
+      "name": "note of U+FEFF, U+001F and U+0085 only",
+      "body": {
+        "note": "\ufeff\u001f\u0085",
+        "comments": [
+          {
+            "name": "A",
+            "slide": "sales",
+            "rect": [
+              1248,
+              238,
+              576,
+              400
+            ],
+            "text": "直して"
+          }
+        ]
+      },
+      "valid": true,
+      "normalized": {
+        "note": null,
+        "comments": [
+          {
+            "name": "A",
+            "slide": "sales",
+            "rect": [
+              1248,
+              238,
+              576,
+              400
+            ],
+            "text": "直して"
+          }
+        ]
+      }
+    },
+    {
       "name": "body is a list",
       "body": [
         {

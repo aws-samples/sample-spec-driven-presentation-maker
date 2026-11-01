@@ -10,12 +10,12 @@
 import fs from "fs"
 import path from "path"
 import { describe, expect, it } from "vitest"
-import { buildReviewFile, buildReviewMessage, newReviewId, validateReviewSubmission, type ReviewSubmission, type ReviewTemplate } from "./schema"
+import { buildReviewFile, buildReviewMessage, newReviewId, stripWhitespace, validateReviewSubmission, WHITESPACE, type ReviewSubmission, type ReviewTemplate } from "./schema"
 
 interface Fixture {
   slide_size: [number, number]
   slugs: string[]
-  cases: { name: string; body: unknown; valid: boolean }[]
+  cases: { name: string; body: unknown; valid: boolean; normalized?: ReviewSubmission }[]
   message_case: {
     id: string
     slide_size: [number, number]
@@ -39,6 +39,7 @@ describe("validateReviewSubmission", () => {
     const result = validateReviewSubmission(c.body, fixture.slide_size, s => slugs.has(s))
     expect(result.ok).toBe(c.valid)
     if (!result.ok) expect(result.error).toBeTruthy()
+    if (c.normalized) expect(result).toEqual({ ok: true, value: c.normalized })
   })
 
   it("trims text and turns an empty note into null", () => {
@@ -54,6 +55,20 @@ describe("validateReviewSubmission", () => {
     validateReviewSubmission({ comments: [{ name: "A", slide: "../x", rect: [0, 0, 10, 10], text: "x" }] },
       fixture.slide_size, s => { seen.push(s); return true })
     expect(seen).toEqual([])
+  })
+})
+
+describe("stripWhitespace", () => {
+  it("strips at least what trim() strips (the Python test checks str.strip())", () => {
+    for (let i = 0; i < 0x10000; i++) {
+      const ch = String.fromCharCode(i)
+      if (ch.trim() === "") expect(WHITESPACE).toContain(ch)
+    }
+  })
+
+  it("strips only the ends", () => {
+    expect(stripWhitespace("\ufeff\u001c a\u0085b \u0085\u3000")).toBe("a\u0085b")
+    expect(stripWhitespace("\u001f")).toBe("")
   })
 })
 

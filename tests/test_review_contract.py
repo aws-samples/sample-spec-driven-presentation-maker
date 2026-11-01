@@ -7,6 +7,7 @@ tests/test_agent_errors.py, so a limit changed on one side fails CI until the ot
 The submission cases themselves are shared through tests/fixtures/review_submissions.json.
 """
 
+import json
 import re
 from pathlib import Path
 
@@ -31,6 +32,12 @@ def _ts_constant(name: str) -> int:
 @pytest.mark.parametrize("name", ["MAX_COMMENTS", "MAX_TEXT_CHARS", "MAX_NOTE_CHARS", "MAX_BODY_BYTES"])
 def test_limits_match(name):
     assert _ts_constant(name) == getattr(review, name)
+
+
+def test_whitespace_matches():
+    match = re.search(r'^export const WHITESPACE = ("[^"]*")$', _SCHEMA_TS, re.MULTILINE)
+    assert match, "WHITESPACE not found in schema.ts"
+    assert json.loads(match.group(1)) == review.WHITESPACE
 
 
 def test_marker_prefix():

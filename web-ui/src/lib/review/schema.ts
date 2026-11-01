@@ -15,6 +15,11 @@ export const MAX_TEXT_CHARS = 2000
 export const MAX_NOTE_CHARS = 4000
 export const MAX_BODY_BYTES = 512 * 1024
 export const DEFAULT_SLIDE_SIZE: [number, number] = [1920, 1080]
+/**
+ * What a note and a comment text are stripped of, and what counts as empty — `WHITESPACE` in
+ * Python (its `str.isspace` set plus U+FEFF). `trim()` alone misses U+001C-U+001F and U+0085.
+ */
+export const WHITESPACE = "\u0009\u000a\u000b\u000c\u000d\u001c\u001d\u001e\u001f\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 
 export const NAME_RE = /^[A-Z]{1,3}$/
 export const SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/
@@ -65,6 +70,17 @@ function charCount(s: string): number {
   return [...s].length
 }
 
+const WHITESPACE_SET = new Set(WHITESPACE)
+
+/** `s` without leading and trailing `WHITESPACE` (Python's `s.strip(WHITESPACE)`). */
+export function stripWhitespace(s: string): string {
+  let start = 0
+  let end = s.length
+  while (start < end && WHITESPACE_SET.has(s[start])) start++
+  while (end > start && WHITESPACE_SET.has(s[end - 1])) end--
+  return s.slice(start, end)
+}
+
 /** Review id for a submission at `now`: UTC `YYYYMMDD-HHMMSS-` plus 4 random hex digits. */
 export function newReviewId(now: Date): string {
   const pad = (n: number) => String(n).padStart(2, "0")
@@ -106,7 +122,7 @@ export function validateReviewSubmission(
   if (body.note !== undefined && body.note !== null) {
     if (typeof body.note !== "string") return fail("note must be a string or null")
     if (body.note.includes("\0")) return fail("note must not contain NUL")
-    const trimmed = body.note.trim()
+    const trimmed = stripWhitespace(body.note)
     if (charCount(trimmed) > MAX_NOTE_CHARS) return fail(`note exceeds ${MAX_NOTE_CHARS} characters`)
     note = trimmed || null
   }
@@ -127,7 +143,7 @@ export function validateReviewSubmission(
     if (rectError) return fail(`${where}.${rectError}`)
     if (typeof c.text !== "string") return fail(`${where}.text must be a string`)
     if (c.text.includes("\0")) return fail(`${where}.text must not contain NUL`)
-    const text = c.text.trim()
+    const text = stripWhitespace(c.text)
     const len = charCount(text)
     if (len < 1 || len > MAX_TEXT_CHARS) return fail(`${where}.text must be 1-${MAX_TEXT_CHARS} characters`)
     if (seen.has(c.name)) return fail(`${where}.name is duplicated`)
