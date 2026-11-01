@@ -1,0 +1,62 @@
+{
+  "plan": "fromright-clean",
+  "driver": "scripts/animation_catalog/gui_capture.py",
+  "shapeNames": {
+    "animation.effectOptions.direction.entrance.flyIn.fromRight": "Rounded Rectangle 1"
+  },
+  "deck": {
+    "slides": 1,
+    "targetsPerSlide": 1,
+    "columns": 1,
+    "rows": 1,
+    "basisPx": [
+      1920.0,
+      1080.0
+    ],
+    "cellPx": [
+      1824.0,
+      984.0
+    ],
+    "shapePx": [
+      1796,
+      948
+    ],
+    "clickMarginPx": 20.0,
+    "neighbourClearancePx": 20.0,
+    "split": false,
+    "note": "1 targets fit one slide as a 1x1 grid"
+  },
+  "counts": {
+    "targets": 1
+  },
+  "targets": [
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromRight",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Right",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Fly In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 1,
+      "cellIndex": 1,
+      "verifyChange": true,
+      "slideIndex": 1,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 58,
+        "width": 1796,
+        "height": 948
+      },
+      "shapeName": "Rounded Rectangle 1"
+    }
+  ]
+}

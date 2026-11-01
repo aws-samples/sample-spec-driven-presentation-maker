@@ -560,6 +560,63 @@ def shape_row_index(package: Path, slide_index: int, shape_name: str) -> tuple[i
     return len(shapes) - 1 - found[0], len(shapes)
 
 
+#: How many times a value press is retried when the package says it changed
+#: nothing. Measured: ``Half Spin`` took on the second attempt, ``Quarter Spin``
+#: on the third, and ``From Right`` had not taken in three separate runs — a
+#: press inside the ``Effect Options`` window is intermittent in a way the
+#: ribbon's own presses are not. Four is one more than the worst seen.
+MAX_VALUE_PRESS_ATTEMPTS = 4
+
+
+def effect_signatures(package: Path, slide_index: int, spid: str) -> list[str]:
+    """Return a comparable signature per effect on one shape, behaviours included.
+
+    The ``p:cTn`` alone is not enough and that is the whole reason this exists:
+    Grow/Shrink's ``Huge`` and its default carry **identical** preset
+    attributes and differ only in ``p:animScale``'s ``p:by``. A gate that
+    compared ``p:cTn`` would call a press that changed the amount "no change".
+
+    Node ``id`` is excluded, because PowerPoint renumbers on save and every
+    effect would then differ from itself.
+    """
+    from lxml import etree
+
+    root = _read_slide_part(package, slide_index)
+    signatures: list[str] = []
+    for element in root.iter():
+        if etree.QName(element).localname != "cTn" or element.get("presetID") is None:
+            continue
+        spids = {
+            target.get("spid")
+            for target in element.iter()
+            if etree.QName(target).localname == "spTgt"
+        }
+        if spids != {spid}:
+            continue
+        parts: list[str] = [
+            f"{name}={value}"
+            for name, value in sorted(element.attrib.items())
+            if name != "id"
+        ]
+        for node in element.iter():
+            local = etree.QName(node).localname
+            if local == "cTn" and node is element:
+                continue
+            parts.append(
+                local
+                + "("
+                + ",".join(
+                    f"{name}={value}"
+                    for name, value in sorted(node.attrib.items())
+                    if name != "id"
+                )
+                + ")"
+                + ((node.text or "").strip())
+            )
+        signatures.append("|".join(parts))
+    return sorted(signatures)
+
+
 def read_slide_effects(package: Path, slide_index: int) -> list[dict[str, Any]]:
     """Return one entry per animation effect on a slide, each with the spid it targets.
 
@@ -1939,6 +1996,7 @@ def capture_record(
     selection_row: str | None = None,
     selection_row_index: int | None = None,
     prerequisite: dict[str, Any] | None = None,
+    value_press: dict[str, Any] | None = None,
     effect: dict[str, Any] | None = None,
     effect_count: tuple[int, int] | None = None,
     batch_index: int | None = None,
@@ -1998,6 +2056,11 @@ def capture_record(
         # is meaningless without it: `From Bottom` is a direction *of Fly In*,
         # and a record that did not say so could be read as a global setting.
         "prerequisite": prerequisite,
+        # How many times the value press had to be made, and whether the package
+        # changed. A press inside the Effect Options window is intermittent, and
+        # a record that did not say so could not be told from a value that
+        # happens to equal the effect's default.
+        "valuePress": value_press,
         "applied": applied,
         "matchedTitle": matched_title,
         "ribbonReadBack": readback or {"start": None, "duration": None},
@@ -2254,12 +2317,54 @@ def press_target(
         # for a tile-only control run. :func:`attribute_batch` is what has to
         # account for that, by telling the default apart from the value.
         ensure_tab(backend, target["guiPath"], timeout=timeout)
-    result = press_path(
-        backend,
-        target["guiPath"],
-        timeout=timeout,
-        alternatives=tuple(target.get("titleAlternatives", ())),
-    )
+    if prerequisite and target.get("verifyChange"):
+        # The value press is verified against the package rather than trusted,
+        # and retried when it changed nothing. Without this the driver cannot
+        # tell a press that did not take from a value that **equals** the
+        # default — which is exactly how ``Full Spin`` and ``From Bottom`` read
+        # correct while ``Quarter Spin`` and ``From Right`` read wrong. Costs
+        # one extra save per target: the prerequisite's effect has to be on disk
+        # to be the thing compared against.
+        press_save(backend, settings.document, timeout=timeout)
+        before = effect_signatures(settings.document, target["slideIndex"], carried["shape_spid"])
+        attempts: list[dict[str, Any]] = []
+        for attempt in range(1, MAX_VALUE_PRESS_ATTEMPTS + 1):
+            result = press_path(
+                backend,
+                target["guiPath"],
+                timeout=timeout,
+                alternatives=tuple(target.get("titleAlternatives", ())),
+            )
+            press_save(backend, settings.document, timeout=timeout)
+            after = effect_signatures(
+                settings.document, target["slideIndex"], carried["shape_spid"]
+            )
+            changed = after != before
+            attempts.append({"attempt": attempt, "changed": changed, "effects": len(after)})
+            if changed:
+                break
+        carried["value_press"] = {
+            "attempts": attempts,
+            "changed": attempts[-1]["changed"],
+            "defaultSignatures": len(before),
+        }
+        if not attempts[-1]["changed"]:
+            raise EffectNotAdded(
+                f"the value press left the shape's effects byte-identical to what the "
+                f"prerequisite wrote, after {len(attempts)} attempt(s); the press reaches the "
+                "control and the application does not act on it, so this value is not measured",
+                expectedSpid=carried["shape_spid"],
+                attempts=len(attempts),
+                effectsBefore=len(before),
+                effectsAfter=len(after),
+            )
+    else:
+        result = press_path(
+            backend,
+            target["guiPath"],
+            timeout=timeout,
+            alternatives=tuple(target.get("titleAlternatives", ())),
+        )
     carried["matched_title"] = result.matched_title
     carried["steps"] = result.as_dicts()
     # Read here, not after the batch's save: the ribbon shows the SELECTED shape's values
