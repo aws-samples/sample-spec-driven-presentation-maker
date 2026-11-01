@@ -1,0 +1,452 @@
+{
+  "layout": "Title Only",
+  "placeholders": {
+    "0": ""
+  },
+  "notes": "When a slide needs changing, point at it. Draw a frame around the part, write what should change, and send all your frames together as one request. Each comment is handled on the slide it points at.",
+  "elements": [
+    {
+      "_comment": "region: preview",
+      "x": 96,
+      "y": 350,
+      "w": 880,
+      "h": 495
+    },
+    {
+      "_comment": "region: comments",
+      "x": 1040,
+      "y": 350,
+      "w": 784,
+      "h": 446
+    },
+    {
+      "_comment": "region: takeaway",
+      "x": 96,
+      "y": 892,
+      "w": 1728,
+      "h": 72
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 96,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#6095FA",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 144,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#3BC59E",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 192,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#B385FB",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 240,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#EFAC44",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 288,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#DB7CD4",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "textbox",
+      "x": 352,
+      "y": 46,
+      "width": 1200,
+      "height": 42,
+      "text": "{{font=Menlo:06 · REVIEW}}",
+      "fontSize": 16,
+      "fontColor": "#9AA3B2",
+      "fontFamily": "Menlo",
+      "verticalAlign": "middle",
+      "_comment": "frame: section label",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 96,
+      "y": 104,
+      "width": 1500,
+      "height": 192,
+      "text": "{{bold:Point at what to change}}",
+      "fontSize": 40,
+      "fontColor": "#EEF0F4",
+      "verticalAlign": "top",
+      "_comment": "frame: title",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 96,
+      "y": 350,
+      "width": 880,
+      "height": 495,
+      "fill": "#151922",
+      "adjustments": [
+        0.0242
+      ],
+      "line": "#2A303C",
+      "lineWidth": 1
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 152,
+      "y": 414,
+      "width": 620,
+      "height": 36,
+      "fill": "#EEF0F4",
+      "adjustments": [
+        0.1667
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 152,
+      "y": 464,
+      "width": 420,
+      "height": 36,
+      "fill": "#EEF0F4",
+      "adjustments": [
+        0.1667
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 152,
+      "y": 576,
+      "width": 700,
+      "height": 18,
+      "fill": "#4A5262",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 152,
+      "y": 628,
+      "width": 740,
+      "height": 18,
+      "fill": "#4A5262",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 152,
+      "y": 680,
+      "width": 640,
+      "height": 18,
+      "fill": "#4A5262",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 152,
+      "y": 732,
+      "width": 720,
+      "height": 18,
+      "fill": "#4A5262",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 128,
+      "y": 394,
+      "width": 780,
+      "height": 128,
+      "fill": "none",
+      "adjustments": [
+        0.0469
+      ],
+      "line": "#6095FA",
+      "lineWidth": 1.5,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 128,
+      "y": 371,
+      "width": 52,
+      "height": 46,
+      "fill": "#6095FA",
+      "adjustments": [
+        0.1304
+      ],
+      "text": "{{bold,font=Menlo:A}}",
+      "fontSize": 16,
+      "fontColor": "#0B0D12",
+      "fontFamily": "Menlo",
+      "align": "center",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 128,
+      "y": 550,
+      "width": 780,
+      "height": 240,
+      "fill": "none",
+      "adjustments": [
+        0.025
+      ],
+      "line": "#3BC59E",
+      "lineWidth": 1.5,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 128,
+      "y": 527,
+      "width": 52,
+      "height": 46,
+      "fill": "#3BC59E",
+      "adjustments": [
+        0.1304
+      ],
+      "text": "{{bold,font=Menlo:B}}",
+      "fontSize": 16,
+      "fontColor": "#0B0D12",
+      "fontFamily": "Menlo",
+      "align": "center",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1040,
+      "y": 350,
+      "width": 784,
+      "height": 136,
+      "fill": "#151922",
+      "adjustments": [
+        0.0882
+      ],
+      "line": "#6095FA",
+      "lineWidth": 1.5
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1072,
+      "y": 395,
+      "width": 52,
+      "height": 46,
+      "fill": "#6095FA",
+      "adjustments": [
+        0.1304
+      ],
+      "text": "{{bold,font=Menlo:A}}",
+      "fontSize": 16,
+      "fontColor": "#0B0D12",
+      "fontFamily": "Menlo",
+      "align": "center",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 1152,
+      "y": 378,
+      "width": 640,
+      "height": 80,
+      "text": "{{bold:Make the title shorter}}",
+      "fontSize": 24,
+      "fontColor": "#EEF0F4",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1040,
+      "y": 520,
+      "width": 784,
+      "height": 136,
+      "fill": "#151922",
+      "adjustments": [
+        0.0882
+      ],
+      "line": "#3BC59E",
+      "lineWidth": 1.5
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1072,
+      "y": 565,
+      "width": 52,
+      "height": 46,
+      "fill": "#3BC59E",
+      "adjustments": [
+        0.1304
+      ],
+      "text": "{{bold,font=Menlo:B}}",
+      "fontSize": 16,
+      "fontColor": "#0B0D12",
+      "fontFamily": "Menlo",
+      "align": "center",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 1152,
+      "y": 548,
+      "width": 640,
+      "height": 80,
+      "text": "{{bold:Turn this list into a chart}}",
+      "fontSize": 24,
+      "fontColor": "#EEF0F4",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "line",
+      "x1": 908,
+      "y1": 458,
+      "x2": 1040,
+      "y2": 418,
+      "color": "#6095FA",
+      "lineWidth": 1.5,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "line",
+      "x1": 908,
+      "y1": 670,
+      "x2": 1040,
+      "y2": 588,
+      "color": "#3BC59E",
+      "lineWidth": 1.5,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1040,
+      "y": 716,
+      "width": 520,
+      "height": 80,
+      "fill": "#6095FA",
+      "adjustments": [
+        0.15
+      ],
+      "text": "{{bold:Request changes}}",
+      "fontSize": 24,
+      "fontColor": "#0B0D12",
+      "align": "center",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "image",
+      "src": "assets:material/arrow_selector_tool-fill",
+      "x": 1524,
+      "y": 770,
+      "width": 56,
+      "height": 56,
+      "iconColor": "#EEF0F4"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 96,
+      "y": 900,
+      "width": 6,
+      "height": 56,
+      "fill": "#6095FA"
+    },
+    {
+      "type": "textbox",
+      "x": 128,
+      "y": 892,
+      "width": 1696,
+      "height": 72,
+      "text": "Draw frames, comment, send them as one request.",
+      "fontSize": 22,
+      "fontColor": "#EEF0F4",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    }
+  ]
+}
