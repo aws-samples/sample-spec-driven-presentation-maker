@@ -3,8 +3,9 @@
 /**
  * ChatPanel sending a change request (Local mode): the sent frames leave the drafts as soon as
  * the request is created and the card shows no status; a turn that fails puts the frames back
- * into the drafts and the note back into the input. Frames without a comment can be sent when
- * another frame has one or the note is set.
+ * into the drafts and the typed message back into the input. Frames without a comment can be
+ * sent when another frame has one or a message is typed; until then the draft bar says so, and
+ * the input keeps its normal placeholder.
  */
 
 import fs from "fs"
@@ -93,6 +94,7 @@ function deferred() {
 }
 
 const sendButton = () => screen.getByRole("button", { name: "Request changes" }) as HTMLButtonElement
+const textbox = () => screen.getByRole("textbox") as HTMLTextAreaElement
 
 describe("ChatPanel change request", () => {
   beforeEach(() => {
@@ -149,5 +151,33 @@ describe("ChatPanel change request", () => {
       note: "make @A the title",
       comments: [{ name: "A", slide: "intro", rect: [10, 20, 300, 200], text: "" }],
     }, "tok")
+  })
+
+  it("keeps the message placeholder while frames exist", async () => {
+    await renderPanel()
+    const placeholder = textbox().placeholder
+    addSaved("intro", "bigger")
+    expect(textbox().placeholder).toBe(placeholder)
+    expect(textbox().placeholder).not.toMatch(/note/i)
+  })
+
+  it("says what is missing until a comment or a message is written", async () => {
+    const { container } = await renderPanel()
+    const hint = () => container.querySelector("[data-review-needs-text]")
+    addSaved("intro", "")
+    expect(hint()?.textContent).toBe("Add a comment or a message to send")
+    expect(sendButton().disabled).toBe(true)
+
+    fireEvent.change(textbox(), { target: { value: " \u3000\n" } })
+    expect(hint()).not.toBeNull()
+    fireEvent.change(textbox(), { target: { value: "make @A the title" } })
+    expect(hint()).toBeNull()
+    expect(sendButton().disabled).toBe(false)
+
+    fireEvent.change(textbox(), { target: { value: "" } })
+    expect(hint()).not.toBeNull()
+    addSaved("sales", "bigger")
+    expect(hint()).toBeNull()
+    expect(sendButton().disabled).toBe(false)
   })
 })

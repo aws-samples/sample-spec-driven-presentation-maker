@@ -619,7 +619,7 @@
     "hideComments": "Hide frames",
     "send": "Request changes",
     "busyHint": "You can send once the agent has finished",
-    "notePlaceholder": "A note for the whole deck (optional)  ⌘↵ to request",
+    "needsTextHint": "Add a comment or a message to send",
     "sendFailed": "Couldn't send the change request",
     "noComment": "No comment"
   }

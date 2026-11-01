@@ -619,7 +619,7 @@
     "hideComments": "枠を隠す",
     "send": "修正を依頼",
     "busyHint": "エージェントの作業が終わると送信できます",
-    "notePlaceholder": "全体への一言（任意）  ⌘↵ で依頼",
+    "needsTextHint": "コメントかメッセージを書くと送信できます",
     "sendFailed": "修正依頼を送信できませんでした",
     "noComment": "コメントなし"
   }

@@ -20,8 +20,9 @@ Entries before v0.5.0 were written retroactively as summaries.
   `@A`; a frame may stay without a comment (a place another comment points to), and only an
   explicit delete (with undo) removes it, or Esc on a frame just drawn. Frames can be moved
   and resized, hovering a frame shows its comment, and unsent frames survive a reload. They
-  collect above the chat input, where **Request changes** (「修正を依頼」) sends them with an
-  optional note for the whole deck once a frame has a comment or the note is set. The server writes `reviews/<id>.json` in the
+  collect above the chat input, where **Request changes** (「修正を依頼」) sends them with
+  whatever is typed in the input as the message, once a frame has a comment or the message is
+  set (until then the frames list says what is missing). The server writes `reviews/<id>.json` in the
   deck — only what was sent (note, slide size, comments with frames in slide pixels) plus a
   short guide for the composers — and returns the chat message the Web UI sends: the note and
   the comments grouped by slide, the file path, how to dispatch them (one composer per slide,

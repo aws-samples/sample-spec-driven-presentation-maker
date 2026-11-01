@@ -38,6 +38,7 @@ import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsServic
 import type { ForkSessionPhase, KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
 import { useReview, type SubmittedReview } from "@/components/review/ReviewProvider"
 import { ReviewDraftBar } from "@/components/review/ReviewDraftBar"
+import { stripWhitespace } from "@/lib/review/schema"
 
 interface ChatPanelProps {
   deckId: string
@@ -519,10 +520,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   /**
    * Send from the input. With comments waiting, the server first writes the review file and
-   * returns the chat message (note, comments, file path, instructions, `[review:<id>]`),
-   * which is sent as-is and also shown (Local .chat.json keeps the display text). A failed
-   * write keeps the comments and the typed note (`false` keeps the input). A failed send
-   * puts the frames back into the drafts and the note back into an empty input, so the
+   * returns the chat message (the typed text as `note`, comments, file path, instructions,
+   * `[review:<id>]`), which is sent as-is and also shown (Local .chat.json keeps the display
+   * text). A failed write keeps the comments and the typed text (`false` keeps the input). A
+   * failed send puts the frames back into the drafts and the text back into an empty input, so the
    * request can be sent again (the chat shows the error).
    */
   const handleInputSend = useCallback(async (
@@ -585,6 +586,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [isLoading, onLoadingChange])
 
   const isInitial = stream.messages.length === 0 && !historyLoading
+  // Only the initial screen shows the pill, so only it keeps the text: a long chat skips the
+  // per-keystroke re-render (the draft bar's blank flag only re-renders when it flips).
+  const [inputBlank, setInputBlank] = useState(true)
+  const handleInputChange = useCallback((value: string) => {
+    if (isInitial) setInputText(value)
+    setInputBlank(!stripWhitespace(value))
+  }, [isInitial])
 
   return (
     <>
@@ -725,8 +733,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           isLoading={isLoading}
           onStop={stream.stopGeneration}
           disabled={!configLoaded || reconnectLoading}
-          placeholder={hasReviewDrafts ? tReview("notePlaceholder") : isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
-          topSlot={reviewActive ? <ReviewDraftBar /> : undefined}
+          placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
+          topSlot={reviewActive ? <ReviewDraftBar inputBlank={inputBlank} /> : undefined}
           sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading, canSend: review.canSubmit } : undefined}
           idToken={auth.user?.id_token}
           sessionId={sessionId}
@@ -738,8 +746,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           slashLoading={slashPickerItems.loading}
           onSlashOpen={slashPickerItems.ensure}
           onTextareaFocus={slashPickerItems.ensure}
-          // Only the initial screen shows the pill; skip the per-keystroke re-render of a long chat.
-          onInputChange={isInitial ? setInputText : undefined}
+          onInputChange={handleInputChange}
         >
           {/* Options expander — the only option (web images) is cloud-only */}
           {!IS_LOCAL && (

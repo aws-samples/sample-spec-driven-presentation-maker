@@ -5,8 +5,9 @@
  * (ChatMessage sizes it: right-aligned, 94% of the chat width).
  *
  * Built from the message itself (`parseReviewMessage`), so it restores from chat history:
- * header with the frame count, the note, one row per frame (a frame without a comment shows a
- * muted 「コメントなし」). It shows no progress: the agent's reply in the chat tells the result.
+ * header with the frame count, the message typed with the frames (unlabelled), one row per frame
+ * (a frame without a comment shows a muted 「コメントなし」). It shows no progress: the agent's
+ * reply in the chat tells the result.
  */
 
 "use client"

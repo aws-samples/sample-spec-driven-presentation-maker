@@ -53,10 +53,12 @@ describe("ReviewRequestCard", () => {
   })
   afterEach(cleanup)
 
-  it("shows the frame count, the note, the frames with slide numbers, and no status", () => {
+  it("shows the frame count, the message, the frames with slide numbers, and no status", () => {
     const { container } = withProvider(<ReviewRequestCard request={REQUEST} />)
     expect(screen.getByText("4 frames")).toBeTruthy()
     expect(container.textContent).toContain("全体的に文字を減らして")
+    // The message is shown as typed, without a label of its own.
+    expect(container.textContent).not.toMatch(/whole deck|\bnote\b/i)
     expect([...container.querySelectorAll("[data-review-comment]")].map(e => e.getAttribute("data-review-comment"))).toEqual(["A", "C", "B", "D"])
     expect(screen.getAllByText("Slide 2")).toHaveLength(2)
     expect(screen.getAllByText("Slide 1")).toHaveLength(2)

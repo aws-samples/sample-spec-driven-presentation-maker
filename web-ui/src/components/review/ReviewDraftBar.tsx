@@ -5,7 +5,9 @@
  *
  * Collapsed: dot + title + frame count + chevron. Expanded: one row per frame to send (tag,
  * text with @ references or a muted 「コメントなし」, slide number, delete on hover); a row click
- * jumps to the frame and opens its card. Renders nothing without a provider or without frames.
+ * jumps to the frame and opens its card. Below the rows, a muted line says why 「修正を依頼」 is
+ * disabled: the agent is busy, or no frame has a comment and the chat input is empty.
+ * Renders nothing without a provider or without frames.
  */
 
 "use client"
@@ -16,8 +18,14 @@ import { ChevronDown, Trash2 } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { useReview } from "@/components/review/ReviewProvider"
 import { MentionText } from "@/components/review/MentionText"
+import { stripWhitespace } from "@/lib/review/schema"
 
-export function ReviewDraftBar() {
+interface ReviewDraftBarProps {
+  /** Whether the chat input is empty (the servers' whitespace set). */
+  inputBlank?: boolean
+}
+
+export function ReviewDraftBar({ inputBlank = false }: ReviewDraftBarProps) {
   const t = useTranslations("review")
   const review = useReview()
   const [open, setOpen] = useState(false)
@@ -25,6 +33,7 @@ export function ReviewDraftBar() {
   const drafts = review.readyDrafts
   if (drafts.length === 0) return null
   const names = new Set(review.drafts.map(d => d.name))
+  const needsText = inputBlank && !drafts.some(d => stripWhitespace(d.text))
 
   const slideLabel = (slug: string) => {
     const i = review.slugs.indexOf(slug)
@@ -93,8 +102,10 @@ export function ReviewDraftBar() {
           })}
         </div>
       )}
-      {review.agentBusy && (
+      {review.agentBusy ? (
         <p className="px-2.5 pb-1.5 text-xs text-foreground-muted">{t("busyHint")}</p>
+      ) : needsText && (
+        <p className="px-2.5 pb-1.5 text-xs text-foreground-muted" data-review-needs-text>{t("needsTextHint")}</p>
       )}
     </div>
   )
