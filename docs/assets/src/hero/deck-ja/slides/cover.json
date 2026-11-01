@@ -1,0 +1,411 @@
+{
+  "layout": "Title Only",
+  "placeholders": {
+    "0": ""
+  },
+  "notes": "Spec-Driven Presentation Maker です。何を伝えるかはあなたが決め、どう見せるかは AI が組み立てます。スライドが領域ごとに組み上がっていく様子も、その場で見られます。",
+  "elements": [
+    {
+      "_comment": "region: title",
+      "x": 96,
+      "y": 292,
+      "w": 880,
+      "h": 440
+    },
+    {
+      "_comment": "region: lead",
+      "x": 96,
+      "y": 770,
+      "w": 860,
+      "h": 130
+    },
+    {
+      "_comment": "region: media",
+      "x": 1000,
+      "y": 334,
+      "w": 824,
+      "h": 500
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 96,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#6095FA",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 144,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#3BC59E",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 192,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#B385FB",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 240,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#EFAC44",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 288,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#DB7CD4",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "textbox",
+      "x": 352,
+      "y": 46,
+      "width": 1200,
+      "height": 42,
+      "text": "{{font=Menlo:AWS-SAMPLES / SAMPLE-SPEC-DRIVEN-PRESENTATION-MAKER}}",
+      "fontSize": 16,
+      "fontColor": "#9AA3B2",
+      "fontFamily": "Menlo",
+      "verticalAlign": "middle",
+      "_comment": "frame: section label",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 96,
+      "y": 292,
+      "width": 880,
+      "height": 440,
+      "text": "{{bold:Spec-Driven}}\n{{bold:Presentation}}\n{{bold:Maker}}",
+      "fontSize": 60,
+      "fontColor": "#EEF0F4",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 96,
+      "y": 770,
+      "width": 860,
+      "height": 130,
+      "text": "伝えたいことを決める。\n{{#EEF0F4:見せ方は AI がつくる。}}",
+      "fontSize": 22,
+      "fontColor": "#9AA3B2",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1000,
+      "y": 334,
+      "width": 824,
+      "height": 500,
+      "fill": "#151922",
+      "adjustments": [
+        0.024
+      ],
+      "line": "#2A303C",
+      "lineWidth": 1
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1040,
+      "y": 390,
+      "width": 744,
+      "height": 92,
+      "fill": "none",
+      "adjustments": [
+        0.0652
+      ],
+      "line": "#6095FA",
+      "lineWidth": 1.5,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1040,
+      "y": 367,
+      "width": 130,
+      "height": 46,
+      "fill": "#6095FA",
+      "adjustments": [
+        0.1304
+      ],
+      "text": "{{bold,font=Menlo:title}}",
+      "fontSize": 16,
+      "fontColor": "#0B0D12",
+      "fontFamily": "Menlo",
+      "align": "center",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 1072,
+      "y": 420,
+      "width": 680,
+      "height": 54,
+      "text": "{{bold:まず内容を固める}}",
+      "fontSize": 24,
+      "fontColor": "#EEF0F4",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1040,
+      "y": 518,
+      "width": 232,
+      "height": 190,
+      "fill": "none",
+      "adjustments": [
+        0.0316
+      ],
+      "line": "#3BC59E",
+      "lineWidth": 1.5,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1296,
+      "y": 518,
+      "width": 232,
+      "height": 190,
+      "fill": "none",
+      "adjustments": [
+        0.0316
+      ],
+      "line": "#B385FB",
+      "lineWidth": 1.5,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1552,
+      "y": 518,
+      "width": 232,
+      "height": 190,
+      "fill": "none",
+      "adjustments": [
+        0.0316
+      ],
+      "line": "#EFAC44",
+      "lineWidth": 1.5,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1040,
+      "y": 495,
+      "width": 149,
+      "height": 46,
+      "fill": "#3BC59E",
+      "adjustments": [
+        0.1304
+      ],
+      "text": "{{bold,font=Menlo:step-1}}",
+      "fontSize": 16,
+      "fontColor": "#0B0D12",
+      "fontFamily": "Menlo",
+      "align": "center",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1296,
+      "y": 495,
+      "width": 149,
+      "height": 46,
+      "fill": "#B385FB",
+      "adjustments": [
+        0.1304
+      ],
+      "text": "{{bold,font=Menlo:step-2}}",
+      "fontSize": 16,
+      "fontColor": "#0B0D12",
+      "fontFamily": "Menlo",
+      "align": "center",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1552,
+      "y": 495,
+      "width": 149,
+      "height": 46,
+      "fill": "#EFAC44",
+      "adjustments": [
+        0.1304
+      ],
+      "text": "{{bold,font=Menlo:step-3}}",
+      "fontSize": 16,
+      "fontColor": "#0B0D12",
+      "fontFamily": "Menlo",
+      "align": "center",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "image",
+      "src": "assets:material/description",
+      "x": 1068,
+      "y": 560,
+      "width": 56,
+      "height": 56,
+      "iconColor": "#3BC59E"
+    },
+    {
+      "type": "textbox",
+      "x": 1068,
+      "y": 620,
+      "width": 190,
+      "height": 44,
+      "text": "{{bold:ブリーフ}}",
+      "fontSize": 22,
+      "fontColor": "#EEF0F4",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1068,
+      "y": 680,
+      "width": 150,
+      "height": 10,
+      "fill": "#2A303C",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "image",
+      "src": "assets:material/palette",
+      "x": 1324,
+      "y": 560,
+      "width": 56,
+      "height": 56,
+      "iconColor": "#B385FB"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1324,
+      "y": 636,
+      "width": 110,
+      "height": 14,
+      "fill": "#2A303C",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "image",
+      "src": "assets:material/arrow_selector_tool-fill",
+      "x": 1444,
+      "y": 620,
+      "width": 44,
+      "height": 44,
+      "iconColor": "#B385FB"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1040,
+      "y": 762,
+      "width": 744,
+      "height": 40,
+      "fill": "none",
+      "adjustments": [
+        0.15
+      ],
+      "line": "#DB7CD4",
+      "lineWidth": 1.5,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1040,
+      "y": 739,
+      "width": 188,
+      "height": 46,
+      "fill": "#DB7CD4",
+      "adjustments": [
+        0.1304
+      ],
+      "text": "{{bold,font=Menlo:takeaway}}",
+      "fontSize": 16,
+      "fontColor": "#0B0D12",
+      "fontFamily": "Menlo",
+      "align": "center",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    }
+  ]
+}

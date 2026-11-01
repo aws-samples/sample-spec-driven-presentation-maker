@@ -1,0 +1,780 @@
+{
+  "layout": "Title Only",
+  "placeholders": {
+    "0": ""
+  },
+  "notes": "たいていのデッキは白紙のスライドから始まります。箱を描いて並べ、また少しずらすうちに、伝えたいことが見えなくなっていきます。ここでは先にメッセージを決め、レイアウトはそこから決まります。",
+  "elements": [
+    {
+      "_comment": "region: before",
+      "x": 96,
+      "y": 350,
+      "w": 760,
+      "h": 500
+    },
+    {
+      "_comment": "region: after",
+      "x": 952,
+      "y": 350,
+      "w": 872,
+      "h": 500
+    },
+    {
+      "_comment": "region: takeaway",
+      "x": 96,
+      "y": 892,
+      "w": 1728,
+      "h": 72
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 96,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#6095FA",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 144,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#3BC59E",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 192,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#B385FB",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 240,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#EFAC44",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 288,
+      "y": 64,
+      "width": 40,
+      "height": 6,
+      "fill": "#DB7CD4",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "textbox",
+      "x": 352,
+      "y": 46,
+      "width": 1200,
+      "height": 42,
+      "text": "{{font=Menlo:02 · }}課題",
+      "fontSize": 16,
+      "fontColor": "#9AA3B2",
+      "fontFamily": "Menlo",
+      "verticalAlign": "middle",
+      "_comment": "frame: section label",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 96,
+      "y": 104,
+      "width": 1500,
+      "height": 192,
+      "text": "{{bold:白紙のスライドから始めない}}",
+      "fontSize": 40,
+      "fontColor": "#EEF0F4",
+      "verticalAlign": "top",
+      "_comment": "frame: title",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 96,
+      "y": 350,
+      "width": 760,
+      "height": 500,
+      "fill": "#151922",
+      "adjustments": [
+        0.024
+      ],
+      "line": "#2A303C",
+      "lineWidth": 1
+    },
+    {
+      "type": "textbox",
+      "x": 136,
+      "y": 424,
+      "width": 400,
+      "height": 32,
+      "text": "白紙から",
+      "fontSize": 16,
+      "fontColor": "#9AA3B2",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0,
+      "fontFamily": "Menlo"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 136,
+      "y": 470,
+      "width": 680,
+      "height": 352,
+      "fill": "#0B0D12",
+      "line": "#2A303C",
+      "lineWidth": 1
+    },
+    {
+      "type": "line",
+      "x1": 136,
+      "y1": 620,
+      "x2": 816,
+      "y2": 620,
+      "color": "#4A5262",
+      "lineWidth": 1,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "line",
+      "x1": 508,
+      "y1": 470,
+      "x2": 508,
+      "y2": 822,
+      "color": "#4A5262",
+      "lineWidth": 1,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 184,
+      "y": 514,
+      "width": 300,
+      "height": 34,
+      "fill": "#2A303C",
+      "adjustments": [
+        0.1176
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 184,
+      "y": 656,
+      "width": 236,
+      "height": 140,
+      "fill": "#2A303C",
+      "adjustments": [
+        0.0429
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 538,
+      "y": 676,
+      "width": 216,
+      "height": 120,
+      "fill": "#2A303C",
+      "adjustments": [
+        0.05
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 528,
+      "y": 540,
+      "width": 196,
+      "height": 96,
+      "fill": "none",
+      "line": "#9AA3B2",
+      "lineWidth": 1,
+      "dashStyle": "dash"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 522,
+      "y": 534,
+      "width": 12,
+      "height": 12,
+      "fill": "#9AA3B2"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 718,
+      "y": 534,
+      "width": 12,
+      "height": 12,
+      "fill": "#9AA3B2"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 522,
+      "y": 630,
+      "width": 12,
+      "height": 12,
+      "fill": "#9AA3B2"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 718,
+      "y": 630,
+      "width": 12,
+      "height": 12,
+      "fill": "#9AA3B2"
+    },
+    {
+      "type": "image",
+      "src": "assets:material/open_with",
+      "x": 602,
+      "y": 564,
+      "width": 48,
+      "height": 48,
+      "iconColor": "#9AA3B2"
+    },
+    {
+      "type": "image",
+      "src": "assets:material/arrow_selector_tool-fill",
+      "x": 712,
+      "y": 632,
+      "width": 52,
+      "height": 52,
+      "iconColor": "#EEF0F4"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 96,
+      "y": 350,
+      "width": 760,
+      "height": 500,
+      "fill": "#0B0D12",
+      "adjustments": [
+        0.024
+      ],
+      "opacity": 0.55
+    },
+    {
+      "type": "textbox",
+      "x": 136,
+      "y": 368,
+      "width": 400,
+      "height": 44,
+      "text": "{{bold:BEFORE}}",
+      "fontSize": 24,
+      "fontColor": "#9AA3B2",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 952,
+      "y": 350,
+      "width": 872,
+      "height": 500,
+      "fill": "#151922",
+      "adjustments": [
+        0.024
+      ],
+      "line": "#6095FA",
+      "lineWidth": 1.5
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 964,
+      "y": 350,
+      "width": 848,
+      "height": 6,
+      "fill": "#6095FA"
+    },
+    {
+      "type": "textbox",
+      "x": 992,
+      "y": 368,
+      "width": 400,
+      "height": 44,
+      "text": "{{bold:AFTER}}",
+      "fontSize": 24,
+      "fontColor": "#6095FA",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 992,
+      "y": 424,
+      "width": 400,
+      "height": 32,
+      "text": "スペックから",
+      "fontSize": 16,
+      "fontColor": "#6095FA",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0,
+      "fontFamily": "Menlo"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 992,
+      "y": 476,
+      "width": 376,
+      "height": 92,
+      "fill": "#0B0D12",
+      "adjustments": [
+        0.1087
+      ],
+      "line": "#2A303C",
+      "lineWidth": 1
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 992,
+      "y": 490,
+      "width": 6,
+      "height": 64,
+      "fill": "#6095FA"
+    },
+    {
+      "type": "image",
+      "src": "assets:material/description",
+      "x": 1016,
+      "y": 498,
+      "width": 48,
+      "height": 48,
+      "iconColor": "#6095FA"
+    },
+    {
+      "type": "textbox",
+      "x": 1078,
+      "y": 496,
+      "width": 280,
+      "height": 52,
+      "text": "{{bold:ブリーフ}}",
+      "fontSize": 22,
+      "fontColor": "#EEF0F4",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 992,
+      "y": 592,
+      "width": 376,
+      "height": 92,
+      "fill": "#0B0D12",
+      "adjustments": [
+        0.1087
+      ],
+      "line": "#2A303C",
+      "lineWidth": 1
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 992,
+      "y": 606,
+      "width": 6,
+      "height": 64,
+      "fill": "#3BC59E"
+    },
+    {
+      "type": "image",
+      "src": "assets:material/palette",
+      "x": 1016,
+      "y": 614,
+      "width": 48,
+      "height": 48,
+      "iconColor": "#3BC59E"
+    },
+    {
+      "type": "textbox",
+      "x": 1078,
+      "y": 612,
+      "width": 280,
+      "height": 52,
+      "text": "{{bold:スタイル}}",
+      "fontSize": 22,
+      "fontColor": "#EEF0F4",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 992,
+      "y": 708,
+      "width": 376,
+      "height": 92,
+      "fill": "#0B0D12",
+      "adjustments": [
+        0.1087
+      ],
+      "line": "#2A303C",
+      "lineWidth": 1
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 992,
+      "y": 722,
+      "width": 6,
+      "height": 64,
+      "fill": "#B385FB"
+    },
+    {
+      "type": "image",
+      "src": "assets:material/format_list_numbered",
+      "x": 1016,
+      "y": 730,
+      "width": 48,
+      "height": 48,
+      "iconColor": "#B385FB"
+    },
+    {
+      "type": "textbox",
+      "x": 1078,
+      "y": 728,
+      "width": 280,
+      "height": 52,
+      "text": "{{bold:アウトライン}}",
+      "fontSize": 22,
+      "fontColor": "#EEF0F4",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "line",
+      "x1": 1380,
+      "y1": 650,
+      "x2": 1420,
+      "y2": 650,
+      "color": "#9AA3B2",
+      "lineWidth": 1.5,
+      "arrowEnd": "triangle"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1432,
+      "y": 546,
+      "width": 352,
+      "height": 198,
+      "fill": "#0B0D12",
+      "adjustments": [
+        0.0303
+      ],
+      "line": "#2A303C",
+      "lineWidth": 1
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 1450,
+      "y": 564,
+      "width": 11,
+      "height": 3,
+      "fill": "#6095FA"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 1464,
+      "y": 564,
+      "width": 11,
+      "height": 3,
+      "fill": "#3BC59E"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 1478,
+      "y": 564,
+      "width": 11,
+      "height": 3,
+      "fill": "#B385FB"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 1492,
+      "y": 564,
+      "width": 11,
+      "height": 3,
+      "fill": "#EFAC44"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 1506,
+      "y": 564,
+      "width": 11,
+      "height": 3,
+      "fill": "#DB7CD4"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1450,
+      "y": 580,
+      "width": 200,
+      "height": 14,
+      "fill": "#EEF0F4",
+      "adjustments": [
+        0.2143
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1450,
+      "y": 618,
+      "width": 100,
+      "height": 100,
+      "fill": "#151922",
+      "adjustments": [
+        0.04
+      ],
+      "line": "#2A303C",
+      "lineWidth": 0.75
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 1456,
+      "y": 618,
+      "width": 88,
+      "height": 3,
+      "fill": "#6095FA"
+    },
+    {
+      "type": "image",
+      "src": "assets:material/description",
+      "x": 1462,
+      "y": 632,
+      "width": 28,
+      "height": 28,
+      "iconColor": "#6095FA"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1462,
+      "y": 674,
+      "width": 64,
+      "height": 6,
+      "fill": "#9AA3B2",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1462,
+      "y": 690,
+      "width": 48,
+      "height": 6,
+      "fill": "#2A303C",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1558,
+      "y": 618,
+      "width": 100,
+      "height": 100,
+      "fill": "#151922",
+      "adjustments": [
+        0.04
+      ],
+      "line": "#2A303C",
+      "lineWidth": 0.75
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 1564,
+      "y": 618,
+      "width": 88,
+      "height": 3,
+      "fill": "#3BC59E"
+    },
+    {
+      "type": "image",
+      "src": "assets:material/palette",
+      "x": 1570,
+      "y": 632,
+      "width": 28,
+      "height": 28,
+      "iconColor": "#3BC59E"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1570,
+      "y": 674,
+      "width": 64,
+      "height": 6,
+      "fill": "#9AA3B2",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1570,
+      "y": 690,
+      "width": 48,
+      "height": 6,
+      "fill": "#2A303C",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1666,
+      "y": 618,
+      "width": 100,
+      "height": 100,
+      "fill": "#151922",
+      "adjustments": [
+        0.04
+      ],
+      "line": "#2A303C",
+      "lineWidth": 0.75
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 1672,
+      "y": 618,
+      "width": 88,
+      "height": 3,
+      "fill": "#B385FB"
+    },
+    {
+      "type": "image",
+      "src": "assets:material/format_list_numbered",
+      "x": 1678,
+      "y": 632,
+      "width": 28,
+      "height": 28,
+      "iconColor": "#B385FB"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1678,
+      "y": 674,
+      "width": 64,
+      "height": 6,
+      "fill": "#9AA3B2",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1678,
+      "y": 690,
+      "width": 48,
+      "height": 6,
+      "fill": "#2A303C",
+      "adjustments": [
+        0.5
+      ]
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 96,
+      "y": 900,
+      "width": 6,
+      "height": 56,
+      "fill": "#6095FA"
+    },
+    {
+      "type": "textbox",
+      "x": 128,
+      "y": 892,
+      "width": 1696,
+      "height": 72,
+      "text": "先にメッセージを決めれば、レイアウトはついてくる。",
+      "fontSize": 22,
+      "fontColor": "#EEF0F4",
+      "align": "left",
+      "verticalAlign": "middle",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    }
+  ]
+}
