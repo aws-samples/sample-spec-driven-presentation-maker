@@ -21,7 +21,7 @@ import sys
 import time
 from contextvars import ContextVar
 from pathlib import Path
-from typing import Annotated, Literal
+from typing import Annotated, Any, Literal
 
 # Add sdpm/ (skill root) to sys.path so the engine is importable
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "sdpm"))
@@ -603,7 +603,7 @@ def read_attachment(
     source: Annotated[str, Field(description='S3 key from the [Attached:...] marker (uploads/{userId}/{uuid}/{name}), or an https:// URL.')],
     offset: Annotated[int, Field(description='UTF-8 byte offset into the text to start from.')] = 0,
     limit: Annotated[int, Field(description='Max bytes returned, 512–10240.')] = 10240,
-) -> str:
+) -> dict[str, Any]:
     """Read a user-supplied file or URL as paged, line-numbered text — PDF, DOCX, XLSX, PPTX,
     text, CSV, HTML, JSON — or the image itself. Pure read, nothing is stored; works before
     a deck exists. Formats and paging: read_guides(["attachments"]).
