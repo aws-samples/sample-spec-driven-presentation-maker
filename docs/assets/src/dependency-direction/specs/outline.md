@@ -1,0 +1,1 @@
+- [dependency-direction] Dependency direction: imports point inward, network calls connect the AWS parts

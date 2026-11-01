@@ -89,7 +89,7 @@ and create new styles with AI in the Web UI or by asking your agent. See
 | **The Web UI on your computer** | A chat app in your browser, with the spec, the slides and comments side by side. Runs locally, no AWS account. | The installer adds Node.js 20+ and Kiro CLI, which runs the agent | [Quick Start](#quick-start), then `sdpm webui` |
 | **A team server on AWS** | The Web UI and the MCP server deployed in your AWS account, with sign-in through Amazon Cognito. | An AWS account. No local tools for One-Click Deploy | [One-Click Deploy](#one-click-deploy-on-aws) |
 
-![The Web UI deck page: the chat with a change request and the agent's reply on the left, the slides on the right](docs/assets/screenshots/webui-deck.png)
+![The Web UI deck page: the slides on the left, the chat with a change request and the agent's reply on the right](docs/assets/screenshots/webui-deck.png)
 
 ### One-Click Deploy on AWS
 

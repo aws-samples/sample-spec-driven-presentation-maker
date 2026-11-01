@@ -5,7 +5,7 @@
 Spec-Driven Presentation Maker の Layer 4 Web UI コンポーネント。
 チャットベースの対話でプレゼンテーションの設計・生成・プレビューを行う React アプリケーション。
 
-![チャット画面](readme-imgs/fast-chat-screenshot.png)
+![デッキ画面。左にスライド、右にチャット（修正依頼とエージェントの返答）](../docs/assets/screenshots/webui-deck.png)
 
 ---
 

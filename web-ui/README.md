@@ -5,7 +5,7 @@
 Layer 4 Web UI for [Spec-Driven Presentation Maker](../README.md).
 A React-based chat interface for creating presentations through conversational AI — design your spec, then let the agent build the slides.
 
-![Chat UI](readme-imgs/fast-chat-screenshot.png)
+![The deck page: the slides on the left, the chat with a change request and the agent's reply on the right](../docs/assets/screenshots/webui-deck.png)
 
 ---
 
