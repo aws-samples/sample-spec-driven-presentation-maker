@@ -2178,6 +2178,20 @@ def press_target(
             "matchedTitle": before.matched_title,
             "steps": before.as_dicts(),
         }
+        # **Do not re-select the shape here.** It was tried, to stop the value
+        # press adding a second effect instead of editing the first, and it
+        # breaks the route outright: selecting the shape in the Selection Pane
+        # deselects its *effect*, so ``Effect Options`` goes disabled again and
+        # the next step times out waiting for a window that cannot open. The
+        # two states are exclusive — shape selected, or effect selected — and
+        # the tile press is what leaves the effect selected.
+        #
+        # So the value press adding an effect is the application's behaviour and
+        # not a selection bug: a tile press writes the tile's default, and a
+        # press inside the window writes a **second** effect carrying the value.
+        # Measured: 2 effects on the shape (``by`` 150000 and 400000) against 1
+        # for a tile-only control run. :func:`attribute_batch` is what has to
+        # account for that, by telling the default apart from the value.
         ensure_tab(backend, target["guiPath"], timeout=timeout)
     result = press_path(
         backend,
