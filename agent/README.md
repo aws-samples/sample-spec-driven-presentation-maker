@@ -153,7 +153,7 @@ agent/
 ├── basic_agent.py          # Main agent (entrypoint)
 ├── tools/
 │   └── web_tools.py        # web_fetch
-├── requirements.txt
+├── pyproject.toml          # dependencies (locked in the root uv.lock)
 ├── Dockerfile
 └── __init__.py
 ```

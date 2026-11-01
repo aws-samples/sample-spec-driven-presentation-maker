@@ -39,6 +39,28 @@ Entries before v0.5.0 were written retroactively as summaries.
   live once in `shared/review_template.json`. `get_deck` now returns `slideSize` for PPTX
   decks too, and the cloud sandbox syncs `reviews/`.
 
+### Changed
+
+- **One Python lock for everything.** The repository root is now a uv workspace (`sdpm`,
+  `servers/local`, `servers/remote`, `agent`, `api`) with a single `uv.lock`. The MCP Runtime
+  and Agent Runtime images and the API Lambda bundle install exactly the locked versions,
+  hash-checked, and never resolve dependencies at build time. The tests run against the same
+  lock. Removed: `sdpm/uv.lock`, `servers/local/uv.lock`, `servers/remote/constraints.txt`,
+  `agent/requirements.txt`, `agent/requirements.lock`, `api/requirements.txt`. To change a
+  dependency, edit the member's `pyproject.toml` and run `make lock` (`uv lock`).
+  - **Local installs:** `sdpm update` keeps working unchanged. The MCP server's environment
+    moves from `~/.sdpm/checkout/servers/local/.venv` to `~/.sdpm/checkout/.venv`. You can
+    delete the old `servers/local/.venv` and `sdpm/.venv` directories in the checkout.
+  - **AWS deploys:** the Agent Runtime image now builds from the repository root (both images
+    share the root `.dockerignore`, now an allowlist). The API Lambda bundle targets
+    `manylinux_2_34` (the python3.13 runtime's Amazon Linux 2023) and is built by
+    `scripts/bundle_api_lambda.sh`.
+- **CI builds and starts what a deploy ships.** Both runtime images are built on linux/arm64
+  and started (MCP `initialize` + `tools/list`, Agent `/ping`), and the API Lambda bundle is
+  imported in the Lambda runtime image. This replaces the `container-deps` dry runs. The
+  Python tests run on 3.13, the version the images ship, and the local smoke test runs on
+  3.11, the oldest supported version, with only the local server's dependencies.
+
 ### Security
 
 - **Local Web UI refuses cross-site POSTs.** Every POST route of the local server (`sdpm webui`,
