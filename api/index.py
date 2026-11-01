@@ -1336,6 +1336,18 @@ def _slide_slugs(deck_id: str) -> set:
     return slugs
 
 
+def _delete_reviews(deck_id: str) -> None:
+    """Delete every object under the deck's reviews/ (a review file is used once)."""
+    paginator = s3_client.get_paginator("list_objects_v2")
+    keys = [
+        obj["Key"]
+        for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/reviews/")
+        for obj in page.get("Contents", [])
+    ]
+    for key in keys:
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
+
+
 def _object_exists(key: str) -> bool:
     try:
         s3_client.head_object(Bucket=BUCKET_NAME, Key=key)
@@ -1348,8 +1360,10 @@ def _object_exists(key: str) -> bool:
 def create_review(deck_id: str) -> Any:
     """Create a change request from the Web UI comment tool.
 
-    Writes ``reviews/<id>.json`` (what was sent plus the composers' guide; nobody rewrites it)
-    and returns the chat message the Web UI sends to the orchestrator. The server picks the
+    Replaces the deck's review file: deletes everything under ``reviews/`` (the file is a
+    disposable hand-off, and the Web UI only sends while the agent is idle), then writes
+    ``reviews/<id>.json`` (what was sent plus the composers' guide; nobody rewrites it) and
+    returns the chat message the Web UI sends to the orchestrator. The server picks the
     id and takes slide_size from deck.json; the client sends only
     ``{note, comments: [{name, slide, rect, text}]}``. Owners and collaborators may write
     (same permission as editing slides).
@@ -1379,6 +1393,7 @@ def create_review(deck_id: str) -> Any:
     if error:
         return {"error": error}, 400
 
+    _delete_reviews(deck_id)
     for _ in range(3):
         review_id = new_review_id(datetime.now(timezone.utc))
         key = _review_key(deck_id, review_id)

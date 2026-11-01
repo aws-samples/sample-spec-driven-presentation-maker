@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * Local change request route: POST validates, writes `reviews/<id>.json` and returns the chat
- * message; cross-site requests, unknown decks and bad bodies are refused before any write.
+ * message, replacing the deck's previous review files; cross-site requests, unknown decks and
+ * bad bodies are refused before any write or delete.
  */
 
 import fs from "fs"
@@ -77,14 +78,26 @@ describe("POST /api/decks/[id]/reviews", () => {
     expect(parseReviewMessage(message)).toEqual({ id, note: "全体的に", comments: stored.comments })
   })
 
+  it("replaces the previous review files, so one file is left", async () => {
+    write("d1/reviews/20261031-090000-aaaa.json", "{}")
+    write("d1/reviews/notes.txt", "x")
+    write("d2/reviews/20261031-090000-cccc.json", "{}")
+    await post("d1", { comments: [comment()] })
+    const res = await post("d1", { comments: [comment({ text: "二回目" })] })
+    const { id } = await res.json()
+    expect(reviewFiles()).toEqual([`${id}.json`])
+    expect(fs.readdirSync(path.join(root, "d2", "reviews"))).toEqual(["20261031-090000-cccc.json"])
+  })
+
   it.each([
     ["unknown slug", { comments: [comment({ slide: "missing" })] }],
     ["rect overflow", { comments: [comment({ rect: [1000, 0, 400, 100] })] }],
     ["101 comments", { comments: Array.from({ length: 101 }, (_, i) => comment({ name: String.fromCharCode(65 + (i % 26)).repeat(1 + Math.floor(i / 26)) })) }],
-  ])("rejects %s with 400", async (_name, body) => {
-    const before = reviewFiles().length
+  ])("rejects %s with 400 and keeps the previous file", async (_name, body) => {
+    const before = reviewFiles()
+    expect(before.length).toBeGreaterThan(0)
     expect((await post("d1", body)).status).toBe(400)
-    expect(reviewFiles().length).toBe(before)
+    expect(reviewFiles()).toEqual(before)
   })
 
   it("rejects invalid JSON with 400", async () => {
@@ -96,10 +109,10 @@ describe("POST /api/decks/[id]/reviews", () => {
   })
 
   it("refuses a cross-site origin with 403", async () => {
-    const before = reviewFiles().length
+    const before = reviewFiles()
     expect((await post("d1", { comments: [comment()] }, { origin: "http://evil.example" })).status).toBe(403)
     expect((await post("d1", { comments: [comment()] }, { origin: "null" })).status).toBe(403)
-    expect(reviewFiles().length).toBe(before)
+    expect(reviewFiles()).toEqual(before)
   })
 
   it("refuses a non-JSON content type with 415", async () => {

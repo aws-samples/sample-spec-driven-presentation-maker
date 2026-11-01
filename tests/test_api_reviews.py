@@ -102,6 +102,14 @@ class _FakeS3:
         self.calls.append("list_objects_v2")
         return {"Contents": [{"Key": k} for k in sorted(self.objects) if k.startswith(Prefix)]}
 
+    def get_paginator(self, op):
+        assert op == "list_objects_v2"
+        return types.SimpleNamespace(paginate=lambda Bucket, Prefix: [self.list_objects_v2(Bucket, Prefix)])
+
+    def delete_object(self, Bucket, Key):
+        self.calls.append("delete_object")
+        self.objects.pop(Key, None)
+
     def generate_presigned_url(self, op, Params, ExpiresIn):
         return f"https://app-origin.example/{Params['Key']}"
 
@@ -225,14 +233,42 @@ def test_create_rejects_oversize_body(monkeypatch, index):
     assert status == 413 and s3.puts == []
 
 
-def test_create_regenerates_an_existing_id(monkeypatch, index):
+def test_create_regenerates_an_id_taken_meanwhile(monkeypatch, index):
+    """An id written by a concurrent POST after the old files were deleted is not reused."""
     _, s3 = _setup(monkeypatch, index, body=_submission())
     ids = iter(["20261101-102000-aaaa", "20261101-102000-bbbb"])
     monkeypatch.setattr(index, "new_review_id", lambda now: next(ids))
-    s3.objects["decks/d1/reviews/20261101-102000-aaaa.json"] = b"{}"
+    taken = "decks/d1/reviews/20261101-102000-aaaa.json"
+    head = s3.head_object
+    monkeypatch.setattr(s3, "head_object", lambda Bucket, Key: {} if Key == taken else head(Bucket, Key))
     result = index.create_review("d1")
     assert result["id"] == "20261101-102000-bbbb"
-    assert s3.objects["decks/d1/reviews/20261101-102000-aaaa.json"] == b"{}"
+    assert [p["Key"] for p in s3.puts] == ["decks/d1/reviews/20261101-102000-bbbb.json"]
+
+
+def test_create_replaces_the_previous_review_files(monkeypatch, index):
+    old = {
+        "decks/d1/reviews/20261031-090000-aaaa.json": b"{}",
+        "decks/d1/reviews/20261031-100000-bbbb.json": b"{}",
+        "decks/d1/reviews/notes.txt": b"x",
+    }
+    other_deck = "decks/d2/reviews/20261031-090000-cccc.json"
+    _, s3 = _setup(monkeypatch, index, objects={**_DECK_OBJECTS, **old, other_deck: b"{}"}, body=_submission())
+    index.create_review("d1")
+    second = index.create_review("d1")["id"]
+    reviews = sorted(k for k in s3.objects if k.startswith("decks/d1/reviews/"))
+    assert reviews == [f"decks/d1/reviews/{second}.json"]
+    assert len(s3.puts) == 2
+    assert other_deck in s3.objects
+    assert all(k in s3.objects for k in _DECK_OBJECTS)
+
+
+def test_create_keeps_the_previous_file_when_the_submission_is_invalid(monkeypatch, index):
+    previous = "decks/d1/reviews/20261031-090000-aaaa.json"
+    _, s3 = _setup(monkeypatch, index, objects={**_DECK_OBJECTS, previous: b"{}"}, body=_submission(comments=[]))
+    _, status = index.create_review("d1")
+    assert status == 400
+    assert previous in s3.objects and "delete_object" not in s3.calls
 
 
 # --- get_deck slideSize ------------------------------------------------------

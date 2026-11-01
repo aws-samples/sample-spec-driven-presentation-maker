@@ -1,9 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Local change request API — writes `reviews/<id>.json` for a deck on the filesystem and
- * returns the chat message the Web UI sends. Local mode only. Mirrors the cloud Lambda
- * `POST /decks/{id}/reviews`.
+ * Local change request API — replaces the deck's review file on the filesystem (deletes the
+ * files under `reviews/`, writes `reviews/<id>.json`) and returns the chat message the Web UI
+ * sends. The file is a disposable hand-off and the Web UI only sends while the agent is idle,
+ * so at most one exists. Local mode only. Mirrors the cloud Lambda `POST /decks/{id}/reviews`.
  */
 
 import fs from "fs"
@@ -53,6 +54,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   const template = loadReviewTemplate()
   const reviewsDir = path.join(dp, "reviews") // nosemgrep: path-join-resolve-traversal — dp validated by resolveDeckDir
   fs.mkdirSync(reviewsDir, { recursive: true })
+  for (const entry of fs.readdirSync(reviewsDir, { withFileTypes: true })) {
+    if (!entry.isDirectory()) fs.unlinkSync(path.join(reviewsDir, entry.name)) // nosemgrep: path-join-resolve-traversal — entry name from readdir of a validated dir
+  }
   for (let attempt = 0; attempt < 3; attempt++) {
     const reviewId = newReviewId(new Date())
     const file = buildReviewFile(reviewId, size, result.value, template)
