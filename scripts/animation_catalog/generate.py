@@ -3705,6 +3705,48 @@ def parse_gui_capture_package(package: Path) -> dict[str, dict[str, Any]]:
     return by_spid
 
 
+def parse_gui_capture_package_all(package: Path) -> dict[str, list[dict[str, Any]]]:
+    """Return **every** preset effect per target spid, not one.
+
+    :func:`parse_gui_capture_package` keeps one effect per spid, which is right
+    for a capture where each shape carries one. The effect-options capture is
+    not that: each shape carries **two** — the tile's default and a second one
+    holding the pressed value — so resolving them needs both, and the ordering
+    inside a spid is document order.
+    """
+    from lxml import etree
+
+    parser = etree.XMLParser(resolve_entities=False, load_dtd=False, no_network=True)
+    by_spid: dict[str, list[dict[str, Any]]] = {}
+    with zipfile.ZipFile(package) as archive:
+        for name in sorted(archive.namelist()):
+            if not ORACLE_SLIDE_PART.fullmatch(name):
+                continue
+            root = etree.fromstring(archive.read(name), parser=parser)
+            for element in root.iter():
+                if _oracle_local(element) != "cTn" or element.get("presetID") is None:
+                    continue
+                spids = sorted({
+                    target.get("spid")
+                    for target in element.iter()
+                    if _oracle_local(target) == "spTgt" and target.get("spid")
+                })
+                if len(spids) != 1:
+                    continue
+                attributes = _oracle_attributes(element)
+                attributes.pop("id", None)
+                by_spid.setdefault(spids[0], []).append(
+                    {
+                        "part": name,
+                        "attributes": attributes,
+                        "spids": spids,
+                        "iterate": _effect_iterate(element),
+                        "behaviors": effect_behaviors(element),
+                    }
+                )
+    return by_spid
+
+
 def merge_gui_capture(records: list[dict[str, Any]],
                       effects: dict[str, dict[str, Any]]) -> dict[str, Any]:
     """Join the driver's read-back with the effects its saved package holds.
