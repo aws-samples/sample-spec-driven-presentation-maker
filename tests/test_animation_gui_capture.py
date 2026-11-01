@@ -272,6 +272,7 @@ class FakeNode:
         selected: bool = False,
         children: list[FakeNode] | None = None,
         rows: list[FakeNode] | None = None,
+        index: int | None = None,
         on_press: Callable[[], None] | None = None,
         on_set_selected: Callable[[bool], None] | None = None,
         press_error: str | None = None,
@@ -285,6 +286,7 @@ class FakeNode:
         self._selected = selected
         self._children = children if children is not None else []
         self._rows = rows
+        self._index = index
         self.on_press = on_press
         self.on_set_selected = on_set_selected
         self.press_error = press_error
@@ -293,14 +295,26 @@ class FakeNode:
 
     @property
     def rows(self) -> list[FakeNode] | None:
-        """``AXRows``, which an outline publishes in full. None for anything else.
+        """``AXRows``, which an outline publishes more of than ``AXChildren``. None else.
 
         The asymmetry with ``children`` is the point: live, ``AXRows`` was 152 and
         ``AXVisibleRows`` 24, and reading children instead is what had the driver report
-        "the pane shows 62 names" and fail 26 targets looking for rows that existed.
+        "the pane shows 62 names" and fail 26 targets looking for rows that existed. It
+        is not all of them either — see ``published_row_count``.
         """
         self.counter.read()
         return self._rows
+
+    @property
+    def index(self) -> int | None:
+        """``AXIndex``: the row's own position in its outline, as it reports it.
+
+        This is what identifies a row when the pane publishes only some of them, and
+        every live row published one: 0, 1, 76 and 151 at those offsets. ``None`` for an
+        element that does not publish it, which is everything but a row.
+        """
+        self.counter.read()
+        return self._index
 
     @property
     def role(self) -> str:
@@ -397,6 +411,8 @@ class FakePowerPoint:
         duplicate_row: str | None = None,
         visible_row_count: int | None = None,
         named_row_count: int | None = None,
+        published_row_count: int | None = None,
+        partial_reads: int | None = None,
         selection_pane_open: bool = False,
         active_tab: str = driver.RIBBON_ANCHOR_TAB,
         decoy_windows: int = 4,
@@ -410,9 +426,15 @@ class FakePowerPoint:
         #: the driver asked for never reads back selected. This is the Selection Pane's
         #: analogue of the click that left the shape unselected.
         self.selection_sticks = selection_sticks
-        #: Rows the pane does not publish, by shape name.
+        #: Rows the pane does not publish, by shape name. Removing one **renumbers**
+        #: every row below it, exactly as the live outline's ``AXIndex`` would.
         self.missing_rows = set(missing_rows)
+        #: A name the pane publishes one extra row for, at the end of pane order.
         self.duplicate_row = duplicate_row
+        #: An index two published rows both claim as their own ``AXIndex``. The live pane
+        #: never did this; the driver refuses rather than picking, because selecting one
+        #: row of two would apply the value to a shape of two.
+        self.duplicate_index: int | None = None
         #: ``selected row -> shape the press actually animates``. The pane reports the
         #: row the driver selected, and PowerPoint applies the effect elsewhere. With a
         #: read-back-confirmed row selection this is the ONLY way the wrong shape can
@@ -437,6 +459,16 @@ class FakePowerPoint:
         #: present and selectable throughout. A row with no name is still a row and is
         #: still selectable here, which is what makes addressing one by index work.
         self.named_row_count = named_row_count
+        #: How many rows ``AXRows`` itself publishes, as a prefix. ``None`` means all of
+        #: them. This is the state that refused 7 targets: the pane published 43, 54, 61,
+        #: 63, 74, 88 and 91 rows of 152 on consecutive reads during one run, so neither
+        #: the count nor an offset into it says anything and a row is found by its own
+        #: ``AXIndex``.
+        self.published_row_count = published_row_count
+        #: How many reads keep ``published_row_count`` before the pane publishes all its
+        #: rows. ``None`` means forever. A small number models a pane that fills in,
+        #: which is what the driver retries for.
+        self.partial_reads = partial_reads
         self.selection_pane_open = selection_pane_open
         self.active_tab = active_tab
         #: How many same-titled windows PowerPoint publishes that are NOT the document.
@@ -639,12 +671,14 @@ class FakePowerPoint:
             for index, name in enumerate(names)
         ]
 
-        def row(name: str, label: str | None) -> FakeNode:
+        def row(position: int, name: str, label: str | None) -> FakeNode:
             # Selection is keyed on the row's own shape, named or not: a row with no
             # readable label still selects its shape, which is the whole reason a row can
-            # be addressed by index.
+            # be addressed by index. The index is the row's own ``AXIndex``, so it stays
+            # correct in a read that publishes only some of the rows.
             return self._node(
                 role=driver.SELECTION_ROW_ROLE,
+                index=position,
                 selected=name == self.selected_name,
                 on_set_selected=(
                     lambda selected, name=name: self._set_row_selected(name, selected)
@@ -661,13 +695,37 @@ class FakePowerPoint:
         # the driver report "the pane shows 62 names", then 47, and fail 26 targets
         # looking for a row that was there the whole time. The fake reproduces the
         # asymmetry so that regression cannot come back unnoticed.
-        rows = list(zip(names, labels))
-        visible = rows if self.visible_row_count is None else rows[: self.visible_row_count]
+        rows = [
+            (self.duplicate_index if self.duplicate_index is not None and position == 0 else position, pair)
+            for position, pair in enumerate(zip(names, labels))
+        ]
+        published = rows[: self._publication_limit()]
+        visible = (
+            published if self.visible_row_count is None else published[: self.visible_row_count]
+        )
         return self._node(
             role=driver.SELECTION_PANE_ROLE,
-            children=[row(name, label) for name, label in visible],
-            rows=[row(name, label) for name, label in rows],
+            children=[row(position, name, label) for position, (name, label) in visible],
+            rows=[row(position, name, label) for position, (name, label) in published],
         )
+
+    def _publication_limit(self) -> int | None:
+        """How many rows ``AXRows`` publishes on this read, or None for all of them.
+
+        The live pane publishes a **prefix** that changes between reads: 43, 54, 61, 63,
+        74, 88 then 91 rows of 152 on consecutive reads during one run, because it
+        rebuilds while the application works. ``partial_reads`` spends that state after a
+        given number of reads, so a test can have the pane fill in — which is what the
+        driver's retry is for — rather than only model a pane that never does.
+        """
+        if self.published_row_count is None:
+            return None
+        if self.partial_reads is None:
+            return self.published_row_count
+        if self.partial_reads <= 0:
+            return None
+        self.partial_reads -= 1
+        return self.published_row_count
 
     def _document_window(self) -> FakeNode:
         children = [self._toolbar(), self._ribbon()]
@@ -1489,44 +1547,67 @@ class TestFailureRecording:
         assert session["fake"].presses == []
         assert session["fake"].selections, "the driver did try to select each row"
 
-    def test_a_pane_missing_one_row_rejects_every_target_and_presses_nothing(self, session):
-        """One missing row invalidates every index, so the whole run is recorded failed.
+    def test_a_renumbered_pane_fails_rather_than_pressing_the_wrong_shape(self, session):
+        """A pane missing one row renumbers the rest, and the name check catches it.
 
-        A press with the wrong shape selected is worse than a failure, because the value
-        is applied and the record names the intended target. Since a row index is derived
-        from the slide's shape order, a pane that is short one row shifts every index past
-        it — so no target can be selected and none is pressed.
+        This is the failure the name is still kept for. A row index comes from the
+        slide's shape order, so a pane short one row has every row below it renumbered:
+        the row at a target's index is then a **different shape**. Selecting it and
+        pressing would apply the value to that shape under this target's key, which no
+        later gate can undo — so the row's own published name is compared against the
+        name expected at that index, and a mismatch is a refusal.
 
-        This is the cost of addressing rows by index rather than by name, and it is paid
-        deliberately: by name, only the missing row's own target failed here.
+        What is asserted is the property, not a count: no press ever lands on a shape
+        other than the one its target names, and every captured record is attributed.
         """
         fake = session["fake"]
         targets = session["plan"]["targets"]
         fake.missing_rows = {targets[1]["shapeName"]}
         summary = driver.run_capture(session["plan"], session["settings"], fake, version="16.113.1")
-        assert (summary["captured"], summary["failed"]) == (0, len(targets))
+        assert summary["failed"] >= 1, "a renumbered pane cannot serve every target"
         for failure in summary["failures"]:
             assert failure["error"]["kind"] == "controlNotFound"
-            assert "rows" in failure["error"]["message"]
-            assert failure["selectionRow"] is None
-            assert failure["selectionRowIndex"] is None
-        assert fake.presses == [], "nothing was pressed on any shape"
+            message = failure["error"]["message"]
+            # Either the row at that index publishes another shape's name, or — for a
+            # target near the end of the pane — the index is now past the last row.
+            assert "rather than" in message or "never published" in message
+        records = [
+            record
+            for record in driver.read_records(session["settings"].readback_path)
+            if record.get("record") == driver.RECORD_KIND and not record["rejected"]
+        ]
+        assert len(records) == summary["captured"]
+        for record in records:
+            assert record["attributed"], "a captured record is attributed or it is not a capture"
+        intended = {
+            (target["guiPath"][-1], session["spids"][target["key"]]) for target in targets
+        }
+        assert set(fake.presses) <= intended, "a press landed on a shape its target did not name"
 
-    def test_a_pane_with_a_row_too_many_is_refused_rather_than_chosen_between(self, session):
-        """An extra row is the same refusal as a missing one, and for the same reason.
+    def test_two_rows_claiming_one_index_are_refused_rather_than_chosen_between(self, session):
+        """Ambiguity is a refusal, as it was when rows were addressed by name."""
+        fake = session["fake"]
+        name = session["plan"]["targets"][0]["shapeName"]
+        row_index, row_count = driver.shape_row_index(session["settings"].document, 1, name)
+        fake.duplicate_index = row_index
+        fake.selection_pane_open = True
+        with pytest.raises(driver.AmbiguousControl, match=f"index {row_index}"):
+            driver.select_shape(fake, name, row_index=row_index, row_count=row_count, timeout=2.0)
+        assert fake.selections == [], "no row was selected"
+        assert fake.slept == 0.0, "ambiguity failed at once rather than being polled"
 
-        It used to be an ``ambiguousControl``: two rows carried one name and the by-name
-        lookup refused to pick. By index it is the count that refuses, which also covers
-        an extra row the pane does not name at all.
+    def test_an_extra_row_beyond_the_slides_shapes_does_not_stop_a_capture(self, session):
+        """A row the slide has no shape for is harmless, because an index identifies.
+
+        The by-name version refused the whole target here, since two rows carried one
+        name. A row is now found by the index it reports, so a stray row at the end of
+        the pane changes nothing — and that is worth pinning, because it is the ordinary
+        case of a pane that is not exactly the slide's shape list.
         """
         fake = session["fake"]
         fake.duplicate_row = session["plan"]["targets"][0]["shapeName"]
         summary = driver.run_capture(session["plan"], session["settings"], fake, version="16.113.1")
-        assert summary["failed"] == len(session["plan"]["targets"])
-        for failure in summary["failures"]:
-            assert failure["error"]["kind"] == "controlNotFound"
-        assert fake.selections == [], "no row was selected"
-        assert fake.slept == 0.0, "the count failed at once rather than being polled"
+        assert (summary["captured"], summary["failed"]) == (len(session["plan"]["targets"]), 0)
 
     def test_a_press_that_the_application_refuses_is_recorded(self, session, monkeypatch):
         original = FakePowerPoint._gallery
@@ -1691,6 +1772,7 @@ class TestTheCanvasClickIsGone:
         assert sorted(driver.AXNode.__protocol_attrs__) == [
             "children",
             "enabled",
+            "index",
             "press",
             "role",
             "selected",
@@ -1797,10 +1879,10 @@ class TestSelectionPane:
         fake.selection_pane_open = True
         rows = driver.selection_rows(fake)
         assert rows, "the pane publishes rows"
-        for row, names in rows:
-            assert row.title is None, "a live row carries no title"
-            assert names, "and its name is a descendant static text's value"
-        assert driver.row_names(rows[0][0]) == [rows[0][1][0]]
+        for row in rows:
+            assert row.node.title is None, "a live row carries no title"
+            assert row.names, "and its name is a descendant static text's value"
+        assert driver.row_names(rows[0].node) == [rows[0].names[0]]
 
     def test_the_rows_are_in_reverse_z_order_and_carry_the_labels_too(self, session, built_deck):
         """Reverse z-order, one row per shape and one per label — as measured.
@@ -1812,7 +1894,7 @@ class TestSelectionPane:
         """
         fake = session["fake"]
         fake.selection_pane_open = True
-        names = [name for _row, row_names in driver.selection_rows(fake) for name in row_names]
+        names = [name for row in driver.selection_rows(fake) for name in row.names]
         z_order = [name for name, _spid in shape_names_in_z_order(session["settings"].document, 1)]
         assert names == list(reversed(z_order))
         targets = {target["shapeName"] for target in session["plan"]["targets"]}
@@ -1833,10 +1915,11 @@ class TestSelectionPane:
         fake.selection_pane_open = True
         document = session["settings"].document
         rows = driver.selection_rows(fake)
+        by_index = {row.index: row for row in rows}
         for name, _spid in shape_names_in_z_order(document, 1):
             row_index, row_count = driver.shape_row_index(document, 1, name)
             assert row_count == len(rows)
-            assert rows[row_index][1] == [name]
+            assert by_index[row_index].names == [name]
 
     def test_selecting_by_index_is_what_makes_the_right_shape_get_the_effect(self, session):
         """Each press lands on the shape whose row was selected, and only that one."""
@@ -1895,23 +1978,39 @@ class TestSelectionPane:
         driver.select_shape(fake, name, row_index=row_index, row_count=row_count, timeout=2.0)
         assert fake.reads - before >= 2
 
-    def test_a_row_count_that_disagrees_with_the_slide_refuses_rather_than_guesses(self, session):
-        """A pane that is not one row per shape makes every index meaningless.
+    def test_a_part_built_pane_is_retried_rather_than_refused(self, session):
+        """``AXRows`` publishes a prefix that grows, so an absent row is "not yet".
 
-        One missing row shifts every index past it, so selecting at the derived offset
-        would apply this target's value to another shape under this target's key — which
-        no later gate can undo. The refusal says both counts and nothing is selected.
+        Measured live: the same 152-shape pane published 43, 54, 61, 63, 74, 88 and 91
+        rows on consecutive reads while the application worked. An index-addressed lookup
+        that refused the first read it did not find the row in rejected 7 targets for
+        rows that appeared moments later.
         """
         fake = session["fake"]
         fake.selection_pane_open = True
         name = session["plan"]["targets"][0]["shapeName"]
         row_index, row_count = driver.shape_row_index(session["settings"].document, 1, name)
-        fake.missing_rows = {session["plan"]["targets"][1]["shapeName"]}
+        fake.published_row_count = row_index  # one short of the row wanted
+        fake.partial_reads = 2
+        selection = driver.select_shape(
+            fake, name, row_index=row_index, row_count=row_count, timeout=2.0
+        )
+        assert selection == driver.RowSelection(row_index, name)
+        assert fake.slept > 0.0, "it waited rather than finding the row first time"
+
+    def test_a_row_that_is_never_published_is_a_bounded_failure_naming_the_read(self, session):
+        """The retry is bounded, and what it reports is the read rather than a guess."""
+        fake = session["fake"]
+        fake.selection_pane_open = True
+        name = session["plan"]["targets"][0]["shapeName"]
+        row_index, row_count = driver.shape_row_index(session["settings"].document, 1, name)
+        fake.published_row_count = row_index
         with pytest.raises(driver.ControlNotFound) as raised:
             driver.select_shape(fake, name, row_index=row_index, row_count=row_count, timeout=2.0)
         message = str(raised.value)
-        assert f"{row_count - 1} rows" in message and f"{row_count} shapes" in message
-        assert name in message
+        assert f"row {row_index} of {row_count}" in message
+        assert f"published {row_index} rows" in message
+        assert f"indices 0..{row_index - 1}" in message
         assert fake.selections == [], "nothing was selected"
 
     def test_a_row_whose_name_contradicts_its_index_fails_loudly(self, session):
@@ -1929,17 +2028,27 @@ class TestSelectionPane:
             driver.select_shape(fake, name, row_index=row_index, row_count=row_count, timeout=2.0)
         assert fake.selections == []
 
-    def test_a_long_pane_truncates_the_names_it_reports(self, session):
-        """153 rows must not all end up in one failure message."""
+    def test_a_long_pane_reports_its_shape_rather_than_every_name_it_holds(self, session):
+        """A failure says how many rows and which indices, not 153 names.
+
+        The by-name version listed the names the pane did show, truncated to twelve,
+        because a name was the key and the operator needed to see what was there
+        instead. An index needs the read's **shape**: how many rows and what range of
+        indices. That is three numbers rather than a list, and it says the one thing the
+        operator can act on — whether the row is missing or the pane is part-built.
+        """
         fake = session["fake"]
         fake._shapes = [(f"Shape {index}", str(index + 2)) for index in range(40)]
         fake._spids = dict(fake._shapes)
         fake.selection_pane_open = True
         with pytest.raises(driver.ControlNotFound) as raised:
-            driver.select_shape(fake, "No Such Shape", row_index=0, row_count=152, timeout=2.0)
+            driver.select_shape(fake, "Shape 0", row_index=140, row_count=152, timeout=2.0)
         message = str(raised.value)
-        assert len(re.findall(r"'Shape \d+'", message)) == driver.MAX_REPORTED_ROW_NAMES == 12
-        assert "40 rows" in message and "152 shapes" in message
+        assert "row 140 of 152" in message
+        assert "published 40 rows" in message and "indices 0..39" in message
+        assert re.findall(r"'Shape \d+'", message) == ["'Shape 0'"], (
+            "the only name in the message is the one that was expected, not the pane's"
+        )
 
     def test_a_closed_pane_is_a_named_failure_rather_than_an_empty_row_list(self, session):
         with pytest.raises(driver.ControlNotFound, match="Selection Pane is not open"):
@@ -2763,7 +2872,7 @@ class TestRowsComeFromAXRows:
         fake.selection_pane_open = True
         fake.visible_row_count = 1
         rows = driver.selection_rows(fake)
-        names = [name for _row, labels in rows for name in labels]
+        names = [name for row in rows for name in row.names]
         assert len(rows) == len(fake._shapes)
         for target in session["plan"]["targets"]:
             assert target["shapeName"] in names

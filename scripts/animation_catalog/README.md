@@ -237,21 +237,26 @@ by **setting `AXSelected` on that shape's row** — there is no `AXPress` on a r
 editor-pane frame and no settling.
 
 A row is addressed by **index**, which is the shape's position in **reverse
-z-order**, read offline from the package. It was addressed by name first, and
-the name is still checked whenever the pane publishes one, but a name cannot be
-the key: a row's `title` is `None` and its name is the `value` of a descendant
-`AXStaticText` that **only exists once the row has been scrolled into view**. One
-run's batches read 80 names, then 54, from the same 152 rows, and 11 targets were
-rejected as "no Selection Pane row is named ..." for rows that were present and
-selectable throughout. The row order was verified against the package twice at
-152 rows with 0 mismatches.
+z-order**, read offline from the package and matched against the row that reports
+that `AXIndex`. The row order was verified against the live pane twice at 152
+rows with 0 mismatches.
 
-What guards the index is a count: the pane must publish exactly one row per shape
-on the slide or the selection refuses. That costs something and it is worth
-saying — a pane short one row now fails **every** target rather than that row's
-own, because one missing row shifts every index past it. The alternative is
-applying a value to the wrong shape under the right key, which no later gate can
-undo.
+Two keys were tried and discarded, and both failures are measured. A **name**
+cannot be the key: a row's `title` is `None` and its name is the `value` of a
+descendant `AXStaticText` that only exists once the row has been scrolled into
+view, so one run's batches read 80 names, then 54, and rejected 11 targets as "no
+Selection Pane row is named ..." for rows that were selectable throughout. An
+**offset into `AXRows`** cannot be the key either: the pane published 43, 54, 61,
+63, 74, 88 and 91 rows on consecutive reads of the same 152-shape slide, because
+it rebuilds while the application works, and that rejected 7 more targets. Every
+row publishes its own `AXIndex` in both states, so that is what a row is found
+by, and a read that does not contain the row is retried until it does.
+
+The name is still checked whenever the pane publishes one, as a check on the
+order rather than a lookup: if the row at an index is named something other than
+the shape expected there, the target is refused. That is what stands between a
+renumbered pane and a value applied to the wrong shape under the right key, which
+no later gate can undo.
 
 So `read_canvas_geometry`, `canvas_point`, `read_shape_center_pt`, `parse_zoom`
 and the `--pane-frame` / `--pane-role` / `--zoom` options are gone, along with

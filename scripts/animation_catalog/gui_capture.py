@@ -351,11 +351,6 @@ CONTAINER_ROLES = (TOOLBAR_ROLE, RIBBON_ROLE, SELECTION_PANE_ROLE)
 #: it, so the ribbon is the tab group carrying the ribbon's own first tab.
 CONTAINER_ANCHORS = {RIBBON_ROLE: RIBBON_ANCHOR_TAB}
 
-#: How many row names a row-mismatch failure lists before truncating. The live pane
-#: carries one row per shape *and* one per label — 153 for a 76-target deck — so the
-#: whole list in a message would bury the name that matters.
-MAX_REPORTED_ROW_NAMES = 12
-
 #: Recorded per target so a merged evidence file says how each capture was driven. The
 #: previous value of this field was a click point.
 SELECTED_BY = "selectionPaneRow"
@@ -784,6 +779,8 @@ class AXNode(Protocol):
     def enabled(self) -> bool: ...
     @property
     def selected(self) -> bool: ...
+    @property
+    def index(self) -> int | None: ...
     @property
     def children(self) -> Sequence[AXNode]: ...
     def press(self) -> None: ...
@@ -1445,28 +1442,48 @@ def row_names(row: AXNode) -> list[str]:
     ]
 
 
-def selection_rows(backend: AXBackend) -> list[tuple[AXNode, list[str]]]:
-    """Return the pane's rows with their names, in pane order, from a fresh read.
+class PaneRow(NamedTuple):
+    """One Selection Pane row: the element, the index it reports, and any name it shows.
+
+    ``index`` is the row's own ``AXIndex`` when it publishes one, and its offset in the
+    read when it does not. Which it was is not recorded, deliberately: the only consumer
+    is :func:`select_shape`, and what protects it from the difference is that a row with
+    a name must match the name expected at that index.
+    """
+
+    node: AXNode
+    index: int
+    names: list[str]
+
+
+def selection_rows(backend: AXBackend) -> list[PaneRow]:
+    """Return the pane's rows with their indices and names, from a fresh read.
 
     Pane order is **reverse z-order**: the live pane's row 0 was ``TextBox 152`` and row
     1 ``Rounded Rectangle 151``. :func:`select_shape` depends on that order, because it
     addresses a row by index; the order was verified against the package twice, 152 rows
     and 0 mismatches each time.
 
-    Rows come from the outline's ``AXRows``, which publishes **all** of them, and not
-    from ``AXChildren``, which publishes only what is scrolled into view. That one
-    difference is why 26 targets failed: the driver reported "the pane shows 62 names",
-    then 47, for rows that existed the whole time. Measured on the live pane: ``AXRows``
-    152, ``AXVisibleRows`` 24. An outline that publishes no ``AXRows`` falls back to the
-    bounded walk, which also picks up a row nested one level deeper — a grouped shape's
-    disclosure row — rather than reporting it missing.
+    Rows come from the outline's ``AXRows``, which publishes more of them than
+    ``AXChildren`` does — that difference is why 26 targets once failed, the driver
+    reporting "the pane shows 62 names", then 47, for rows that existed. An outline that
+    publishes no ``AXRows`` falls back to the bounded walk, which also picks up a row
+    nested one level deeper — a grouped shape's disclosure row — rather than reporting it
+    missing.
 
-    A row's **names list can be empty**, and that is not an error. All 152 rows are
-    published, but only a row that has been scrolled into view publishes an
-    ``AXStaticText`` to read a name from: a later run saw 80 readable names in one batch
-    and 54 in the next, from the same 152 rows. So the names here are a *validation*
-    signal — checked when present, absent without complaint when not — and never the way
-    a row is found.
+    **``AXRows`` is not all of them either**, and two earlier readings of this were
+    wrong. Probed on an idle pane it answered 152 rows, every one carrying a readable
+    name, and both this docstring and the notes concluded no scrolling was needed. Under
+    load the same pane published **43, 54, 61, 63, 74, 88 and 91** rows on consecutive
+    reads — the pane rebuilds as the application works, and a read can catch it
+    part-built. So neither the number of rows in a read nor a row's offset within it says
+    anything, and what identifies a row is its **own ``AXIndex``**, which every row
+    publishes.
+
+    A row's **names list can also be empty**: only a row that has been scrolled into
+    view publishes an ``AXStaticText`` to read a name from. The names here are therefore
+    a *validation* signal — checked when present, absent without complaint when not — and
+    never the way a row is found.
 
     One pass, not one pass per row. Walking the outline measured 4.1 s and calling
     :func:`row_names` on each of 152 rows another 4.3 s, because the second pass visits
@@ -1476,7 +1493,7 @@ def selection_rows(backend: AXBackend) -> list[tuple[AXNode, list[str]]]:
     disclosure row is still addressable by its own name.
     """
     outline = selection_outline(backend)
-    rows: list[tuple[AXNode, list[str]]] = []
+    rows: list[PaneRow] = []
     names_by_row: dict[int, list[str]] = {}
     published = getattr(outline, "rows", None)
     roots = list(published) if published else list(outline.children)
@@ -1491,7 +1508,10 @@ def selection_rows(backend: AXBackend) -> list[tuple[AXNode, list[str]]]:
         if role == SELECTION_ROW_ROLE:
             owner = len(rows)
             names_by_row[owner] = []
-            rows.append((node, names_by_row[owner]))
+            published_index = node.index
+            rows.append(
+                PaneRow(node, owner if published_index is None else published_index, names_by_row[owner])
+            )
         elif role == SELECTION_LABEL_ROLE and owner >= 0:
             value = node.value
             if value not in (None, ""):
@@ -1567,67 +1587,109 @@ def select_shape(
     ## Why an index, when this used to be a name
 
     A name is the better key right up to the point where the pane will not publish one.
-    ``AXRows`` publishes all 152 rows, but only a row that has been scrolled into view
-    carries the ``AXStaticText`` its name is read from, and the counts move between
-    reads: one run's batches saw 80 readable names, then 54, out of the same 152 rows.
-    By-name lookup therefore rejected 11 targets with "no Selection Pane row is named
-    ..." for rows that were present and selectable the whole time. Scrolling the pane to
-    materialize a name would be work done only to recover a key the package already has.
+    Only a row that has been scrolled into view carries the ``AXStaticText`` its name is
+    read from, and the counts move between reads: one run's batches saw 80 readable
+    names, then 54. By-name lookup therefore rejected 11 targets with "no Selection Pane
+    row is named ..." for rows that were present and selectable the whole time. Scrolling
+    the pane to materialize a name would be work done only to recover a key the package
+    already has.
 
     So the row is addressed by ``row_index`` from :func:`shape_row_index` — the shape's
-    position in reverse z-order — and the name is used the other way round, as a check:
+    position in reverse z-order — and the name is used the other way round, as a check.
 
-    * The pane must publish **exactly** ``row_count`` rows. A different count means the
-      index cannot be trusted, and that is a :class:`ControlNotFound` rather than a
-      selection at whatever offset, because selecting the wrong row would apply this
-      target's value to another shape under this target's key.
-    * If the row *does* publish names and ``shape_name`` is not among them, that is a
-      :class:`ControlNotFound` naming both, so a wrong order fails loudly instead of
-      being discovered later in the attribution.
+    ## Which index, though: the row's own, not its offset
 
-    What that count check gives up, stated rather than implied: a pane missing **one**
-    row now fails **every** target rather than that target alone, because one missing row
-    shifts every index past it. The by-name version could isolate it. That trade is taken
-    knowingly — the live pane published one row per shape on every read, and the failure
-    mode it buys protection against is applying a value to the wrong shape under the
-    right key, which no later gate can undo.
+    The first version of this took ``rows[row_index]`` and required the pane to publish
+    exactly ``row_count`` rows first. That refused 7 targets, because the pane published
+    43, 54, 61, 63, 74, 88 and 91 rows on consecutive reads of the same 152-shape slide:
+    it rebuilds while the application works, and a read catches it part-built. The
+    refusal was right — an offset into a partial read is not the row asked for — but
+    waiting for a whole one is not a mechanism either.
 
-    The index is re-resolved against a **fresh read** on every poll, exactly as the name
-    was, because rows are rebuilt like every other element here.
+    Every row publishes its **own ``AXIndex``**, measured as 0, 1, 76 and 151 for the
+    rows at those offsets. So a row is found by matching that, and a partial read is
+    perfectly usable as long as it happens to contain the row wanted. ``row_count`` is
+    now only used to describe the slide in a failure message.
+
+    Three gates, in the order they fire:
+
+    * A read with no row at ``row_index`` is "not yet": the lookup is **retried against
+      fresh reads** until ``timeout``, because the pane does fill in. Only then is it a
+      :class:`DriverTimeout` saying how many rows were published and which indices.
+    * Two rows reporting one index is an :class:`AmbiguousControl`, never a choice.
+    * A row that publishes names none of which is ``shape_name`` is a
+      :class:`ControlNotFound` naming both. That is the check that makes the index safe:
+      if ``AXIndex`` were ever relative to a partial read rather than absolute, or the
+      pane were in some order other than reverse z-order, this is what catches it before
+      a press lands on another shape. Under load the pane published a name for every row
+      it published, so this gate is live exactly when it is needed.
     """
 
-    def resolve_row() -> tuple[AXNode, list[str]]:
+    #: What the most recent read saw, so a timeout can describe it without reading the
+    #: pane again. One extra outline read per target is the single most expensive thing
+    #: this driver does, and a failure message is not worth one.
+    last_read: dict[str, Any] = {"rows": 0, "indices": "none"}
+
+    def resolve_row() -> PaneRow | None:
         rows = selection_rows(backend)
-        if len(rows) != row_count:
-            readable = [name for _row, names in rows for name in names]
-            shown = sorted(readable)[:MAX_REPORTED_ROW_NAMES]
-            raise ControlNotFound(
-                f"the Selection Pane publishes {len(rows)} rows but the slide carries {row_count} "
-                f"shapes, so row {row_index} cannot be trusted to be {shape_name!r}; "
-                f"{len(readable)} rows published a name, including {shown}"
+        indices = sorted(row.index for row in rows)
+        last_read["rows"] = len(rows)
+        last_read["indices"] = f"{indices[0]}..{indices[-1]}" if indices else "none"
+        matching = [row for row in rows if row.index == row_index]
+        if len(matching) > 1:
+            raise AmbiguousControl(
+                f"{len(matching)} Selection Pane rows report index {row_index}; refusing to "
+                f"choose which one is {shape_name!r}"
             )
-        row, names = rows[row_index]
-        if names and shape_name not in names:
+        if not matching:
+            return None
+        row = matching[0]
+        if row.names and shape_name not in row.names:
             raise ControlNotFound(
-                f"Selection Pane row {row_index} publishes {names} rather than {shape_name!r}; "
-                "the pane's order is not the reverse z-order this index was derived from"
+                f"Selection Pane row {row_index} publishes {row.names} rather than "
+                f"{shape_name!r}; the pane is not in the reverse z-order this index was "
+                "derived from"
             )
-        return row, names
+        return row
+
+    def describe() -> str:
+        return (
+            f"row {row_index} of {row_count} (expected to be {shape_name!r}); the last read "
+            f"published {last_read['rows']} rows, indices {last_read['indices']}"
+        )
+
+    def selected_now() -> bool:
+        found = resolve_row()
+        return found is not None and found.node.selected
 
     view = held(backend)
-    row, names = resolve_row()
-    row.set_selected(True)
+    try:
+        row = wait_until(
+            view,
+            resolve_row,
+            timeout=timeout,
+            # Nothing is swallowed: a row that is not published yet is a None return
+            # rather than an exception, so the only things that can be raised here are a
+            # name that contradicts the index and two rows claiming one index. Polling
+            # cannot make either come true, and swallowing them would turn a pane in the
+            # wrong order into a timeout 10 seconds later instead of a refusal now.
+            swallow=(),
+            what=f"{shape_name!r}'s Selection Pane row to be published",
+        )
+    except DriverTimeout as exc:
+        raise ControlNotFound(
+            f"the Selection Pane never published {describe()}"
+        ) from exc
+    row.node.set_selected(True)
     view.stale()
     wait_until(
         view,
-        lambda: resolve_row()[0].selected,
+        selected_now,
         timeout=timeout,
-        what=(
-            f"Selection Pane row {row_index} (expected to be {shape_name!r}) to read back as "
-            "selected"
-        ),
+        swallow=(),
+        what=f"the Selection Pane's {describe()} to read back as selected",
     )
-    return RowSelection(row_index, shape_name if shape_name in names else None)
+    return RowSelection(row_index, shape_name if shape_name in row.names else None)
 
 
 def press_save(backend: AXBackend, document: Path, *, timeout: float) -> None:
@@ -2284,6 +2346,19 @@ class LiveAXNode:
         return bool(self._attribute(self._ax.kAXSelectedAttribute))
 
     @property
+    def index(self) -> int | None:
+        """``AXIndex``: the row's own position in its outline, as it reports it.
+
+        This is what makes a row identifiable when the pane publishes only some of them.
+        Measured on the Selection Pane's rows: ``AXIndex`` 0, 1, 76 and 151 for the
+        published rows at those offsets, so a row's self-reported index and its offset
+        agree when every row is published — and the self-reported one is still readable
+        when they are not. ``None`` for an element that publishes no ``AXIndex``.
+        """
+        value = self._attribute("AXIndex")
+        return None if value is None else int(value)
+
+    @property
     def children(self) -> Sequence[AXNode]:
         kids = self._attribute(self._ax.kAXChildrenAttribute) or []
         return [LiveAXNode(child, self._ax) for child in kids]
@@ -2292,11 +2367,14 @@ class LiveAXNode:
     def rows(self) -> Sequence[AXNode] | None:
         """Return the element's ``AXRows``, or None when it publishes none.
 
-        An outline publishes **all** of its rows here, where ``AXChildren`` publishes
-        only what is scrolled into view. Measured on the Selection Pane: ``AXRows`` 152,
-        ``AXVisibleRows`` 24 — and walking children had the driver report "the pane shows
-        62 names", then 47, which is how 26 targets failed to find a row that existed.
-        Every one of the 152 rows reached this way carries a readable name.
+        An outline publishes more of its rows here than ``AXChildren`` does. Measured on
+        an idle Selection Pane: ``AXRows`` 152, ``AXVisibleRows`` 24, ``AXChildren`` 153
+        — and walking children had the driver report "the pane shows 62 names", then 47,
+        which is how 26 targets failed to find a row that existed.
+
+        It is **not** a promise of all of them. During a run the same pane published 43,
+        54, 61, 63, 74, 88 and 91 rows on consecutive reads of a 152-shape slide, which
+        is why a row is found by its own ``AXIndex`` rather than by its offset here.
         """
         rows = self._attribute("AXRows")
         if rows is None:

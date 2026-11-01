@@ -284,18 +284,31 @@ once. Measured live:
 | a row's `title` | `None`. The shape name is the **`value` of a descendant `AXStaticText`** |
 | a row's actions | `AXShowDefaultUI`, `AXShowAlternateUI` and a Rename. **No `AXPress`** |
 | selecting a row | **set `AXSelected`**, the standard outline-row mechanism, then read it back |
-| `AXRows` vs `AXChildren` | `AXRows` publishes all 152; `AXChildren` only the ~24 scrolled into view |
-| a row's **name**, during a run | published only for rows that have been scrolled into view. One run read **80** names, then **54**, from the same 152 rows |
+| `AXRows` vs `AXChildren` | idle: `AXRows` 152, `AXChildren` 153, `AXVisibleRows` 24 |
+| `AXRows` **during a run** | **43, 54, 61, 63, 74, 88, 91** rows on consecutive reads of the same 152-shape slide. It is not all of them |
+| a row's **name**, during a run | published only for rows that have been scrolled into view. One run read **80** names, then **54** |
+| **`AXIndex` on a row** | every row publishes one: 0, 1, 76 and 151 at those offsets. **This is what identifies a row** |
+| `AXRowCount` on the outline | not published (`None`) |
 | row order against the package | reverse z-order, **152 of 152 agreeing, 0 mismatches, verified twice** |
+| the enclosing `AXScrollArea` | its `AXVerticalScrollBar`'s `AXValue` **is settable** — an unused fallback, should the retry below ever stop being enough |
 
 So a shape is selected **by row index** — its position in reverse z-order, read
-offline from the package — with no coordinates, no keyboard focus and no timing
-dependency. The name is a *check* on that order when the pane publishes one, not
-the key: selecting by name rejected 11 targets as "no Selection Pane row is
-named ..." for rows that were there and selectable the whole time, because an
-unscrolled row carries no `AXStaticText` to read a name from. Scrolling the pane
-to materialize a name would be work done only to recover a key the package
-already has.
+offline from the package, matched against the row that reports that `AXIndex`.
+No coordinates, no keyboard focus, no timing dependency.
+
+Two things that look like they would work and do not. **A name is not a key**:
+selecting by name rejected 11 targets as "no Selection Pane row is named ..."
+for rows that were there and selectable the whole time, because an unscrolled row
+carries no `AXStaticText` to read a name from. And **an offset into `AXRows` is
+not a key either**: that rejected 7 more, because the pane rebuilds while the
+application works and a read catches it part-built. A row's own `AXIndex` is
+readable in both states, so a partial read is usable whenever it contains the row
+wanted, and a read that does not is simply retried.
+
+The name is kept as a **check**: if the row at an index publishes a name, it must
+be the name expected there. That is what would catch a pane in some other order,
+or an `AXIndex` that turned out to be relative to a partial read rather than
+absolute, before a press lands on another shape.
 
 Two cautions carried over from elsewhere in this file: pressing
 `Selection Pane...` while the pane is open **closes** it, the same trap as
@@ -427,8 +440,9 @@ guessing. Correct this section after the first run.
 | --- | --- |
 | The Selection Pane stays open, and keeps publishing rows, across a ribbon tab change and a `Save` | the next target's row lookup fails as `controlNotFound` and the run continues; it does not press on the previous shape |
 | Writing `AXSelected` on a row selects the shape, and the row then reads back selected | the read-back times out per target **before** any press, so a selection that does not take costs a record rather than another shape's effect |
-| `AXRows` publishes every shape's row, including ones scrolled out of view — unlike the slide navigator, which published only 6 of 76 | the row count disagrees with the slide's shape count and **every** target is `controlNotFound` saying both numbers, loudly and on the first target |
-| The pane's row order is the reverse of the slide part's shape order | the row at the derived index publishes a different name and that target is `controlNotFound` naming both — provided the row publishes a name at all |
+| A row's `AXIndex` is its absolute position in the outline, not its offset in a partial read | the row at a derived index publishes another shape's name and that target is `controlNotFound` naming both — provided the row publishes a name at all |
+| A row the pane has not published yet appears within the timeout | that target is `controlNotFound` saying how many rows the last read published and which indices, so the operator can tell a missing row from a part-built pane |
+| The pane's row order is the reverse of the slide part's shape order | same as the first row of this table: a name mismatch at the derived index |
 | A row's name, **when the pane publishes one**, is exactly the package's `p:cNvPr/@name` | the order check above misfires and reports a mismatch that is only a naming difference |
 | PowerPoint writes one `p:cTn` with a `presetClass` per applied effect, with the target shape's `spid` beneath it | attribution reads nothing and every target is rejected as `effectNotAdded`, loudly and on the first target |
 | `Save` writes the new effect into the file before the next read | the attribution reads a stale package and rejects, rather than crediting the wrong effect |
