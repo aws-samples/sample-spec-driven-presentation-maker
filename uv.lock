@@ -3787,7 +3787,7 @@ requires-dist = [
     { name = "pdfplumber", specifier = ">=0.11.0" },
     { name = "pillow" },
     { name = "pygments", specifier = ">=2.19.2" },
-    { name = "pypdf", specifier = ">=4.0.0" },
+    { name = "pypdf", specifier = ">=6.15.0" },
     { name = "python-docx", specifier = ">=1.0.0" },
     { name = "python-pptx" },
     { name = "qrcode" },
