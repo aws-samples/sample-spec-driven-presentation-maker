@@ -125,9 +125,9 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 
 | 使うもの | 手順 |
 |---|---|
-| いつもの AI エージェント（Claude Code、Cursor、VS Code、Codex） | **「〜のスライドを作って」** と頼むだけ。別のエージェントに後から接続するには `sdpm register` |
+| いつもの AI エージェント（Claude Code、Cursor、VS Code、Codex） | **「〜のスライドを作って」** と頼むだけ。別のエージェントに後から接続するには `sdpm register`（開いていたエージェントは再起動してください） |
 | Kiro CLI | `kiro-cli chat --agent sdpm`（インストーラーがこの専用エージェントを作ります） |
-| ブラウザ | 最初に 1 度 `kiro-cli login` を実行し、`sdpm webui` |
+| ブラウザ | 最初に 1 度 `kiro-cli login` を実行し、`sdpm webui`。インストール時に Web UI を入れなかった場合は `sdpm update --with-webui` で追加できます |
 | Claude Desktop | [`sdpm.mcpb` をダウンロード](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb)してダブルクリック（インストーラー不要） |
 
 Web UI はエージェントを Kiro CLI で動かすので、`kiro-cli login` で Kiro にサインインします。

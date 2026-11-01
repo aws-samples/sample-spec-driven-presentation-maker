@@ -125,9 +125,9 @@ Node.js), it first asks whether to install them. Then start:
 
 | With | Do this |
 |---|---|
-| Your AI agent (Claude Code, Cursor, VS Code, Codex) | Ask it **"Make slides about …"**. To connect another agent later: `sdpm register` |
+| Your AI agent (Claude Code, Cursor, VS Code, Codex) | Ask it **"Make slides about …"**. To connect another agent later: `sdpm register` (restart the agent if it was already open) |
 | Kiro CLI | `kiro-cli chat --agent sdpm` (the installer creates this dedicated agent) |
-| Your browser | Run `kiro-cli login` once, then `sdpm webui` |
+| Your browser | Run `kiro-cli login` once, then `sdpm webui`. Skipped the Web UI at install? `sdpm update --with-webui` adds it |
 | Claude Desktop | [Download `sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) and double-click it (no installer needed) |
 
 The Web UI runs its agent through Kiro CLI, so `kiro-cli login` signs you in to Kiro with

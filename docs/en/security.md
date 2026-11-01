@@ -20,8 +20,8 @@ These settings come with every deployment of the CDK stacks in `infra/`:
   stack uses its own Cognito user pool, which is the default and the One-Click Deploy setup.
   It lets external MCP clients find the OAuth settings and sign in (see
   [Connecting Agents](add-to-gateway.md)). Its routes (`/.well-known/*`, `/authorize`,
-  `/token`, `/register`, `/mcp`) have no API Gateway authorizer, and the WAF IP restriction
-  is not attached to it. `/mcp` refuses requests without a bearer token and forwards the
+  `/token`, `/register`, `/` and `/mcp`) have no API Gateway authorizer, and the WAF IP restriction
+  is not attached to it. `/` and `/mcp` refuse requests without a bearer token and forward the
   token to the MCP runtime, which validates it. `/register` is open Dynamic Client
   Registration: any caller can create a Cognito app client (see the review list below).
 - **CloudFront**: Origin Access Control for the site bucket and for slide previews, and a
