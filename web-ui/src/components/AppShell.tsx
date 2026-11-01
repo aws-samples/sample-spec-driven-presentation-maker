@@ -224,7 +224,6 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
 
                 <div className="my-1 border-t border-border" />
 
-                {/* Agent Settings — disabled (ACP supports kiro-cli only) */}
                 {/* Sign out (cloud only) */}
                 <CloudOnly>
                   <button
@@ -247,7 +246,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
       {/* ── Content area ── */}
       {children}
 
-      {/* Agent settings dialog (local only) */}
+      {/* Settings dialog */}
       <Settings open={settingsOpen} onOpenChange={setSettingsOpen} />
     </div>
   )

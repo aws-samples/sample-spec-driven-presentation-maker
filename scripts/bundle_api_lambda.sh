@@ -45,6 +45,6 @@ trap 'rm -rf "$REQS" ${UV_DIR:+"$UV_DIR"}' EXIT
 
 cp -r "$ROOT"/api/*.py "$OUT"/
 cp -r "$ROOT/shared" "$OUT/shared"
-# sdpm Engine — required by sdpm.engine.analyzer for template listing and
-# uploaded-template analysis (api/index.py); its dependencies come from sdpm-skill.
+# sdpm Engine — required by sdpm.engine.analyzer for template analysis
+# (GET /templates, POST /templates/user); its dependencies come from sdpm-skill.
 cp -r "$ROOT/sdpm/sdpm" "$OUT/sdpm"

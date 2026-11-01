@@ -4,19 +4,13 @@ version = "1.0.0"
 description = "spec-driven-presentation-maker REST API Lambda (Layer 4)"
 requires-python = ">=3.11"
 # Versions are locked in the workspace uv.lock (root); scripts/bundle_api_lambda.sh
-# bundles from it. sdpm-skill brings the engine's dependencies for sdpm.engine.analyzer
-# (template listing and uploaded-template analysis in api/index.py); the bundle copies
-# sdpm/sdpm itself. The four document parsers below are no longer used by api/
-# (upload-time conversion moved to sdpm.tools.attachment.ingest); kept so the Lambda
-# bundle stays as it was; trimming them is a separate change.
+# bundles from it. api/ needs sdpm/sdpm only for sdpm.engine.analyzer (template listing
+# and uploaded-template analysis); sdpm-skill brings its dependencies, and with them the
+# core's document parsers, which api/ does not import. The bundle copies sdpm/sdpm itself.
 dependencies = [
     "sdpm-skill",
     "aws-lambda-powertools[all]>=2.0.0",
     "boto3>=1.34.0",
-    "pdfplumber>=0.11.0",
-    "pypdf>=4.0.0",
-    "python-docx>=1.0.0",
-    "openpyxl>=3.1.0",
 ]
 
 # An application, not a library: uv installs its dependencies, never builds it.

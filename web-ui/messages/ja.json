@@ -79,13 +79,6 @@
     "private": "非公開",
     "selectDeck": "{name} を選択"
   },
-  "workspace": {
-    "slideCount": "{count, plural, other {# 枚のスライド}}",
-    "lastEdited": "最終編集 {date}",
-    "share": "共有",
-    "slideAlt": "スライド {number}",
-    "noSlides": "スライドはまだありません。チャットから作成できます。"
-  },
   "deckActions": {
     "internal": "社内公開",
     "private": "非公開",
@@ -265,8 +258,6 @@
     "placeholderMobile": "なんでも聞いてください…",
     "placeholderDesktop": "なんでも聞いてください…  / でテンプレート・スタイル  ⌘↵ で送信",
     "forceStop": "強制停止 — 進行中のレポートが失われる可能性があります",
-    "mentionSuggestions": "メンション候補",
-    "errorSwitchModel": "モデルを切り替えられませんでした",
     "slidePreview": "スライドプレビュー",
     "options": "オプション",
     "fetchWebImages": "Web 画像を取得",

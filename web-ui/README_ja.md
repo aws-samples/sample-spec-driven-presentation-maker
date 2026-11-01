@@ -205,7 +205,7 @@ web-ui/
 
 - `ChatPanel` — メインのチャット UI
 - `ChatMessage` — メッセージの描画（Markdown 対応）
-- `ToolCard` / `ToolIndicator` — エージェントのツール実行表示
+- `ToolCard` — エージェントのツール実行表示
 - `FileDropZone` / `AttachmentPreview` — ファイルアップロード
 
 ### deck
@@ -215,7 +215,6 @@ web-ui/
 - `DeckCard` / `DeckListView` — デッキ一覧と検索
 - `SlideCarousel` — スライドのプレビュー表示
 - `OutlineView` / `SpecStepNav` — アウトラインとスペック進行状況
-- `WorkspaceView` — ワークスペース管理
 
 ### auth
 

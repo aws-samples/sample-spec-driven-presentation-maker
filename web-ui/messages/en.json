@@ -79,13 +79,6 @@
     "private": "Private",
     "selectDeck": "Select {name}"
   },
-  "workspace": {
-    "slideCount": "{count, plural, one {# slide} other {# slides}}",
-    "lastEdited": "Last edited {date}",
-    "share": "Share",
-    "slideAlt": "Slide {number}",
-    "noSlides": "No slides yet. Use the chat to create slides."
-  },
   "deckActions": {
     "internal": "Internal",
     "private": "Private",
@@ -265,8 +258,6 @@
     "placeholderMobile": "Ask anything…",
     "placeholderDesktop": "Ask anything…  / template · style  ⌘↵ send",
     "forceStop": "Force stop — partial report may be lost",
-    "mentionSuggestions": "Mention suggestions",
-    "errorSwitchModel": "Failed to switch model",
     "slidePreview": "Slide preview",
     "options": "Options",
     "fetchWebImages": "Fetch web images",

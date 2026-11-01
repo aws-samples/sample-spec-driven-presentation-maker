@@ -27,7 +27,6 @@ export interface SlidePreview {
   previewUrl: string | null
   composeUrl?: string | null
   updatedAt: string
-  slideJson?: string
 }
 
 export interface SpecFiles {
@@ -249,26 +248,6 @@ export async function createReview(deckId: string, submission: ReviewSubmission,
   const data = (await response.json()) as { id?: unknown; message?: unknown }
   if (typeof data.id !== "string" || typeof data.message !== "string") throw new Error("Invalid review response")
   return { id: data.id, message: data.message }
-}
-
-/**
- * Fetch deck with slideJson included (for JSON download).
- *
- * @param deckId - Deck identifier
- * @param idToken - Cognito ID token
- * @returns Deck detail with slideJson populated
- */
-export async function getDeckWithJson(deckId: string, idToken: string): Promise<DeckDetail> {
-  const base = await getApiBaseUrl()
-  const response = await fetch(`${base}decks/${deckId}?include=slideJson`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  })
-
-  if (!response.ok) {
-    throw new Error(`Failed to get deck: ${response.status}`)
-  }
-
-  return response.json()
 }
 
 export interface SlideSearchResult {
@@ -689,7 +668,7 @@ export async function downloadTemplate(name: string, idToken: string): Promise<v
     throw new Error(data.error || "No download URL returned")
   }
   // Direct navigation — Content-Disposition on the presigned URL triggers download.
-  // Same approach as deck PPTX download (WorkspaceView.tsx), no CORS needed.
+  // No CORS needed.
   window.location.href = data.downloadUrl
 }
 

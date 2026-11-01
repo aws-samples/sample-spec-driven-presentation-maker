@@ -14,7 +14,6 @@ export const MAX_COMMENTS = 100
 export const MAX_TEXT_CHARS = 2000
 export const MAX_NOTE_CHARS = 4000
 export const MAX_BODY_BYTES = 512 * 1024
-export const DEFAULT_SLIDE_SIZE: [number, number] = [1920, 1080]
 /**
  * What a note and a comment text are stripped of, and what counts as empty — `WHITESPACE` in
  * Python (its `str.isspace` set plus U+FEFF). `trim()` alone misses U+001C-U+001F and U+0085.

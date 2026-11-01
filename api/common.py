@@ -41,25 +41,6 @@ def get_user_id(event: Any) -> str:
     return sub
 
 
-def get_user_alias(event: Any) -> str:
-    """Extract user alias (email prefix) from API Gateway authorizer claims.
-
-    Supports both REST API (v1) and HTTP API (v2) JWT authorizer formats.
-
-    Args:
-        event: Powertools current_event with request_context.authorizer.
-
-    Returns:
-        Alias string (email prefix before @), or empty string if unavailable.
-    """
-    raw = event.raw_event.get("requestContext", {}).get("authorizer", {})
-    if "jwt" in raw:
-        email = raw["jwt"].get("claims", {}).get("email", "")
-    else:
-        email = raw.get("claims", {}).get("email", "")
-    return email.split("@")[0] if email else ""
-
-
 def now_iso() -> str:
     """Return current UTC time in ISO 8601 format.
 

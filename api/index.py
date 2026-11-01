@@ -1107,7 +1107,6 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
 
     # Read slides from S3 (deck.json + slides/*.json format)
     slides = []
-    include_json = (app.current_event.get_query_string_value("include") or "") == "slideJson"
 
     # Collect compose keys for animation (epoch-keyed)
     compose_keys = set()
@@ -1158,13 +1157,11 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
 
     preview_keys = _list_preview_keys(deck_id)
     for i, slug in enumerate(slugs):
-        slide_data = None
-        if legacy_slides is not None:
-            slide_data = legacy_slides[i]
-        else:
+        if legacy_slides is None:
+            # A slug whose slides/{slug}.json is missing or unreadable is not listed.
             try:
                 slide_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/slides/{slug}.json")
-                slide_data = json.loads(slide_resp["Body"].read())
+                json.loads(slide_resp["Body"].read())
             except Exception:
                 continue
         slide_preview = _resolve_preview_url(deck_id, slug, preview_keys)
@@ -1174,8 +1171,6 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
             compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}_", compose_keys)
         if compose_key:
             slide_entry["composeUrl"] = preview_url(compose_key)
-        if include_json:
-            slide_entry["slideJson"] = json.dumps(slide_data)
         slides.append(slide_entry)
 
     specs = _read_specs(deck_id)

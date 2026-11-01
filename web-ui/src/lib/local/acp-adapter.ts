@@ -1,9 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ACP Agent Adapter — server-side storage for agent configs.
- * Mirrors AgentSettingsDialog's AgentConfig interface.
- * Stores in servers/local/.sdpm/acp-config.json.
+ * ACP Agent Adapter — reads the agent config for the ACP process manager.
+ * Stored in servers/local/.sdpm/acp-config.json (kiro-cli preset when missing).
  */
 
 import fs from "fs"
@@ -56,34 +55,7 @@ function readConfig(): StoredConfig {
   return { activeAgent: "kiro-cli", agents: PRESETS }
 }
 
-function writeConfig(config: StoredConfig): void {
-  try {
-    fs.mkdirSync(CONFIG_DIR, { recursive: true })
-    fs.writeFileSync(CONFIG_PATH, JSON.stringify(config, null, 2) + "\n", "utf-8")
-  } catch {}
-}
-
-export function getAgents(): AgentConfig[] {
-  return readConfig().agents
-}
-
-export function getActiveAgentId(): string {
-  return readConfig().activeAgent
-}
-
 export function getActiveAgent(): AgentConfig {
   const config = readConfig()
   return config.agents.find(a => a.id === config.activeAgent) || config.agents[0] || PRESETS[0]
-}
-
-export function setActiveAgentId(id: string): void {
-  const config = readConfig()
-  config.activeAgent = id
-  writeConfig(config)
-}
-
-export function saveAgents(agents: AgentConfig[]): void {
-  const config = readConfig()
-  config.agents = agents
-  writeConfig(config)
 }
