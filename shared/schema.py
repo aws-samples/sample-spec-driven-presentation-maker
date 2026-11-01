@@ -64,25 +64,12 @@ def fav_sk(deck_id: str) -> str:
     return f"FAV#{deck_id}"
 
 
-def template_pk(template_id: str) -> str:
-    """Partition key for a template record.
-
-    Args:
-        template_id: Template identifier.
-
-    Returns:
-        PK string in format TEMPLATE#{template_id}.
-    """
-    return f"TEMPLATE#{template_id}"
-
-
 # ---------------------------------------------------------------------------
 # Key prefix constants (for begins_with queries)
 # ---------------------------------------------------------------------------
 
 DECK_SK_PREFIX = "DECK#"
 FAV_SK_PREFIX = "FAV#"
-TEMPLATE_PK_PREFIX = "TEMPLATE#"
 
 
 # ---------------------------------------------------------------------------
