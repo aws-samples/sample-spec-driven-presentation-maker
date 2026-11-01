@@ -173,6 +173,8 @@ export async function fetchHtmlUrl(deckId: string, purpose: HtmlUrlPurpose, idTo
  * @param idToken - Cognito ID token
  */
 export async function patchDeck(deckId: string, updates: Record<string, string>, idToken: string): Promise<void> {
+  // Local mode links the chat session in the invoke route (.session); there is no PATCH route.
+  if (IS_LOCAL) return
   const base = await getApiBaseUrl()
   await fetch(`${base}decks/${deckId}`, {
     method: "PATCH",
