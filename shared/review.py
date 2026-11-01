@@ -3,7 +3,8 @@
 """Change requests from the Web UI comment tool — the authoritative contract.
 
 A change request is one submission of positioned comments: each comment names a frame
-(``A``, ``B``, …) drawn on a slide, in slide px. The server (Cloud API Lambda, Local API
+(``A``, ``B``, …) drawn on a slide, in slide px, with a text that may be empty (a frame the
+other texts point to). A request needs at least one non-empty text or a note. The server (Cloud API Lambda, Local API
 route) validates the submission, picks the id, writes ``reviews/<id>.json`` for the
 composers and returns the chat message the Web UI sends to the orchestrator. The file is a
 disposable hand-off: nobody rewrites it after the POST.
@@ -106,8 +107,8 @@ def _validate_comment(
     if "\x00" in text:
         return None, f"{where}.text must not contain NUL"
     text = text.strip(WHITESPACE)
-    if not 1 <= len(text) <= MAX_TEXT_CHARS:
-        return None, f"{where}.text must be 1-{MAX_TEXT_CHARS} characters"
+    if len(text) > MAX_TEXT_CHARS:
+        return None, f"{where}.text exceeds {MAX_TEXT_CHARS} characters"
     return {"name": name, "slide": slide, "rect": list(comment["rect"]), "text": text}, None
 
 
@@ -122,7 +123,8 @@ def validate_review_submission(
     only called with slugs that passed ``SLUG_RE``).
 
     Returns ``(normalized, None)`` — ``{"note": str | None, "comments": [...]}`` with text
-    stripped of ``WHITESPACE`` and an empty note as None — or ``(None, error message)``.
+    stripped of ``WHITESPACE`` (possibly empty) and an empty note as None — or
+    ``(None, error message)``. At least one text or the note must be non-empty.
     """
     if not isinstance(body, dict):
         return None, "body must be an object"
@@ -154,6 +156,8 @@ def validate_review_submission(
             return None, f"comments[{index}].name is duplicated"
         seen.add(item["name"])
         normalized.append(item)
+    if note is None and not any(c["text"] for c in normalized):
+        return None, "a comment text or the note must be non-empty"
     return {"note": note, "comments": normalized}, None
 
 

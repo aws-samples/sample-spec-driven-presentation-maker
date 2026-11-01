@@ -7,7 +7,7 @@
  */
 
 import type { Rect } from "@/lib/review/geometry"
-import { NAME_RE, stripWhitespace } from "@/lib/review/schema"
+import { NAME_RE } from "@/lib/review/schema"
 import { nextSeq } from "@/lib/review/naming"
 
 export interface DraftFrame {
@@ -61,8 +61,7 @@ export function loadDrafts(deckId: string): DraftState {
   for (const f of data.frames) {
     const frame = parseFrame(f)
     if (!frame) return { ...EMPTY_DRAFTS, frames: [] }
-    // A frame always carries a comment; an empty one was still being written when the page closed.
-    if (stripWhitespace(frame.text) && !frames.some(x => x.name === frame.name)) frames.push(frame)
+    if (!frames.some(x => x.name === frame.name)) frames.push(frame)
   }
   const stored = typeof data.seq === "number" && Number.isInteger(data.seq) && data.seq >= 0 ? data.seq : 0
   return { seq: Math.max(stored, nextSeq(frames.map(f => f.name))), frames }

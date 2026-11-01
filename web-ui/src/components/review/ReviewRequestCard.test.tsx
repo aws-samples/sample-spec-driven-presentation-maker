@@ -3,13 +3,13 @@
 /**
  * The 修正依頼 card in the chat is built from the change request message itself (the
  * server's message for the shared fixture), restores from Local and Cloud history, and shows
- * 対応中 while the turn for that message runs, 完了 after, 未完了 when the turn failed.
+ * no request status.
  */
 
 import fs from "fs"
 import path from "path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, fireEvent, screen } from "@testing-library/react"
+import { cleanup, fireEvent, screen } from "@testing-library/react"
 import type { ReactNode } from "react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import type { ChatMessage as HistoryMessage } from "@/services/deckService"
@@ -17,7 +17,7 @@ import type { ChatMessage as HistoryMessage } from "@/services/deckService"
 vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { dismiss: vi.fn() }) }))
 vi.mock("@/services/deckService", () => ({ createReview: vi.fn(), batchGetSlidePreviewUrls: vi.fn(async () => new Map()) }))
 
-import { ReviewProvider, sentFrameKey, useReview, type ReviewContextValue } from "./ReviewProvider"
+import { ReviewProvider, useReview, type ReviewContextValue } from "./ReviewProvider"
 import { ReviewRequestCard } from "./ReviewRequestCard"
 import { ChatMessage } from "@/components/chat/ChatMessage"
 import { parseCloudHistory, parseLocalHistory } from "@/components/chat/chatHistory"
@@ -53,52 +53,31 @@ describe("ReviewRequestCard", () => {
   })
   afterEach(cleanup)
 
-  it("shows the count, the note, the comments with slide numbers, and 完了 after the turn", () => {
-    const { container } = withProvider(<ReviewRequestCard request={REQUEST} working={false} />)
-    expect(screen.getByText("3 comments")).toBeTruthy()
+  it("shows the frame count, the note, the frames with slide numbers, and no status", () => {
+    const { container } = withProvider(<ReviewRequestCard request={REQUEST} />)
+    expect(screen.getByText("4 frames")).toBeTruthy()
     expect(container.textContent).toContain("全体的に文字を減らして")
-    expect([...container.querySelectorAll("[data-review-comment]")].map(e => e.getAttribute("data-review-comment"))).toEqual(["A", "C", "B"])
+    expect([...container.querySelectorAll("[data-review-comment]")].map(e => e.getAttribute("data-review-comment"))).toEqual(["A", "C", "B", "D"])
     expect(screen.getAllByText("Slide 2")).toHaveLength(2)
-    expect(screen.getByText("Slide 1")).toBeTruthy()
-    expect(container.querySelector("[data-review-status]")?.getAttribute("data-review-status")).toBe("done")
-    expect(screen.getByText("Done")).toBeTruthy()
-  })
-
-  it("shows 対応中 while the turn runs", () => {
-    const { container } = withProvider(<ReviewRequestCard request={REQUEST} working />)
-    expect(container.querySelector("[data-review-status='working'] .animate-spin")).toBeTruthy()
-    expect(screen.getByText("In progress")).toBeTruthy()
-  })
-
-  it("jumps to a frame that is on the canvas while the request is in progress", () => {
-    const { container } = withProvider(<ReviewRequestCard request={REQUEST} working />)
-    const row = () => container.querySelector("[data-review-comment='A']")!
-    expect(row().getAttribute("role")).toBeNull()
-    act(() => api!.setWorkingReview("d1", REQUEST))
-    expect(row().getAttribute("role")).toBe("button")
-    fireEvent.click(row())
-    // No canvas here: focusFrame turns the tool on to reveal the frame and selects it.
-    expect(api?.selected).toBe(sentFrameKey(ID, "A"))
-    expect(api?.toolOn).toBe(true)
-  })
-
-  it("shows 未完了 instead of 完了 when the turn for the message failed", () => {
-    const { container } = withProvider(<ReviewRequestCard request={REQUEST} working={false} failed />)
-    expect(container.querySelector("[data-review-status]")?.getAttribute("data-review-status")).toBe("failed")
-    expect(screen.getByText("Not completed")).toBeTruthy()
+    expect(screen.getAllByText("Slide 1")).toHaveLength(2)
+    // D was sent without a comment.
+    expect(container.querySelector("[data-review-comment='D']")?.textContent).toContain("No comment")
     expect(screen.queryByText("Done")).toBeNull()
+    expect(screen.queryByText("In progress")).toBeNull()
+    expect(container.querySelector("[role='button']")).toBeNull()
+  })
+
+  it("does not highlight canvas frames from its mentions", () => {
+    const { container } = withProvider(<ReviewRequestCard request={REQUEST} />)
+    const mention = container.querySelector("[data-mention='B']")!
+    fireEvent.mouseEnter(mention)
+    expect(api?.highlight).toBeNull()
   })
 
   it("renders without a provider, with slugs for slide labels", () => {
-    renderWithIntl(<ReviewRequestCard request={REQUEST} working={false} />)
+    renderWithIntl(<ReviewRequestCard request={REQUEST} />)
     expect(screen.getByText("Change request")).toBeTruthy()
     expect(screen.getAllByText("sales")).toHaveLength(2)
-  })
-
-  it("does not link another deck's request to the canvas", () => {
-    const { container } = withProvider(<ReviewRequestCard request={REQUEST} working deckId="other" />)
-    act(() => api!.setWorkingReview("d1", REQUEST))
-    expect(container.querySelector("[data-review-comment='A']")?.getAttribute("role")).toBeNull()
   })
 })
 
@@ -110,7 +89,6 @@ describe("ChatMessage with a change request", () => {
     const [msg] = parseLocalHistory([{ role: "user", content: MESSAGE, toolUses: [] } as unknown as HistoryMessage])
     const { container } = withProvider(<ChatMessage role={msg.role} content={msg.content} />)
     expect(container.querySelector("[data-review-request-card]")).toBeTruthy()
-    expect(screen.getByText("Done")).toBeTruthy()
     expect(container.textContent).not.toContain("[review:")
     expect(container.textContent).not.toContain("How to handle it")
   })
@@ -119,37 +97,8 @@ describe("ChatMessage with a change request", () => {
     const [msg] = parseCloudHistory([{ role: "user", content: [{ text: `<!--sdpm:include_images=true-->\n${MESSAGE}` }] } as unknown as HistoryMessage])
     const { container } = withProvider(<ChatMessage role={msg.role} content={msg.content} />)
     expect(container.querySelector("[data-review-request-card]")).toBeTruthy()
-    expect(screen.getByText("3 comments")).toBeTruthy()
+    expect(screen.getByText("4 frames")).toBeTruthy()
     expect(container.textContent).not.toContain("[review:")
-  })
-
-  it("restores a failed send from Local history as 未完了", () => {
-    const [msg] = parseLocalHistory([
-      { role: "user", content: MESSAGE, toolUses: [], failed: true },
-      { role: "assistant", content: "Sorry, something went wrong. Please try again.", toolUses: [] },
-    ] as unknown as HistoryMessage[])
-    expect(msg.failed).toBe(true)
-    const { container } = withProvider(<ChatMessage role={msg.role} content={msg.content} failed={msg.failed} />)
-    expect(container.querySelector("[data-review-status]")?.getAttribute("data-review-status")).toBe("failed")
-    expect(screen.queryByText("Done")).toBeNull()
-  })
-
-  it("restores a request the agent never answered from Cloud history as 未完了", () => {
-    const history = [
-      { role: "user", content: [{ text: MESSAGE }] },
-      { role: "user", content: [{ text: "hello?" }] },
-      { role: "assistant", content: [{ text: "Hi" }] },
-    ] as unknown as HistoryMessage[]
-    const [unanswered, answered] = parseCloudHistory(history)
-    expect(unanswered.failed).toBe(true)
-    expect(answered.failed).toBeUndefined()
-    const { container } = withProvider(<ChatMessage role={unanswered.role} content={unanswered.content} failed={unanswered.failed} />)
-    expect(container.querySelector("[data-review-status]")?.getAttribute("data-review-status")).toBe("failed")
-  })
-
-  it("shows 対応中 while the turn for the message runs", () => {
-    const { container } = withProvider(<ChatMessage role="user" content={MESSAGE} reviewWorking />)
-    expect(container.querySelector("[data-review-status='working']")).toBeTruthy()
   })
 
   it("renders an ordinary message, or a marker without the request, as the usual bubble", () => {

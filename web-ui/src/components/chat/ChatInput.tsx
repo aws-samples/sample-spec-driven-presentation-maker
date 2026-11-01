@@ -55,9 +55,10 @@ export interface ChatInputProps {
   topSlot?: ReactNode
   /**
    * Replaces the icon send button with a labelled one that can send an empty input
-   * (the caller has something else to send); `blocked` disables it.
+   * (the caller has something else to send); `blocked` disables it, and so does
+   * `canSend` returning false for the current input.
    */
-  sendOverride?: { label: string; blocked: boolean }
+  sendOverride?: { label: string; blocked: boolean; canSend?: (input: string) => boolean }
   /** Opens the Local-only kiro session picker. */
   onContinueFromSession?: () => void
   /** Disabled once this chat already has messages. */
@@ -232,7 +233,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   }, [input, updateInput])
 
   const hasContent = !!input.trim() || attachments.length > 0 || snippets.length > 0
-  const canSend = sendOverride ? !sendOverride.blocked : hasContent
+  const canSend = sendOverride ? !sendOverride.blocked && (sendOverride.canSend?.(input) ?? true) : hasContent
 
   const handleSend = async () => {
     if (!canSend || isLoading || disabled) return

@@ -12,7 +12,7 @@
 
 "use client"
 
-import { useState, useRef, useCallback, useEffect } from "react"
+import { useState, useRef, useCallback } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
 import { invokeAgentCore, stopRuntimeSession } from "@/services/agentCoreService"
@@ -39,8 +39,6 @@ export interface Message {
   snippets?: { label: string; text: string }[]
   attachments?: { fileName: string; fileType: string }[]
   mcpStatus?: McpServerStatus[]
-  /** User message whose turn failed (saved in Local .chat.json): a change request card shows 未完了. */
-  failed?: boolean
 }
 
 /** Shape of tool-use callback data from the agent streaming API. */
@@ -60,10 +58,7 @@ export interface UseChatStreamOptions {
   deckId?: string
   /** Called on every tool event (start, complete, stream). Panel handles side effects. */
   onToolEvent?: (toolName: string, data: ToolUseCallbackData | undefined) => void
-  /**
-   * Called after each send completes (success, failure or abort), once the final messages
-   * (error text, `failed` flag) have rendered, so `messagesRef` already holds them.
-   */
+  /** Called after each send completes (success or abort). */
   onSendComplete?: () => void
 }
 
@@ -117,14 +112,6 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const messagesRef = useRef(messages)
   messagesRef.current = messages
   const auth = useAuth()
-  // Counts finished sends; onSendComplete runs from an effect after the render that carries
-  // the final messages (the updates queued in catch have not rendered yet in finally).
-  const [completedSends, setCompletedSends] = useState(0)
-  const onSendCompleteRef = useRef(onSendComplete)
-  onSendCompleteRef.current = onSendComplete
-  useEffect(() => {
-    if (completedSends > 0) onSendCompleteRef.current?.()
-  }, [completedSends])
 
   const stopGeneration = useCallback(() => {
     abortControllerRef.current?.abort()
@@ -321,8 +308,6 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
             ...updated[updated.length - 1],
             content: displayMessage,
           }
-          const sent = updated.length - 2
-          if (!options?.hideUserMessage && updated[sent]?.role === "user") updated[sent] = { ...updated[sent], failed: true }
           return updated
         })
       }
@@ -330,10 +315,10 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       abortControllerRef.current = null
       isLoadingRef.current = false
       setIsLoading(false)
-      setCompletedSends((n) => n + 1)
+      onSendComplete?.()
     }
     return ok
-  }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent])
+  }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent, onSendComplete])
 
   return { messages, setMessages, isLoading, sendMessage, stopGeneration, messagesRef }
 }

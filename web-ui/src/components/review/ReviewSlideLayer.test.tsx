@@ -147,6 +147,31 @@ describe("ReviewSlideLayer", () => {
     expect(toastMock).not.toHaveBeenCalled()
   })
 
+  it("Esc on a new frame cancels it even after typing", () => {
+    const layer = renderLayer()
+    press(layer, 100, 100)
+    release(layer, 100, 100)
+    fireEvent.change(editor()!, { target: { value: "typed" } })
+    fireEvent.keyDown(editor()!, { key: "Escape" })
+    expect(api.drafts).toEqual([])
+  })
+
+  it("a frame saved without a comment stays, looks the same and peeks as 「コメントなし」", () => {
+    const layer = renderLayer()
+    drawAndSave(layer, "bigger")
+    drawAndSave(layer, "   ")
+    expect(api.drafts.map(d => [d.name, d.text])).toEqual([["A", "bigger"], ["B", ""]])
+    const [a, b] = [...document.querySelectorAll<HTMLElement>("[data-review-frame]")]
+    expect(b.className).toBe(a.className)
+    expect([...b.attributes].map(x => x.name)).toEqual([...a.attributes].map(x => x.name))
+    act(() => { api.setPeek("B") })
+    expect(document.querySelector("[data-review-card] [data-review-no-comment]")?.textContent).toBe("No comment")
+    // Reopening and leaving it empty still keeps it.
+    act(() => { api.openEditor("B") })
+    fireEvent.keyDown(editor()!, { key: "Enter" })
+    expect(api.drafts).toHaveLength(2)
+  })
+
   it("Delete removes the selected draft and offers undo", () => {
     const layer = renderLayer()
     drawAndSave(layer, "bigger")
@@ -195,6 +220,18 @@ describe("ReviewSlideLayer", () => {
     expect(api.toolOn).toBe(true)
     fireEvent.keyDown(window, { key: "Escape" })
     expect(api.toolOn).toBe(false)
+  })
+
+  it("@ suggests frames without a comment too", () => {
+    const layer = renderLayer()
+    drawAndSave(layer, "")
+    press(layer, 800, 400)
+    release(layer, 800, 400)
+    fireEvent.change(editor()!, { target: { value: "move it to @" } })
+    const options = screen.getAllByRole("option")
+    expect(options).toHaveLength(1)
+    expect(options[0].textContent).toContain("A")
+    expect(options[0].textContent).toContain("No comment")
   })
 
   it("@ suggests the other drafts and inserts the chosen name", () => {

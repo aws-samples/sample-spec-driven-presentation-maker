@@ -33,7 +33,6 @@ export function parseLocalHistory(history: ChatMessage[]): Message[] {
       content: (typeof raw.content === "string" ? raw.content : "") as string,
       toolUses: (raw.toolUses as ToolUse[]) || [],
       blocks: (raw.blocks as ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[]) || undefined,
-      ...(raw.failed === true ? { failed: true } : {}),
     }
   })
 }
@@ -52,8 +51,7 @@ function parseAttachments(text: string): { fileName: string; fileType: string }[
  *
  * User messages containing toolResult blocks are folded into the preceding
  * assistant message's matching toolUse (status + result), not emitted as
- * standalone messages. A user message the agent never answered (no assistant
- * message before the next user message) is marked `failed`.
+ * standalone messages.
  */
 export function parseCloudHistory(history: ChatMessage[]): Message[] {
   const parsed: Message[] = []
@@ -142,8 +140,5 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
       ...(attachments.length > 0 ? { attachments } : {}),
     })
   }
-  parsed.forEach((m, i) => {
-    if (m.role === "user" && parsed[i + 1]?.role !== "assistant") m.failed = true
-  })
   return parsed
 }

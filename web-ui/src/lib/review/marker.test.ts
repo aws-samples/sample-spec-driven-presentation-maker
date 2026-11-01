@@ -32,7 +32,7 @@ describe("parseReviewMessage", () => {
     expect(parsed?.note).toBe(c.normalized.note)
     expect(byName(parsed!.comments)).toEqual(byName(c.normalized.comments))
     // Slide by slide, in sent order
-    expect(parsed!.comments.map(x => x.name)).toEqual(["A", "C", "B"])
+    expect(parsed!.comments.map(x => x.name)).toEqual(["A", "C", "B", "D"])
   })
 
   it("finds the request behind the prefixes a send adds (Cloud history)", () => {

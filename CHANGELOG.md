@@ -16,11 +16,12 @@ Entries before v0.5.0 were written retroactively as summaries.
   change request (修正依頼). Turn on the **Comment** tool from the preview header, with `C`,
   or from the button that appears when hovering a slide. Drag to outline an area, or click
   to place a frame when nothing is being edited (a click while a frame is selected only
-  confirms it). Every frame needs a comment and gets a letter name (A, B, …, AA) that other
-  comments can reference with `@A`; frames can be moved, resized and deleted (with undo),
-  hovering a frame shows its comment, and unsent comments survive a reload. The unsent
-  comments collect above the chat input, where **Request changes** (「修正を依頼」) sends
-  them with an optional note for the whole deck. The server writes `reviews/<id>.json` in the
+  confirms it). Each frame gets a letter name (A, B, …, AA) that comments can reference with
+  `@A`; a frame may stay without a comment (a place another comment points to), and only an
+  explicit delete (with undo) removes it, or Esc on a frame just drawn. Frames can be moved
+  and resized, hovering a frame shows its comment, and unsent frames survive a reload. They
+  collect above the chat input, where **Request changes** (「修正を依頼」) sends them with an
+  optional note for the whole deck once a frame has a comment or the note is set. The server writes `reviews/<id>.json` in the
   deck — only what was sent (note, slide size, comments with frames in slide pixels) plus a
   short guide for the composers — and returns the chat message the Web UI sends: the note and
   the comments grouped by slide, the file path, how to dispatch them (one composer per slide,
@@ -28,11 +29,10 @@ Entries before v0.5.0 were written retroactively as summaries.
   orchestrator works from the message alone; the composers read the file. Nobody rewrites the
   file, each new request replaces the deck's previous one, and the role documents are
   unchanged (the feature is the Web UI's). The chat shows the request as a card with its
-  comments, **In progress** while the agent's turn for it runs and **Done** after, built from
-  the message so it restores from chat history on both the AWS stack and locally; the sent
-  frames stay on the slides as **In progress** until the turn ends. When the turn fails, the
-  comments and the note go back to the drafts and the input to be sent again, and the card
-  shows **Not completed**, also after a reload. HTML decks show stacked static slide previews while the tool is on, so frames and the
+  frames, built from the message so it restores from chat history on both the AWS stack and
+  locally; it shows no progress (the agent's reply tells the result), and the sent frames leave
+  the slides once the request is created. When the chat send fails, the frames and the note go
+  back to the drafts and the input to be sent again. HTML decks show stacked static slide previews while the tool is on, so frames and the
   agent see the same layout. New API route `POST /decks/{id}/reviews` (edit permission,
   validated frames, slugs and sizes) with a matching local route; the message and guide texts
   live once in `shared/review_template.json`. `get_deck` now returns `slideSize` for PPTX

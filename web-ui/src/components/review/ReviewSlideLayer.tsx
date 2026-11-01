@@ -9,8 +9,8 @@
  * background draws (drag) or places (click) frames, following `resolveBackgroundRelease`:
  * a click while something is open or selected only confirms it.
  *
- * Drafts: body drag moves, the 8 handles of the selected draft resize, a click opens the card.
- * Sent open comments: read-only, pulse while the agent works on them. Done comments are not drawn.
+ * Frames (all unsent drafts, with or without a comment, drawn alike): body drag moves, the 8
+ * handles of the selected frame resize, a click opens the card. Sent frames are not drawn.
  */
 
 "use client"
@@ -18,7 +18,6 @@
 import { useLayoutEffect, useRef, useState } from "react"
 import type { PointerEvent as ReactPointerEvent } from "react"
 import { useTranslations } from "next-intl"
-import { Loader2 } from "lucide-react"
 import { useReview } from "@/components/review/ReviewProvider"
 import {
   HANDLES, clickFrame, moveRect, normalizeDrag, pointToSlide, resizeRect, toPercent, withMinSize,
@@ -70,13 +69,12 @@ export function ReviewSlideLayer({ slug, index }: ReviewSlideLayerProps) {
     capture(e)
   }
 
-  const onFrameDown = (e: ReactPointerEvent<HTMLElement>, key: string, kind: "draft" | "sent", handle?: Handle) => {
+  const onFrameDown = (e: ReactPointerEvent<HTMLElement>, key: string, handle?: Handle) => {
     e.stopPropagation()
     if (e.button !== 0) return
     const wasOpen = review.editor?.key === key
     if (!wasOpen) review.closeEditor(true)
     review.select(key)
-    if (kind === "sent") { review.openEditor(key); return }
     const frame = review.drafts.find(d => d.name === key)
     if (!frame) return
     drag.current = { kind: handle ? "resize" : "move", handle, name: key, p0: toSlide(e), origin: frame.rect, rect: null, moved: false, wasOpen }
@@ -127,7 +125,6 @@ export function ReviewSlideLayer({ slug, index }: ReviewSlideLayerProps) {
   }
 
   const drafts = review.drafts.filter(d => d.slide === slug)
-  const sent = review.openSent.filter(f => f.slide === slug)
 
   return (
     <div
@@ -147,67 +144,42 @@ export function ReviewSlideLayer({ slug, index }: ReviewSlideLayerProps) {
         return (
           <FrameBox
             key={d.name}
-            frameKey={d.name}
             name={d.name}
-            kind="draft"
             rect={rect}
             size={size}
             selected={selected}
             highlight={review.highlight === d.name}
-            working={false}
             label={t("frameLabel", { name: d.name })}
-            onPointerDown={(e, handle) => onFrameDown(e, d.name, "draft", handle)}
+            onPointerDown={(e, handle) => onFrameDown(e, d.name, handle)}
             onOpen={() => review.openEditor(d.name)}
             handles={selected}
           />
         )
       })}
-      {sent.map((f) => (
-        <FrameBox
-          key={f.key}
-          frameKey={f.key}
-          name={f.name}
-          kind="sent"
-          rect={f.rect}
-          size={f.size}
-          selected={review.selected === f.key}
-          highlight={review.highlight === f.key}
-          working
-          label={t("frameLabel", { name: f.name })}
-          onPointerDown={(e) => onFrameDown(e, f.key, "sent")}
-          onOpen={() => review.openEditor(f.key)}
-          handles={false}
-        />
-      ))}
       {temp && <div className="review-temp" style={toPercent(temp, size)} data-review-temp />}
     </div>
   )
 }
 
 interface FrameBoxProps {
-  frameKey: string
   name: string
-  kind: "draft" | "sent"
   rect: Rect
   size: SlideSize
   selected: boolean
   highlight: boolean
-  working: boolean
   label: string
   handles: boolean
   onPointerDown: (e: ReactPointerEvent<HTMLElement>, handle?: Handle) => void
   onOpen: () => void
 }
 
-function FrameBox({ frameKey, name, kind, rect, size, selected, highlight, working, label, handles, onPointerDown, onOpen }: FrameBoxProps) {
+function FrameBox({ name, rect, size, selected, highlight, label, handles, onPointerDown, onOpen }: FrameBoxProps) {
   return (
     <div
       className="review-frame"
-      data-review-frame={frameKey}
-      data-kind={kind}
+      data-review-frame={name}
       data-selected={selected}
       data-highlight={highlight}
-      data-working={working}
       style={toPercent(rect, size)}
       role="button"
       tabIndex={0}
@@ -215,10 +187,7 @@ function FrameBox({ frameKey, name, kind, rect, size, selected, highlight, worki
       onPointerDown={(e) => onPointerDown(e)}
       onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); onOpen() } }}
     >
-      <div className="review-tag text-xs font-bold">
-        {working && <Loader2 className="h-2.5 w-2.5 animate-spin" aria-hidden />}
-        {name}
-      </div>
+      <div className="review-tag text-xs font-bold">{name}</div>
       {handles && HANDLES.map((h) => (
         <div key={h} className={`review-hd review-hd-${h}`} data-handle={h} onPointerDown={(e) => { e.stopPropagation(); onPointerDown(e, h) }} />
       ))}

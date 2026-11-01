@@ -31,9 +31,9 @@ describe("drafts storage", () => {
     }
   })
 
-  it("drops frames whose comment is empty", () => {
-    localStorage.setItem("sdpm-review-drafts:d1", JSON.stringify({ v: 1, seq: 3, frames: [frame("A"), frame("C", "  "), frame("D", "\u001c\u0085")] }))
-    expect(loadDrafts("d1")).toEqual({ seq: 3, frames: [frame("A")] })
+  it("keeps frames without a comment", () => {
+    localStorage.setItem("sdpm-review-drafts:d1", JSON.stringify({ v: 1, seq: 3, frames: [frame("A"), frame("C", "")] }))
+    expect(loadDrafts("d1")).toEqual({ seq: 3, frames: [frame("A"), frame("C", "")] })
   })
 
   it("seq never falls behind a stored name, so deleted names are not reused", () => {

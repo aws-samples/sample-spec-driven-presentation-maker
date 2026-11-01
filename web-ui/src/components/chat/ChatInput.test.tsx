@@ -179,6 +179,16 @@ describe("ChatInput send override and keep-on-failure", () => {
     expect(onSend).not.toHaveBeenCalled()
   })
 
+  it("keeps the override button disabled until canSend accepts the input", () => {
+    const { onSend, textarea } = renderInput({ sendOverride: { label: "Request changes", blocked: false, canSend: (input: string) => input.trim() !== "" } })
+    const button = screen.getByRole("button", { name: "Request changes" }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true })
+    expect(onSend).not.toHaveBeenCalled()
+    changeValue(textarea, "overall")
+    expect(button.disabled).toBe(false)
+  })
+
   it("keeps the text when onSend resolves to false", async () => {
     const onSend = vi.fn(async () => false as const)
     const { textarea } = renderInput({ onSend, sendOverride: { label: "Request changes", blocked: false } })

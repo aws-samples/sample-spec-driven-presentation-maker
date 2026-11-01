@@ -4,7 +4,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
-import type { SentReview } from "@/lib/review/marker"
 
 const { toastMock, createReview } = vi.hoisted(() => {
   const toastMock = Object.assign(vi.fn((..._args: unknown[]) => "toast-1"), { dismiss: vi.fn() })
@@ -30,10 +29,6 @@ function renderProvider(props: Partial<React.ComponentProps<typeof ReviewProvide
       <Capture />
     </ReviewProvider>,
   )
-}
-
-function sent(id: string, names: string[], slide = "intro"): SentReview {
-  return { id, note: null, comments: names.map(name => ({ name, slide, rect: [0, 0, 100, 100], text: `fix ${name}` })) }
 }
 
 /** Draw a frame and save its text, as the canvas and card do. */
@@ -83,30 +78,49 @@ describe("ReviewProvider", () => {
     expect(api.drafts).toEqual([])
   })
 
-  it("a comment is required: an empty new frame goes without undo, an emptied one is deleted with undo (R2.6)", () => {
+  it("a frame stays without a comment; only Esc on a frame just drawn cancels it", () => {
     renderProvider()
     act(() => { api.addFrame("intro", [0, 0, 100, 100]) })
     act(() => { api.closeEditor(true) })
-    expect(api.drafts).toEqual([])
-    expect(api.canUndo).toBe(false)
-    expect(toastMock).not.toHaveBeenCalled()
+    expect(api.drafts.map(d => [d.name, d.text])).toEqual([["A", ""]])
+    expect(api.readyDrafts).toHaveLength(1)
 
+    // Esc (cancel) on a new frame removes it without undo, even with typed text.
+    act(() => { api.addFrame("intro", [0, 0, 100, 100]) })
+    act(() => { api.setEditorText("typed") })
+    act(() => { api.closeEditor(false) })
+    expect(api.drafts.map(d => d.name)).toEqual(["A"])
+    expect(api.canUndo).toBe(false)
+
+    // Emptying a saved comment keeps the frame; cancelling an existing frame keeps it.
     addSaved("intro", "keep")
-    act(() => { api.openEditor("B") })
+    act(() => { api.openEditor("C") })
     act(() => { api.setEditorText("   ") })
     act(() => { api.closeEditor(true) })
-    expect(api.drafts).toEqual([])
-    expect(api.canUndo).toBe(true)
-    expect(toastMock).toHaveBeenCalledTimes(1)
+    act(() => { api.openEditor("A") })
+    act(() => { api.closeEditor(false) })
+    expect(api.drafts.map(d => [d.name, d.text])).toEqual([["A", ""], ["C", ""]])
+    expect(toastMock).not.toHaveBeenCalled()
   })
 
-  it("a comment of only the whitespace the servers strip (U+001C, U+0085) counts as empty", () => {
+  it("strips the whitespace the servers strip (U+001C, U+0085) from a comment", () => {
     renderProvider()
-    act(() => { api.addFrame("intro", [0, 0, 100, 100]) })
-    act(() => { api.setEditorText("\u001c\u0085 ") })
-    act(() => { api.closeEditor(true) })
-    expect(api.drafts).toEqual([])
-    expect(api.readyDrafts).toEqual([])
+    addSaved("intro", "\u001c\u0085 ")
+    expect(api.drafts.map(d => d.text)).toEqual([""])
+  })
+
+  it("can submit with a comment or a note, not with frames alone", async () => {
+    renderProvider()
+    expect(api.canSubmit("note")).toBe(false)
+    addSaved("intro", "")
+    expect(api.canSubmit("")).toBe(false)
+    expect(api.canSubmit(" \u0085")).toBe(false)
+    expect(api.canSubmit("overall")).toBe(true)
+    await act(async () => { await expect(api.submit("")).rejects.toThrow() })
+    expect(createReview).not.toHaveBeenCalled()
+    expect(api.drafts).toHaveLength(1)
+    addSaved("sales", "bigger")
+    expect(api.canSubmit("")).toBe(true)
   })
 
   it("cancel keeps the saved text", () => {
@@ -142,6 +156,7 @@ describe("ReviewProvider", () => {
     addSaved("intro", "\u0085 bigger \u001c")
     addSaved("sales", "@A colour")
     addSaved("gone", "slide was deleted")
+    addSaved("sales", "")
     let created: SubmittedReview | null = null
     await act(async () => { created = await api.submit("\u001f overall note \u0085") })
     expect(created).toMatchObject({ id: "20261101-102000-a1b2", message: "[review:20261101-102000-a1b2] …" })
@@ -150,13 +165,13 @@ describe("ReviewProvider", () => {
       comments: [
         { name: "A", slide: "intro", rect: [10, 21, 300, 201], text: "bigger" },
         { name: "B", slide: "sales", rect: [10, 21, 300, 201], text: "@A colour" },
+        { name: "D", slide: "sales", rect: [10, 21, 300, 201], text: "" },
       ],
     }, "tok")
+    // The sent frames leave the canvas at once.
     expect(api.drafts).toEqual([])
     expect(api.toolOn).toBe(false)
-    // The frames come back from the chat message while its turn runs (setWorkingReview).
-    expect(api.openSent).toEqual([])
-    expect(addSaved("intro", "after")).toBe("D")
+    expect(addSaved("intro", "after")).toBe("E")
   })
 
   it("restore puts the sent frames back in front of frames drawn since, once", async () => {
@@ -199,28 +214,6 @@ describe("ReviewProvider", () => {
     addSaved("intro", "keep me")
     await act(async () => { await expect(api.submit("")).rejects.toThrow("boom") })
     expect(api.drafts.map(d => d.text)).toEqual(["keep me"])
-  })
-
-  it("shows the working request's frames on existing slides until the turn ends", () => {
-    renderProvider()
-    const id = "20261101-102000-a1b2"
-    const review = { ...sent(id, ["A"]), comments: [...sent(id, ["A"]).comments, ...sent(id, ["B"], "gone").comments] }
-    act(() => { api.setWorkingReview("d1", review) })
-    expect(api.workingReview).toBe(review)
-    expect(api.openSent).toEqual([{ key: `${id}/A`, requestId: id, name: "A", slide: "intro", rect: [0, 0, 100, 100], size: { width: 1920, height: 1080 }, text: "fix A" }])
-    expect(api.lookup(`${id}/A`)?.kind).toBe("sent")
-    act(() => { api.select(`${id}/A`); api.setPeek(`${id}/A`) })
-    act(() => { api.setWorkingReview("d1", null) })
-    expect(api.openSent).toEqual([])
-    expect(api.selected).toBeNull()
-    expect(api.peek).toBeNull()
-  })
-
-  it("ignores a working request reported for another deck", () => {
-    renderProvider()
-    act(() => { api.setWorkingReview("d2", sent("20261101-102000-a1b2", ["A"])) })
-    expect(api.workingReview).toBeNull()
-    expect(api.openSent).toEqual([])
   })
 
   it("changing deck resets the tool and selection", () => {

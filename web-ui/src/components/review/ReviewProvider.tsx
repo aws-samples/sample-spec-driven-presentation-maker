@@ -8,14 +8,13 @@
  * screens without a provider so those components render nothing extra.
  *
  * State: tool on/off, unsent frames (persisted per deck in localStorage with a sequence that
- * only grows), selection, the open card, hover, mention highlight, one undo slot for the last
- * delete, and the change request the agent is working on (its frames stay on the canvas as
- * 対応中 until the turn ends; the chat panel reports it from the message, see
- * `setWorkingReview`). Pure rules live in `@/lib/review/*`. Changing deck resets everything
+ * only grows), selection, the open card, hover, mention highlight and one undo slot for the
+ * last delete. A frame keeps its place whether or not it has a comment; only an explicit delete
+ * removes it, and Esc on a frame just drawn cancels it. Sent frames leave the canvas once the
+ * request is created. Pure rules live in `@/lib/review/*`. Changing deck resets everything
  * except whether the hint was seen. Nothing here reads the review files.
  *
- * Frame keys: a draft is keyed by its name (`A`); a sent comment by `<requestId>/<name>`
- * (`sentFrameKey`), so names reused across browsers never collide on the canvas.
+ * Frames are keyed by their name (`A`).
  */
 
 "use client"
@@ -29,26 +28,14 @@ import { DEFAULT_SIZE, roundRect, type Rect, type SlideSize } from "@/lib/review
 import { loadDrafts, saveDrafts, type DraftFrame } from "@/lib/review/drafts"
 import { frameName, nextSeq } from "@/lib/review/naming"
 import { MENTION_RE, stripWhitespace, type ReviewSubmission } from "@/lib/review/schema"
-import type { SentReview } from "@/lib/review/marker"
-
-export interface SentFrame {
-  key: string
-  requestId: string
-  name: string
-  slide: string
-  rect: Rect
-  /** Slide size the rect was written in (the deck's). */
-  size: SlideSize
-  text: string
-}
 
 export interface EditorState {
   key: string
-  /** True for a frame just drawn: closing it without text removes it without undo. */
+  /** True for a frame just drawn: cancelling its card (Esc, ×) removes it without undo. */
   isNew: boolean
 }
 
-export type FrameLookup = { kind: "draft"; frame: DraftFrame; index: number } | { kind: "sent"; frame: SentFrame }
+export interface FrameLookup { frame: DraftFrame; index: number }
 
 export interface ReviewContextValue {
   enabled: boolean
@@ -59,17 +46,15 @@ export interface ReviewContextValue {
   toolOn: boolean
   hintSeen: boolean
   drafts: DraftFrame[]
-  /** Drafts with a comment on a slide that exists: what `submit` sends. */
+  /** Drafts on a slide that exists: what `submit` sends. */
   readyDrafts: DraftFrame[]
+  /** Whether `submit(note)` has something to ask for: a ready draft with a comment, or a note. */
+  canSubmit: (note: string) => boolean
   selected: string | null
   editor: EditorState | null
   peek: string | null
   highlight: string | null
   canUndo: boolean
-  /** The change request of the agent turn in progress (its comments are 対応中). */
-  workingReview: SentReview | null
-  /** Frames of `workingReview` on slides that exist. */
-  openSent: SentFrame[]
   setToolOn: (on: boolean) => void
   toggleTool: () => void
   addFrame: (slide: string, rect: Rect) => string
@@ -86,12 +71,10 @@ export interface ReviewContextValue {
   setHighlight: (key: string | null) => void
   focusFrame: (key: string) => void
   lookup: (key: string) => FrameLookup | null
-  /** The chat of `deckId` has a turn running for `review` (null: none); ignored for another deck. */
-  setWorkingReview: (deckId: string, review: SentReview | null) => void
   /**
-   * Create the request from the ready drafts (they leave the drafts); resolves to the chat
-   * message to send and `restore`, which puts the sent frames back into the drafts when the
-   * chat send fails.
+   * Create the request from the ready drafts (they leave the drafts and the canvas); resolves
+   * to the chat message to send and `restore`, which puts the sent frames back into the drafts
+   * when the chat send fails.
    */
   submit: (note: string) => Promise<SubmittedReview>
   /** A frame was moved or resized on screen (the card follows it). */
@@ -105,10 +88,6 @@ export interface SubmittedReview {
   id: string
   message: string
   restore: () => void
-}
-
-export function sentFrameKey(requestId: string, name: string): string {
-  return `${requestId}/${name}`
 }
 
 /** Names mentioned as `@X` in `text`. */
@@ -140,14 +119,13 @@ interface Core {
   peek: string | null
   highlight: string | null
   undo: { frame: DraftFrame; index: number } | null
-  working: SentReview | null
 }
 
 function initCore(deckId: string | null | undefined): Core {
   const stored = deckId ? loadDrafts(deckId) : { seq: 0, frames: [] }
   return {
     deckId, seq: stored.seq, drafts: stored.frames, toolOn: false, selected: null, editor: null,
-    peek: null, highlight: null, undo: null, working: null,
+    peek: null, highlight: null, undo: null,
   }
 }
 
@@ -221,29 +199,22 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
   }, [])
 
   /* ── Derived ── */
-  const openSent = useMemo<SentFrame[]>(() => {
-    const working = core.working
-    if (!working) return []
-    const slugSet = new Set(stableSlugs)
-    return working.comments
-      .filter(c => slugSet.has(c.slide))
-      .map(c => ({ key: sentFrameKey(working.id, c.name), requestId: working.id, name: c.name, slide: c.slide, rect: c.rect, size, text: c.text }))
-  }, [core.working, stableSlugs, size])
-
   const readyDrafts = useMemo(() => {
     const slugSet = new Set(stableSlugs)
-    return core.drafts.filter(d => stripWhitespace(d.text) && slugSet.has(d.slide))
+    return core.drafts.filter(d => slugSet.has(d.slide))
   }, [core.drafts, stableSlugs])
+
+  const canSubmit = useCallback((note: string) => (
+    readyDrafts.length > 0 && (readyDrafts.some(d => stripWhitespace(d.text)) || !!stripWhitespace(note))
+  ), [readyDrafts])
 
   const lookup = useCallback((key: string): FrameLookup | null => {
     const c = coreRef.current
     const index = c.drafts.findIndex(d => d.name === key)
-    if (index >= 0) return { kind: "draft", frame: c.drafts[index], index }
-    const sent = openSent.find(f => f.key === key)
-    return sent ? { kind: "sent", frame: sent } : null
+    return index >= 0 ? { frame: c.drafts[index], index } : null
   // core is read through coreRef; re-create when drafts change so consumers re-render.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [openSent, core.drafts])
+  }, [core.drafts])
 
   /* ── Frames ── */
   const deleteFrame = useCallback((name: string) => {
@@ -287,29 +258,13 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
   }, [update, clearUndo])
   useEffect(() => { undoDeleteRef.current = undoDelete }, [undoDelete])
 
-  /**
-   * Apply `text` to draft `name` (R2.6): a comment is required, so an empty text removes a
-   * frame that never had one (no undo) and deletes one that had (with undo).
-   */
+  /** Apply `text` to draft `name`, stripped; an empty comment is kept (the frame stays). */
   const commitText = useCallback((name: string, text: string) => {
-    const c = coreRef.current
-    const frame = c.drafts.find(d => d.name === name)
+    const frame = coreRef.current.drafts.find(d => d.name === name)
     if (!frame) return
     const value = stripWhitespace(text)
-    if (value) {
-      if (value !== frame.text) update(cur => ({ ...cur, drafts: cur.drafts.map(d => (d.name === name ? { ...d, text: value } : d)) }))
-      return
-    }
-    if (!stripWhitespace(frame.text)) {
-      update(cur => ({
-        ...cur, drafts: cur.drafts.filter(d => d.name !== name),
-        selected: cur.selected === name ? null : cur.selected,
-        peek: cur.peek === name ? null : cur.peek,
-      }))
-      return
-    }
-    deleteFrame(name)
-  }, [update, deleteFrame])
+    if (value !== frame.text) update(cur => ({ ...cur, drafts: cur.drafts.map(d => (d.name === name ? { ...d, text: value } : d)) }))
+  }, [update])
 
   const closeEditor = useCallback((save: boolean) => {
     const c = coreRef.current
@@ -317,11 +272,18 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     if (!ed) return
     const typed = editorText.current
     editorText.current = null
+    // Cancelling the card of a frame just drawn cancels the frame (no undo).
+    if (!save && ed.isNew) {
+      update(cur => ({
+        ...cur, editor: null, drafts: cur.drafts.filter(d => d.name !== ed.key),
+        selected: cur.selected === ed.key ? null : cur.selected,
+        peek: cur.peek === ed.key ? null : cur.peek,
+      }))
+      return
+    }
     update(cur => ({ ...cur, editor: null }))
-    const frame = c.drafts.find(d => d.name === ed.key)
-    if (!frame) return
-    // Cancelling keeps the saved text; a frame left without any text is removed.
-    commitText(frame.name, save && typed !== null ? typed : frame.text)
+    // Cancelling keeps the saved text.
+    if (save && typed !== null) commitText(ed.key, typed)
   }, [update, commitText])
 
   const openEditor = useCallback((key: string, isNew = false) => {
@@ -383,22 +345,6 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
   }, [closeEditor, setToolOn, select, openEditor])
 
   /* ── Change requests ── */
-  const setWorkingReview = useCallback((forDeck: string, working: SentReview | null) => {
-    update(cur => {
-      if (cur.deckId !== forDeck || cur.working === working) return cur
-      if (cur.working && working && cur.working.id === working.id) return cur
-      // The frames leave the canvas with the turn: drop any selection or card on them.
-      const gone = (key: string | null) => !!key && key.includes("/") && !(working && key.startsWith(`${working.id}/`))
-      return {
-        ...cur, working,
-        selected: gone(cur.selected) ? null : cur.selected,
-        peek: gone(cur.peek) ? null : cur.peek,
-        highlight: gone(cur.highlight) ? null : cur.highlight,
-        editor: cur.editor && gone(cur.editor.key) ? null : cur.editor,
-      }
-    })
-  }, [update])
-
   const submit = useCallback(async (note: string): Promise<SubmittedReview> => {
     closeEditor(true)
     const c = coreRef.current
@@ -406,8 +352,9 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     if (!forDeck) throw new Error("No deck is open")
     const { slugs: currentSlugs, size: currentSize, idToken: token } = live.current
     const slugSet = new Set(currentSlugs)
-    const frames = c.drafts.filter(d => stripWhitespace(d.text) && slugSet.has(d.slide))
-    if (!frames.length) throw new Error("No comments to send")
+    const frames = c.drafts.filter(d => slugSet.has(d.slide))
+    if (!frames.length) throw new Error("No frames to send")
+    if (!frames.some(d => stripWhitespace(d.text)) && !stripWhitespace(note)) throw new Error("No comment or note to send")
     const submission: ReviewSubmission = {
       note: stripWhitespace(note) || null,
       comments: frames.map(d => ({ name: d.name, slide: d.slide, rect: roundRect(d.rect, currentSize), text: stripWhitespace(d.text) })),
@@ -451,16 +398,15 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
 
   const value = useMemo<ReviewContextValue>(() => ({
     enabled, deckId: deckId ?? null, slugs: stableSlugs, slideSize: size, agentBusy,
-    toolOn: core.toolOn, hintSeen, drafts: core.drafts, readyDrafts, selected: core.selected, editor: core.editor,
+    toolOn: core.toolOn, hintSeen, drafts: core.drafts, readyDrafts, canSubmit, selected: core.selected, editor: core.editor,
     peek: core.peek, highlight: core.highlight, canUndo: core.undo !== null,
-    workingReview: core.working, openSent,
     setToolOn, toggleTool, addFrame, updateRect, commitText, deleteFrame, undoDelete, select, openEditor, closeEditor,
-    setEditorText, setPeek, setHighlight, focusFrame, lookup, setWorkingReview, submit,
+    setEditorText, setPeek, setHighlight, focusFrame, lookup, submit,
     notifyFrameMoved, onFrameMoved, setDragging, isDragging,
   }), [
-    enabled, deckId, stableSlugs, size, agentBusy, core, hintSeen, readyDrafts, openSent,
+    enabled, deckId, stableSlugs, size, agentBusy, core, hintSeen, readyDrafts, canSubmit,
     setToolOn, toggleTool, addFrame, updateRect, commitText, deleteFrame, undoDelete, select, openEditor, closeEditor,
-    setEditorText, setPeek, setHighlight, focusFrame, lookup, setWorkingReview, submit,
+    setEditorText, setPeek, setHighlight, focusFrame, lookup, submit,
     notifyFrameMoved, onFrameMoved, setDragging, isDragging,
   ])
 

@@ -1575,15 +1575,6 @@ body {
   background: color-mix(in oklch, var(--human) 14%, transparent);
   box-shadow: 0 0 0 4px color-mix(in oklch, var(--human) 35%, transparent);
 }
-.review-frame[data-kind="sent"] {
-  border-color: color-mix(in oklch, var(--human) 70%, transparent);
-  cursor: pointer;
-}
-.review-frame[data-working="true"] { animation: review-pulse 1.3s ease-in-out infinite; }
-@keyframes review-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 color-mix(in oklch, var(--human) 35%, transparent); }
-  50% { box-shadow: 0 0 0 6px color-mix(in oklch, var(--human) 0%, transparent); }
-}
 .review-tag {
   position: absolute;
   left: -1.5px;
@@ -1636,7 +1627,7 @@ body {
 }
 .review-card[data-mode="peek"] { pointer-events: none; box-shadow: 0 10px 28px oklch(0 0 0 / 40%); }
 /* Editing: the card takes on the frame's colour, so it reads as "this frame is open". */
-.review-card[data-mode="edit"], .review-card[data-mode="view"] {
+.review-card[data-mode="edit"] {
   border-color: color-mix(in oklch, var(--human) 45%, transparent);
   box-shadow: 0 16px 48px oklch(0 0 0 / 50%), 0 0 0 3px color-mix(in oklch, var(--human) 10%, transparent);
 }
@@ -1653,7 +1644,6 @@ body {
 @keyframes review-reveal { from { opacity: 0; transform: translateY(-3px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .review-frame[data-working="true"],
   .review-card[data-phase="enter"],
   .review-card[data-phase="leave"],
   .review-reveal { animation: none; }

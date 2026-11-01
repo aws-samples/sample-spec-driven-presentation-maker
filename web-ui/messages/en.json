@@ -606,25 +606,21 @@
     "placeholder": "Describe the change…  @ to reference another frame",
     "footer": "Enter to save · Shift+Enter for a new line",
     "slide": "Slide {n}",
-    "status": {
-      "working": "In progress",
-      "failed": "Not completed"
-    },
-    "frameLabel": "Comment {name}",
-    "deleteLabel": "Delete comment (Delete)",
+    "frameLabel": "Frame {name}",
+    "deleteLabel": "Delete frame (Delete)",
     "closeLabel": "Close (Esc)",
     "mentionList": "Frames to reference",
     "deleted": "Deleted {name}",
     "deletedReferenced": "Deleted {name} (referenced by {refs})",
     "undo": "Undo",
     "draftTitle": "Change request",
-    "draftCount": "{count, plural, one {# comment} other {# comments}}",
-    "showComments": "Show comments",
-    "hideComments": "Hide comments",
+    "draftCount": "{count, plural, one {# frame} other {# frames}}",
+    "showComments": "Show frames",
+    "hideComments": "Hide frames",
     "send": "Request changes",
     "busyHint": "You can send once the agent has finished",
     "notePlaceholder": "A note for the whole deck (optional)  ⌘↵ to request",
-    "complete": "Done",
-    "sendFailed": "Couldn't send the change request"
+    "sendFailed": "Couldn't send the change request",
+    "noComment": "No comment"
   }
 }

@@ -183,15 +183,11 @@ interface ChatMessageProps {
   onSend?: (text: string) => void
   /** Whether hearing cards should be disabled (a new message was sent). */
   hearingDisabled?: boolean
-  /** Deck of this chat; a change request card links to the frames only for the open deck. */
+  /** Deck of this chat; a change request card numbers the slides only for the open deck. */
   deckId?: string
-  /** The agent turn for this (user) message is running: a change request card shows 対応中. */
-  reviewWorking?: boolean
-  /** The agent turn for this (user) message failed: a change request card shows 未完了. */
-  failed?: boolean
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, sessionId, accessToken, onSend, hearingDisabled = false, deckId, reviewWorking = false, failed = false }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, sessionId, accessToken, onSend, hearingDisabled = false, deckId }: ChatMessageProps) {
   const t = useTranslations("chat")
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
@@ -287,7 +283,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 ))}
               </div>
             )}
-            <ReviewRequestCard request={reviewRequest} working={reviewWorking} failed={failed} deckId={deckId} />
+            <ReviewRequestCard request={reviewRequest} deckId={deckId} />
           </div>
         ) : isUser ? (
           /* User bubble */

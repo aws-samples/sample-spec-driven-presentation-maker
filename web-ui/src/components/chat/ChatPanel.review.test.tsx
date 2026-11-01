@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ChatPanel sending a change request (Local mode): the frames stay on the canvas as 対応中
- * while the agent turn runs and leave when it ends; a turn that fails puts the comments back
- * into the drafts and the note back into the input, and saves the message flagged `failed`,
- * so its card shows 未完了 live and after a reload.
+ * ChatPanel sending a change request (Local mode): the sent frames leave the drafts as soon as
+ * the request is created and the card shows no status; a turn that fails puts the frames back
+ * into the drafts and the note back into the input. Frames without a comment can be sent when
+ * another frame has one or the note is set.
  */
 
 import fs from "fs"
@@ -60,11 +60,6 @@ function Capture() {
 
 const fetchMock = vi.fn(async (..._args: unknown[]) => new Response("{}", { headers: { "content-type": "application/json" } }))
 
-/** Bodies of the Local chat saves (`POST /api/agent/chat`). */
-const savedChats = () => fetchMock.mock.calls
-  .filter(([url]) => url === "/api/agent/chat")
-  .map(([, init]) => JSON.parse((init as RequestInit).body as string) as { messages: { role: string; failed?: boolean }[] })
-
 async function renderPanel() {
   const view = renderWithIntl(
     <ReviewProvider deckId="d1" slugs={["intro", "sales"]} enabled agentBusy={false} openChat={() => {}} idToken="tok">
@@ -97,7 +92,7 @@ function deferred() {
   return { promise, resolve, reject }
 }
 
-const status = (container: HTMLElement) => container.querySelector("[data-review-status]")?.getAttribute("data-review-status")
+const sendButton = () => screen.getByRole("button", { name: "Request changes" }) as HTMLButtonElement
 
 describe("ChatPanel change request", () => {
   beforeEach(() => {
@@ -113,7 +108,7 @@ describe("ChatPanel change request", () => {
     vi.unstubAllGlobals()
   })
 
-  it("keeps the frames on the canvas while the turn runs and removes them when it ends", async () => {
+  it("takes the sent frames off at once and shows the card without a status", async () => {
     const turn = deferred()
     invokeAgentCore.mockImplementation(() => turn.promise)
     const { container } = await renderPanel()
@@ -122,32 +117,37 @@ describe("ChatPanel change request", () => {
 
     expect(createReview).toHaveBeenCalledWith("d1", expect.objectContaining({ note: "overall" }), "tok")
     expect(invokeAgentCore.mock.calls[0][0]).toBe(MESSAGE)
-    await waitFor(() => expect(api.workingReview?.id).toBe(ID))
-    expect(api.openSent.map(f => f.name)).toEqual(["A", "C", "B"])
     expect(api.drafts).toEqual([])
-    expect(status(container)).toBe("working")
+    await waitFor(() => expect(container.querySelector("[data-review-request-card]")).not.toBeNull())
+    expect(container.querySelector("[data-review-status]")).toBeNull()
 
     await act(async () => { turn.resolve() })
-    await waitFor(() => expect(api.workingReview).toBeNull())
-    expect(api.openSent).toEqual([])
-    expect(status(container)).toBe("done")
+    expect(api.drafts).toEqual([])
+    expect(container.querySelector("[data-review-status]")).toBeNull()
   })
 
-  it("puts the comments and the note back and shows 未完了 when the turn fails", async () => {
+  it("puts the frames and the note back when the turn fails", async () => {
     invokeAgentCore.mockRejectedValue(new Error("network down"))
     const { container } = await renderPanel()
     addSaved("intro", "bigger")
-    addSaved("sales", "@A colour")
+    addSaved("sales", "")
     await requestChanges("overall")
 
-    await waitFor(() => expect(api.drafts.map(d => d.text)).toEqual(["bigger", "@A colour"]))
+    await waitFor(() => expect(api.drafts.map(d => d.text)).toEqual(["bigger", ""]))
     expect(api.readyDrafts).toHaveLength(2)
-    expect(api.openSent).toEqual([])
-    expect(status(container)).toBe("failed")
-    expect(screen.queryByText("Done")).toBeNull()
+    expect(container.querySelector("[data-review-status]")).toBeNull()
     await waitFor(() => expect((screen.getByRole("textbox") as HTMLTextAreaElement).value).toBe("overall"))
-    // The one save at the end of the turn (.chat.json) carries the flag, so the card restores as 未完了.
-    expect(savedChats()).toHaveLength(1)
-    expect(savedChats()[0].messages.find(m => m.role === "user")?.failed).toBe(true)
+  })
+
+  it("sends frames without a comment once the note is set", async () => {
+    invokeAgentCore.mockResolvedValue(undefined)
+    await renderPanel()
+    addSaved("intro", "")
+    expect(sendButton().disabled).toBe(true)
+    await requestChanges("make @A the title")
+    expect(createReview).toHaveBeenCalledWith("d1", {
+      note: "make @A the title",
+      comments: [{ name: "A", slide: "intro", rect: [10, 20, 300, 200], text: "" }],
+    }, "tok")
   })
 })

@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * ReviewCommentCard — one fixed-position card for hovering a frame (peek) and for opening it
- * (edit for drafts, view for sent comments). Hover → click turns the same card into the
- * editor in place: its height morphs, the header buttons and footer fade in, the border takes
+ * (edit). A frame without a comment peeks as a muted 「コメントなし」. Hover → click turns the
+ * same card into the editor in place: its height morphs, the header buttons and footer fade in, the border takes
  * the annotation colour. Moving between frames while peeking glides the card over.
  *
  * Placement (mock `placePop`): right of the frame (left when there is no room), top aligned to
@@ -18,12 +18,11 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import { createPortal } from "react-dom"
 import TextareaAutosize from "react-textarea-autosize"
 import { useTranslations } from "next-intl"
-import { Loader2, Trash2, X } from "lucide-react"
+import { Trash2, X } from "lucide-react"
 import { useCompositionSafe } from "@/hooks/useCompositionSafe"
 import { MentionText } from "@/components/review/MentionText"
-import { frameElement, sentFrameKey, useReview, type ReviewContextValue } from "@/components/review/ReviewProvider"
+import { frameElement, useReview, type ReviewContextValue } from "@/components/review/ReviewProvider"
 import type { DraftFrame } from "@/lib/review/drafts"
-import { stripWhitespace } from "@/lib/review/schema"
 
 const CARD_WIDTH = 300
 const GAP = 12
@@ -31,7 +30,7 @@ const PEEK_DELAY_MS = 120
 const LEAVE_MS = 110
 const MORPH_MS = 230
 
-type Mode = "peek" | "edit" | "view"
+type Mode = "peek" | "edit"
 interface CardView { key: string; mode: Mode; phase: "enter" | "steady" | "leave"; glide: boolean; reveal: boolean; seq: number }
 
 const ICON_BUTTON = "inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-background-hover hover:text-foreground"
@@ -48,8 +47,7 @@ export function ReviewCommentCard() {
   const targetKey = active ? (active.editor?.key ?? active.peek) : null
   const found = active && targetKey ? active.lookup(targetKey) : null
   const desired: { key: string; mode: Mode } | null = !active || !targetKey || !found ? null
-    : !active.editor ? { key: targetKey, mode: "peek" }
-      : { key: targetKey, mode: found.kind === "draft" ? "edit" : "view" }
+    : { key: targetKey, mode: active.editor ? "edit" : "peek" }
   const desiredSig = desired ? `${desired.key}|${desired.mode}` : ""
 
   // Derive the card's transition from the change of target (state adjusted during render).
@@ -195,16 +193,11 @@ export function ReviewCommentCard() {
   const shown = review.lookup(view.key)
   if (!shown) return null
 
-  const isSent = shown.kind === "sent"
   const name = shown.frame.name
   const slideIndex = review.slugs.indexOf(shown.frame.slide)
-  // Sent frames are on the canvas only while the agent works on their request.
-  const status = isSent ? "working" : null
   const reveal = view.reveal ? "review-reveal" : ""
-  const draftNames = new Set(review.drafts.filter(d => stripWhitespace(d.text)).map(d => d.name))
-  const sentNames = new Set(isSent ? (review.workingReview?.comments.map(c => c.name) ?? []) : [])
-  const exists = (n: string) => (isSent ? sentNames.has(n) : draftNames.has(n))
-  const keyFor = isSent ? (n: string) => sentFrameKey((shown.frame as { requestId: string }).requestId, n) : undefined
+  const draftNames = new Set(review.drafts.map(d => d.name))
+  const exists = (n: string) => draftNames.has(n)
   const mode = view.mode
 
   return createPortal(
@@ -223,12 +216,6 @@ export function ReviewCommentCard() {
         <span className="inline-flex h-5 flex-none items-center rounded-[5px] bg-human px-[7px] text-xs font-bold text-human-ink">{name}</span>
         {slideIndex >= 0 && <span className="text-xs text-muted-foreground">{t("slide", { n: slideIndex + 1 })}</span>}
         <span className="flex-1" />
-        {status && (mode !== "edit") && (
-          <span className={`flex items-center gap-1 pr-1.5 text-xs text-muted-foreground ${reveal}`}>
-            {status === "working" && <Loader2 className="h-2.5 w-2.5 animate-spin" aria-hidden />}
-            {t(`status.${status}`)}
-          </span>
-        )}
         {mode === "edit" && !review.editor?.isNew && (
           <button type="button" className={`${ICON_BUTTON} ${reveal}`} aria-label={t("deleteLabel")} title={t("deleteLabel")} onClick={() => review.deleteFrame(name)}>
             <Trash2 className="h-[15px] w-[15px]" />
@@ -240,12 +227,14 @@ export function ReviewCommentCard() {
           </button>
         )}
       </div>
-      {mode === "edit" && shown.kind === "draft" && view.phase !== "leave" ? (
+      {mode === "edit" && view.phase !== "leave" ? (
         <CardEditor key={view.key} review={review} frame={shown.frame} reveal={view.reveal} onResize={place} />
-      ) : (
+      ) : shown.frame.text ? (
         <div className={`whitespace-pre-wrap break-words px-3 pb-2.5 text-sm leading-relaxed ${mode === "peek" ? "line-clamp-6" : ""}`}>
-          <MentionText text={shown.frame.text} exists={exists} keyFor={keyFor} />
+          <MentionText text={shown.frame.text} exists={exists} />
         </div>
+      ) : (
+        <div className="px-3 pb-2.5 text-sm text-muted-foreground" data-review-no-comment>{t("noComment")}</div>
       )}
     </div>,
     document.body,
@@ -259,7 +248,7 @@ interface CardEditorProps {
   onResize: () => void
 }
 
-/** The draft's textarea with `@` completion of the other drafts (R3.4). */
+/** The draft's textarea with `@` completion of the other frames, with or without a comment (R3.4). */
 function CardEditor({ review, frame, reveal, onResize }: CardEditorProps) {
   const t = useTranslations("review")
   const [value, setValue] = useState(frame.text)
@@ -290,7 +279,7 @@ function CardEditor({ review, frame, reveal, onResize }: CardEditorProps) {
 
   const query = value.slice(0, caret).match(/@([A-Za-z]*)$/)
   const candidates = query
-    ? review.drafts.filter(d => d.name !== frame.name && stripWhitespace(d.text) && d.name.startsWith(query[1].toUpperCase()))
+    ? review.drafts.filter(d => d.name !== frame.name && d.name.startsWith(query[1].toUpperCase()))
     : []
   const active = Math.min(mi, Math.max(0, candidates.length - 1))
 
@@ -353,7 +342,9 @@ function CardEditor({ review, frame, reveal, onResize }: CardEditorProps) {
               onMouseDown={(e) => { e.preventDefault(); insertMention(d.name) }}
             >
               <span className="inline-flex h-5 flex-none items-center rounded-[5px] bg-human px-[7px] text-xs font-bold text-human-ink">{d.name}</span>
-              <span className="max-w-[170px] truncate text-foreground-secondary">{d.text}</span>
+              {d.text
+                ? <span className="max-w-[170px] truncate text-foreground-secondary">{d.text}</span>
+                : <span className="max-w-[170px] truncate text-muted-foreground">{t("noComment")}</span>}
               <span className="ml-auto text-xs text-muted-foreground">{t("slide", { n: review.slugs.indexOf(d.slide) + 1 })}</span>
             </div>
           ))}

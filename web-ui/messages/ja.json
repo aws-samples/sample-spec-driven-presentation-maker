@@ -606,25 +606,21 @@
     "placeholder": "どうしたいかを書く…  @ で他の枠を参照",
     "footer": "Enter で保存 · Shift+Enter で改行",
     "slide": "スライド {n}",
-    "status": {
-      "working": "対応中",
-      "failed": "未完了"
-    },
-    "frameLabel": "コメント {name}",
-    "deleteLabel": "コメントを削除 (Delete)",
+    "frameLabel": "枠 {name}",
+    "deleteLabel": "枠を削除 (Delete)",
     "closeLabel": "閉じる (Esc)",
     "mentionList": "参照する枠",
     "deleted": "{name} を削除しました",
     "deletedReferenced": "{name} を削除しました（{refs} から参照されています）",
     "undo": "元に戻す",
     "draftTitle": "修正依頼",
-    "draftCount": "{count, plural, other {コメント # 件}}",
-    "showComments": "コメントを表示",
-    "hideComments": "コメントを隠す",
+    "draftCount": "{count, plural, other {枠 # 件}}",
+    "showComments": "枠を表示",
+    "hideComments": "枠を隠す",
     "send": "修正を依頼",
     "busyHint": "エージェントの作業が終わると送信できます",
     "notePlaceholder": "全体への一言（任意）  ⌘↵ で依頼",
-    "complete": "完了",
-    "sendFailed": "修正依頼を送信できませんでした"
+    "sendFailed": "修正依頼を送信できませんでした",
+    "noComment": "コメントなし"
   }
 }

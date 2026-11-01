@@ -38,7 +38,6 @@ import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsServic
 import type { ForkSessionPhase, KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
 import { useReview, type SubmittedReview } from "@/components/review/ReviewProvider"
 import { ReviewDraftBar } from "@/components/review/ReviewDraftBar"
-import { parseReviewMessage } from "@/lib/review/marker"
 
 interface ChatPanelProps {
   deckId: string
@@ -523,8 +522,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
    * returns the chat message (note, comments, file path, instructions, `[review:<id>]`),
    * which is sent as-is and also shown (Local .chat.json keeps the display text). A failed
    * write keeps the comments and the typed note (`false` keeps the input). A failed send
-   * puts the comments back into the drafts and the note back into an empty input, so the
-   * request can be sent again; its message is flagged `failed`, so its card shows 未完了.
+   * puts the frames back into the drafts and the note back into an empty input, so the
+   * request can be sent again (the chat shows the error).
    */
   const handleInputSend = useCallback(async (
     text: string,
@@ -584,21 +583,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     }
     return () => onLoadingChange?.(false)
   }, [isLoading, onLoadingChange])
-
-  // The change request of the running turn: its frames stay on the canvas as 対応中 and
-  // leave with the turn. Derived from the chat, so a reconnected turn shows them too.
-  const lastUserIdx = stream.messages.findLastIndex((m) => m.role === "user")
-  const workingContent = isLoading && lastUserIdx >= 0 ? stream.messages[lastUserIdx].content : null
-  const workingReview = useMemo(() => (workingContent ? parseReviewMessage(workingContent) : null), [workingContent])
-  const setWorkingReview = review?.setWorkingReview
-  useEffect(() => {
-    if (!reviewActive || !setWorkingReview) return
-    setWorkingReview(deckId, workingReview)
-  }, [reviewActive, setWorkingReview, deckId, workingReview])
-  useEffect(() => {
-    if (!reviewActive || !setWorkingReview) return
-    return () => setWorkingReview(deckId, null)
-  }, [reviewActive, setWorkingReview, deckId])
 
   const isInitial = stream.messages.length === 0 && !historyLoading
 
@@ -703,6 +687,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         ) : (
           <div className="space-y-4">
             {(() => {
+              const lastUserIdx = stream.messages.findLastIndex((m) => m.role === "user")
               return stream.messages.map((msg, i) => (
               <div key={i}>
                 {msg.mcpStatus && (
@@ -724,8 +709,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   onSend={(text: string) => handleSend(text, [], [], [])}
                   hearingDisabled={i < lastUserIdx}
                   deckId={deckId}
-                  reviewWorking={isLoading && i === lastUserIdx}
-                  failed={msg.failed}
                 />
               </div>
             ))
@@ -744,7 +727,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           disabled={!configLoaded || reconnectLoading}
           placeholder={hasReviewDrafts ? tReview("notePlaceholder") : isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
           topSlot={reviewActive ? <ReviewDraftBar /> : undefined}
-          sendOverride={hasReviewDrafts ? { label: tReview("send"), blocked: isLoading } : undefined}
+          sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading, canSend: review.canSubmit } : undefined}
           idToken={auth.user?.id_token}
           sessionId={sessionId}
           deckId={deckId}

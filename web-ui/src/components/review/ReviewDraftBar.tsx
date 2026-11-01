@@ -3,9 +3,9 @@
 /**
  * ReviewDraftBar — the unsent comments collected above the chat input (the 修正依頼 block).
  *
- * Collapsed: dot + title + count + chevron. Expanded: one row per comment ready to send
- * (tag, text with @ references, slide number, delete on hover); a row click jumps to the
- * frame and opens its card. Renders nothing without a provider or without ready comments.
+ * Collapsed: dot + title + frame count + chevron. Expanded: one row per frame to send (tag,
+ * text with @ references or a muted 「コメントなし」, slide number, delete on hover); a row click
+ * jumps to the frame and opens its card. Renders nothing without a provider or without frames.
  */
 
 "use client"
@@ -70,9 +70,13 @@ export function ReviewDraftBar() {
               >
                 <span className="inline-flex h-5 flex-none items-center rounded-[5px] bg-human px-[7px] text-xs font-bold text-human-ink">{d.name}</span>
                 <div className="min-w-0 flex-1">
-                  <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
-                    <MentionText text={d.text} exists={n => names.has(n)} />
-                  </div>
+                  {d.text ? (
+                    <div className="whitespace-pre-wrap break-words text-sm leading-relaxed">
+                      <MentionText text={d.text} exists={n => names.has(n)} />
+                    </div>
+                  ) : (
+                    <div className="text-sm leading-relaxed text-foreground-muted">{t("noComment")}</div>
+                  )}
                   <div className="mt-px text-xs text-foreground-muted">{slideLabel(d.slide)}</div>
                 </div>
                 <button

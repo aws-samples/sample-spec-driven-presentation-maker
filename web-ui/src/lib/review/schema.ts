@@ -110,7 +110,8 @@ function validateRect(rect: unknown, [width, height]: [number, number]): string 
 
 /**
  * Validate a change request (same rules and order as `validate_review_submission` in Python).
- * `slugExists` is only called with slugs that passed `SLUG_RE`.
+ * A comment text may be empty (a frame the other texts point to); at least one text or the
+ * note must not be. `slugExists` is only called with slugs that passed `SLUG_RE`.
  */
 export function validateReviewSubmission(
   body: unknown, slideSize: [number, number], slugExists: (slug: string) => boolean,
@@ -144,12 +145,12 @@ export function validateReviewSubmission(
     if (typeof c.text !== "string") return fail(`${where}.text must be a string`)
     if (c.text.includes("\0")) return fail(`${where}.text must not contain NUL`)
     const text = stripWhitespace(c.text)
-    const len = charCount(text)
-    if (len < 1 || len > MAX_TEXT_CHARS) return fail(`${where}.text must be 1-${MAX_TEXT_CHARS} characters`)
+    if (charCount(text) > MAX_TEXT_CHARS) return fail(`${where}.text exceeds ${MAX_TEXT_CHARS} characters`)
     if (seen.has(c.name)) return fail(`${where}.name is duplicated`)
     seen.add(c.name)
     out.push({ name: c.name, slide: c.slide, rect: [...(c.rect as number[])] as ReviewRect, text })
   }
+  if (note === null && !out.some(c => c.text)) return fail("a comment text or the note must be non-empty")
   return { ok: true, value: { note, comments: out } }
 }
 
