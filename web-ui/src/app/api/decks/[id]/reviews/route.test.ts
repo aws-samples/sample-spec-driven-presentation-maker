@@ -94,8 +94,9 @@ describe("POST /api/decks/[id]/reviews", () => {
     ["rect overflow", { comments: [comment({ rect: [1000, 0, 400, 100] })] }],
     ["101 comments", { comments: Array.from({ length: 101 }, (_, i) => comment({ name: String.fromCharCode(65 + (i % 26)).repeat(1 + Math.floor(i / 26)) })) }],
   ])("rejects %s with 400 and keeps the previous file", async (_name, body) => {
+    write("d1/reviews/20261031-090000-bbbb.json", "{}")
     const before = reviewFiles()
-    expect(before.length).toBeGreaterThan(0)
+    expect(before).toContain("20261031-090000-bbbb.json")
     expect((await post("d1", body)).status).toBe(400)
     expect(reviewFiles()).toEqual(before)
   })
