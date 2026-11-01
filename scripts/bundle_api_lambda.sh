@@ -8,9 +8,10 @@
 # (infra/lib/web-ui-stack.ts) and CI (.github/workflows/ci.yml, api-lambda) all run
 # this script, so CI checks exactly what a deploy ships.
 #
-# Wheels only, for the Lambda platform, whatever the host is (an arm64 CodeBuild or
-# a Mac builds the same bundle). Uses uv from PATH, or installs the pinned version
-# into a temporary directory when there is none (CodeBuild, the bundling image).
+# Wheels only, for the Lambda platform (python3.13 = Amazon Linux 2023, glibc 2.34),
+# whatever the host is (an arm64 CodeBuild or a Mac builds the same bundle). Uses uv
+# from PATH, or installs the pinned version into a temporary directory when there is
+# none (CodeBuild, the bundling image).
 set -euo pipefail
 
 UV_VERSION="0.13.6"
@@ -29,7 +30,7 @@ fi
 
 "$UV" pip install \
   --target "$OUT" \
-  --python-platform x86_64-manylinux2014 \
+  --python-platform x86_64-manylinux_2_34 \
   --python-version 3.13 \
   --only-binary :all: \
   --no-cache \

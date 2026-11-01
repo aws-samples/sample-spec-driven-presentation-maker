@@ -219,15 +219,14 @@ jobs:
       - uses: astral-sh/setup-uv@v10.3.2
       - name: Bundle
         run: bash scripts/bundle_api_lambda.sh "$RUNNER_TEMP/api-bundle"
-      - name: Handler imports from the bundle alone
+      - name: Handler imports from the bundle alone, in the Lambda runtime image
         # -I -S: no site-packages, so nothing outside the bundle can satisfy an import.
-        env:
-          TABLE_NAME: ci
-          PPTX_BUCKET: ci
-          AWS_DEFAULT_REGION: us-east-1
         run: |
-          python -I -S -c "import sys; sys.path.insert(0, sys.argv[1]); import index, shared.ingest, sdpm.api" \
-            "$RUNNER_TEMP/api-bundle"
+          docker run --rm --entrypoint /var/lang/bin/python3 \
+            -v "$RUNNER_TEMP/api-bundle:/var/task:ro" \
+            -e TABLE_NAME=ci -e PPTX_BUCKET=ci -e AWS_DEFAULT_REGION=us-east-1 \
+            public.ecr.aws/lambda/python:3.13 \
+            -I -S -c "import sys; sys.path.insert(0, '/var/task'); import index, shared.ingest, sdpm.api"
 
   guard:
     runs-on: ubuntu-latest
