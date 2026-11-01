@@ -13,8 +13,9 @@ _LOCAL = str(_ROOT / "servers" / "local")
 if _LOCAL not in sys.path:
     sys.path.insert(0, _LOCAL)
 
-import compose  # noqa: E402
 import sandbox_tools  # noqa: E402
+
+import sdpm.engine.preview.compose as compose  # noqa: E402
 
 
 def test_local_compose_output_includes_regions(tmp_path: Path, monkeypatch):

@@ -321,7 +321,12 @@ def run_python(
                 # --- Compose: SVG → optimized JSON ---
                 if svg_path:
                     try:
-                        from compose import extract_optimized_defs, split_slide_components, count_slides
+                        from sdpm.engine.preview.compose import (
+                            count_slides,
+                            extract_optimized_defs,
+                            mark_changed,
+                            split_slide_components,
+                        )
                         import time as _t
                         import re as _re
 
@@ -338,13 +343,6 @@ def run_python(
                                 cur = prev_by_slug.get(slug_name)
                                 if not cur or int(_re.search(r"_(\d+)\.json$", cur.name).group(1)) < ep:
                                     prev_by_slug[slug_name] = f
-
-                        def _mk(c: dict) -> str:
-                            b = c.get("bbox")
-                            return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
-
-                        def _fp(c: dict) -> str:
-                            return f"{c['class']}|{c.get('text', '')}"
 
                         (compose_dir / f"defs_{epoch}.json").write_text(
                             json.dumps(extract_optimized_defs(svg_path), ensure_ascii=False),
@@ -375,16 +373,11 @@ def run_python(
                                 if prev_file and prev_file.exists():
                                     try:
                                         prev_comps = json.loads(prev_file.read_text(encoding="utf-8")).get("components", [])
-                                        prev_map = {_mk(c): _fp(c) for c in prev_comps}
-                                        for c in comp_data["components"]:
-                                            k = _mk(c)
-                                            c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
+                                        mark_changed(comp_data["components"], prev_comps)
                                     except Exception:
-                                        for c in comp_data["components"]:
-                                            c["changed"] = True
+                                        mark_changed(comp_data["components"], None)
                                 else:
-                                    for c in comp_data["components"]:
-                                        c["changed"] = True
+                                    mark_changed(comp_data["components"], None)
                                 (compose_dir / f"{slug}_{epoch}.json").write_text(
                                     json.dumps(comp_data, ensure_ascii=False), encoding="utf-8"
                                 )

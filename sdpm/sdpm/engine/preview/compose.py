@@ -2,12 +2,16 @@
 # SPDX-License-Identifier: MIT-0
 """SVG composition: split LibreOffice SVG into optimized per-slide components.
 
-MCP Remote only — consumed by WebUI for build animation.
-Not shared with Engine/CLI/MCP Local (no consumer there).
+Consumed by the Web UI live preview (build animation). Both servers call it
+after ``run_python``: MCP Local writes the result to ``compose/`` in the deck
+directory, MCP Remote uploads it to S3. Storage and file naming stay in the
+servers; everything here is computation on the SVG and on compose payloads.
 """
 
 import base64
+import hashlib
 import io
+import json
 import logging
 import re
 from pathlib import Path
@@ -20,6 +24,12 @@ logger = logging.getLogger("sdpm.compose")
 SVG_NS = "http://www.w3.org/2000/svg"
 OOO_NS = "http://xml.openoffice.org/svg/export"
 _PNG_B64_RE = re.compile(r"data:image/png;base64,([A-Za-z0-9+/=]+)")
+# Strip textLength/lengthAdjust on <text>/<tspan> — webkit compresses glyphs
+# when these are present, while measure reads BoundingBox rects (unaffected).
+_TEXT_LENGTH_RE = re.compile(r'\s(?:textLength|lengthAdjust)="[^"]*"')
+
+_INHERITABLE_ATTRS = ("fill-rule", "stroke-width", "stroke-linejoin")
+"""Presentation attributes that LibreOffice sets once on root <svg> and children inherit."""
 
 
 def _png_to_webp_b64(match: re.Match) -> str:
@@ -31,18 +41,12 @@ def _png_to_webp_b64(match: re.Match) -> str:
 
 
 def _convert_images(svg_str: str) -> str:
-    return _PNG_B64_RE.sub(_png_to_webp_b64, svg_str)
+    return _TEXT_LENGTH_RE.sub("", _PNG_B64_RE.sub(_png_to_webp_b64, svg_str))
 
 
 def _strip_fonts(defs_el: etree._Element) -> None:
     for font in defs_el.findall(f".//{{{SVG_NS}}}font"):
         font.getparent().remove(font)
-
-
-def count_slides(svg_path: Path) -> int:
-    """Return the number of slides in a LibreOffice SVG."""
-    root = etree.parse(str(svg_path)).getroot()
-    return len(root.findall(f".//{{{SVG_NS}}}g[@class='Slide']"))
 
 
 def load_svg(svg_path: Path) -> etree._ElementTree:
@@ -52,6 +56,15 @@ def load_svg(svg_path: Path) -> etree._ElementTree:
 
 def _as_tree(svg: "Path | etree._ElementTree") -> etree._ElementTree:
     return svg if isinstance(svg, etree._ElementTree) else etree.parse(str(svg))
+
+
+def count_slides(svg_path: "Path | etree._ElementTree") -> int:
+    """Return the number of slides in a LibreOffice SVG.
+
+    Accepts a path or a tree from :func:`load_svg`.
+    """
+    root = _as_tree(svg_path).getroot()
+    return len(root.findall(f".//{{{SVG_NS}}}g[@class='Slide']"))
 
 
 def extract_optimized_defs(svg_path: "Path | etree._ElementTree") -> dict:
@@ -67,10 +80,6 @@ def extract_optimized_defs(svg_path: "Path | etree._ElementTree") -> dict:
         _strip_fonts(d)
     defs_svg = "".join(etree.tostring(d, encoding="unicode") for d in defs_elements)
     return {"version": 1, "defs": _convert_images(defs_svg)}
-
-
-_INHERITABLE_ATTRS = ("fill-rule", "stroke-width", "stroke-linejoin")
-"""Presentation attributes that LibreOffice sets once on root <svg> and children inherit."""
 
 
 def _propagate_root_attrs(element: etree._Element, root_attrs: dict) -> None:
@@ -193,3 +202,51 @@ def split_slide_components(svg_path: "Path | etree._ElementTree", slide_num: int
         "bgSvg": bg_svg,
         "components": components,
     }
+
+
+# --- Component-level diff against the previous compose of the same slide ---
+
+
+def source_hash(slide: dict) -> str:
+    """Content hash of a slide's JSON, stored as ``sourceHash`` in the compose payload."""
+    return hashlib.md5(
+        json.dumps(slide, sort_keys=True, ensure_ascii=False).encode(),
+        usedforsecurity=False,
+    ).hexdigest()
+
+
+def _mk(c: dict) -> str:
+    """Match key: class + bbox identifies "the same component" across builds."""
+    b = c.get("bbox")
+    return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
+
+
+def _fp(c: dict) -> str:
+    """Fingerprint: class + text decides whether a matched component changed."""
+    return f"{c['class']}|{c.get('text', '')}"
+
+
+def mark_changed(
+    components: list[dict],
+    prev_components: "list[dict] | None",
+    src_hash: str = "",
+    prev_hash: "str | None" = None,
+) -> None:
+    """Set ``changed`` on each component by comparing with the previous compose.
+
+    - No previous compose (``prev_components is None``): every component changed.
+    - Same non-empty ``src_hash`` as the previous compose: nothing changed.
+    - Otherwise a component changed when no previous component has the same
+      class + bbox, or the matched one had different text.
+    """
+    if prev_components is None:
+        for c in components:
+            c["changed"] = True
+    elif src_hash and prev_hash == src_hash:
+        for c in components:
+            c["changed"] = False
+    else:
+        prev_map = {_mk(c): _fp(c) for c in prev_components}
+        for c in components:
+            k = _mk(c)
+            c["changed"] = k not in prev_map or prev_map[k] != _fp(c)

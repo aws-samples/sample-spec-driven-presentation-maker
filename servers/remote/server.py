@@ -1244,8 +1244,13 @@ def run_python(
                         # Uses _prepare_epoch (snapshot time) so the composer with the
                         # newest slides/ snapshot wins on defs via epoch comparison.
                         try:
-                            from tools.compose import extract_optimized_defs, load_svg, split_slide_components
-                            import hashlib as _hashlib
+                            from sdpm.engine.preview.compose import (
+                                extract_optimized_defs,
+                                load_svg,
+                                mark_changed,
+                                source_hash,
+                                split_slide_components,
+                            )
 
                             svg_path = tmpdir / "measure.svg"
                             if not svg_path.exists():
@@ -1269,14 +1274,6 @@ def run_python(
                                         if ep > best_ep:
                                             best_ep, best_k = ep, k
                                     return best_k
-
-                                # Component-level diff helpers
-                                def _mk(c: dict) -> str:
-                                    b = c.get("bbox")
-                                    return f"{c['class']}|{b['x']},{b['y']},{b['w']},{b['h']}" if b else f"{c['class']}|none"
-
-                                def _fp(c: dict) -> str:
-                                    return f"{c['class']}|{c.get('text', '')}"
 
                                 # Determine which slugs to generate compose for:
                                 # the rendered slugs, plus any slug with no compose
@@ -1328,14 +1325,7 @@ def run_python(
                                         comp_data["regions"] = extract_regions(slide)
 
                                         # sourceHash from slide JSON (content-based diff)
-                                        src_hash = (
-                                            _hashlib.md5(
-                                                _json.dumps(slides[pn - 1], sort_keys=True, ensure_ascii=False).encode(),
-                                                usedforsecurity=False,
-                                            ).hexdigest()
-                                            if pn <= len(slides)
-                                            else ""
-                                        )
+                                        src_hash = source_hash(slides[pn - 1]) if pn <= len(slides) else ""
                                         comp_data["sourceHash"] = src_hash
 
                                         # Diff against previous compose for same slug
@@ -1351,18 +1341,7 @@ def run_python(
                                             except Exception:
                                                 pass
 
-                                        # If sourceHash unchanged, all components are unchanged
-                                        if prev_comps is not None and prev_hash == src_hash and src_hash:
-                                            for c in comp_data["components"]:
-                                                c["changed"] = False
-                                        elif prev_comps is not None:
-                                            prev_map = {_mk(c): _fp(c) for c in prev_comps}
-                                            for c in comp_data["components"]:
-                                                k = _mk(c)
-                                                c["changed"] = k not in prev_map or prev_map[k] != _fp(c)
-                                        else:
-                                            for c in comp_data["components"]:
-                                                c["changed"] = True
+                                        mark_changed(comp_data["components"], prev_comps, src_hash, prev_hash)
 
                                         _storage.upload_file(
                                             key=f"{compose_prefix}{slug}_{_prepare_epoch}.json",
