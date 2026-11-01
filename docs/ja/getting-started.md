@@ -90,8 +90,11 @@ sdpm doctor             環境チェック
 sdpm uninstall          ~/.sdpm・ランチャー・ショートカットを削除。登録解除も提案
 ```
 
-ランチャーは全 OS で同じです。`sdpm mcp` は手でサーバーを確認するためのものです。クライアントに渡す
-設定は `uv` と checkout を直接指します（次節）。
+ランチャーは全 OS で同じです。macOS と Linux では `~/.local/bin` に入ります。このディレクトリが `PATH` に
+無い場合はインストーラーが最後にそう表示するので、シェルの `PATH` に追加して新しいターミナルを開いて
+ください。Windows では `%USERPROFILE%\bin` に入り、インストーラーがユーザーの `PATH` に追加します。新しい
+ターミナルを開くと使えます。`sdpm mcp` は手でサーバーを確認するためのものです。クライアントに渡す
+設定は `uv` と checkout を直接指す（次節）ので、クライアント側でランチャーが `PATH` にある必要はありません。
 
 ## AI エージェントから使う（MCP）
 
@@ -143,8 +146,8 @@ MCP サーバーなので、MCP に対応したエージェントならどれで
 
 | prompt | 動作 |
 |---|---|
-| `sdpm-vibe` | 質問せずに素材からデッキを作る |
-| `sdpm-spec` | 先に対話でデッキの構成を固める |
+| `sdpm-vibe` | **すばやく作成**: 質問せずに素材からデッキを作る |
+| `sdpm-spec` | **確認しながら作成**: 先に対話でデッキの構成を固める |
 | `sdpm-style` | 再利用できるスタイル（配色、フォント、スライドの見せ方）を作る |
 | `sdpm-translate` | PPTX デッキの別の言語のコピーを作る |
 
@@ -160,7 +163,9 @@ VS Code は `/mcp.sdpm.sdpm-vibe`、Kiro CLI は `/sdpm-vibe`。
 
 `sdpm webui` は Web UI をローカルモードで起動して開きます。ローカルモードは `http://localhost:3000`
 で動く Next.js アプリで、ACP（Agent Client Protocol。アプリから AI エージェントを動かすための
-プロトコル）で Kiro CLI と話します。初回の前に `kiro-cli login` を 1 度実行してください。インストーラーは
+プロトコル）で Kiro CLI と話します。初回の前に `kiro-cli login` を 1 度実行してください。GitHub、Google、
+AWS Builder ID、組織の IAM Identity Center のいずれかで Kiro にサインインします。AWS アカウントは不要で、
+Kiro には無料プランがあります（[Kiro の料金](https://kiro.dev/pricing/)）。インストーラーは
 デスクトップショートカットも作ります。MCP サーバーだけを入れた場合は、`sdpm update --with-webui` で
 後から Web UI を足せます。詳細: [Web UI ローカルモード](../../web-ui/README_ja.md#local-mode)。
 
@@ -196,6 +201,7 @@ VS Code は `/mcp.sdpm.sdpm-vibe`、Kiro CLI は `/sdpm-vibe`。
 4. 枠はチャット入力の上に集まります。**修正を依頼** を押すと、入力欄に書いた内容と一緒に送ります。
 
 エージェントはスライドごとにコンポーザーを割り当てて修正し、コメントの 1 つずつに返答します。
+コメントツールはデスクトップでのみ使えます（ローカルモードと AWS 構成の両方）。
 
 ![Web UI でスライドに置いたコメント枠と、チャット入力の上の修正依頼](../assets/screenshots/webui-comments.png)
 

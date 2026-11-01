@@ -1,8 +1,10 @@
-# spec-driven-presentation-maker Deploy Guide
+# Deploy Guide
 
-## About spec-driven-presentation-maker
-
-spec-driven-presentation-maker is an open-source toolkit that adds presentation generation capabilities to AI agents. Simply connect it as an MCP (Model Context Protocol) tool to your existing AI system, and you can generate slides through conversation. Choose the layer that fits your needs — from a local CLI to a full-stack web app.
+This guide deploys SDPM to your AWS account as a team server. The default (`layer4`) is the
+Web UI and the MCP server, with sign-in through Amazon Cognito. `layer3` deploys only the
+MCP server, for teams that connect their own AI agents ([Connecting Agents](add-to-gateway.md)).
+To run SDPM on your own computer instead, see [Getting Started](getting-started.md).
+This guide is in English only.
 
 ---
 
@@ -14,6 +16,11 @@ Deploy SDPM to your AWS account with a single click. No local tools or CLI setup
 
 - Signed in to the [AWS Management Console](https://console.aws.amazon.com/)
 - **AdministratorAccess** or equivalent permissions in the target account
+- Amazon Bedrock access to the model you set in `ModelId` (an Anthropic Claude model by
+  default). Bedrock enables models on first use, but Anthropic asks each account once for
+  use case details. If your account has never used a Claude model, open any Anthropic
+  model in the Bedrock console's **Model catalog** and submit the form before you deploy.
+  Otherwise the problem only shows up in the first chat, after the 30–40 minute deployment.
 
 ### Step 1: Click the Launch Stack button
 
@@ -49,6 +56,12 @@ The CloudFormation console will display a parameter form. Fill in the following:
 ### Step 4: Sign in
 
 When deployment completes, a temporary password is sent to the **NotificationEmailAddress** you specified. Open the Web UI URL (included in the notification email or found in CloudFormation Outputs `SdpmWebUi` → `SiteUrl`), sign in with that email and temporary password, and set a new password on first login. That's it — you can start generating slides immediately.
+
+The Web UI on AWS works as described in
+[What you can do in the Web UI](getting-started.md#what-you-can-do-in-the-web-ui): Fast path
+or Review path, `/` for templates and styles, and
+[comments on the slides](getting-started.md#comments-on-the-slides). Continuing from a Kiro
+CLI session is available only in the local Web UI.
 
 ---
 
@@ -281,7 +294,7 @@ Bedrock Model Invocation Logging allows only one configuration per account/regio
 
 ## Estimated Monthly Cost
 
-See [Cost Estimates](cost.md) for a full breakdown and optimization tips.
+See [Cost Estimates](cost.md) for a full breakdown and how to stop the fixed charges.
 
 ## Related Documents
 

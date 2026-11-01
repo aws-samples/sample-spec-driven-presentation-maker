@@ -30,9 +30,9 @@
   **アートディレクション** として表示されます。
 - **アウトライン**: 1 スライド 1 行。そのスライドの主張、見せるもの、根拠の出どころ。
 
-スライドを作る前に、それぞれを確認できます。その後、1 つのコンポーザーが全スライドのレイアウトを
-決め、複数のコンポーザーが並列で中身を作ります。エージェントはプレビューを確認し、直す点を
-コンポーザーに戻します。
+スライドを作る前に、それぞれを確認できます。その後はコンポーザー（スライドを作る補助エージェント）の出番です。
+1 つのコンポーザーが全スライドのレイアウトを決め、複数のコンポーザーが並列で中身を作ります。エージェントは
+プレビューを確認し、直す点をコンポーザーに戻します。
 
 ![ワークフロー: 依頼からスペック（ブリーフ、スタイル、アウトライン）を作り、コンポーザーがスライドを作成（レイアウトパスの後に並列でコンテンツ作成）、エージェントがレビュー。Web UI のコメントから修正をコンポーザーに依頼](./docs/assets/workflow-ja.png)
 
@@ -120,7 +120,8 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 ```
 
 インストーラーが聞くのは 2 つです。ブラウザ用の Web UI も入れるか、見つかった AI エージェントの
-どれに接続するか。終わったら次のように始めます。
+どれに接続するか。必要なツール（`git`、`uv`、Node.js など）が足りなければ、その前に入れるかどうかを
+聞きます。終わったら次のように始めます。
 
 | 使うもの | 手順 |
 |---|---|
@@ -129,7 +130,14 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 | ブラウザ | 最初に 1 度 `kiro-cli login` を実行し、`sdpm webui` |
 | Claude Desktop | [`sdpm.mcpb` をダウンロード](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb)してダブルクリック（インストーラー不要） |
 
+Web UI はエージェントを Kiro CLI で動かすので、`kiro-cli login` で Kiro にサインインします。
+GitHub、Google、AWS Builder ID、組織の IAM Identity Center のいずれかを使えます。AWS アカウントは不要で、
+Kiro には無料プランがあります（[Kiro の料金](https://kiro.dev/pricing/)）。
+
 `sdpm` で何が入っていて何に接続済みかを表示し、`sdpm update` で更新、`sdpm uninstall` で削除します。
+ランチャーは `~/.local/bin` に入ります（Windows では `%USERPROFILE%\bin` で、インストーラーが `PATH` に
+追加します）。このディレクトリが `PATH` にないとインストーラーが表示したら、`PATH` に追加して新しい
+ターミナルを開いてください。
 スライドのプレビューには LibreOffice と poppler が必要で、インストーラーが導入を提案します。
 
 インストーラーのオプション、エージェントごとの接続、Web UI の使い方は[はじめに](docs/ja/getting-started.md)にあります。
@@ -147,7 +155,7 @@ IT などの業界別シナリオを収録しています。
 
 ## ドキュメント
 
-開発者・運用者向けのドキュメントは英語のみです。
+開発者向けと一部の運用者向けのドキュメントは英語のみです。
 
 **使う**
 
@@ -161,7 +169,7 @@ IT などの業界別シナリオを収録しています。
 | ドキュメント | 内容 |
 |---|---|
 | [Deploy guide](docs/en/deploy-cloudshell.md) | ワンクリックデプロイと AWS CloudShell からのデプロイ（ローカルの CDK / Docker 不要） |
-| [Cost Estimates](docs/en/cost.md) | 月額コストの内訳と抑え方 |
+| [Cost Estimates](docs/en/cost.md) | 月額コストの内訳と、固定費を止める方法 |
 | [Security](docs/en/security.md) | スタックが設定するものと、本番前に確認すること |
 | [使用量の計測](docs/ja/usage-measurement.md) | ユーザー別のトークン数とスライド作成数 |
 | [アンインストール](docs/ja/uninstall.md) | デプロイした AWS リソースの削除 |

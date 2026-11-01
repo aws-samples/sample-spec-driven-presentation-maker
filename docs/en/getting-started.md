@@ -95,8 +95,13 @@ sdpm doctor             environment checks
 sdpm uninstall          remove ~/.sdpm, the launcher, shortcuts; offers to unregister
 ```
 
-The launcher is the same on every OS. `sdpm mcp` is for checking the server by hand. The
-configuration that clients receive points at `uv` and the checkout directly (next section).
+The launcher is the same on every OS. It lives in `~/.local/bin` on macOS and Linux. If
+that directory is not on your `PATH`, the installer says so at the end: add it to your
+shell's `PATH` and open a new terminal. On Windows the launcher goes into
+`%USERPROFILE%\bin`, which the installer adds to your user `PATH`; open a new terminal to
+pick it up. `sdpm mcp` is for checking the server by hand. The configuration that clients
+receive points at `uv` and the checkout directly (next section), so clients do not need the
+launcher on `PATH`.
 
 ## Your AI agent (MCP)
 
@@ -147,8 +152,8 @@ To choose how the agent works, use the server's prompts where your client shows 
 
 | Prompt | What it does |
 |---|---|
-| `sdpm-vibe` | Builds the deck from your material without asking questions |
-| `sdpm-spec` | Shapes the deck with you in conversation first |
+| `sdpm-vibe` | **Fast path**: builds the deck from your material without asking questions |
+| `sdpm-spec` | **Review path**: shapes the deck with you in conversation first |
 | `sdpm-style` | Creates a reusable style (colours, fonts, how slides look) |
 | `sdpm-translate` | Makes a copy of a PPTX deck in another language |
 
@@ -164,7 +169,10 @@ reason, the server downloads them in the background on its first start.
 
 `sdpm webui` starts the Web UI in Local mode and opens it. Local mode is a Next.js app on
 `http://localhost:3000` that talks to Kiro CLI over ACP (Agent Client Protocol, which lets an
-app drive an AI agent). Run `kiro-cli login` once before the first use. The installer also
+app drive an AI agent). Run `kiro-cli login` once before the first use. It signs you in to
+Kiro with GitHub, Google, an AWS Builder ID or your organization's IAM Identity Center; no
+AWS account is needed, and Kiro has a free plan ([Kiro pricing](https://kiro.dev/pricing/)).
+The installer also
 creates a desktop shortcut. If you installed only the MCP server, add the Web UI later with
 `sdpm update --with-webui`. Details: [Web UI Local mode](../../web-ui/README.md#local-mode).
 
@@ -202,6 +210,7 @@ You can mark what to change directly on the slides and send it as one change req
    together with anything you typed in the input.
 
 The agent sends one composer per slide to make the changes and replies to each comment.
+The Comment tool is available on desktop only, in Local mode and on the AWS stack.
 
 ![Comment frames on a slide in the Web UI, with the change request above the chat input](../assets/screenshots/webui-comments.png)
 

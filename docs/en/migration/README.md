@@ -29,10 +29,11 @@ are gone:
 Install once with the installer, then remove the old entry from each client. The
 [onboarding guide](onboarding.md) has a table with the removal step for each one.
 
-Kiro CLI users: run `sdpm register kiro-cli`. It finds two leftovers of the old setup and
-offers to remove them:
+Kiro CLI users: run `sdpm register kiro-cli`. It finds three kinds of leftovers of the old
+setup and offers to remove them:
 
 - the generated agent `~/.kiro/agents/sdpm-composer.json`, which can no longer start
+- the `~/.kiro/skills/sdpm-*` links (or copied directories) of the old skills
 - an `sdpm` entry in the global `~/.kiro/settings/mcp.json`, which loads the tools into every
   Kiro CLI session
 

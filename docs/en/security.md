@@ -14,8 +14,16 @@ These settings come with every deployment of the CDK stacks in `infra/`:
   (SSE-S3), and a bucket policy that refuses requests without TLS. The deck bucket writes
   server access logs under `access-logs/`. Versioning is not enabled.
 - **DynamoDB**: encryption at rest with an AWS-managed key, and point-in-time recovery.
-- **API Gateway** (HTTP API): a Cognito JWT authorizer on every route. Only the CORS
-  preflight (`OPTIONS`) is open.
+- **Web UI API** (API Gateway HTTP API `SdpmHttpApi`, Layer 4): a Cognito JWT authorizer on
+  every route. Only the CORS preflight (`OPTIONS`) is open.
+- **MCP discovery API** (API Gateway HTTP API `sdpm-mcp-discovery`): created whenever the
+  stack uses its own Cognito user pool, which is the default and the One-Click Deploy setup.
+  It lets external MCP clients find the OAuth settings and sign in (see
+  [Connecting Agents](add-to-gateway.md)). Its routes (`/.well-known/*`, `/authorize`,
+  `/token`, `/register`, `/mcp`) have no API Gateway authorizer, and the WAF IP restriction
+  is not attached to it. `/mcp` refuses requests without a bearer token and forwards the
+  token to the MCP runtime, which validates it. `/register` is open Dynamic Client
+  Registration: any caller can create a Cognito app client (see the review list below).
 - **CloudFront**: Origin Access Control for the site bucket and for slide previews, and a
   redirect from HTTP to HTTPS.
 - **AgentCore Runtime**: the agent and MCP runtimes validate a JWT on every call
@@ -49,7 +57,17 @@ sample cannot set safe defaults for them. Evaluate each one before production us
    logs should be kept, and for how long, is your choice.
 6. **Cognito advanced security** (MFA, compromised-credential detection) is off by default
    to keep the demo simple.
-7. **Bedrock model and region**: if data residency matters, avoid cross-region inference
+7. **Cognito self sign-up** is on (`selfSignUpEnabled: true` in `infra/lib/auth-stack.ts`).
+   Anyone who reaches the sign-up page can create an account with a verified email address
+   and use the Bedrock-backed agent. For a closed group of users, set `selfSignUpEnabled` to
+   `false` in `infra/lib/auth-stack.ts` (there is no `config.yaml` setting for it) and create
+   the users yourself ([Deploy guide](deploy-cloudshell.md#creating-a-cognito-user-layer-4)).
+8. **Open Dynamic Client Registration** (`auth.enableDCR`, default `true`): the discovery
+   API's `/register` creates a Cognito app client for any caller. This suits personal and
+   demo use. To allow only known MCP clients, set `auth.enableDCR: false` and list their
+   callback URLs in `auth.mcpCallbackUrls`
+   ([Connecting Agents](add-to-gateway.md#connection-method-b-static-client-registration-authmcpcallbackurls)).
+9. **Bedrock model and region**: if data residency matters, avoid cross-region inference
    profiles.
 
 ### Only if you switch AgentCore runtimes to platformVersion V2

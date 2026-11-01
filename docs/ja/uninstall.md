@@ -19,6 +19,13 @@ CloudFormation コンソールから手で削除するのは手間がかかり�
 - `SdpmAuth`（既定の Cognito 構成を使っている場合）
 - `SdpmCloudFrontWaf`（WAF を有効にした場合のみ。us-east-1 のみ）
 
+**ワンクリックデプロイ** を使った場合は、Launch Stack ボタンが選んだリージョンに `SdpmDeploymentStack`
+も作っています。中身はデプロイを動かすためのものだけです: CodeBuild プロジェクト、その IAM ロール
+（`AdministratorAccess` 付き）、ビルドを開始する Lambda 関数、通知メール用の SNS トピック。このスタックを
+削除しても上のアプリのスタックは消えず、アプリのスタックを削除してもこのスタックは残ります。アプリの
+スタックを削除した後に、CloudFormation コンソールか `delstack --region <region> -s SdpmDeploymentStack`
+で最後に削除してください。
+
 ## おすすめ: delstack を使う
 
 [go-to-k/delstack](https://github.com/go-to-k/delstack) は、CloudFormation スタックを正しい依存関係の
@@ -111,7 +118,7 @@ S3 バケットや ECR リポジトリが残っていてスタックが `DELETE_
 
 次のリソースが残っていないことを確認します。
 
-- CloudFormation: 上に挙げたスタック
+- CloudFormation: 上に挙げたスタック（ワンクリックデプロイの場合は `SdpmDeploymentStack` も）
 - S3: `sdpm-*` または `cdk-*` で始まるバケット
 - DynamoDB: `sdpm-*` のテーブル
 - ECR: `sdpm-*` のリポジトリ

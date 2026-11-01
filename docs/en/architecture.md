@@ -289,7 +289,7 @@ A reference implementation of a full-stack application.
 - **API** — Lambda-backed REST API (deck CRUD, file upload, chat history)
 - **Auth** — Amazon Cognito User Pool with hosted UI
 
-The agent fetches its role documents through the entry tools (`start_presentation`, `start_composing`, `start_style`) and places them in its system prompt, so the MCP server stays the single source of truth for workflow text. The agent itself has no `start_*` tools. Its `compose_slides` tool runs `check_specs`, then dispatches composer agents: the layout pass first, then the content groups in parallel.
+The agent fetches its role documents through the entry tools (`start_presentation`, `start_composing`, `start_style`) and places them in its system prompt, so the MCP server stays the single source of truth for workflow text. The agent itself has no `start_*` tools. Its `compose_slides` tool runs `check_specs` and then dispatches one composer agent per group it is given, up to 10 at a time. The agent calls it twice: once for the layout pass over all slides, then once for the content groups, which run in parallel.
 
 ---
 

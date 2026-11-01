@@ -28,9 +28,10 @@ Before building any slide, the agent writes a spec in three parts:
 - **Outline**: one line per slide, with the slide's claim, what it shows, and where the
   facts come from.
 
-You can review each part before any slide is built. Then one composer fixes the layout of
-every slide, and several composers fill in the slides in parallel. The agent checks the
-previews and sends fixes back to a composer.
+You can review each part before any slide is built. Then composers (helper agents that build
+the slides) take over: one composer fixes the layout of every slide, and several composers
+fill in the slides in parallel. The agent checks the previews and sends fixes back to a
+composer.
 
 ![Workflow: your request goes into a spec (brief, style, outline), composers build the slides (layout pass, then content in parallel), and the agent reviews them; comments in the Web UI send changes back to the composers](./docs/assets/workflow-en.png)
 
@@ -119,7 +120,8 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 ```
 
 The installer asks two things: whether to add the browser Web UI, and which of the AI agents
-it found on your computer to connect. Then start:
+it found on your computer to connect. If tools it needs are missing (such as `git`, `uv` or
+Node.js), it first asks whether to install them. Then start:
 
 | With | Do this |
 |---|---|
@@ -128,8 +130,15 @@ it found on your computer to connect. Then start:
 | Your browser | Run `kiro-cli login` once, then `sdpm webui` |
 | Claude Desktop | [Download `sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) and double-click it (no installer needed) |
 
+The Web UI runs its agent through Kiro CLI, so `kiro-cli login` signs you in to Kiro with
+GitHub, Google, an AWS Builder ID or your organization's IAM Identity Center. No AWS account
+is needed, and Kiro has a free plan ([Kiro pricing](https://kiro.dev/pricing/)).
+
 `sdpm` shows what is installed and connected, `sdpm update` updates it, and `sdpm uninstall`
-removes it. Slide previews need LibreOffice and poppler; the installer offers them.
+removes it. The launcher goes into `~/.local/bin` (on Windows, `%USERPROFILE%\bin`, which
+the installer adds to your `PATH`); if the installer says that directory is not on your
+`PATH`, add it and open a new terminal. Slide previews need LibreOffice and
+poppler; the installer offers them.
 
 The [Getting Started](docs/en/getting-started.md) guide covers the installer options, each
 AI agent, and the Web UI.
@@ -160,7 +169,7 @@ other industries.
 | Document | What it covers |
 |---|---|
 | [Deploy guide](docs/en/deploy-cloudshell.md) | One-Click Deploy and deploying from AWS CloudShell (no local CDK or Docker) |
-| [Cost Estimates](docs/en/cost.md) | Monthly cost breakdown and how to lower it |
+| [Cost Estimates](docs/en/cost.md) | Monthly cost breakdown and how to stop the fixed charges |
 | [Security](docs/en/security.md) | What the stack sets up and what to review before production |
 | [Measuring Usage](docs/en/usage-measurement.md) | Tokens and slide counts per user |
 | [Uninstall](docs/en/uninstall.md) | Remove the deployed AWS resources |
