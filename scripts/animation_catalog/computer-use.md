@@ -489,6 +489,56 @@ with both motion switches off, then saved and extracted offline:
   the probe slide already carried that duration. A ribbon-applied value is the
   effect's own default; a scripted one is not.)
 
+## What the Duration field does to an effect's XML — **MEASURED**
+
+Measured 2026-11-01 on PowerPoint for Mac 16.113.1, by applying a tile and then
+pressing `AXIncrement` on the ribbon's `Duration:` incrementor, saving, and
+reading the behaviours back out of the package. 4 effects, 41 behaviours, two
+ratios (×2 and a fractional one).
+
+Two preconditions, both measured:
+
+- **Selecting the shape is not enough.** With only the shape selected, the
+  `Duration:` incrementor reads `''` and is **disabled**; the effect itself has
+  to be selected, which pressing its gallery tile does. The incrementor is an
+  `AXIncrementor` whose `AXValue` is **not settable** — its actions are
+  `AXConfirm`, `AXIncrement`, `AXDecrement` — so a duration is reached by
+  stepping, and one step is **0.25 s**.
+- Changing the duration leaves `presetID`, `presetSubtype`, the behaviour count
+  and the behaviour order **unchanged**, and touches **no attribute at all**:
+  `@path`, `@by`, `@filter`, `@calcmode` and `@valueType` are identical before
+  and after. Only time moves.
+
+| Behaviour | What happens to `dur` and `delay` |
+| --- | --- |
+| `p:anim`, `p:animClr`, `p:animEffect`, `p:animMotion`, `p:animRot`, `p:animScale` | both scale in proportion to the effect duration |
+| the visibility `p:set` | `dur` stays **1** and does **not** scale; its `delay` is **recomputed** from the new duration, not scaled |
+
+At ×2 every animated value doubled exactly: Wave's `p:animMotion` 250→500 and
+its four `p:animRot` 125→250 at delays 0, 250, 500, 750; entrance Bounce's 14
+animated behaviours all doubled, down to `dur="26"`→`52`. Fly In's `p:set`
+stayed at `dur="1"` while its two `p:anim` went 500→1000, which is what proves
+the visibility behaviour is exempt rather than merely rounding to the same
+number.
+
+The exit visibility delay distinguishes the two candidate rules by exactly one
+millisecond, and it was measured: Fly Out sits at `delay="499"` at 0.50 s, and
+at 1.00 s it is **999**, not the 998 that scaling 499 would give. So an exit
+hides the shape at `duration − 1` whatever the duration is.
+
+**A fractional ratio is reproducible except on an exact tie.** At ×3/2 and
+×9/8, every value whose exact product was not a half rounded normally
+(1822→2050, 164→185, 26→29, 650→731, 1642→1847). The six values whose exact
+product **was** a half split both ways — 580→652 and 332→373 down, 1324→1490,
+676→761 and 125→188 up — which is the signature of PowerPoint's own internal
+float precision rather than a tie rule that can be restated here. So:
+
+- writing an effect **at its measured default duration is byte-exact**, because
+  the measured integers are what get written;
+- writing it at any other duration is proportional and **may differ by 1 ms**
+  from PowerPoint on a `.5` boundary. That limit is a measurement, not an
+  estimate, and it belongs in the catalog beside the scaled values.
+
 ## Step 1 — transition directions on extension elements — **CLOSED**
 
 Closed on 2026-10-31 by the scripting oracle, not from here. It applied all 207
