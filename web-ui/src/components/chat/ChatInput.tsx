@@ -49,7 +49,7 @@ export interface ChatInputProps {
   sessionId?: string
   /** Deck ID for file upload context. */
   deckId?: string
-  /** Slot for additional UI above the textarea row (e.g., Options panel, @mentions overlay). */
+  /** Slot for additional UI above the textarea row (e.g., Options panel). */
   children?: ReactNode
   /** Rendered first inside the input box, above attachments (e.g. the review draft bar). */
   topSlot?: ReactNode
@@ -67,10 +67,6 @@ export interface ChatInputProps {
   stopTitle?: string
   /** Called on every input change (e.g., for @mention detection). */
   onInputChange?: (value: string) => void
-  /** Overlay rendered inside the textarea's relative container (e.g., MentionOverlay). */
-  textareaOverlay?: ReactNode
-  /** Additional className for the textarea element (e.g., text-transparent for overlay mode). */
-  textareaClassName?: string
   /** Template/style candidates. Omit to disable the slash picker. */
   slashItems?: PickerItem[]
   slashLoading?: boolean
@@ -85,14 +81,14 @@ export interface ChatInputHandle {
   /** Replace the whole input (e.g. the HTML format pill); keeps focus, caret at the end. */
   replaceText: (next: string) => void
   focus: () => void
-  /** Ref to the internal textarea element (for MentionOverlay positioning). */
+  /** Ref to the internal textarea element. */
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
   /** Programmatically add files (for external drop zones). */
   addFiles: (files: File[]) => void
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, stopTitle, onInputChange, textareaOverlay, textareaClassName, slashItems, slashLoading, onSlashOpen, onTextareaFocus },
+  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, stopTitle, onInputChange, slashItems, slashLoading, onSlashOpen, onTextareaFocus },
   ref,
 ) {
   const t = useTranslations("chatInput")
@@ -372,10 +368,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 aria-activedescendant={slashEnabled && picker.open && picker.filtered[picker.activeIndex]
                   ? slashOptionId(slashListboxId, picker.activeIndex)
                   : undefined}
-                className={`w-full bg-transparent resize-none text-sm py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground leading-relaxed font-[inherit] tracking-[inherit] ${textareaClassName ?? ""}`}
+                className="w-full bg-transparent resize-none text-sm py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground leading-relaxed font-[inherit] tracking-[inherit]"
                 autoFocus
               />
-              {textareaOverlay}
             </div>
 
             {isLoading ? (

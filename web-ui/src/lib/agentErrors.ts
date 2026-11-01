@@ -62,9 +62,3 @@ export function agentErrorMessage(message: string, code?: string): string {
   if (resolved === "internal" && !code && message) return message
   return MESSAGES[resolved]
 }
-
-/** Whether the user can fix this by simply retrying. */
-export function isRetryableAgentError(message: string, code?: string): boolean {
-  const resolved = (code && code in MESSAGES ? code : classifyAgentError(message)) as AgentErrorCode
-  return resolved === "throttled" || resolved === "timeout" || resolved === "model_not_ready" || resolved === "service_unavailable"
-}

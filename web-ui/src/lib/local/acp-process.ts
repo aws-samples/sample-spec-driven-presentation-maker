@@ -447,14 +447,6 @@ export function saveSessionToDeck(deckId: string, sessionId: string): void {
   fs.writeFileSync(path.join(dir, ".session"), sessionId, "utf-8")
 }
 
-/** Read sessionId from deck's .session file. */
-export function readSessionFromDeck(deckId: string): string | null {
-  const fs = require("fs") as typeof import("fs")
-  const dir = resolveDeckDir(deckId)
-  if (!dir) return null
-  try { return fs.readFileSync(path.join(dir, ".session"), "utf-8").trim() } catch { return null }
-}
-
 /** Save a fork's source metadata to the deck. */
 export function saveOriginToDeck(deckId: string, origin: SessionOrigin): void {
   const fs = require("fs") as typeof import("fs")
