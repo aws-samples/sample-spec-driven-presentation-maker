@@ -63,14 +63,30 @@ def _off(value):
     return value
 
 
+def _unlink_theme_effect(element):
+    """Point ``<p:style><a:effectRef>`` at no theme effect style (idx 0).
+
+    python-pptx's default ``<p:style>`` (autoshapes: idx 2, connectors: idx 1)
+    references the template theme's effect style, an outer shadow in the Office
+    default theme and the bundled blank templates. PowerPoint lets an explicit
+    ``<a:effectLst/>`` override it, but LibreOffice ignores an empty list and
+    still paints the theme shadow, so previews showed shadows the JSON never
+    asked for. idx 0 removes the reference itself; the rest of ``<p:style>``
+    (line / fill / font references) stays as it was.
+    """
+    style = element.find(qn('p:style'))
+    eff_ref = style.find(qn('a:effectRef')) if style is not None else None
+    if eff_ref is not None:
+        eff_ref.set('idx', '0')
+
+
 def apply_effects(element, elem_def, emu_per_px=6350):
     """Apply visual effects (shadow, glow, softEdge, reflection, bevel, 3D rotation).
 
     What the JSON says is what renders: an element with no effect keys gets an
-    explicit empty ``<a:effectLst/>``. Without it, python-pptx's default
-    ``<p:style><a:effectRef idx="…">`` resolves to the template theme's effect
-    style, which in the Office default theme (and the bundled blank templates)
-    is an outer shadow — so shapes would grow a shadow nobody asked for.
+    explicit empty ``<a:effectLst/>``, and its ``<p:style>`` no longer refers to
+    the template theme's effect style (see ``_unlink_theme_effect``), so no
+    theme shadow appears in PowerPoint or LibreOffice.
     ``"shadow": "none"`` (likewise glow/softEdge/reflection/bevel) is an
     explicit off, not an unknown preset.
     """
@@ -86,6 +102,8 @@ def apply_effects(element, elem_def, emu_per_px=6350):
         sp_pr = element.find(qn('pic:spPr'))
     if sp_pr is None:
         return
+
+    _unlink_theme_effect(element)
 
     if not any([shadow, glow, soft_edge, reflection, bevel, rotation3d]):
         if sp_pr.find(qn('a:effectLst')) is None:
