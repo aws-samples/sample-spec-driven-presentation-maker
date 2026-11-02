@@ -45,7 +45,8 @@
             }
           }
         }
-      ]
+      ],
+      "measuredDurationMs": 2000
     },
     {
       "key": "animation.effectOptions.amount.emphasis.growShrink.larger",
@@ -85,7 +86,8 @@
             }
           }
         }
-      ]
+      ],
+      "measuredDurationMs": 2000
     },
     {
       "key": "animation.effectOptions.amount.emphasis.growShrink.smaller",
@@ -125,7 +127,8 @@
             }
           }
         }
-      ]
+      ],
+      "measuredDurationMs": 2000
     },
     {
       "key": "animation.effectOptions.amount.emphasis.growShrink.tiny",
@@ -165,7 +168,8 @@
             }
           }
         }
-      ]
+      ],
+      "measuredDurationMs": 2000
     },
     {
       "key": "animation.effectOptions.amount.emphasis.spin.fullSpin",
@@ -201,6 +205,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": null
     },
     {
@@ -237,6 +242,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": null
     },
     {
@@ -273,6 +279,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": null
     },
     {
@@ -309,6 +316,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 0,
@@ -504,7 +512,8 @@
             }
           }
         }
-      ]
+      ],
+      "measuredDurationMs": 500
     }
   ]
 }

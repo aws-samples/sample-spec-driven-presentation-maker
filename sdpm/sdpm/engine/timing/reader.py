@@ -44,7 +44,7 @@ effects) tuple the writer used, so the two sides agree without the extension.
 from __future__ import annotations
 
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from functools import lru_cache
 from typing import Any, Iterable, Mapping, Sequence
@@ -232,6 +232,14 @@ class _Reverse:
     presets: Mapping[tuple[str, str, str], Any]
     transitions: Mapping[tuple[str, tuple[tuple[str, str], ...]], Any]
     requires: tuple[str, ...]
+    #: ``(presetClass, presetID, presetSubtype) -> (entry, setting, value)`` for
+    #: every ``Effect Options`` value whose subtype identifies it on its own.
+    #: Without these a preset written with a non-default option would not resolve
+    #: at all — Fly In's ``From Right`` is subtype 2 and no entry claims it — so
+    #: this is what makes an option round-trip rather than merely import.
+    preset_options: Mapping[tuple[str, str, str], tuple[Any, str, str]] = field(
+        default_factory=dict
+    )
 
 
 def _preference(entry: Any) -> tuple[int, int, str]:
@@ -253,6 +261,7 @@ def _preference(entry: Any) -> tuple[int, int, str]:
 def reverse_index(index: CapabilityIndex) -> _Reverse:
     """Return (and cache) the OOXML → semantic lookups for one catalog."""
     presets: dict[tuple[str, str, str], Any] = {}
+    preset_options: dict[tuple[str, str, str], tuple[Any, str, str]] = {}
     transitions: dict[tuple[str, tuple[tuple[str, str], ...]], Any] = {}
     for entry in sorted(
         [*index.items.values(), *index.candidates.values()], key=_preference
@@ -277,10 +286,7 @@ def reverse_index(index: CapabilityIndex) -> _Reverse:
         if ooxml.get("presetId") is None:
             continue
         preset = _semantic_preset(entry)
-        if preset is None or preset.get("variant") is not None:
-            # A direction is persisted as presetSubtype and the catalog
-            # records no variant → subtype mapping, so only the default
-            # subtype of a tile can be inverted.
+        if preset is None:
             continue
         preset_class = ooxml.get("presetClass")
         classes = preset_class if isinstance(preset_class, list) else [preset_class]
@@ -291,12 +297,55 @@ def reverse_index(index: CapabilityIndex) -> _Reverse:
                 continue
             token = (one, str(ooxml["presetId"]), str(ooxml.get("presetSubtype", 0)))
             presets.setdefault(token, entry)
+            for setting, value, subtype in _option_subtypes(ooxml):
+                presets.setdefault((one, str(ooxml["presetId"]), subtype), entry)
+                preset_options.setdefault(
+                    (one, str(ooxml["presetId"]), subtype), (entry, setting, value)
+                )
     requires = tuple(
         str(row.get("requires"))
         for row in index.alternate_content.get("supported", ())
         if row.get("requires")
     )
-    return _Reverse(presets=presets, transitions=transitions, requires=requires)
+    return _Reverse(
+        presets=presets,
+        transitions=transitions,
+        requires=requires,
+        preset_options=preset_options,
+    )
+
+
+def _option_subtypes(ooxml: Mapping[str, Any]) -> list[tuple[str, str, str]]:
+    """Return ``(setting, value, subtype)`` for options a subtype identifies alone.
+
+    Three kinds are left out, each because inverting it from the subtype would
+    be a guess rather than a reading:
+
+    * the value whose subtype **is** the effect's default. The written bytes are
+      the plain effect, so the reader emits no ``options`` and the JSON
+      round-trips as the effect it asked for.
+    * a subtype carried by more than one value of the effect. 9 of the 37
+      measured groups never move the subtype — Spin's two directions are both
+      subtype 0, differing only in the sign of ``p:animRot/@by`` — so the
+      subtype cannot say which was asked for. These import as the plain effect
+      and are one-way until the reader compares behaviours.
+    * a subtype two different *settings* share, for the four effects offering
+      two settings at once.
+    """
+    options = ooxml.get("effectOptions")
+    if not isinstance(options, Mapping):
+        return []
+    default_subtype = ooxml.get("presetSubtype")
+    seen: dict[str, int] = {}
+    candidates: list[tuple[str, str, str]] = []
+    for setting, option in options.items():
+        for value, measured in (option.get("values") or {}).items():
+            subtype = measured.get("presetSubtype")
+            if subtype is None or subtype == default_subtype:
+                continue
+            seen[str(subtype)] = seen.get(str(subtype), 0) + 1
+            candidates.append((str(setting), str(value), str(subtype)))
+    return [entry for entry in candidates if seen[entry[2]] == 1]
 
 
 def _semantic_preset(entry: Any) -> Mapping[str, Any] | None:
@@ -1015,7 +1064,7 @@ class _TimingReader:
         _only_children(ctn, {"stCondLst", "childTnLst"}, f"{sequence} effect p:cTn")
         node_type = attrs.get("nodeType")
         start_type = self._start_type(node_type, interactive, click_index, opens_click_group)
-        entry = self._preset_entry(attrs, sequence)
+        entry, options = self._preset_entry(attrs, sequence)
         preset = dict(_semantic_preset(entry) or {})
         behaviors = _child(ctn, "childTnLst")
         if behaviors is None:
@@ -1026,11 +1075,7 @@ class _TimingReader:
 
         effect: dict[str, Any] = {
             "target": {"element": target},
-            "preset": {
-                "category": preset.get("category"),
-                "effect": preset.get("effect"),
-                "variant": None,
-            },
+            "preset": self._read_preset(preset, options),
             "start": {"type": start_type, "delayMs": self._delay(ctn, f"{sequence} effect")},
             "timing": self._read_timing(attrs, duration, sequence),
             "afterEffect": {"type": "none"},
@@ -1062,7 +1107,18 @@ class _TimingReader:
             return "withPrevious"
         raise _Unsupported(f"effect p:cTn has unsupported nodeType {node_type!r}")
 
-    def _preset_entry(self, attrs: Mapping[str, str], sequence: str) -> Any:
+    def _preset_entry(
+        self, attrs: Mapping[str, str], sequence: str
+    ) -> tuple[Any, dict[str, str] | None]:
+        """Return the catalog entry for these preset attributes, and the option they name.
+
+        When the subtype names an ``Effect Options`` value, the entry comes back
+        **overlaid with that value's measured behaviours** — the same overlay
+        the writer applies. Without it :meth:`_read_behaviors` would validate
+        what was written against the tile's own behaviour list and reject it:
+        19 of the 95 tiles have no measured behaviours at all, so every option
+        on those tiles dropped to the raw fallback rather than importing.
+        """
         preset_class = attrs.get("presetClass")
         preset_id = attrs.get("presetID")
         if preset_class is None or preset_id is None:
@@ -1077,7 +1133,41 @@ class _TimingReader:
                 f"no catalog entry establishes presetClass={preset_class!r} "
                 f"presetID={preset_id!r} presetSubtype={attrs.get('presetSubtype', '0')!r}"
             )
-        return entry
+        found = self.reverse.preset_options.get(token)
+        if found is None:
+            return entry, None
+        _owner, setting, value = found
+        measured = (
+            ((entry.ooxml.get("effectOptions") or {}).get(setting) or {}).get("values") or {}
+        ).get(value)
+        if not isinstance(measured, Mapping):
+            return entry, None
+        overlay = dict(entry.ooxml)
+        overlay["presetSubtype"] = measured.get("presetSubtype")
+        overlay["behaviors"] = measured.get("behaviors") or []
+        overlay["behaviorChildren"] = measured.get("behaviorChildren") or []
+        if measured.get("measuredDurationMs") is not None:
+            overlay["measuredDurationMs"] = measured["measuredDurationMs"]
+        return replace(entry, ooxml=overlay), {setting: value}
+
+    def _read_preset(
+        self, preset: Mapping[str, Any], options: Mapping[str, str] | None
+    ) -> dict[str, Any]:
+        """Return the semantic preset, naming the ``Effect Options`` value when one is written.
+
+        ``options`` is **omitted** rather than set to null when the effect is at
+        its default, so JSON written without options reads back without them.
+        An option the subtype cannot identify is omitted too; see
+        :func:`_option_subtypes` for which, and why guessing there would be
+        worse than saying nothing.
+        """
+        read: dict[str, Any] = {
+            "category": preset.get("category"),
+            "effect": preset.get("effect"),
+        }
+        if options:
+            read["options"] = dict(options)
+        return read
 
     def _read_timing(
         self, attrs: Mapping[str, str], duration: int | None, sequence: str

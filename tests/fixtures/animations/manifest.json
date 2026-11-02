@@ -38,7 +38,7 @@
               {
                 "id": "show-hero",
                 "target": {"element": "hero"},
-                "preset": {"category": "entrance", "effect": "fade", "variant": null},
+                "preset": {"category": "entrance", "effect": "fade"},
                 "start": {"type": "onPageClick", "delayMs": 0},
                 "timing": {"durationMs": 500},
                 "afterEffect": {"type": "none"},
@@ -95,7 +95,7 @@
               {
                 "id": "first",
                 "target": {"element": "hero"},
-                "preset": {"category": "entrance", "effect": "fade", "variant": null},
+                "preset": {"category": "entrance", "effect": "fade"},
                 "start": {"type": "onPageClick", "delayMs": 0},
                 "timing": {"durationMs": 500},
                 "afterEffect": {"type": "none"},
@@ -104,7 +104,7 @@
               {
                 "id": "second",
                 "target": {"element": "aside"},
-                "preset": {"category": "entrance", "effect": "fade", "variant": null},
+                "preset": {"category": "entrance", "effect": "fade"},
                 "start": {"type": "afterPrevious", "delayMs": 250},
                 "timing": {"durationMs": 700, "repeatCount": 2, "autoReverse": true, "acceleration": 0.2, "restart": "never"},
                 "afterEffect": {"type": "none"},
@@ -113,7 +113,7 @@
               {
                 "id": "third",
                 "target": {"element": "hero"},
-                "preset": {"category": "entrance", "effect": "fade", "variant": null},
+                "preset": {"category": "entrance", "effect": "fade"},
                 "start": {"type": "withPrevious", "delayMs": 0},
                 "timing": {"durationMs": 500},
                 "afterEffect": {"type": "none"},
@@ -128,7 +128,7 @@
                   {
                     "id": "on-click",
                     "target": {"element": "aside"},
-                    "preset": {"category": "entrance", "effect": "fade", "variant": null},
+                    "preset": {"category": "entrance", "effect": "fade"},
                     "start": {"type": "withPrevious", "delayMs": 0},
                     "timing": {"durationMs": 300},
                     "afterEffect": {"type": "none"},
@@ -278,7 +278,7 @@
               {
                 "id": "show-title",
                 "target": {"element": "heroTitle"},
-                "preset": {"category": "entrance", "effect": "fade", "variant": null},
+                "preset": {"category": "entrance", "effect": "fade"},
                 "start": {"type": "onPageClick", "delayMs": 0},
                 "timing": {"durationMs": 500},
                 "afterEffect": {"type": "none"},
@@ -287,7 +287,7 @@
               {
                 "id": "show-body",
                 "target": {"element": "body"},
-                "preset": {"category": "entrance", "effect": "fade", "variant": null},
+                "preset": {"category": "entrance", "effect": "fade"},
                 "start": {"type": "afterPrevious", "delayMs": 0},
                 "timing": {"durationMs": 500},
                 "afterEffect": {"type": "none"},
@@ -335,7 +335,7 @@
               {
                 "id": "show-caption",
                 "target": {"element": "caption"},
-                "preset": {"category": "entrance", "effect": "fade", "variant": null},
+                "preset": {"category": "entrance", "effect": "fade"},
                 "start": {"type": "onPageClick", "delayMs": 0},
                 "timing": {"durationMs": 500},
                 "afterEffect": {"type": "none"},
@@ -390,7 +390,7 @@
               {
                 "id": "show-caption",
                 "target": {"element": "caption"},
-                "preset": {"category": "entrance", "effect": "fade", "variant": null},
+                "preset": {"category": "entrance", "effect": "fade"},
                 "start": {"type": "onPageClick", "delayMs": 0},
                 "timing": {"durationMs": 500},
                 "afterEffect": {"type": "none"},
@@ -443,7 +443,7 @@
               {
                 "id": "show-caption",
                 "target": {"element": "caption"},
-                "preset": {"category": "entrance", "effect": "fade", "variant": null},
+                "preset": {"category": "entrance", "effect": "fade"},
                 "start": {"type": "onPageClick", "delayMs": 0},
                 "timing": {"durationMs": 500},
                 "afterEffect": {"type": "none"},
@@ -496,7 +496,7 @@
               {
                 "id": "show-caption",
                 "target": {"element": "caption"},
-                "preset": {"category": "entrance", "effect": "fade", "variant": null},
+                "preset": {"category": "entrance", "effect": "fade"},
                 "start": {"type": "onPageClick", "delayMs": 0},
                 "timing": {"durationMs": 500},
                 "afterEffect": {"type": "none"},

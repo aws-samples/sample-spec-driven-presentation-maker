@@ -53,7 +53,7 @@ A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 #: refused for their payloads.
 BIDIRECTIONAL_COVERAGE = {"transitions": 147, "presets": 101}
 
-FADE = {"category": "entrance", "effect": "fade", "variant": None}
+FADE = {"category": "entrance", "effect": "fade"}
 
 SLIDE_XML = (
     '<p:sld xmlns:p="%s" xmlns:a="%s"><p:cSld><p:spTree>'
@@ -307,14 +307,14 @@ SEQUENCED_SLIDE = {
             # One shape animated three times across two click groups, with a
             # sibling joining the second group, and NO durationMs anywhere.
             _effect("in", timing={},
-                    preset={"category": "entrance", "effect": "flyIn", "variant": None}),
+                    preset={"category": "entrance", "effect": "flyIn"}),
             _effect("stress", timing={}, start={"type": "afterPrevious", "delayMs": 0},
-                    preset={"category": "emphasis", "effect": "wave", "variant": None}),
+                    preset={"category": "emphasis", "effect": "wave"}),
             _effect("join", element="aside", timing={},
                     start={"type": "withPrevious", "delayMs": 0},
-                    preset={"category": "entrance", "effect": "fade", "variant": None}),
+                    preset={"category": "entrance", "effect": "fade"}),
             _effect("out", timing={}, start={"type": "onPageClick", "delayMs": 500},
-                    preset={"category": "exit", "effect": "flyOut", "variant": None}),
+                    preset={"category": "exit", "effect": "flyOut"}),
         ],
         "interactiveSequences": [{
             "id": "interactive-0",

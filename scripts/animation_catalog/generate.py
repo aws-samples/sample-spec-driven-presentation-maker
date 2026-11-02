@@ -61,6 +61,23 @@ GUI_CAPTURE_MERGED = "merged-evidence.json"
 GUI_CAPTURE_PACKAGE = "powerpoint-oracle.pptx"
 GUI_CAPTURE_READBACK = "powerpoint-readback.jsonl"
 
+#: The effect-option capture: every value of every setting a gallery tile's
+#: ``Effect Options`` control offers. 133 values over 6 settings on 33 of the 95
+#: tiles; the other 62 offer only ``Sequence``, which is the text-unit setting
+#: and already writable.
+#:
+#: These are **per effect**, which is the finding that shapes the catalog: Fly
+#: In's ``From Right`` and Stretch's ``From Right`` are different measurements,
+#: and 7 of the 37 (effect, setting) groups do not move ``presetSubtype`` at all
+#: — Spin's direction is the *sign* of ``p:animRot/@by``. So an option carries
+#: its own behaviours, and lives inside its effect's entry rather than in a
+#: shared direction vocabulary.
+DEFAULT_EFFECT_OPTIONS_EVIDENCE = (
+    REPO_ROOT / "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02"
+)
+EFFECT_OPTIONS_MERGED = "merged-effect-options.json"
+EFFECT_OPTIONS_DATE = "2026-11-02"
+
 CATALOG_SCHEMA_VERSION = 1
 BASELINE_APPLICATION = "Microsoft PowerPoint"
 BASELINE_VERSION = "16.113.1"
@@ -754,10 +771,13 @@ PRESET_SUBTYPE_EVIDENCE = [
 ]
 
 DIRECTION_GAP = (
-    "MsoAnimDirection values are effect-specific and persist as p:cTn/@presetSubtype. "
-    "The available evidence binds subtype codes to gallery tiles, not to direction names, so the "
-    "code for this direction is not established here; see presetSubtypeEvidence and resolve by "
-    "PowerPoint read-back (Task 8)."
+    "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured "
+    "per effect and live in each gallery entry's ooxml.effectOptions, written as "
+    "preset.options.direction; this enumerator is tracked only for sdef coverage. It has no "
+    "presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators "
+    "are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 "
+    "have no MsoAnimDirection name. The same label also means different subtypes on different "
+    "effects, so a name-to-subtype table cannot exist."
 )
 
 #: Behavior payloads, split into what a normative ECMA-376 element/attribute
@@ -916,10 +936,14 @@ def effect_semantic(**patch: Any) -> dict[str, Any]:
         # fully captured baseline: presetID 10, p:animEffect filter "fade" and
         # the normative visibility p:set.
         #
-        # ``variant`` stays null unless an entry is specifically about a
-        # direction: a non-null variant means "use this MsoAnimDirection", and
-        # those names are the only ones the catalog defines.
-        "preset": {"category": "entrance", "effect": "fade", "variant": None},
+        # No ``variant``. It named one of the 45 ``MsoAnimDirection``
+        # enumerators, and the effect-option capture showed that vocabulary does
+        # not describe the galleries: 33 of the 45 are not reachable from any
+        # tile, and 24 of the 36 labels the tiles do offer have no name in it.
+        # A setting is now written as ``preset.options``, which names the
+        # setting too and is validated against the effect's own measured values
+        # in ``ooxml.effectOptions``.
+        "preset": {"category": "entrance", "effect": "fade"},
         "start": {"type": "onPageClick", "delayMs": 0},
         "timing": dict(BASE_TIMING),
         "afterEffect": {"type": "none"},
@@ -1700,7 +1724,7 @@ def gui_items() -> list[dict[str, Any]]:
             f"animation.gallery.{category}.{slug}", NATIVE, animation_template(row),
             effect_semantic(
                 preset={"category": "entrance" if category == "text" else category,
-                        "effect": slug, "variant": None},
+                        "effect": slug},
                 timing={"durationMs": tile_duration_ms(row)},
             ),
             native_evidence(row[10], f"animations/{category}"),
@@ -1723,7 +1747,7 @@ def gui_items() -> list[dict[str, Any]]:
             )
         items.append(_accepted(
             f"animation.gallery.media.{slug}", level, ooxml,
-            effect_semantic(preset={"category": "media", "effect": slug, "variant": None}),
+            effect_semantic(preset={"category": "media", "effect": slug}),
             native_evidence("native-media-background-timing", "") if preset_id else
             {"source": "ECMA-376 presetClass mediacall", "commit": None},
         ))
@@ -1736,7 +1760,7 @@ def gui_items() -> list[dict[str, Any]]:
              "gap": "PowerPoint carries preset motion paths as literal SVG path data in p:animMotion/@path; "
                     "that geometry is not present in the available evidence, so the writer must emit a "
                     "custom path or defer until Task 8 captures it"},
-            effect_semantic(preset={"category": "motionPath", "effect": group, "variant": None}),
+            effect_semantic(preset={"category": "motionPath", "effect": group}),
             {"source": "Animations ribbon gallery, Motion Paths group", "commit": None},
         ))
 
@@ -1833,7 +1857,13 @@ def enum_value_items(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict[
             f"animation.effectOptions.direction.{semantic}", SEMANTIC,
             {"strategy": "presetSubtype", "attribute": "p:cTn/@presetSubtype", "presetSubtype": None,
              "requiresCapture": True, "gap": DIRECTION_GAP},
-            effect_semantic(preset={"category": "entrance", "effect": "flyIn", "variant": semantic}),
+            # The example asks for the enumerator by name through the new
+            # vocabulary, so the writer refuses it and quotes this entry's own
+            # gap. Without that the example would write a plain Fly In — the
+            # tile's default direction — and the entry would report itself
+            # generated while demonstrating nothing it describes.
+            effect_semantic(preset={"category": "entrance", "effect": "flyIn",
+                                    "options": {"direction": semantic}}),
             {"source": SDEF_SOURCE, "commit": None},
         ))
 
@@ -1984,8 +2014,7 @@ def _effect_candidate(key: str, enumerator: str, code: str) -> dict[str, Any]:
             extra: dict[str, Any] = {"guiKey": f"animation.gallery.{tile[0]}.{tile[1]}" if tile
                                      else "animation.moreEffects.entrance"}
             return _accepted(key, level, ooxml, effect_semantic(
-                preset={"category": "entrance", "effect": tile[1] if tile else camel(enumerator.replace("animation type", "")),
-                        "variant": None}), evidence, **extra)
+                preset={"category": "entrance", "effect": tile[1] if tile else camel(enumerator.replace("animation type", ""))}), evidence, **extra)
 
         match = EFFECT_NAME_MATCH.get(enumerator)
         ooxml = {
@@ -2004,7 +2033,7 @@ def _effect_candidate(key: str, enumerator: str, code: str) -> dict[str, Any]:
         return _accepted(
             key, SEMANTIC, ooxml,
             effect_semantic(preset={"category": "entrance",
-                                    "effect": camel(enumerator.replace("animation type", "")), "variant": None}),
+                                    "effect": camel(enumerator.replace("animation type", ""))}),
             {"source": SDEF_SOURCE, "commit": None},
             guiKey=(f"animation.gallery.{match[0]}.{match[1]}" if match else "animation.moreEffects.entrance"),
         )
@@ -2035,8 +2064,7 @@ def _effect_candidate(key: str, enumerator: str, code: str) -> dict[str, Any]:
         return _accepted(
             key, level, ooxml,
             effect_semantic(preset={"category": "emphasis",
-                                    "effect": tile[1] if tile else camel(enumerator.replace("animation type", "")),
-                                    "variant": None}),
+                                    "effect": tile[1] if tile else camel(enumerator.replace("animation type", ""))}),
             evidence,
             guiKey=f"animation.gallery.emphasis.{tile[1]}" if tile else "animation.moreEffects.emphasis",
         )
@@ -2054,7 +2082,7 @@ def _effect_candidate(key: str, enumerator: str, code: str) -> dict[str, Any]:
             )
         return _accepted(
             key, level, ooxml,
-            effect_semantic(preset={"category": "media", "effect": slug, "variant": None}),
+            effect_semantic(preset={"category": "media", "effect": slug}),
             native_evidence("native-media-background-timing", "") if preset_id
             else {"source": "ECMA-376 presetClass mediacall", "commit": None},
             guiKey=f"animation.gallery.media.{slug}",
@@ -2068,7 +2096,7 @@ def _effect_candidate(key: str, enumerator: str, code: str) -> dict[str, Any]:
          "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML "
                 "presetID is informational only. That geometry is not in the available evidence, so the "
                 "writer must emit a custom path or defer until Task 8 captures it."},
-        effect_semantic(preset={"category": "motionPath", "effect": slug, "variant": None}),
+        effect_semantic(preset={"category": "motionPath", "effect": slug}),
         {"source": SDEF_SOURCE, "commit": None},
         guiKey="animation.moreEffects.motionPath",
     )
@@ -2651,6 +2679,199 @@ def promote_gui_captures(items: list[dict[str, Any]],
     return items
 
 
+def option_slug(label: str) -> str:
+    """Return the JSON name for a GUI label.
+
+    Mirrors ``effect_options_plan.slugify`` exactly, because the plan's target
+    keys and the catalog's option names have to agree for the evidence to reach
+    the entry: ``From Bottom-Left`` is ``fromBottomLeft``, ``4 Spokes`` is
+    ``spokes4`` (a name cannot start with a digit), ``25%`` is ``percent25``.
+    """
+    words = [word for word in label.replace("-", " ").replace("%", " percent").split() if word]
+    if words and words[0][0].isdigit():
+        words = words[1:] + [words[0]]
+    head, *rest = words or [label]
+    return head.lower() + "".join(word[:1].upper() + word[1:].lower() for word in rest)
+
+
+def load_effect_options_evidence(
+    directory: Path | None = None,
+) -> dict[str, dict[str, list[dict[str, Any]]]]:
+    """Return ``effectKey -> setting -> [measured value]`` from the merged capture.
+
+    The merge is produced by ``effect_options_merge.py``, which refuses to
+    publish a set where two values of one setting carry the same OOXML — that
+    is how three values which had silently recorded their effect's **default**
+    were found. Reading its output rather than the raw captures means the
+    catalog cannot be built from an unverified reading.
+    """
+    directory = directory or DEFAULT_EFFECT_OPTIONS_EVIDENCE
+    path = directory / EFFECT_OPTIONS_MERGED
+    if not path.exists():
+        return {}
+    document = json.loads(path.read_text(encoding="utf-8"))
+    counts = document.get("counts") or {}
+    if counts.get("missing") or counts.get("collisions"):
+        raise SystemExit(
+            f"FAIL: {path} reports {counts.get('missing')} unmeasured and "
+            f"{counts.get('collisions')} colliding effect option(s); run "
+            "effect_options_merge.py --check and re-capture before generating"
+        )
+    grouped: dict[str, dict[str, list[dict[str, Any]]]] = {}
+    for target in document.get("targets") or []:
+        grouped.setdefault(target["effectKey"], {}).setdefault(target["setting"], []).append(
+            target
+        )
+    return grouped
+
+
+def promote_effect_options(
+    entry: dict[str, Any], settings: dict[str, list[dict[str, Any]]]
+) -> dict[str, Any]:
+    """Write one gallery entry's measured ``Effect Options`` values into its OOXML.
+
+    Each value carries its own ``presetSubtype`` **and** its own behaviours,
+    because neither alone is sufficient:
+
+    * 9 of the 37 groups never move ``presetSubtype``. Spin's Clockwise and
+      Counterclockwise are both subtype 0 and differ only in the sign of
+      ``p:animRot/@by``, so a subtype-only option would write one direction for
+      both.
+    * No group moves ``presetSubtype`` *alone*. The behaviours are what actually
+      animate the shape — the subtype is the label PowerPoint names the effect
+      by — so the writer has to emit the measured behaviours either way.
+
+    ``default`` names the value whose OOXML equals what pressing the tile alone
+    produces, and ``defaultResolvedBy`` says how that was established:
+
+    ``signature``
+        The tile's own measured ``presetSubtype`` and behaviours match the
+        value's exactly. The strongest answer, available for the 14 effects the
+        gallery capture measured.
+    ``presetSubtype``
+        19 of the 95 tiles were outside the gallery capture's plan and carry no
+        measured behaviours, so there is nothing to compare. The subtype the
+        catalog already holds from native fixtures identifies the value instead,
+        and only when it matches **exactly one** of them.
+    ``None``
+        Neither worked, and the catalog says so rather than picking. This is the
+        honest answer for ``Shape``'s ``Shapes`` setting, whose four values all
+        carry the tile's subtype because the shape lives in
+        ``p:animEffect/@filter`` — without the tile's behaviours there is no way
+        to tell which of Box, Circle, Diamond and Plus is the default.
+    """
+    ooxml = entry.get("ooxml")
+    if not isinstance(ooxml, dict) or entry.get("status") != "accepted":
+        return entry
+
+    tile_signature = json.dumps(
+        {
+            "presetSubtype": ooxml.get("presetSubtype"),
+            "behaviors": ooxml.get("behaviors") or [],
+        },
+        sort_keys=True,
+    )
+
+    options: dict[str, Any] = {}
+    for setting, targets in sorted(settings.items()):
+        values: dict[str, Any] = {}
+        default_slug: str | None = None
+        for target in sorted(targets, key=lambda item: item["value"]):
+            behaviors = [measured_behavior(b) for b in target.get("behaviors") or []]
+            subtype_text = (target.get("effectAttributes") or {}).get("presetSubtype")
+            subtype = int(subtype_text) if subtype_text is not None else None
+            slug = option_slug(target["value"])
+            values[slug] = {
+                "label": target["value"],
+                "presetSubtype": subtype,
+                "behaviors": behaviors,
+                "behaviorChildren": sorted({b["element"] for b in behaviors}),
+                "measuredIn": target.get("measuredIn"),
+            }
+            signature = json.dumps(
+                {"presetSubtype": subtype, "behaviors": behaviors}, sort_keys=True
+            )
+            if signature == tile_signature:
+                default_slug = slug
+        resolved_by = "signature" if default_slug is not None else None
+        if default_slug is None and not (ooxml.get("behaviors") or []):
+            # No measured behaviours to compare against, so fall back to the
+            # subtype the catalog holds from native fixtures. Only a unique
+            # match counts: a setting whose values all share the tile's subtype
+            # cannot be resolved this way, and guessing one would put a default
+            # label on bytes that do not belong to it.
+            matches = [
+                slug
+                for slug, value in values.items()
+                if value["presetSubtype"] == ooxml.get("presetSubtype")
+            ]
+            if len(matches) == 1:
+                default_slug = matches[0]
+                resolved_by = "presetSubtype"
+        options[option_slug(setting)] = {
+            "setting": setting,
+            "default": default_slug,
+            "defaultResolvedBy": resolved_by,
+            "values": values,
+        }
+
+    ooxml["effectOptions"] = options
+    # Measured one setting at a time: each value was applied with every *other*
+    # setting left at its default. For the four effects offering two settings at
+    # once that leaves the combinations unmeasured, and the writer refuses them
+    # rather than composing two measurements into a value PowerPoint never
+    # wrote. Recorded here so the refusal quotes the catalog instead of a
+    # hardcoded sentence.
+    if len(options) > 1:
+        combinations = 1
+        for option in options.values():
+            combinations *= len(option["values"])
+        ooxml["effectOptionCombinations"] = {
+            "measured": "oneSettingAtATime",
+            "settings": sorted(options),
+            "combinations": combinations,
+            "gap": (
+                "each value was measured with the effect's other setting left at its default, "
+                f"so the {combinations} combinations of "
+                f"{' and '.join(sorted(options))} are not measured; ask for one setting at a time"
+            ),
+        }
+    entry.setdefault("capture", {})["effectOptions"] = {
+        "source": GUI_CAPTURE_SOURCE,
+        "application": BASELINE_APPLICATION,
+        "version": BASELINE_VERSION,
+        "capturedAt": EFFECT_OPTIONS_DATE,
+        "driver": GUI_CAPTURE_DRIVER,
+        "merged": (
+            DEFAULT_EFFECT_OPTIONS_EVIDENCE.relative_to(REPO_ROOT).as_posix()
+            + f"/{EFFECT_OPTIONS_MERGED}"
+        ),
+        "settings": sorted(options),
+        "values": sum(len(option["values"]) for option in options.values()),
+        "verifiedBy": (
+            "effect_options_merge.py: no two values of one setting carry the same OOXML"
+        ),
+    }
+    return entry
+
+
+def promote_all_effect_options(
+    items: list[dict[str, Any]],
+    evidence: dict[str, dict[str, list[dict[str, Any]]]],
+) -> list[dict[str, Any]]:
+    """Fold every measured effect option into the entry its effect names."""
+    by_key = {entry["key"]: entry for entry in items}
+    missing = sorted(key for key in evidence if key not in by_key)
+    if missing:
+        raise SystemExit(
+            f"FAIL: the effect-option capture names {len(missing)} effect(s) no catalog item "
+            f"carries: {missing}"
+        )
+    for key, settings in evidence.items():
+        promote_effect_options(by_key[key], settings)
+    return items
+
+
 def align_candidate_durations(candidates: list[dict[str, Any]],
                               items: list[dict[str, Any]]) -> list[dict[str, Any]]:
     """Drop the example duration of a candidate that mirrors a non-scalable tile.
@@ -2710,7 +2931,8 @@ def candidate_entries(sdef_enums: dict[str, list[tuple[str, str]]],
                     key, SEMANTIC,
                     {"strategy": "presetSubtype", "attribute": "p:cTn/@presetSubtype", "presetSubtype": None,
                      "requiresCapture": True, "gap": DIRECTION_GAP},
-                    effect_semantic(preset={"category": "entrance", "effect": "flyIn", "variant": semantic}),
+                    effect_semantic(preset={"category": "entrance", "effect": "flyIn",
+                                            "options": {"direction": semantic}}),
                     {"source": SDEF_SOURCE, "commit": None},
                     guiKey=f"animation.effectOptions.direction.{semantic}",
                 )
@@ -2803,6 +3025,10 @@ def build_catalog(manifest: dict[str, Any], sdef_enums: dict[str, list[tuple[str
     items = promote_gui_captures(
         gui_items() + enum_value_items(sdef_enums), load_gui_capture_evidence()
     )
+    # After the gallery capture, not before: an option's default is resolved by
+    # comparing it against what pressing the tile alone produces, and that
+    # comparison needs the tile's own measured behaviours already in place.
+    items = promote_all_effect_options(items, load_effect_options_evidence())
     items.sort(key=lambda entry: entry["key"])
     candidates = align_candidate_durations(candidate_entries(sdef_enums, evidence), items)
     candidates.sort(key=lambda entry: entry["key"])

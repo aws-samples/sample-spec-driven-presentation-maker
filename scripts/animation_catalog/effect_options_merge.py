@@ -59,11 +59,19 @@ GUI_ONLY = REPO_ROOT / "tests" / "fixtures" / "animations" / "gui-only"
 #: them, **in the order they were taken**. A later capture wins, because the
 #: reason a target was captured again is that the earlier reading was refused.
 DEFAULT_PLAN = GUI_ONLY / "effect-options-capture-2026-11-02" / "plan.json"
+#: Every capture is a directory carrying its own ``plan.json``,
+#: ``powerpoint-oracle.pptx`` and ``powerpoint-readback.jsonl``, so every value
+#: here can be re-derived by re-running ``effect_options_resolve.py``. Two
+#: earlier re-runs (``quarter-spin-resolved.json`` and
+#: ``spin-reopen-resolved.json``) could not: they were resolved in a scratch
+#: directory and only the result was committed, so the package their values
+#: came from no longer exists. Their two values were measured again as
+#: ``spin-amounts/`` and agreed, which is why they could be dropped rather than
+#: trusted.
 DEFAULT_RESOLVED = (
     GUI_ONLY / "effect-options-capture-2026-11-02" / "resolved.json",
     GUI_ONLY / "effect-options-remeasure-2026-11-02" / "resolved.json",
-    GUI_ONLY / "effect-options-remeasure-2026-11-02" / "spin-reopen-resolved.json",
-    GUI_ONLY / "effect-options-remeasure-2026-11-02" / "quarter-spin-resolved.json",
+    GUI_ONLY / "effect-options-remeasure-2026-11-02" / "spin-amounts" / "resolved.json",
     GUI_ONLY / "effect-options-remeasure-2026-11-02" / "from-right" / "resolved.json",
     GUI_ONLY / "effect-options-remeasure-2026-11-02" / "stretch-from-top" / "resolved.json",
     GUI_ONLY / "effect-options-remeasure-2026-11-02" / "transparency-25" / "resolved.json",

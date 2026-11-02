@@ -37,7 +37,7 @@ NS = {
     "mc": "http://schemas.openxmlformats.org/markup-compatibility/2006",
 }
 
-FADE = {"category": "entrance", "effect": "fade", "variant": None}
+FADE = {"category": "entrance", "effect": "fade"}
 
 
 def _effect(effect_id="show-hero", element="hero", **patch):

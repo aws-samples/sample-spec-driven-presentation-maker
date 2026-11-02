@@ -6,8 +6,7 @@
   "captures": [
     "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json",
     "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json",
-    "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/spin-reopen-resolved.json",
-    "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/quarter-spin-resolved.json",
+    "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/spin-amounts/resolved.json",
     "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/from-right/resolved.json",
     "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/stretch-from-top/resolved.json",
     "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/transparency-25/resolved.json"
@@ -69,6 +68,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json"
     },
     {
@@ -110,6 +110,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json"
     },
     {
@@ -151,6 +152,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json"
     },
     {
@@ -192,6 +194,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json"
     },
     {
@@ -199,7 +202,7 @@
       "effectKey": "animation.gallery.emphasis.spin",
       "setting": "Amount",
       "value": "Full Spin",
-      "shapeSpid": "2",
+      "shapeSpid": "10",
       "effectsOnShape": 1,
       "outcome": "resolved",
       "mechanism": "modifiedInPlace",
@@ -228,15 +231,16 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": null,
-      "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/spin-reopen-resolved.json"
+      "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json"
     },
     {
       "key": "animation.effectOptions.amount.emphasis.spin.halfSpin",
       "effectKey": "animation.gallery.emphasis.spin",
       "setting": "Amount",
       "value": "Half Spin",
-      "shapeSpid": "4",
+      "shapeSpid": "2",
       "effectsOnShape": 1,
       "outcome": "resolved",
       "mechanism": "modifiedInPlace",
@@ -265,28 +269,15 @@
           "values": {}
         }
       ],
-      "differences": [
-        {
-          "index": 0,
-          "element": "p:animRot",
-          "attributes": {
-            "default": {
-              "by": "21600000"
-            },
-            "measured": {
-              "by": "10800000"
-            }
-          }
-        }
-      ],
-      "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/spin-reopen-resolved.json"
+      "measuredDurationMs": 2000,
+      "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/spin-amounts/resolved.json"
     },
     {
       "key": "animation.effectOptions.amount.emphasis.spin.quarterSpin",
       "effectKey": "animation.gallery.emphasis.spin",
       "setting": "Amount",
       "value": "Quarter Spin",
-      "shapeSpid": "2",
+      "shapeSpid": "4",
       "effectsOnShape": 1,
       "outcome": "resolved",
       "mechanism": "modifiedInPlace",
@@ -315,7 +306,8 @@
           "values": {}
         }
       ],
-      "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/quarter-spin-resolved.json"
+      "measuredDurationMs": 2000,
+      "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/spin-amounts/resolved.json"
     },
     {
       "key": "animation.effectOptions.amount.emphasis.spin.twoSpins",
@@ -351,6 +343,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 0,
@@ -426,6 +419,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": null,
       "differences": [
         {
           "index": 0,
@@ -539,6 +533,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": null,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/transparency-25/resolved.json"
     },
     {
@@ -600,6 +595,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": null,
       "differences": null,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
@@ -662,6 +658,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": null,
       "differences": [
         {
           "index": 0,
@@ -755,6 +752,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": null,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
@@ -797,6 +795,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 0,
@@ -866,6 +865,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 0,
@@ -930,6 +930,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": null,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
@@ -967,6 +968,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 0,
@@ -1161,6 +1163,7 @@
           }
         }
       ],
+      "measuredDurationMs": 5000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -1341,6 +1344,7 @@
           }
         }
       ],
+      "measuredDurationMs": 5000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -1403,6 +1407,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -1465,6 +1470,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -1527,6 +1533,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -1589,6 +1596,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -1781,6 +1789,7 @@
           }
         }
       ],
+      "measuredDurationMs": 1000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -1973,6 +1982,7 @@
           }
         }
       ],
+      "measuredDurationMs": 1000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -2156,6 +2166,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "differences": null,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
@@ -2340,6 +2351,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "differences": [
         {
           "index": 1,
@@ -2631,6 +2643,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "differences": [
         {
           "index": 1,
@@ -2922,6 +2935,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "differences": [
         {
           "index": 1,
@@ -3319,6 +3333,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/from-right/resolved.json"
     },
     {
@@ -3502,6 +3517,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "differences": [
         {
           "index": 2,
@@ -3793,6 +3809,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "differences": [
         {
           "index": 1,
@@ -4190,6 +4207,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "differences": [
         {
           "index": 1,
@@ -4532,6 +4550,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -4660,6 +4679,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -4788,6 +4808,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -4916,6 +4937,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -4978,6 +5000,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -5040,6 +5063,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -5102,6 +5126,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": null,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
@@ -5165,6 +5190,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 1,
@@ -5243,6 +5269,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -5305,6 +5332,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -5367,6 +5395,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -5429,6 +5458,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -5608,6 +5638,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "differences": null,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
@@ -5918,6 +5949,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "differences": [
         {
           "behaviourCount": [
@@ -6463,6 +6495,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "differences": [
         {
           "behaviourCount": [
@@ -7008,6 +7041,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "differences": [
         {
           "behaviourCount": [
@@ -7553,6 +7587,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/stretch-from-top/resolved.json"
     },
     {
@@ -7615,6 +7650,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -7677,6 +7713,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -7739,6 +7776,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -7801,6 +7839,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -7863,6 +7902,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -7925,6 +7965,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -7987,6 +8028,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -8049,6 +8091,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -8625,6 +8668,7 @@
           }
         }
       ],
+      "measuredDurationMs": 5000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -9201,6 +9245,7 @@
           }
         }
       ],
+      "measuredDurationMs": 5000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -9263,6 +9308,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -9325,6 +9371,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -9387,6 +9434,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -9449,6 +9497,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -9626,6 +9675,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -9931,6 +9981,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -10236,6 +10287,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -10541,6 +10593,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -10846,6 +10899,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -11036,6 +11090,7 @@
           }
         }
       ],
+      "measuredDurationMs": 1000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -11226,6 +11281,7 @@
           }
         }
       ],
+      "measuredDurationMs": 1000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -11407,6 +11463,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -11588,6 +11645,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -11769,6 +11827,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -11950,6 +12009,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -12131,6 +12191,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -12312,6 +12373,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -12493,6 +12555,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -12674,6 +12737,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -12802,6 +12866,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -12930,6 +12995,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13058,6 +13124,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13186,6 +13253,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13248,6 +13316,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13310,6 +13379,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13372,6 +13442,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 0,
@@ -13450,6 +13521,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": null,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
@@ -13513,6 +13585,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13575,6 +13648,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13637,6 +13711,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13699,6 +13774,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13761,6 +13837,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13823,6 +13900,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13885,6 +13963,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -13947,6 +14026,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -14009,6 +14089,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -14071,6 +14152,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -14133,6 +14215,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -14195,6 +14278,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -14257,6 +14341,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 1,
@@ -14335,6 +14420,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": null,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
@@ -14398,6 +14484,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 1,
@@ -14476,6 +14563,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 1,
@@ -14554,6 +14642,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 0,
@@ -14632,6 +14721,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": null,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
@@ -14695,6 +14785,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 0,
@@ -14773,6 +14864,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "differences": [
         {
           "index": 0,
@@ -14851,6 +14943,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -14913,6 +15006,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -14975,6 +15069,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -15037,6 +15132,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -15099,6 +15195,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -15161,6 +15258,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -15223,6 +15321,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -15285,6 +15384,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -15347,6 +15447,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -15409,6 +15510,7 @@
           }
         }
       ],
+      "measuredDurationMs": 2000,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -15601,6 +15703,7 @@
           "values": {}
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -15923,6 +16026,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -16113,6 +16217,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -16431,6 +16536,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -16610,6 +16716,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -16919,6 +17026,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -17098,6 +17206,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -17277,6 +17386,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -17586,6 +17696,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -17765,6 +17876,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -17942,6 +18054,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -18119,6 +18232,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -18360,6 +18474,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -18537,6 +18652,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -18714,6 +18830,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     },
     {
@@ -19019,6 +19136,7 @@
           }
         }
       ],
+      "measuredDurationMs": 500,
       "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
     }
   ]

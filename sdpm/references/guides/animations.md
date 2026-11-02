@@ -321,6 +321,54 @@ re-derived.
 `custom` is not a gallery — it is the advanced form, written with a `behaviors` list; a custom
 motion path is a `motion` behavior.
 
+#### `preset.options` — the effect's own settings
+
+Picking a tile is not the whole choice. 33 of the effects above carry a setting of their own,
+the one PowerPoint shows under **Animations ▸ Effect Options**, and `preset.options` names it:
+
+```json
+{"preset": {"category": "entrance", "effect": "flyIn", "options": {"direction": "fromRight"}}}
+{"preset": {"category": "entrance", "effect": "wheel",  "options": {"spokes": "spokes4"}}}
+{"preset": {"category": "emphasis", "effect": "spin",   "options": {"amount": "twoSpins"}}}
+{"preset": {"category": "emphasis", "effect": "transparency", "options": {"amount": "percent25"}}}
+```
+
+There are **133 values over 6 settings** — `direction` (87), `amount` (12), `zoom` (12),
+`spokes` (10), `shapes` (8) and `vanishingPoint` (4) — and every one was applied in PowerPoint
+and read back out of the saved package. Omit `options` to get the effect's default.
+
+**The values are per effect.** Fly In's `fromRight` and Stretch's `fromRight` are different
+measurements, so there is no global list of directions: ask the catalog entry, or read the
+error, which names what the effect you asked for actually offers.
+
+```
+mainSequence[0].preset.options.direction 'sideways' is not a measured value of
+'animation.gallery.entrance.flyIn''s 'Direction'; it offers ['fromBottom', 'fromBottomLeft',
+'fromBottomRight', 'fromLeft', 'fromRight', 'fromTop', 'fromTopLeft', 'fromTopRight']
+```
+
+**One setting at a time.** Four effects offer two settings at once — `emphasis.growShrink` and
+`emphasis.spin` (`amount` + `direction`), `entrance.shape` and `exit.shape` (`direction` +
+`shapes`). Each value was measured with the other setting left at its default, so the
+combinations were never applied and asking for both is refused rather than composed. Spin's
+direction is the *sign* of `p:animRot/@by` and its amount is the magnitude; writing
+`counterclockwise` + `twoSpins` would mean inventing `-43200000`, which PowerPoint was never
+observed to write.
+
+**`preset.variant` is gone** (a leftover `"variant": null` is ignored; any other value fails).
+It took one of the 45 `MsoAnimDirection` scripting names and
+never worked — any value at all was refused — and the capture showed why that vocabulary could
+not be made to work: 33 of its 45 names are not offered by any gallery tile, 24 of the 36
+labels the tiles do offer have no name in it, and the same label means different subtypes on
+different effects. Writing `variant` now fails with a pointer to `options`, and one of its old
+names fails with the reason.
+
+On import, 111 of the 133 read back as the option they were written from. The other 22 are the
+settings PowerPoint persists **only** in the behaviour payload, leaving `presetSubtype`
+unchanged — Spin's two directions are both subtype 0 — so the identifier the reader matches on
+cannot tell them apart. Those import as the effect at its default rather than as a guess; the
+XML is still read, and nothing is lost but the label.
+
 A `media` command other than `mediaPlay`, and a custom motion path, are still refused by name
 rather than approximated. Asking for one fails with its catalog key:
 
@@ -347,10 +395,10 @@ three ratios. Two details come with it:
 `boldReveal` and `transparency` have no numeric duration at all — PowerPoint shows `Auto` and
 writes `indefinite` — so a `durationMs` on either is **refused** rather than ignored. Omit it.
 
-`preset.variant` (a direction such as `fromLeft`) is validated against the catalog's 45
-direction names and then **refused for every value**: a direction persists as the preset's
-`presetSubtype`, and the capture records only each tile's default subtype, so writing it
-would silently substitute the default direction. Leave `variant` out (or `null`).
+An option changes the duration basis with it. A setting is measured on its own capture, so
+`options` carries its own measured duration and `durationMs` scales against that rather than
+against the tile's — which is what lets the 19 effects with no measured duration of their own
+be written at any duration once an option names one.
 
 ### Triggers
 
@@ -497,8 +545,9 @@ substitution would lose the user's setting.
 | Transition sound | `transition.sound.effect` |
 | Transition sound: loop until next sound | `transition.sound.loopUntilNext` |
 
-Plus every effect direction (`preset.variant`, 45 keys under
-`animation.effectOptions.direction.`) and every gallery preset outside the table above.
+Plus the 45 `MsoAnimDirection` scripting names (`animation.effectOptions.direction.`), which
+are not an sdpm input at all — directions are written with `preset.options.direction` and
+validated per effect — and every gallery preset outside the table above.
 
 The error always names the key, the recorded gap and the slide:
 
@@ -536,7 +585,8 @@ part sdpm does not understand would be silent data loss.
 
 Recognized semantically today: slide transitions with their catalogued option sets and all
 three Morph variants, duration, advance-on-click and advance-after-time, `morphId`, the
-authorable entrance/exit/media presets with their default direction, main and interactive
+authorable entrance/exit/media presets, the 111 effect-option values whose `presetSubtype`
+identifies them (read back as `preset.options`), main and interactive
 sequences and their order, the four writable triggers, delay, duration, repeat count, repeat
 duration, auto-reverse, acceleration, deceleration, restart, catalogued paragraph builds, and
 stable effect IDs.
@@ -545,7 +595,10 @@ Kept as raw rather than semantic JSON — preserved and replayable, but not auth
 
 - a preset the catalog records as capture-required (reading it semantically would produce
   JSON the writer then refuses, so the round-trip would break on content the file carried);
-- a non-default preset direction (`presetSubtype` other than the tile's own);
+- an effect option PowerPoint persists only in the behaviour payload, leaving `presetSubtype`
+  at the tile's own value — 22 of the 133, such as Spin's two directions, which are both
+  subtype 0 and differ in the sign of `p:animRot/@by`. These import as the effect at its
+  default: the XML is read, only the option's name is not recovered;
 - an effect with no `presetClass` / `presetID` — an explicit behavior list whose payload sdpm
   does not invert;
 - behaviors that do not match the catalog entry's recorded children exactly, or whose

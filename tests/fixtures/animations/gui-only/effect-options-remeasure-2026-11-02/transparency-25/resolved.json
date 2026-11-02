@@ -65,7 +65,8 @@
           "attrNames": [],
           "values": {}
         }
-      ]
+      ],
+      "measuredDurationMs": null
     }
   ]
 }

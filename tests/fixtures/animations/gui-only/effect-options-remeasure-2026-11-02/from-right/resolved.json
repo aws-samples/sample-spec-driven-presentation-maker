@@ -187,7 +187,8 @@
             }
           }
         }
-      ]
+      ],
+      "measuredDurationMs": 500
     }
   ]
 }

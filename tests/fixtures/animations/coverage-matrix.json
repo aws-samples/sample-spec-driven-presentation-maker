@@ -13,7 +13,7 @@
   },
   "source": {
     "catalog": "sdpm/references/catalogs/powerpoint-animation-catalog.json",
-    "catalogDigest": "sha256:de8309a951b1d534ded9a5597f3f9a3d141347f69c1ac33c620592a688beb5d2",
+    "catalogDigest": "sha256:b0c56dff2d382530558d45aa0e9beb6559223cc182487259d415635d61190f2d",
     "catalogGeneratedAt": "2026-10-30T00:00:00Z",
     "guiManifest": "powerpoint-gui-surface-16.113.1.json@2026-10-30.1",
     "baseline": {
@@ -549,9 +549,9 @@
       "formEstablishedCatalogKey": "animation.timing.acceleration"
     },
     {
-      "id": "animationVariant:across",
+      "id": "animationVariant:direction=across",
       "axis": "animationVariant",
-      "value": "across",
+      "value": "direction=across",
       "catalogKey": "animation.effectOptions.direction.across",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -562,9 +562,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:bottom",
+      "id": "animationVariant:direction=bottom",
       "axis": "animationVariant",
-      "value": "bottom",
+      "value": "direction=bottom",
       "catalogKey": "animation.effectOptions.direction.bottom",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -575,9 +575,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:bottomLeft",
+      "id": "animationVariant:direction=bottomLeft",
       "axis": "animationVariant",
-      "value": "bottomLeft",
+      "value": "direction=bottomLeft",
       "catalogKey": "animation.effectOptions.direction.bottomLeft",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -588,9 +588,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:bottomRight",
+      "id": "animationVariant:direction=bottomRight",
       "axis": "animationVariant",
-      "value": "bottomRight",
+      "value": "direction=bottomRight",
       "catalogKey": "animation.effectOptions.direction.bottomRight",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -601,9 +601,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:center",
+      "id": "animationVariant:direction=center",
       "axis": "animationVariant",
-      "value": "center",
+      "value": "direction=center",
       "catalogKey": "animation.effectOptions.direction.center",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -614,9 +614,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:clockwise",
+      "id": "animationVariant:direction=clockwise",
       "axis": "animationVariant",
-      "value": "clockwise",
+      "value": "direction=clockwise",
       "catalogKey": "animation.effectOptions.direction.clockwise",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -627,9 +627,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:counterclockwise",
+      "id": "animationVariant:direction=counterclockwise",
       "axis": "animationVariant",
-      "value": "counterclockwise",
+      "value": "direction=counterclockwise",
       "catalogKey": "animation.effectOptions.direction.counterclockwise",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -640,9 +640,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:cycleClockwise",
+      "id": "animationVariant:direction=cycleClockwise",
       "axis": "animationVariant",
-      "value": "cycleClockwise",
+      "value": "direction=cycleClockwise",
       "catalogKey": "animation.effectOptions.direction.cycleClockwise",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -653,9 +653,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:cycleCounterclockwise",
+      "id": "animationVariant:direction=cycleCounterclockwise",
       "axis": "animationVariant",
-      "value": "cycleCounterclockwise",
+      "value": "direction=cycleCounterclockwise",
       "catalogKey": "animation.effectOptions.direction.cycleCounterclockwise",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -666,9 +666,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:down",
+      "id": "animationVariant:direction=down",
       "axis": "animationVariant",
-      "value": "down",
+      "value": "direction=down",
       "catalogKey": "animation.effectOptions.direction.down",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -679,9 +679,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:downLeft",
+      "id": "animationVariant:direction=downLeft",
       "axis": "animationVariant",
-      "value": "downLeft",
+      "value": "direction=downLeft",
       "catalogKey": "animation.effectOptions.direction.downLeft",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -692,9 +692,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:downRight",
+      "id": "animationVariant:direction=downRight",
       "axis": "animationVariant",
-      "value": "downRight",
+      "value": "direction=downRight",
       "catalogKey": "animation.effectOptions.direction.downRight",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -705,9 +705,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:fontAllCaps",
+      "id": "animationVariant:direction=fontAllCaps",
       "axis": "animationVariant",
-      "value": "fontAllCaps",
+      "value": "direction=fontAllCaps",
       "catalogKey": "animation.effectOptions.direction.fontAllCaps",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -718,9 +718,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:fontBold",
+      "id": "animationVariant:direction=fontBold",
       "axis": "animationVariant",
-      "value": "fontBold",
+      "value": "direction=fontBold",
       "catalogKey": "animation.effectOptions.direction.fontBold",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -731,9 +731,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:fontItalic",
+      "id": "animationVariant:direction=fontItalic",
       "axis": "animationVariant",
-      "value": "fontItalic",
+      "value": "direction=fontItalic",
       "catalogKey": "animation.effectOptions.direction.fontItalic",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -744,9 +744,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:fontShadow",
+      "id": "animationVariant:direction=fontShadow",
       "axis": "animationVariant",
-      "value": "fontShadow",
+      "value": "direction=fontShadow",
       "catalogKey": "animation.effectOptions.direction.fontShadow",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -757,9 +757,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:fontStrikethrough",
+      "id": "animationVariant:direction=fontStrikethrough",
       "axis": "animationVariant",
-      "value": "fontStrikethrough",
+      "value": "direction=fontStrikethrough",
       "catalogKey": "animation.effectOptions.direction.fontStrikethrough",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -770,9 +770,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:fontUnderline",
+      "id": "animationVariant:direction=fontUnderline",
       "axis": "animationVariant",
-      "value": "fontUnderline",
+      "value": "direction=fontUnderline",
       "catalogKey": "animation.effectOptions.direction.fontUnderline",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -783,9 +783,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:gradual",
+      "id": "animationVariant:direction=gradual",
       "axis": "animationVariant",
-      "value": "gradual",
+      "value": "direction=gradual",
       "catalogKey": "animation.effectOptions.direction.gradual",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -796,9 +796,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:horizontal",
+      "id": "animationVariant:direction=horizontal",
       "axis": "animationVariant",
-      "value": "horizontal",
+      "value": "direction=horizontal",
       "catalogKey": "animation.effectOptions.direction.horizontal",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -809,9 +809,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:horizontalIn",
+      "id": "animationVariant:direction=horizontalIn",
       "axis": "animationVariant",
-      "value": "horizontalIn",
+      "value": "direction=horizontalIn",
       "catalogKey": "animation.effectOptions.direction.horizontalIn",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -822,9 +822,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:horizontalOut",
+      "id": "animationVariant:direction=horizontalOut",
       "axis": "animationVariant",
-      "value": "horizontalOut",
+      "value": "direction=horizontalOut",
       "catalogKey": "animation.effectOptions.direction.horizontalOut",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -835,9 +835,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:inBottom",
+      "id": "animationVariant:direction=inBottom",
       "axis": "animationVariant",
-      "value": "inBottom",
+      "value": "direction=inBottom",
       "catalogKey": "animation.effectOptions.direction.inBottom",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -848,9 +848,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:inCenter",
+      "id": "animationVariant:direction=inCenter",
       "axis": "animationVariant",
-      "value": "inCenter",
+      "value": "direction=inCenter",
       "catalogKey": "animation.effectOptions.direction.inCenter",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -861,9 +861,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:inSlightly",
+      "id": "animationVariant:direction=inSlightly",
       "axis": "animationVariant",
-      "value": "inSlightly",
+      "value": "direction=inSlightly",
       "catalogKey": "animation.effectOptions.direction.inSlightly",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -874,9 +874,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:instant",
+      "id": "animationVariant:direction=instant",
       "axis": "animationVariant",
-      "value": "instant",
+      "value": "direction=instant",
       "catalogKey": "animation.effectOptions.direction.instant",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -887,9 +887,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:inward",
+      "id": "animationVariant:direction=inward",
       "axis": "animationVariant",
-      "value": "inward",
+      "value": "direction=inward",
       "catalogKey": "animation.effectOptions.direction.inward",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -900,9 +900,9 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:left",
+      "id": "animationVariant:direction=left",
       "axis": "animationVariant",
-      "value": "left",
+      "value": "direction=left",
       "catalogKey": "animation.effectOptions.direction.left",
       "catalogGroup": "guiItems",
       "status": "accepted",
@@ -913,10 +913,218 @@
       "formEstablishedCatalogKey": null
     },
     {
-      "id": "animationVariant:noDirection",
+      "id": "animationVariant:direction=noDirection",
       "axis": "animationVariant",
-      "value": "noDirection",
+      "value": "direction=noDirection",
       "catalogKey": "animation.effectOptions.direction.noDirection",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=ordinalMask",
+      "axis": "animationVariant",
+      "value": "direction=ordinalMask",
+      "catalogKey": "animation.effectOptions.direction.ordinalMask",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=out",
+      "axis": "animationVariant",
+      "value": "direction=out",
+      "catalogKey": "animation.effectOptions.direction.out",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=outBottom",
+      "axis": "animationVariant",
+      "value": "direction=outBottom",
+      "catalogKey": "animation.effectOptions.direction.outBottom",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=outCenter",
+      "axis": "animationVariant",
+      "value": "direction=outCenter",
+      "catalogKey": "animation.effectOptions.direction.outCenter",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=outSlightly",
+      "axis": "animationVariant",
+      "value": "direction=outSlightly",
+      "catalogKey": "animation.effectOptions.direction.outSlightly",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=right",
+      "axis": "animationVariant",
+      "value": "direction=right",
+      "catalogKey": "animation.effectOptions.direction.right",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=slightly",
+      "axis": "animationVariant",
+      "value": "direction=slightly",
+      "catalogKey": "animation.effectOptions.direction.slightly",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=top",
+      "axis": "animationVariant",
+      "value": "direction=top",
+      "catalogKey": "animation.effectOptions.direction.top",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=topLeft",
+      "axis": "animationVariant",
+      "value": "direction=topLeft",
+      "catalogKey": "animation.effectOptions.direction.topLeft",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=topRight",
+      "axis": "animationVariant",
+      "value": "direction=topRight",
+      "catalogKey": "animation.effectOptions.direction.topRight",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=up",
+      "axis": "animationVariant",
+      "value": "direction=up",
+      "catalogKey": "animation.effectOptions.direction.up",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=upLeft",
+      "axis": "animationVariant",
+      "value": "direction=upLeft",
+      "catalogKey": "animation.effectOptions.direction.upLeft",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=upRight",
+      "axis": "animationVariant",
+      "value": "direction=upRight",
+      "catalogKey": "animation.effectOptions.direction.upRight",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=vertical",
+      "axis": "animationVariant",
+      "value": "direction=vertical",
+      "catalogKey": "animation.effectOptions.direction.vertical",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=verticalIn",
+      "axis": "animationVariant",
+      "value": "direction=verticalIn",
+      "catalogKey": "animation.effectOptions.direction.verticalIn",
+      "catalogGroup": "guiItems",
+      "status": "accepted",
+      "capabilityLevel": "semanticPreservationOnly",
+      "verification": "powerPointReadBackRequired",
+      "members": 2,
+      "formEstablishedMembers": 0,
+      "formEstablishedCatalogKey": null
+    },
+    {
+      "id": "animationVariant:direction=verticalOut",
+      "axis": "animationVariant",
+      "value": "direction=verticalOut",
+      "catalogKey": "animation.effectOptions.direction.verticalOut",
       "catalogGroup": "guiItems",
       "status": "accepted",
       "capabilityLevel": "semanticPreservationOnly",
@@ -937,214 +1145,6 @@
       "members": 334,
       "formEstablishedMembers": 179,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink"
-    },
-    {
-      "id": "animationVariant:ordinalMask",
-      "axis": "animationVariant",
-      "value": "ordinalMask",
-      "catalogKey": "animation.effectOptions.direction.ordinalMask",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:out",
-      "axis": "animationVariant",
-      "value": "out",
-      "catalogKey": "animation.effectOptions.direction.out",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:outBottom",
-      "axis": "animationVariant",
-      "value": "outBottom",
-      "catalogKey": "animation.effectOptions.direction.outBottom",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:outCenter",
-      "axis": "animationVariant",
-      "value": "outCenter",
-      "catalogKey": "animation.effectOptions.direction.outCenter",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:outSlightly",
-      "axis": "animationVariant",
-      "value": "outSlightly",
-      "catalogKey": "animation.effectOptions.direction.outSlightly",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:right",
-      "axis": "animationVariant",
-      "value": "right",
-      "catalogKey": "animation.effectOptions.direction.right",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:slightly",
-      "axis": "animationVariant",
-      "value": "slightly",
-      "catalogKey": "animation.effectOptions.direction.slightly",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:top",
-      "axis": "animationVariant",
-      "value": "top",
-      "catalogKey": "animation.effectOptions.direction.top",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:topLeft",
-      "axis": "animationVariant",
-      "value": "topLeft",
-      "catalogKey": "animation.effectOptions.direction.topLeft",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:topRight",
-      "axis": "animationVariant",
-      "value": "topRight",
-      "catalogKey": "animation.effectOptions.direction.topRight",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:up",
-      "axis": "animationVariant",
-      "value": "up",
-      "catalogKey": "animation.effectOptions.direction.up",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:upLeft",
-      "axis": "animationVariant",
-      "value": "upLeft",
-      "catalogKey": "animation.effectOptions.direction.upLeft",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:upRight",
-      "axis": "animationVariant",
-      "value": "upRight",
-      "catalogKey": "animation.effectOptions.direction.upRight",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:vertical",
-      "axis": "animationVariant",
-      "value": "vertical",
-      "catalogKey": "animation.effectOptions.direction.vertical",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:verticalIn",
-      "axis": "animationVariant",
-      "value": "verticalIn",
-      "catalogKey": "animation.effectOptions.direction.verticalIn",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
-    },
-    {
-      "id": "animationVariant:verticalOut",
-      "axis": "animationVariant",
-      "value": "verticalOut",
-      "catalogKey": "animation.effectOptions.direction.verticalOut",
-      "catalogGroup": "guiItems",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 2,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
     },
     {
       "id": "boundary:animations.interactiveSequences[].effects[].start.delayMs:maximum",

@@ -486,7 +486,10 @@ def build_matrix(catalog: Mapping[str, Any], index: CapabilityIndex, *, catalog_
         preset = effect.get("preset")
         if not isinstance(preset, Mapping):
             return None
-        return str(preset.get("variant") or "none")
+        options = preset.get("options")
+        if isinstance(options, Mapping) and options:
+            return ",".join(f"{setting}={value}" for setting, value in sorted(options.items()))
+        return "none"
 
     cells: list[Cell] = []
 

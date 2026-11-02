@@ -91,7 +91,7 @@ from __future__ import annotations
 
 import json
 import re
-from dataclasses import dataclass, field
+from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from functools import lru_cache
 from pathlib import Path
@@ -347,7 +347,6 @@ class CapabilityIndex:
         self._transitions: dict[str, list[CapabilityEntry]] = {}
         self._presets: dict[tuple[str, str], CapabilityEntry] = {}
         self._builds: dict[tuple[str, str, str | None], dict[str, CapabilityEntry]] = {}
-        self._directions: set[str] = set()
 
         for group, bucket in (("guiItems", self.items), ("candidates", self.candidates)):
             for raw in catalog.get(group) or ():
@@ -382,9 +381,6 @@ class CapabilityIndex:
         preset = effect.get("preset")
         if not isinstance(preset, Mapping):
             return
-        variant = preset.get("variant")
-        if isinstance(variant, str):
-            self._directions.add(variant)
         if strategy not in self.PRESET_STRATEGIES:
             return
         category, name = preset.get("category"), preset.get("effect")
@@ -479,9 +475,14 @@ class CapabilityIndex:
         """Return every transition effect name the catalog accepts."""
         return tuple(sorted(self._transitions))
 
-    def direction_names(self) -> frozenset[str]:
-        """Return every preset variant name the catalog knows."""
-        return frozenset(self._directions)
+    # There is no ``direction_names``. It returned the 45 ``MsoAnimDirection``
+    # scripting names that ``preset.variant`` validated against, and the
+    # effect-option capture showed that vocabulary to be the wrong one: of the
+    # 36 direction labels the galleries actually offer, only 12 had a name in
+    # it, while 33 of its 45 names are not reachable from any tile. Directions
+    # are per effect — Fly In's ``From Right`` and Stretch's ``From Right`` are
+    # different measurements — so they live in each entry's
+    # ``ooxml.effectOptions`` and are validated there. See ``effect_options``.
 
 
 def default_catalog_path() -> Path:
@@ -1287,31 +1288,138 @@ class TimingWriter:
             raise TimingWriteError(
                 f"slide {self.slide_slug!r}: {label}.preset needs a category and an effect"
             )
-        variant = preset.get("variant")
-        if variant is not None:
-            if variant not in self.index.direction_names():
-                raise TimingWriteError(
-                    f"slide {self.slide_slug!r}: {label}.preset.variant {variant!r} is not a catalog "
-                    f"direction; allowed: {', '.join(sorted(self.index.direction_names()))}"
-                )
-            # A direction is persisted as the preset's ``presetSubtype``, and
-            # the only subtype the capture records is the tile's default one.
-            # The refusal is therefore unconditional, exactly like the other
-            # options this writer cannot express: closing the catalog gap
-            # without also recording a variant → subtype mapping would make the
-            # writer emit the default direction and drop the requested one.
-            refuse_unimplemented(
-                self.index,
-                f"animation.effectOptions.direction.{variant}",
-                f"slide {self.slide_slug!r}: {label}.preset.variant {variant!r}",
-                "a direction is persisted as the preset's presetSubtype, and this writer has no "
-                "captured variant-to-presetSubtype mapping, so the requested direction would be "
-                "replaced by the tile's default one",
+        if preset.get("variant") is not None:
+            # Only a non-null one fails. ``variant`` named one of the 45
+            # ``MsoAnimDirection`` enumerators and was refused for every value,
+            # so the catalog's own examples all spelled it ``null`` and any
+            # document written against them carries that. A null asked for
+            # nothing, and failing it would break those documents to tell them
+            # about a field they are not using. A **non-null** one is a real
+            # request for a direction, and ignoring it would silently write the
+            # tile's default instead — so that is the one that has to stop.
+            raise TimingWriteError(
+                f"slide {self.slide_slug!r}: {label}.preset.variant {preset['variant']!r} is no "
+                f"longer a field; write {label}.preset.options instead, which names the setting "
+                "as well as the value and is validated against what this effect offers, as in "
+                '{"options": {"direction": "fromRight"}}'
             )
         try:
-            return self.index.preset(category, name)
+            entry = self.index.preset(category, name)
         except TimingWriteError as error:
             raise TimingWriteError(f"slide {self.slide_slug!r}: {label}: {error}") from error
+        options = preset.get("options")
+        if options is None:
+            return entry
+        return self._with_effect_options(entry, options, label)
+
+    def _with_effect_options(
+        self, entry: CapabilityEntry, options: Any, label: str
+    ) -> CapabilityEntry:
+        """Return the entry as if the requested ``Effect Options`` value were applied.
+
+        The chosen value's measured ``presetSubtype`` and behaviours are laid
+        over the entry's own, so :meth:`_preset_attrs` and
+        :meth:`_preset_behaviors` need to know nothing about options: they read
+        the same fields they always did. That is the whole reason the overlay
+        is built here rather than threaded through them.
+
+        Both fields are replaced, never one. 9 of the 37 measured groups do not
+        move ``presetSubtype`` at all — Spin's ``Clockwise`` and
+        ``Counterclockwise`` are both subtype 0 and differ only in the sign of
+        ``p:animRot/@by`` — so an overlay that carried only the subtype would
+        write one direction for both. And no group moves the subtype alone, so
+        the behaviours always differ too.
+        """
+        if not isinstance(options, Mapping):
+            raise TimingWriteError(
+                f"slide {self.slide_slug!r}: {label}.preset.options must be an object mapping a "
+                'setting to a value, as in {"direction": "fromRight"}'
+            )
+        if not options:
+            return entry
+        available = entry.ooxml.get("effectOptions")
+        if not isinstance(available, Mapping) or not available:
+            raise TimingWriteError(
+                f"slide {self.slide_slug!r}: {label}.preset {entry.key!r} offers no effect "
+                f"options, so {sorted(options)} cannot be set; 33 of the 95 gallery effects "
+                "carry a setting and the rest expose only the text-unit sequence"
+            )
+        unknown = sorted(name for name in options if name not in available)
+        if unknown:
+            raise TimingWriteError(
+                f"slide {self.slide_slug!r}: {label}.preset.options {unknown} is not a setting of "
+                f"{entry.key!r}; it offers {sorted(available)}"
+            )
+        if len(options) > 1:
+            # Each value was measured with the effect's *other* setting left at
+            # its default, so the combinations were never applied. Composing
+            # two measurements — taking Spin's sign from one and its magnitude
+            # from the other — would emit a value PowerPoint was never observed
+            # to write, which is the inference this whole capture exists to
+            # remove.
+            gap = (entry.ooxml.get("effectOptionCombinations") or {}).get("gap")
+            raise CapabilityGapError(
+                entry.key,
+                gap or "the combinations of this effect's settings are not measured",
+                what=(
+                    f"slide {self.slide_slug!r}: {label}.preset.options {sorted(options)} "
+                    "together"
+                ),
+                unimplemented=False,
+            )
+        (setting, wanted), = options.items()
+        option = available[setting]
+        values = option.get("values") or {}
+        if not isinstance(wanted, str) or wanted not in values:
+            self._refuse_retired_direction(wanted, str(setting), label)
+            raise TimingWriteError(
+                f"slide {self.slide_slug!r}: {label}.preset.options.{setting} {wanted!r} is not a "
+                f"measured value of {entry.key!r}'s {option.get('setting', setting)!r}; "
+                f"it offers {sorted(values)}"
+            )
+        measured = values[wanted]
+        return self._overlay(entry, measured)
+
+    def _refuse_retired_direction(self, wanted: Any, setting: str, label: str) -> None:
+        """Quote the catalog when the asked-for value is a retired scripting name.
+
+        ``preset.variant`` validated against the 45 ``MsoAnimDirection``
+        enumerators, and someone migrating to ``options`` will reach for the
+        same names. 33 of them are not offered by any gallery tile and the rest
+        do not spell the labels that are, so the plain "not a measured value"
+        error would leave them guessing why a name that used to be accepted is
+        gone. The catalog records the reason on the enumerator's own entry, so
+        the refusal quotes it rather than restating it here.
+        """
+        if setting != "direction" or not isinstance(wanted, str):
+            return
+        entry = self.index.entry(f"animation.effectOptions.direction.{wanted}")
+        if entry is None or entry.gap is None:
+            return
+        raise CapabilityGapError(
+            entry.key,
+            entry.gap,
+            what=f"slide {self.slide_slug!r}: {label}.preset.options.{setting} {wanted!r}",
+            unimplemented=False,
+        )
+
+    def _overlay(self, entry: CapabilityEntry, measured: Mapping[str, Any]) -> CapabilityEntry:
+        overlay = dict(entry.ooxml)
+        overlay["presetSubtype"] = measured.get("presetSubtype")
+        overlay["behaviors"] = measured.get("behaviors") or []
+        overlay["behaviorChildren"] = measured.get("behaviorChildren") or []
+        if measured.get("measuredDurationMs") is not None:
+            # The option's own duration basis, not the effect's. 19 of the 95
+            # tiles fell outside the gallery capture's plan and have no measured
+            # duration, so without this an option on one of them could not be
+            # written at any duration but the one it was captured at.
+            # ``durationScaling`` is not touched: :meth:`_duration_scale` only
+            # consults it when there is no measured duration to scale from, and
+            # setting one here is exactly what removes that case.
+            overlay["measuredDurationMs"] = measured["measuredDurationMs"]
+        if measured.get("iterate"):
+            overlay["iterate"] = measured["iterate"]
+        return replace(entry, ooxml=overlay)
 
     def _preset_attrs(
         self, entry: CapabilityEntry, preset: Mapping[str, Any], label: str

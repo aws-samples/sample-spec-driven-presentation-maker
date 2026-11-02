@@ -149,10 +149,19 @@ def _effect_label(effect: dict) -> str:
     """One short line naming what an effect does, for the diff report."""
     preset = effect.get("preset")
     if isinstance(preset, dict):
-        name = "/".join(
-            str(preset[key]) for key in ("category", "effect", "variant")
+        parts = [
+            str(preset[key]) for key in ("category", "effect")
             if preset.get(key) is not None
-        )
+        ]
+        options = preset.get("options")
+        if isinstance(options, dict) and options:
+            # Named in the line because a changed direction is a changed
+            # animation, and a diff that showed only "entrance/flyIn" on both
+            # sides would report no difference where the reader sees one.
+            parts.append(
+                ",".join(f"{setting}={value}" for setting, value in sorted(options.items()))
+            )
+        name = "/".join(parts)
     else:
         behaviors = effect.get("behaviors")
         kinds = [

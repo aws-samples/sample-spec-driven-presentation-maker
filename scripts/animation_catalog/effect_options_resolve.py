@@ -199,6 +199,14 @@ def resolve(capture_dir: Path, plan: dict[str, Any]) -> dict[str, Any]:
         entry["behaviors"] = effect["behaviors"]
         if effect.get("iterate"):
             entry["iterate"] = effect["iterate"]
+        # The duration the measured timings belong to, read off the ribbon at
+        # the moment of capture. Without it an option's behaviours cannot be
+        # written at any other duration: 19 of the 95 tiles were outside the
+        # gallery capture's plan and have no measured duration of their own, so
+        # the option cannot borrow one from its effect.
+        entry["measuredDurationMs"] = generate.ribbon_duration_ms(
+            (record.get("ribbonReadBack") or {}).get("duration")
+        )
         # What distinguishes this value, when the tile's default is known. For a
         # Direction it is ``presetSubtype`` — Fly In's eight directions carry
         # eight different ones — and for an Amount it is a behaviour payload.

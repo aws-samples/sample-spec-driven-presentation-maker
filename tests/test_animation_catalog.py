@@ -1617,3 +1617,224 @@ def test_spin_direction_is_measured_even_though_its_subtype_does_not_move():
 
     assert rotation(spin["Clockwise"]) == ["21600000"]
     assert rotation(spin["Counterclockwise"]) == ["-21600000"]
+
+
+# --- preset.options: the measured Effect Options values -------------------
+def _options_slide(preset):
+    """Write one preset onto the catalog slide and return (node, re-imported motion)."""
+    import sys
+
+    sys.path.insert(0, str(REPO_ROOT / "scripts" / "animation_catalog"))
+    import accept as acceptance
+
+    from sdpm.engine.timing import CATALOG_TARGET_ID, TimingWriter, load_capability_index
+    from sdpm.engine.timing.reader import read_slide_motion
+
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    slide, registry, _spids = acceptance.catalog_slide()
+    node = TimingWriter(registry, index=index, slide_slug="catalog").build(
+        {
+            "mainSequence": [
+                {
+                    "id": "e1",
+                    "target": {"element": CATALOG_TARGET_ID},
+                    "preset": preset,
+                    "start": {"type": "onPageClick", "delayMs": 0},
+                }
+            ],
+            "interactiveSequences": [],
+        }
+    )
+    slide.append(node)
+    return node, read_slide_motion(slide, slide_slug="catalog", index=index)
+
+
+def _written_subtype(node):
+    import lxml.etree as etree
+
+    for ctn in node.iter():
+        if etree.QName(ctn).localname == "cTn" and ctn.get("presetID") is not None:
+            return ctn.get("presetSubtype")
+    return None
+
+
+def _payloads(node, element):
+    import lxml.etree as etree
+
+    local = element.split(":")[-1]
+    return [
+        n.get("by") or n.get("prLst") or n.get("filter") or ""
+        for n in node.iter()
+        if etree.QName(n).localname == local
+    ]
+
+
+def test_every_measured_effect_option_writes_the_bytes_it_measured():
+    """All 133 values write, and each writes its own measured presetSubtype.
+
+    This is the claim `preset.options` makes, and it is the one worth guarding:
+    the failure it prevents is the writer emitting the tile's **default** while
+    accepting a request for something else, which is what `preset.variant` did
+    before it was removed and what three of the captures themselves did before
+    the verify gate.
+    """
+    from sdpm.engine.timing import load_capability_index
+
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    checked = 0
+    wrong: list[str] = []
+    for entry in sorted(index.items.values(), key=lambda e: e.key):
+        options = entry.ooxml.get("effectOptions")
+        if not options:
+            continue
+        semantic = (
+            (entry.semantic.get("animations") or {}).get("mainSequence") or [{}]
+        )[0].get("preset") or {}
+        for setting, option in sorted(options.items()):
+            for value, measured in sorted((option.get("values") or {}).items()):
+                node, _motion = _options_slide(
+                    {
+                        "category": semantic.get("category"),
+                        "effect": semantic.get("effect"),
+                        "options": {setting: value},
+                    }
+                )
+                got = _written_subtype(node)
+                if str(measured.get("presetSubtype")) != str(got):
+                    wrong.append(
+                        f"{entry.key} {setting}={value}: wrote presetSubtype {got}, "
+                        f"measured {measured.get('presetSubtype')}"
+                    )
+                checked += 1
+    assert not wrong, wrong
+    assert checked == 133, f"expected the 133 measured options, walked {checked}"
+
+
+def test_an_option_whose_subtype_identifies_it_reads_back_as_itself():
+    """A non-default option must survive JSON -> PPTX -> JSON.
+
+    Fly In's `From Right` is `presetSubtype` 2 and, before this, no catalog
+    entry claimed subtype 2 at all — so the reader rejected the effect outright
+    and dropped the whole slide's animations to the raw fallback. The option
+    tokens in the reverse index are what fixed that, which is why reading back
+    is asserted and not only writing.
+    """
+    for value in ("fromRight", "fromTop", "fromLeft", "fromTopRight", "fromBottomLeft"):
+        _node, motion = _options_slide(
+            {"category": "entrance", "effect": "flyIn", "options": {"direction": value}}
+        )
+        effects = (motion.animations or {}).get("mainSequence") or []
+        assert effects, f"{value} produced no importable effect"
+        assert effects[0]["preset"].get("options") == {"direction": value}
+
+
+def test_the_default_option_and_no_option_both_read_back_without_options():
+    """`options` is omitted, not nulled, when the effect is at its default.
+
+    Otherwise JSON written without options would not equal the JSON read back
+    from it, and every existing preset entry would stop round-tripping.
+    """
+    from sdpm.engine.timing import load_capability_index
+
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    default = index.items["animation.gallery.entrance.flyIn"].ooxml["effectOptions"][
+        "direction"
+    ]["default"]
+    assert default == "fromBottom"
+    for preset in (
+        {"category": "entrance", "effect": "flyIn"},
+        {"category": "entrance", "effect": "flyIn", "options": {"direction": default}},
+    ):
+        _node, motion = _options_slide(preset)
+        effects = (motion.animations or {}).get("mainSequence") or []
+        assert effects
+        assert "options" not in effects[0]["preset"]
+
+
+def test_a_setting_carried_only_by_behaviours_still_writes_the_right_bytes():
+    """Spin's direction is the sign of `p:animRot/@by`, not a subtype.
+
+    Both its values carry `presetSubtype` 0, so an overlay that applied only
+    the subtype would write Clockwise for both. 9 of the 37 measured groups are
+    like this, which is why the overlay replaces the behaviours too.
+    """
+    for value, want in (("clockwise", "21600000"), ("counterclockwise", "-21600000")):
+        node, _motion = _options_slide(
+            {"category": "emphasis", "effect": "spin", "options": {"direction": value}}
+        )
+        assert _written_subtype(node) == "0"
+        assert want in _payloads(node, "p:animRot"), _payloads(node, "p:animRot")
+    for value, want in (
+        ("quarterSpin", "5400000"),
+        ("halfSpin", "10800000"),
+        ("twoSpins", "43200000"),
+    ):
+        node, _motion = _options_slide(
+            {"category": "emphasis", "effect": "spin", "options": {"amount": value}}
+        )
+        assert want in _payloads(node, "p:animRot")
+
+
+def test_options_refuses_what_it_cannot_measure():
+    """Each refusal, including the two that are easy to get wrong.
+
+    `variant` is refused rather than ignored, because a document that still
+    sets it is asking for a direction that would silently become the default.
+    Two settings at once are refused because each value was measured with the
+    other setting left at its default: composing Spin's sign from one and its
+    magnitude from the other would emit bytes PowerPoint was never seen to
+    write.
+    """
+    from sdpm.engine.timing import CapabilityGapError, MotionWriteError
+
+    with pytest.raises(MotionWriteError, match="no longer a field"):
+        _options_slide({"category": "entrance", "effect": "flyIn", "variant": "right"})
+    # A null one asked for nothing. The catalog's own examples all spelled it
+    # that way, so failing it would break documents written against them to
+    # report a field they are not using.
+    _node, motion = _options_slide(
+        {"category": "entrance", "effect": "flyIn", "variant": None}
+    )
+    effects = (motion.animations or {}).get("mainSequence") or []
+    assert effects and "variant" not in effects[0]["preset"]
+    with pytest.raises(MotionWriteError, match="is not a setting"):
+        _options_slide(
+            {"category": "entrance", "effect": "flyIn", "options": {"spokes": "spoke1"}}
+        )
+    with pytest.raises(MotionWriteError, match="is not a measured value"):
+        _options_slide(
+            {"category": "entrance", "effect": "flyIn", "options": {"direction": "sideways"}}
+        )
+    with pytest.raises(MotionWriteError, match="offers no effect options"):
+        _options_slide(
+            {"category": "entrance", "effect": "appear", "options": {"direction": "fromRight"}}
+        )
+    with pytest.raises(CapabilityGapError, match="not measured"):
+        _options_slide(
+            {
+                "category": "emphasis",
+                "effect": "spin",
+                "options": {"direction": "counterclockwise", "amount": "twoSpins"},
+            }
+        )
+
+
+def test_a_retired_scripting_direction_name_is_refused_with_the_reason():
+    """The 45 `MsoAnimDirection` names were `variant`'s vocabulary, so they will be tried.
+
+    `right` is one of them and is not a Fly In direction label, so the plain
+    "not a measured value" error would leave a reader guessing. The refusal
+    quotes the enumerator's own catalog gap instead.
+    """
+    from sdpm.engine.timing import CapabilityGapError
+
+    with pytest.raises(CapabilityGapError, match="not sdpm's input vocabulary"):
+        _options_slide(
+            {"category": "entrance", "effect": "flyIn", "options": {"direction": "right"}}
+        )

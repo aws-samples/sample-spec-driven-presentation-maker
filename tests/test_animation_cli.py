@@ -50,7 +50,7 @@ def _deck(tmp_path: Path, *, animations=True, transitions=True) -> Path:
             "mainSequence": [{
                 "id": "show-hero",
                 "target": {"element": "hero"},
-                "preset": {"category": "entrance", "effect": "fade", "variant": None},
+                "preset": {"category": "entrance", "effect": "fade"},
                 "start": {"type": "onPageClick", "delayMs": 0},
                 "timing": {"durationMs": 500},
                 "afterEffect": {"type": "none"},

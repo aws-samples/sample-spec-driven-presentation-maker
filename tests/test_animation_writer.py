@@ -854,56 +854,122 @@ def test_no_unwritten_option_reaches_the_package(registry, patched_index):
     assert registry is not None
 
 
-def test_direction_variants_are_refused_until_powerpoint_read_back():
-    slide_def = _slide(
-        animations={
-            "mainSequence": [_effect("fx", "hero", preset={"category": "entrance", "effect": "flyIn", "variant": "left"})],
-            "interactiveSequences": [],
-        }
-    )
-    with pytest.raises(CapabilityGapError) as error:
-        _build(slide_def)
-    assert error.value.key == "animation.effectOptions.direction.left"
+def test_a_direction_is_written_rather_than_refused():
+    """This test used to assert the opposite, and the reason it flipped matters.
 
-
-def test_a_direction_variant_stays_refused_after_its_catalog_gap_closes(registry, patched_index):
-    """A direction persists as the preset's ``presetSubtype``, and the capture
-    records only the tile's default subtype. Without a variant → subtype
-    mapping, a closed catalog gap would make the writer emit the default
-    direction and drop the requested one, so the refusal does not depend on the
-    gap either."""
-    index = patched_index(_close_gap("animation.effectOptions.direction.left"))
-    assert index.entry("animation.effectOptions.direction.left").writable
-    writer = TimingWriter(registry, index=index, slide_slug="catalog")
-    with pytest.raises(CapabilityGapError) as error:
-        writer.build(
-            {
-                "mainSequence": [
-                    _effect(
-                        "fx",
-                        "catalogTarget",
-                        preset={"category": "entrance", "effect": "fade", "variant": "left"},
-                    )
-                ],
-                "interactiveSequences": [],
-            }
-        )
-    assert error.value.key == "animation.effectOptions.direction.left"
-    assert "presetSubtype" in str(error.value)
-    assert "not implemented by the writer" in str(error.value)
-
-
-def test_unknown_variant_lists_the_catalog_directions():
+    A direction persists as the preset's ``presetSubtype``, and no capture had
+    recorded anything but each tile's default one — so asking for a direction
+    was refused, because writing it would have emitted the default and dropped
+    the request. The 2026-11-02 effect-option capture measured all 133 values,
+    so the direction is now transcribed, and the assertion is the subtype
+    itself.
+    """
     slide_def = _slide(
         animations={
             "mainSequence": [
-                _effect("fx", "hero", preset={"category": "entrance", "effect": "flyIn", "variant": "sideways"})
+                _effect(
+                    "fx",
+                    "hero",
+                    preset={
+                        "category": "entrance",
+                        "effect": "flyIn",
+                        "options": {"direction": "fromRight"},
+                    },
+                )
             ],
             "interactiveSequences": [],
         }
     )
-    with pytest.raises(TimingWriteError, match="not a catalog direction"):
+    _builder, slide = _build(slide_def)
+    timing = _timing(slide)
+    subtypes = [
+        ctn.get("presetSubtype")
+        for ctn in timing.iter()
+        if etree.QName(ctn).localname == "cTn" and ctn.get("presetID") is not None
+    ]
+    assert subtypes == ["2"], subtypes
+    # And the motion itself says "from the right", independently of the number:
+    # ppt_x runs from beyond the right edge to the shape's own position.
+    values = [
+        node.get("val")
+        for node in timing.iter()
+        if etree.QName(node).localname == "strVal"
+    ]
+    assert "1+#ppt_w/2" in values, values
+
+
+def test_a_retired_scripting_direction_name_is_refused_with_its_catalog_gap():
+    """``variant`` validated against these 45 names, so they are what a reader will try.
+
+    ``left`` is one of them and is not a Fly In direction label, so the plain
+    "not a measured value" error would not explain why a name that used to be
+    accepted no longer is. The refusal quotes the enumerator's own gap.
+    """
+    slide_def = _slide(
+        animations={
+            "mainSequence": [
+                _effect(
+                    "fx",
+                    "hero",
+                    preset={
+                        "category": "entrance",
+                        "effect": "flyIn",
+                        "options": {"direction": "left"},
+                    },
+                )
+            ],
+            "interactiveSequences": [],
+        }
+    )
+    with pytest.raises(CapabilityGapError) as error:
         _build(slide_def)
+    assert error.value.key == "animation.effectOptions.direction.left"
+    assert "not sdpm's input vocabulary" in str(error.value)
+
+
+def test_a_non_null_variant_is_refused_and_points_at_options():
+    """The field is gone, and a document still setting it must hear so.
+
+    Ignoring a non-null ``variant`` would write the tile's default direction
+    while the document asked for another one, which is the exact failure the
+    old unconditional refusal existed to prevent.
+    """
+    slide_def = _slide(
+        animations={
+            "mainSequence": [
+                _effect(
+                    "fx", "hero",
+                    preset={"category": "entrance", "effect": "flyIn", "variant": "left"},
+                )
+            ],
+            "interactiveSequences": [],
+        }
+    )
+    with pytest.raises(TimingWriteError, match="no longer a field"):
+        _build(slide_def)
+
+
+def test_unknown_option_value_lists_what_the_effect_offers():
+    """Per effect, not a global list: Fly In's directions are not Stretch's."""
+    slide_def = _slide(
+        animations={
+            "mainSequence": [
+                _effect(
+                    "fx",
+                    "hero",
+                    preset={
+                        "category": "entrance",
+                        "effect": "flyIn",
+                        "options": {"direction": "sideways"},
+                    },
+                )
+            ],
+            "interactiveSequences": [],
+        }
+    )
+    with pytest.raises(TimingWriteError, match="is not a measured value") as error:
+        _build(slide_def)
+    assert "fromTopRight" in str(error.value)
 
 
 def test_unknown_effect_lists_the_supported_effects():

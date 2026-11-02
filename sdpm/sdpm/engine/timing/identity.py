@@ -84,10 +84,15 @@ def effect_identity(*, sequence: str, target: str, effect: Mapping[str, Any]) ->
     behaviors = effect.get("behaviors")
     normalized: dict[str, Any] = {"sequence": sequence, "target": target}
     if isinstance(preset, Mapping):
+        options = preset.get("options")
         normalized["preset"] = {
             "category": preset.get("category"),
             "effect": preset.get("effect"),
-            "variant": preset.get("variant"),
+            # The chosen Effect Options value is part of what makes two effects
+            # the same effect: Fly In from the right and Fly In from the bottom
+            # are different animations on the same tile, and an id derived
+            # without the option would collide for the two.
+            "options": dict(sorted(options.items())) if isinstance(options, Mapping) else None,
         }
     if isinstance(behaviors, Sequence) and not isinstance(behaviors, (str, bytes)):
         normalized["behaviors"] = [
