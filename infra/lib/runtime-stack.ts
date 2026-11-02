@@ -23,6 +23,7 @@ import { Construct } from "constructs";
 import * as path from "path";
 import { AUTH_SSM_PARAMS } from "./auth-stack";
 import { RuntimeResourcePolicy } from "./construct/runtime-resource-policy";
+import { agentCoreServicePrincipal } from "./construct/agentcore-principal";
 
 interface RuntimeStackProps extends cdk.StackProps {
   /** Amazon DynamoDB table from DataStack. */
@@ -71,8 +72,9 @@ export class RuntimeStack extends cdk.Stack {
     });
 
     // --- IAM Role for Runtime ---
+    // Trust: only AgentCore resources of this account (confused-deputy guard).
     const runtimeRole = new iam.Role(this, "RuntimeRole", {
-      assumedBy: new iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+      assumedBy: agentCoreServicePrincipal(this),
       description: "Execution role for spec-driven-presentation-maker AgentCore Runtime",
     });
 
@@ -99,34 +101,17 @@ export class RuntimeStack extends cdk.Stack {
       actions: ["logs:CreateLogStream", "logs:PutLogEvents"],
       resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`],
     }));
+    // ECR pull: the image repository is granted below (image.repository.grant);
+    // GetAuthorizationToken has no resource scope.
     runtimeRole.addToPolicy(
       new iam.PolicyStatement({
-        actions: [
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:GetAuthorizationToken",
-        ],
+        actions: ["ecr:GetAuthorizationToken"],
         resources: ["*"],
       })
     );
 
-    // CloudWatch Logs / X-Ray / Metrics — required for AgentCore Runtime observability
+    // X-Ray / Metrics — required for AgentCore Runtime observability
     // https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html
-    runtimeRole.addToPolicy(
-      new iam.PolicyStatement({
-        actions: [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams",
-        ],
-        resources: [
-          `arn:aws:logs:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:log-group:/aws/bedrock-agentcore/runtimes/*`,
-          `arn:aws:logs:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`,
-        ],
-      })
-    );
     runtimeRole.addToPolicy(
       new iam.PolicyStatement({
         actions: [
@@ -179,17 +164,6 @@ export class RuntimeStack extends cdk.Stack {
         resources: [
           `arn:aws:bedrock-agentcore:${cdk.Aws.REGION}:aws:browser/aws.browser.v1`,
         ],
-      })
-    );
-
-    // --- AWS Marketplace permissions (required for Bedrock model subscriptions) ---
-    runtimeRole.addToPolicy(
-      new iam.PolicyStatement({
-        actions: [
-          "aws-marketplace:ViewSubscriptions",
-          "aws-marketplace:Subscribe",
-        ],
-        resources: ["*"],
       })
     );
 

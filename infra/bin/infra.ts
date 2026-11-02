@@ -218,8 +218,6 @@ if (config.stacks?.agent) {
   const agent = new AgentStack(app, "SdpmAgent", {
     env,
     description: "Spec-Driven Presentation Maker - Agent (uksb-ynuz0lkrea)(tag:agent)",
-    table: data.table,
-    pptxBucket: data.pptxBucket,
     mcpRuntimeArn: runtime.runtimeArn,
     oidcDiscoveryUrl: authStack ? undefined : oidcDiscoveryUrl,
     allowedClients,
