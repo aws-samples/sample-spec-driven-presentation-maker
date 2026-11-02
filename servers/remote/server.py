@@ -1004,6 +1004,7 @@ def _refresh_pptx_deck(
     import traceback
 
     from sdpm.api import refresh_pptx
+    from shared.artifact_keys import COMPOSE_DEFS, compose_prefix, latest_compose_keys
     from tools.generate import _prepare_workspace, pin_workspace_build_config
 
     user_id = _get_user_id()
@@ -1016,9 +1017,10 @@ def _refresh_pptx_deck(
     try:
         tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
         pin_workspace_build_config(tmpdir, build_kwargs)
-        compose_prefix = f"decks/{deck_id}/compose/"
-        old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
-        latest = _latest_compose_keys(old_keys, compose_prefix)
+        prefix = compose_prefix(deck_id)
+        old_keys = _storage.list_files(prefix=prefix, bucket=_storage.pptx_bucket)
+        latest = latest_compose_keys(old_keys, prefix)
+        latest.pop(COMPOSE_DEFS, None)
         phase["prepare_s3"] = time.monotonic() - t
 
         t = time.monotonic()
@@ -1072,22 +1074,6 @@ def _refresh_pptx_deck(
                 "run_python post-processing for deck %s: %s",
                 deck_id, " ".join(f"{k}={v:.1f}s" for k, v in phase.items()),
             )
-
-
-_COMPOSE_KEY = re.compile(r"^(?P<slug>.+)_(?P<epoch>\d+)\.json$")
-
-
-def _latest_compose_keys(keys: list[str], prefix: str) -> dict[str, str]:
-    """{slug: its newest ``<prefix><slug>_<epoch>.json`` key} (defs excluded)."""
-    best: dict[str, tuple[int, str]] = {}
-    for key in keys:
-        m = _COMPOSE_KEY.match(key.removeprefix(prefix))
-        if not key.startswith(prefix) or not m or m["slug"] == "defs":
-            continue
-        epoch = int(m["epoch"])
-        if m["slug"] not in best or best[m["slug"]][0] < epoch:
-            best[m["slug"]] = (epoch, key)
-    return {slug: key for slug, (_, key) in best.items()}
 
 
 def _key_epoch(key: str) -> int | None:
@@ -1144,6 +1130,8 @@ def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old
     import shutil
     from concurrent.futures import ThreadPoolExecutor
 
+    from shared.artifact_keys import COMPOSE_DEFS, compose_key, compose_prefix
+
     t0 = time.monotonic()
     try:
         try:
@@ -1166,7 +1154,7 @@ def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old
         _clear_pending_preview(deck_id, pending)
 
         try:
-            prefix = f"decks/{deck_id}/compose/"
+            prefix = compose_prefix(deck_id)
 
             def previous(slug: str) -> tuple[str, dict | None]:
                 key = latest.get(slug)
@@ -1187,7 +1175,7 @@ def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old
                 logger.warning("compose for %s: %s", deck_id, composed.shortfall)
             if composed.defs is not None:
                 _storage.upload_file(
-                    key=f"{prefix}defs_{epoch}.json",
+                    key=compose_key(prefix, COMPOSE_DEFS, epoch),
                     data=json.dumps(composed.defs, ensure_ascii=False).encode(),
                     content_type="application/json",
                 )
@@ -1199,7 +1187,7 @@ def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old
             def upload(item: tuple[str, dict]) -> None:
                 slug, payload = item
                 _storage.upload_file(
-                    key=f"{prefix}{slug}_{epoch}.json",
+                    key=compose_key(prefix, slug, epoch),
                     data=json.dumps(payload, ensure_ascii=False).encode(),
                     content_type="application/json",
                 )

@@ -16,8 +16,15 @@ function safeRead(p: string): string | null {
   try { return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : null } catch { return null }
 }
 
-/** Slug grammar of HTML slide files (`slides/<slug>.html`), as in the core engine. */
+// Copies of the Python definitions, pinned by tests/test_slug_parity.py.
+/** Slug grammar of HTML slide files (`slides/<slug>.html`): `SLUG_RE` in sdpm.engine.schema. */
 const HTML_SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/
+/** A slide line of outline.md: `OUTLINE_ENTRY_RE` in sdpm.engine.schema. */
+const OUTLINE_ENTRY_RE = /^-\s*\[([a-z0-9-]+)\]/
+/** `compose/<slug>_<epoch>.json` (slug "defs" is the deck's defs): `COMPOSE_NAME_RE` in shared/artifact_keys.py. */
+const COMPOSE_FILE_RE = /^(.+)_(\d+)\.json$/
+/** Local preview image of a slide, `preview/<slug>.png` (outline slug). */
+const PREVIEW_PNG_RE = /^([a-z0-9-]+)\.png$/
 
 /** `?v=<mtime>` cache-buster so the UI sees a rebuilt file as a new URL; null when absent. */
 function versionedUrl(filePath: string, url: string): string | null {
@@ -58,12 +65,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   let defsFilename: string | null = null
   const composeDir = path.join(dp, "compose")
   if (fs.existsSync(composeDir)) {
-    const epochOf = (n: string) => { const m = n.match(/_(\d+)\.json$/); return m ? parseInt(m[1]) : 0 }
+    const epochOf = (n: string) => { const m = n.match(COMPOSE_FILE_RE); return m ? parseInt(m[2]) : 0 }
     let defsEpoch = -1
     for (const n of fs.readdirSync(composeDir)) {
       if (!n.endsWith(".json")) continue
       if (n.startsWith("defs_")) { const e = epochOf(n); if (e > defsEpoch) { defsEpoch = e; defsFilename = n }; continue }
-      const m = n.match(/^(.+)_(\d+)\.json$/)
+      const m = n.match(COMPOSE_FILE_RE)
       if (!m) continue
       const [, slug, epochStr] = m
       const cur = composeBySlug.get(slug)
@@ -75,7 +82,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const specsDir = path.join(dp, "specs")
   const outlineText = safeRead(path.join(specsDir, "outline.md"))
   const outlineSlugs = outlineText
-    ? outlineText.split("\n").map(l => /^-\s*\[([a-z0-9-]+)\]/.exec(l)?.[1]).filter((s): s is string => !!s)
+    ? outlineText.split("\n").map(l => OUTLINE_ENTRY_RE.exec(l)?.[1]).filter((s): s is string => !!s)
     : []
 
   // Index preview PNGs — supports both slug-named ({slug}.png) and legacy page-numbered (page{N}-*.png)
@@ -86,7 +93,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     for (const f of fs.readdirSync(previewDir)) {
       if (!f.endsWith(".png")) continue
       const pageMatch = f.match(/^page(\d+)[-.]/); if (pageMatch) { previewByPage.set(parseInt(pageMatch[1]), f); continue }
-      const slugMatch = f.match(/^([a-z0-9-]+)\.png$/); if (slugMatch) previewBySlug.set(slugMatch[1], f)
+      const slugMatch = f.match(PREVIEW_PNG_RE); if (slugMatch) previewBySlug.set(slugMatch[1], f)
     }
   }
 
