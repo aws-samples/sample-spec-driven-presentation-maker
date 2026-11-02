@@ -1076,11 +1076,6 @@ def _refresh_pptx_deck(
             )
 
 
-def _key_epoch(key: str) -> int | None:
-    m = re.search(r"_(\d+)\.json$", key)
-    return int(m.group(1)) if m else None
-
-
 def _delete_quietly(key: str) -> None:
     try:
         _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=key)
@@ -1130,7 +1125,7 @@ def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old
     import shutil
     from concurrent.futures import ThreadPoolExecutor
 
-    from shared.artifact_keys import COMPOSE_DEFS, compose_key, compose_prefix
+    from shared.artifact_keys import COMPOSE_DEFS, compose_key, compose_prefix, superseded_compose_keys
 
     t0 = time.monotonic()
     try:
@@ -1180,8 +1175,10 @@ def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old
                     content_type="application/json",
                 )
                 # Older defs (only older than this snapshot) and legacy slide_{N}_*.json go.
+                for k in superseded_compose_keys(old_keys, prefix, [COMPOSE_DEFS], epoch):
+                    _delete_quietly(k)
                 for k in old_keys:
-                    if ("/defs_" in k and (_key_epoch(k) or 0) < epoch) or re.search(r"/slide_\d+_\d+\.json$", k):
+                    if re.search(r"/slide_\d+_\d+\.json$", k):
                         _delete_quietly(k)
 
             def upload(item: tuple[str, dict]) -> None:
@@ -1191,9 +1188,8 @@ def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old
                     data=json.dumps(payload, ensure_ascii=False).encode(),
                     content_type="application/json",
                 )
-                for k in old_keys:  # older compose of this slug only
-                    if k.startswith(f"{prefix}{slug}_") and (_key_epoch(k) or epoch) < epoch:
-                        _delete_quietly(k)
+                for k in superseded_compose_keys(old_keys, prefix, [slug], epoch):  # this slug only
+                    _delete_quietly(k)
 
             with ThreadPoolExecutor(max_workers=8) as pool:
                 list(pool.map(upload, sorted(composed.slides.items())))

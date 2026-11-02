@@ -122,6 +122,18 @@ def latest_compose_keys(keys: Iterable[str], prefix: str = "") -> dict[str, str]
     return latest_by_slug(keys, lambda key: compose_slug_epoch(key, prefix))
 
 
+def superseded_compose_keys(keys: Iterable[str], prefix: str, slugs: Iterable[str], epoch: int) -> list[str]:
+    """Compose keys under ``prefix`` of ``slugs`` (``COMPOSE_DEFS`` for the defs) with an
+    epoch below ``epoch``: what a write of those slugs at ``epoch`` replaces."""
+    wanted = set(slugs)
+    out = []
+    for key in keys:
+        se = compose_slug_epoch(key, prefix)
+        if se and se[0] in wanted and se[1] < epoch:
+            out.append(key)
+    return out
+
+
 # --- HTML decks: html/{deck_id}/... ---
 
 

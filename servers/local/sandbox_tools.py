@@ -227,7 +227,7 @@ def run_python(
 def _write_compose(deck_dir: Path, refresh: Any, result: dict[str, Any]) -> None:
     """Write the refresh's compose payloads to compose/<slug>_<epoch>.json and
     compose/defs_<epoch>.json; older files of the written slugs and older defs go."""
-    from shared.artifact_keys import COMPOSE_DEFS, compose_key, compose_slug_epoch, latest_compose_keys
+    from shared.artifact_keys import COMPOSE_DEFS, compose_key, latest_compose_keys, superseded_compose_keys
 
     compose_dir = deck_dir / "compose"
     names = [f.name for f in compose_dir.iterdir()] if compose_dir.is_dir() else []
@@ -248,11 +248,8 @@ def _write_compose(deck_dir: Path, refresh: Any, result: dict[str, Any]) -> None
         for slug, payload in composed.slides.items():
             (compose_dir / compose_key("", slug, epoch)).write_text(
                 json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        written = {COMPOSE_DEFS, *composed.slides}
-        for name in names:
-            se = compose_slug_epoch(name)
-            if se and se[0] in written and se[1] < epoch:
-                (compose_dir / name).unlink(missing_ok=True)
+        for name in superseded_compose_keys(names, "", (COMPOSE_DEFS, *composed.slides), epoch):
+            (compose_dir / name).unlink(missing_ok=True)
         result["compose"] = f"{len(composed.slides)} slides composed"
     if composed.error or composed.shortfall:
         result["compose_error"] = composed.error or composed.shortfall

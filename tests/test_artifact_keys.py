@@ -77,3 +77,31 @@ def test_latest_compose_keys_mixed_slugs():
         ak.COMPOSE_DEFS: f"{prefix}defs_250.json",
     }
     assert ak.latest_compose_keys(["intro_1.json", "intro_2.json"]) == {"intro": "intro_2.json"}
+
+
+def test_compose_lookup_is_exact_not_a_prefix_match():
+    """slug ``slide`` vs legacy ``slide_N_*.json``, slug ``intro`` vs ``intro_2_*.json``."""
+    prefix = ak.compose_prefix("d1")
+    keys = [f"{prefix}slide_3_500.json", f"{prefix}slide_100.json", f"{prefix}intro_2_900.json"]
+    latest = ak.latest_compose_keys(keys, prefix)
+    assert latest["slide"] == f"{prefix}slide_100.json"
+    assert "intro" not in latest
+
+
+def test_superseded_compose_keys():
+    prefix = ak.compose_prefix("d1")
+    keys = [
+        f"{prefix}intro_100.json",
+        f"{prefix}intro_300.json",
+        f"{prefix}intro_2_100.json",
+        f"{prefix}slide_1_100.json",
+        f"{prefix}slide_100.json",
+        f"{prefix}defs_100.json",
+        f"{prefix}defs_300.json",
+        f"{prefix}intro.json",
+    ]
+    assert ak.superseded_compose_keys(keys, prefix, ["intro"], 300) == [f"{prefix}intro_100.json"]
+    assert ak.superseded_compose_keys(keys, prefix, ["slide"], 300) == [f"{prefix}slide_100.json"]
+    assert ak.superseded_compose_keys(keys, prefix, [ak.COMPOSE_DEFS], 300) == [f"{prefix}defs_100.json"]
+    assert ak.superseded_compose_keys(keys, prefix, ["intro", ak.COMPOSE_DEFS], 100) == []
+    assert ak.superseded_compose_keys(["intro_1.json", "intro_2_1.json"], "", ["intro"], 5) == ["intro_1.json"]
