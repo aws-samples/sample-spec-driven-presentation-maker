@@ -1,0 +1,435 @@
+{
+  "source": "sdpm GUI capture",
+  "application": "Microsoft PowerPoint",
+  "version": "16.113.1",
+  "capturedAt": "2026-11-01",
+  "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
+  "package": "powerpoint-oracle.pptx",
+  "readBack": "powerpoint-readback.jsonl",
+  "captureRecords": 7,
+  "effectsInPackage": 7,
+  "resolved": 7,
+  "unresolved": [],
+  "captures": [
+    {
+      "key": "animation.gallery.motionPath.bounce",
+      "catalogKey": "animation.gallery.motionPath.bounce",
+      "slideIndex": 1,
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Bounce"
+      ],
+      "matchedTitle": "Bounce",
+      "shapeName": "Rounded Rectangle 1",
+      "shapeSpid": "2",
+      "attributedSpid": "2",
+      "selectionRowIndex": 13,
+      "selectedBy": "selectionPaneRow",
+      "ribbonReadBack": {
+        "start": "On Click",
+        "duration": "02.00"
+      },
+      "rejected": false,
+      "capturedAt": "2026-11-02T02:56:06Z",
+      "effect": {
+        "part": "ppt/slides/slide1.xml",
+        "attributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect",
+          "presetClass": "path",
+          "presetID": "41",
+          "presetSubtype": "0"
+        },
+        "spids": [
+          "2"
+        ],
+        "iterate": null,
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 c -0.004 -0.008 -0.018 -0.016 -0.023 -0.016 c -0.031 0 -0.063 0.125 -0.063 0.25 c 0 -0.063 -0.016 -0.125 -0.031 -0.125 c -0.016 0 -0.031 0.063 -0.031 0.125 c 0 -0.031 -0.008 -0.063 -0.016 -0.063 c -0.008 0 -0.016 0.031 -0.016 0.063 c 0 -0.016 -0.004 -0.031 -0.008 -0.031 c -0.004 0 -0.008 0.016 -0.008 0.031 c 0 -0.008 -0.002 -0.016 -0.004 -0.016 c -0.001 0 -0.004 0.008 -0.004 0.016 c 0 -0.004 -0.001 -0.008 -0.002 -0.008 c 0 -0.001 -0.002 0.004 -0.002 0.008 c 0 -0.002 0 -0.004 -0.001 -0.004 c 0 0.001 -0.001 0.002 -0.001 0.004 c 0 -0.001 0 -0.002 0 -0.003 c -0.001 0 -0.001 0.001 -0.001 0.002 c -0.001 0 -0.001 -0.001 -0.001 -0.002 c -0.001 0 -0.001 0.001 -0.001 0.002 E",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "carrier": {},
+            "timing": {
+              "dur": "2000",
+              "fill": "hold"
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "values": {}
+          }
+        ]
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.invertedShape",
+      "catalogKey": "animation.gallery.motionPath.invertedShape",
+      "slideIndex": 1,
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Inverted Shape"
+      ],
+      "matchedTitle": "Inverted Shape",
+      "shapeName": "Rounded Rectangle 3",
+      "shapeSpid": "4",
+      "attributedSpid": "4",
+      "selectionRowIndex": 11,
+      "selectedBy": "selectionPaneRow",
+      "ribbonReadBack": {
+        "start": "On Click",
+        "duration": "02.00"
+      },
+      "rejected": false,
+      "capturedAt": "2026-11-02T02:56:07Z",
+      "effect": {
+        "part": "ppt/slides/slide1.xml",
+        "attributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect",
+          "presetClass": "path",
+          "presetID": "34",
+          "presetSubtype": "0"
+        },
+        "spids": [
+          "4"
+        ],
+        "iterate": null,
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 C 0.004 -0.004 0.01 -0.006 0.015 -0.006 C 0.022 -0.006 0.029 -0.003 0.033 0.002 C 0.05 0.022 0.063 0.066 0.063 0.118 C 0.063 0.118 0.063 0.119 0.063 0.119 C 0.063 0.119 0.063 0.12 0.063 0.12 C 0.063 0.172 0.05 0.217 0.033 0.237 C 0.029 0.241 0.022 0.244 0.015 0.244 C 0.01 0.244 0.004 0.242 0 0.238 C -0.004 0.234 -0.006 0.229 -0.006 0.223 C -0.006 0.216 -0.003 0.21 0.002 0.206 C 0.022 0.188 0.066 0.175 0.118 0.175 C 0.118 0.175 0.119 0.175 0.119 0.175 C 0.119 0.175 0.12 0.175 0.12 0.175 C 0.172 0.175 0.217 0.188 0.237 0.206 C 0.241 0.21 0.244 0.216 0.244 0.223 C 0.244 0.229 0.242 0.234 0.238 0.238 C 0.234 0.242 0.229 0.244 0.223 0.244 C 0.216 0.244 0.21 0.241 0.206 0.237 C 0.188 0.217 0.175 0.172 0.175 0.12 C 0.175 0.12 0.175 0.119 0.175 0.119 C 0.175 0.119 0.175 0.118 0.175 0.118 C 0.175 0.066 0.188 0.022 0.206 0.001 C 0.21 -0.003 0.216 -0.006 0.223 -0.006 C 0.229 -0.006 0.234 -0.004 0.238 0 C 0.242 0.004 0.244 0.01 0.244 0.015 C 0.244 0.022 0.241 0.028 0.237 0.033 C 0.217 0.05 0.172 0.063 0.12 0.063 C 0.12 0.063 0.12 0.063 0.119 0.063 C 0.119 0.063 0.118 0.063 0.118 0.063 C 0.066 0.063 0.022 0.05 0.002 0.033 C -0.003 0.028 -0.006 0.022 -0.006 0.015 C -0.006 0.01 -0.004 0.004 0 0 Z",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "carrier": {},
+            "timing": {
+              "dur": "2000",
+              "fill": "hold"
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "values": {}
+          }
+        ]
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.specialCurve",
+      "catalogKey": "animation.gallery.motionPath.specialCurve",
+      "slideIndex": 1,
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Special Curve"
+      ],
+      "matchedTitle": "Special Curve",
+      "shapeName": "Rounded Rectangle 5",
+      "shapeSpid": "6",
+      "attributedSpid": "6",
+      "selectionRowIndex": 9,
+      "selectedBy": "selectionPaneRow",
+      "ribbonReadBack": {
+        "start": "On Click",
+        "duration": "02.00"
+      },
+      "rejected": false,
+      "capturedAt": "2026-11-02T02:56:08Z",
+      "effect": {
+        "part": "ppt/slides/slide1.xml",
+        "attributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect",
+          "presetClass": "path",
+          "presetID": "28",
+          "presetSubtype": "0"
+        },
+        "spids": [
+          "6"
+        ],
+        "iterate": null,
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 C 0.017 0 0.031 0.014 0.031 0.031 C 0.031 0.049 0.017 0.063 0 0.063 C -0.017 0.063 -0.031 0.077 -0.031 0.094 C -0.031 0.111 -0.017 0.125 0 0.125 C 0.017 0.125 0.031 0.139 0.031 0.156 C 0.031 0.173 0.017 0.187 0 0.187 C -0.017 0.187 -0.031 0.201 -0.031 0.219 C -0.031 0.236 -0.017 0.25 0 0.25 C 0.017 0.25 0.031 0.236 0.031 0.219 C 0.031 0.201 0.017 0.187 0 0.187 C -0.017 0.187 -0.031 0.173 -0.031 0.156 C -0.031 0.139 -0.017 0.125 0 0.125 C 0.017 0.125 0.031 0.111 0.031 0.094 C 0.031 0.077 0.017 0.063 0 0.063 C -0.017 0.063 -0.031 0.049 -0.031 0.031 C -0.031 0.014 -0.017 0 0 0 Z",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "carrier": {},
+            "timing": {
+              "dur": "2000",
+              "fill": "hold"
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "values": {}
+          }
+        ]
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.specialShape",
+      "catalogKey": "animation.gallery.motionPath.specialShape",
+      "slideIndex": 1,
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Special Shape"
+      ],
+      "matchedTitle": "Special Shape",
+      "shapeName": "Rounded Rectangle 7",
+      "shapeSpid": "8",
+      "attributedSpid": "8",
+      "selectionRowIndex": 7,
+      "selectedBy": "selectionPaneRow",
+      "ribbonReadBack": {
+        "start": "On Click",
+        "duration": "02.00"
+      },
+      "rejected": false,
+      "capturedAt": "2026-11-02T02:56:10Z",
+      "effect": {
+        "part": "ppt/slides/slide1.xml",
+        "attributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect",
+          "presetClass": "path",
+          "presetID": "31",
+          "presetSubtype": "0"
+        },
+        "spids": [
+          "8"
+        ],
+        "iterate": null,
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 C 0.002 -0.003 0.012 -0.034 0.037 -0.032 C 0.075 -0.029 0.09 -0.007 0.125 -0.029 C 0.147 -0.042 0.173 -0.075 0.192 -0.074 C 0.235 -0.073 0.244 -0.039 0.244 -0.008 C 0.245 0.036 0.189 0.073 0.121 0.077 C 0.052 0.08 -0.005 0.033 0 0 Z",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "carrier": {},
+            "timing": {
+              "dur": "2000",
+              "fill": "hold"
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "values": {}
+          }
+        ]
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.spiral",
+      "catalogKey": "animation.gallery.motionPath.spiral",
+      "slideIndex": 1,
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Spiral"
+      ],
+      "matchedTitle": "Spiral",
+      "shapeName": "Rounded Rectangle 9",
+      "shapeSpid": "10",
+      "attributedSpid": "10",
+      "selectionRowIndex": 5,
+      "selectedBy": "selectionPaneRow",
+      "ribbonReadBack": {
+        "start": "On Click",
+        "duration": "02.00"
+      },
+      "rejected": false,
+      "capturedAt": "2026-11-02T02:56:11Z",
+      "effect": {
+        "part": "ppt/slides/slide1.xml",
+        "attributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect",
+          "presetClass": "path",
+          "presetID": "55",
+          "presetSubtype": "0"
+        },
+        "spids": [
+          "10"
+        ],
+        "iterate": null,
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 C 0.004 -0.067 -0.046 -0.125 -0.113 -0.129 C -0.177 -0.134 -0.237 -0.089 -0.241 -0.024 C -0.246 0.036 -0.204 0.092 -0.144 0.096 C -0.089 0.099 -0.037 0.062 -0.033 0.006 C -0.029 -0.045 -0.064 -0.093 -0.115 -0.097 C -0.162 -0.1 -0.206 -0.069 -0.209 -0.022 C -0.212 0.02 -0.184 0.061 -0.142 0.063 C -0.104 0.066 -0.068 0.042 -0.065 0.004 C -0.063 -0.03 -0.084 -0.063 -0.117 -0.065 C -0.146 -0.067 -0.175 -0.049 -0.177 -0.02 C -0.179 0.005 -0.164 0.029 -0.14 0.031 C -0.12 0.033 -0.099 0.022 -0.098 0.002 C -0.096 -0.014 -0.104 -0.031 -0.119 -0.033 C -0.131 -0.033 -0.143 -0.029 -0.145 -0.018 C -0.146 -0.011 -0.144 -0.004 -0.138 -0.001 C -0.135 0 -0.133 0 -0.13 -0.001 E",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "carrier": {},
+            "timing": {
+              "dur": "2000",
+              "fill": "hold"
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "values": {}
+          }
+        ]
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.star",
+      "catalogKey": "animation.gallery.motionPath.star",
+      "slideIndex": 1,
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Star"
+      ],
+      "matchedTitle": "Star",
+      "shapeName": "Rounded Rectangle 11",
+      "shapeSpid": "12",
+      "attributedSpid": "12",
+      "selectionRowIndex": 3,
+      "selectedBy": "selectionPaneRow",
+      "ribbonReadBack": {
+        "start": "On Click",
+        "duration": "02.00"
+      },
+      "rejected": false,
+      "capturedAt": "2026-11-02T02:56:13Z",
+      "effect": {
+        "part": "ppt/slides/slide1.xml",
+        "attributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect",
+          "presetClass": "path",
+          "presetID": "16",
+          "presetSubtype": "0"
+        },
+        "spids": [
+          "12"
+        ],
+        "iterate": null,
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 L 0.091 -0.034 L 0.125 -0.125 L 0.158 -0.034 L 0.249 0 L 0.158 0.034 L 0.125 0.125 L 0.091 0.034 L 0 0 Z",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "carrier": {},
+            "timing": {
+              "dur": "2000",
+              "fill": "hold"
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "values": {}
+          }
+        ]
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.waves",
+      "catalogKey": "animation.gallery.motionPath.waves",
+      "slideIndex": 1,
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Waves"
+      ],
+      "matchedTitle": "Waves",
+      "shapeName": "Rounded Rectangle 13",
+      "shapeSpid": "14",
+      "attributedSpid": "14",
+      "selectionRowIndex": 1,
+      "selectedBy": "selectionPaneRow",
+      "ribbonReadBack": {
+        "start": "On Click",
+        "duration": "02.00"
+      },
+      "rejected": false,
+      "capturedAt": "2026-11-02T02:56:14Z",
+      "effect": {
+        "part": "ppt/slides/slide1.xml",
+        "attributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect",
+          "presetClass": "path",
+          "presetID": "48",
+          "presetSubtype": "0"
+        },
+        "spids": [
+          "14"
+        ],
+        "iterate": null,
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 C 0.008 0.008 0.017 0.016 0.021 0.026 C 0.025 0.037 0.027 0.05 0.029 0.063 C 0.031 0.076 0.029 0.087 0.027 0.099 C 0.025 0.11 0.022 0.122 0.015 0.132 C 0.009 0.142 -0.001 0.15 -0.012 0.156 C -0.022 0.162 -0.034 0.166 -0.046 0.168 C -0.058 0.17 -0.07 0.17 -0.081 0.168 C -0.093 0.166 -0.104 0.161 -0.113 0.153 C -0.122 0.146 -0.13 0.137 -0.134 0.126 C -0.139 0.116 -0.141 0.102 -0.141 0.091 C -0.142 0.08 -0.141 0.067 -0.136 0.056 C -0.131 0.046 -0.122 0.038 -0.11 0.034 C -0.098 0.031 -0.086 0.035 -0.078 0.042 C -0.071 0.049 -0.066 0.06 -0.065 0.073 C -0.065 0.086 -0.066 0.098 -0.071 0.108 C -0.076 0.118 -0.075 0.12 -0.095 0.133 C -0.113 0.147 -0.131 0.143 -0.142 0.144 C -0.153 0.144 -0.162 0.14 -0.173 0.136 C -0.185 0.131 -0.195 0.122 -0.202 0.114 C -0.209 0.106 -0.212 0.096 -0.216 0.08 C -0.219 0.064 -0.219 0.056 -0.219 0.044 C -0.219 0.032 -0.219 0.02 -0.219 0.008 E",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "carrier": {},
+            "timing": {
+              "dur": "2000",
+              "fill": "hold"
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "values": {}
+          }
+        ]
+      }
+    }
+  ]
+}

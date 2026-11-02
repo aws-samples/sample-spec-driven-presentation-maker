@@ -1,0 +1,2302 @@
+{
+  "plan": "sdpm animation GUI capture",
+  "driver": "scripts/animation_catalog/gui_capture.py",
+  "shapeNames": {
+    "animation.gallery.motionPath.bounce": "Rounded Rectangle 1",
+    "animation.gallery.motionPath.invertedShape": "Rounded Rectangle 3",
+    "animation.gallery.motionPath.specialCurve": "Rounded Rectangle 5",
+    "animation.gallery.motionPath.specialShape": "Rounded Rectangle 7",
+    "animation.gallery.motionPath.spiral": "Rounded Rectangle 9",
+    "animation.gallery.motionPath.star": "Rounded Rectangle 11",
+    "animation.gallery.motionPath.waves": "Rounded Rectangle 13"
+  },
+  "deck": {
+    "slides": 1,
+    "targetsPerSlide": 7,
+    "columns": 3,
+    "rows": 3,
+    "basisPx": [
+      1920.0,
+      1080.0
+    ],
+    "cellPx": [
+      608.0,
+      328.0
+    ],
+    "shapePx": [
+      580,
+      292
+    ],
+    "clickMarginPx": 20.0,
+    "neighbourClearancePx": 20.0,
+    "split": false,
+    "note": "7 targets fit one slide as a 3x3 grid"
+  },
+  "generatedFrom": {
+    "catalog": "sdpm/references/catalogs/powerpoint-animation-catalog.json",
+    "manifest": "sdpm/references/catalogs/powerpoint-gui-surface-16.113.1.json",
+    "manifestVersion": "2026-10-30.1",
+    "applicationVersion": "16.113.1",
+    "selection": "guiItems with ooxml.requiresCapture true whose key is in animation.gallery.*, animation.effectOptions.*, animation.afterAnimation.*, animation.timing.*, animation.sound.*, animation.start.*"
+  },
+  "counts": {
+    "targets": 7,
+    "deferredTargets": 51,
+    "setAsideScriptingEnumerators": 185,
+    "gapsWithoutCaptureFlag": 8
+  },
+  "targets": [
+    {
+      "key": "animation.gallery.motionPath.bounce",
+      "control": null,
+      "surface": null,
+      "gap": "PowerPoint carries preset motion paths as literal SVG path data in p:animMotion/@path; that geometry is not present in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it",
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Bounce"
+      ],
+      "title": "Bounce",
+      "titleAlternatives": [],
+      "titleSource": "catalogKey",
+      "targetIndex": 1,
+      "slideIndex": 1,
+      "cellIndex": 1,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 58,
+        "width": 580,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 1"
+    },
+    {
+      "key": "animation.gallery.motionPath.invertedShape",
+      "control": null,
+      "surface": null,
+      "gap": "PowerPoint carries preset motion paths as literal SVG path data in p:animMotion/@path; that geometry is not present in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it",
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Inverted Shape"
+      ],
+      "title": "Inverted Shape",
+      "titleAlternatives": [],
+      "titleSource": "catalogKey",
+      "targetIndex": 2,
+      "slideIndex": 1,
+      "cellIndex": 2,
+      "shapeRectPx": {
+        "x": 670,
+        "y": 58,
+        "width": 580,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 3"
+    },
+    {
+      "key": "animation.gallery.motionPath.specialCurve",
+      "control": null,
+      "surface": null,
+      "gap": "PowerPoint carries preset motion paths as literal SVG path data in p:animMotion/@path; that geometry is not present in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it",
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Special Curve"
+      ],
+      "title": "Special Curve",
+      "titleAlternatives": [],
+      "titleSource": "catalogKey",
+      "targetIndex": 3,
+      "slideIndex": 1,
+      "cellIndex": 3,
+      "shapeRectPx": {
+        "x": 1278,
+        "y": 58,
+        "width": 580,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 5"
+    },
+    {
+      "key": "animation.gallery.motionPath.specialShape",
+      "control": null,
+      "surface": null,
+      "gap": "PowerPoint carries preset motion paths as literal SVG path data in p:animMotion/@path; that geometry is not present in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it",
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Special Shape"
+      ],
+      "title": "Special Shape",
+      "titleAlternatives": [],
+      "titleSource": "catalogKey",
+      "targetIndex": 4,
+      "slideIndex": 1,
+      "cellIndex": 4,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 386,
+        "width": 580,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 7"
+    },
+    {
+      "key": "animation.gallery.motionPath.spiral",
+      "control": null,
+      "surface": null,
+      "gap": "PowerPoint carries preset motion paths as literal SVG path data in p:animMotion/@path; that geometry is not present in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it",
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Spiral"
+      ],
+      "title": "Spiral",
+      "titleAlternatives": [],
+      "titleSource": "catalogKey",
+      "targetIndex": 5,
+      "slideIndex": 1,
+      "cellIndex": 5,
+      "shapeRectPx": {
+        "x": 670,
+        "y": 386,
+        "width": 580,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 9"
+    },
+    {
+      "key": "animation.gallery.motionPath.star",
+      "control": null,
+      "surface": null,
+      "gap": "PowerPoint carries preset motion paths as literal SVG path data in p:animMotion/@path; that geometry is not present in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it",
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Star"
+      ],
+      "title": "Star",
+      "titleAlternatives": [],
+      "titleSource": "catalogKey",
+      "targetIndex": 6,
+      "slideIndex": 1,
+      "cellIndex": 6,
+      "shapeRectPx": {
+        "x": 1278,
+        "y": 386,
+        "width": 580,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 11"
+    },
+    {
+      "key": "animation.gallery.motionPath.waves",
+      "control": null,
+      "surface": null,
+      "gap": "PowerPoint carries preset motion paths as literal SVG path data in p:animMotion/@path; that geometry is not present in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it",
+      "guiPath": [
+        "Animations",
+        "Path Animation",
+        "Waves"
+      ],
+      "title": "Waves",
+      "titleAlternatives": [],
+      "titleSource": "catalogKey",
+      "targetIndex": 7,
+      "slideIndex": 1,
+      "cellIndex": 7,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 714,
+        "width": 580,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 13"
+    }
+  ],
+  "deferredTargets": [
+    {
+      "key": "animation.afterAnimation.dim",
+      "control": "Effect Options ▸ Effect ▸ After animation",
+      "surface": "dialog dropdown value",
+      "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8",
+      "reason": "After animation is a dropdown in the Animation Pane's effect dialog, which needs a prerequisite effect and a dialog tab the entry's metadata does not name"
+    },
+    {
+      "key": "animation.afterAnimation.hide",
+      "control": "Effect Options ▸ Effect ▸ After animation",
+      "surface": "dialog dropdown value",
+      "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8",
+      "reason": "After animation is a dropdown in the Animation Pane's effect dialog, which needs a prerequisite effect and a dialog tab the entry's metadata does not name"
+    },
+    {
+      "key": "animation.afterAnimation.hideOnNextClick",
+      "control": "Effect Options ▸ Effect ▸ After animation",
+      "surface": "dialog dropdown value",
+      "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8",
+      "reason": "After animation is a dropdown in the Animation Pane's effect dialog, which needs a prerequisite effect and a dialog tab the entry's metadata does not name"
+    },
+    {
+      "key": "animation.effectOptions.direction.across",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.bottom",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.bottomLeft",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.bottomRight",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.center",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.clockwise",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.counterclockwise",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.cycleClockwise",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.cycleCounterclockwise",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.down",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.downLeft",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.downRight",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.fontAllCaps",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.fontBold",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.fontItalic",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.fontShadow",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.fontStrikethrough",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.fontUnderline",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.gradual",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.horizontal",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.horizontalIn",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.horizontalOut",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.inBottom",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.inCenter",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.inSlightly",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.instant",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.inward",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.left",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.noDirection",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.ordinalMask",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.out",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.outBottom",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.outCenter",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.outSlightly",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.right",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.slightly",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.top",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.topLeft",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.topRight",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.up",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.upLeft",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.upRight",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.vertical",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.verticalIn",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.effectOptions.direction.verticalOut",
+      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "surface": "ribbon menu value",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "the Effect Options direction labels depend on which effect is currently applied (Fly In offers From Bottom, Wheel offers 1 Spoke), and no catalog metadata binds a direction entry to an effect, so the path cannot be derived from the entry alone"
+    },
+    {
+      "key": "animation.gallery.media.mediaPause",
+      "control": "Animations tab ▸ Animation gallery (Media)",
+      "surface": "ribbon gallery tile",
+      "gap": "presetClass mediacall is captured, but this command's presetID is not; only Play (presetID 1, cmd playFrom(0.0)) appears in the available native media timing evidence",
+      "reason": "the Media gallery is present only while a media object is selected, and the capture deck carries a shape; capturing these needs a deck with audio or video on the slide"
+    },
+    {
+      "key": "animation.gallery.media.mediaStop",
+      "control": "Animations tab ▸ Animation gallery (Media)",
+      "surface": "ribbon gallery tile",
+      "gap": "presetClass mediacall is captured, but this command's presetID is not; only Play (presetID 1, cmd playFrom(0.0)) appears in the available native media timing evidence",
+      "reason": "the Media gallery is present only while a media object is selected, and the capture deck carries a shape; capturing these needs a deck with audio or video on the slide"
+    },
+    {
+      "key": "animation.gallery.motionPath.custom",
+      "control": "Animations tab ▸ Animation gallery (Motion Paths)",
+      "surface": "ribbon gallery group",
+      "gap": "PowerPoint carries preset motion paths as literal SVG path data in p:animMotion/@path; that geometry is not present in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it",
+      "reason": "a custom motion path is drawn on the canvas; no titled control applies one"
+    }
+  ],
+  "setAsideScriptingEnumerators": [
+    {
+      "key": "MsoAnimAfterEffect.dim",
+      "enum": "MsoAnimAfterEffect",
+      "enumerator": "dim",
+      "code": "0x00ff0001",
+      "guiKey": "animation.afterAnimation.dim",
+      "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimAfterEffect.hide",
+      "enum": "MsoAnimAfterEffect",
+      "enumerator": "hide",
+      "code": "0x00ff0002",
+      "guiKey": "animation.afterAnimation.hide",
+      "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimAfterEffect.hide on next click",
+      "enum": "MsoAnimAfterEffect",
+      "enumerator": "hide on next click",
+      "code": "0x00ff0003",
+      "guiKey": "animation.afterAnimation.hideOnNextClick",
+      "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.across",
+      "enum": "MsoAnimDirection",
+      "enumerator": "across",
+      "code": "0x00f90012",
+      "guiKey": "animation.effectOptions.direction.across",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.bottom",
+      "enum": "MsoAnimDirection",
+      "enumerator": "bottom",
+      "code": "0x00f9000b",
+      "guiKey": "animation.effectOptions.direction.bottom",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.bottom left",
+      "enum": "MsoAnimDirection",
+      "enumerator": "bottom left",
+      "code": "0x00f9000f",
+      "guiKey": "animation.effectOptions.direction.bottomLeft",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.bottom right",
+      "enum": "MsoAnimDirection",
+      "enumerator": "bottom right",
+      "code": "0x00f9000e",
+      "guiKey": "animation.effectOptions.direction.bottomRight",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.center",
+      "enum": "MsoAnimDirection",
+      "enumerator": "center",
+      "code": "0x00f9001c",
+      "guiKey": "animation.effectOptions.direction.center",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.clockwise",
+      "enum": "MsoAnimDirection",
+      "enumerator": "clockwise",
+      "code": "0x00f90015",
+      "guiKey": "animation.effectOptions.direction.clockwise",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.counterclockwise",
+      "enum": "MsoAnimDirection",
+      "enumerator": "counterclockwise",
+      "code": "0x00f90016",
+      "guiKey": "animation.effectOptions.direction.counterclockwise",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.cycle clockwise",
+      "enum": "MsoAnimDirection",
+      "enumerator": "cycle clockwise",
+      "code": "0x00f9002b",
+      "guiKey": "animation.effectOptions.direction.cycleClockwise",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.cycle counterclockwise",
+      "enum": "MsoAnimDirection",
+      "enumerator": "cycle counterclockwise",
+      "code": "0x00f9002c",
+      "guiKey": "animation.effectOptions.direction.cycleCounterclockwise",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.down",
+      "enum": "MsoAnimDirection",
+      "enumerator": "down",
+      "code": "0x00f90003",
+      "guiKey": "animation.effectOptions.direction.down",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.down left",
+      "enum": "MsoAnimDirection",
+      "enumerator": "down left",
+      "code": "0x00f90009",
+      "guiKey": "animation.effectOptions.direction.downLeft",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.down right",
+      "enum": "MsoAnimDirection",
+      "enumerator": "down right",
+      "code": "0x00f90008",
+      "guiKey": "animation.effectOptions.direction.downRight",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.font all caps",
+      "enum": "MsoAnimDirection",
+      "enumerator": "font all caps",
+      "code": "0x00f90028",
+      "guiKey": "animation.effectOptions.direction.fontAllCaps",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.font bold",
+      "enum": "MsoAnimDirection",
+      "enumerator": "font bold",
+      "code": "0x00f90023",
+      "guiKey": "animation.effectOptions.direction.fontBold",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.font italic",
+      "enum": "MsoAnimDirection",
+      "enumerator": "font italic",
+      "code": "0x00f90024",
+      "guiKey": "animation.effectOptions.direction.fontItalic",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.font shadow",
+      "enum": "MsoAnimDirection",
+      "enumerator": "font shadow",
+      "code": "0x00f90027",
+      "guiKey": "animation.effectOptions.direction.fontShadow",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.font strikethrough",
+      "enum": "MsoAnimDirection",
+      "enumerator": "font strikethrough",
+      "code": "0x00f90026",
+      "guiKey": "animation.effectOptions.direction.fontStrikethrough",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.font underline",
+      "enum": "MsoAnimDirection",
+      "enumerator": "font underline",
+      "code": "0x00f90025",
+      "guiKey": "animation.effectOptions.direction.fontUnderline",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.gradual",
+      "enum": "MsoAnimDirection",
+      "enumerator": "gradual",
+      "code": "0x00f9002a",
+      "guiKey": "animation.effectOptions.direction.gradual",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.horizontal",
+      "enum": "MsoAnimDirection",
+      "enumerator": "horizontal",
+      "code": "0x00f90010",
+      "guiKey": "animation.effectOptions.direction.horizontal",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.horizontal in",
+      "enum": "MsoAnimDirection",
+      "enumerator": "horizontal in",
+      "code": "0x00f90017",
+      "guiKey": "animation.effectOptions.direction.horizontalIn",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.horizontal out",
+      "enum": "MsoAnimDirection",
+      "enumerator": "horizontal out",
+      "code": "0x00f90018",
+      "guiKey": "animation.effectOptions.direction.horizontalOut",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.in bottom",
+      "enum": "MsoAnimDirection",
+      "enumerator": "in bottom",
+      "code": "0x00f9001f",
+      "guiKey": "animation.effectOptions.direction.inBottom",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.in center",
+      "enum": "MsoAnimDirection",
+      "enumerator": "in center",
+      "code": "0x00f9001e",
+      "guiKey": "animation.effectOptions.direction.inCenter",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.in slightly",
+      "enum": "MsoAnimDirection",
+      "enumerator": "in slightly",
+      "code": "0x00f9001d",
+      "guiKey": "animation.effectOptions.direction.inSlightly",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.instant",
+      "enum": "MsoAnimDirection",
+      "enumerator": "instant",
+      "code": "0x00f90029",
+      "guiKey": "animation.effectOptions.direction.instant",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.inward",
+      "enum": "MsoAnimDirection",
+      "enumerator": "inward",
+      "code": "0x00f90013",
+      "guiKey": "animation.effectOptions.direction.inward",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.left",
+      "enum": "MsoAnimDirection",
+      "enumerator": "left",
+      "code": "0x00f90004",
+      "guiKey": "animation.effectOptions.direction.left",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.no direction",
+      "enum": "MsoAnimDirection",
+      "enumerator": "no direction",
+      "code": "0x00f90000",
+      "guiKey": "animation.effectOptions.direction.noDirection",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.ordinal mask",
+      "enum": "MsoAnimDirection",
+      "enumerator": "ordinal mask",
+      "code": "0x00f90005",
+      "guiKey": "animation.effectOptions.direction.ordinalMask",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.out",
+      "enum": "MsoAnimDirection",
+      "enumerator": "out",
+      "code": "0x00f90014",
+      "guiKey": "animation.effectOptions.direction.out",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.out bottom",
+      "enum": "MsoAnimDirection",
+      "enumerator": "out bottom",
+      "code": "0x00f90022",
+      "guiKey": "animation.effectOptions.direction.outBottom",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.out center",
+      "enum": "MsoAnimDirection",
+      "enumerator": "out center",
+      "code": "0x00f90021",
+      "guiKey": "animation.effectOptions.direction.outCenter",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.out slightly",
+      "enum": "MsoAnimDirection",
+      "enumerator": "out slightly",
+      "code": "0x00f90020",
+      "guiKey": "animation.effectOptions.direction.outSlightly",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.right",
+      "enum": "MsoAnimDirection",
+      "enumerator": "right",
+      "code": "0x00f90002",
+      "guiKey": "animation.effectOptions.direction.right",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.slightly",
+      "enum": "MsoAnimDirection",
+      "enumerator": "slightly",
+      "code": "0x00f9001b",
+      "guiKey": "animation.effectOptions.direction.slightly",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.top",
+      "enum": "MsoAnimDirection",
+      "enumerator": "top",
+      "code": "0x00f9000a",
+      "guiKey": "animation.effectOptions.direction.top",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.top left",
+      "enum": "MsoAnimDirection",
+      "enumerator": "top left",
+      "code": "0x00f9000c",
+      "guiKey": "animation.effectOptions.direction.topLeft",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.top right",
+      "enum": "MsoAnimDirection",
+      "enumerator": "top right",
+      "code": "0x00f9000d",
+      "guiKey": "animation.effectOptions.direction.topRight",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.up",
+      "enum": "MsoAnimDirection",
+      "enumerator": "up",
+      "code": "0x00f90001",
+      "guiKey": "animation.effectOptions.direction.up",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.up left",
+      "enum": "MsoAnimDirection",
+      "enumerator": "up left",
+      "code": "0x00f90006",
+      "guiKey": "animation.effectOptions.direction.upLeft",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.up right",
+      "enum": "MsoAnimDirection",
+      "enumerator": "up right",
+      "code": "0x00f90007",
+      "guiKey": "animation.effectOptions.direction.upRight",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.vertical",
+      "enum": "MsoAnimDirection",
+      "enumerator": "vertical",
+      "code": "0x00f90011",
+      "guiKey": "animation.effectOptions.direction.vertical",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.vertical in",
+      "enum": "MsoAnimDirection",
+      "enumerator": "vertical in",
+      "code": "0x00f90019",
+      "guiKey": "animation.effectOptions.direction.verticalIn",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimDirection.vertical out",
+      "enum": "MsoAnimDirection",
+      "enumerator": "vertical out",
+      "code": "0x00f9001a",
+      "guiKey": "animation.effectOptions.direction.verticalOut",
+      "gap": "MsoAnimDirection is not sdpm's input vocabulary for a direction. Directions were measured per effect and live in each gallery entry's ooxml.effectOptions, written as preset.options.direction; this enumerator is tracked only for sdef coverage. It has no presetSubtype of its own because the name does not identify one: 33 of the 45 enumerators are not offered by any gallery tile, and of the 36 direction labels the tiles do offer, 24 have no MsoAnimDirection name. The same label also means different subtypes on different effects, so a name-to-subtype table cannot exist.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type 4 point star path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type 4 point star path",
+      "code": "0x01020065",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type 5 point star path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type 5 point star path",
+      "code": "0x0102005a",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type 6 point star path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type 6 point star path",
+      "code": "0x01020060",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type 8 point star path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type 8 point star path",
+      "code": "0x01020066",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type arc down path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type arc down path",
+      "code": "0x0102007a",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type arc left path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type arc left path",
+      "code": "0x01020088",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type arc right path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type arc right path",
+      "code": "0x0102008f",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type arc up",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type arc up",
+      "code": "0x0102002f",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 47 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type arc up path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type arc up path",
+      "code": "0x01020081",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type ascend",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type ascend",
+      "code": "0x01020027",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 39 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type bean path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type bean path",
+      "code": "0x01020074",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type blast",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type blast",
+      "code": "0x01020040",
+      "guiKey": "animation.moreEffects.emphasis",
+      "gap": "this emphasis effect has no entry in the COM-derived emphasis presetID table and no gallery tile, so its OOXML presetID is not established; resolve by PowerPoint read-back (Task 8)",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type bold flash",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type bold flash",
+      "code": "0x0102003f",
+      "guiKey": "animation.gallery.emphasis.boldFlash",
+      "gap": "the capture records p:anim for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type bold reveal",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type bold reveal",
+      "code": "0x01020041",
+      "guiKey": "animation.gallery.emphasis.boldReveal",
+      "gap": "the capture records p:set for this effect but not the value payload of p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type boomerang",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type boomerang",
+      "code": "0x01020019",
+      "guiKey": "animation.gallery.entrance.boomerang",
+      "gap": "the capture records p:anim, p:animEffect, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type bounce",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type bounce",
+      "code": "0x0102001a",
+      "guiKey": "animation.gallery.entrance.bounce",
+      "gap": "the capture records p:anim, p:animEffect, p:animScale, p:set for this effect but not the value payload of p:anim, p:animScale, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type bounce left path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type bounce left path",
+      "code": "0x0102007e",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type bounce right path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type bounce right path",
+      "code": "0x0102008b",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type box",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type box",
+      "code": "0x01020004",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type brush on color",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type brush on color",
+      "code": "0x01020042",
+      "guiKey": "animation.gallery.emphasis.brushColor",
+      "gap": "the capture records p:set for this effect but not the value payload of p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type brush on underline",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type brush on underline",
+      "code": "0x01020043",
+      "guiKey": "animation.gallery.emphasis.underline",
+      "gap": "the capture records p:set for this effect but not the value payload of p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type buzzsaw path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type buzzsaw path",
+      "code": "0x0102006e",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type center revolve",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type center revolve",
+      "code": "0x01020028",
+      "guiKey": "animation.gallery.entrance.centerRevolve",
+      "gap": "MsoAnimEffect ordinal 40 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type change fill color",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type change fill color",
+      "code": "0x01020036",
+      "guiKey": "animation.gallery.emphasis.fillColor",
+      "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type change font",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type change font",
+      "code": "0x01020037",
+      "guiKey": "animation.moreEffects.emphasis",
+      "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type change font color",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type change font color",
+      "code": "0x01020038",
+      "guiKey": "animation.gallery.emphasis.fontColor",
+      "gap": "the capture records p:animClr for this effect but not the value payload of p:animClr, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type change font size",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type change font size",
+      "code": "0x01020039",
+      "guiKey": "animation.moreEffects.emphasis",
+      "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type change font style",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type change font style",
+      "code": "0x0102003a",
+      "guiKey": "animation.moreEffects.emphasis",
+      "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type change line color",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type change line color",
+      "code": "0x0102003c",
+      "guiKey": "animation.gallery.emphasis.lineColor",
+      "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type circle path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type circle path",
+      "code": "0x01020056",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type color blend",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type color blend",
+      "code": "0x01020044",
+      "guiKey": "animation.moreEffects.emphasis",
+      "gap": "this emphasis effect has no entry in the COM-derived emphasis presetID table and no gallery tile, so its OOXML presetID is not established; resolve by PowerPoint read-back (Task 8)",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type color reveal",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type color reveal",
+      "code": "0x0102001b",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type color wave",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type color wave",
+      "code": "0x01020045",
+      "guiKey": "animation.moreEffects.emphasis",
+      "gap": "this emphasis effect has no entry in the COM-derived emphasis presetID table and no gallery tile, so its OOXML presetID is not established; resolve by PowerPoint read-back (Task 8)",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type complementary color",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type complementary color",
+      "code": "0x01020046",
+      "guiKey": "animation.gallery.emphasis.complementaryColor",
+      "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type complementary color 2",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type complementary color 2",
+      "code": "0x01020047",
+      "guiKey": "animation.gallery.emphasis.complementaryColor2",
+      "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type constrasting color",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type constrasting color",
+      "code": "0x01020048",
+      "guiKey": "animation.gallery.emphasis.contrastingColor",
+      "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type crawl",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type crawl",
+      "code": "0x01020007",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type credits",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type credits",
+      "code": "0x0102001c",
+      "guiKey": "animation.gallery.entrance.credits",
+      "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type crescent moon path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type crescent moon path",
+      "code": "0x0102005b",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type curved square path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type curved square path",
+      "code": "0x01020069",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type curved x path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type curved x path",
+      "code": "0x0102006a",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type curvy left path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type curvy left path",
+      "code": "0x01020085",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type curvy right path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type curvy right path",
+      "code": "0x01020092",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type curvy star path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type curvy star path",
+      "code": "0x0102006c",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type darken",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type darken",
+      "code": "0x01020049",
+      "guiKey": "animation.gallery.emphasis.darken",
+      "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type decaying wave path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type decaying wave path",
+      "code": "0x01020091",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type desaturate",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type desaturate",
+      "code": "0x0102004a",
+      "guiKey": "animation.gallery.emphasis.desaturate",
+      "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type descend",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type descend",
+      "code": "0x0102002a",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 42 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type diagonal down right path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type diagonal down right path",
+      "code": "0x01020086",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type diagonal up right path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type diagonal up right path",
+      "code": "0x0102008d",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type diamond",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type diamond",
+      "code": "0x01020008",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type diamond path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type diamond path",
+      "code": "0x01020058",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type down path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type down path",
+      "code": "0x0102007f",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type ease in",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type ease in",
+      "code": "0x0102001d",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type equal triangle path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type equal triangle path",
+      "code": "0x01020062",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type expand",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type expand",
+      "code": "0x01020032",
+      "guiKey": "animation.gallery.entrance.expand",
+      "gap": "MsoAnimEffect ordinal 50 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type fade zoom",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type fade zoom",
+      "code": "0x01020030",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 48 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type faded swivel",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type faded swivel",
+      "code": "0x01020029",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 41 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type figure 8 four path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type figure 8 four path",
+      "code": "0x01020071",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type flash bulb",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type flash bulb",
+      "code": "0x0102004b",
+      "guiKey": "animation.gallery.emphasis.pulse",
+      "gap": "the capture records p:animEffect, p:animScale for this effect but not the value payload of p:animScale, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type flash once",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type flash once",
+      "code": "0x0102000b",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type flicker",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type flicker",
+      "code": "0x0102004c",
+      "guiKey": "animation.gallery.emphasis.colorPulse",
+      "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type flip",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type flip",
+      "code": "0x01020033",
+      "guiKey": "animation.gallery.entrance.flip",
+      "gap": "MsoAnimEffect ordinal 51 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type float",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type float",
+      "code": "0x0102001e",
+      "guiKey": "animation.gallery.entrance.float",
+      "gap": "the capture records p:anim, p:animEffect, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type fly",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type fly",
+      "code": "0x01020002",
+      "guiKey": "animation.gallery.entrance.flyIn",
+      "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type fold",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type fold",
+      "code": "0x01020035",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 53 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type football path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type football path",
+      "code": "0x01020061",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type funnel path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type funnel path",
+      "code": "0x01020089",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type glide",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type glide",
+      "code": "0x01020031",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 49 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type grow and turn",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type grow and turn",
+      "code": "0x0102001f",
+      "guiKey": "animation.gallery.entrance.growTurn",
+      "gap": "the capture records p:anim, p:animEffect, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type grow shrink",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type grow shrink",
+      "code": "0x0102003b",
+      "guiKey": "animation.gallery.emphasis.growShrink",
+      "gap": "the capture records p:animScale for this effect but not the value payload of p:animScale, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type grow with color",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type grow with color",
+      "code": "0x0102004d",
+      "guiKey": "animation.gallery.emphasis.growWithColor",
+      "gap": "the capture records p:anim, p:animClr, p:set for this effect but not the value payload of p:anim, p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type heart path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type heart path",
+      "code": "0x0102005e",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type heartbeat path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type heartbeat path",
+      "code": "0x01020082",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type hexagon path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type hexagon path",
+      "code": "0x01020059",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type horizontal figure 8 path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type horizontal figure 8 path",
+      "code": "0x0102006f",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type inverted square path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type inverted square path",
+      "code": "0x01020077",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type inverted triangle path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type inverted triangle path",
+      "code": "0x01020076",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type left path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type left path",
+      "code": "0x01020078",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type light speed",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type light speed",
+      "code": "0x01020020",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 32 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type lighten",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type lighten",
+      "code": "0x0102004e",
+      "guiKey": "animation.gallery.emphasis.lighten",
+      "gap": "the capture records p:animClr, p:set for this effect but not the value payload of p:animClr, p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type loop de loop path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type loop de loop path",
+      "code": "0x0102006d",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type media pause",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type media pause",
+      "code": "0x01020054",
+      "guiKey": "animation.gallery.media.mediaPause",
+      "gap": "presetClass mediacall is captured but this command's presetID is not; only Play is present in the available native media timing evidence",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type media stop",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type media stop",
+      "code": "0x01020055",
+      "guiKey": "animation.gallery.media.mediaStop",
+      "gap": "presetClass mediacall is captured but this command's presetID is not; only Play is present in the available native media timing evidence",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type neutron path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type neutron path",
+      "code": "0x01020072",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type octagon path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type octagon path",
+      "code": "0x0102005f",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type parallelogram path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type parallelogram path",
+      "code": "0x01020063",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type peanut path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type peanut path",
+      "code": "0x01020070",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type peek",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type peek",
+      "code": "0x0102000c",
+      "guiKey": "animation.gallery.entrance.peekIn",
+      "gap": "the capture records p:anim, p:animEffect, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type pentagon path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type pentagon path",
+      "code": "0x01020064",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type pinwheel",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type pinwheel",
+      "code": "0x01020021",
+      "guiKey": "animation.gallery.entrance.pinwheel",
+      "gap": "MsoAnimEffect ordinal 33 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type plus",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type plus",
+      "code": "0x0102000d",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type plus path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type plus path",
+      "code": "0x01020075",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type pointy star path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type pointy star path",
+      "code": "0x01020068",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type random effect",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type random effect",
+      "code": "0x01020018",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "the presetID is corroborated but no gallery tile was captured for this effect, so its behaviour children and their payloads are unknown and the effect cannot be written",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type right path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type right path",
+      "code": "0x01020095",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type right triangle path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type right triangle path",
+      "code": "0x01020057",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type rise up",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type rise up",
+      "code": "0x01020022",
+      "guiKey": "animation.gallery.entrance.riseUp",
+      "gap": "MsoAnimEffect ordinal 34 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type s curve 1 path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type s curve 1 path",
+      "code": "0x01020090",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type s curve 2 path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type s curve 2 path",
+      "code": "0x0102007c",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type shimmer",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type shimmer",
+      "code": "0x01020034",
+      "guiKey": "animation.gallery.emphasis.shimmer",
+      "gap": "MsoAnimEffect ordinal 52 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type sine wave path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type sine wave path",
+      "code": "0x0102007d",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type sling",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type sling",
+      "code": "0x0102002b",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 43 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type spin",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type spin",
+      "code": "0x0102003d",
+      "guiKey": "animation.gallery.emphasis.spin",
+      "gap": "the capture records p:animRot for this effect but not the value payload of p:animRot, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type spinner",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type spinner",
+      "code": "0x0102002c",
+      "guiKey": "animation.gallery.entrance.spinner",
+      "gap": "MsoAnimEffect ordinal 44 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type spiral",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type spiral",
+      "code": "0x0102000f",
+      "guiKey": "animation.gallery.entrance.spiralIn",
+      "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type spiral left path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type spiral left path",
+      "code": "0x0102008c",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type spiral right path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type spiral right path",
+      "code": "0x01020083",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type spring path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type spring path",
+      "code": "0x0102008a",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type square path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type square path",
+      "code": "0x0102005c",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type stairs down path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type stairs down path",
+      "code": "0x01020093",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type stretch",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type stretch",
+      "code": "0x01020011",
+      "guiKey": "animation.gallery.entrance.stretch",
+      "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type stretchy",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type stretchy",
+      "code": "0x0102002d",
+      "guiKey": "animation.gallery.exit.stretchy",
+      "gap": "MsoAnimEffect ordinal 45 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type style emphasis",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type style emphasis",
+      "code": "0x0102004f",
+      "guiKey": "animation.moreEffects.emphasis",
+      "gap": "this emphasis effect has no entry in the COM-derived emphasis presetID table and no gallery tile, so its OOXML presetID is not established; resolve by PowerPoint read-back (Task 8)",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type swish",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type swish",
+      "code": "0x01020023",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 35 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type swivel",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type swivel",
+      "code": "0x01020013",
+      "guiKey": "animation.gallery.entrance.basicSwivel",
+      "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type swoosh path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type swoosh path",
+      "code": "0x01020073",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type teardrop path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type teardrop path",
+      "code": "0x01020067",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type teeter",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type teeter",
+      "code": "0x01020050",
+      "guiKey": "animation.gallery.emphasis.teeter",
+      "gap": "the capture records p:animRot for this effect but not the value payload of p:animRot, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type thin line",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type thin line",
+      "code": "0x01020024",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 36 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type transparency",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type transparency",
+      "code": "0x0102003e",
+      "guiKey": "animation.gallery.emphasis.transparency",
+      "gap": "the capture records p:animEffect, p:set for this effect but not the value payload of p:set, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type trapezoid path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type trapezoid path",
+      "code": "0x0102005d",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type turn down path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type turn down path",
+      "code": "0x01020087",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type turn right path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type turn right path",
+      "code": "0x01020079",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type turn up path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type turn up path",
+      "code": "0x01020080",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type turn up right path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type turn up right path",
+      "code": "0x0102008e",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type unfold",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type unfold",
+      "code": "0x01020025",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 37 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type up path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type up path",
+      "code": "0x01020094",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type vertical figure 8 path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type vertical figure 8 path",
+      "code": "0x0102006b",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type vertical grow",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type vertical grow",
+      "code": "0x01020051",
+      "guiKey": "animation.moreEffects.emphasis",
+      "gap": "this emphasis effect has no entry in the COM-derived emphasis presetID table and no gallery tile, so its OOXML presetID is not established; resolve by PowerPoint read-back (Task 8)",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type wave",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type wave",
+      "code": "0x01020052",
+      "guiKey": "animation.gallery.emphasis.wave",
+      "gap": "the capture records p:animMotion, p:animRot for this effect but not the value payload of p:animMotion, p:animRot, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type wave path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type wave path",
+      "code": "0x01020084",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type whip",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type whip",
+      "code": "0x01020026",
+      "guiKey": "animation.gallery.entrance.whip",
+      "gap": "MsoAnimEffect ordinal 38 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type zigzag path",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type zigzag path",
+      "code": "0x0102007b",
+      "guiKey": "animation.moreEffects.motionPath",
+      "gap": "a preset motion path persists as literal SVG path data in p:animMotion/@path; the OOXML presetID is informational only. That geometry is not in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type zip",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type zip",
+      "code": "0x0102002e",
+      "guiKey": "animation.moreEffects.entrance",
+      "gap": "MsoAnimEffect ordinal 46 is above the corroborated ordinal==presetID band (<= 31). The OOXML entrance/exit presetID for this effect is not established in this environment (documented divergence: msoAnimEffectLightSpeed is 32 but saves presetID 34; msoAnimEffectFold is 53 but saves 58). Resolve by PowerPoint read-back (Task 8) before emitting a presetID.",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimEffect.animation type zoom",
+      "enum": "MsoAnimEffect",
+      "enumerator": "animation type zoom",
+      "code": "0x01020017",
+      "guiKey": "animation.gallery.entrance.basicZoom",
+      "gap": "the capture records p:anim, p:set for this effect but not the value payload of p:anim, so the effect cannot be reproduced; see behaviorPayloads.unresolved",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    },
+    {
+      "key": "MsoAnimTriggerType.no trigger",
+      "enum": "MsoAnimTriggerType",
+      "enumerator": "no trigger",
+      "code": "0x01000000",
+      "guiKey": "animation.start.none",
+      "gap": "msoAnimTriggerNone reports an effect with no trigger; its persisted form is not captured here",
+      "reason": "a scripting enumerator is applied by code and the GUI applies by label, so closing this through the GUI would state a name correspondence rather than measure a value"
+    }
+  ],
+  "gapsWithoutCaptureFlag": [
+    {
+      "key": "animation.afterAnimation.dimColor",
+      "control": "Effect Options ▸ Effect ▸ After animation colour picker",
+      "gap": "the dim colour node PowerPoint writes after the effect is not captured here",
+      "verification": "powerPointReadBackRequired",
+      "note": "carries a gap but not requiresCapture, so the selection rule excludes it"
+    },
+    {
+      "key": "animation.sound.effect",
+      "control": "Effect Options ▸ Effect ▸ Sound",
+      "gap": "effect-sound placement inside the effect par is not captured here",
+      "verification": "powerPointReadBackRequired",
+      "note": "carries a gap but not requiresCapture, so the selection rule excludes it"
+    },
+    {
+      "key": "animation.sound.stopPreviousSound",
+      "control": "Effect Options ▸ Effect ▸ Sound",
+      "gap": "Stop previous sound persists as a command node whose exact form is not captured here",
+      "verification": "powerPointReadBackRequired",
+      "note": "carries a gap but not requiresCapture, so the selection rule excludes it"
+    },
+    {
+      "key": "animation.start.none",
+      "control": "Animations tab ▸ Start",
+      "gap": "msoAnimTriggerNone reports an effect with no trigger; the persisted form is the absence of a start condition and is not captured here",
+      "verification": "powerPointReadBackRequired",
+      "note": "carries a gap but not requiresCapture, so the selection rule excludes it"
+    },
+    {
+      "key": "animation.timing.bounceEnd",
+      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "gap": "Bounce end is synthesised from extra behaviours; the exact native form is not captured here",
+      "verification": "powerPointReadBackRequired",
+      "note": "carries a gap but not requiresCapture, so the selection rule excludes it"
+    },
+    {
+      "key": "animation.timing.rewind",
+      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "gap": "the attribute PowerPoint 16.113.1 writes for Rewind when done playing is not captured here",
+      "verification": "powerPointReadBackRequired",
+      "note": "carries a gap but not requiresCapture, so the selection rule excludes it"
+    },
+    {
+      "key": "animation.timing.smoothEnd",
+      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "gap": "Smooth end is a motion-path option; its persisted form is not captured here",
+      "verification": "powerPointReadBackRequired",
+      "note": "carries a gap but not requiresCapture, so the selection rule excludes it"
+    },
+    {
+      "key": "animation.timing.smoothStart",
+      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "gap": "Smooth start is a motion-path option; its persisted form is not captured here",
+      "verification": "powerPointReadBackRequired",
+      "note": "carries a gap but not requiresCapture, so the selection rule excludes it"
+    }
+  ]
+}

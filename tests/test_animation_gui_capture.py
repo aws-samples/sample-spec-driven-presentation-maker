@@ -72,18 +72,24 @@ MEASURED_PANE_HEAD = ("TextBox 152", "Rounded Rectangle 151", "TextBox 150")
 #: The target count the checked-in catalog derives today, and the grid it fits on one
 #: slide. Both are asserted against the plan rather than trusted.
 #: What the planner derives when every gallery gap is reopened. It is 92 rather
-#: than the 76 captured on 2026-11-01 because 16 more tiles now carry measured
+#: than the 76 captured on 2026-11-01 because 23 more tiles now carry measured
+#: behaviours — 16 lifted from their own default effect option, and the 7 Complex
+#: motion paths captured on 2026-11-02. Superseded comment line follows.
 #: behaviours: they were outside that plan, and the effect-option capture
 #: reached them through their own default option, whose behaviours are the
 #: tile's. The live plan derives **0** — every gallery gap is closed.
-EXPECTED_TARGETS = 92
+EXPECTED_TARGETS = 99
 #: 10 columns by 8 rows, not the 8x10 first chosen. A click's accuracy is bounded by the
 #: shape's SHORT side, which was 22 pt at a 2.2 cell aspect with a two-line label. A live
 #: run then put 71 presses onto five shapes, because a click that lands on empty canvas
 #: leaves the previous shape selected and the next press overwrites ITS effect. Squarer
 #: cells and a one-line label take the short side to 43.5 pt.
-EXPECTED_GRID = (12, 8)
-EXPECTED_SHAPE_PX = (124, 87)
+#: Two slides, because one cannot hold 99 shapes that are both clickable and
+#: wide enough for the longest key on one line. The second slide is the
+#: constraints being honoured, not a layout failure.
+EXPECTED_SLIDES = 2
+EXPECTED_GRID = (8, 7)
+EXPECTED_SHAPE_PX = (200, 105)
 
 
 # --- a package the fake can apply effects to --------------------------------
@@ -1095,37 +1101,62 @@ class TestPlanDerivation:
 
 # --- the shape grid ---------------------------------------------------------
 class TestShapeGrid:
-    """One slide of many shapes, with a layout that is checked rather than eyeballed."""
+    """Shapes over as few slides as the constraints allow, checked rather than eyeballed."""
 
-    def test_the_whole_catalog_fits_one_slide(self, reopened_plan):
+    def test_the_catalog_is_laid_out_over_as_few_slides_as_the_constraints_allow(
+        self, reopened_plan
+    ):
+        """Two slides, and the second one is the constraints working rather than failing.
+
+        This asserted one slide while the catalog had 76 targets. It has 99 once
+        every gallery gap is reopened, and one slide cannot hold that many shapes
+        that are both clickable — 80 px on the short side — and wide enough for
+        `complementaryColor2` on one line, which needs 114 px. Shrinking either
+        is what a capture pays for later, so the grid splits instead.
+        """
         assert reopened_plan["counts"]["targets"] == EXPECTED_TARGETS
         deck = reopened_plan["deck"]
-        assert deck["slides"] == 1
-        assert deck["split"] is False
+        assert deck["slides"] == EXPECTED_SLIDES
         assert (deck["columns"], deck["rows"]) == EXPECTED_GRID
         assert tuple(deck["shapePx"]) == EXPECTED_SHAPE_PX
         # The short side is what bounds a click. 87 px is 43.5 pt, double the 22 pt that
         # made a live run land 71 presses on five shapes.
         assert min(deck["shapePx"]) / 2 >= 40, "the short side is back under 40 pt"
-        assert {target["slideIndex"] for target in reopened_plan["targets"]} == {1}
+        assert deck["shapePx"][0] >= planner.label_width_px("complementaryColor2"), (
+            "the widest label no longer fits its box on one line"
+        )
+        slides = {target["slideIndex"] for target in reopened_plan["targets"]}
+        assert slides == set(range(1, EXPECTED_SLIDES + 1))
 
     def test_every_target_gets_its_own_cell_in_plan_order(self, reopened_plan):
-        cells = [(target["slideIndex"], target["cellIndex"]) for target in reopened_plan["targets"]]
+        targets = reopened_plan["targets"]
+        cells = [(t["slideIndex"], t["cellIndex"]) for t in targets]
         assert len(set(cells)) == len(cells)
-        assert [target["targetIndex"] for target in reopened_plan["targets"]] == list(
-            range(1, len(reopened_plan["targets"]) + 1)
-        )
-        assert [cell for _slide, cell in cells] == list(range(1, len(cells) + 1))
+        assert [t["targetIndex"] for t in targets] == list(range(1, len(targets) + 1))
+        # Cell numbering restarts on each slide, so plan order is checked per slide
+        # rather than across the whole run.
+        by_slide: dict[int, list[int]] = {}
+        for slide, cell in cells:
+            by_slide.setdefault(slide, []).append(cell)
+        for slide, numbers in sorted(by_slide.items()):
+            assert numbers == list(range(1, len(numbers) + 1)), slide
 
     def test_no_two_shapes_overlap_and_no_shape_leaves_the_slide(self, reopened_plan):
-        rects = [planner.Rect(**target["shapeRectPx"]) for target in reopened_plan["targets"]]
-        for first in range(len(rects)):
-            for second in range(first + 1, len(rects)):
-                assert not rects[first].overlaps(rects[second]), (first, second)
-        for rect in rects:
-            assert rect.x >= 0 and rect.y >= 0
-            assert rect.x + rect.width <= planner.DECK_BASIS_PX[0]
-            assert rect.y + rect.height <= planner.DECK_BASIS_PX[1]
+        by_slide: dict[int, list[planner.Rect]] = {}
+        for target in reopened_plan["targets"]:
+            by_slide.setdefault(target["slideIndex"], []).append(
+                planner.Rect(**target["shapeRectPx"])
+            )
+        # Per slide: two shapes at the same position on *different* slides are not
+        # an overlap, and comparing across slides reported one.
+        for slide, rects in sorted(by_slide.items()):
+            for first in range(len(rects)):
+                for second in range(first + 1, len(rects)):
+                    assert not rects[first].overlaps(rects[second]), (slide, first, second)
+            for rect in rects:
+                assert rect.x >= 0 and rect.y >= 0
+                assert rect.x + rect.width <= planner.DECK_BASIS_PX[0]
+                assert rect.y + rect.height <= planner.DECK_BASIS_PX[1]
 
     def test_a_click_at_a_centre_clears_its_own_edges_and_every_neighbour(self, real_plan):
         rects = [planner.Rect(**target["shapeRectPx"]) for target in real_plan["targets"]]

@@ -57,6 +57,17 @@ ORACLE_EVIDENCE_READBACK = "powerpoint-readback.jsonl"
 DEFAULT_GUI_CAPTURE_EVIDENCE = (
     REPO_ROOT / "tests/fixtures/animations/gui-only/batch-2026-11-01-complete"
 )
+
+#: Every checked-in gallery capture, in the order they were taken; a later one
+#: wins a key the earlier also carries. There is more than one because the
+#: surface grew: the 2026-11-01 batch covered the gaps the catalog knew about,
+#: and reading the ``Path Animation`` popup then exposed its **Complex** group —
+#: seven paths this build applies that the catalog had no key for, hidden behind
+#: 65 Windows-only path enumerators it cannot.
+GUI_CAPTURE_EVIDENCE_DIRS = (
+    DEFAULT_GUI_CAPTURE_EVIDENCE,
+    REPO_ROOT / "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02",
+)
 GUI_CAPTURE_MERGED = "merged-evidence.json"
 GUI_CAPTURE_PACKAGE = "powerpoint-oracle.pptx"
 GUI_CAPTURE_READBACK = "powerpoint-readback.jsonl"
@@ -1383,7 +1394,31 @@ CONTROL_ITEMS: tuple[tuple[str, str, str, dict[str, Any] | None, dict[str, Any] 
 
 #: Motion-path gallery groups. The persisted payload is p:animMotion/@path,
 #: which the available evidence does not contain for the preset paths.
-MOTION_PATH_GROUPS = ("lines", "arcs", "turns", "shapes", "loops", "custom")
+#:
+#: The last seven are the popup's **Complex** group, and they were missing
+#: entirely until the platform inventory read the popup: the catalog tracked 65
+#: Windows-only path enumerators that this build cannot apply, and behind that
+#: noise nobody noticed seven paths it can. ``discover_platform_inventory.py``
+#: records the full list, so a group added to the popup shows up as a label with
+#: no key rather than staying invisible.
+MOTION_PATH_GROUPS = (
+    # Custom — drawn on the canvas, so deferred rather than captured.
+    "custom",
+    # Basic — measured on 2026-11-01.
+    "lines",
+    "arcs",
+    "turns",
+    "shapes",
+    "loops",
+    # Complex — applicable here, never captured.
+    "bounce",
+    "invertedShape",
+    "specialCurve",
+    "specialShape",
+    "spiral",
+    "star",
+    "waves",
+)
 
 #: SmartArt/diagram build values (normative ST_AnimationDgmBuildType).
 SMARTART_BUILDS = {
@@ -2476,16 +2511,19 @@ def load_gui_capture_evidence(directory: Path | None = None) -> dict[str, dict[s
     zip parse while the merge itself stays reproducible from the two artefacts
     beside it with ``--parse-gui-capture``.
     """
-    directory = directory or DEFAULT_GUI_CAPTURE_EVIDENCE
-    path = directory / GUI_CAPTURE_MERGED
-    if not path.exists():
-        return {}
-    document = json.loads(path.read_text(encoding="utf-8"))
+    directories = [directory] if directory is not None else list(GUI_CAPTURE_EVIDENCE_DIRS)
     records: dict[str, dict[str, Any]] = {}
-    for record in document.get("captures", []):
-        key = record.get("catalogKey")
-        if isinstance(key, str) and "effect" in record:
-            records[key] = record
+    for folder in directories:
+        path = folder / GUI_CAPTURE_MERGED
+        if not path.exists():
+            continue
+        document = json.loads(path.read_text(encoding="utf-8"))
+        for record in document.get("captures", []):
+            key = record.get("catalogKey")
+            if isinstance(key, str) and "effect" in record:
+                # A later batch wins: a key captured again was captured again
+                # for a reason, and the newest reading is the one to trust.
+                records[key] = {**record, "capturedIn": folder.name}
     return records
 
 
@@ -2543,13 +2581,25 @@ def measured_behavior(behavior: dict[str, Any]) -> dict[str, Any]:
 
 
 def gui_capture_block(record: dict[str, Any]) -> dict[str, Any]:
-    """Return the per-entry provenance block for one GUI-captured value."""
-    fixture = DEFAULT_GUI_CAPTURE_EVIDENCE.relative_to(REPO_ROOT).as_posix()
+    """Return the per-entry provenance block for one GUI-captured value.
+
+    The batch comes from the record, not from a constant. There is more than one
+    checked-in capture now, and a block naming the wrong one would point a
+    reader at a package that does not contain the entry — provenance that is
+    worse than none, because it looks checkable and is not.
+    """
+    folder = record.get("capturedIn") or DEFAULT_GUI_CAPTURE_EVIDENCE.name
+    batch = next(
+        (d for d in GUI_CAPTURE_EVIDENCE_DIRS if d.name == folder),
+        DEFAULT_GUI_CAPTURE_EVIDENCE,
+    )
+    fixture = batch.relative_to(REPO_ROOT).as_posix()
     return {
         "source": GUI_CAPTURE_SOURCE,
         "application": BASELINE_APPLICATION,
         "version": BASELINE_VERSION,
-        "capturedAt": GUI_CAPTURE_DATE,
+        "capturedAt": GUI_CAPTURE_DATE if batch is DEFAULT_GUI_CAPTURE_EVIDENCE else None,
+        "capturedIn": folder,
         "driver": GUI_CAPTURE_DRIVER,
         "fixture": f"{fixture}/{GUI_CAPTURE_PACKAGE}",
         "readBack": f"{fixture}/{GUI_CAPTURE_READBACK}",

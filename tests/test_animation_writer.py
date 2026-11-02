@@ -87,12 +87,16 @@ NS = {
 #: a gallery tile the GUI capture measured. The test below checks that
 #: resolution per entry rather than taking the list on trust.
 CATALOG_COVERAGE = {
-    "total": 667,
+    # 674, not 667: the 7 Complex motion paths are new catalog entries, and they
+    # generate rather than refuse because the capture measured their geometry.
+    "total": 674,
     "generated": {
-        "total": 458,
-        "guiItems": 218,
+        # Each +7 is the Complex motion paths: new guiItems entries that
+        # generate because their geometry was measured rather than inferred.
+        "total": 465,
+        "guiItems": 225,
         "candidates": 240,
-        "animation": 241,
+        "animation": 248,
         "transition": 217,
     },
     "refused": {
@@ -2016,7 +2020,9 @@ def test_the_capture_records_a_build_list_only_for_shape_level_tiles(index, cata
         else:
             missing.append(category)
     assert len(recorded) == 95 and set(recorded) == {"entrance", "emphasis", "exit"}
-    assert sorted(missing) == ["media"] * 3 + ["motionPath"] * 6
+    # 13 motion paths, not 6: a build list belongs to a shape-level tile, and the
+    # 7 Complex paths joined the 6 that already had none.
+    assert sorted(missing) == ["media"] * 3 + ["motionPath"] * 13
     assert index.entry("animation.gallery.entrance.fade").ooxml["buildList"] == "p:bldP/@animBg=1"
 
 
@@ -2843,7 +2849,7 @@ def test_the_catalog_is_parsed_once_and_indexed_for_lookup():
     assert after.misses == before.misses or after.misses == before.misses + 1
     assert after.hits >= before.hits + 200
     # Indexed, not scanned: the lookup maps are built once at construction.
-    assert len(index.items) == 293
+    assert len(index.items) == 300
     assert len(index.candidates) == 435
     assert index.entry("animation.gallery.entrance.fade") is index.items["animation.gallery.entrance.fade"]
     assert default_catalog_path().stat().st_size > 1_000_000

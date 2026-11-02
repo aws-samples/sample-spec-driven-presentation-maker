@@ -51,7 +51,9 @@ A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 #: covered are the difference: 24 emphasis tiles and 5 motion-path groups that
 #: had no writable form at all, plus 47 entrance and exit tiles that were
 #: refused for their payloads.
-BIDIRECTIONAL_COVERAGE = {"transitions": 147, "presets": 101}
+#: 108 presets, not 101: the 7 Complex motion paths were captured on 2026-11-02
+#: and are invertible like the Basic five.
+BIDIRECTIONAL_COVERAGE = {"transitions": 147, "presets": 108}
 
 FADE = {"category": "entrance", "effect": "fade"}
 

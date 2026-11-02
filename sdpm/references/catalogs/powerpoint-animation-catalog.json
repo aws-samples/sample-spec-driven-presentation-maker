@@ -5,7 +5,7 @@
     "version": "16.113.1",
     "platform": "macOS",
     "generatedAt": "2026-10-30T00:00:00Z",
-    "guiManifest": "powerpoint-gui-surface-16.113.1.json@2026-10-30.1"
+    "guiManifest": "powerpoint-gui-surface-16.113.1.json@2026-11-02.1"
   },
   "provenance": {
     "references": [
@@ -229,9 +229,9 @@
       "nonPersisted": 2,
       "outOfScope": 45
     },
-    "guiItemTotal": 293,
+    "guiItemTotal": 300,
     "guiItemStatusCounts": {
-      "accepted": 280,
+      "accepted": 287,
       "rejected": 0,
       "nonPersisted": 11,
       "outOfScope": 2
@@ -3879,6 +3879,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -4109,6 +4110,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -4256,6 +4258,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -4484,6 +4487,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -4723,6 +4727,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -4967,6 +4972,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -5211,6 +5217,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -5455,6 +5462,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -5699,6 +5707,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -5943,6 +5952,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -6145,6 +6155,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -6298,6 +6309,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -6673,6 +6685,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -6929,6 +6942,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -7173,6 +7187,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -7349,6 +7364,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -7584,6 +7600,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -7738,6 +7755,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -7945,6 +7963,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -8248,6 +8267,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -8453,6 +8473,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -8811,6 +8832,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -8988,6 +9010,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -9201,6 +9224,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -9889,6 +9913,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -11446,6 +11471,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -12333,6 +12359,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -12971,6 +12998,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -14188,6 +14216,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -14716,6 +14745,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -14924,6 +14954,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -15464,6 +15495,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -15751,6 +15783,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -16050,6 +16083,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -16539,6 +16573,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -17189,6 +17224,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -18878,6 +18914,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -19242,6 +19279,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -19926,6 +19964,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -20290,6 +20329,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -20895,6 +20935,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -21707,6 +21748,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -22114,6 +22156,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -24094,6 +24137,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -24742,6 +24786,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -25698,6 +25743,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -26823,6 +26869,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -28635,6 +28682,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -30077,6 +30125,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -30955,6 +31004,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -32517,6 +32567,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -33729,6 +33780,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -35553,6 +35605,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -35847,6 +35900,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -36118,6 +36172,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -36324,6 +36379,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -36743,6 +36799,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -37035,6 +37092,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -37521,6 +37579,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -38153,6 +38212,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -39788,6 +39848,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -40485,6 +40546,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -40840,6 +40902,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -41893,6 +41956,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -42242,6 +42306,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -42585,6 +42650,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -43776,6 +43842,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -44405,6 +44472,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -45432,6 +45500,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -46376,6 +46445,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -47477,6 +47547,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -47810,6 +47881,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -47825,6 +47897,143 @@
         "shapeSpid": "144",
         "attributedSpid": "144",
         "selectionRowIndex": null,
+        "selectedBy": "selectionPaneRow",
+        "ribbonReadBack": {
+          "start": "On Click",
+          "duration": "02.00"
+        },
+        "identifierRelation": "measuredWhereNoneWasRecorded"
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.bounce",
+      "status": "accepted",
+      "capabilityLevel": "nativeTemplate",
+      "semanticJson": {
+        "animations": {
+          "mainSequence": [
+            {
+              "id": "catalogEffect",
+              "target": {
+                "element": "catalogTarget"
+              },
+              "preset": {
+                "category": "motionPath",
+                "effect": "bounce"
+              },
+              "start": {
+                "type": "onPageClick",
+                "delayMs": 0
+              },
+              "timing": {
+                "durationMs": 2000,
+                "repeatCount": 1,
+                "repeatDurationMs": null,
+                "autoReverse": false,
+                "acceleration": 0,
+                "deceleration": 0,
+                "restart": "always",
+                "rewind": false,
+                "smoothStart": false,
+                "smoothEnd": false,
+                "bounceEnd": 0
+              },
+              "afterEffect": {
+                "type": "none"
+              },
+              "sound": null
+            }
+          ],
+          "interactiveSequences": []
+        }
+      },
+      "ooxml": {
+        "strategy": "preset",
+        "element": "p:cTn",
+        "presetClass": "path",
+        "presetId": 41,
+        "presetSubtype": 0,
+        "nodeType": "clickEffect",
+        "effectAttributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect"
+        },
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 c -0.004 -0.008 -0.018 -0.016 -0.023 -0.016 c -0.031 0 -0.063 0.125 -0.063 0.25 c 0 -0.063 -0.016 -0.125 -0.031 -0.125 c -0.016 0 -0.031 0.063 -0.031 0.125 c 0 -0.031 -0.008 -0.063 -0.016 -0.063 c -0.008 0 -0.016 0.031 -0.016 0.063 c 0 -0.016 -0.004 -0.031 -0.008 -0.031 c -0.004 0 -0.008 0.016 -0.008 0.031 c 0 -0.008 -0.002 -0.016 -0.004 -0.016 c -0.001 0 -0.004 0.008 -0.004 0.016 c 0 -0.004 -0.001 -0.008 -0.002 -0.008 c 0 -0.001 -0.002 0.004 -0.002 0.008 c 0 -0.002 0 -0.004 -0.001 -0.004 c 0 0.001 -0.001 0.002 -0.001 0.004 c 0 -0.001 0 -0.002 0 -0.003 c -0.001 0 -0.001 0.001 -0.001 0.002 c -0.001 0 -0.001 -0.001 -0.001 -0.002 c -0.001 0 -0.001 0.001 -0.001 0.002 E",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "durMs": 2000,
+            "timingAttributes": {
+              "fill": "hold"
+            }
+          }
+        ],
+        "behaviorChildren": [
+          "p:animMotion"
+        ],
+        "measuredDurationMs": 2000,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        }
+      },
+      "evidence": {
+        "source": "sdpm GUI capture",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "capturedApplicationVersion": "16.113.1",
+        "slideIndex": 1
+      },
+      "verification": "guiCapture",
+      "capture": {
+        "source": "sdpm GUI capture",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "capturedAt": null,
+        "capturedIn": "motion-paths-complex-2026-11-02",
+        "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "readBack": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-readback.jsonl",
+        "merged": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/merged-evidence.json",
+        "guiPath": [
+          "Animations",
+          "Path Animation",
+          "Bounce"
+        ],
+        "matchedTitle": "Bounce",
+        "slideIndex": 1,
+        "shapeName": "Rounded Rectangle 1",
+        "shapeSpid": "2",
+        "attributedSpid": "2",
+        "selectionRowIndex": 13,
         "selectedBy": "selectionPaneRow",
         "ribbonReadBack": {
           "start": "On Click",
@@ -47887,6 +48096,143 @@
         "commit": null
       },
       "verification": "powerPointReadBackRequired"
+    },
+    {
+      "key": "animation.gallery.motionPath.invertedShape",
+      "status": "accepted",
+      "capabilityLevel": "nativeTemplate",
+      "semanticJson": {
+        "animations": {
+          "mainSequence": [
+            {
+              "id": "catalogEffect",
+              "target": {
+                "element": "catalogTarget"
+              },
+              "preset": {
+                "category": "motionPath",
+                "effect": "invertedShape"
+              },
+              "start": {
+                "type": "onPageClick",
+                "delayMs": 0
+              },
+              "timing": {
+                "durationMs": 2000,
+                "repeatCount": 1,
+                "repeatDurationMs": null,
+                "autoReverse": false,
+                "acceleration": 0,
+                "deceleration": 0,
+                "restart": "always",
+                "rewind": false,
+                "smoothStart": false,
+                "smoothEnd": false,
+                "bounceEnd": 0
+              },
+              "afterEffect": {
+                "type": "none"
+              },
+              "sound": null
+            }
+          ],
+          "interactiveSequences": []
+        }
+      },
+      "ooxml": {
+        "strategy": "preset",
+        "element": "p:cTn",
+        "presetClass": "path",
+        "presetId": 34,
+        "presetSubtype": 0,
+        "nodeType": "clickEffect",
+        "effectAttributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect"
+        },
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 C 0.004 -0.004 0.01 -0.006 0.015 -0.006 C 0.022 -0.006 0.029 -0.003 0.033 0.002 C 0.05 0.022 0.063 0.066 0.063 0.118 C 0.063 0.118 0.063 0.119 0.063 0.119 C 0.063 0.119 0.063 0.12 0.063 0.12 C 0.063 0.172 0.05 0.217 0.033 0.237 C 0.029 0.241 0.022 0.244 0.015 0.244 C 0.01 0.244 0.004 0.242 0 0.238 C -0.004 0.234 -0.006 0.229 -0.006 0.223 C -0.006 0.216 -0.003 0.21 0.002 0.206 C 0.022 0.188 0.066 0.175 0.118 0.175 C 0.118 0.175 0.119 0.175 0.119 0.175 C 0.119 0.175 0.12 0.175 0.12 0.175 C 0.172 0.175 0.217 0.188 0.237 0.206 C 0.241 0.21 0.244 0.216 0.244 0.223 C 0.244 0.229 0.242 0.234 0.238 0.238 C 0.234 0.242 0.229 0.244 0.223 0.244 C 0.216 0.244 0.21 0.241 0.206 0.237 C 0.188 0.217 0.175 0.172 0.175 0.12 C 0.175 0.12 0.175 0.119 0.175 0.119 C 0.175 0.119 0.175 0.118 0.175 0.118 C 0.175 0.066 0.188 0.022 0.206 0.001 C 0.21 -0.003 0.216 -0.006 0.223 -0.006 C 0.229 -0.006 0.234 -0.004 0.238 0 C 0.242 0.004 0.244 0.01 0.244 0.015 C 0.244 0.022 0.241 0.028 0.237 0.033 C 0.217 0.05 0.172 0.063 0.12 0.063 C 0.12 0.063 0.12 0.063 0.119 0.063 C 0.119 0.063 0.118 0.063 0.118 0.063 C 0.066 0.063 0.022 0.05 0.002 0.033 C -0.003 0.028 -0.006 0.022 -0.006 0.015 C -0.006 0.01 -0.004 0.004 0 0 Z",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "durMs": 2000,
+            "timingAttributes": {
+              "fill": "hold"
+            }
+          }
+        ],
+        "behaviorChildren": [
+          "p:animMotion"
+        ],
+        "measuredDurationMs": 2000,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        }
+      },
+      "evidence": {
+        "source": "sdpm GUI capture",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "capturedApplicationVersion": "16.113.1",
+        "slideIndex": 1
+      },
+      "verification": "guiCapture",
+      "capture": {
+        "source": "sdpm GUI capture",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "capturedAt": null,
+        "capturedIn": "motion-paths-complex-2026-11-02",
+        "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "readBack": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-readback.jsonl",
+        "merged": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/merged-evidence.json",
+        "guiPath": [
+          "Animations",
+          "Path Animation",
+          "Inverted Shape"
+        ],
+        "matchedTitle": "Inverted Shape",
+        "slideIndex": 1,
+        "shapeName": "Rounded Rectangle 3",
+        "shapeSpid": "4",
+        "attributedSpid": "4",
+        "selectionRowIndex": 11,
+        "selectedBy": "selectionPaneRow",
+        "ribbonReadBack": {
+          "start": "On Click",
+          "duration": "02.00"
+        },
+        "identifierRelation": "measuredWhereNoneWasRecorded"
+      }
     },
     {
       "key": "animation.gallery.motionPath.lines",
@@ -48001,6 +48347,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -48137,6 +48484,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -48273,6 +48621,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -48288,6 +48637,554 @@
         "shapeSpid": "150",
         "attributedSpid": "150",
         "selectionRowIndex": null,
+        "selectedBy": "selectionPaneRow",
+        "ribbonReadBack": {
+          "start": "On Click",
+          "duration": "02.00"
+        },
+        "identifierRelation": "measuredWhereNoneWasRecorded"
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.specialCurve",
+      "status": "accepted",
+      "capabilityLevel": "nativeTemplate",
+      "semanticJson": {
+        "animations": {
+          "mainSequence": [
+            {
+              "id": "catalogEffect",
+              "target": {
+                "element": "catalogTarget"
+              },
+              "preset": {
+                "category": "motionPath",
+                "effect": "specialCurve"
+              },
+              "start": {
+                "type": "onPageClick",
+                "delayMs": 0
+              },
+              "timing": {
+                "durationMs": 2000,
+                "repeatCount": 1,
+                "repeatDurationMs": null,
+                "autoReverse": false,
+                "acceleration": 0,
+                "deceleration": 0,
+                "restart": "always",
+                "rewind": false,
+                "smoothStart": false,
+                "smoothEnd": false,
+                "bounceEnd": 0
+              },
+              "afterEffect": {
+                "type": "none"
+              },
+              "sound": null
+            }
+          ],
+          "interactiveSequences": []
+        }
+      },
+      "ooxml": {
+        "strategy": "preset",
+        "element": "p:cTn",
+        "presetClass": "path",
+        "presetId": 28,
+        "presetSubtype": 0,
+        "nodeType": "clickEffect",
+        "effectAttributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect"
+        },
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 C 0.017 0 0.031 0.014 0.031 0.031 C 0.031 0.049 0.017 0.063 0 0.063 C -0.017 0.063 -0.031 0.077 -0.031 0.094 C -0.031 0.111 -0.017 0.125 0 0.125 C 0.017 0.125 0.031 0.139 0.031 0.156 C 0.031 0.173 0.017 0.187 0 0.187 C -0.017 0.187 -0.031 0.201 -0.031 0.219 C -0.031 0.236 -0.017 0.25 0 0.25 C 0.017 0.25 0.031 0.236 0.031 0.219 C 0.031 0.201 0.017 0.187 0 0.187 C -0.017 0.187 -0.031 0.173 -0.031 0.156 C -0.031 0.139 -0.017 0.125 0 0.125 C 0.017 0.125 0.031 0.111 0.031 0.094 C 0.031 0.077 0.017 0.063 0 0.063 C -0.017 0.063 -0.031 0.049 -0.031 0.031 C -0.031 0.014 -0.017 0 0 0 Z",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "durMs": 2000,
+            "timingAttributes": {
+              "fill": "hold"
+            }
+          }
+        ],
+        "behaviorChildren": [
+          "p:animMotion"
+        ],
+        "measuredDurationMs": 2000,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        }
+      },
+      "evidence": {
+        "source": "sdpm GUI capture",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "capturedApplicationVersion": "16.113.1",
+        "slideIndex": 1
+      },
+      "verification": "guiCapture",
+      "capture": {
+        "source": "sdpm GUI capture",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "capturedAt": null,
+        "capturedIn": "motion-paths-complex-2026-11-02",
+        "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "readBack": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-readback.jsonl",
+        "merged": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/merged-evidence.json",
+        "guiPath": [
+          "Animations",
+          "Path Animation",
+          "Special Curve"
+        ],
+        "matchedTitle": "Special Curve",
+        "slideIndex": 1,
+        "shapeName": "Rounded Rectangle 5",
+        "shapeSpid": "6",
+        "attributedSpid": "6",
+        "selectionRowIndex": 9,
+        "selectedBy": "selectionPaneRow",
+        "ribbonReadBack": {
+          "start": "On Click",
+          "duration": "02.00"
+        },
+        "identifierRelation": "measuredWhereNoneWasRecorded"
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.specialShape",
+      "status": "accepted",
+      "capabilityLevel": "nativeTemplate",
+      "semanticJson": {
+        "animations": {
+          "mainSequence": [
+            {
+              "id": "catalogEffect",
+              "target": {
+                "element": "catalogTarget"
+              },
+              "preset": {
+                "category": "motionPath",
+                "effect": "specialShape"
+              },
+              "start": {
+                "type": "onPageClick",
+                "delayMs": 0
+              },
+              "timing": {
+                "durationMs": 2000,
+                "repeatCount": 1,
+                "repeatDurationMs": null,
+                "autoReverse": false,
+                "acceleration": 0,
+                "deceleration": 0,
+                "restart": "always",
+                "rewind": false,
+                "smoothStart": false,
+                "smoothEnd": false,
+                "bounceEnd": 0
+              },
+              "afterEffect": {
+                "type": "none"
+              },
+              "sound": null
+            }
+          ],
+          "interactiveSequences": []
+        }
+      },
+      "ooxml": {
+        "strategy": "preset",
+        "element": "p:cTn",
+        "presetClass": "path",
+        "presetId": 31,
+        "presetSubtype": 0,
+        "nodeType": "clickEffect",
+        "effectAttributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect"
+        },
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 C 0.002 -0.003 0.012 -0.034 0.037 -0.032 C 0.075 -0.029 0.09 -0.007 0.125 -0.029 C 0.147 -0.042 0.173 -0.075 0.192 -0.074 C 0.235 -0.073 0.244 -0.039 0.244 -0.008 C 0.245 0.036 0.189 0.073 0.121 0.077 C 0.052 0.08 -0.005 0.033 0 0 Z",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "durMs": 2000,
+            "timingAttributes": {
+              "fill": "hold"
+            }
+          }
+        ],
+        "behaviorChildren": [
+          "p:animMotion"
+        ],
+        "measuredDurationMs": 2000,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        }
+      },
+      "evidence": {
+        "source": "sdpm GUI capture",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "capturedApplicationVersion": "16.113.1",
+        "slideIndex": 1
+      },
+      "verification": "guiCapture",
+      "capture": {
+        "source": "sdpm GUI capture",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "capturedAt": null,
+        "capturedIn": "motion-paths-complex-2026-11-02",
+        "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "readBack": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-readback.jsonl",
+        "merged": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/merged-evidence.json",
+        "guiPath": [
+          "Animations",
+          "Path Animation",
+          "Special Shape"
+        ],
+        "matchedTitle": "Special Shape",
+        "slideIndex": 1,
+        "shapeName": "Rounded Rectangle 7",
+        "shapeSpid": "8",
+        "attributedSpid": "8",
+        "selectionRowIndex": 7,
+        "selectedBy": "selectionPaneRow",
+        "ribbonReadBack": {
+          "start": "On Click",
+          "duration": "02.00"
+        },
+        "identifierRelation": "measuredWhereNoneWasRecorded"
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.spiral",
+      "status": "accepted",
+      "capabilityLevel": "nativeTemplate",
+      "semanticJson": {
+        "animations": {
+          "mainSequence": [
+            {
+              "id": "catalogEffect",
+              "target": {
+                "element": "catalogTarget"
+              },
+              "preset": {
+                "category": "motionPath",
+                "effect": "spiral"
+              },
+              "start": {
+                "type": "onPageClick",
+                "delayMs": 0
+              },
+              "timing": {
+                "durationMs": 2000,
+                "repeatCount": 1,
+                "repeatDurationMs": null,
+                "autoReverse": false,
+                "acceleration": 0,
+                "deceleration": 0,
+                "restart": "always",
+                "rewind": false,
+                "smoothStart": false,
+                "smoothEnd": false,
+                "bounceEnd": 0
+              },
+              "afterEffect": {
+                "type": "none"
+              },
+              "sound": null
+            }
+          ],
+          "interactiveSequences": []
+        }
+      },
+      "ooxml": {
+        "strategy": "preset",
+        "element": "p:cTn",
+        "presetClass": "path",
+        "presetId": 55,
+        "presetSubtype": 0,
+        "nodeType": "clickEffect",
+        "effectAttributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect"
+        },
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 C 0.004 -0.067 -0.046 -0.125 -0.113 -0.129 C -0.177 -0.134 -0.237 -0.089 -0.241 -0.024 C -0.246 0.036 -0.204 0.092 -0.144 0.096 C -0.089 0.099 -0.037 0.062 -0.033 0.006 C -0.029 -0.045 -0.064 -0.093 -0.115 -0.097 C -0.162 -0.1 -0.206 -0.069 -0.209 -0.022 C -0.212 0.02 -0.184 0.061 -0.142 0.063 C -0.104 0.066 -0.068 0.042 -0.065 0.004 C -0.063 -0.03 -0.084 -0.063 -0.117 -0.065 C -0.146 -0.067 -0.175 -0.049 -0.177 -0.02 C -0.179 0.005 -0.164 0.029 -0.14 0.031 C -0.12 0.033 -0.099 0.022 -0.098 0.002 C -0.096 -0.014 -0.104 -0.031 -0.119 -0.033 C -0.131 -0.033 -0.143 -0.029 -0.145 -0.018 C -0.146 -0.011 -0.144 -0.004 -0.138 -0.001 C -0.135 0 -0.133 0 -0.13 -0.001 E",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "durMs": 2000,
+            "timingAttributes": {
+              "fill": "hold"
+            }
+          }
+        ],
+        "behaviorChildren": [
+          "p:animMotion"
+        ],
+        "measuredDurationMs": 2000,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        }
+      },
+      "evidence": {
+        "source": "sdpm GUI capture",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "capturedApplicationVersion": "16.113.1",
+        "slideIndex": 1
+      },
+      "verification": "guiCapture",
+      "capture": {
+        "source": "sdpm GUI capture",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "capturedAt": null,
+        "capturedIn": "motion-paths-complex-2026-11-02",
+        "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "readBack": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-readback.jsonl",
+        "merged": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/merged-evidence.json",
+        "guiPath": [
+          "Animations",
+          "Path Animation",
+          "Spiral"
+        ],
+        "matchedTitle": "Spiral",
+        "slideIndex": 1,
+        "shapeName": "Rounded Rectangle 9",
+        "shapeSpid": "10",
+        "attributedSpid": "10",
+        "selectionRowIndex": 5,
+        "selectedBy": "selectionPaneRow",
+        "ribbonReadBack": {
+          "start": "On Click",
+          "duration": "02.00"
+        },
+        "identifierRelation": "measuredWhereNoneWasRecorded"
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.star",
+      "status": "accepted",
+      "capabilityLevel": "nativeTemplate",
+      "semanticJson": {
+        "animations": {
+          "mainSequence": [
+            {
+              "id": "catalogEffect",
+              "target": {
+                "element": "catalogTarget"
+              },
+              "preset": {
+                "category": "motionPath",
+                "effect": "star"
+              },
+              "start": {
+                "type": "onPageClick",
+                "delayMs": 0
+              },
+              "timing": {
+                "durationMs": 2000,
+                "repeatCount": 1,
+                "repeatDurationMs": null,
+                "autoReverse": false,
+                "acceleration": 0,
+                "deceleration": 0,
+                "restart": "always",
+                "rewind": false,
+                "smoothStart": false,
+                "smoothEnd": false,
+                "bounceEnd": 0
+              },
+              "afterEffect": {
+                "type": "none"
+              },
+              "sound": null
+            }
+          ],
+          "interactiveSequences": []
+        }
+      },
+      "ooxml": {
+        "strategy": "preset",
+        "element": "p:cTn",
+        "presetClass": "path",
+        "presetId": 16,
+        "presetSubtype": 0,
+        "nodeType": "clickEffect",
+        "effectAttributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect"
+        },
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 L 0.091 -0.034 L 0.125 -0.125 L 0.158 -0.034 L 0.249 0 L 0.158 0.034 L 0.125 0.125 L 0.091 0.034 L 0 0 Z",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "durMs": 2000,
+            "timingAttributes": {
+              "fill": "hold"
+            }
+          }
+        ],
+        "behaviorChildren": [
+          "p:animMotion"
+        ],
+        "measuredDurationMs": 2000,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        }
+      },
+      "evidence": {
+        "source": "sdpm GUI capture",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "capturedApplicationVersion": "16.113.1",
+        "slideIndex": 1
+      },
+      "verification": "guiCapture",
+      "capture": {
+        "source": "sdpm GUI capture",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "capturedAt": null,
+        "capturedIn": "motion-paths-complex-2026-11-02",
+        "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "readBack": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-readback.jsonl",
+        "merged": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/merged-evidence.json",
+        "guiPath": [
+          "Animations",
+          "Path Animation",
+          "Star"
+        ],
+        "matchedTitle": "Star",
+        "slideIndex": 1,
+        "shapeName": "Rounded Rectangle 11",
+        "shapeSpid": "12",
+        "attributedSpid": "12",
+        "selectionRowIndex": 3,
         "selectedBy": "selectionPaneRow",
         "ribbonReadBack": {
           "start": "On Click",
@@ -48409,6 +49306,7 @@
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
         "capturedAt": "2026-11-01",
+        "capturedIn": "batch-2026-11-01-complete",
         "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
         "fixture": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-oracle.pptx",
         "readBack": "tests/fixtures/animations/gui-only/batch-2026-11-01-complete/powerpoint-readback.jsonl",
@@ -48424,6 +49322,143 @@
         "shapeSpid": "152",
         "attributedSpid": "152",
         "selectionRowIndex": null,
+        "selectedBy": "selectionPaneRow",
+        "ribbonReadBack": {
+          "start": "On Click",
+          "duration": "02.00"
+        },
+        "identifierRelation": "measuredWhereNoneWasRecorded"
+      }
+    },
+    {
+      "key": "animation.gallery.motionPath.waves",
+      "status": "accepted",
+      "capabilityLevel": "nativeTemplate",
+      "semanticJson": {
+        "animations": {
+          "mainSequence": [
+            {
+              "id": "catalogEffect",
+              "target": {
+                "element": "catalogTarget"
+              },
+              "preset": {
+                "category": "motionPath",
+                "effect": "waves"
+              },
+              "start": {
+                "type": "onPageClick",
+                "delayMs": 0
+              },
+              "timing": {
+                "durationMs": 2000,
+                "repeatCount": 1,
+                "repeatDurationMs": null,
+                "autoReverse": false,
+                "acceleration": 0,
+                "deceleration": 0,
+                "restart": "always",
+                "rewind": false,
+                "smoothStart": false,
+                "smoothEnd": false,
+                "bounceEnd": 0
+              },
+              "afterEffect": {
+                "type": "none"
+              },
+              "sound": null
+            }
+          ],
+          "interactiveSequences": []
+        }
+      },
+      "ooxml": {
+        "strategy": "preset",
+        "element": "p:cTn",
+        "presetClass": "path",
+        "presetId": 48,
+        "presetSubtype": 0,
+        "nodeType": "clickEffect",
+        "effectAttributes": {
+          "accel": "50000",
+          "decel": "50000",
+          "fill": "hold",
+          "grpId": "0",
+          "nodeType": "clickEffect"
+        },
+        "behaviors": [
+          {
+            "element": "p:animMotion",
+            "attributes": {
+              "origin": "layout",
+              "path": "M 0 0 C 0.008 0.008 0.017 0.016 0.021 0.026 C 0.025 0.037 0.027 0.05 0.029 0.063 C 0.031 0.076 0.029 0.087 0.027 0.099 C 0.025 0.11 0.022 0.122 0.015 0.132 C 0.009 0.142 -0.001 0.15 -0.012 0.156 C -0.022 0.162 -0.034 0.166 -0.046 0.168 C -0.058 0.17 -0.07 0.17 -0.081 0.168 C -0.093 0.166 -0.104 0.161 -0.113 0.153 C -0.122 0.146 -0.13 0.137 -0.134 0.126 C -0.139 0.116 -0.141 0.102 -0.141 0.091 C -0.142 0.08 -0.141 0.067 -0.136 0.056 C -0.131 0.046 -0.122 0.038 -0.11 0.034 C -0.098 0.031 -0.086 0.035 -0.078 0.042 C -0.071 0.049 -0.066 0.06 -0.065 0.073 C -0.065 0.086 -0.066 0.098 -0.071 0.108 C -0.076 0.118 -0.075 0.12 -0.095 0.133 C -0.113 0.147 -0.131 0.143 -0.142 0.144 C -0.153 0.144 -0.162 0.14 -0.173 0.136 C -0.185 0.131 -0.195 0.122 -0.202 0.114 C -0.209 0.106 -0.212 0.096 -0.216 0.08 C -0.219 0.064 -0.219 0.056 -0.219 0.044 C -0.219 0.032 -0.219 0.02 -0.219 0.008 E",
+              "pathEditMode": "relative",
+              "ptsTypes": ""
+            },
+            "attrNames": [
+              "ppt_x",
+              "ppt_y"
+            ],
+            "durMs": 2000,
+            "timingAttributes": {
+              "fill": "hold"
+            }
+          }
+        ],
+        "behaviorChildren": [
+          "p:animMotion"
+        ],
+        "measuredDurationMs": 2000,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        }
+      },
+      "evidence": {
+        "source": "sdpm GUI capture",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "capturedApplicationVersion": "16.113.1",
+        "slideIndex": 1
+      },
+      "verification": "guiCapture",
+      "capture": {
+        "source": "sdpm GUI capture",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "capturedAt": null,
+        "capturedIn": "motion-paths-complex-2026-11-02",
+        "driver": "macOS accessibility API; no Apple Events and no Visual Basic",
+        "fixture": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx",
+        "readBack": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/powerpoint-readback.jsonl",
+        "merged": "tests/fixtures/animations/gui-only/motion-paths-complex-2026-11-02/merged-evidence.json",
+        "guiPath": [
+          "Animations",
+          "Path Animation",
+          "Waves"
+        ],
+        "matchedTitle": "Waves",
+        "slideIndex": 1,
+        "shapeName": "Rounded Rectangle 13",
+        "shapeSpid": "14",
+        "attributedSpid": "14",
+        "selectionRowIndex": 1,
         "selectedBy": "selectionPaneRow",
         "ribbonReadBack": {
           "start": "On Click",

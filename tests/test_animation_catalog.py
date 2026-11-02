@@ -1347,7 +1347,9 @@ def gui_capture() -> dict:
 
 def test_the_gui_capture_covers_every_gui_addressable_animation_value(gui_capture):
     """76 values, each joined to its effect by the spid the driver verified."""
-    assert len(gui_capture) == 76
+    # 76 from the 2026-11-01 batch plus the 7 Complex motion paths, which the
+    # catalog had no key for until the Path Animation popup was read.
+    assert len(gui_capture) == 83
     assert all("effect" in record for record in gui_capture.values())
     assert all(
         record["attributedSpid"] == record["shapeSpid"] for record in gui_capture.values()
@@ -1390,7 +1392,7 @@ def test_a_promoted_entry_states_the_duration_its_timings_belong_to(catalog, gui
         key for key in gui_capture
         if entries[key]["ooxml"]["durationScaling"]["rule"] == "notScalable"
     ]
-    assert len(scalable) + len(fixed) == 76
+    assert len(scalable) + len(fixed) == 83
     assert sorted(fixed) == [
         "animation.gallery.emphasis.boldReveal",
         "animation.gallery.emphasis.transparency",
@@ -1421,7 +1423,10 @@ def test_the_capture_confirms_the_identifiers_rather_than_replacing_them(catalog
     for key in gui_capture:
         relation = entries[key]["capture"]["identifierRelation"]
         relations[relation] = relations.get(relation, 0) + 1
-    assert relations == {"confirmsCatalogued": 71, "measuredWhereNoneWasRecorded": 5}
+    # The 7 Complex paths join the 5 Basic ones in having had no catalogued
+    # identifier at all: a motion path's presetID was never in the evidence the
+    # catalog was built from, so every one of the 12 is a first measurement.
+    assert relations == {"confirmsCatalogued": 71, "measuredWhereNoneWasRecorded": 12}
 
 
 def test_the_measured_motion_paths_are_the_five_gallery_groups(catalog, gui_capture):
@@ -2177,3 +2182,110 @@ def test_the_platform_inventory_records_the_whole_path_animation_popup():
     } <= labels
     assert "More Motion Paths..." not in labels and "More Motion Paths…" not in labels
     assert len(inventory["noMoreEffectsRoute"]["corroboration"]) == 2
+
+
+def test_the_complex_motion_paths_are_measured_and_writable():
+    """Seven paths this build applies, which the catalog had no key for.
+
+    The Path Animation popup offers Custom (4 drawn), Basic (5, measured
+    2026-11-01) and **Complex** (7). The catalog knew the first nine and not the
+    last seven, and nobody noticed because it was tracking 65 Windows-only path
+    enumerators this build cannot apply — reading the popup is what separated
+    the two.
+
+    The assertion is the geometry, because a Bézier that is close is wrong.
+    """
+    from sdpm.engine.timing import load_capability_index
+
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    measured = {
+        "bounce": 41,
+        "invertedShape": 34,
+        "specialCurve": 28,
+        "specialShape": 31,
+        "spiral": 55,
+        "star": 16,
+        "waves": 48,
+    }
+    for slug, preset_id in measured.items():
+        entry = index.items[f"animation.gallery.motionPath.{slug}"]
+        ooxml = entry.ooxml
+        assert ooxml["presetId"] == preset_id, slug
+        assert ooxml["measuredDurationMs"] == 2000, slug
+        assert entry.writable, f"{slug} is still refused"
+        motion = [b for b in ooxml["behaviors"] if b["element"] == "p:animMotion"]
+        assert len(motion) == 1, slug
+        attrs = motion[0]["attributes"]
+        assert attrs["origin"] == "layout" and attrs["pathEditMode"] == "relative", slug
+        # Transcribed, not re-derived: the literal path data PowerPoint wrote.
+        assert attrs["path"].startswith("M 0 0"), slug
+        assert len(attrs["path"]) > 100, f"{slug} path looks truncated: {attrs['path']!r}"
+        assert entry.ooxml.get("requiresCapture") is None, slug
+
+    # Star is a closed polygon, which is the one path short enough to assert whole.
+    star = index.items["animation.gallery.motionPath.star"].ooxml["behaviors"][0]
+    assert star["attributes"]["path"] == (
+        "M 0 0 L 0.091 -0.034 L 0.125 -0.125 L 0.158 -0.034 L 0.249 0 "
+        "L 0.158 0.034 L 0.125 0.125 L 0.091 0.034 L 0 0 Z"
+    )
+
+
+def test_every_path_the_popup_offers_has_a_catalog_key():
+    """The gap that hid the Complex group must not be able to reopen.
+
+    A path in the popup with no catalog key is invisible: nothing refuses it,
+    nothing plans it, and no count goes up when it is missing. The inventory is
+    read from the live UI, so a group a future build adds fails here instead.
+    `Draw *` is excluded because a drawn path has no deterministic value.
+    """
+    import re
+
+    from sdpm.engine.timing import load_capability_index
+
+    inventory = json.loads(
+        (
+            REPO_ROOT
+            / "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02"
+            / "platform-inventory.json"
+        ).read_text()
+    )
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    have = {
+        re.sub(r"[^a-z0-9]", "", key.rsplit(".", 1)[-1].lower())
+        for key in index.items
+        if key.startswith("animation.gallery.motionPath.")
+    }
+    offered = [
+        label for label in inventory["labels"] if not label.startswith("Draw")
+    ]
+    assert len(offered) == 12, offered
+    missing = [
+        label
+        for label in offered
+        if re.sub(r"[^a-z0-9]", "", label.lower()) not in have
+    ]
+    assert not missing, f"the Path Animation popup offers paths the catalog has no key for: {missing}"
+
+
+def test_the_manifest_no_longer_claims_a_dialog_this_build_lacks():
+    """The four `More ... Effects` entries described a surface that is not there.
+
+    They named `Add Animation ▸ More … Effects…` as their control, and
+    PowerPoint for Mac has no Add Animation control at all. A manifest entry
+    that points at a surface nobody can open is worse than silence: it reads as
+    checkable.
+    """
+    manifest = json.loads(
+        (REPO_ROOT / "sdpm/references/catalogs/powerpoint-gui-surface-16.113.1.json").read_text()
+    )
+    more = [i for i in manifest["items"] if i["key"].startswith("animation.moreEffects.")]
+    assert len(more) == 4
+    for item in more:
+        assert item["surface"] == "absent on macOS", item["key"]
+        assert "not present in this build" in item["control"], item["key"]
+        assert "no Add Animation control" in item["sourceEvidence"], item["key"]
+        assert item["status"] == "nonPersisted", item["key"]

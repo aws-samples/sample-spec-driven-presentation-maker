@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "manifestVersion": "2026-10-30.1",
+  "manifestVersion": "2026-11-02.1",
   "baseline": {
     "application": "Microsoft PowerPoint",
     "version": "16.113.1",
@@ -1725,11 +1725,31 @@
       "status": "accepted"
     },
     {
+      "key": "animation.gallery.motionPath.bounce",
+      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "value": "bounce",
+      "surface": "ribbon gallery group",
+      "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
+      "persisted": true,
+      "verificationMethod": "powerPointReadBackRequired",
+      "status": "accepted"
+    },
+    {
       "key": "animation.gallery.motionPath.custom",
       "control": "Animations tab ▸ Animation gallery (Motion Paths)",
       "value": "custom",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Animations ribbon inspection",
+      "persisted": true,
+      "verificationMethod": "powerPointReadBackRequired",
+      "status": "accepted"
+    },
+    {
+      "key": "animation.gallery.motionPath.invertedShape",
+      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "value": "invertedShape",
+      "surface": "ribbon gallery group",
+      "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
       "persisted": true,
       "verificationMethod": "powerPointReadBackRequired",
       "status": "accepted"
@@ -1765,11 +1785,61 @@
       "status": "accepted"
     },
     {
+      "key": "animation.gallery.motionPath.specialCurve",
+      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "value": "specialCurve",
+      "surface": "ribbon gallery group",
+      "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
+      "persisted": true,
+      "verificationMethod": "powerPointReadBackRequired",
+      "status": "accepted"
+    },
+    {
+      "key": "animation.gallery.motionPath.specialShape",
+      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "value": "specialShape",
+      "surface": "ribbon gallery group",
+      "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
+      "persisted": true,
+      "verificationMethod": "powerPointReadBackRequired",
+      "status": "accepted"
+    },
+    {
+      "key": "animation.gallery.motionPath.spiral",
+      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "value": "spiral",
+      "surface": "ribbon gallery group",
+      "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
+      "persisted": true,
+      "verificationMethod": "powerPointReadBackRequired",
+      "status": "accepted"
+    },
+    {
+      "key": "animation.gallery.motionPath.star",
+      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "value": "star",
+      "surface": "ribbon gallery group",
+      "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
+      "persisted": true,
+      "verificationMethod": "powerPointReadBackRequired",
+      "status": "accepted"
+    },
+    {
       "key": "animation.gallery.motionPath.turns",
       "control": "Animations tab ▸ Animation gallery (Motion Paths)",
       "value": "turns",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Animations ribbon inspection",
+      "persisted": true,
+      "verificationMethod": "powerPointReadBackRequired",
+      "status": "accepted"
+    },
+    {
+      "key": "animation.gallery.motionPath.waves",
+      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "value": "waves",
+      "surface": "ribbon gallery group",
+      "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
       "persisted": true,
       "verificationMethod": "powerPointReadBackRequired",
       "status": "accepted"
@@ -1806,40 +1876,40 @@
     },
     {
       "key": "animation.moreEffects.emphasis",
-      "control": "Add Animation ▸ More … Effects… dialog",
+      "control": "not present in this build — on Windows, Add Animation ▸ More … Effects…",
       "value": "emphasis",
-      "surface": "modal dialog container",
-      "sourceEvidence": "PowerPoint 16.113.1 Add Animation menu inspection",
+      "surface": "absent on macOS",
+      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More … Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
       "persisted": false,
       "verificationMethod": "guiInspection",
       "status": "nonPersisted"
     },
     {
       "key": "animation.moreEffects.entrance",
-      "control": "Add Animation ▸ More … Effects… dialog",
+      "control": "not present in this build — on Windows, Add Animation ▸ More … Effects…",
       "value": "entrance",
-      "surface": "modal dialog container",
-      "sourceEvidence": "PowerPoint 16.113.1 Add Animation menu inspection",
+      "surface": "absent on macOS",
+      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More … Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
       "persisted": false,
       "verificationMethod": "guiInspection",
       "status": "nonPersisted"
     },
     {
       "key": "animation.moreEffects.exit",
-      "control": "Add Animation ▸ More … Effects… dialog",
+      "control": "not present in this build — on Windows, Add Animation ▸ More … Effects…",
       "value": "exit",
-      "surface": "modal dialog container",
-      "sourceEvidence": "PowerPoint 16.113.1 Add Animation menu inspection",
+      "surface": "absent on macOS",
+      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More … Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
       "persisted": false,
       "verificationMethod": "guiInspection",
       "status": "nonPersisted"
     },
     {
       "key": "animation.moreEffects.motionPath",
-      "control": "Add Animation ▸ More … Effects… dialog",
+      "control": "not present in this build — on Windows, Add Animation ▸ More … Effects…",
       "value": "motionPath",
-      "surface": "modal dialog container",
-      "sourceEvidence": "PowerPoint 16.113.1 Add Animation menu inspection",
+      "surface": "absent on macOS",
+      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More … Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
       "persisted": false,
       "verificationMethod": "guiInspection",
       "status": "nonPersisted"

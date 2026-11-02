@@ -306,12 +306,14 @@ slides.
 | `entrance` | `appear`, `basicSwivel`, `basicZoom`, `blinds`, `boomerang`, `bounce`, `centerRevolve`, `checkerboard`, `credits`, `curveUp`, `dissolveIn`, `drop`, `expand`, `fade`, `flip`, `float`, `floatIn`, `flyIn`, `growTurn`, `peekIn`, `pinwheel`, `randomBars`, `riseUp`, `shape`, `spinner`, `spiralIn`, `split`, `stretch`, `strips`, `swivel`, `wedge`, `wheel`, `whip`, `wipe`, `zoom` |
 | `exit` | `basicSwivel`, `basicZoom`, `blinds`, `boomerang`, `bounce`, `centerRevolve`, `checkerboard`, `collapse`, `contract`, `credits`, `curveDown`, `disappear`, `dissolveOut`, `drop`, `fade`, `flip`, `float`, `floatOut`, `flyOut`, `peekOut`, `pinwheel`, `randomBars`, `shape`, `shrinkTurn`, `sinkDown`, `spinner`, `spiralOut`, `split`, `stretchy`, `strips`, `swivel`, `wedge`, `wheel`, `whip`, `wipe`, `zoom` |
 | `emphasis` | `blink`, `boldFlash`, `boldReveal`, `brushColor`, `colorPulse`, `complementaryColor`, `complementaryColor2`, `contrastingColor`, `darken`, `desaturate`, `fillColor`, `fontColor`, `growShrink`, `growWithColor`, `lighten`, `lineColor`, `objectColor`, `pulse`, `shimmer`, `spin`, `teeter`, `transparency`, `underline`, `wave` |
-| `motionPath` | `arcs`, `lines`, `loops`, `shapes`, `turns` |
+| `motionPath` | `arcs`, `bounce`, `invertedShape`, `lines`, `loops`, `shapes`, `specialCurve`, `specialShape`, `spiral`, `star`, `turns`, `waves` |
 | `media` | `mediaPlay` |
 | `custom` | none ever |
 
-That is the whole Animations ribbon: 35 entrance, 36 exit, 24 emphasis and the 5 motion-path
-groups. `emphasis` and `motionPath` used to have none at all, and the gallery tiles were
+That is the whole Animations ribbon: 35 entrance, 36 exit, 24 emphasis and 12 of the Path
+Animation popup's 16 entries — its Basic group of 5 and its Complex group of 7. The remaining
+four are `Draw Curve`, `Draw Freeform`, `Draw Line` and `Draw Scribble`, which are drawn on the
+canvas and so have no fixed geometry to write. `emphasis` and `motionPath` used to have none at all, and the gallery tiles were
 refused by name, because the available evidence recorded *which* behaviour children each tile
 writes and not what they say. A capture of every GUI-addressable value on 2026-11-01 measured
 the payloads from the package PowerPoint saved, so each of these effects is now written as

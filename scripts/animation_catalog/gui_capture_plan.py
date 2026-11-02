@@ -169,6 +169,9 @@ CELL_ASPECT = 1.5
 SHAPE_FONT_PT = 11
 LABEL_FONT_PT = 6
 
+#: Deck pixels per point. The basis is 1920x1080 px for a 960x540 pt slide.
+PX_PER_PT = 2.0
+
 #: How far, in points, a shape's centre in the generated package may sit from the centre
 #: the grid asked for before :func:`resolve_shape_names` refuses to match the two. Any
 #: two shapes are at least ``CELL_GAP_X_PX`` apart, so this cannot match a neighbour.
@@ -447,7 +450,9 @@ def _usable(basis: tuple[float, float]) -> tuple[float, float]:
     return (basis[0] - 2 * SLIDE_MARGIN_PX, basis[1] - 2 * SLIDE_MARGIN_PX)
 
 
-def _candidate_grids(per_slide: int, basis: tuple[float, float]) -> list[tuple[float, int, int]]:
+def _candidate_grids(
+    per_slide: int, basis: tuple[float, float], min_shape_w_px: float = 0.0
+) -> list[tuple[float, int, int]]:
     """Return every column count that fits ``per_slide`` cells, best aspect ratio first.
 
     A candidate only counts when the shape it implies is at least twice
@@ -467,11 +472,39 @@ def _candidate_grids(per_slide: int, basis: tuple[float, float]) -> list[tuple[f
             continue
         if min(shape_w, shape_h) < MIN_SHAPE_SHORT_SIDE_PX:
             continue
+        if shape_w < min_shape_w_px:
+            continue
         candidates.append((abs(cell_w / cell_h - CELL_ASPECT), columns, rows))
     return sorted(candidates)
 
 
-def max_targets_per_slide(*, basis: tuple[float, float] = DECK_BASIS_PX) -> int:
+def widest_label_px(targets: Sequence[dict[str, Any]]) -> float:
+    """The width the widest target's label needs, in deck pixels.
+
+    Both the plan's layout and the deck built from it have to use this, or the
+    deck's shapes land somewhere the plan does not expect and the driver selects
+    by a rectangle that is not the shape's.
+    """
+    return max(
+        (label_width_px(label_text(str(target["key"]))) for target in targets),
+        default=0.0,
+    )
+
+
+def label_width_px(label: str) -> float:
+    """Width one line of ``label`` needs, in deck pixels.
+
+    Half the point size per character is the estimate the layout check has always
+    used for this font, and it is deliberately generous: a label that overflows
+    wraps to a second line, and two lines were what once cost 18 px of shape
+    height and produced the 22 pt shapes a live run then mis-clicked.
+    """
+    return len(label) * LABEL_FONT_PT * 0.5 * PX_PER_PT
+
+
+def max_targets_per_slide(
+    *, basis: tuple[float, float] = DECK_BASIS_PX, min_shape_w_px: float = 0.0
+) -> int:
     """How many clickable shapes one slide can carry under the separation constraints.
 
     A cell has to hold a shape at least :data:`MIN_SHAPE_SHORT_SIDE_PX` on its short
@@ -482,13 +515,28 @@ def max_targets_per_slide(*, basis: tuple[float, float] = DECK_BASIS_PX) -> int:
     """
     usable_w, usable_h = _usable(basis)
     short = max(2 * CLICK_MARGIN_PX, MIN_SHAPE_SHORT_SIDE_PX)
-    columns = int(usable_w // (short + CELL_GAP_X_PX))
+    # A shape also has to be wide enough for its own label on one line, which
+    # for the longest catalog key binds harder than the short side does.
+    columns = int(usable_w // (max(short, min_shape_w_px) + CELL_GAP_X_PX))
     rows = int(usable_h // (short + CELL_GAP_Y_PX + LABEL_HEIGHT_PX))
     return columns * rows
 
 
-def grid_layout(count: int, *, basis: tuple[float, float] = DECK_BASIS_PX) -> Grid:
+def grid_layout(
+    count: int,
+    *,
+    basis: tuple[float, float] = DECK_BASIS_PX,
+    min_shape_w_px: float = 0.0,
+) -> Grid:
     """Lay ``count`` clickable shapes out over as few slides as the constraints allow.
+
+    ``min_shape_w_px`` is the width the widest label needs on one line, which
+    :func:`assign_cells` derives from the targets. It is a parameter rather than
+    a constant because it depends on the keys being captured, and it is enforced
+    here rather than checked afterwards for the same reason
+    :data:`MIN_SHAPE_SHORT_SIDE_PX` is: a label that does not fit wraps, a
+    wrapped label steals shape height, and that is how a run once ended up
+    clicking 22 pt shapes.
 
     One slide is preferred and is what the catalog's current 76 targets get. The returned
     grid is **checked, not asserted by eye**: no two shapes on a slide overlap, every
@@ -501,17 +549,18 @@ def grid_layout(count: int, *, basis: tuple[float, float] = DECK_BASIS_PX) -> Gr
         raise ValueError(f"a grid needs at least one target, got {count}")
     # The closed form above says where to start; the loop is the guarantee, so a wrong
     # capacity would cost a slide rather than produce an unclickable grid.
-    per_slide = min(count, max_targets_per_slide(basis=basis))
-    while per_slide > 1 and not _candidate_grids(per_slide, basis):
+    per_slide = min(count, max_targets_per_slide(basis=basis, min_shape_w_px=min_shape_w_px))
+    while per_slide > 1 and not _candidate_grids(per_slide, basis, min_shape_w_px):
         per_slide -= 1
-    if not _candidate_grids(per_slide, basis):
+    if not _candidate_grids(per_slide, basis, min_shape_w_px):
         raise ValueError(
             f"not even one shape fits a {basis[0]:g}x{basis[1]:g} px slide with a "
-            f"{CLICK_MARGIN_PX:g}px click margin; the constraints are unsatisfiable"
+            f"{CLICK_MARGIN_PX:g}px click margin and a {min_shape_w_px:g}px label; the "
+            "constraints are unsatisfiable"
         )
     slides = math.ceil(count / per_slide)
     per_slide = math.ceil(count / slides)
-    _aspect, columns, rows = _candidate_grids(per_slide, basis)[0]
+    _aspect, columns, rows = _candidate_grids(per_slide, basis, min_shape_w_px)[0]
 
     usable_w, usable_h = _usable(basis)
     cell_w, cell_h = usable_w / columns, usable_h / rows
@@ -588,8 +637,14 @@ def assign_cells(targets: Sequence[dict[str, Any]]) -> Grid:
     ``shapeName`` is left null here on purpose: it is settled by ``--generate``, which
     reads the name back out of the package sdpm wrote, because sdpm derives a shape's name
     from its geometry rather than from the element id the deck JSON asked for.
+
+    The widest label the targets carry becomes a layout constraint. It depends on
+    the keys being captured — ``complementaryColor2`` is 19 characters and needs
+    114 px — so it cannot be a constant, and it has to bind the grid rather than
+    be checked after it: a label that does not fit wraps, and a wrapped label
+    takes the height that keeps a shape clickable.
     """
-    grid = grid_layout(len(targets))
+    grid = grid_layout(len(targets), min_shape_w_px=widest_label_px(targets))
     for ordinal, (target, cell) in enumerate(zip(targets, grid.cells), start=1):
         target["targetIndex"] = ordinal
         target["slideIndex"] = cell.slide_index
@@ -735,7 +790,10 @@ def build_capture_deck(plan: dict[str, Any], deck_dir: Path, *, template: Path =
     targets = plan.get("targets", [])
     if not targets:
         raise ValueError("the plan has no targets, so there is no deck to build")
-    grid = grid_layout(len(targets))
+    # The same label constraint the plan was laid out under. Without it the deck's
+    # shapes would sit where a different grid put them, and the driver would
+    # select by a rectangle that is not the shape's.
+    grid = grid_layout(len(targets), min_shape_w_px=widest_label_px(targets))
     (deck_dir / "slides").mkdir(parents=True, exist_ok=True)
     (deck_dir / "specs").mkdir(parents=True, exist_ok=True)
     (deck_dir / "deck.json").write_text(
