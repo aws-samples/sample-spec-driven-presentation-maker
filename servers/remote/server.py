@@ -600,7 +600,7 @@ def analyze_template(
 
 @offloaded_tool
 def read_attachment(
-    source: Annotated[str, Field(description='S3 key from the [Attached:...] marker (uploads/{userId}/{uuid}/{name}), or an https:// URL.')],
+    source: Annotated[str, Field(description='Upload handle from the [Attached:...] marker (uploads/{uuid}/{name}), or an https:// URL.')],
     offset: Annotated[int, Field(description='UTF-8 byte offset into the text to start from.')] = 0,
     limit: Annotated[int, Field(description='Max bytes returned, 512–10240.')] = 10240,
 ) -> dict[str, Any]:
@@ -621,7 +621,7 @@ def read_attachment(
 
 @offloaded_tool
 def import_attachment(
-    source: Annotated[str, Field(description='S3 key from the [Attached:...] marker (uploads/{userId}/{uuid}/{name}), or an https:// URL.')],
+    source: Annotated[str, Field(description='Upload handle from the [Attached:...] marker (uploads/{uuid}/{name}), or an https:// URL.')],
     deck_id: Annotated[str, Field(description='Deck ID.')],
     filename: Annotated[str, Field(description="Filename override; defaults to the source's name.")] = "",
 ) -> str:
@@ -1316,7 +1316,7 @@ def run_style_python(
             ):
                 key = user_library.user_style_key(user_id, style_name)
                 _storage.upload_file(key=key, data=style_html.encode("utf-8"), content_type="text/html")
-                result["saved"] = {"filename": f"{style_name}.html", "key": key}
+                result["saved"] = {"filename": f"{style_name}.html", "name": style_name}
         else:
             # No style_name → nothing can persist. If the code wrote
             # style.html anyway, that would be silent data loss — surface it.

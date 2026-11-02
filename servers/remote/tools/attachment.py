@@ -28,10 +28,11 @@ from sdpm.tools.attachment.fetcher import fetch_url
 from sdpm.tools.attachment.limits import MAX_RAW_SIZE_BYTES
 from sdpm.tools.attachment.pipeline import import_attachment_core
 from sdpm.tools.attachment.source import (
+    CloudSource,
     classify_source,
+    resolve_cloud_source,
     sanitize_filename,
     source_identity_s3,
-    validate_cloud_source,
 )
 from storage import Storage
 
@@ -124,20 +125,13 @@ def read_attachment(
     try:
         kind = classify_source(source)
         if kind == "s3_key":
-            validate_cloud_source(source, user_id)
-            try:
-                metadata = storage.head_object(source)
-            except Exception:
-                raise SourceNotFound(source)
-            if int(metadata.get("ContentLength", 0)) > MAX_RAW_SIZE_BYTES:
-                raise SourceLimitExceeded("S3 source exceeds the 100 MiB raw limit")
-            raw = storage.download_file_from_pptx_bucket(source)
-            if len(raw) != int(metadata.get("ContentLength", len(raw))) or len(raw) > MAX_RAW_SIZE_BYTES:
-                raise SourceLimitExceeded("S3 source size changed during materialization")
-            resolved_name = source.rsplit("/", 1)[-1]
+            upload = resolve_cloud_source(source, user_id)
+            source = upload.handle
+            raw, metadata = _download_upload(storage, upload)
+            resolved_name = upload.handle.rsplit("/", 1)[-1]
             content_type = metadata.get("ContentType")
             source_identity = source_identity_s3(
-                source,
+                upload.key,
                 str(metadata.get("ETag", "")),
                 len(raw),
             )
@@ -177,9 +171,35 @@ def read_attachment(
             return response
     except AttachmentError as error:
         return error.to_dict()
+    except Exception as error:
+        logger.exception("Remote attachment read failed")
+        raise RuntimeError(_without_user_id(str(error), user_id)) from None
 
 
 logger = logging.getLogger(__name__)
+
+
+def _download_upload(storage: Storage, upload: CloudSource) -> tuple[bytes, dict[str, Any]]:
+    """Bytes and metadata of an owned upload; storage errors name only the handle."""
+    try:
+        metadata = storage.head_object(upload.key)
+    except Exception:
+        raise SourceNotFound(upload.handle)
+    if int(metadata.get("ContentLength", 0)) > MAX_RAW_SIZE_BYTES:
+        raise SourceLimitExceeded("S3 source exceeds the 100 MiB raw limit")
+    try:
+        raw = storage.download_file_from_pptx_bucket(upload.key)
+    except Exception:
+        logger.exception("Upload download failed after a successful head")
+        raise SourceNotFound(upload.handle)
+    if len(raw) != int(metadata.get("ContentLength", len(raw))) or len(raw) > MAX_RAW_SIZE_BYTES:
+        raise SourceLimitExceeded("S3 source size changed during materialization")
+    return raw, metadata
+
+
+def _without_user_id(message: str, user_id: str) -> str:
+    """``message`` with the caller's id removed (S3 errors can name a key under it)."""
+    return message.replace(user_id, "<user>") if user_id else message
 
 
 class _RemoteStageCache(LocalStageCache):
@@ -361,20 +381,13 @@ def import_attachment(
             logger.warning("Attachment orphan GC skipped for %s: %s", deck_id, error)
         kind = classify_source(source)
         if kind == "s3_key":
-            validate_cloud_source(source, user_id)
-            try:
-                metadata = storage.head_object(source)
-            except Exception:
-                raise SourceNotFound(source)
-            if int(metadata.get("ContentLength", 0)) > MAX_RAW_SIZE_BYTES:
-                raise SourceLimitExceeded("S3 source exceeds the 100 MiB raw limit")
-            raw = storage.download_file_from_pptx_bucket(source)
-            if len(raw) != int(metadata.get("ContentLength", len(raw))) or len(raw) > MAX_RAW_SIZE_BYTES:
-                raise SourceLimitExceeded("S3 source size changed during materialization")
-            resolved_name = filename or source.rsplit("/", 1)[-1]
+            upload = resolve_cloud_source(source, user_id)
+            source = upload.handle
+            raw, metadata = _download_upload(storage, upload)
+            resolved_name = filename or upload.handle.rsplit("/", 1)[-1]
             content_type = metadata.get("ContentType")
             source_identity = source_identity_s3(
-                source,
+                upload.key,
                 str(metadata.get("ETag", "")),
                 len(raw),
             )
@@ -411,7 +424,10 @@ def import_attachment(
                 source_identity=source_identity,
                 cache=_remote_stage_cache(user_id, storage),
             )
-            if result.get("code") == "IMPORT_INCOMPLETE" or "error" in result:
+            if "code" in result or "error" in result:
+                # Core errors carry str(exception); S3 errors there can name a cache key under the user id.
+                if isinstance(result.get("message"), str):
+                    result["message"] = _without_user_id(result["message"], user_id)
                 return json.dumps(result, ensure_ascii=False)
 
             import_key = result["importKey"]
@@ -430,7 +446,8 @@ def import_attachment(
         return json.dumps(error.to_dict(), ensure_ascii=False)
     except Exception as error:
         logger.exception("Remote attachment import failed")
-        return json.dumps({"error": {"code": "IMPORT_ERROR", "message": str(error)}}, ensure_ascii=False)
+        message = _without_user_id(str(error), user_id)
+        return json.dumps({"error": {"code": "IMPORT_ERROR", "message": message}}, ensure_ascii=False)
 
 
 def _read_manifest(storage: Storage, key: str) -> dict[str, Any] | None:

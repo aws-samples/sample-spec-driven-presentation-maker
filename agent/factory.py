@@ -188,7 +188,10 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
                 retries={"max_attempts": 5, "mode": "adaptive"},
             ),
         )
-        composer_mcp_factory = lambda mcp_session_id="": mcp_agentcore_runtime(jwt_token=jwt_token, session_id=mcp_session_id)  # noqa: E731
+        # Composers get their own Presentation Maker client per group; it carries the
+        # composer allowlist so a composer sees only the deck tools.
+        composer_filters = {"allowed": MODES["composer"].allowed_tools}
+        composer_mcp_factory = lambda mcp_session_id="": mcp_agentcore_runtime(jwt_token=jwt_token, session_id=mcp_session_id, tool_filters=composer_filters)  # noqa: E731
         compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create, user_id=user_id, session_id=session_id)
         tools.append(compose_slides)
 
