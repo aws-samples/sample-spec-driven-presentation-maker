@@ -8,8 +8,7 @@
 
 import * as parser from './strandsParser.js';
 import { getAllowedModels } from "@/lib/allowedModels";
-
-const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === 'local';
+import { IS_LOCAL } from "@/lib/mode";
 
 // Read the user's selected chat model from localStorage, validated against the allowed list.
 function readSelectedChatModelId() {

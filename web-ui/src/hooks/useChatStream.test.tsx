@@ -11,13 +11,17 @@ import { NextIntlClientProvider } from "next-intl"
 import type { ReactNode } from "react"
 import en from "../../messages/en.json"
 
-const { invokeAgentCore } = vi.hoisted(() => ({ invokeAgentCore: vi.fn() }))
+const { invokeAgentCore, stopLocalAgent, notifyError } = vi.hoisted(() => ({
+  invokeAgentCore: vi.fn(), stopLocalAgent: vi.fn(), notifyError: vi.fn(),
+}))
 vi.mock("@/lib/mode", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/mode")>()), IS_LOCAL: true }))
 vi.mock("@/hooks/useAuth", () => {
   const auth = { isAuthenticated: true, user: { access_token: "at", profile: { sub: "u1" } } }
   return { useAuth: () => auth }
 })
 vi.mock("@/services/agentCoreService", () => ({ invokeAgentCore, stopRuntimeSession: vi.fn() }))
+vi.mock("@/services/localService", () => ({ stopLocalAgent }))
+vi.mock("@/lib/errors", () => ({ notifyError }))
 
 import { useChatStream } from "./useChatStream"
 
@@ -45,5 +49,22 @@ describe("useChatStream session conflicts", () => {
 
   it("keeps the generic message for other failures", async () => {
     expect(await lastReplyAfter(new Error("Local agent error: 500: "))).toBe("Sorry, something went wrong. Please try again.")
+  })
+})
+
+describe("useChatStream stopGeneration (local)", () => {
+  it("asks the local agent to stop the session", async () => {
+    stopLocalAgent.mockResolvedValueOnce(undefined)
+    const { result } = renderHook(() => useChatStream({ sessionId: "K1", mode: "vibe", deckId: "d1" }), { wrapper })
+    act(() => result.current.stopGeneration())
+    expect(stopLocalAgent).toHaveBeenCalledWith({ sessionId: "K1" })
+  })
+
+  it("reports a failed stop with the translated message", async () => {
+    const error = new Error("HTTP 500")
+    stopLocalAgent.mockRejectedValueOnce(error)
+    const { result } = renderHook(() => useChatStream({ sessionId: "K1", mode: "vibe", deckId: "d1" }), { wrapper })
+    await act(async () => { result.current.stopGeneration() })
+    expect(notifyError).toHaveBeenCalledWith(en.chat.errorStopGeneration, error)
   })
 })

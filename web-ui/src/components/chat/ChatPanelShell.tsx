@@ -27,6 +27,7 @@ import { useRef, useEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
 import { IS_LOCAL } from "@/lib/mode"
+import { stopLocalAgent } from "@/services/localService"
 import { notifyError } from "@/lib/errors"
 import { ErrorBoundary } from "@/components/ErrorBoundary"
 import { useTranslations } from "next-intl"
@@ -158,11 +159,7 @@ export function ChatPanelShell({
 
   /** New chat button: reset Panel A to fresh state. */
   const handleNewChat = () => {
-    if (IS_LOCAL) fetch("/api/agent/stop", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ newChat: true }),
-    }).catch((err) => notifyError(t("errorResetSession"), err))
+    if (IS_LOCAL) stopLocalAgent({ newChat: true }).catch((err) => notifyError(t("errorResetSession"), err))
     if (chatTab === "new" || panelAOwnsCurrentDeck) {
       setPanelAKey((k) => k + 1)
       setPanelADeckId(null)

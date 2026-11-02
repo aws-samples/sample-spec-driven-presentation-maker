@@ -7,6 +7,8 @@
  * All requests require a Cognito ID token for authorization.
  */
 
+import { IS_LOCAL } from "@/lib/mode"
+import { loadRuntimeConfig } from "@/lib/runtimeConfig"
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
 import type { ReviewSubmission } from "@/lib/review/schema"
 
@@ -72,10 +74,6 @@ export interface ScriptWarning {
 /** Why an HTML deck URL is requested: Present / PDF (inline, 4 hours) or Download (attachment). */
 export type HtmlUrlPurpose = "present" | "download"
 
-const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === 'local'
-
-let apiBaseUrl = ""
-
 /** Session-level cache for slide preview presigned URLs. */
 const previewUrlCache = new Map<string, string | null>()
 
@@ -87,12 +85,8 @@ const previewUrlCache = new Map<string, string | null>()
  */
 async function getApiBaseUrl(): Promise<string> {
   if (IS_LOCAL) return "/api/"
-  if (apiBaseUrl) return apiBaseUrl
-
-  const response = await fetch("/aws-exports.json")
-  const config = await response.json()
-  apiBaseUrl = config.apiBaseUrl || ""
-  return apiBaseUrl
+  const config = await loadRuntimeConfig()
+  return config.apiBaseUrl || ""
 }
 
 /**

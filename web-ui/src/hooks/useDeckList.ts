@@ -14,6 +14,7 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
+import { useTranslations } from "next-intl"
 import { IS_LOCAL } from "@/lib/mode"
 import {
   listDecks, DeckSummary,
@@ -21,6 +22,7 @@ import {
   updateVisibility, deleteDeck, toggleFavorite,
   searchSlides, SlideSearchResult,
 } from "@/services/deckService"
+import { openInOs } from "@/services/localService"
 import { toast } from "sonner"
 import { notifyError } from "@/lib/errors"
 import { isHtmlPreview } from "@/lib/preview"
@@ -41,6 +43,8 @@ export function useDeckList(
   isAuthenticated: boolean,
   activeDeckId: string | null,
 ) {
+  const t = useTranslations("decksPage")
+  const tCarousel = useTranslations("carousel")
   const [decks, setDecks] = useState<DeckSummary[]>([])
   const [publicDecks, setPublicDecks] = useState<DeckSummary[]>([])
   const [favoriteDecks, setFavoriteDecks] = useState<DeckSummary[]>([])
@@ -189,24 +193,24 @@ export function useDeckList(
       await updateVisibility(deckId, visibility, idToken)
       setDecks((prev) => prev.map((d) => d.deckId === deckId ? { ...d, visibility } : d))
     } catch {
-      toast.error("Failed to update visibility.")
+      toast.error(t("errorUpdateVisibility"))
     }
-  }, [idToken])
+  }, [idToken, t])
 
   const handleDownload = useCallback((deckId: string) => {
     const target = decks.find((d) => d.deckId === deckId)
     if (!target?.pptxUrl) return
     if (IS_LOCAL) {
-      fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch((err) => notifyError("Failed to open PPTX", err))
+      openInOs(deckId, "output.pptx").catch((err) => notifyError(tCarousel("errorOpenPptx"), err))
     } else {
       window.open(target.pptxUrl, "_blank")
     }
-  }, [decks])
+  }, [decks, tCarousel])
 
   const handleOpenFolder = useCallback((deckId: string) => {
     if (!IS_LOCAL) return
-    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch((err) => notifyError("Failed to open deck folder", err))
-  }, [])
+    openInOs(deckId).catch((err) => notifyError(tCarousel("errorOpenFolder"), err))
+  }, [tCarousel])
 
   const confirmDelete = useCallback(async () => {
     if (!deleteTarget || !idToken) return
@@ -215,9 +219,9 @@ export function useDeckList(
       setDecks((prev) => prev.filter((d) => d.deckId !== deleteTarget.deckId))
       setDeleteTarget(null)
     } catch {
-      toast.error("Failed to delete deck.")
+      toast.error(t("errorDeleteDeck"))
     }
-  }, [deleteTarget, idToken])
+  }, [deleteTarget, idToken, t])
 
   /** Bulk delete: ask for confirmation, then delete in parallel (bounded). */
   const requestBulkDelete = useCallback((deckIds: string[]) => {
