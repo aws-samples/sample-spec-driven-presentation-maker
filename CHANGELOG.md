@@ -236,6 +236,14 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Security
 
+- **The AgentCore runtimes allow only the operations the app uses.** The agent and MCP
+  runtimes, their `DEFAULT` endpoints and the named endpoints `sdpm_agent_endpoint` and
+  `sdpm_endpoint` now carry a resource-based policy (`AWS::BedrockAgentCore::ResourcePolicy`,
+  managed in `infra/`) that allows `InvokeAgentRuntime` and `StopRuntimeSession` and denies
+  `InvokeAgentRuntimeCommand`. Any other runtime operation is refused. Chat, the stop
+  button, the agent's calls to the MCP runtime and external MCP clients keep working; a
+  caller that ran commands in a runtime session through `InvokeAgentRuntimeCommand` now gets
+  403.
 - **The agent no longer sees the user's id in Cloud attachments.** The upload handle the API
   returns and the Web UI puts in the `[Attached:…]` marker is now `uploads/{uuid}/{name}`
   instead of the S3 key `uploads/{userId}/{uuid}/{name}`. The MCP server builds the S3 key from
