@@ -2329,6 +2329,62 @@ def test_the_misspelled_chart_level_enumerator_is_kept_verbatim():
     assert {"chart by category", "chart by series", "chart by series elements"} <= enumerators
 
 
+def test_rewind_and_bounce_end_are_measured_through_the_driver():
+    """The last two timing options, measured by the driver rather than by hand.
+
+    Both are the kind of press a gallery gate cannot judge: they edit the effect
+    already on the shape, so its count does not move. Rewind changes the
+    existing ``fill`` from ``hold`` to ``remove``; Bounce End adds an extension
+    attribute, which makes PowerPoint wrap the whole timing tree in
+    ``mc:AlternateContent`` so a consumer that does not know ``p14`` still gets
+    a playable effect.
+
+    The second one is why the signature comparison had to stop counting both
+    branches: clearing it removes the wrapper, so every effect's signature list
+    changes and a per-shape gate would accuse six shapes nobody pressed.
+    """
+    measured = json.loads(
+        (
+            REPO_ROOT
+            / "tests/fixtures/animations/gui-only/timing-rewind-bounce-2026-11-02"
+            / "timing-rewind-bounce.json"
+        ).read_text()
+    )
+    assert measured["platform"] == "macOS"
+    assert measured["version"] == "16.113.1"
+    assert set(measured["settings"]) == {
+        "animation.timing.rewind",
+        "animation.timing.bounceEnd",
+    }
+
+    rewind = measured["settings"]["animation.timing.rewind"]
+    assert rewind["element"] == "p:cTn"
+    assert (rewind["attribute"], rewind["clearedValue"], rewind["checkedValue"]) == (
+        "fill",
+        "hold",
+        "remove",
+    )
+    assert 'fill="hold"' in rewind["evidence"]["cleared"]
+    assert 'fill="remove"' in rewind["evidence"]["checked"]
+
+    bounce = measured["settings"]["animation.timing.bounceEnd"]
+    assert bounce["attribute"] == "p14:presetBounceEnd"
+    assert bounce["checkedValue"] == "50000"
+    # The fallback is the same effect *without* the extension, which is what
+    # makes the wrapper lossless for a consumer that ignores p14.
+    alternate = bounce["alternateContent"]
+    assert alternate["choice"]["requires"] == "p14"
+    assert alternate["choice"]["cTn"]["p14:presetBounceEnd"] == "50000"
+    assert "p14:presetBounceEnd" not in alternate["fallback"]["cTn"]
+    assert alternate["fallback"]["requires"] is None
+
+    # The gate's own result is part of the evidence: a press that restructured
+    # the package still attributed to exactly one shape.
+    assert measured["attribution"]["finding"].startswith("the gate reported exactly one shape")
+    assert len(measured["methodFindings"]) >= 5
+    assert set(measured["notMeasured"]) >= {"animation.afterAnimation.*", "animation.sound.*"}
+
+
 def test_smooth_start_and_smooth_end_are_measured_as_ctn_attributes():
     """Two of the four timing options are measured, and they are attributes.
 

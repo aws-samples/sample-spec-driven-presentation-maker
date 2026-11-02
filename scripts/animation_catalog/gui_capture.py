@@ -223,7 +223,16 @@ from collections import Counter
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any, Callable, Iterator, NamedTuple, Protocol, Sequence, runtime_checkable
+from typing import (
+    Any,
+    Callable,
+    Iterator,
+    Mapping,
+    NamedTuple,
+    Protocol,
+    Sequence,
+    runtime_checkable,
+)
 
 #: The consent argument. Deliberately **not** the scripting oracle's own token: the two
 #: drivers gate different mechanisms, and ``tests/test_animation_catalog.py`` pins the
@@ -586,9 +595,12 @@ def effect_signatures(package: Path, slide_index: int, spid: str) -> list[str]:
     from lxml import etree
 
     root = _read_slide_part(package, slide_index)
+    live = _live_effect_nodes(root)
     signatures: list[str] = []
     for element in root.iter():
         if etree.QName(element).localname != "cTn" or element.get("presetID") is None:
+            continue
+        if element not in live:
             continue
         spids = {
             target.get("spid")
@@ -619,6 +631,41 @@ def effect_signatures(package: Path, slide_index: int, spid: str) -> list[str]:
             )
         signatures.append("|".join(parts))
     return sorted(signatures)
+
+
+def _live_effect_nodes(root: Any) -> set[Any]:
+    """Return the effect nodes a conforming consumer actually applies.
+
+    ``mc:AlternateContent`` carries the same effect twice — once in the
+    ``mc:Choice`` that needs an extension, once in the ``mc:Fallback`` that does
+    not — and only one is ever live. Counting both made one effect read as two,
+    which would be harmless if the duplication were stable. It is not: measured
+    2026-11-02, clearing ``Bounce End`` removed ``p14:presetBounceEnd`` and with
+    it the whole ``AlternateContent``, so **every** effect's signature list went
+    from two entries to one and all seven shapes reported a change for a press
+    that touched one.
+
+    That matters for the pane-setting gate specifically. Its stray-shape failure
+    asks which shapes moved, so a save that restructures the package would
+    accuse six shapes nobody pressed.
+    """
+    from lxml import etree
+
+    live: set[Any] = set()
+    for node in root.iter():
+        local = etree.QName(node).localname
+        if local != "cTn" or node.get("presetID") is None:
+            continue
+        inside_fallback = False
+        parent = node.getparent()
+        while parent is not None:
+            if etree.QName(parent).localname == "Fallback":
+                inside_fallback = True
+                break
+            parent = parent.getparent()
+        if not inside_fallback:
+            live.add(node)
+    return live
 
 
 def read_slide_effects(package: Path, slide_index: int) -> list[dict[str, Any]]:
@@ -815,6 +862,85 @@ def attribute_batch(
     return credited
 
 
+def attribute_modified_batch(
+    before: Mapping[str, Sequence[str]],
+    after: Mapping[str, Sequence[str]],
+    expected_spids: Sequence[str],
+) -> dict[str, dict[str, Any]]:
+    """Attribute a save that **changed** effects rather than adding any.
+
+    Every gate here so far asks whether a shape *gained* an effect, which is the
+    right question for a gallery tile. A pane setting is the other kind of
+    press: Smooth Start, an after-animation value, Bounce End — each edits the
+    effect already on the shape, so the count does not move and
+    :func:`attribute_batch` would call a landed press "no change".
+
+    The evidence is therefore the effect's own signature, which already carries
+    its attributes **and** its behaviour payloads — the same string
+    :func:`effect_signatures` built so that Grow/Shrink's ``Huge`` could be told
+    from its default. ``before``/``after`` map spid to that shape's signatures.
+
+    Returns ``spid -> {before, after}`` for the targets whose signatures moved. A
+    target whose signatures are unchanged is absent and is the caller's to
+    reject on its own, with the rest of the batch still credited.
+
+    One batch-level failure, and it is the one that matters for this surface: a
+    **shape outside the batch whose signatures moved**. The Animation Pane's
+    `Delete` button sits beside the controls being pressed, and a ref landing on
+    it removes effects rather than editing them — that is exactly a change on a
+    shape nobody selected, so the batch is refused and the stray spid named
+    rather than the other presses credited around it.
+    """
+    unique = list(dict.fromkeys(expected_spids))
+    if not unique:
+        return {}
+    expected = set(unique)
+    moved = {
+        spid
+        for spid in set(before) | set(after)
+        if list(before.get(spid, ())) != list(after.get(spid, ()))
+    }
+    stray = sorted(moved - expected, key=str)
+    if stray:
+        raise EffectMisattributed(
+            f"the batch's save changed the effects on shape spids {stray}, and no target in the "
+            f"batch selected any of them; the batch selected {sorted(expected)}. A pane setting "
+            "edits the effect on the selected shape, so a change elsewhere means a press landed "
+            "somewhere this run cannot account for — the Animation Pane's Delete button sits "
+            "beside these controls — and the whole batch is refused rather than credited around it",
+            attributedSpid=stray[0],
+            straySpids=stray,
+            expectedSpids=sorted(expected),
+            strayBefore={spid: list(before.get(spid, ())) for spid in stray},
+            strayAfter={spid: list(after.get(spid, ())) for spid in stray},
+        )
+    return {
+        spid: {
+            "spid": spid,
+            "signaturesBefore": list(before.get(spid, ())),
+            "signaturesAfter": list(after.get(spid, ())),
+        }
+        for spid in unique
+        if spid in moved
+    }
+
+
+def not_changed_in_batch(
+    before: Mapping[str, Sequence[str]],
+    after: Mapping[str, Sequence[str]],
+    spid: str,
+) -> TargetFailure:
+    """Return the failure for a pane-setting target whose effect did not move."""
+    return EffectNotAdded(
+        f"the save left shape spid {spid}'s effect signatures unchanged, so the pane setting did "
+        "not reach the effect; a press that lands on a disabled control, or on a control belonging "
+        "to a different effect, looks exactly like this",
+        attributedSpid=spid,
+        signaturesBefore=list(before.get(spid, ())),
+        signaturesAfter=list(after.get(spid, ())),
+    )
+
+
 def not_added_in_batch(
     before: Sequence[dict[str, Any]],
     after: Sequence[dict[str, Any]],
@@ -926,10 +1052,18 @@ def find_containers(
     window: AXNode,
     role: str,
     *,
+    title: str | None = None,
     max_depth: int = CONTAINER_DEPTH,
     max_nodes: int = MAX_CONTAINER_NODES,
 ) -> list[AXNode]:
     """Return the window's containers of one role, without ever looking inside one.
+
+    ``title`` narrows by the container's own name, which the Animation Pane needs
+    and the ribbon and toolbar do not: the pane is an ``AXGroup``, and a window
+    holds many of those, so role alone is ambiguous rather than selective. The
+    pane carries the title ``Animations``, so naming it keeps the rule this
+    search exists for — start at the smallest container **certain** to hold the
+    thing — instead of relaxing to a walk.
 
     This is the search that replaced walking the window. It descends from the window's
     own children, stops at every node whose role is in :data:`CONTAINER_ROLES` — keeping
@@ -954,7 +1088,12 @@ def find_containers(
             )
         node_role = node.role
         if node_role == role:
-            found.append(node)
+            if title is None or node.title == title:
+                found.append(node)
+                continue
+            # A same-role container with a different name is not the one being
+            # asked for, and its contents are still behind a boundary — so it is
+            # pruned like any other container rather than descended into.
             continue
         if node_role in CONTAINER_ROLES or depth >= max_depth:
             continue
@@ -963,7 +1102,7 @@ def find_containers(
 
 
 def window_container(
-    window: AXNode, role: str, *, what: str, absent: str | None = None
+    window: AXNode, role: str, *, what: str, absent: str | None = None, title: str | None = None
 ) -> AXNode:
     """Resolve the one container of a role, or fail saying which it is.
 
@@ -972,7 +1111,7 @@ def window_container(
     window, because a lookup that quietly walked everything is the cost this whole
     mechanism exists to remove and it would come back unnoticed.
     """
-    found = find_containers(window, role)
+    found = find_containers(window, role, title=title)
     if not found:
         raise ControlNotFound(
             absent
@@ -1164,14 +1303,20 @@ class Containers:
             self._named[title] = held_window = found
         return held_window
 
-    def container(self, role: str, *, what: str, absent: str | None = None) -> AXNode:
-        found = self._containers.get(role)
+    def container(
+        self, role: str, *, what: str, absent: str | None = None, title: str | None = None
+    ) -> AXNode:
+        # Keyed by role **and** title: the Animation Pane shares ``AXGroup``
+        # with other containers, so holding one under the bare role would hand
+        # the pane's node back for a later lookup of a different group.
+        token = (role, title)
+        found = self._containers.get(token)
         if found is None:
             # Only a success is held. A container that is absent must be looked for again
             # on the next call, because "absent" is how an unopened Selection Pane reads
             # and the whole point of opening it is that the answer changes.
-            found = window_container(self.window(), role, what=what, absent=absent)
-            self._containers[role] = found
+            found = window_container(self.window(), role, what=what, absent=absent, title=title)
+            self._containers[token] = found
         return found
 
 
@@ -1227,9 +1372,15 @@ class Scope:
     window_title: str | None = None
     container_role: str | None = None
     descend: tuple[str, ...] = ()
+    #: The container's own name, when its role is not selective on its own. The
+    #: Animation Pane is an ``AXGroup`` and a window holds many, so the pane is
+    #: reached by naming it rather than by relaxing the container rule.
+    container_title: str | None = None
 
     def inside(self, title: str) -> Scope:
-        return Scope(self.window_title, self.container_role, self.descend + (title,))
+        return Scope(
+            self.window_title, self.container_role, self.descend + (title,), self.container_title
+        )
 
     def in_window(self, title: str) -> Scope:
         # A popup — ``Effect Options``, ``Path Animation``, ``Arrange`` — is a window of a
@@ -1237,7 +1388,10 @@ class Scope:
         return Scope(title, None, ())
 
     def describe(self) -> str:
-        parts = [self.window_title or "document window", self.container_role, *self.descend]
+        container = self.container_role
+        if container and self.container_title:
+            container = f"{container}[{self.container_title}]"
+        parts = [self.window_title or "document window", container, *self.descend]
         return " > ".join(part for part in parts if part)
 
 
@@ -1246,6 +1400,31 @@ RIBBON_SCOPE = Scope(container_role=RIBBON_ROLE)
 
 #: The Quick Access toolbar, which holds exactly one control this driver wants.
 TOOLBAR_SCOPE = Scope(container_role=TOOLBAR_ROLE)
+
+#: The Animation Pane's settings view, where the per-effect options live. Read
+#: 2026-11-02: PowerPoint for Mac 16.113.1 has **no** "Effect Options" dialog
+#: with Effect / Timing tabs. Those settings sit inline in the pane as
+#: collapsible sections under a scroll area, so the route is the pane itself and
+#: not a window — see ``computer-use.md``, "The per-effect settings surface".
+#:
+#: The pane's own tab is called ``Animations``, not "Animation Pane", and the
+#: ribbon control that opens it is a **switch**.
+ANIMATION_PANE_TAB = "Animations"
+ANIMATION_PANE_SWITCH = "Animation Pane"
+
+#: The four sections the 2026-11-02 read returned, each answering ``AXPress``.
+#: Which sections exist depends on the selection, so a section this driver asks
+#: for and does not find is a failure rather than a reason to look elsewhere.
+PANE_SECTIONS = ("Effect Options", "Timing", "Text Animations", "Triggers")
+
+#: The pane is an ``AXGroup`` titled ``Animations``, read 2026-11-02. It is
+#: named as a container for the same reason the ribbon and the Selection Pane
+#: are: a lookup that starts at the document window traverses every Selection
+#: Pane row on the way, and this surface is pressed once per target.
+ANIMATION_PANE_ROLE = "AXGroup"
+ANIMATION_PANE_SCOPE = Scope(
+    container_role=ANIMATION_PANE_ROLE, container_title=ANIMATION_PANE_TAB
+)
 
 #: What each container is called in a failure message, so "no AXTabGroup" reads as a
 #: statement about PowerPoint rather than about a role name.
@@ -1298,6 +1477,7 @@ def resolve_scope(backend: AXBackend, scope: Scope) -> AXNode:
             node = view.container(
                 scope.container_role,
                 what=CONTAINER_NAMES.get(scope.container_role, scope.container_role),
+                title=scope.container_title,
             )
     else:
         node = view.named_window(scope.window_title)
@@ -1306,6 +1486,7 @@ def resolve_scope(backend: AXBackend, scope: Scope) -> AXNode:
                 node,
                 scope.container_role,
                 what=CONTAINER_NAMES.get(scope.container_role, scope.container_role),
+                title=scope.container_title,
             )
     for title in scope.descend:
         node = _resolve_in(node, title)
@@ -1892,6 +2073,96 @@ def close_window(backend: AXBackend, title: str, *, timeout: float) -> str:
         what=f"the {title!r} window to close",
     )
     return "closed"
+
+
+def open_animation_pane(backend: AXBackend, *, timeout: float) -> str:
+    """Make the Animation Pane visible, and return how it got there.
+
+    The ribbon control is a **switch**, not a button, so pressing it when the
+    pane is already open closes it. The pane's own tab is checked for first and
+    the switch is only touched when the tab is absent.
+    """
+    view = held(backend)
+
+    def pane_open() -> bool:
+        view.stale()
+        try:
+            _resolve_in(resolve_scope(view, ANIMATION_PANE_SCOPE), ANIMATION_PANE_TAB)
+        except TargetFailure:
+            return False
+        return True
+
+    if pane_open():
+        return "alreadyOpen"
+    # `ensure_tab` takes a whole GUI path — the tab plus the control it is being
+    # activated for — so the switch is named here rather than the tab alone.
+    ensure_tab(backend, ("Animations", ANIMATION_PANE_SWITCH), timeout=timeout)
+    _resolve_in(resolve_scope(view, RIBBON_SCOPE), ANIMATION_PANE_SWITCH).press()
+    view.stale()
+    wait_until(backend, pane_open, timeout=timeout, what="the Animation Pane to open")
+    return "switched"
+
+
+def expand_pane_section(backend: AXBackend, section: str, *, timeout: float) -> str:
+    """Expand one Animation Pane settings section, and return how it got there.
+
+    A section is a disclosure whose value is ``"1"`` when open, so an already
+    open section is left alone: pressing it would close it and the control
+    underneath would then be unreachable rather than merely slow.
+    """
+    if section not in PANE_SECTIONS:
+        raise ControlNotFound(
+            f"{section!r} is not one of this build's Animation Pane sections {list(PANE_SECTIONS)}",
+            section=section,
+        )
+    view = held(backend)
+    scope = ANIMATION_PANE_SCOPE
+
+    def opened() -> bool:
+        view.stale()
+        return _resolve_in(resolve_scope(view, scope), section).value == "1"
+
+    if opened():
+        return "alreadyExpanded"
+    _resolve_in(resolve_scope(view, scope), section).press()
+    view.stale()
+    wait_until(backend, opened, timeout=timeout, what=f"the {section!r} section to expand")
+    return "expanded"
+
+
+def set_pane_checkbox(
+    backend: AXBackend, label: str, *, to: bool, timeout: float
+) -> dict[str, Any]:
+    """Set one Animation Pane checkbox, and report what it was and became.
+
+    The state is **read back** rather than assumed, because PowerPoint answers a
+    landed toggle with a timeout often enough that the press's own result cannot
+    be trusted: measured 2026-11-02, ``agent-desktop`` reported ``TIMEOUT``
+    (``ax_error -25204``) with the postcondition already satisfied.
+
+    A checkbox already in the asked-for state is left alone and reported as
+    such, so the caller can reject it rather than record a save that proves
+    nothing: pressing it would move it away from the value being measured.
+    """
+    view = held(backend)
+    scope = ANIMATION_PANE_SCOPE
+
+    def state() -> bool:
+        view.stale()
+        return _resolve_in(resolve_scope(view, scope), label).value == "1"
+
+    was = state()
+    if was is to:
+        return {"label": label, "was": was, "became": was, "pressed": False}
+    _resolve_in(resolve_scope(view, scope), label).press()
+    view.stale()
+    wait_until(
+        backend,
+        lambda: state() is to,
+        timeout=timeout,
+        what=f"{label!r} to read back as {'checked' if to else 'cleared'}",
+    )
+    return {"label": label, "was": was, "became": to, "pressed": True}
 
 
 def press_save(backend: AXBackend, document: Path, *, timeout: float) -> None:

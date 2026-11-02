@@ -1,0 +1,82 @@
+{
+  "record": "paneSettingMeasurement",
+  "application": "Microsoft PowerPoint",
+  "version": "16.113.1",
+  "platform": "macOS",
+  "mechanism": "gui_capture.py's pane-setting primitives against live PowerPoint: open the Animation Pane, expand a section, toggle a checkbox with the state read back, press Save in the Quick Access toolbar, then diff per-shape effect signatures",
+  "measuredAt": "2026-11-02",
+  "document": "a scratch deck carrying the seven Complex motion paths, one effect per shape",
+  "selectedEffect": {
+    "cTnId": "29",
+    "presetID": "48",
+    "presetClass": "path",
+    "spid": "14",
+    "note": "the Waves motion path, which is what the Animation Pane had selected"
+  },
+  "attribution": {
+    "finding": "the gate reported exactly one shape, spid 14, for each press, including the press that restructured the package",
+    "note": "this is the pane-setting gate rather than the gallery one: a pane setting edits the effect already on the shape, so the effect count does not move and the evidence is the effect's own signature instead"
+  },
+  "settings": {
+    "animation.timing.rewind": {
+      "control": "Animation Pane / Timing / Rewind when done playing",
+      "defaultChecked": false,
+      "element": "p:cTn",
+      "attribute": "fill",
+      "clearedValue": "hold",
+      "checkedValue": "remove",
+      "finding": "Rewind is not an added node. It changes the effect's existing fill from hold to remove, which is why a gate asking whether a shape gained an effect would have called the press a no-op.",
+      "evidence": {
+        "cleared": "<p:cTn id=\"29\" presetID=\"48\" presetClass=\"path\" presetSubtype=\"0\" fill=\"hold\" grpId=\"0\" nodeType=\"clickEffect\">",
+        "checked": "<p:cTn id=\"29\" presetID=\"48\" presetClass=\"path\" presetSubtype=\"0\" fill=\"remove\" grpId=\"0\" nodeType=\"clickEffect\">"
+      }
+    },
+    "animation.timing.bounceEnd": {
+      "control": "Animation Pane / Effect Options / Bounce End",
+      "defaultChecked": false,
+      "element": "p:cTn",
+      "attribute": "p14:presetBounceEnd",
+      "checkedValue": "50000",
+      "clearedForm": "the attribute is absent, and with it the whole mc:AlternateContent",
+      "finding": "Bounce End is an extension attribute, so PowerPoint wraps the timing tree in mc:AlternateContent to keep it readable by a consumer that does not know p14. Checking it adds the wrapper; clearing it removes the wrapper entirely.",
+      "alternateContent": {
+        "choice": {
+          "requires": "p14",
+          "cTn": {
+            "presetID": "48",
+            "presetClass": "path",
+            "presetSubtype": "0",
+            "fill": "remove",
+            "grpId": "0",
+            "nodeType": "clickEffect",
+            "p14:presetBounceEnd": "50000"
+          }
+        },
+        "fallback": {
+          "requires": null,
+          "cTn": {
+            "presetID": "48",
+            "presetClass": "path",
+            "presetSubtype": "0",
+            "fill": "remove",
+            "grpId": "0",
+            "nodeType": "clickEffect"
+          },
+          "note": "the same effect without the extension attribute, so a consumer that ignores p14 plays the motion path with no bounce"
+        }
+      }
+    }
+  },
+  "methodFindings": [
+    "The Animation Pane is an AXGroup titled 'Animations'. Role alone is not selective — a window holds many groups — so the driver's container rule needed a title as well as a role rather than a relaxation to a window walk.",
+    "The ribbon control that opens the pane is a switch, so pressing it when the pane is already open closes it. The pane's own tab is checked for first and the switch is only touched when the tab is absent.",
+    "A section is a disclosure whose value is \"1\" when open, so an already open section is left alone: pressing it would close it and the control underneath would become unreachable.",
+    "Save works through the Quick Access toolbar button and does not need focus, unlike the menubar route, whose refs cannot be pressed at all: the snapshot resolves the app as 'Microsoft PowerPoint' while the process owning the menubar reports 'PowerPoint', so a click returns STALE_REF on a source_process_identity mismatch.",
+    "Counting both mc:AlternateContent branches made one effect read as two, and the duplication is not stable — clearing Bounce End removed the wrapper, so every effect's signature list changed and all seven shapes reported a change for a press that touched one. Signatures now ignore the mc:Fallback branch, and the re-measurement reported exactly one shape."
+  ],
+  "notMeasured": {
+    "animation.afterAnimation.*": "the After animation popup is a selection, not a checkbox, so it needs a second target kind",
+    "animation.sound.*": "needs an audio part and a package relationship the writer does not create",
+    "animation.gallery.media.*": "needs a deck containing a video"
+  }
+}
