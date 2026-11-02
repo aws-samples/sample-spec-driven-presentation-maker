@@ -5,8 +5,9 @@
  * The process map: a new chat's process is reachable under the client id (C) and its kiro
  * session id (K, what the deck's `.session` stores); close and eviction drop every key of a
  * process; the size limit counts processes, not keys; a prompt to a session still answering
- * is refused; a turn ends with the answer to its session/prompt, whatever the sub-agent
- * sessions sent. kiro-cli is replaced by a fake child that answers the ACP requests.
+ * is refused; a turn ends with the answer to its session/prompt (result or error), whatever the
+ * sub-agent sessions or other requests sent. kiro-cli is replaced by a fake child that answers
+ * the ACP requests.
  */
 
 import { EventEmitter } from "events"
@@ -28,6 +29,8 @@ class FakeChild extends EventEmitter {
   killed = false
   prompts: number[] = []
   cancelled: string[] = []
+  /** Methods answered with a JSON-RPC error instead of a result. */
+  failing = new Set<string>()
   constructor(private readonly sessionId: string, private readonly lockedSessions: Set<string>) { super() }
 
   private send(msg: Record<string, unknown>) {
@@ -46,6 +49,7 @@ class FakeChild extends EventEmitter {
       this.update(req.params.sessionId as string, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "earlier" } })
       this.send({ id: req.id, result: {} })
     } else if (req.method === "session/prompt") this.prompts.push(req.id)
+    else if (this.failing.has(req.method)) this.send({ id: req.id, error: { message: "Internal error", data: `${req.method} failed` } })
     else this.send({ id: req.id, result: {} })
   }
 
@@ -64,6 +68,10 @@ class FakeChild extends EventEmitter {
 
   endTurn(stopReason = "end_turn") {
     this.send({ id: this.prompts.shift(), result: { stopReason } })
+  }
+
+  failPrompt() {
+    this.send({ id: this.prompts.shift(), error: { message: "Internal error", data: "model stream failed" } })
   }
 
   kill() {
@@ -223,6 +231,47 @@ describe("turn state", () => {
     await settle()
     expect(acp.isSessionRunning("C1")).toBe(false)
     await expect(acp.sendPrompt("C1", "after cancel")).resolves.toMatchObject({ sessionId: "K1" })
+  })
+
+  it("ends the turn when session/prompt is answered with an error, and accepts the next send", async () => {
+    await acp.createNewProcessFor("C1")
+    const child = children[0]
+    const prompted = await acp.sendPrompt("C1", "build the deck")
+    const errors: unknown[] = []
+    prompted.subscribe((msg) => { if (msg.error) errors.push(msg.error) })
+    prompted.send()
+    child.runSubagent("S1")
+    await settle()
+    expect(acp.isSessionRunning("C1")).toBe(true)
+
+    child.failPrompt()
+    await settle()
+    expect(errors).toHaveLength(1)
+    expect(acp.isSessionRunning("C1")).toBe(false)
+    expect(acp.isSessionRunning("K1")).toBe(false)
+
+    // No SessionBusyError (→ 409): the failed prompt released the session.
+    await turn(child, "K1")
+    expect(acp.isSessionRunning("K1")).toBe(false)
+    expect(spawn).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps the turn running when another request fails mid-turn, until the prompt is answered", async () => {
+    await acp.createNewProcessFor("C1")
+    const child = children[0]
+    child.failing.add("session/set_config_option")
+    const prompted = await acp.sendPrompt("C1", "build the deck")
+    prompted.send()
+    await settle()
+
+    await expect(acp.setConfigOption("C1", "model", "unknown")).rejects.toThrow(/session\/set_config_option failed/)
+    await settle()
+    expect(acp.isSessionRunning("C1")).toBe(true)
+    await expect(acp.sendPrompt("C1", "again")).rejects.toThrow(/still answering/)
+
+    child.endTurn()
+    await settle()
+    expect(acp.isSessionRunning("C1")).toBe(false)
   })
 })
 
