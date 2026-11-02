@@ -310,7 +310,7 @@ slides.
 | `behaviors` | The advanced form: an explicit list of PowerPoint behavior primitives. See below. |
 | `start` | `{"type", "delayMs", "target"}`. See *Triggers*. |
 | `timing` | See *Timing*. |
-| `afterEffect` | `{"type": "none"}`. Any other value is refused — see *Not authorable today*. |
+| `afterEffect` | `{"type": "none"}` (the default), `"hide"`, `"hideOnNextClick"` or `"dim"`. A `dim` may carry `"color": "#RRGGBB"`. |
 | `sound` | Must be `null`. Refused — see *Not authorable today*. |
 | `text` | Paragraph/word/character build options. See *Builds*. |
 | `chart.build` | Chart build. See *Builds*. |
@@ -542,12 +542,48 @@ be written at any duration once an option names one.
 | `acceleration` | `0`–`1` fraction of the duration spent accelerating. | yes |
 | `deceleration` | `0`–`1` fraction spent decelerating. | yes |
 | `restart` | `always` / `whenNotActive` / `never`. | yes |
-| `rewind` | Boolean. | **no** |
-| `smoothStart` | Boolean. | **no** |
-| `smoothEnd` | Boolean. | **no** |
-| `bounceEnd` | Non-negative number. | **no** |
+| `rewind` | Boolean. Writes `p:cTn/@fill="remove"` in place of the default `hold`. | yes |
+| `smoothStart` | Boolean. | **no** — use `acceleration` |
+| `smoothEnd` | Boolean. | **no** — use `deceleration` |
+| `bounceEnd` | `0`–`1` fraction, like `acceleration`. | **no** |
 
-A truthy value in one of the last four is refused by catalog key, not ignored.
+`smoothStart` and `smoothEnd` are not missing features. They are the Animation Pane's names
+for `p:cTn/@accel` and `@decel` at `50000`, which is `acceleration` / `deceleration` set to
+`0.5` — measured 2026-11-02. Asking for either one is refused with the field to use instead.
+
+`bounceEnd` is refused, and the reason is the markup rather than the value: measured, it is
+`p:cTn/@p14:presetBounceEnd` at `50000`, and PowerPoint pairs that extension attribute with
+an `mc:AlternateContent` fallback branch this writer cannot emit. So it is a `0`–`1` fraction
+like the other two percentages, not a duration.
+
+### After animation
+
+What the shape does once its effect has played. The pane calls it *After animation*; the
+default is `none`, which writes nothing at all.
+
+```json
+{"afterEffect": {"type": "dim", "color": "#808080"}}
+```
+
+| `type` | What it does | What it writes |
+|---|---|---|
+| `none` | nothing; the shape stays as the effect left it | no markup — the whole `p:subTnLst` is absent |
+| `hide` | hides the shape when **this effect** finishes | `p:set` on `style.visibility`, `masterRel="sameClick"` |
+| `hideOnNextClick` | hides it on the next click | `p:set` on `style.visibility`, `masterRel="nextClick"` |
+| `dim` | recolours it | `p:animClr` on `ppt_c` |
+
+`color` applies only to `dim`, and it is the only field that changes what a `dim` writes:
+with it the colour is `a:srgbClr` with your hex, without it a scheme colour. On `none`, which
+writes no node at all, or on either hide value, which animates `style.visibility`, there is
+nowhere for a colour to go — so a colour there is rejected rather than quietly dropped.
+
+Two details worth knowing, both measured on PowerPoint for Mac 16.113.1 (2026-11-02):
+
+* An unqualified `dim` writes `a:schemeClr val="accent2"`. That is the scheme colour the
+  pane's `Accent Scheme Color` swatch writes — **not** `accent1` — and it is the only one of
+  the eight swatches that was measured. State `color` if you need a specific colour.
+* Only `hide` carries a start condition, because it has to wait for its own effect to end,
+  and that condition names the effect's own timing-node id. Nothing in your JSON controls it.
 
 ### Builds — text, chart, SmartArt
 
@@ -628,16 +664,11 @@ substitution would lose the user's setting.
 
 | Setting | Catalog key |
 |---|---|
-| After animation: dim | `animation.afterAnimation.dim` |
-| After animation: dim colour | `animation.afterAnimation.dimColor` |
-| After animation: hide after animation | `animation.afterAnimation.hide` |
-| After animation: hide on next click | `animation.afterAnimation.hideOnNextClick` |
 | Media bookmark as a start trigger | `animation.media.bookmarkTrigger` |
 | Effect sound | `animation.sound.effect` |
 | Stop previous sound | `animation.sound.stopPreviousSound` |
 | Trigger "with no trigger" | `animation.start.none` |
 | Timing: bounce end | `animation.timing.bounceEnd` |
-| Timing: rewind when done playing | `animation.timing.rewind` |
 | Timing: smooth end | `animation.timing.smoothEnd` |
 | Timing: smooth start | `animation.timing.smoothStart` |
 | Transition sound | `transition.sound.effect` |
@@ -654,9 +685,6 @@ slide 'intro': mainSequence[0].timing.smoothStart cannot be generated: catalog e
 'animation.timing.smoothStart' is semantic-preservation-only (<recorded gap>).
 Capture it with the PowerPoint oracle (Task 8); sdpm refuses to approximate it.
 ```
-
-`afterEffect.color` (the dim colour) is refused on its own key, `animation.afterAnimation.dimColor`,
-even when `afterEffect.type` is left at `none`.
 
 A sound needs an audio part plus a package relationship the writer does not create, so
 `sound` must stay `null` on both an effect and a transition. The shape is validated when

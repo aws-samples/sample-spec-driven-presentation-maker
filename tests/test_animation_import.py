@@ -508,5 +508,111 @@ def test_a_still_deck_gets_no_animation_keys_and_no_logical_ids(tmp_path):
     assert not (tmp_path / "out" / "animations").exists()
 
 
+@pytest.mark.parametrize(
+    "after",
+    [
+        {"type": "none"},
+        {"type": "hide"},
+        {"type": "hideOnNextClick"},
+        {"type": "dim"},
+        {"type": "dim", "color": "#808080"},
+    ],
+    ids=["none", "hide", "hideOnNextClick", "dim", "dimColor"],
+)
+def test_an_after_animation_value_comes_back_as_it_went_in(tmp_path, after):
+    """Each of the five, written and read, compared as the JSON.
+
+    The two pairs are what make this worth parametrising rather than asserting
+    once: ``hide`` and ``hideOnNextClick`` differ by a single attribute, and so
+    do ``dim`` and ``dimColor``, so a reader that recognised the node and not
+    the distinguishing attribute would return the wrong member of the pair and
+    still look like it worked.
+    """
+    package = _package(tmp_path, _slide(animations={
+        "mainSequence": [_effect(afterEffect=after)],
+        "interactiveSequences": [],
+    }))
+    motion = _read(package)
+    assert motion.raw_timing is None, (
+        "a measured after-effect must not fall to raw replay"
+    )
+    assert motion.animations["mainSequence"][0]["afterEffect"] == after
+
+
+def test_an_unqualified_dim_does_not_come_back_carrying_a_colour(tmp_path):
+    """Because it writes one, and reporting it would change the document.
+
+    An unqualified ``dim`` writes ``a:schemeClr val="accent2"`` — the one swatch
+    that was measured. Reading that back as ``{"type": "dim", "color": ...}``
+    would hand back JSON that differs from the JSON that produced the package
+    while writing the same bytes, which is the failure the round-trip gate
+    exists to catch.
+    """
+    package = _package(tmp_path, _slide(animations={
+        "mainSequence": [_effect(afterEffect={"type": "dim"})],
+        "interactiveSequences": [],
+    }))
+    assert "accent2" in _slide_xml(package)
+    motion = _read(package)
+    assert motion.animations["mainSequence"][0]["afterEffect"] == {"type": "dim"}
+
+
+def test_a_dim_to_an_unmeasured_scheme_colour_is_kept_raw_rather_than_flattened(tmp_path):
+    """The seven swatches nobody measured are the decks this protects.
+
+    Only ``accent2`` inverts, because it is the only swatch whose mapping was
+    measured. Mapping any other scheme colour to a bare ``dim`` would silently
+    drop which colour the deck dims to — so the effect falls to raw replay,
+    which keeps it.
+    """
+    package = _package(tmp_path, _slide(animations={
+        "mainSequence": [_effect(afterEffect={"type": "dim"})],
+        "interactiveSequences": [],
+    }))
+
+    def repoint(slide):
+        for node in slide.iter():
+            if node.tag.endswith("}schemeClr") and node.get("val") == "accent2":
+                node.set("val", "accent4")
+
+    _mutate(package, repoint)
+    motion = _read(package)
+    assert motion.animations is None, "it did not invert"
+    assert motion.raw_timing is not None, (
+        "an unmeasured scheme colour is preserved raw, not flattened to a bare dim"
+    )
+    assert b"accent4" in motion.raw_timing.xml
+
+
+def test_rewind_round_trips_through_the_fill_attribute(tmp_path):
+    """And its default does not come back as an explicit false.
+
+    ``@fill`` is ``hold`` unless Rewind is on, so a reader that reported
+    ``rewind: False`` for the default would add a key the input did not carry.
+    """
+    for timing, expected in (
+        ({"durationMs": 500}, {"durationMs": 500}),
+        ({"durationMs": 500, "rewind": True}, {"durationMs": 500, "rewind": True}),
+    ):
+        package = _package(
+            tmp_path,
+            _slide(animations={
+                "mainSequence": [_effect(timing=timing)],
+                "interactiveSequences": [],
+            }),
+            name=f"rewind-{'on' if timing.get('rewind') else 'off'}.pptx",
+        )
+        motion = _read(package)
+        assert motion.raw_timing is None
+        assert motion.animations["mainSequence"][0]["timing"] == expected
+
+
+def _slide_xml(path):
+    from lxml import etree
+
+    slide = list(Presentation(str(path)).slides)[0]
+    return etree.tostring(slide._element).decode()
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

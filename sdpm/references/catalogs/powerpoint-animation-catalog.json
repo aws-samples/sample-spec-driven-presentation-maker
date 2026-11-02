@@ -314,7 +314,7 @@
     {
       "key": "animation.afterAnimation.dim",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
+      "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "animations": {
           "mainSequence": [
@@ -355,23 +355,25 @@
       },
       "ooxml": {
         "strategy": "afterEffect",
-        "candidateElements": [
-          "p:animClr",
-          "p:cTn/@afterEffect"
+        "elements": [
+          "p:subTnLst/p:animClr",
+          "p:animClr/p:cBhvr/p:cTn/@afterEffect",
+          "p:to/a:schemeClr/@val"
         ],
-        "requiresCapture": true,
-        "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8"
+        "note": "p:subTnLst/p:animClr[@clrSpc='rgb'][@dir='cw'] animating ppt_c, with p:cBhvr/@override='childStyle' and p:cTn dur='1' fill='hold' display='0' masterRel='nextClick' afterEffect='1'. The colour is p:to/a:schemeClr for a scheme swatch and p:to/a:srgbClr for an explicit colour; those are the only two things that differ between dim and dimColor. Measured: the Accent Scheme Color swatch writes accent2, not accent1, so the other seven swatch mappings are not inferred from labels."
       },
       "evidence": {
-        "source": "ECMA-376 CT_TLCommonTimeNodeData/@afterEffect",
-        "commit": null
+        "source": "Animation Pane measurement through scripts/animation_catalog/gui_capture.py",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/after-effects-2026-11-02/after-effects.json",
+        "capturedApplicationVersion": "16.113.1"
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "nativeCapture"
     },
     {
       "key": "animation.afterAnimation.dimColor",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
+      "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "animations": {
           "mainSequence": [
@@ -414,20 +416,23 @@
       "ooxml": {
         "strategy": "behavior",
         "elements": [
-          "p:animClr"
+          "p:subTnLst/p:animClr",
+          "p:to/a:srgbClr/@val"
         ],
-        "gap": "the dim colour node PowerPoint writes after the effect is not captured here"
+        "note": "measured 2026-11-02 through the pane's 'More Colors...' item, which opens a Colors window. The node is the same p:animClr the scheme swatches write; the only difference is the colour child, p:to/a:srgbClr instead of a:schemeClr. Corroborated: the Colors window's own colour well read rgb 0.752941 0.313725 0.301961, which is 192, 80, 77 -- exactly the C0504D that was written, so the value was read back rather than chosen"
       },
       "evidence": {
-        "source": "PowerPoint 16.113.1 ribbon/dialog surface",
-        "commit": null
+        "source": "Animation Pane measurement through scripts/animation_catalog/gui_capture.py",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/after-effects-2026-11-02/after-effects.json",
+        "capturedApplicationVersion": "16.113.1"
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "nativeCapture"
     },
     {
       "key": "animation.afterAnimation.hide",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
+      "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "animations": {
           "mainSequence": [
@@ -468,22 +473,25 @@
       },
       "ooxml": {
         "strategy": "afterEffect",
-        "candidateElements": [
-          "p:set"
+        "elements": [
+          "p:subTnLst/p:set",
+          "p:set/p:cBhvr/p:cTn/@masterRel",
+          "p:to/p:strVal/@val"
         ],
-        "requiresCapture": true,
-        "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8"
+        "note": "p:subTnLst/p:set animating style.visibility to 'hidden', with p:cBhvr/@override='childStyle' and p:cTn dur='1' fill='hold' display='0' masterRel='sameClick' afterEffect='1'. Only this value carries a start condition: p:stCondLst/p:cond[@evt='end'][@delay='0']/p:tn/@val names the effect's OWN p:cTn id, because hiding after animation has to wait for that effect to end."
       },
       "evidence": {
-        "source": "ECMA-376 CT_TLCommonTimeNodeData/@afterEffect",
-        "commit": null
+        "source": "Animation Pane measurement through scripts/animation_catalog/gui_capture.py",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/after-effects-2026-11-02/after-effects.json",
+        "capturedApplicationVersion": "16.113.1"
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "nativeCapture"
     },
     {
       "key": "animation.afterAnimation.hideOnNextClick",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
+      "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "animations": {
           "mainSequence": [
@@ -524,18 +532,20 @@
       },
       "ooxml": {
         "strategy": "afterEffect",
-        "candidateElements": [
-          "p:set",
-          "p:cTn/@afterEffect"
+        "elements": [
+          "p:subTnLst/p:set",
+          "p:set/p:cBhvr/p:cTn/@masterRel",
+          "p:to/p:strVal/@val"
         ],
-        "requiresCapture": true,
-        "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8"
+        "note": "p:subTnLst/p:set animating style.visibility to 'hidden', identical to the hide form except masterRel='nextClick' and no p:stCondLst — the hide waits for the audience rather than for the effect. masterRel is the single attribute separating the two."
       },
       "evidence": {
-        "source": "ECMA-376 CT_TLCommonTimeNodeData/@afterEffect",
-        "commit": null
+        "source": "Animation Pane measurement through scripts/animation_catalog/gui_capture.py",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/after-effects-2026-11-02/after-effects.json",
+        "capturedApplicationVersion": "16.113.1"
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "nativeCapture"
     },
     {
       "key": "animation.afterAnimation.none",
@@ -581,7 +591,7 @@
       },
       "ooxml": {
         "strategy": "afterEffect",
-        "candidateElements": []
+        "note": "no markup at all: clearing the pane's After animation to Don't Dim removes the whole p:subTnLst rather than leaving an empty one, so the default is an absence."
       },
       "evidence": {
         "source": "office-kit/pptx",
@@ -51999,7 +52009,7 @@
                 "rewind": false,
                 "smoothStart": false,
                 "smoothEnd": false,
-                "bounceEnd": 300
+                "bounceEnd": 0.5
               },
               "afterEffect": {
                 "type": "none"
@@ -52011,12 +52021,12 @@
         }
       },
       "ooxml": {
-        "strategy": "behavior",
-        "elements": [
-          "p:animScale",
-          "p:anim"
+        "strategy": "attribute",
+        "attributes": [
+          "p:cTn/@p14:presetBounceEnd",
+          "p:animMotion/@p14:bounceEnd"
         ],
-        "gap": "Bounce end is synthesised from extra behaviours; the exact native form is not captured here"
+        "gap": "measured 2026-11-02 as p14:presetBounceEnd=\"50000\" on the effect's p:cTn plus p14:bounceEnd on its motion behaviour -- NOT the synthesised p:animScale/p:anim behaviours the catalog had guessed. The value is established; what is missing is the markup around it. PowerPoint wraps the whole timing tree in mc:AlternateContent (mc:Choice Requires=\"p14\" carrying the attribute, mc:Fallback holding the same effect without it) and this writer emits no mc:AlternateContent anywhere, so writing the extension attribute alone would drop the fallback branch PowerPoint pairs it with"
       },
       "evidence": {
         "source": "PowerPoint 16.113.1 ribbon/dialog surface",
@@ -52470,7 +52480,7 @@
     {
       "key": "animation.timing.rewind",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
+      "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "animations": {
           "mainSequence": [
@@ -52512,16 +52522,17 @@
       "ooxml": {
         "strategy": "attribute",
         "attributes": [
-          "p:cTn/@fill",
-          "p:cTn/@autoRev"
+          "p:cTn/@fill"
         ],
-        "gap": "the attribute PowerPoint 16.113.1 writes for Rewind when done playing is not captured here"
+        "note": "measured 2026-11-02: checking 'Rewind when done playing' changed the effect's existing fill from 'hold' to 'remove' and touched no other attribute. The catalog had listed @autoRev as the other candidate; it is not involved, and it already carries animation.timing.autoReverse, so writing both would conflate two independent settings. Because this moves an existing attribute rather than adding a node, a gate asking whether the shape gained anything reads the press as a no-op"
       },
       "evidence": {
-        "source": "PowerPoint 16.113.1 ribbon/dialog surface",
-        "commit": null
+        "source": "Animation Pane measurement through scripts/animation_catalog/gui_capture.py",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/timing-rewind-bounce-2026-11-02/timing-rewind-bounce.json",
+        "capturedApplicationVersion": "16.113.1"
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "nativeCapture"
     },
     {
       "key": "animation.timing.smoothEnd",
@@ -67699,7 +67710,7 @@
     {
       "key": "MsoAnimAfterEffect.dim",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
+      "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "animations": {
           "mainSequence": [
@@ -67741,17 +67752,18 @@
       "ooxml": {
         "strategy": "afterEffect",
         "candidateElements": [
-          "p:animClr",
-          "p:cTn/@afterEffect"
-        ],
-        "requiresCapture": true,
-        "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8"
+          "p:subTnLst/p:animClr",
+          "p:animClr/p:cBhvr/p:cTn/@afterEffect",
+          "p:to/a:schemeClr/@val"
+        ]
       },
       "evidence": {
-        "source": "ECMA-376 CT_TLCommonTimeNodeData/@afterEffect",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/entrance/01-appear.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "powerPointReadBackRequired",
+      "verification": "nativeCapture",
       "guiKey": "animation.afterAnimation.dim",
       "enum": "MsoAnimAfterEffect",
       "enumerator": "dim",
@@ -67760,7 +67772,7 @@
     {
       "key": "MsoAnimAfterEffect.hide",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
+      "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "animations": {
           "mainSequence": [
@@ -67802,16 +67814,18 @@
       "ooxml": {
         "strategy": "afterEffect",
         "candidateElements": [
-          "p:set"
-        ],
-        "requiresCapture": true,
-        "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8"
+          "p:subTnLst/p:set",
+          "p:set/p:cBhvr/p:cTn/@masterRel",
+          "p:to/p:strVal/@val"
+        ]
       },
       "evidence": {
-        "source": "ECMA-376 CT_TLCommonTimeNodeData/@afterEffect",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/entrance/01-appear.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "powerPointReadBackRequired",
+      "verification": "nativeCapture",
       "guiKey": "animation.afterAnimation.hide",
       "enum": "MsoAnimAfterEffect",
       "enumerator": "hide",
@@ -67820,7 +67834,7 @@
     {
       "key": "MsoAnimAfterEffect.hide on next click",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
+      "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "animations": {
           "mainSequence": [
@@ -67862,17 +67876,18 @@
       "ooxml": {
         "strategy": "afterEffect",
         "candidateElements": [
-          "p:set",
-          "p:cTn/@afterEffect"
-        ],
-        "requiresCapture": true,
-        "gap": "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; the listed ECMA-376 elements are the candidates to verify in Task 8"
+          "p:subTnLst/p:set",
+          "p:set/p:cBhvr/p:cTn/@masterRel",
+          "p:to/p:strVal/@val"
+        ]
       },
       "evidence": {
-        "source": "ECMA-376 CT_TLCommonTimeNodeData/@afterEffect",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/entrance/01-appear.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "powerPointReadBackRequired",
+      "verification": "nativeCapture",
       "guiKey": "animation.afterAnimation.hideOnNextClick",
       "enum": "MsoAnimAfterEffect",
       "enumerator": "hide on next click",

@@ -763,11 +763,66 @@ LEVEL_MAP: dict[str, tuple[str, str, dict[str, str], str]] = {
 }
 
 #: MsoAnimAfterEffect -> semantic afterEffect.type.
+#: MsoAnimAfterEffect -> the after-animation values and the OOXML each writes.
+#:
+#: Measured 2026-11-02 (``after-effects-2026-11-02``). The elements are now the
+#: measured path rather than a candidate list, and the finding is where they
+#: sit: an after-animation value is a child of **``p:subTnLst``**, the sibling of
+#: ``p:childTnLst`` that holds the effect's own behaviour. The old candidates
+#: named ``p:cTn/@afterEffect``, which does appear — on that nested node, not on
+#: the effect — so the guess was right about the attribute and wrong about the
+#: level it lives at, which is exactly the kind of thing only a capture settles.
 AFTER_EFFECT_MAP: dict[str, tuple[str, list[str], str]] = {
     "no after effect": ("none", [], NATIVE),
-    "dim": ("dim", ["p:animClr", "p:cTn/@afterEffect"], SEMANTIC),
-    "hide": ("hide", ["p:set"], SEMANTIC),
-    "hide on next click": ("hideOnNextClick", ["p:set", "p:cTn/@afterEffect"], SEMANTIC),
+    "dim": (
+        "dim",
+        ["p:subTnLst/p:animClr", "p:animClr/p:cBhvr/p:cTn/@afterEffect", "p:to/a:schemeClr/@val"],
+        NATIVE,
+    ),
+    "hide": (
+        "hide",
+        ["p:subTnLst/p:set", "p:set/p:cBhvr/p:cTn/@masterRel", "p:to/p:strVal/@val"],
+        NATIVE,
+    ),
+    "hide on next click": (
+        "hideOnNextClick",
+        ["p:subTnLst/p:set", "p:set/p:cBhvr/p:cTn/@masterRel", "p:to/p:strVal/@val"],
+        NATIVE,
+    ),
+}
+
+#: The measurement every after-animation and Rewind entry cites.
+AFTER_EFFECT_EVIDENCE_DIR = (
+    REPO_ROOT / "tests/fixtures/animations/gui-only/after-effects-2026-11-02"
+)
+AFTER_EFFECT_EVIDENCE_FILE = "after-effects.json"
+
+#: What each measured value writes, for the catalog's own note.
+AFTER_EFFECT_NOTES: dict[str, str] = {
+    "dim": (
+        "p:subTnLst/p:animClr[@clrSpc='rgb'][@dir='cw'] animating ppt_c, with "
+        "p:cBhvr/@override='childStyle' and p:cTn dur='1' fill='hold' display='0' "
+        "masterRel='nextClick' afterEffect='1'. The colour is p:to/a:schemeClr for a scheme "
+        "swatch and p:to/a:srgbClr for an explicit colour; those are the only two things that "
+        "differ between dim and dimColor. Measured: the Accent Scheme Color swatch writes "
+        "accent2, not accent1, so the other seven swatch mappings are not inferred from labels."
+    ),
+    "hide": (
+        "p:subTnLst/p:set animating style.visibility to 'hidden', with "
+        "p:cBhvr/@override='childStyle' and p:cTn dur='1' fill='hold' display='0' "
+        "masterRel='sameClick' afterEffect='1'. Only this value carries a start condition: "
+        "p:stCondLst/p:cond[@evt='end'][@delay='0']/p:tn/@val names the effect's OWN p:cTn id, "
+        "because hiding after animation has to wait for that effect to end."
+    ),
+    "hideOnNextClick": (
+        "p:subTnLst/p:set animating style.visibility to 'hidden', identical to the hide form "
+        "except masterRel='nextClick' and no p:stCondLst — the hide waits for the audience "
+        "rather than for the effect. masterRel is the single attribute separating the two."
+    ),
+    "none": (
+        "no markup at all: clearing the pane's After animation to Don't Dim removes the whole "
+        "p:subTnLst rather than leaving an empty one, so the default is an absence."
+    ),
 }
 
 #: MsoAnimType -> the nine behavior primitives and their OOXML elements.
@@ -1314,9 +1369,15 @@ CONTROL_ITEMS: tuple[tuple[str, str, str, dict[str, Any] | None, dict[str, Any] 
     (
         "animation.timing.rewind",
         "accepted",
-        SEMANTIC,
-        {"strategy": "attribute", "attributes": ["p:cTn/@fill", "p:cTn/@autoRev"],
-         "gap": "the attribute PowerPoint 16.113.1 writes for Rewind when done playing is not captured here"},
+        NATIVE,
+        {"strategy": "attribute", "attributes": ["p:cTn/@fill"],
+         "note": "measured 2026-11-02: checking 'Rewind when done playing' changed the effect's "
+                 "existing fill from 'hold' to 'remove' and touched no other attribute. The "
+                 "catalog had listed @autoRev as the other candidate; it is not involved, and it "
+                 "already carries animation.timing.autoReverse, so writing both would conflate "
+                 "two independent settings. Because this moves an existing attribute rather than "
+                 "adding a node, a gate asking whether the shape gained anything reads the press "
+                 "as a no-op"},
         effect_semantic(timing={"rewind": True}),
         None,
     ),
@@ -1358,9 +1419,16 @@ CONTROL_ITEMS: tuple[tuple[str, str, str, dict[str, Any] | None, dict[str, Any] 
         "animation.timing.bounceEnd",
         "accepted",
         SEMANTIC,
-        {"strategy": "behavior", "elements": ["p:animScale", "p:anim"],
-         "gap": "Bounce end is synthesised from extra behaviours; the exact native form is not captured here"},
-        effect_semantic(timing={"bounceEnd": 300}),
+        {"strategy": "attribute", "attributes": ["p:cTn/@p14:presetBounceEnd", "p:animMotion/@p14:bounceEnd"],
+         "gap": "measured 2026-11-02 as p14:presetBounceEnd=\"50000\" on the effect's p:cTn plus "
+                "p14:bounceEnd on its motion behaviour -- NOT the synthesised p:animScale/p:anim "
+                "behaviours the catalog had guessed. The value is established; what is missing is "
+                "the markup around it. PowerPoint wraps the whole timing tree in "
+                "mc:AlternateContent (mc:Choice Requires=\"p14\" carrying the attribute, "
+                "mc:Fallback holding the same effect without it) and this writer emits no "
+                "mc:AlternateContent anywhere, so writing the extension attribute alone would "
+                "drop the fallback branch PowerPoint pairs it with"},
+        effect_semantic(timing={"bounceEnd": 0.5}),
         None,
     ),
     (
@@ -1398,9 +1466,14 @@ CONTROL_ITEMS: tuple[tuple[str, str, str, dict[str, Any] | None, dict[str, Any] 
     (
         "animation.afterAnimation.dimColor",
         "accepted",
-        SEMANTIC,
-        {"strategy": "behavior", "elements": ["p:animClr"],
-         "gap": "the dim colour node PowerPoint writes after the effect is not captured here"},
+        NATIVE,
+        {"strategy": "behavior", "elements": ["p:subTnLst/p:animClr", "p:to/a:srgbClr/@val"],
+         "note": "measured 2026-11-02 through the pane's 'More Colors...' item, which opens a "
+                 "Colors window. The node is the same p:animClr the scheme swatches write; the "
+                 "only difference is the colour child, p:to/a:srgbClr instead of a:schemeClr. "
+                 "Corroborated: the Colors window's own colour well read rgb 0.752941 0.313725 "
+                 "0.301961, which is 192, 80, 77 -- exactly the C0504D that was written, so the "
+                 "value was read back rather than chosen"},
         effect_semantic(afterEffect={"type": "dim", "color": "#808080"}),
         None,
     ),
@@ -1550,6 +1623,27 @@ def read_sdef_enum_codes(path: Path) -> dict[str, str]:
         enumeration.get("name") or "": enumeration.get("code") or ""
         for enumeration in root.iter("enumeration")
         if enumeration.get("name") in CANDIDATE_ENUMS
+    }
+
+
+def pane_evidence(directory: Path, name: str) -> dict[str, Any]:
+    """Return the provenance record for one Animation Pane measurement.
+
+    The sibling of :func:`native_evidence`, for values that have no captured
+    native *package* because they are not applied by a gallery tile: they are
+    set in the Animation Pane, one press and one save at a time, and the
+    evidence is the measurement record rather than a fixture slide. The fixture
+    path is still a real checked-in file, which is what the catalog's own
+    "a native template names its fixture" rule asks for.
+    """
+    fixture = (directory / name).relative_to(REPO_ROOT)
+    if not (directory / name).is_file():
+        raise SystemExit(f"pane measurement {fixture} is missing")
+    return {
+        "source": "Animation Pane measurement through scripts/animation_catalog/gui_capture.py",
+        "commit": None,
+        "fixture": str(fixture),
+        "capturedApplicationVersion": BASELINE_VERSION,
     }
 
 
@@ -1744,6 +1838,15 @@ CONTROL_EVIDENCE: dict[str, dict[str, Any]] = {
     "animation.timing.durationMs": native_evidence("05-fly-in", "animations/entrance"),
     "animation.timing.delayMs": native_evidence("05-fly-in", "animations/entrance"),
     "animation.timing.autoReverse": native_evidence("87-pulse", "animations/emphasis"),
+    # Measured in the Animation Pane rather than applied by a gallery tile, so
+    # the evidence is the measurement record; see :func:`pane_evidence`.
+    "animation.timing.rewind": pane_evidence(
+        REPO_ROOT / "tests/fixtures/animations/gui-only/timing-rewind-bounce-2026-11-02",
+        "timing-rewind-bounce.json",
+    ),
+    "animation.afterAnimation.dimColor": pane_evidence(
+        AFTER_EFFECT_EVIDENCE_DIR, AFTER_EFFECT_EVIDENCE_FILE
+    ),
     "animation.timing.triggerTarget": {
         "source": NATIVE_REPO, "commit": NATIVE_COMMIT,
         "fixture": "test/fixtures/native-media-interactive-timing.xml",
@@ -1929,18 +2032,29 @@ def enum_value_items(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict[
         ))
 
     for name, (semantic, elements, level) in AFTER_EFFECT_MAP.items():
-        ooxml: dict[str, Any] = {"strategy": "afterEffect", "candidateElements": elements}
+        ooxml: dict[str, Any] = {"strategy": "afterEffect"}
+        if elements:
+            ooxml["elements"] = elements
+        if semantic in AFTER_EFFECT_NOTES:
+            ooxml["note"] = AFTER_EFFECT_NOTES[semantic]
         if level != NATIVE:
             ooxml["requiresCapture"] = True
             ooxml["gap"] = (
                 "the node PowerPoint 16.113.1 writes for this After animation value is not captured here; "
                 "the listed ECMA-376 elements are the candidates to verify in Task 8"
             )
+        # ``none`` is still the native-fixture one: it writes nothing, so the
+        # evidence that it writes nothing is a captured package rather than a
+        # pane measurement.
+        evidence = (
+            native_evidence("01-appear", "animations/entrance")
+            if semantic == "none"
+            else pane_evidence(AFTER_EFFECT_EVIDENCE_DIR, AFTER_EFFECT_EVIDENCE_FILE)
+        )
         items.append(_accepted(
             f"animation.afterAnimation.{semantic}", level, ooxml,
             effect_semantic(afterEffect={"type": semantic}),
-            native_evidence("01-appear", "animations/entrance") if level == NATIVE
-            else {"source": "ECMA-376 CT_TLCommonTimeNodeData/@afterEffect", "commit": None},
+            evidence,
         ))
 
     for name, (semantic, element, level) in BEHAVIOR_MAP.items():

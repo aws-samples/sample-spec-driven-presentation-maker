@@ -122,6 +122,25 @@ SDPM_EFFECT_EXT_URI = "{8C4F5A2E-91D3-4B7A-8F1E-2A6D0B93C57D}"
 #: 100000. The JSON model carries a 0..1 fraction.
 PERCENT_SCALE = 100_000
 
+#: The four after-animation values, as ``type -> (node, animated attribute)``.
+#: Measured 2026-11-02; see :meth:`TimingWriter._write_after_effect`. Three
+#: entries for four values because ``dim`` and ``dimColor`` are the **same** node
+#: and differ only in the colour child — a ``dim`` carrying a ``color`` is the
+#: ``dimColor`` catalog key.
+AFTER_EFFECT_WRITERS: dict[str, tuple[str, str]] = {
+    "hide": ("p:set", "style.visibility"),
+    "hideOnNextClick": ("p:set", "style.visibility"),
+    "dim": ("p:animClr", "ppt_c"),
+}
+
+#: The scheme colour an unqualified ``afterEffect: {"type": "dim"}`` writes.
+#:
+#: Measured, not chosen: the pane's ``Accent Scheme Color`` swatch wrote
+#: ``accent2``. It is **not** ``accent1``, which is the whole reason the other
+#: seven swatch-to-scheme mappings are recorded as unmeasured rather than
+#: inferred from their labels.
+MEASURED_DIM_SCHEME_COLOR = "accent2"
+
 #: ``p:cTn/@repeatCount`` counts in thousandths of a repetition.
 REPEAT_SCALE = 1000
 
@@ -1140,7 +1159,10 @@ class TimingWriter:
         timing = _object(effect.get("timing"), f"slide {self.slide_slug!r}: {label}.timing")
         self._refuse_unwritten_timing(timing, label)
         after = _object(effect.get("afterEffect"), f"slide {self.slide_slug!r}: {label}.afterEffect")
-        self._refuse_unwritten_after_effect(after, label)
+        # Checked here, written after the behaviours: p:subTnLst follows
+        # p:childTnLst in CT_TLCommonTimeNodeData, but a request this writer
+        # would answer wrongly has to fail before any of it is built.
+        self._check_after_effect(after, label)
         if effect.get("sound") is not None:
             refuse_unimplemented(
                 self.index,
@@ -1209,6 +1231,10 @@ class TimingWriter:
                 "p:childTnLst would be empty and PowerPoint would reject the package"
             )
         ctn.append(children)
+        # After p:childTnLst, which is the order CT_TLCommonTimeNodeData fixes.
+        self._write_after_effect(
+            ctn, after, spid=spid, target=target, ctn_id=ctn_id, label=label
+        )
 
         self._register_builds(spid, grp_id, text, chart, smart_art, entry, label)
         effect_id = self._effect_ids.allocate(
@@ -1244,51 +1270,145 @@ class TimingWriter:
                     f"writer emits as timing.{equivalent}; set timing.{equivalent} to 0.5 for the "
                     "value PowerPoint's checkbox writes"
                 )
-        for name, key, reason in (
-            (
-                "rewind",
-                "animation.timing.rewind",
-                "the p:cTn fill/autoRev combination PowerPoint writes for Rewind when done playing "
-                "is not implemented here",
-            ),
-            (
-                "bounceEnd",
+        # `rewind` is written now — see `_timing_attrs`. `bounceEnd` is not, and
+        # the reason is the markup rather than the value: measured 2026-11-02 it
+        # is `p:cTn/@p14:presetBounceEnd` plus `p:animMotion/@p14:bounceEnd`,
+        # and PowerPoint wraps the whole timing tree in `mc:AlternateContent` so
+        # that a consumer which does not know `p14` still gets a playable
+        # effect. This writer emits no `mc:AlternateContent` anywhere, so the
+        # refusal stands until it can.
+        if timing.get("bounceEnd"):
+            refuse_unimplemented(
+                self.index,
                 "animation.timing.bounceEnd",
-                "Bounce end needs the extra synthesised behaviours PowerPoint appends, which this "
-                "writer does not build",
-            ),
-        ):
-            if timing.get(name):
-                refuse_unimplemented(
-                    self.index, key, f"slide {self.slide_slug!r}: {label}.timing.{name}", reason
-                )
+                f"slide {self.slide_slug!r}: {label}.timing.bounceEnd",
+                "Bounce End is p:cTn/@p14:presetBounceEnd inside an mc:AlternateContent wrapper "
+                "(measured 2026-11-02); this writer emits no mc:AlternateContent, so the extension "
+                "attribute would be written without the fallback branch PowerPoint pairs it with",
+            )
 
-    def _refuse_unwritten_after_effect(self, after: Mapping[str, Any], label: str) -> None:
-        """Refuse every after-animation value except the explicit ``none``.
+    def _check_after_effect(self, after: Mapping[str, Any], label: str) -> None:
+        """Reject an after-animation request this writer would answer wrongly.
 
-        ``none`` is the absence of an after-effect and needs no markup. Dim,
-        hide, hide-on-next-click and the dim colour all need nodes the capture
-        does not contain and the writer does not emit, so they stay refused
-        even after their catalog gap closes; Task 8 implements them against the
-        captured form.
+        Checked before anything is written, because the alternative to a refusal
+        here is a package that carries a *different* after-effect from the one
+        asked for.
+
+        Only a colour on a non-dim value qualifies. ``hide`` and
+        ``hideOnNextClick`` write ``p:set`` on ``style.visibility`` and have
+        nowhere to put a colour, so accepting one would drop it in silence.
         """
         kind = after.get("type")
-        if kind not in (None, "none"):
-            refuse_unimplemented(
-                self.index,
-                f"animation.afterAnimation.{kind}",
-                f"slide {self.slide_slug!r}: {label}.afterEffect.type {kind!r}",
-                "the after-animation node PowerPoint writes for this value is not implemented here, "
-                "so the requested after-effect would be silently dropped",
+        # The colour is checked FIRST, before the `none` short-circuit, because
+        # `{"type": "none", "color": ...}` is the combination that would
+        # otherwise be dropped in silence: `none` writes no node, so there would
+        # be nothing for the colour to be on and nothing to say so.
+        if after.get("color") is not None and kind != "dim":
+            raise TimingWriteError(
+                f"slide {self.slide_slug!r}: {label}.afterEffect.color applies only to "
+                f"type 'dim', not {kind!r}: 'none' writes no node at all, and the two hide "
+                "values write p:set on style.visibility, which has nowhere to carry a colour"
             )
-        if after.get("color") is not None:
-            refuse_unimplemented(
-                self.index,
-                "animation.afterAnimation.dimColor",
-                f"slide {self.slide_slug!r}: {label}.afterEffect.color",
-                "the dim colour needs the p:animClr node PowerPoint appends after the effect, which "
-                "this writer does not build",
+        if kind in (None, "none"):
+            return
+        if kind not in AFTER_EFFECT_WRITERS:
+            raise TimingWriteError(
+                f"slide {self.slide_slug!r}: {label}.afterEffect.type {kind!r} is not one of "
+                f"{sorted(AFTER_EFFECT_WRITERS)}"
             )
+
+    def _write_after_effect(
+        self,
+        ctn: etree._Element,
+        after: Mapping[str, Any],
+        *,
+        spid: int,
+        target: Mapping[str, Any],
+        ctn_id: int,
+        label: str,
+    ) -> None:
+        """Write the effect's after-animation value as its ``p:subTnLst``.
+
+        Measured 2026-11-02 and recorded in
+        ``tests/fixtures/animations/gui-only/after-effects-2026-11-02``. The
+        finding that shapes this method: an after-animation value is **not an
+        attribute**. It is a child of ``p:subTnLst``, the sibling of
+        ``p:childTnLst`` that holds the effect's own behaviour — so it is a
+        second, dependent behaviour hung off the effect. The catalog had guessed
+        ``p:cTn/@afterEffect``, which does appear, but on the *nested* node
+        rather than on the effect.
+
+        All four values share one wrapper — ``p:cBhvr override="childStyle"``
+        around ``p:cTn dur="1" fill="hold" display="0" afterEffect="1"`` — and
+        differ in two places only:
+
+        * which node carries it: ``p:set`` on ``style.visibility`` for the hides,
+          ``p:animClr`` on ``ppt_c`` for the dims.
+        * ``masterRel``, and whether the nested ``p:cTn`` names a start
+          condition. ``hide`` is ``sameClick`` and waits for **this effect** to
+          end, so it carries ``p:cond evt="end"`` holding a ``p:tn`` with the
+          effect's own ``p:cTn`` id. The other three are ``nextClick`` and carry
+          no start condition at all.
+
+        ``none`` writes nothing: measured, clearing the pane's ``After
+        animation`` to ``Don't Dim`` removes the whole ``p:subTnLst`` rather than
+        leaving an empty one.
+        """
+        kind = after.get("type")
+        if kind in (None, "none"):
+            return
+        self.index.require(
+            f"animation.afterAnimation.{kind}", what=f"{label} afterEffect.type {kind!r}"
+        )
+        colour = after.get("color")
+        if colour is not None:
+            self.index.require(
+                "animation.afterAnimation.dimColor", what=f"{label} afterEffect.color"
+            )
+        tag, attr_name = AFTER_EFFECT_WRITERS[kind]
+        sub_list = sub(ctn, "p:subTnLst")
+        node_attrs = {"clrSpc": "rgb", "dir": "cw"} if tag == "p:animClr" else {}
+        node = sub(sub_list, tag, **node_attrs)
+
+        # `p:cBhvr` is cTn, tgtEl, attrNameLst, and the nested `p:cTn` carries no
+        # `id`: PowerPoint wrote none, and `_behavior_common` always adds one, so
+        # this builds the three in order rather than reusing it.
+        behavior = sub(node, "p:cBhvr", override="childStyle")
+        inner = sub(
+            behavior,
+            "p:cTn",
+            dur=1,
+            fill="hold",
+            display="0",
+            masterRel="sameClick" if kind == "hide" else "nextClick",
+            afterEffect="1",
+        )
+        if kind == "hide":
+            cond = sub(sub(inner, "p:stCondLst"), "p:cond", evt="end", delay=0)
+            sub(cond, "p:tn", val=ctn_id)
+        self._target(behavior, spid, target)
+        name_node = sub(sub(behavior, "p:attrNameLst"), "p:attrName")
+        name_node.text = attr_name
+
+        to = sub(node, "p:to")
+        if tag == "p:set":
+            sub(to, "p:strVal", val="hidden")
+        elif colour is None:
+            # An unqualified `dim` has no GUI counterpart: every dim in the pane
+            # is a specific swatch. So it writes the one swatch that was
+            # measured — `Accent Scheme Color`, which writes `accent2` and not
+            # `accent1`, which is exactly why the other seven are not guessed
+            # from their labels. A caller wanting a different colour states it
+            # with `afterEffect.color`.
+            sub(to, "a:schemeClr", val=MEASURED_DIM_SCHEME_COLOR)
+        else:
+            text = self._text(colour, f"{label}.afterEffect", "color")
+            if not SRGB_RE.fullmatch(text):
+                raise TimingWriteError(
+                    f"slide {self.slide_slug!r}: {label}.afterEffect.color {colour!r} is not a "
+                    "six-digit sRGB hex colour"
+                )
+            sub(to, "a:srgbClr", val=text.lstrip("#").upper())
 
     def _timing_attrs(self, timing: Mapping[str, Any], label: str) -> dict[str, Any]:
         attrs: dict[str, Any] = {}
@@ -1304,6 +1424,21 @@ class TimingWriter:
         if timing.get("autoReverse"):
             self.index.require("animation.timing.autoReverse", what=f"{label} timing.autoReverse")
             attrs["autoRev"] = "1"
+        if timing.get("rewind"):
+            # "Rewind when done playing" is `p:cTn/@fill`, and nothing else:
+            # measured 2026-11-02, checking the box changed the effect's
+            # existing fill from "hold" to "remove" and touched no other
+            # attribute. The catalog had guessed `@fill` **or** `@autoRev`;
+            # `@autoRev` is not involved, and it already carries
+            # `timing.autoReverse`, so writing both would have conflated two
+            # independent settings.
+            #
+            # `fill` is already in the caller's attrs as "hold", so this
+            # overrides a default rather than adding an attribute — which is
+            # why a gate that asked whether the shape *gained* anything called
+            # the press a no-op.
+            self.index.require("animation.timing.rewind", what=f"{label} timing.rewind")
+            attrs["fill"] = "remove"
         for name, attribute, key in (
             ("acceleration", "accel", "animation.timing.acceleration"),
             ("deceleration", "decel", "animation.timing.deceleration"),

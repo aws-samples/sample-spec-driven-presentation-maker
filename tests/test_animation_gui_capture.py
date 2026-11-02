@@ -1415,14 +1415,26 @@ class TestPlanDerivation:
         # capture has nothing to aim at.
         assert "animation.gallery.motionPath.custom" not in reasons
         assert "media object" in reasons["animation.gallery.media.mediaStop"]
-        assert "effect dialog" in reasons["animation.afterAnimation.dim"]
+        # The four After animation values were deferred here as needing an
+        # "effect dialog". They were measured on 2026-11-02 — in the Animation
+        # Pane, because this build has no effect dialog at all — and the writer
+        # emits them, so they are not targets any more.
+        assert not [key for key in reasons if key.startswith("animation.afterAnimation.")]
+        assert "animation.timing.rewind" not in reasons
         assert all(reasons.values())
 
     def test_gaps_without_the_capture_flag_are_listed_rather_than_implied_closed(self, real_plan):
         keys = {entry["key"] for entry in real_plan["gapsWithoutCaptureFlag"]}
-        # computer-use.md Steps 3 to 5 are exactly these, and none carries requiresCapture.
-        assert "animation.timing.rewind" in keys
         assert "animation.sound.effect" in keys
+        # `animation.timing.rewind` was listed here. Measured 2026-11-02 it is
+        # `p:cTn/@fill` moving from "hold" to "remove", which the writer emits,
+        # so its gap is closed rather than merely unflagged.
+        assert "animation.timing.rewind" not in keys
+        # `animation.timing.bounceEnd` is still here, and for a different reason
+        # from the rest: its value IS measured — `p:cTn/@p14:presetBounceEnd` at
+        # 50000 — but PowerPoint pairs the extension attribute with an
+        # `mc:AlternateContent` fallback branch this writer cannot emit.
+        assert "animation.timing.bounceEnd" in keys
         # `animation.start.none` was listed here until the catalog stopped
         # treating an absent start condition as a value awaiting measurement.
         assert "animation.start.none" not in keys

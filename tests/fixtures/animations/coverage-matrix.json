@@ -13,7 +13,7 @@
   },
   "source": {
     "catalog": "sdpm/references/catalogs/powerpoint-animation-catalog.json",
-    "catalogDigest": "sha256:8dde16d90f46fde9274eab6e9ab0d4f20eae0d20fa4052480440b13f7b8aaf3b",
+    "catalogDigest": "sha256:d436f5fe222a598267ca5a89ade379350985308ec3a65b71974d413d60224fa8",
     "catalogGeneratedAt": "2026-10-30T00:00:00Z",
     "guiManifest": "powerpoint-gui-surface-16.113.1.json@2026-11-02.1",
     "baseline": {
@@ -77,7 +77,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 253,
-      "formEstablishedMembers": 112,
+      "formEstablishedMembers": 120,
       "formEstablishedCatalogKey": "animation.gallery.entrance.appear"
     },
     {
@@ -139,11 +139,11 @@
       "catalogKey": "animation.afterAnimation.dim",
       "catalogGroup": "guiItems",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "nativeCapture",
       "members": 9,
-      "formEstablishedMembers": 2,
-      "formEstablishedCatalogKey": "animation.afterAnimation.none"
+      "formEstablishedMembers": 9,
+      "formEstablishedCatalogKey": "animation.afterAnimation.dim"
     },
     {
       "id": "animationFamily:animation.behavior.color",
@@ -545,7 +545,7 @@
       "capabilityLevel": "presetMapping",
       "verification": "powerPointReadBackRequired",
       "members": 13,
-      "formEstablishedMembers": 11,
+      "formEstablishedMembers": 12,
       "formEstablishedCatalogKey": "animation.timing.acceleration"
     },
     {
@@ -1143,7 +1143,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 336,
-      "formEstablishedMembers": 186,
+      "formEstablishedMembers": 194,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink"
     },
     {
@@ -1590,7 +1590,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 444,
-      "formEstablishedMembers": 204,
+      "formEstablishedMembers": 212,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink",
       "note": "catalog-pinned value 0; the catalog establishes 2 distinct value(s) for this path"
     },
@@ -1604,7 +1604,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 444,
-      "formEstablishedMembers": 204,
+      "formEstablishedMembers": 212,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink",
       "note": "catalog-pinned value 0; the catalog establishes 2 distinct value(s) for this path"
     },
@@ -1758,7 +1758,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 444,
-      "formEstablishedMembers": 204,
+      "formEstablishedMembers": 212,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink",
       "note": "catalog-pinned value 0; the catalog establishes 2 distinct value(s) for this path"
     },
@@ -1772,7 +1772,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 444,
-      "formEstablishedMembers": 204,
+      "formEstablishedMembers": 212,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink",
       "note": "catalog-pinned value 0; the catalog establishes 2 distinct value(s) for this path"
     },
@@ -1788,7 +1788,7 @@
       "members": 1,
       "formEstablishedMembers": 0,
       "formEstablishedCatalogKey": null,
-      "note": "catalog-pinned value 300; the catalog establishes 2 distinct value(s) for this path"
+      "note": "catalog-pinned value 0.5; the catalog establishes 2 distinct value(s) for this path"
     },
     {
       "id": "boundary:animations.mainSequence[].timing.bounceEnd:minimum",
@@ -1800,7 +1800,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 444,
-      "formEstablishedMembers": 205,
+      "formEstablishedMembers": 213,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink",
       "note": "catalog-pinned value 0; the catalog establishes 2 distinct value(s) for this path"
     },
@@ -1814,7 +1814,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 444,
-      "formEstablishedMembers": 205,
+      "formEstablishedMembers": 213,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink",
       "note": "catalog-pinned value 0; the catalog establishes 2 distinct value(s) for this path"
     },
@@ -1842,7 +1842,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 444,
-      "formEstablishedMembers": 204,
+      "formEstablishedMembers": 212,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink",
       "note": "catalog-pinned value 0; the catalog establishes 2 distinct value(s) for this path"
     },
@@ -1856,7 +1856,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 444,
-      "formEstablishedMembers": 204,
+      "formEstablishedMembers": 212,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink",
       "note": "catalog-pinned value 0; the catalog establishes 2 distinct value(s) for this path"
     },
@@ -1884,7 +1884,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 381,
-      "formEstablishedMembers": 143,
+      "formEstablishedMembers": 151,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.brushColor",
       "note": "catalog-pinned value 500; the catalog establishes 5 distinct value(s) for this path"
     },
@@ -1898,7 +1898,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 381,
-      "formEstablishedMembers": 143,
+      "formEstablishedMembers": 151,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.brushColor",
       "note": "catalog-pinned value 500; the catalog establishes 5 distinct value(s) for this path"
     },
@@ -1926,7 +1926,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 444,
-      "formEstablishedMembers": 204,
+      "formEstablishedMembers": 212,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink",
       "note": "catalog-pinned value 1; the catalog establishes 2 distinct value(s) for this path"
     },
@@ -1940,7 +1940,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 444,
-      "formEstablishedMembers": 204,
+      "formEstablishedMembers": 212,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink",
       "note": "catalog-pinned value 1; the catalog establishes 2 distinct value(s) for this path"
     },
@@ -2077,11 +2077,11 @@
       "catalogKey": "animation.afterAnimation.dim",
       "catalogGroup": "guiItems",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "nativeCapture",
       "members": 8,
-      "formEstablishedMembers": 2,
-      "formEstablishedCatalogKey": "animation.afterAnimation.none"
+      "formEstablishedMembers": 8,
+      "formEstablishedCatalogKey": "animation.afterAnimation.dim"
     },
     {
       "id": "mapping:animMotion",
@@ -2105,8 +2105,8 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
-      "members": 16,
-      "formEstablishedMembers": 15,
+      "members": 17,
+      "formEstablishedMembers": 16,
       "formEstablishedCatalogKey": "animation.textOptions.animateAttachedShape"
     },
     {
@@ -2116,11 +2116,11 @@
       "catalogKey": "animation.afterAnimation.dimColor",
       "catalogGroup": "guiItems",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
-      "members": 21,
-      "formEstablishedMembers": 18,
-      "formEstablishedCatalogKey": "animation.behavior.color"
+      "capabilityLevel": "nativeTemplate",
+      "verification": "nativeCapture",
+      "members": 20,
+      "formEstablishedMembers": 19,
+      "formEstablishedCatalogKey": "animation.afterAnimation.dimColor"
     },
     {
       "id": "mapping:behaviorPrimitives",
@@ -2366,7 +2366,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 514,
-      "formEstablishedMembers": 272,
+      "formEstablishedMembers": 280,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink"
     },
     {
@@ -2500,7 +2500,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
       "members": 396,
-      "formEstablishedMembers": 160,
+      "formEstablishedMembers": 168,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink"
     },
     {

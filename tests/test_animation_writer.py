@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -100,22 +101,31 @@ CATALOG_COVERAGE = {
     "generated": {
         # Each +7 is the Complex motion paths: new guiItems entries that
         # generate because their geometry was measured rather than inferred.
-        # The last +2 is `shimmer` and `stretchy`, which generate now that
-        # their example carries the gallery their own guiKey names instead of
-        # a hardcoded `entrance`.
-        # The last +1 is the reversed Clock, which writes once the parameter
-        # set that selects it is kept apart from the attributes it emits.
-        "total": 468,
-        "guiItems": 225,
-        "candidates": 243,
-        "animation": 250,
+        # The +2 is `shimmer` and `stretchy`, which generate now that their
+        # example carries the gallery their own guiKey names instead of a
+        # hardcoded `entrance`.
+        # The +1 is the reversed Clock, which writes once the parameter set that
+        # selects it is kept apart from the attributes it emits.
+        #
+        # The last +8 is the 2026-11-02 Animation Pane measurement, and it is
+        # the same eight keys that left `refused` below: the four After
+        # animation values (p:subTnLst holding a p:set or a p:animClr), their
+        # three MsoAnimAfterEffect mirrors, and Rewind (p:cTn/@fill, "hold" ->
+        # "remove"). guiItems takes five of them and candidates the three
+        # mirrors, which is what says the eight are accounted for rather than
+        # the totals happening to move by eight.
+        "total": 476,
+        "guiItems": 230,
+        "candidates": 246,
+        "animation": 258,
         "transition": 218,
     },
     "refused": {
-        "total": 201,
-        "guiItems": 58,
-        "candidates": 143,
-        "animation": 199,
+        # 193, not 201: the eight keys named above are written now.
+        "total": 193,
+        "guiItems": 53,
+        "candidates": 140,
+        "animation": 191,
         "transition": 2,
     },
     "generatedDespiteGap": [
@@ -135,7 +145,13 @@ CATALOG_COVERAGE = {
     #: behavior *payload* was never captured. The payload slice is down from 121
     #: to 11 and holds no gallery tile at all — only enum candidates whose own
     #: mapping is open, so they resolve to no measured tile.
-    "captureRequiredRefusals": 190,
+    #:
+    #: 182, not 190: the eight Animation Pane keys. Note that this number counts
+    #: every mapping refusal, including the ones no capture can close — the 45
+    #: MsoAnimDirection names and the Windows-only effects — so the harness's own
+    #: `captureRequired` figure is smaller. Eight of those remain, and seven of
+    #: them are the deferred sound and media keys.
+    "captureRequiredRefusals": 182,
     "payloadRefusals": {"total": 11, "guiItems": 0, "candidates": 11},
 }
 
@@ -754,17 +770,25 @@ def test_after_effect_none_is_written_without_complaint():
 #: refuse unconditionally: a plain catalog lookup would start *passing* when
 #: Task 8 closes the gap, and the setting would then be dropped in silence.
 UNWRITTEN_OPTIONS = [
-    ({"afterEffect": {"type": "dim"}}, "animation.afterAnimation.dim"),
-    ({"afterEffect": {"type": "hide"}}, "animation.afterAnimation.hide"),
-    ({"afterEffect": {"type": "hideOnNextClick"}}, "animation.afterAnimation.hideOnNextClick"),
-    ({"afterEffect": {"type": "none", "color": "#808080"}}, "animation.afterAnimation.dimColor"),
-    ({"timing": {"durationMs": 500, "rewind": True}}, "animation.timing.rewind"),
-    # `smoothStart` and `smoothEnd` were here. They are not unwritten options:
-    # the 2026-11-02 measurement shows they are the Animation Pane's name for
-    # `p:cTn/@accel` and `@decel` at 50000, which this writer already emits as
-    # `timing.acceleration` / `.deceleration`. They now refuse by naming the
-    # field to use instead, which the test below asserts.
-    ({"timing": {"durationMs": 500, "bounceEnd": 300}}, "animation.timing.bounceEnd"),
+    # The four After animation values and Rewind were here. They are written
+    # now, against the form measured on 2026-11-02 and recorded in
+    # `tests/fixtures/animations/gui-only/after-effects-2026-11-02`, and
+    # `test_each_after_animation_value_writes_its_measured_form` below asserts
+    # what each one emits. Rewind turned out to be `p:cTn/@fill` alone — the
+    # catalog's other candidate, `@autoRev`, is not involved and already carries
+    # `timing.autoReverse`.
+    #
+    # `smoothStart` and `smoothEnd` were here too. They are not unwritten
+    # options either: the same measurement shows they are the Animation Pane's
+    # name for `p:cTn/@accel` and `@decel` at 50000, which this writer already
+    # emits as `timing.acceleration` / `.deceleration`. They refuse by naming
+    # the field to use instead, which a test below asserts.
+    #
+    # `bounceEnd` stays, and the reason is the markup rather than the value:
+    # measured, it is `p:cTn/@p14:presetBounceEnd` inside an
+    # `mc:AlternateContent` wrapper, and this writer emits no
+    # `mc:AlternateContent` anywhere.
+    ({"timing": {"durationMs": 500, "bounceEnd": 0.5}}, "animation.timing.bounceEnd"),
     (
         {"start": {"type": "withPrevious", "delayMs": 0, "bookmark": "cue1"}},
         "animation.media.bookmarkTrigger",
@@ -851,39 +875,168 @@ def test_an_unwritten_option_stays_refused_after_its_catalog_gap_closes(
     assert "Implement it against the captured form" in str(error.value)
 
 
-def test_a_dim_colour_is_refused_whichever_after_effect_carries_it(registry, patched_index):
-    """The colour is refused on its own account, so it cannot slip through a
-    combination whose type happens to be allowed."""
-    index = patched_index(_close_gap("animation.afterAnimation.dim"))
-    writer = TimingWriter(registry, index=index, slide_slug="catalog")
-    with pytest.raises(CapabilityGapError) as error:
-        writer.build(
-            {
-                "mainSequence": [
-                    _effect("fx", "catalogTarget", afterEffect={"type": "dim", "color": "#808080"})
-                ],
+@pytest.mark.parametrize(
+    "after,expected",
+    [
+        (
+            {"type": "hide"},
+            '<p:subTnLst><p:set><p:cBhvr override="childStyle">'
+            '<p:cTn dur="1" fill="hold" display="0" masterRel="sameClick" afterEffect="1">'
+            '<p:stCondLst><p:cond evt="end" delay="0"><p:tn val="2"/></p:cond></p:stCondLst>'
+            "</p:cTn>"
+            '<p:tgtEl><p:spTgt spid="2"/></p:tgtEl>'
+            "<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst>"
+            '</p:cBhvr><p:to><p:strVal val="hidden"/></p:to></p:set></p:subTnLst>',
+        ),
+        (
+            {"type": "hideOnNextClick"},
+            '<p:subTnLst><p:set><p:cBhvr override="childStyle">'
+            '<p:cTn dur="1" fill="hold" display="0" masterRel="nextClick" afterEffect="1"/>'
+            '<p:tgtEl><p:spTgt spid="2"/></p:tgtEl>'
+            "<p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst>"
+            '</p:cBhvr><p:to><p:strVal val="hidden"/></p:to></p:set></p:subTnLst>',
+        ),
+        (
+            {"type": "dim"},
+            '<p:subTnLst><p:animClr clrSpc="rgb" dir="cw"><p:cBhvr override="childStyle">'
+            '<p:cTn dur="1" fill="hold" display="0" masterRel="nextClick" afterEffect="1"/>'
+            '<p:tgtEl><p:spTgt spid="2"/></p:tgtEl>'
+            "<p:attrNameLst><p:attrName>ppt_c</p:attrName></p:attrNameLst>"
+            '</p:cBhvr><p:to><a:schemeClr val="accent2"/></p:to></p:animClr></p:subTnLst>',
+        ),
+        (
+            {"type": "dim", "color": "#808080"},
+            '<p:subTnLst><p:animClr clrSpc="rgb" dir="cw"><p:cBhvr override="childStyle">'
+            '<p:cTn dur="1" fill="hold" display="0" masterRel="nextClick" afterEffect="1"/>'
+            '<p:tgtEl><p:spTgt spid="2"/></p:tgtEl>'
+            "<p:attrNameLst><p:attrName>ppt_c</p:attrName></p:attrNameLst>"
+            '</p:cBhvr><p:to><a:srgbClr val="808080"/></p:to></p:animClr></p:subTnLst>',
+        ),
+    ],
+    ids=["hide", "hideOnNextClick", "dim", "dimColor"],
+)
+def test_each_after_animation_value_writes_its_measured_form(after, expected):
+    """The four values, asserted as the markup rather than as "it did something".
+
+    Measured 2026-11-02 and recorded in
+    ``tests/fixtures/animations/gui-only/after-effects-2026-11-02``. This test
+    used to assert that all four were refused.
+
+    The finding these assertions carry: an after-animation value is **not an
+    attribute**. It is a child of ``p:subTnLst``, the sibling of
+    ``p:childTnLst``. The catalog had guessed ``p:cTn/@afterEffect``, which does
+    appear — on that nested node rather than on the effect — so only a capture
+    could have settled where it lives.
+
+    Within each pair exactly one thing differs, which is why these are spelled
+    out in full rather than checked by substring: ``masterRel`` plus the start
+    condition for the hides, and the colour child for the dims. A test that
+    looked for ``p:subTnLst`` would pass on the wrong one of each pair.
+    """
+    _builder, slide = _build(
+        _slide(
+            animations={
+                "mainSequence": [_effect("fx", "hero", afterEffect=after)],
                 "interactiveSequences": [],
             }
-        )
-    # The type is checked first and is itself unimplemented; with both gaps
-    # closed the colour is still the second refusal rather than a dropped field.
-    assert error.value.key == "animation.afterAnimation.dim"
-    both = patched_index(
-        lambda catalog: (
-            _close_gap("animation.afterAnimation.dim")(catalog),
-            _close_gap("animation.afterAnimation.dimColor")(catalog),
         )
     )
-    with pytest.raises(CapabilityGapError) as error:
-        TimingWriter(registry, index=both, slide_slug="catalog").build(
-            {
+    root = _xml(slide)
+    found = root.xpath(".//*[local-name()='subTnLst']")
+    assert len(found) == 1, "one after-animation value writes exactly one p:subTnLst"
+    spid = root.xpath(".//*[local-name()='cTn'][@presetID]//*[local-name()='spTgt']/@spid")[0]
+    # Serializing a fragment repeats every namespace declaration the root
+    # carries, so they are stripped rather than listed: the assertion is about
+    # the elements and attributes, and the nsmap is asserted elsewhere.
+    serialized = re.sub(r' xmlns:[A-Za-z0-9]+="[^"]*"', "", etree.tostring(found[0]).decode())
+    # The two ids in the expected markup are the effect's own target spid and
+    # its own p:cTn id, neither of which is a constant, so they are substituted
+    # from what the writer actually allocated rather than hard-coded.
+    own_id = root.xpath(".//*[local-name()='cTn'][@presetID]/@id")[0]
+    assert serialized == expected.replace('spid="2"', f'spid="{spid}"').replace(
+        'val="2"', f'val="{own_id}"'
+    )
+
+
+def test_only_the_hide_after_animation_form_waits_for_its_own_effect():
+    """``p:tn/@val`` names the effect's **own** ``p:cTn`` id, not a fixed number.
+
+    Which is the one part of the measured form that cannot be copied verbatim:
+    hiding "after animation" has to wait for *this* effect to end, so the id has
+    to be the one the writer allocated. Asserted on the second effect of a
+    slide, where a hard-coded id would be visibly wrong.
+    """
+    _builder, slide = _build(
+        _slide(
+            animations={
                 "mainSequence": [
-                    _effect("fx", "catalogTarget", afterEffect={"type": "none", "color": "#808080"})
+                    _effect("first", "hero"),
+                    _effect("second", "hero", afterEffect={"type": "hide"}),
                 ],
                 "interactiveSequences": [],
             }
         )
-    assert error.value.key == "animation.afterAnimation.dimColor"
+    )
+    root = _xml(slide)
+    effects = root.xpath(
+        ".//*[local-name()='cTn'][@presetID]",
+    )
+    assert len(effects) == 2
+    hiding = effects[1]
+    own_id = hiding.get("id")
+    referenced = hiding.xpath(".//*[local-name()='subTnLst']//*[local-name()='tn']/@val")
+    assert referenced == [own_id], (
+        f"the hide waits for {referenced}, not for its own effect {own_id}"
+    )
+    assert own_id != effects[0].get("id"), "the two effects must have different ids"
+
+
+def test_a_dim_colour_is_rejected_on_a_type_that_cannot_carry_it():
+    """A colour outside ``dim`` has nowhere to go, so it is refused rather than dropped.
+
+    ``none`` is the case worth naming: it writes no node at all, so a colour on
+    it would vanish with nothing to say so — and it is checked **before** the
+    ``none`` short-circuit for exactly that reason.
+    """
+    for kind in ("none", "hide", "hideOnNextClick"):
+        slide_def = _slide(
+            animations={
+                "mainSequence": [
+                    _effect("fx", "hero", afterEffect={"type": kind, "color": "#808080"})
+                ],
+                "interactiveSequences": [],
+            }
+        )
+        with pytest.raises(TimingWriteError, match="applies only to type 'dim'"):
+            _build(slide_def)
+
+
+def test_rewind_moves_the_existing_fill_rather_than_adding_an_attribute():
+    """Measured 2026-11-02: ``@fill`` ``hold`` -> ``remove``, and nothing else.
+
+    The catalog had listed ``@autoRev`` as the other candidate. It is not
+    involved, and it already carries ``timing.autoReverse`` — so the two are
+    asserted to be independent here, because writing both would have conflated
+    them.
+    """
+    def fill_of(**timing):
+        _builder, slide = _build(
+            _slide(
+                animations={
+                    "mainSequence": [
+                        _effect("fx", "hero", timing={"durationMs": 500, **timing})
+                    ],
+                    "interactiveSequences": [],
+                }
+            )
+        )
+        effect = _xml(slide).xpath(".//*[local-name()='cTn'][@presetID]")[0]
+        return effect.get("fill"), effect.get("autoRev")
+
+    assert fill_of() == ("hold", None), "hold is the default this overrides"
+    assert fill_of(rewind=True) == ("remove", None)
+    assert fill_of(autoReverse=True) == ("hold", "1"), "auto-reverse is a different setting"
+    assert fill_of(rewind=True, autoReverse=True) == ("remove", "1")
 
 
 def test_no_unwritten_option_reaches_the_package(registry, patched_index):

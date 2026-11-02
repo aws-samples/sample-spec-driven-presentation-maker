@@ -70,6 +70,7 @@ from sdpm.engine.timing.writer import (
     ANIM_VALUE_TYPES,
     BEHAVIOR_ELEMENTS,
     CMD_TYPES,
+    MEASURED_DIM_SCHEME_COLOR,
     MOTION_ORIGINS,
     MOTION_PATH_EDIT_MODES,
     PERCENT_SCALE,
@@ -1270,7 +1271,13 @@ class _TimingReader:
         # `p:iterate` used to be unlisted here, so a by-word or by-character
         # text animation — the three `animation.textOptions.unit` values — sent
         # the whole slide's timing to the raw fallback on the element alone.
-        _only_children(ctn, {"stCondLst", "childTnLst", "iterate"}, f"{sequence} effect p:cTn")
+        # `p:iterate` used to be unlisted here, so a by-word or by-character
+        # text animation sent the whole slide's timing to the raw fallback.
+        # `p:subTnLst` is the after-animation value and was unlisted for the
+        # same reason — it was unwritable, so nothing produced one.
+        _only_children(
+            ctn, {"stCondLst", "childTnLst", "iterate", "subTnLst"}, f"{sequence} effect p:cTn"
+        )
         node_type = attrs.get("nodeType")
         start_type = self._start_type(node_type, interactive, click_index, opens_click_group)
         behaviors = _child(ctn, "childTnLst")
@@ -1324,7 +1331,7 @@ class _TimingReader:
             "timing": self._read_timing(attrs, duration, sequence),
             **({"text": text} if text else {}),
             **build_fields,
-            "afterEffect": {"type": "none"},
+            "afterEffect": self._read_after_effect(ctn, sequence),
             "sound": None,
         }
         if behavior_list is not None:
@@ -1432,6 +1439,107 @@ class _TimingReader:
             read["options"] = dict(options)
         return read
 
+    def _read_after_effect(self, ctn: etree._Element, sequence: str) -> dict[str, Any]:
+        """Invert the effect's ``p:subTnLst`` into its ``afterEffect``.
+
+        The absent case is the common one and is the **default**, not a gap:
+        measured 2026-11-02, clearing the pane's ``After animation`` to ``Don't
+        Dim`` removes the whole ``p:subTnLst``, so no node means ``none``.
+
+        Everything else is read strictly, and a form that does not match what
+        was measured raises :class:`_Unsupported` so the effect falls to raw
+        replay. That is the point rather than caution: a near miss here would
+        hand back an ``afterEffect`` the package does not carry, and the two
+        pairs differ by one attribute each — ``masterRel`` for the hides and the
+        colour child for the dims — so "close enough" is a different value.
+        """
+        sub_list = _child(ctn, "subTnLst")
+        if sub_list is None:
+            return {"type": "none"}
+        children = _only_children(sub_list, {"set", "animClr"}, f"{sequence} effect p:subTnLst")
+        if len(children) != 1:
+            raise _Unsupported(
+                f"{sequence} effect p:subTnLst carries {len(children)} children; one "
+                "after-animation value writes exactly one"
+            )
+        node = children[0]
+        behavior = _child(node, "cBhvr")
+        if behavior is None or behavior.get("override") != "childStyle":
+            raise _Unsupported(
+                f"{sequence} effect p:subTnLst child has no p:cBhvr override=\"childStyle\""
+            )
+        inner = _child(behavior, "cTn")
+        if inner is None:
+            raise _Unsupported(f"{sequence} effect after-animation behaviour has no p:cTn")
+        inner_attrs = _require_attrs(
+            inner,
+            ("id", "dur", "fill", "display", "masterRel", "afterEffect"),
+            f"{sequence} effect after-animation p:cTn",
+        )
+        if inner_attrs.get("afterEffect") not in {"1", "true"}:
+            raise _Unsupported(
+                f"{sequence} effect p:subTnLst behaviour is not marked afterEffect"
+            )
+        master_rel = inner_attrs.get("masterRel")
+        # An explicit None test, not `or ()`: an lxml element with no children is
+        # falsey today and will be truthy in a future version, so the short form
+        # would silently stop reading the list.
+        name_list = _child(behavior, "attrNameLst")
+        names = [
+            (name.text or "").strip()
+            for name in (name_list if name_list is not None else ())
+            if _local(name) == "attrName"
+        ]
+        to = _child(node, "to")
+
+        if _local(node) == "set":
+            value = _child(to, "strVal") if to is not None else None
+            if names != ["style.visibility"] or value is None or value.get("val") != "hidden":
+                raise _Unsupported(
+                    f"{sequence} effect p:subTnLst p:set animates {names} to "
+                    f"{None if value is None else value.get('val')!r}, not style.visibility to "
+                    "'hidden'"
+                )
+            # The one attribute that separates them. `sameClick` waits for this
+            # effect to end — which is why only that form carries a start
+            # condition naming the effect's own id — and `nextClick` waits for
+            # the audience.
+            if master_rel == "sameClick":
+                return {"type": "hide"}
+            if master_rel == "nextClick":
+                return {"type": "hideOnNextClick"}
+            raise _Unsupported(
+                f"{sequence} effect after-animation masterRel {master_rel!r} is neither "
+                "'sameClick' nor 'nextClick'"
+            )
+
+        if names != ["ppt_c"]:
+            raise _Unsupported(
+                f"{sequence} effect p:subTnLst p:animClr animates {names}, not ppt_c"
+            )
+        srgb = to.find(f"{{{A_NS}}}srgbClr") if to is not None else None
+        scheme = to.find(f"{{{A_NS}}}schemeClr") if to is not None else None
+        if srgb is not None:
+            raw = srgb.get("val") or ""
+            if not re.fullmatch(r"[0-9A-Fa-f]{6}", raw):
+                raise _Unsupported(
+                    f"{sequence} effect dim colour {raw!r} is not a six-digit sRGB hex"
+                )
+            return {"type": "dim", "color": f"#{raw.upper()}"}
+        if scheme is not None:
+            # Only the one scheme colour that was measured inverts. Mapping any
+            # other to a bare `dim` would drop which colour the deck dims to,
+            # and raw replay keeps it instead — the seven unmeasured swatches
+            # are exactly the decks this protects.
+            if scheme.get("val") == MEASURED_DIM_SCHEME_COLOR:
+                return {"type": "dim"}
+            raise _Unsupported(
+                f"{sequence} effect dims to scheme colour {scheme.get('val')!r}; only "
+                f"{MEASURED_DIM_SCHEME_COLOR!r} was measured, so inverting this one would drop "
+                "which colour the deck dims to"
+            )
+        raise _Unsupported(f"{sequence} effect p:animClr after-animation has no p:to colour")
+
     def _read_timing(
         self, attrs: Mapping[str, str], duration: int | None, sequence: str
     ) -> dict[str, Any]:
@@ -1456,6 +1564,14 @@ class _TimingReader:
             timing["autoReverse"] = True
         elif "autoRev" in attrs and attrs["autoRev"] not in {"0", "false"}:
             raise _Unsupported(f"{sequence} effect autoRev {attrs['autoRev']!r} is not a boolean")
+        # "Rewind when done playing" is `@fill`, and the default is `hold`:
+        # measured 2026-11-02, the checkbox moved the existing fill from "hold"
+        # to "remove" and touched nothing else. So `hold` reports nothing rather
+        # than `rewind: False` — the writer emits no `rewind` key for a false,
+        # and reporting one would hand back JSON that differs from the JSON that
+        # produced the package.
+        if attrs.get("fill") == "remove":
+            timing["rewind"] = True
         for name, key in (("accel", "acceleration"), ("decel", "deceleration")):
             if name not in attrs:
                 continue
