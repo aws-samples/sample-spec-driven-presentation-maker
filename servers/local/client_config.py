@@ -429,6 +429,24 @@ def _run(argv: list[str]) -> int:
         return 127
 
 
+def _probe(argv: list[str]) -> str:
+    """Run a client CLI for its output. Anything that goes wrong reads as no output.
+
+    Separate from :func:`_run`, which reports an exit code and lets the command
+    write to the terminal: a probe needs what the command *said*. It is
+    injectable for the same reason ``run`` is, and the reason is not
+    hypothetical — a caller that stubbed ``run`` to keep a test off the machine
+    still shelled out from here, so the test's result depended on what the
+    developer happened to have installed. See
+    ``test_register_runs_cli_and_reports_failures``.
+    """
+    try:
+        out = subprocess.run(argv, capture_output=True, text=True, timeout=30, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return ""
+    return out.stdout
+
+
 @dataclass
 class Outcome:
     client: Client
@@ -473,6 +491,7 @@ def register(
     dry_run: bool = False,
     assume_yes: bool = False,
     run: Callable[[list[str]], int] = _run,
+    probe: Callable[[list[str]], str] = _probe,
     open_url: Callable[[str], bool] = webbrowser.open,
     agent_name: str = DEFAULT_KIRO_AGENT,
     chosen: Optional[list[Client]] = None,
@@ -507,7 +526,9 @@ def register(
             else:
                 outcomes.append(Outcome(client, "registered", next_step(client, agent_name)))
             if client.id == "claude-code":
-                _offer_claude_plugin_cleanup(dry_run=dry_run, assume_yes=assume_yes, run=run)
+                _offer_claude_plugin_cleanup(
+                    dry_run=dry_run, assume_yes=assume_yes, run=run, probe=probe
+                )
         elif client.deeplink is not None:
             url = client.deeplink(target)
             if dry_run:
@@ -557,17 +578,19 @@ def _print_leftover_warning() -> None:
 CLAUDE_PLUGIN = "sdpm@sdpm"
 
 
-def claude_plugin_installed() -> bool:
+def claude_plugin_installed(probe: Callable[[list[str]], str] = _probe) -> bool:
     """The pre-installer Claude Code plugin — its bundled server and skills duplicate ours."""
-    try:
-        out = subprocess.run(["claude", "plugin", "list"], capture_output=True, text=True, timeout=30, check=False)
-    except (OSError, subprocess.TimeoutExpired):
-        return False
-    return CLAUDE_PLUGIN in out.stdout
+    return CLAUDE_PLUGIN in probe(["claude", "plugin", "list"])
 
 
-def _offer_claude_plugin_cleanup(*, dry_run: bool, assume_yes: bool, run: Callable[[list[str]], int] = _run) -> None:
-    if not claude_plugin_installed():
+def _offer_claude_plugin_cleanup(
+    *,
+    dry_run: bool,
+    assume_yes: bool,
+    run: Callable[[list[str]], int] = _run,
+    probe: Callable[[list[str]], str] = _probe,
+) -> None:
+    if not claude_plugin_installed(probe):
         return
     print(f"The Claude Code plugin {CLAUDE_PLUGIN} (pre-installer) is still installed. It bundles its own")
     print("copy of the server and skills, so every sdpm tool would appear twice.")

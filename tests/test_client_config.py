@@ -137,7 +137,11 @@ def test_register_runs_cli_and_reports_failures(capsys):
         return 1 if argv[0] == "codex" else 0
 
     clients = [cc.by_id("claude-code"), cc.by_id("codex")]
-    failures = cc.register(clients, POSIX, assume_yes=True, run=run, open_url=lambda _u: True)
+    # `probe` is what decides whether the Claude Code plugin cleanup fires. Left
+    # at its default it shells out, and this assertion then depended on whether
+    # the developer had the sdpm plugin installed.
+    failures = cc.register(clients, POSIX, assume_yes=True, run=run,
+                           probe=lambda _a: "", open_url=lambda _u: True)
     assert calls == ["claude", "codex"] and failures == 1
     out = capsys.readouterr().out
     assert "Codex" in out and "failed" in out and "sdpm mcp-config codex" in out
@@ -270,10 +274,10 @@ def test_register_kiro_offers_to_remove_global_entry(tmp_path, monkeypatch, caps
     assert "redundant" in capsys.readouterr().out
 
 
-def test_register_claude_code_offers_plugin_uninstall(monkeypatch, capsys):
-    monkeypatch.setattr(cc, "claude_plugin_installed", lambda: True)
+def test_register_claude_code_offers_plugin_uninstall(capsys):
     ran = []
-    cc.register([cc.by_id("claude-code")], POSIX, assume_yes=True, run=lambda a: (ran.append(a), 0)[1])
+    cc.register([cc.by_id("claude-code")], POSIX, assume_yes=True,
+                run=lambda a: (ran.append(a), 0)[1], probe=lambda _a: "sdpm@sdpm")
     assert ran == [
         ["claude", "mcp", "add", "--scope", "user", "sdpm", "--", *cc.server_argv(POSIX)],
         ["claude", "plugin", "uninstall", "sdpm@sdpm"],
@@ -281,8 +285,39 @@ def test_register_claude_code_offers_plugin_uninstall(monkeypatch, capsys):
     assert "appear twice" in capsys.readouterr().out
 
 
-def test_register_claude_code_without_plugin_runs_only_add(monkeypatch):
-    monkeypatch.setattr(cc, "claude_plugin_installed", lambda: False)
+def test_register_claude_code_without_plugin_runs_only_add():
     ran = []
-    cc.register([cc.by_id("claude-code")], POSIX, assume_yes=True, run=lambda a: (ran.append(a), 0)[1])
+    cc.register([cc.by_id("claude-code")], POSIX, assume_yes=True,
+                run=lambda a: (ran.append(a), 0)[1], probe=lambda _a: "")
     assert len(ran) == 1
+
+
+def test_register_touches_no_subprocess_when_both_seams_are_injected(monkeypatch):
+    """Injecting `run` was not enough, and that is the bug this guards.
+
+    `claude_plugin_installed` shelled out directly, so a test that stubbed
+    `run` to stay off the machine still ran `claude plugin list` — and on a
+    developer's machine with the sdpm plugin installed the cleanup then fired
+    an extra `claude plugin uninstall` through the stubbed runner.
+    `test_register_runs_cli_and_reports_failures` asserted an exact call list
+    and failed for that reason alone.
+
+    So the assertion is that nothing reaches `subprocess` at all: any new path
+    that shells out without a seam fails here rather than on one machine.
+    """
+
+    def forbidden(*args, **kwargs):
+        raise AssertionError(f"register() shelled out: {args!r}")
+
+    monkeypatch.setattr(cc.subprocess, "run", forbidden)
+    ran = []
+    failures = cc.register(
+        [cc.by_id("claude-code"), cc.by_id("codex")],
+        POSIX,
+        assume_yes=True,
+        run=lambda a: (ran.append(a), 0)[1],
+        probe=lambda _a: "",
+        open_url=lambda _u: True,
+    )
+    assert failures == 0
+    assert [a[0] for a in ran] == ["claude", "codex"]
