@@ -999,6 +999,7 @@ class AXNode(Protocol):
     def children(self) -> Sequence[AXNode]: ...
     def press(self) -> None: ...
     def set_selected(self, selected: bool) -> None: ...
+    def set_focused(self, focused: bool) -> None: ...
 
 
 class AXBackend(Protocol):
@@ -1012,6 +1013,24 @@ class AXBackend(Protocol):
     def windows(self) -> list[AXNode]: ...
     def now(self) -> float: ...
     def sleep(self, seconds: float) -> None: ...
+
+    # --- the keyboard, and the two reads that make it safe to use -----------
+    #
+    # One surface needs a key event: the Animation Pane's effect list, which no
+    # accessibility write can select a row in. See `select_pane_effect`.
+    #
+    # `post_key` delivers to **the process owning the document window**, never to
+    # whatever is frontmost. That is the whole reason it is safe: three decks
+    # share one PowerPoint process on the measuring host, and other applications
+    # are the operator's own work. A key that can only reach a named process
+    # cannot be typed into either.
+    #
+    # The two reads are preconditions, not conveniences. A process receives a key
+    # at its focused window and its focused element, so without them a press is
+    # aimed at whatever happened to be in front.
+    def focused_window_title(self) -> str | None: ...
+    def focused_element_role(self) -> str | None: ...
+    def post_key(self, keycode: int) -> None: ...
 
 
 def walk(root: AXNode, *, max_depth: int = MAX_TREE_DEPTH, max_nodes: int = MAX_TREE_NODES) -> Iterator[AXNode]:
@@ -1291,6 +1310,18 @@ class Containers:
     def sleep(self, seconds: float) -> None:
         self._backend.sleep(seconds)
 
+    # Delegated and deliberately **not** held. These two are the preconditions for
+    # sending a key, so a cached answer would be the one thing worse than no answer:
+    # it would report focus as it was before the operator clicked elsewhere.
+    def focused_window_title(self) -> str | None:
+        return self._backend.focused_window_title()
+
+    def focused_element_role(self) -> str | None:
+        return self._backend.focused_element_role()
+
+    def post_key(self, keycode: int) -> None:
+        self._backend.post_key(keycode)
+
     # --- what it holds ----------------------------------------------------
     def stale(self) -> None:
         """Drop everything held. Called after every action and before every poll."""
@@ -1473,6 +1504,13 @@ ANIMATION_LIST_TITLE = "Animation list"
 #: ``'Animation order: 7, Starts: On Click, Path effect, Curvy Left, 007.'``
 #: Measured 2026-11-02.
 PANE_CELL_ROLE = "AXCell"
+
+#: macOS virtual keycodes for the two keys this driver sends, and the only two.
+#: They move the Animation Pane's effect selection, which no accessibility write
+#: can do — see :func:`select_pane_effect`. Named rather than inlined so that a
+#: grep for what this driver can type returns a list of length two.
+KEY_ARROW_DOWN = 125
+KEY_ARROW_UP = 126
 
 #: Both panes share one tab bar once the Selection Pane is open, so the
 #: Animation Pane is revealed by selecting its tab rather than by the ribbon
@@ -2381,6 +2419,181 @@ def pane_effect_rows(backend: AXBackend) -> list[dict[str, Any]]:
     return described
 
 
+def _effect_list(backend: AXBackend) -> AXNode:
+    """The Animation Pane's effect list element itself."""
+    view = held(backend)
+    for node in walk(animation_pane(view)):
+        if node.role == SELECTION_PANE_ROLE:
+            return node
+    raise ControlNotFound(
+        f"the Animation Pane publishes no {SELECTION_PANE_ROLE}, so it has no effect list"
+    )
+
+
+def _refuse_unless_keys_reach_the_effect_list(backend: AXBackend) -> None:
+    """Raise unless an arrow key would land in the effect list being driven.
+
+    Both halves are required and neither is a formality:
+
+    * The process delivers a key to its **focused window**. The measuring host had
+      three decks open in one PowerPoint process, so "send a key to PowerPoint"
+      says nothing about which deck receives it. ``AXFocusedWindow`` is not
+      settable on this application, so this can only require the right one.
+    * A window delivers a key to its **focused element**. Without this the arrow
+      would move the slide, scroll the canvas or type into a text box.
+
+    Checked immediately before every press rather than once per target: the
+    operator can click into another window between two presses, and the whole
+    reason this is acceptable at all is that a key cannot go anywhere it was not
+    just confirmed to be going.
+    """
+    view = held(backend)
+    wanted = view.window().title
+    focused = view.focused_window_title()
+    if focused != wanted:
+        raise TargetFailure(
+            f"PowerPoint's focused window is {focused!r}, not the deck being measured "
+            f"({wanted!r}), so an arrow key would move something in another document; "
+            "bring the capture deck to the front",
+            focusedWindow=focused,
+            wantedWindow=wanted,
+        )
+    role = view.focused_element_role()
+    if role != SELECTION_PANE_ROLE:
+        raise TargetFailure(
+            f"the focused element is a {role}, not the {SELECTION_PANE_ROLE} holding the "
+            "effect list, so an arrow key would move something other than the effect "
+            "selection",
+            focusedRole=role,
+        )
+
+
+def select_pane_effect(
+    backend: AXBackend, *, described_as: str, timeout: float
+) -> dict[str, Any]:
+    """Select one effect in the Animation Pane's list, by what the effect **is**.
+
+    ``described_as`` matches against the row's own description — e.g. ``"Curvy
+    Left"`` against ``'Animation order: 7, Starts: On Click, Path effect, Curvy
+    Left, 007.'`` — so a measurement names the effect it measured instead of
+    asserting a row number that depends on pane ordering.
+
+    **This is the one place the driver sends a key event**, and only because every
+    alternative was measured and none works: ``AXSelected`` on the row and
+    ``AXSelectedRows`` on the outline both report settable, return 0 and never read
+    back; ``AXPress`` is not published; the row's two actions do nothing; selecting
+    the shape selects no effect; and ``agent-desktop``'s ``click`` answers
+    "Selection was delivered but its effect could not be verified". What does work
+    is ``AXFocused`` on the list plus an arrow key — measured 2026-11-02, two Down
+    presses moved the selection to rows 1 and 2 and the four settings sections and
+    six popups appeared with it.
+
+    Three properties keep that from being the mouse event this driver removed:
+
+    * The key is posted **to PowerPoint's process**, so it cannot reach another
+      application or be typed into the operator's work.
+    * It needs no coordinate and no pointer, so nothing is aimed by position —
+      which is what corrupted evidence on 2026-10-31.
+    * Every press is preceded by :func:`_refuse_unless_keys_reach_the_effect_list`
+      and followed by a read of the selection, so a press that went somewhere else
+      fails here rather than being recorded as a measurement.
+
+    It walks the selection one row at a time instead of computing a press count,
+    because the read-back after each press is what makes the walk honest: a list
+    that stops moving fails as "stuck" rather than silently swallowing presses.
+    """
+    view = held(backend)
+
+    def rows() -> list[dict[str, Any]]:
+        return pane_effect_rows(view)
+
+    def target_in(found: list[dict[str, Any]]) -> dict[str, Any]:
+        matching = [
+            row
+            for row in found
+            if row["describedAs"] and described_as in row["describedAs"]
+        ]
+        if not matching:
+            raise ControlNotFound(
+                f"no effect in the Animation Pane is described as {described_as!r}",
+                describedAs=described_as,
+                rows=[row["describedAs"] for row in found],
+            )
+        if len(matching) > 1:
+            raise AmbiguousControl(
+                f"{len(matching)} effects in the Animation Pane match {described_as!r}; "
+                "refusing to choose",
+                matched=[row["describedAs"] for row in matching],
+            )
+        return matching[0]
+
+    found = rows()
+    target = target_in(found)
+    if target["selected"]:
+        return {
+            "describedAs": target["describedAs"],
+            "rowIndex": target["rowIndex"],
+            "how": "alreadySelected",
+            "presses": 0,
+        }
+
+    # Focus is what the key follows, so it is established once and then re-checked
+    # before each press rather than trusted for the whole walk.
+    _effect_list(view).set_focused(True)
+    view.stale()
+
+    presses = 0
+    # One press per row is enough to cross the list from either end; the bound
+    # exists so a list that answers presses without moving terminates.
+    limit = len(found) + 1
+    while presses < limit:
+        _refuse_unless_keys_reach_the_effect_list(view)
+        found = rows()
+        target = target_in(found)
+        if target["selected"]:
+            return {
+                "describedAs": target["describedAs"],
+                "rowIndex": target["rowIndex"],
+                "how": "arrowKeys",
+                "presses": presses,
+            }
+        selected = [row for row in found if row["selected"]]
+        if len(selected) > 1:
+            raise AmbiguousControl(
+                f"the effect list has {len(selected)} rows selected, so an arrow key would "
+                "move an ambiguous selection",
+                selected=[row["describedAs"] for row in selected],
+            )
+        # With nothing selected the first Down takes the top row, so down is also
+        # the right first move from empty.
+        at = selected[0]["rowIndex"] if selected else -1
+        before = at
+        view.post_key(KEY_ARROW_DOWN if at < target["rowIndex"] else KEY_ARROW_UP)
+        presses += 1
+        view.stale()
+        # PowerPoint answers a key asynchronously, so the move is waited for rather
+        # than assumed — and "did not move" is a failure, not a slow success.
+        def moved(before: int = before) -> bool:
+            view.stale()
+            current = [row for row in pane_effect_rows(view) if row["selected"]]
+            return bool(current) and current[0]["rowIndex"] != before
+        wait_until(
+            view,
+            moved,
+            timeout=timeout,
+            what=(
+                f"the effect list's selection to move off row {before} after an arrow key "
+                f"(press {presses})"
+            ),
+        )
+
+    raise TargetFailure(
+        f"the effect list's selection did not reach {described_as!r} in {limit} arrow keys",
+        describedAs=described_as,
+        presses=presses,
+    )
+
+
 def selected_pane_effect(backend: AXBackend) -> dict[str, Any]:
     """Return the effect the Animation Pane has selected, or refuse saying nothing is.
 
@@ -2413,11 +2626,11 @@ def selected_pane_effect(backend: AXBackend) -> dict[str, Any]:
     measured on 2026-11-02 were measured with an effect that something *outside*
     the driver had selected, which is why they looked like it worked.
 
-    What is left is physical input — a real click, or focusing the list and
-    sending arrow keys — and that is a decision about this driver's contract
-    rather than a detail, so it is not taken here. Until it is taken, the pane's
-    per-effect settings are reachable only with an effect already selected, and
-    this is the precondition check that says whether one is.
+    What does work is focusing the list and sending an arrow key, which
+    :func:`select_pane_effect` does. This function stays because it is the
+    cheaper question — "is an effect selected, and which one?" — and because the
+    settings sections exist only while one is, so it is the precondition every
+    pane setting is read against.
 
     The selection is not load-bearing for correctness, which is worth stating:
     :func:`attribute_modified_batch` compares the package either side of the save,
@@ -3412,8 +3625,26 @@ class LiveAXNode:
         if error:
             raise TargetFailure(f"AXPress on {self.title!r} ({self.role}) failed with AX error {error}")
 
+    def set_focused(self, focused: bool) -> None:
+        """Write ``AXFocused``. The second and last attribute this driver sets.
+
+        It exists for one element: the Animation Pane's effect list, which has to
+        hold keyboard focus before an arrow key can move its selection. Measured
+        2026-11-02, this is the **only** write that surface accepts — ``AXSelected``
+        on a row and ``AXSelectedRows`` on the outline both report settable, return
+        0 and never read back, while this one takes and the application's
+        ``AXFocusedUIElement`` becomes the list.
+        """
+        error = self._ax.AXUIElementSetAttributeValue(
+            self._element, self._ax.kAXFocusedAttribute, bool(focused)
+        )
+        if error:
+            raise TargetFailure(
+                f"setting AXFocused on a {self.role} failed with AX error {error}"
+            )
+
     def set_selected(self, selected: bool) -> None:
-        """Write ``AXSelected``. The only attribute this driver ever sets.
+        """Write ``AXSelected``. One of the two attributes this driver ever sets.
 
         A Selection Pane row has no ``AXPress`` — its actions are ``AXShowDefaultUI``,
         ``AXShowAlternateUI`` and a Rename — so setting this attribute is how an outline
@@ -3440,9 +3671,11 @@ class LiveAXNode:
 class LiveAXBackend:
     """The real host. pyobjc is imported here so importing this module never needs it.
 
-    It posts no events of any kind, so **Quartz is no longer imported**: the only
-    binding that needed it was the mouse event, and the documented invocation lost a
-    ``--with`` with it.
+    It posts **no mouse events**. It posts exactly one kind of event — an arrow key,
+    to PowerPoint's own process — for the one surface where no accessibility write
+    works at all: see :meth:`post_key` and :func:`select_pane_effect`. So Quartz is
+    imported again, inside that method, and the documented invocation carries
+    ``--with pyobjc-framework-Quartz``.
     """
 
     def __init__(self) -> None:
@@ -3481,7 +3714,60 @@ class LiveAXBackend:
     # canvas point, with a click state, a move settle, a button hold and a 0.35 s settle
     # after the up, and its last live run captured 2 of 12 attempted targets: the pointer
     # landed in the right place and the shape stayed unselected. Shape selection is a
-    # Selection Pane row now, so this backend posts no events at all.
+    # Selection Pane row now, so this backend posts no **mouse** events at all.
+
+    def focused_window_title(self) -> str | None:
+        """The title of the window a key sent to this process would reach.
+
+        Read rather than set: ``AXFocusedWindow`` reports ``settable=False`` on this
+        application, so the driver can require the right deck and cannot redirect to
+        it. Requiring is enough — and is the point: the measuring host had three
+        decks open in one process (``cx-deck``, ``spin2-deck``, ``eo-deck``), so a
+        key aimed at "PowerPoint" is aimed at whichever of them has focus.
+        """
+        element = self._application()
+        error, window = self._ax.AXUIElementCopyAttributeValue(element, "AXFocusedWindow", None)
+        if error or window is None:
+            return None
+        return LiveAXNode(window, self._ax).title
+
+    def focused_element_role(self) -> str | None:
+        """The role of the element a key sent to this process would reach.
+
+        The second half of the precondition. A window's focused element is where its
+        key events land, so this is what says the arrow key will move the effect
+        list's selection rather than the slide, the canvas or a text box.
+        """
+        element = self._application()
+        error, focused = self._ax.AXUIElementCopyAttributeValue(
+            element, "AXFocusedUIElement", None
+        )
+        if error or focused is None:
+            return None
+        return LiveAXNode(focused, self._ax).role
+
+    def post_key(self, keycode: int) -> None:
+        """Post one key, down then up, **to PowerPoint's process**.
+
+        ``CGEventPostToPid`` rather than ``CGEventPost``: a posted-to-pid event is
+        delivered to the named process and reaches nothing else, so it cannot be
+        typed into the operator's own work and cannot reach another application. It
+        moves no cursor and takes no focus, which is why this is not the mouse event
+        that was removed — that one needed a screen coordinate and a pointer, and
+        this one needs neither.
+
+        Quartz is imported here, and only here, for the same reason pyobjc is
+        imported in this class at all: importing this module must not need it. The
+        documented invocation therefore carries
+        ``--with pyobjc-framework-Quartz`` again.
+        """
+        import Quartz
+
+        for pressed in (True, False):
+            event = Quartz.CGEventCreateKeyboardEvent(None, keycode, pressed)
+            if event is None:  # pragma: no cover - the binding would have to fail
+                raise TargetFailure(f"could not create a key event for keycode {keycode}")
+            Quartz.CGEventPostToPid(self._pid, event)
 
     def now(self) -> float:
         return time.monotonic()

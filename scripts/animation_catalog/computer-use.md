@@ -710,27 +710,58 @@ the ribbon's popups do. Click the combobox, let it settle, then
 
 Close every popup with `escape` before touching the next control.
 
-## Step 3 — After animation (dim, hide, hide on next click)
+## Step 3 — After animation (dim, hide, hide on next click) — **measured**
 
-**The route is measured; the values are not yet captured.**
-`Effect Options ▸ After animation:` defaults to `Don't Dim` and offers 12 items:
+Measured 2026-11-02 through `gui_capture.py` end to end, four presses and four
+saves, each attributed to one shape. Full evidence in
+`tests/fixtures/animations/gui-only/after-effects-2026-11-02/after-effects.json`.
 
-| Item | Role | Closes |
-| --- | --- | --- |
-| 8 scheme swatches: Background, Text and Lines, Shadows, Title Text, Fills, Accent, Accent and Hyperlink, Accent and Followed Hyperlink | `button` | `animation.afterAnimation.dim` |
-| `More Colors...` | `menuitem` | `animation.afterAnimation.dimColor` |
-| `Don't Dim` | `menuitem` | the default |
-| `Hide After Animation` | `menuitem` | `animation.afterAnimation.hide` |
-| `Hide on Next Mouse Click` | `menuitem` | `animation.afterAnimation.hideOnNextClick` |
+This section used to ask "whether PowerPoint writes `p:cTn/@afterEffect`, an
+extra `p:set` on `style.visibility`, or a trailing `p:animClr`". The answer is
+**all three at once**, and in a place none of those guesses put it: the value is
+a child of **`p:subTnLst`**, the sibling of `p:childTnLst` that holds the
+effect's own behaviour. So an after-effect is a second, dependent behaviour hung
+off the effect, not a flag on it — which is why nothing about `p:cTn` revealed
+it.
 
-The 8 swatches are the **scheme** colours, so a dim records a theme-colour
-reference rather than an RGB literal; `More Colors...` is the arbitrary-RGB
-route. Capture one swatch and one `More Colors...` value to tell the two
-storage forms apart.
+| Value | Element under `p:subTnLst` | `attrName` | `to` |
+| --- | --- | --- | --- |
+| `Hide After Animation` | `p:set` | `style.visibility` | `p:strVal val="hidden"` |
+| `Hide on Next Mouse Click` | `p:set` | `style.visibility` | `p:strVal val="hidden"` |
+| a scheme swatch | `p:animClr clrSpc="rgb" dir="cw"` | `ppt_c` | `a:schemeClr` |
+| `More Colors...` | `p:animClr clrSpc="rgb" dir="cw"` | `ppt_c` | `a:srgbClr` |
+| `Don't Dim` | — | — | the whole `p:subTnLst` is **absent** |
 
-What to look for: whether PowerPoint writes `p:cTn/@afterEffect`, an extra
-`p:set` on `style.visibility`, or a trailing `p:animClr`, and where the dim
-colour lives.
+Every one of the four carries the same `p:cBhvr override="childStyle"` and the
+same `p:cTn dur="1" fill="hold" display="0" afterEffect="1"`. Within each pair
+exactly one thing differs, and it is the thing that cannot be guessed:
+
+* **hide vs hideOnNextClick** — `masterRel`, `sameClick` against `nextClick`.
+  `Hide After Animation` additionally carries a `p:stCondLst` holding
+  `cond evt="end" delay="0"` and `tn val="29"`, the effect's **own** `p:cTn` id,
+  because hiding "after animation" has to wait for this effect to end. The
+  next-click form's `p:cTn` is self-closing.
+* **dim vs dimColor** — the colour child alone. `a:schemeClr` for a swatch,
+  `a:srgbClr` for `More Colors...`. The rest of the subtree is byte-identical.
+
+`Accent Scheme Color` writes **`accent2`**, not `accent1`. The other seven
+swatch-to-scheme-name mappings are *not* measured and must not be extrapolated
+from the labels for exactly that reason.
+
+The menu publishes 13 addressable items in two roles — the 8 swatches are
+`AXButton`, the 4 named choices and one blank entry are `AXMenuItem` — which is
+why a search for menu items alone found four of them and timed out on the rest.
+
+`More Colors...` opens a **separate window** titled `Colors` (not a sheet),
+carrying pressable `OK` and `Cancel`. That is worth knowing because this driver
+has no escape key: it posts two keycodes and both are arrows, so a panel
+dismissible only by a key would strand the application.
+
+One trap for a run that automates this: **a popup's read-back depends on which
+kind of item was pressed.** The named choices leave the popup showing their own
+name; a colour swatch leaves it showing `' '`, a single space. So
+`set_pane_choice` needs `reads_back_as` for a swatch and not for a named item,
+and assuming the item's name times out on a press that has already landed.
 
 ## Step 4 — Effect sound and Stop previous sound
 

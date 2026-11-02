@@ -2385,6 +2385,105 @@ def test_rewind_and_bounce_end_are_measured_through_the_driver():
     assert set(measured["notMeasured"]) >= {"animation.afterAnimation.*", "animation.sound.*"}
 
 
+def test_the_four_after_animation_values_are_measured_through_the_driver():
+    """All four, and the one thing they have in common is the shape of the answer.
+
+    An after-animation value is **not an attribute**. It is a child of ``p:subTnLst``,
+    the sibling of ``p:childTnLst`` that holds the effect's own behaviour — so it is a
+    second, dependent behaviour hung off the effect rather than a flag on it. Which is
+    why no amount of looking at ``p:cTn`` would have found it.
+
+    They split two and two. The hide values write ``p:set`` on ``style.visibility``; the
+    dim values write ``p:animClr`` on ``ppt_c``. Inside each pair exactly one thing
+    differs, and in both cases it is the thing a writer would otherwise have to guess:
+
+    * hide vs hideOnNextClick: ``masterRel``, and whether the ``p:cTn`` carries a start
+      condition pointing at the effect's own id.
+    * dim vs dimColor: the colour child, ``a:schemeClr`` against ``a:srgbClr``. Nothing
+      else in the subtree moves.
+
+    This is also the first measurement on this surface where the **driver** selected the
+    effect: ``select_pane_effect`` focuses the list and posts arrow keys, because no
+    accessibility write selects one. The two values measured the day before were taken
+    against a selection made by hand.
+    """
+    measured = json.loads(
+        (
+            REPO_ROOT
+            / "tests/fixtures/animations/gui-only/after-effects-2026-11-02"
+            / "after-effects.json"
+        ).read_text()
+    )
+    assert measured["platform"] == "macOS"
+    assert measured["version"] == "16.113.1"
+    assert set(measured["settings"]) == {
+        "animation.afterAnimation.hide",
+        "animation.afterAnimation.hideOnNextClick",
+        "animation.afterAnimation.dim",
+        "animation.afterAnimation.dimColor",
+        "animation.afterAnimation.dontDim",
+    }
+
+    # Every measured value hangs off p:subTnLst, which is the finding.
+    applied = [
+        setting
+        for key, setting in measured["settings"].items()
+        if key != "animation.afterAnimation.dontDim"
+    ]
+    assert all(setting["element"].startswith("p:subTnLst > ") for setting in applied)
+    assert all("<p:subTnLst>" in setting["evidence"] for setting in applied)
+
+    hide = measured["settings"]["animation.afterAnimation.hide"]
+    next_click = measured["settings"]["animation.afterAnimation.hideOnNextClick"]
+    assert hide["element"] == next_click["element"] == "p:subTnLst > p:set"
+    assert hide["attrName"] == next_click["attrName"] == "style.visibility"
+    assert hide["value"] == next_click["value"] == "hidden"
+    # The one difference, and the start condition that follows from it: hiding "after
+    # animation" has to wait for this effect to end, so it names the effect's own id.
+    assert hide["distinguishedBy"]["masterRel"] == "sameClick"
+    assert next_click["distinguishedBy"]["masterRel"] == "nextClick"
+    assert 'masterRel="sameClick"' in hide["evidence"]
+    assert '<p:tn val="29"/>' in hide["evidence"]
+    assert 'masterRel="nextClick"' in next_click["evidence"]
+    assert "stCondLst" not in next_click["evidence"]
+
+    dim = measured["settings"]["animation.afterAnimation.dim"]
+    dim_colour = measured["settings"]["animation.afterAnimation.dimColor"]
+    assert dim["element"] == dim_colour["element"] == "p:subTnLst > p:animClr"
+    assert dim["attrName"] == dim_colour["attrName"] == "ppt_c"
+    assert (dim["colour"], dim["measuredValue"]) == ("a:schemeClr", "accent2")
+    assert (dim_colour["colour"], dim_colour["measuredValue"]) == ("a:srgbClr", "C0504D")
+    assert '<a:schemeClr val="accent2"/>' in dim["evidence"]
+    assert '<a:srgbClr val="C0504D"/>' in dim_colour["evidence"]
+    # The two subtrees are identical but for the colour child, which is what makes the
+    # pair safe to implement as one writer with one branch.
+    assert dim["evidence"].replace(
+        '<a:schemeClr val="accent2"/>', "COLOUR"
+    ) == dim_colour["evidence"].replace('<a:srgbClr val="C0504D"/>', "COLOUR")
+
+    # 'Accent' writing accent2 is why the remaining swatches are recorded as unmeasured
+    # rather than extrapolated from their labels.
+    assert dim["measuredSwatch"] == "Accent Scheme Color"
+    assert "accent1" in dim["notMeasured"]
+
+    default = measured["settings"]["animation.afterAnimation.dontDim"]
+    assert default["isDefault"] is True
+    assert "absent" in default["clearedForm"]
+
+    # Attribution, checked a second way against the written package rather than only by
+    # the diff that credited it.
+    assert measured["attribution"]["finding"].startswith("the gate reported exactly one shape")
+    assert "only spid 14" in measured["attribution"]["corroboration"]
+
+    # The menu's two roles, which is what made a menu-item-only search time out.
+    roles = {item["role"] for item in measured["menu"]["items"]}
+    assert roles == {"AXButton", "AXMenuItem"}
+    swatches = [item for item in measured["menu"]["items"] if item["role"] == "AXButton"]
+    assert len(swatches) == 8
+    assert all(item["title"].endswith("Scheme Color") for item in swatches)
+    assert "Delete" in measured["menu"]["hazard"]
+
+
 def test_smooth_start_and_smooth_end_are_measured_as_ctn_attributes():
     """Two of the four timing options are measured, and they are attributes.
 

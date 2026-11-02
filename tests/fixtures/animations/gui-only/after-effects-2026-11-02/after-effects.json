@@ -1,0 +1,114 @@
+{
+  "record": "paneSettingMeasurement",
+  "application": "Microsoft PowerPoint",
+  "version": "16.113.1",
+  "platform": "macOS",
+  "mechanism": "gui_capture.py end to end against live PowerPoint: open the Animation Pane, select the effect with select_pane_effect (AXFocused on the list plus arrow keys), expand Effect Options, press one item of the After animation popup, press Save in the Quick Access toolbar, then diff per-shape effect signatures",
+  "measuredAt": "2026-11-02",
+  "document": "a scratch deck carrying the seven Complex motion paths, one effect per shape",
+  "selectedEffect": {
+    "cTnId": "29",
+    "presetID": "48",
+    "presetClass": "path",
+    "spid": "14",
+    "describedAs": "Animation order: 7, Starts: On Click, Path effect, Curvy Left, 007.",
+    "selectedBy": "select_pane_effect, by description — the first measurement on this surface where the driver selected the effect itself rather than inheriting a hand-made selection"
+  },
+  "attribution": {
+    "finding": "the gate reported exactly one shape, spid 14, for each of the four saves",
+    "corroboration": "checked a second way against the written package: of the seven effects, only spid 14's carries a p:subTnLst at all, so no other shape could have received a press",
+    "note": "the pane-setting gate rather than the gallery one: an after-effect edits the effect already on the shape, so the effect count does not move and the evidence is the effect's own signature"
+  },
+  "finding": "An after-animation value is not an attribute. It is a child of p:subTnLst — a sibling of p:childTnLst, which holds the effect's own behaviour — so it is a second, dependent behaviour attached to the effect. The two hide values use p:set on style.visibility; the two dim values use p:animClr on ppt_c. Clearing to Don't Dim removes the whole p:subTnLst.",
+  "settings": {
+    "animation.afterAnimation.hide": {
+      "control": "Animation Pane / Effect Options / After animation: / Hide After Animation",
+      "msoEnumerator": "MsoAnimAfterEffect.hide",
+      "element": "p:subTnLst > p:set",
+      "attrName": "style.visibility",
+      "value": "hidden",
+      "distinguishedBy": {
+        "masterRel": "sameClick",
+        "stCondLst": "present: cond evt=\"end\" delay=\"0\" holding tn val=\"29\", the effect's own cTn id, so the hide starts when this effect ends"
+      },
+      "evidence": "<p:subTnLst><p:set><p:cBhvr override=\"childStyle\"><p:cTn dur=\"1\" fill=\"hold\" display=\"0\" masterRel=\"sameClick\" afterEffect=\"1\"><p:stCondLst><p:cond evt=\"end\" delay=\"0\"><p:tn val=\"29\"/></p:cond></p:stCondLst></p:cTn><p:tgtEl><p:spTgt spid=\"14\"/></p:tgtEl><p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val=\"hidden\"/></p:to></p:set></p:subTnLst>"
+    },
+    "animation.afterAnimation.hideOnNextClick": {
+      "control": "Animation Pane / Effect Options / After animation: / Hide on Next Mouse Click",
+      "msoEnumerator": "MsoAnimAfterEffect.hide on next click",
+      "element": "p:subTnLst > p:set",
+      "attrName": "style.visibility",
+      "value": "hidden",
+      "distinguishedBy": {
+        "masterRel": "nextClick",
+        "stCondLst": "absent: the p:cTn is self-closing, because the hide is triggered by the next click rather than by this effect ending"
+      },
+      "evidence": "<p:subTnLst><p:set><p:cBhvr override=\"childStyle\"><p:cTn dur=\"1\" fill=\"hold\" display=\"0\" masterRel=\"nextClick\" afterEffect=\"1\"/><p:tgtEl><p:spTgt spid=\"14\"/></p:tgtEl><p:attrNameLst><p:attrName>style.visibility</p:attrName></p:attrNameLst></p:cBhvr><p:to><p:strVal val=\"hidden\"/></p:to></p:set></p:subTnLst>"
+    },
+    "animation.afterAnimation.dim": {
+      "control": "Animation Pane / Effect Options / After animation: / one of the eight scheme-colour swatches",
+      "msoEnumerator": "MsoAnimAfterEffect.dim",
+      "element": "p:subTnLst > p:animClr",
+      "attrName": "ppt_c",
+      "colour": "a:schemeClr",
+      "measuredSwatch": "Accent Scheme Color",
+      "measuredValue": "accent2",
+      "distinguishedBy": {
+        "masterRel": "nextClick",
+        "note": "p:animClr carries clrSpc=\"rgb\" dir=\"cw\" even for a scheme colour"
+      },
+      "evidence": "<p:subTnLst><p:animClr clrSpc=\"rgb\" dir=\"cw\"><p:cBhvr override=\"childStyle\"><p:cTn dur=\"1\" fill=\"hold\" display=\"0\" masterRel=\"nextClick\" afterEffect=\"1\"/><p:tgtEl><p:spTgt spid=\"14\"/></p:tgtEl><p:attrNameLst><p:attrName>ppt_c</p:attrName></p:attrNameLst></p:cBhvr><p:to><a:schemeClr val=\"accent2\"/></p:to></p:animClr></p:subTnLst>",
+      "notMeasured": "the other seven swatches. Their menu titles are known (Background, Text and Lines, Shadows, Title Text, Fills, Accent and Hyperlink, Accent and Followed Hyperlink, each suffixed 'Scheme Color') but which a:schemeClr name each writes was not measured, and 'Accent' mapping to accent2 rather than accent1 is the reason that cannot be guessed from the label."
+    },
+    "animation.afterAnimation.dimColor": {
+      "control": "Animation Pane / Effect Options / After animation: / More Colors...",
+      "element": "p:subTnLst > p:animClr",
+      "attrName": "ppt_c",
+      "colour": "a:srgbClr",
+      "measuredValue": "C0504D",
+      "distinguishedBy": {
+        "fromDim": "the colour child, and only that: an explicit a:srgbClr where a swatch writes a:schemeClr. Everything around it — p:animClr, clrSpc, dir, the cBhvr, masterRel, ppt_c — is identical.",
+        "masterRel": "nextClick"
+      },
+      "evidence": "<p:subTnLst><p:animClr clrSpc=\"rgb\" dir=\"cw\"><p:cBhvr override=\"childStyle\"><p:cTn dur=\"1\" fill=\"hold\" display=\"0\" masterRel=\"nextClick\" afterEffect=\"1\"/><p:tgtEl><p:spTgt spid=\"14\"/></p:tgtEl><p:attrNameLst><p:attrName>ppt_c</p:attrName></p:attrNameLst></p:cBhvr><p:to><a:srgbClr val=\"C0504D\"/></p:to></p:animClr></p:subTnLst>",
+      "corroboration": "the Colors panel's own colour well read 'rgb 0.752941 0.313725 0.301961 1', which is 192, 80, 77 — exactly the C0504D that was written. The value was not chosen, it was read back, which is what makes this a measurement of the element form rather than of a colour."
+    },
+    "animation.afterAnimation.dontDim": {
+      "control": "Animation Pane / Effect Options / After animation: / Don't Dim",
+      "isDefault": true,
+      "clearedForm": "the whole p:subTnLst is absent, not an empty one and not a p:set with a neutral value",
+      "finding": "So there is nothing to write for the default, and reading it back is the absence of p:subTnLst rather than a value."
+    }
+  },
+  "menu": {
+    "finding": "The After animation popup holds 12 choices in three kinds, and the kinds have different roles — which is why looking for AXMenuItem alone found four of them and timed out on the rest.",
+    "items": [
+      {"title": "Background Scheme Color", "role": "AXButton"},
+      {"title": "Text and Lines Scheme Color", "role": "AXButton"},
+      {"title": "Shadows Scheme Color", "role": "AXButton"},
+      {"title": "Title Text Scheme Color", "role": "AXButton"},
+      {"title": "Fills Scheme Color", "role": "AXButton"},
+      {"title": "Accent Scheme Color", "role": "AXButton"},
+      {"title": "Accent and Hyperlink Scheme Color", "role": "AXButton"},
+      {"title": "Accent and Followed Hyperlink Scheme Color", "role": "AXButton"},
+      {"title": "More Colors...", "role": "AXMenuItem"},
+      {"title": "Don't Dim", "role": "AXMenuItem"},
+      {"title": "Hide After Animation", "role": "AXMenuItem"},
+      {"title": "Hide on Next Mouse Click", "role": "AXMenuItem"},
+      {"title": " ", "role": "AXMenuItem", "note": "a blank item the menu publishes alongside the twelve choices"}
+    ],
+    "hazard": "Walking the pane for a menu item also reaches the pane's own buttons — Close Animations, Close Selection Pane, Play From, Move up, Move down and Delete. Delete sits beside the controls being pressed and removes effects rather than editing them, which is the failure the attribution gate exists to catch."
+  },
+  "methodFindings": [
+    "The effect was selected by the driver itself. No accessibility write selects a row in the Animation Pane's effect list — AXSelected on the row and AXSelectedRows on the outline are both accepted and ignored — so select_pane_effect sets AXFocused on the list and posts arrow keys to PowerPoint's process. Measured: Down from an empty list took row 1, each further Down advanced one row, and the four settings sections appeared with the first selection.",
+    "The ANIMATIONS header at row 0 is not selectable: Down from empty skipped it, and three Up presses from row 1 all left the selection on row 1. So the list's floor is row 1 and an Up press at the top is a key that legitimately moves nothing.",
+    "A popup's read-back depends on the kind of item pressed. The three named items leave the popup showing their own name; a colour swatch leaves it showing ' ' — a single space. So set_pane_choice needs reads_back_as for a swatch and not for a named item, and a run that assumed the item's name would time out on a press that had landed.",
+    "More Colors... opens a separate window titled 'Colors', not a sheet, carrying pressable OK and Cancel buttons. That matters because this driver has no escape key — it posts two keycodes, both arrows — so a panel dismissible only by a key would have stranded the application.",
+    "Four presses, four saves, and the selection survived all of them: the effect stayed selected across each save, so the pane did not have to be re-reached per value."
+  ],
+  "notMeasured": {
+    "the other seven colour swatches": "see animation.afterAnimation.dim.notMeasured",
+    "animation.sound.*": "needs an audio part and a package relationship the writer does not create; no fixture in the repository contains a sound",
+    "animation.gallery.media.*": "needs a deck containing a video"
+  }
+}

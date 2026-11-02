@@ -79,7 +79,7 @@
     "The effect rows are identifiable after all. The name is not a descendant AXStaticText the way a Selection Pane row's is - which is why a search for one returned nothing and the rows were called nameless - it is the row's AXCell child's own title, and it describes the effect: 'Animation order: 7, Starts: On Click, Path effect, Curvy Left, 007.'"
   ],
   "notMeasured": {
-    "animation.afterAnimation.*": "the After animation popup is a selection rather than a checkbox, which set_pane_choice now handles - but reaching it needs an effect selected, and no accessibility mechanism selects one (see methodFindings). Hide After Animation and Hide on Next Mouse Click were measured in this session against a hand-selected effect; dim and dimColor were not.",
+    "animation.afterAnimation.*": "MEASURED 2026-11-02 in after-effects-2026-11-02/after-effects.json — all four values, with the effect selected by the driver itself rather than by hand. This entry is kept so the reason it was open here is not lost: the popup is a selection rather than a checkbox, and reaching it needs an effect selected, which nothing in the accessibility API does.",
     "animation.sound.*": "needs an audio part and a package relationship the writer does not create",
     "animation.gallery.media.*": "needs a deck containing a video"
   }

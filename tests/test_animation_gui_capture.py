@@ -298,8 +298,10 @@ class FakeNode:
         index: int | None = None,
         on_press: Callable[[], None] | None = None,
         on_set_selected: Callable[[bool], None] | None = None,
+        on_set_focused: Callable[[bool], None] | None = None,
         press_error: str | None = None,
         select_error: str | None = None,
+        focus_error: str | None = None,
         counter: ReadCounter | None = None,
     ) -> None:
         self._role = role
@@ -312,8 +314,10 @@ class FakeNode:
         self._index = index
         self.on_press = on_press
         self.on_set_selected = on_set_selected
+        self.on_set_focused = on_set_focused
         self.press_error = press_error
         self.select_error = select_error
+        self.focus_error = focus_error
         self.counter = counter if counter is not None else ReadCounter()
 
     @property
@@ -380,6 +384,12 @@ class FakeNode:
             raise driver.TargetFailure(self.select_error)
         if self.on_set_selected is not None:
             self.on_set_selected(selected)
+
+    def set_focused(self, focused: bool) -> None:
+        if self.focus_error:
+            raise driver.TargetFailure(self.focus_error)
+        if self.on_set_focused is not None:
+            self.on_set_focused(focused)
 
 
 #: Tiles the Entrance gallery holds, as **pages**. The live gallery is an
@@ -529,6 +539,28 @@ class FakePowerPoint:
         #: Every effect row a caller tried to select, in order. The attempts are recorded
         #: and ignored, as the live rows record and ignore them.
         self.effect_row_selections: list[int] = []
+        #: Which of this process's windows has focus, which is where a posted key lands.
+        #: ``None`` means the document window, as on open. A test names another deck to
+        #: model the measuring host, where three documents shared one PowerPoint process
+        #: and "send a key to PowerPoint" said nothing about which received it.
+        self.focused_window: str | None = None
+        #: The role of the focused element, which is where the focused window sends its
+        #: keys. ``None`` models the window itself being focused, as it is on open.
+        self.focused_role: str | None = None
+        #: Every key posted to this process, in order, as keycodes.
+        self.keys: list[int] = []
+        #: Keys that arrived while focus was NOT on the effect list. A key counted here
+        #: went somewhere nobody aimed it — into a slide, a text box or the operator's
+        #: own document — so tests assert this is empty rather than only asserting that
+        #: the right thing happened.
+        self.stray_keys: list[int] = []
+        #: When true, the list accepts arrow keys and does not move. A walk that
+        #: swallowed presses would otherwise spin until its own bound.
+        self.effect_list_stuck = False
+        #: When false, ``AXFocused`` on the list is accepted and focus does not land.
+        #: The driver must then send no key at all, because it would go wherever focus
+        #: actually is.
+        self.effect_list_takes_focus = True
         #: Which pane sections are expanded. A section is a disclosure, so pressing an
         #: already-open one closes it.
         self.expanded_sections: set[str] = set()
@@ -943,6 +975,10 @@ class FakePowerPoint:
                 on_set_selected=(
                     lambda selected, position=position: self.effect_row_selections.append(position)
                 ),
+                # ``AXFocused`` on a row is not what works either — it is the
+                # **outline** that takes focus. A row offers it so that a driver aiming
+                # at the wrong element still lands somewhere inert.
+                on_set_focused=lambda focused: None,
                 children=(
                     []
                     if position == 0
@@ -968,11 +1004,20 @@ class FakePowerPoint:
         return self._node(
             role=driver.SELECTION_PANE_ROLE,
             title=driver.ANIMATION_LIST_TITLE,
+            # ``AXFocused`` is the one write this surface accepts, and it is what the
+            # arrow keys follow. Measured 2026-11-02: it takes, and the application's
+            # AXFocusedUIElement becomes this outline.
+            on_set_focused=self._focus_effect_list,
             children=[
                 *(row(position) for position in range(self.animation_row_count + 1)),
                 self._node(role="AXColumn"),
             ],
         )
+
+    def _focus_effect_list(self, focused: bool) -> None:
+        if not self.effect_list_takes_focus:
+            return
+        self.focused_role = driver.SELECTION_PANE_ROLE if focused else None
 
     def _selection_pane(self) -> FakeNode:
         """The pane: one row per shape in reverse z-order, named by a descendant label.
@@ -1121,6 +1166,42 @@ class FakePowerPoint:
         if self.arrange_open:
             windows.append(self._arrange_window())
         return windows
+
+    # --- the keyboard -----------------------------------------------------
+    def focused_window_title(self) -> str | None:
+        return self.document_title if self.focused_window is None else self.focused_window
+
+    def focused_element_role(self) -> str | None:
+        return self.focused_role
+
+    def post_key(self, keycode: int) -> None:
+        """Deliver one key as the process does: to the focused window's focused element.
+
+        A key arriving with focus anywhere other than the effect list is recorded as
+        **stray** and moves nothing. That is the failure worth modelling: the driver's
+        whole justification for sending a key is that it cannot land anywhere it was not
+        just confirmed to be going, and a fake that moved the selection regardless of
+        focus could not tell a correct driver from one that skipped the check.
+        """
+        self.keys.append(keycode)
+        if (
+            self.focused_window_title() != self.document_title
+            or self.focused_role != driver.SELECTION_PANE_ROLE
+        ):
+            self.stray_keys.append(keycode)
+            return
+        if self.effect_list_stuck:
+            return
+        current = self.selected_effect_row
+        if isinstance(current, (set, frozenset, tuple, list)):
+            return
+        step = 1 if keycode == driver.KEY_ARROW_DOWN else -1
+        # Row 0 is the ANIMATIONS header and is **not selectable**: measured
+        # 2026-11-02, Down from an empty list took row 1 rather than row 0, and three
+        # Up presses from row 1 all left the selection on row 1. So the walk's floor is
+        # row 1, and an Up press at the top is a key that legitimately moves nothing.
+        position = 1 if current is None else current + step
+        self.selected_effect_row = max(1, min(position, self.animation_row_count))
 
     def now(self) -> float:
         return self._now
@@ -2096,31 +2177,36 @@ class TestSlideNavigationIsGone:
         assert not hasattr(driver, "HAS_ANIMATION")
         assert not hasattr(driver, "select_slide")
 
-    def test_the_only_attribute_the_driver_writes_is_a_rows_selection(self):
-        """``kAXSelectedAttribute`` is back, on outline rows, and nowhere else.
+    def test_the_driver_writes_exactly_two_attributes(self):
+        """A row's selection, and the effect list's focus. Nothing else, ever.
 
-        It never read back true on the navigator's cells, which is why slide selection is
-        gone; it does take on a Selection Pane row, which is a different element with a
-        different mechanism. The narrow method is the guard: there is no "set any
-        attribute" escape hatch to reach for the next time something looks selectable.
+        ``kAXSelectedAttribute`` never read back true on the navigator's cells, which is
+        why slide selection is gone; it does take on a Selection Pane row, which is a
+        different element with a different mechanism.
+
+        ``kAXFocusedAttribute`` is the second, and it is here because it is the **only**
+        write the Animation Pane's effect list accepts: selecting a row through
+        ``AXSelected`` or ``AXSelectedRows`` is accepted and ignored, so focus plus an
+        arrow key is the whole mechanism. See `select_pane_effect`.
+
+        Two narrow methods, and still no "set any attribute" escape hatch to reach for
+        the next time something looks settable — which is how the 2026-10-31 run came to
+        write ``kAXSelected`` onto cells that never read it back.
         """
         tree = ast.parse(DRIVER_SOURCE.read_text(encoding="utf-8"))
-        owners = {
-            function.name
-            for function in ast.walk(tree)
-            if isinstance(function, ast.FunctionDef)
-            for node in ast.walk(function)
-            if isinstance(node, ast.Attribute) and node.attr == "kAXSelectedAttribute"
-        }
-        assert owners == {"selected", "set_selected"}, owners
-        setters = {
-            function.name
-            for function in ast.walk(tree)
-            if isinstance(function, ast.FunctionDef)
-            for node in ast.walk(function)
-            if isinstance(node, ast.Attribute) and node.attr == "AXUIElementSetAttributeValue"
-        }
-        assert setters == {"set_selected"}, setters
+
+        def owners_of(attribute: str) -> set[str]:
+            return {
+                function.name
+                for function in ast.walk(tree)
+                if isinstance(function, ast.FunctionDef)
+                for node in ast.walk(function)
+                if isinstance(node, ast.Attribute) and node.attr == attribute
+            }
+
+        assert owners_of("kAXSelectedAttribute") == {"selected", "set_selected"}
+        assert owners_of("kAXFocusedAttribute") == {"set_focused"}
+        assert owners_of("AXUIElementSetAttributeValue") == {"set_selected", "set_focused"}
         assert not hasattr(driver.LiveAXNode, "set_attribute")
 
     def test_the_module_docstring_records_both_live_failures(self):
@@ -2166,18 +2252,32 @@ class TestTheCanvasClickIsGone:
 
         The docstrings say what was deleted and why, which means they name
         ``CGEventPost``; a text search would read that as the code being back.
+
+        The driver does post events again — **two keycodes, to one pid**, for the one
+        surface no accessibility write reaches. So this no longer bans ``CGEvent``
+        wholesale; it names the two bindings that are allowed and bans the rest, which
+        is a tighter statement than the blanket ban was. In particular
+        ``CGEventPostToPid`` is allowed and bare ``CGEventPost`` is not: posting to a
+        named process is what keeps a key out of the operator's other applications,
+        and the global post is exactly the thing that would not.
         """
         tree = ast.parse(DRIVER_SOURCE.read_text(encoding="utf-8"))
         used = {node.attr for node in ast.walk(tree) if isinstance(node, ast.Attribute)} | {
             node.id for node in ast.walk(tree) if isinstance(node, ast.Name)
         }
+        allowed = {"CGEventCreateKeyboardEvent", "CGEventPostToPid"}
         forbidden = {
             name
             for name in used
-            if name.startswith(("CGEvent", "kCGMouse", "kCGEvent"))
+            if (
+                name.startswith(("CGEvent", "kCGMouse", "kCGEvent"))
+                and name not in allowed
+            )
             or name in {"kAXPositionAttribute", "kAXSizeAttribute", "AXValueGetValue"}
         }
-        assert not forbidden, f"the driver uses mouse or geometry bindings again: {sorted(forbidden)}"
+        assert not forbidden, (
+            f"the driver uses mouse, global-post or geometry bindings again: {sorted(forbidden)}"
+        )
         assert not hasattr(driver.AXBackend, "click")
         assert not hasattr(driver.LiveAXBackend, "click")
         # The protocols themselves, so a reintroduced click would have to re-declare the
@@ -2191,10 +2291,35 @@ class TestTheCanvasClickIsGone:
             "press",
             "role",
             "selected",
+            "set_focused",
             "set_selected",
             "title",
             "value",
         ]
+
+    def test_the_keyboard_is_two_keycodes_and_is_aimed_at_a_process(self):
+        """The three properties that make a posted key different from the deleted click.
+
+        It cannot reach another application (posted to a pid), it is not aimed by
+        position (no coordinate anywhere in the call), and it can only be an arrow.
+        """
+        keycodes = {
+            name: value
+            for name, value in vars(driver).items()
+            if name.startswith("KEY_") and isinstance(value, int)
+        }
+        assert keycodes == {"KEY_ARROW_DOWN": 125, "KEY_ARROW_UP": 126}
+
+        tree = ast.parse(DRIVER_SOURCE.read_text(encoding="utf-8"))
+        posters = {
+            function.name
+            for function in ast.walk(tree)
+            if isinstance(function, ast.FunctionDef)
+            for node in ast.walk(function)
+            if isinstance(node, ast.Attribute) and node.attr == "CGEventPostToPid"
+        }
+        assert posters == {"post_key"}, posters
+        assert "post_key" in driver.AXBackend.__protocol_attrs__
 
     def test_the_module_docstring_records_what_the_click_was_worth(self):
         doc = driver.__doc__ or ""
@@ -2655,6 +2780,129 @@ class TestTheAnimationPane:
             "and it did nothing"
         )
 
+    def test_an_effect_is_selected_by_what_it_is_using_arrow_keys(self, session):
+        """The one surface this driver sends a key event to, and what makes that safe.
+
+        No accessibility write selects an effect row. What works is ``AXFocused`` on the
+        list plus an arrow key, measured 2026-11-02. The effect is addressed by its own
+        description rather than by a row number, and the walk reads the selection back
+        after every press.
+        """
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+
+        result = driver.select_pane_effect(fake, described_as="Curvy Left", timeout=2.0)
+        assert result["rowIndex"] == 7
+        assert result["how"] == "arrowKeys"
+        assert result["describedAs"].endswith("Path effect, Curvy Left, 007.")
+        assert fake.keys == [driver.KEY_ARROW_DOWN] * 7, "one press per row, from empty"
+        assert fake.stray_keys == [], "every key landed in the effect list"
+
+    def test_the_header_row_is_not_selectable(self, session):
+        """Measured 2026-11-02, and it sets the walk's floor.
+
+        Down from an empty list took row 1, not the ``ANIMATIONS`` header at row 0, and
+        three Up presses from row 1 all left the selection where it was. So the header is
+        never the selection, and an Up press at the top moves nothing — which a walk
+        that treated "did not move" as a failure in every case would misread.
+        """
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+        fake.focused_role = driver.SELECTION_PANE_ROLE
+
+        fake.post_key(driver.KEY_ARROW_DOWN)
+        assert fake.selected_effect_row == 1, "the first Down skips the header"
+        for _ in range(3):
+            fake.post_key(driver.KEY_ARROW_UP)
+        assert fake.selected_effect_row == 1, "Up at the top row stays"
+        assert all(row["describedAs"] is None for row in driver.pane_effect_rows(fake)[:1])
+
+    def test_it_walks_upwards_when_the_effect_is_above_the_selection(self, session):
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+        fake.selected_effect_row = 7
+
+        result = driver.select_pane_effect(fake, described_as="Bean", timeout=2.0)
+        assert result["rowIndex"] == 4
+        assert fake.keys == [driver.KEY_ARROW_UP] * 3
+        assert fake.stray_keys == []
+
+    def test_an_already_selected_effect_costs_no_keys(self, session):
+        """Because a key that need not be sent is a key that can go wrong."""
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+        fake.selected_effect_row = 7
+
+        result = driver.select_pane_effect(fake, described_as="Curvy Left", timeout=2.0)
+        assert result["how"] == "alreadySelected"
+        assert result["presses"] == 0
+        assert fake.keys == []
+
+    def test_no_key_is_sent_when_another_deck_has_focus(self, session):
+        """The reason this is not the mouse event that was removed.
+
+        A process delivers a key to its focused window, and the measuring host had three
+        decks open in one PowerPoint process. A key sent while another one has focus
+        moves something in a document nobody is measuring — so the driver refuses, and
+        the assertion that matters is that **nothing was sent**.
+        """
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+        fake.focused_window = "someone-elses-deck"
+
+        with pytest.raises(driver.TargetFailure, match="not the deck being measured"):
+            driver.select_pane_effect(fake, described_as="Curvy Left", timeout=2.0)
+        assert fake.keys == []
+
+    def test_no_key_is_sent_when_focus_did_not_land_on_the_list(self, session):
+        """The second half of the precondition: a window sends keys to its focused
+        element, so focus landing elsewhere means the arrow moves the slide instead."""
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+        fake.effect_list_takes_focus = False
+
+        with pytest.raises(driver.TargetFailure, match="focused element is a"):
+            driver.select_pane_effect(fake, described_as="Curvy Left", timeout=2.0)
+        assert fake.keys == []
+        assert fake.stray_keys == []
+
+    def test_a_list_that_answers_keys_without_moving_is_a_bounded_failure(self, session):
+        """Which is what the read-back after each press is for."""
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+        fake.effect_list_stuck = True
+
+        with pytest.raises(driver.TargetFailure, match="selection to move off row"):
+            driver.select_pane_effect(fake, described_as="Curvy Left", timeout=0.2)
+        assert len(fake.keys) == 1, "it stopped at the first press that did nothing"
+
+    def test_an_effect_the_list_does_not_hold_is_refused_before_any_key(self, session):
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+
+        with pytest.raises(driver.ControlNotFound, match="described as 'Pinwheel'"):
+            driver.select_pane_effect(fake, described_as="Pinwheel", timeout=2.0)
+        assert fake.keys == []
+
+    def test_a_description_matching_two_effects_is_refused_rather_than_chosen(self, session):
+        """``Path effect`` matches all seven, and selecting the first would measure one
+        effect while the record named a different one."""
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+
+        with pytest.raises(driver.AmbiguousControl, match="7 effects"):
+            driver.select_pane_effect(fake, described_as="Path effect", timeout=2.0)
+        assert fake.keys == []
+
     def test_with_no_effect_selected_the_refusal_names_the_mechanism(self, session):
         """Because the next question is always "then how do I select one?".
 
@@ -2886,7 +3134,13 @@ class TestNoAccessibilityDependency:
             }
             & wanted
         }
-        assert owners == {"__init__"}, f"pyobjc imported outside the live backend: {owners}"
+        # ``post_key`` is the second owner, and it is Quartz alone: the keyboard binding
+        # lives there rather than in __init__ so that a driver run which never selects an
+        # effect never imports it, and so the import sits next to the one call that
+        # needs it.
+        assert owners == {"__init__", "post_key"}, (
+            f"pyobjc imported outside the live backend: {owners}"
+        )
 
     def test_pyobjc_is_not_a_declared_dependency_of_the_repo(self):
         text = (REPO_ROOT / "pyproject.toml").read_text(encoding="utf-8")
