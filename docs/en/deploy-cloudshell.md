@@ -55,7 +55,7 @@ The CloudFormation console will display a parameter form. Fill in the following:
 
 ### Step 4: Sign in
 
-When deployment completes, a temporary password is sent to the **NotificationEmailAddress** you specified. Open the Web UI URL (included in the notification email or found in CloudFormation Outputs `SdpmWebUi` → `SiteUrl`), sign in with that email and temporary password, and set a new password on first login. That's it — you can start generating slides immediately.
+When deployment completes, a temporary password is sent to the **NotificationEmailAddress** you specified. Open the Web UI URL (included in the notification email or found in CloudFormation Outputs `SdpmWebUi` → `SiteUrl`), sign in with that email and temporary password, and set a new password on first login. That's it — you can start generating slides immediately. To give more people access, [create a Cognito user](#creating-a-cognito-user-layer-4) for each of them.
 
 The Web UI on AWS works as described in
 [What you can do in the Web UI](getting-started.md#what-you-can-do-in-the-web-ui): Fast path
@@ -198,7 +198,10 @@ If you missed them, check the CloudFormation console.
 
 ### Creating a Cognito User (Layer 4)
 
-The default Cognito User Pool has no users, so you need to create one manually.
+Self sign-up is off by default, so an administrator creates each user. One-Click Deploy
+creates the first user for **NotificationEmailAddress**; with the other deploy methods the
+user pool starts empty. Users created here sign in to the Web UI and to MCP clients that
+connect through the stack's Cognito sign-in ([Connecting Agents](add-to-gateway.md)).
 
 1. Open the [Cognito Console](https://console.aws.amazon.com/cognito/)
 2. Select **sdpm-users** from the User Pool list
@@ -253,6 +256,19 @@ echo "========================================="
 echo ""
 echo "Open the URL above to sign in."
 ```
+
+To have Cognito generate the temporary password and email it to the user instead, leave out
+`--temporary-password` and add `--desired-delivery-mediums EMAIL`. The user sets a new
+password at the first sign-in either way.
+
+### Letting Users Sign Up Themselves
+
+To let people create their own account from the sign-in page, set `auth.selfSignUp: true`
+in `infra/config.yaml`, optionally with `auth.allowedEmailDomains` to accept only some
+email domains, and deploy again with `deploy.sh` (it uploads your `config.yaml`). See
+[Developer guide — Default: Amazon Cognito User Pool](developer-guide.md#default-amazon-cognito-user-pool)
+for how the domain check works. One-Click Deploy has no parameter for this and uses the
+default (off).
 
 ## Options Reference
 

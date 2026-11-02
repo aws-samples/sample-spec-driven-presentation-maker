@@ -16,7 +16,10 @@
 
 import * as cdk from "aws-cdk-lib";
 import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as logs from "aws-cdk-lib/aws-logs";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import * as path from "path";
 import { Construct } from "constructs";
 
 export interface AuthStackProps extends cdk.StackProps {
@@ -24,6 +27,43 @@ export interface AuthStackProps extends cdk.StackProps {
   callbackUrls?: string[];
   /** OAuth callback URLs for external MCP clients (from config.yaml). */
   mcpCallbackUrls?: string[];
+  /**
+   * Let people create their own account from the sign-in page (`auth.selfSignUp`).
+   * Default false: an administrator creates the users.
+   */
+  selfSignUp?: boolean;
+  /**
+   * Email domains allowed to self sign up (`auth.allowedEmailDomains`). Requires
+   * `selfSignUp: true`. Enforced by a Cognito Pre sign-up Lambda trigger: exact,
+   * case-insensitive match; subdomains are not included.
+   */
+  allowedEmailDomains?: string[];
+}
+
+/** One DNS name: labels of letters, digits and inner hyphens, at least two labels. */
+const EMAIL_DOMAIN_RE = /^(?=.{1,253}$)(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?$/;
+
+/**
+ * Validate `auth.allowedEmailDomains` and return the domains in lower case.
+ * Throws a config error for entries that are not plain domain names (no `@`,
+ * no wildcard) and for duplicates.
+ */
+export function normalizeAllowedEmailDomains(domains: string[]): string[] {
+  const seen = new Set<string>();
+  for (const entry of domains) {
+    const domain = entry.trim().toLowerCase();
+    if (!EMAIL_DOMAIN_RE.test(domain)) {
+      throw new Error(
+        `Config error: auth.allowedEmailDomains entry "${entry}" is not a domain name. ` +
+        `Use the part after "@" (for example "example.com"), without wildcards.`,
+      );
+    }
+    if (seen.has(domain)) {
+      throw new Error(`Config error: auth.allowedEmailDomains contains duplicate "${domain}".`);
+    }
+    seen.add(domain);
+  }
+  return [...seen];
 }
 
 /**
@@ -59,9 +99,20 @@ export class AuthStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: AuthStackProps) {
     super(scope, id, props);
 
+    const selfSignUp = props?.selfSignUp === true;
+    const allowedEmailDomains = normalizeAllowedEmailDomains(props?.allowedEmailDomains ?? []);
+    if (allowedEmailDomains.length > 0 && !selfSignUp) {
+      throw new Error(
+        "Config error: auth.allowedEmailDomains applies to self sign-up only. " +
+        "Set auth.selfSignUp: true, or remove auth.allowedEmailDomains.",
+      );
+    }
+
+    // Changing selfSignUpEnabled or the Lambda triggers updates the user pool in
+    // place (AdminCreateUserConfig / LambdaConfig); existing users are kept.
     this.userPool = new cognito.UserPool(this, "UserPool", {
       userPoolName: "sdpm-users",
-      selfSignUpEnabled: true,
+      selfSignUpEnabled: selfSignUp,
       signInAliases: { email: true },
       autoVerify: { email: true },
       passwordPolicy: {
@@ -72,6 +123,28 @@ export class AuthStack extends cdk.Stack {
       },
       removalPolicy: cdk.RemovalPolicy.DESTROY,
     });
+
+    // Email domain check for self sign-up. It runs inside Cognito, so it applies
+    // to every sign-up request, whichever client sends it.
+    if (allowedEmailDomains.length > 0) {
+      const preSignUpFn = new lambda.Function(this, "PreSignUpFn", {
+        runtime: lambda.Runtime.PYTHON_3_13,
+        handler: "index.handler",
+        code: lambda.Code.fromAsset(path.join(__dirname, "..", "lambdas", "pre-signup")),
+        environment: {
+          ALLOWED_EMAIL_DOMAINS: allowedEmailDomains.join(","),
+        },
+        // Cognito waits at most 5 seconds for a trigger.
+        timeout: cdk.Duration.seconds(5),
+        memorySize: 128,
+        description: "Cognito Pre sign-up: allow self sign-up only from auth.allowedEmailDomains",
+        logGroup: new logs.LogGroup(this, "PreSignUpFnLogs", {
+          retention: logs.RetentionDays.ONE_WEEK,
+          removalPolicy: cdk.RemovalPolicy.DESTROY,
+        }),
+      });
+      this.userPool.addTrigger(cognito.UserPoolOperation.PRE_SIGN_UP, preSignUpFn);
+    }
 
     this.cognitoDomainPrefix = `sdpm-auth-${this.account}-${this.region}`;
     this.userPool.addDomain("Domain", {
