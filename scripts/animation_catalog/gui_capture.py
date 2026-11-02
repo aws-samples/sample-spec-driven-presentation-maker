@@ -1053,6 +1053,7 @@ def find_containers(
     role: str,
     *,
     title: str | None = None,
+    reject_title: str | None = None,
     max_depth: int = CONTAINER_DEPTH,
     max_nodes: int = MAX_CONTAINER_NODES,
 ) -> list[AXNode]:
@@ -1088,7 +1089,9 @@ def find_containers(
             )
         node_role = node.role
         if node_role == role:
-            if title is None or node.title == title:
+            node_title = node.title
+            wanted = title is None or node_title == title
+            if wanted and (reject_title is None or node_title != reject_title):
                 found.append(node)
                 continue
             # A same-role container with a different name is not the one being
@@ -1102,7 +1105,13 @@ def find_containers(
 
 
 def window_container(
-    window: AXNode, role: str, *, what: str, absent: str | None = None, title: str | None = None
+    window: AXNode,
+    role: str,
+    *,
+    what: str,
+    absent: str | None = None,
+    title: str | None = None,
+    reject_title: str | None = None,
 ) -> AXNode:
     """Resolve the one container of a role, or fail saying which it is.
 
@@ -1111,7 +1120,7 @@ def window_container(
     window, because a lookup that quietly walked everything is the cost this whole
     mechanism exists to remove and it would come back unnoticed.
     """
-    found = find_containers(window, role, title=title)
+    found = find_containers(window, role, title=title, reject_title=reject_title)
     if not found:
         raise ControlNotFound(
             absent
@@ -1304,18 +1313,32 @@ class Containers:
         return held_window
 
     def container(
-        self, role: str, *, what: str, absent: str | None = None, title: str | None = None
+        self,
+        role: str,
+        *,
+        what: str,
+        absent: str | None = None,
+        title: str | None = None,
+        reject_title: str | None = None,
     ) -> AXNode:
-        # Keyed by role **and** title: the Animation Pane shares ``AXGroup``
-        # with other containers, so holding one under the bare role would hand
-        # the pane's node back for a later lookup of a different group.
-        token = (role, title)
+        # Keyed by role **and** the title filters: the Animation Pane shares
+        # ``AXGroup`` with other containers and its effect list shares
+        # ``AXOutline`` with the Selection Pane, so holding one under the bare
+        # role would hand the wrong node back to a later lookup.
+        token = (role, title, reject_title)
         found = self._containers.get(token)
         if found is None:
             # Only a success is held. A container that is absent must be looked for again
             # on the next call, because "absent" is how an unopened Selection Pane reads
             # and the whole point of opening it is that the answer changes.
-            found = window_container(self.window(), role, what=what, absent=absent, title=title)
+            found = window_container(
+                self.window(),
+                role,
+                what=what,
+                absent=absent,
+                title=title,
+                reject_title=reject_title,
+            )
             self._containers[token] = found
         return found
 
@@ -1412,6 +1435,13 @@ TOOLBAR_SCOPE = Scope(container_role=TOOLBAR_ROLE)
 ANIMATION_PANE_TAB = "Animations"
 ANIMATION_PANE_SWITCH = "Animation Pane"
 
+#: The Selection Pane's own tab, which shares the one side-pane tab bar. Named
+#: because the state that matters is both panes open with one behind the other,
+#: and a message that can say which pane is in front is the difference between
+#: "not found" and "select the other tab". Measured 2026-11-02 alongside
+#: ``Close Selection Pane``, an ``AXButton`` the bar carries per tab.
+SELECTION_PANE_TAB = "Selection Pane"
+
 #: The four sections the 2026-11-02 read returned, each answering ``AXPress``.
 #: Which sections exist depends on the selection, so a section this driver asks
 #: for and does not find is a failure rather than a reason to look elsewhere.
@@ -1421,10 +1451,54 @@ PANE_SECTIONS = ("Effect Options", "Timing", "Text Animations", "Triggers")
 #: named as a container for the same reason the ribbon and the Selection Pane
 #: are: a lookup that starts at the document window traverses every Selection
 #: Pane row on the way, and this surface is pressed once per target.
+#: A pane popup and the items it attaches when pressed. Measured 2026-11-02:
+#: the menu arrives as the popup's **own child**, not as a new window, which is
+#: how the ribbon's popups behave and the reason this needed its own primitive.
+#: Both roles, because the ``After animation`` menu mixes them: its four named
+#: choices are ``AXMenuItem`` while its eight scheme colours are ``AXButton``
+#: inside a colour-swatch group. Looking for menu items alone found the four and
+#: timed out on the eight.
+POPUP_ROLE = "AXPopUpButton"
+MENU_ITEM_ROLES = ("AXMenuItem", "AXButton")
+
+#: The Animation Pane's effect list, which shares ``AXOutline`` with the
+#: Selection Pane. Named here so the Selection Pane can be identified by
+#: excluding it; see :func:`selection_pane`.
+ANIMATION_LIST_TITLE = "Animation list"
+
+#: Both panes share one tab bar once the Selection Pane is open, so the
+#: Animation Pane is revealed by selecting its tab rather than by the ribbon
+#: switch, which would close it.
+PANE_TAB_ROLE = "AXRadioButton"
+
 ANIMATION_PANE_ROLE = "AXGroup"
-ANIMATION_PANE_SCOPE = Scope(
-    container_role=ANIMATION_PANE_ROLE, container_title=ANIMATION_PANE_TAB
-)
+
+#: The side pane's tab bar, which is how the side pane is identified at all.
+#:
+#: It shares ``AXTabGroup`` with the ribbon and is told apart by its title:
+#: measured 2026-11-02, the ribbon's is ``ribbon`` and the side pane's is
+#: ``Tab bar, N tabs`` — the same second ``AXTabGroup``
+#: :func:`window_container` already disambiguates the ribbon against.
+#:
+#: This prefix is load-bearing rather than decorative. **Three** live elements
+#: are titled ``Animations``: the ribbon's own tab, the side pane's group, and
+#: the pane's tab. Searching the window for an ``AXRadioButton`` titled
+#: ``Animations`` finds the *ribbon tab*, whose ``AXValue`` is ``"1"`` whenever
+#: that tab is active — which is the state this driver deliberately puts the
+#: ribbon in — so such a search reports the Animation Pane open while the side
+#: pane is showing something else entirely. Measured 2026-11-02: it cost a run,
+#: reporting ``alreadyOpen`` and then failing on the pane's absent contents.
+#: Every pane lookup therefore starts from this tab bar, which only the side
+#: pane has.
+SIDE_PANE_TAB_BAR_ROLE = RIBBON_ROLE
+SIDE_PANE_TAB_BAR_PREFIX = "Tab bar"
+
+#: How deep the side pane's tab bar sits below its group, and its tabs below the
+#: bar. Measured 2026-11-02: ``AXGroup`` ▸ ``AXTabGroup`` ▸ ``AXRadioButton``,
+#: so both are small. Bounded so that a window shaped differently fails here
+#: rather than turning a pane lookup into a full tree walk.
+SIDE_PANE_TAB_BAR_DEPTH = 4
+SIDE_PANE_TAB_DEPTH = 3
 
 #: What each container is called in a failure message, so "no AXTabGroup" reads as a
 #: statement about PowerPoint rather than about a role name.
@@ -1770,11 +1844,24 @@ def selection_outline(backend: AXBackend) -> AXNode:
     to find the ribbon. It is now a container search that stops at the outline rather
     than descending into its 762 rows.
     """
+    # The Animation Pane publishes an ``AXOutline`` of its own — its effect
+    # list, titled ``Animation list`` — so the role stopped identifying the
+    # Selection Pane the moment the Animation Pane was open. Measured
+    # 2026-11-02: this resolved to a nine-row effect list and ``select_shape``
+    # then timed out waiting for row 13 of 14 in a pane publishing eight rows.
+    #
+    # The Selection Pane's own outline is **untitled**, so it is identified by
+    # excluding the one that is named rather than by naming it. That is the
+    # weaker of the two and it is deliberate: a title this driver asserts and
+    # PowerPoint changes would make the pane unreachable, while excluding a
+    # known impostor degrades to "ambiguous" and raises.
     return held(backend).container(
         SELECTION_PANE_ROLE,
+        reject_title=ANIMATION_LIST_TITLE,
         what=CONTAINER_NAMES[SELECTION_PANE_ROLE],
         absent=(
-            f"the document window holds no {SELECTION_PANE_ROLE}; the Selection Pane is not open"
+            f"the document window holds no {SELECTION_PANE_ROLE} other than the Animation "
+            f"Pane's {ANIMATION_LIST_TITLE!r}; the Selection Pane is not open"
         ),
     )
 
@@ -2075,32 +2162,220 @@ def close_window(backend: AXBackend, title: str, *, timeout: float) -> str:
     return "closed"
 
 
+def _tab_bar_in(node: AXNode) -> AXNode | None:
+    """The side pane's tab bar inside ``node``, or None if it holds none.
+
+    Named by prefix rather than by role alone because the ribbon carries the
+    same role; see :data:`SIDE_PANE_TAB_BAR_PREFIX` for what that cost.
+    """
+    for child in walk(node, max_depth=SIDE_PANE_TAB_BAR_DEPTH):
+        if child.role != SIDE_PANE_TAB_BAR_ROLE:
+            continue
+        if (child.title or "").startswith(SIDE_PANE_TAB_BAR_PREFIX):
+            return child
+    return None
+
+
+def side_pane_group(backend: AXBackend) -> AXNode | None:
+    """The group of whichever side pane is open, or None when none is.
+
+    Identified by holding a side-pane tab bar, which is the only thing about it
+    that does not move: its own title is **whichever tab is active** — measured
+    2026-11-02, ``Animations`` with the Animation Pane showing and ``Selection
+    Pane`` with the Selection Pane showing — so the group cannot be addressed by
+    the name of the pane being looked for.
+
+    The outermost such group is returned, which is what the pre-order descent
+    gives: measured 2026-11-02 the tab bar is a direct child of the outer group,
+    and the inner groups beneath its scroll area hold no tab bar at all.
+
+    Descends the way :func:`find_containers` does — pruning at every container
+    role — rather than walking the window, for the reason that search exists: a
+    window walk crosses the Selection Pane's rows, 762 of them on the deck that
+    motivated the container boundary, to find a group three levels down.
+    """
+    view = held(backend)
+    window = view.window()
+    stack: list[tuple[AXNode, int]] = [(child, 1) for child in reversed(list(window.children))]
+    seen = 1
+    while stack:
+        node, depth = stack.pop()
+        seen += 1
+        if seen > MAX_CONTAINER_NODES:
+            raise TreeTooLarge(
+                f"the search for the side pane visited more than {MAX_CONTAINER_NODES} nodes; "
+                "the window is not shaped as measured and a container search has become a walk"
+            )
+        role = node.role
+        if role == ANIMATION_PANE_ROLE and _tab_bar_in(node) is not None:
+            return node
+        if role in CONTAINER_ROLES or depth >= CONTAINER_DEPTH:
+            continue
+        stack.extend((child, depth + 1) for child in reversed(list(node.children)))
+    return None
+
+
+def _pane_tab(backend: AXBackend, title: str) -> AXNode | None:
+    """One side-pane tab by name, or None when the side pane does not offer it.
+
+    None covers two states the caller has to tell apart by other means: no side
+    pane at all, and a side pane whose bar does not list this tab. Measured
+    2026-11-02 with only the Selection Pane open, the bar read ``Tab bar, 1
+    tabs`` and held no ``Animations`` tab — so an absent tab means the pane is
+    closed, not merely behind another.
+    """
+    group = side_pane_group(backend)
+    if group is None:
+        return None
+    bar = _tab_bar_in(group)
+    if bar is None:  # pragma: no cover - the group was selected by holding one
+        return None
+    for node in walk(bar, max_depth=SIDE_PANE_TAB_DEPTH):
+        if node.role == PANE_TAB_ROLE and node.title == title:
+            return node
+    return None
+
+
 def open_animation_pane(backend: AXBackend, *, timeout: float) -> str:
     """Make the Animation Pane visible, and return how it got there.
 
     The ribbon control is a **switch**, not a button, so pressing it when the
     pane is already open closes it. The pane's own tab is checked for first and
     the switch is only touched when the tab is absent.
+
+    The tab is looked for **inside the side pane's tab bar**, never across the
+    window: the ribbon publishes a radio button titled ``Animations`` too, and
+    its value is ``"1"`` whenever that ribbon tab is active. See
+    :data:`SIDE_PANE_TAB_BAR_PREFIX`.
     """
     view = held(backend)
 
-    def pane_open() -> bool:
+    def pane_tab() -> AXNode | None:
         view.stale()
-        try:
-            _resolve_in(resolve_scope(view, ANIMATION_PANE_SCOPE), ANIMATION_PANE_TAB)
-        except TargetFailure:
-            return False
-        return True
+        return _pane_tab(view, ANIMATION_PANE_TAB)
+
+    def pane_open() -> bool:
+        tab = pane_tab()
+        # ``AXValue`` on the tab is "1" when its own pane is the one showing.
+        return tab is not None and tab.value == "1"
 
     if pane_open():
         return "alreadyOpen"
+
+    # Two different states need two different answers, and pressing the ribbon
+    # switch is only right for one of them. With the Selection Pane open, both
+    # panes share a tab bar and the Animation Pane is merely *behind* its tab:
+    # the switch would close it rather than reveal it. Measured 2026-11-02, this
+    # cost two runs — `select_shape` succeeded and the pane then timed out.
+    tab = pane_tab()
+    if tab is not None:
+        tab.press()
+        view.stale()
+        if pane_open():
+            return "tabSelected"
+
     # `ensure_tab` takes a whole GUI path — the tab plus the control it is being
     # activated for — so the switch is named here rather than the tab alone.
-    ensure_tab(backend, ("Animations", ANIMATION_PANE_SWITCH), timeout=timeout)
+    #
+    # It is handed this view rather than the raw backend, and the view is invalidated
+    # afterwards, because `ensure_tab` **presses a ribbon tab**: a view that kept its
+    # container across that press resolves the switch inside the ribbon as it was
+    # before, where the Animations tab's controls do not exist. That is the module's
+    # own rule — a press is followed by an invalidation — applied to a press made by
+    # a function this one calls rather than by this one.
+    ensure_tab(view, ("Animations", ANIMATION_PANE_SWITCH), timeout=timeout)
+    view.stale()
     _resolve_in(resolve_scope(view, RIBBON_SCOPE), ANIMATION_PANE_SWITCH).press()
     view.stale()
     wait_until(backend, pane_open, timeout=timeout, what="the Animation Pane to open")
     return "switched"
+
+
+def animation_pane(backend: AXBackend) -> AXNode:
+    """Return the side-pane group that is currently showing the Animation Pane.
+
+    Not a :class:`Scope`, and that is the finding rather than a shortcut: the
+    group's own title is whichever tab is active, so no fixed title identifies
+    it. See :func:`side_pane_group` for what does.
+
+    The three states are kept apart, because they need three different answers
+    from the caller: no side pane (open one), a side pane that does not list an
+    ``Animations`` tab (press the ribbon switch), and one that lists it behind
+    the Selection Pane (select the tab). Collapsing them into "not found" is what
+    sent a run into the switch while the pane was already open.
+    """
+    view = held(backend)
+    view.stale()
+    group = side_pane_group(view)
+    if group is None:
+        raise ControlNotFound(
+            "the document window holds no side pane — no group carries a tab bar titled "
+            f"{SIDE_PANE_TAB_BAR_PREFIX!r} — so the Animation Pane is not open; "
+            "call open_animation_pane first"
+        )
+    bar = _tab_bar_in(group)
+    tab = _pane_tab(view, ANIMATION_PANE_TAB)
+    if tab is None:
+        raise ControlNotFound(
+            f"the side pane is open but its tab bar lists no {ANIMATION_PANE_TAB!r} tab "
+            f"(it reads {None if bar is None else bar.title!r}), so the Animation Pane is closed "
+            "rather than merely behind another pane; call open_animation_pane first"
+        )
+    if tab.value != "1":
+        raise ControlNotFound(
+            f"the {ANIMATION_PANE_TAB!r} tab exists but is not the selected one, so the pane's "
+            "settings are behind another pane; call open_animation_pane first"
+        )
+    return group
+
+
+def select_pane_effect(backend: AXBackend, *, row_index: int, timeout: float) -> dict[str, Any]:
+    """Select one effect in the Animation Pane's list, by its row.
+
+    The pane's settings sections only exist while an **effect** is selected —
+    selecting the shape is not enough, and measured 2026-11-02 the sections were
+    absent with a shape selected and no effect. So this runs between
+    :func:`select_shape` and :func:`expand_pane_section`.
+
+    By row index rather than by name, reluctantly: the rows publish no name at
+    all. Every one of the seven read as ``names=[]`` beneath an ``ANIMATIONS``
+    header row, so there is nothing to resolve by and the index is the only
+    address the pane offers. ``AXSelected`` is read back, which is what keeps it
+    honest — a row that did not take selection fails here rather than later as a
+    press on whatever was selected instead.
+    """
+    view = held(backend)
+
+    def rows() -> list[AXNode]:
+        view.stale()
+        pane = animation_pane(view)
+        for node in walk(pane):
+            if node.role == SELECTION_PANE_ROLE:
+                return [child for child in node.children if child.role == SELECTION_ROW_ROLE]
+        return []
+
+    found = rows()
+    if row_index >= len(found):
+        raise ControlNotFound(
+            f"the Animation Pane published {len(found)} effect rows, so row {row_index} does not "
+            "exist; the pane lists one row per effect beneath a header row",
+            rowIndex=row_index,
+            rowCount=len(found),
+        )
+    found[row_index].set_selected(True)
+    view.stale()
+
+    def selected() -> bool:
+        current = rows()
+        return row_index < len(current) and current[row_index].selected
+
+    wait_until(
+        backend,
+        selected,
+        timeout=timeout,
+        what=f"the Animation Pane's effect row {row_index} to read back as selected",
+    )
+    return {"rowIndex": row_index, "rowCount": len(found)}
 
 
 def expand_pane_section(backend: AXBackend, section: str, *, timeout: float) -> str:
@@ -2116,15 +2391,14 @@ def expand_pane_section(backend: AXBackend, section: str, *, timeout: float) -> 
             section=section,
         )
     view = held(backend)
-    scope = ANIMATION_PANE_SCOPE
 
     def opened() -> bool:
         view.stale()
-        return _resolve_in(resolve_scope(view, scope), section).value == "1"
+        return _resolve_in(animation_pane(view), section).value == "1"
 
     if opened():
         return "alreadyExpanded"
-    _resolve_in(resolve_scope(view, scope), section).press()
+    _resolve_in(animation_pane(view), section).press()
     view.stale()
     wait_until(backend, opened, timeout=timeout, what=f"the {section!r} section to expand")
     return "expanded"
@@ -2145,16 +2419,15 @@ def set_pane_checkbox(
     nothing: pressing it would move it away from the value being measured.
     """
     view = held(backend)
-    scope = ANIMATION_PANE_SCOPE
 
     def state() -> bool:
         view.stale()
-        return _resolve_in(resolve_scope(view, scope), label).value == "1"
+        return _resolve_in(animation_pane(view), label).value == "1"
 
     was = state()
     if was is to:
         return {"label": label, "was": was, "became": was, "pressed": False}
-    _resolve_in(resolve_scope(view, scope), label).press()
+    _resolve_in(animation_pane(view), label).press()
     view.stale()
     wait_until(
         backend,
@@ -2163,6 +2436,96 @@ def set_pane_checkbox(
         what=f"{label!r} to read back as {'checked' if to else 'cleared'}",
     )
     return {"label": label, "was": was, "became": to, "pressed": True}
+
+
+def set_pane_choice(
+    backend: AXBackend,
+    *,
+    from_value: str,
+    to_value: str,
+    reads_back_as: str | None = None,
+    timeout: float,
+) -> dict[str, Any]:
+    """Pick one item from an Animation Pane popup, and report what it was and became.
+
+    The popup is found by **the value it currently shows**, because that is its
+    accessibility title: the pane's six popups are titled ``Anchored to
+    Object``, ``Don't Dim``, ``[No Sound]``, ``On Click``, ``2 seconds
+    (Medium)`` and ``(none)``, while their labels are separate static text with
+    no ``AXTitleUIElement`` link to them. Resolving by role would be ambiguous
+    six ways and resolving by position is the thing this driver does not do.
+
+    So ``from_value`` is both the address and a precondition: a popup that is
+    not showing it fails the target rather than measuring from a state the
+    record would then describe wrongly.
+
+    Pressing it attaches an ``AXMenu`` **as the popup's own child** — measured
+    2026-11-02; no new window appears, unlike the ribbon's popups — and the item
+    is pressed inside that menu.
+    """
+    view = held(backend)
+
+    def popup(expected: str) -> AXNode:
+        view.stale()
+        node = _resolve_in(animation_pane(view), expected)
+        if node.role != POPUP_ROLE:
+            raise ControlNotFound(
+                f"{expected!r} in the Animation Pane is a {node.role}, not a {POPUP_ROLE}",
+                expected=expected,
+                role=node.role,
+            )
+        return node
+
+    opener = popup(from_value)
+    opener.press()
+    view.stale()
+
+    def menu_item() -> AXNode | None:
+        # The pane is walked for the item rather than the popup re-resolved by
+        # title: once the menu is attached, ``Don't Dim`` names both the popup
+        # **and** one of its own items, so resolving that title is ambiguous in
+        # exactly the state this has to work in.
+        view.stale()
+        for node in walk(animation_pane(view)):
+            if node.role in MENU_ITEM_ROLES and node.title == to_value:
+                return node
+        return None
+
+    wait_until(
+        backend,
+        lambda: menu_item() is not None,
+        timeout=timeout,
+        what=f"{to_value!r} to appear in the {from_value!r} popup",
+    )
+    found = menu_item()
+    if found is None:  # pragma: no cover - wait_until already raised
+        raise ControlNotFound(f"no menu item titled {to_value!r}")
+    found.press()
+    view.stale()
+    # A named choice leaves the popup showing its own name, so that is the
+    # default read-back. A colour swatch does not — its title is the swatch's
+    # name, not what the popup becomes — so the caller states the expected
+    # read-back for those rather than the check being skipped: a press whose
+    # effect cannot be confirmed in the UI is the failure mode that produced
+    # wrong records on 2026-10-31.
+    expected = reads_back_as or to_value
+    wait_until(
+        backend,
+        lambda: _popup_shows(view, expected),
+        timeout=timeout,
+        what=f"the popup to read back as {expected!r}",
+    )
+    return {"from": from_value, "to": to_value, "readsBackAs": expected, "pressed": True}
+
+
+def _popup_shows(view: Containers, value: str) -> bool:
+    """True when a popup in the scope now reads ``value``."""
+    view.stale()
+    try:
+        node = _resolve_in(animation_pane(view), value)
+    except TargetFailure:
+        return False
+    return node.role == POPUP_ROLE
 
 
 def press_save(backend: AXBackend, document: Path, *, timeout: float) -> None:

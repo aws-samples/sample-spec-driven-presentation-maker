@@ -431,6 +431,9 @@ class FakePowerPoint:
         published_row_count: int | None = None,
         partial_reads: int | None = None,
         selection_pane_open: bool = False,
+        animation_pane_open: bool = False,
+        animation_row_count: int = 0,
+        effect_selection_sticks: bool = True,
         active_tab: str = driver.RIBBON_ANCHOR_TAB,
         decoy_windows: int = 4,
     ) -> None:
@@ -494,6 +497,30 @@ class FakePowerPoint:
         self.partial_reads = partial_reads
         self.selection_pane_open = selection_pane_open
         self.active_tab = active_tab
+        #: Whether the Animation Pane is one of the side pane's tabs. Both panes share
+        #: one tab bar, so this and ``selection_pane_open`` are independent.
+        self.animation_pane_open = animation_pane_open
+        #: Which tab was last brought to the front. Read through :attr:`active_pane`,
+        #: which falls back when this one is no longer open.
+        self._active_pane: str | None = None
+        #: How many effect rows the Animation Pane's list publishes, over and above its
+        #: header row.
+        self.animation_row_count = animation_row_count
+        #: Which row of that list is selected, or None. The pane's settings sections only
+        #: exist while one is.
+        self.selected_effect_row: int | None = None
+        #: Every effect row the driver asked for, in order.
+        self.effect_row_selections: list[int] = []
+        #: When false, writing ``AXSelected`` on an effect row is accepted and does
+        #: nothing — the analogue of ``selection_sticks`` for the effect list.
+        self.effect_selection_sticks = effect_selection_sticks
+        #: Which pane sections are expanded. A section is a disclosure, so pressing an
+        #: already-open one closes it.
+        self.expanded_sections: set[str] = set()
+        #: How many times the ribbon's Animation Pane switch was pressed. A driver that
+        #: presses it when the pane is already open closes the pane, so this is asserted
+        #: rather than merely recorded.
+        self.animation_pane_switch_presses = 0
         #: How many same-titled windows PowerPoint publishes that are NOT the document.
         self.decoy_windows = decoy_windows
         self.trusted_flag = True
@@ -660,6 +687,15 @@ class FakePowerPoint:
             self._node(
                 role="AXRadioButton",
                 title=title,
+                # The active ribbon tab publishes ``AXValue`` of "1", like any radio
+                # button. Measured 2026-11-02, and the fake's missing it is what let a
+                # bug through: the driver looked for the Animation Pane's tab by walking
+                # the window for an ``AXRadioButton`` titled 'Animations', found THIS
+                # one, read "1" because the driver itself had just selected the
+                # Animations ribbon tab, and reported the pane open while the side pane
+                # showed the Selection Pane. A fake whose tabs published no value could
+                # not reproduce it.
+                value="1" if title == self.active_tab else "0",
                 on_press=lambda title=title: setattr(self, "active_tab", title),
             )
             for title in (driver.RIBBON_ANCHOR_TAB, "Transitions", planner.ANIMATIONS_TAB)
@@ -682,6 +718,14 @@ class FakePowerPoint:
                     role="AXIncrementor",
                     title=driver.DURATION_LABEL,
                     value="05.00" if animated else None,
+                ),
+                # A switch, not a button: measured 2026-11-02 as an ``AXCheckBox``
+                # reading "0" with the pane closed.
+                self._node(
+                    role="AXCheckBox",
+                    title=driver.ANIMATION_PANE_SWITCH,
+                    value="1" if self.animation_pane_open else "0",
+                    on_press=self._press_animation_pane_switch,
                 ),
             ]
         children.append(self._node(role="AXScrollArea", children=commands))
@@ -713,6 +757,177 @@ class FakePowerPoint:
         self.selection_pane_presses += 1
         self.selection_pane_open = not self.selection_pane_open
         self.arrange_open = False
+        if self.selection_pane_open:
+            self._active_pane = driver.SELECTION_PANE_TAB
+
+    def _press_animation_pane_switch(self) -> None:
+        """Toggle the Animation Pane, as the ribbon **switch** does.
+
+        A switch, not a button: measured 2026-11-02 it reads ``AXCheckBox`` with
+        ``AXValue`` of "0" while the pane is closed, so pressing it with the pane
+        already open closes it. That is the behaviour the driver has to avoid
+        triggering, so the fake has to offer it.
+        """
+        self.animation_pane_switch_presses += 1
+        self.animation_pane_open = not self.animation_pane_open
+        if self.animation_pane_open:
+            self._active_pane = driver.ANIMATION_PANE_TAB
+
+    def _open_panes(self) -> list[str]:
+        """The side pane's tabs, in the order the bar lists them."""
+        return [
+            name
+            for name, is_open in (
+                (driver.ANIMATION_PANE_TAB, self.animation_pane_open),
+                (driver.SELECTION_PANE_TAB, self.selection_pane_open),
+            )
+            if is_open
+        ]
+
+    @property
+    def active_pane(self) -> str | None:
+        """Which tab the side pane is showing, derived rather than stored.
+
+        Derived because the open flags are set directly by tests as often as by a
+        press, and a stored value goes stale the moment one is: closing the front
+        pane leaves the other one showing, and that has to follow from the flags
+        rather than from having gone through the handler that flipped them.
+        """
+        panes = self._open_panes()
+        if self._active_pane in panes:
+            return self._active_pane
+        return panes[0] if panes else None
+
+    @active_pane.setter
+    def active_pane(self, name: str | None) -> None:
+        self._active_pane = name
+
+    def _side_pane(self) -> FakeNode:
+        """The side pane: one group holding a tab bar and the active pane's content.
+
+        Measured live 2026-11-02 on PowerPoint for Mac 16.113.1::
+
+            AXWindow 'cx-deck'
+              AXSplitGroup
+                AXGroup 'Selection Pane'          <- titled after the ACTIVE tab
+                  AXTabGroup 'Tab bar, 1 tabs'
+                    AXRadioButton 'Selection Pane'  value='1'
+                    AXButton      'Close Selection Pane'
+                  AXScrollArea 'Selection Pane'
+                    AXGroup
+                      AXScrollArea
+                        AXOutline                 <- untitled, 14 rows
+
+        Two things here are what the driver depends on and neither is obvious:
+
+        * The group's title **moves with the active tab**, so the pane cannot be
+          addressed by the name of the pane being looked for.
+        * The tab bar shares ``AXTabGroup`` with the ribbon and is told apart by
+          its title, ``Tab bar, N tabs``. It is also the only thing about the
+          group that does not move, so it is what identifies the side pane.
+
+        A closed pane's tab is **absent from the bar**, not merely unselected:
+        with only the Selection Pane open the bar read ``Tab bar, 1 tabs``. That
+        is what tells "closed" from "behind the other tab", and the two need
+        different answers — the ribbon switch against the tab.
+        """
+        panes = self._open_panes()
+        tabs: list[FakeNode] = []
+        for name in panes:
+            tabs.append(
+                self._node(
+                    role=driver.PANE_TAB_ROLE,
+                    title=name,
+                    value="1" if name == self.active_pane else "0",
+                    on_press=lambda name=name: setattr(self, "active_pane", name),
+                )
+            )
+            # The bar carries a close button per tab, which is why a tab is not the
+            # only AXRadioButton-ish thing in it. Measured: 'Close Selection Pane',
+            # an AXButton with no value.
+            tabs.append(self._node(role="AXButton", title=f"Close {name}"))
+        bar = self._node(
+            role=driver.SIDE_PANE_TAB_BAR_ROLE,
+            title=f"Tab bar, {len(panes)} tabs",
+            children=tabs,
+        )
+        content: list[FakeNode] = []
+        if self.active_pane == driver.SELECTION_PANE_TAB:
+            content.append(
+                self._node(
+                    role="AXScrollArea",
+                    title=driver.SELECTION_PANE_TAB,
+                    children=[
+                        self._node(
+                            role="AXGroup",
+                            children=[
+                                self._node(
+                                    role="AXScrollArea", children=[self._selection_pane()]
+                                )
+                            ],
+                        )
+                    ],
+                )
+            )
+        elif self.active_pane == driver.ANIMATION_PANE_TAB:
+            content.append(self._animation_pane_content())
+        return self._node(role="AXGroup", title=self.active_pane, children=[bar, *content])
+
+    def _animation_pane_content(self) -> FakeNode:
+        """The Animation Pane's own scroll area: its effect list, then its sections.
+
+        The sections only exist while an **effect** is selected — measured
+        2026-11-02, a selected shape with no effect published none — which is why
+        the driver selects a row before expanding anything.
+        """
+        children: list[FakeNode] = [self._animation_list()]
+        if self.selected_effect_row is not None:
+            children += [
+                self._node(
+                    role="AXDisclosureTriangle",
+                    title=section,
+                    value="1" if section in self.expanded_sections else "0",
+                    on_press=lambda section=section: self._toggle_section(section),
+                )
+                for section in driver.PANE_SECTIONS
+            ]
+        return self._node(role="AXScrollArea", title=driver.ANIMATION_PANE_TAB, children=children)
+
+    def _toggle_section(self, section: str) -> None:
+        self.expanded_sections ^= {section}
+
+    def _animation_list(self) -> FakeNode:
+        """The pane's effect list: a header row, then one row per effect.
+
+        Titled ``Animation list``, which is what forced the Selection Pane to be
+        identified by excluding it. Its rows publish **no name at all** — every
+        one read ``names=[]`` — so an effect is addressed by its index and by
+        nothing else.
+        """
+
+        def row(position: int) -> FakeNode:
+            return self._node(
+                role=driver.SELECTION_ROW_ROLE,
+                index=position,
+                selected=position == self.selected_effect_row,
+                on_set_selected=(
+                    lambda selected, position=position: self._select_effect_row(position, selected)
+                ),
+            )
+
+        # One header row ahead of the effects, as the live pane publishes: the
+        # measured effect sat at row index 7 of a list holding 7 effects.
+        return self._node(
+            role=driver.SELECTION_PANE_ROLE,
+            title=driver.ANIMATION_LIST_TITLE,
+            children=[row(position) for position in range(self.animation_row_count + 1)],
+        )
+
+    def _select_effect_row(self, position: int, selected: bool) -> None:
+        self.effect_row_selections.append(position)
+        if not self.effect_selection_sticks:
+            return
+        self.selected_effect_row = position if selected else None
 
     def _selection_pane(self) -> FakeNode:
         """The pane: one row per shape in reverse z-order, named by a descendant label.
@@ -793,8 +1008,12 @@ class FakePowerPoint:
 
     def _document_window(self) -> FakeNode:
         children = [self._toolbar(), self._ribbon()]
-        if self.selection_pane_open:
-            children.append(self._selection_pane())
+        if self.active_pane is not None:
+            # Live, the side pane hangs off an ``AXSplitGroup`` rather than the window,
+            # so the pane's outline sits six levels down. Publishing it as a direct child
+            # of the window would let a container search that is too shallow to work live
+            # pass here. Measured 2026-11-02; see :meth:`_side_pane`.
+            children.append(self._node(role="AXSplitGroup", children=[self._side_pane()]))
         return self._node(role="AXWindow", title=self.document_title, children=children)
 
     def _decoy_window(self, index: int) -> FakeNode:
@@ -2222,6 +2441,199 @@ class TestSelectionPane:
             assert record["selectionRowIndex"] == expected
 
 
+# --- the animation pane -----------------------------------------------------
+class TestTheAnimationPane:
+    """Finding the pane at all, which is where the per-effect settings live.
+
+    Three elements are titled ``Animations``: the ribbon's own tab, the side pane's
+    group, and the pane's tab. Every test here exists because that ambiguity is not
+    academic — it shipped a driver that reported the pane open while it was closed.
+    """
+
+    def test_the_ribbons_animations_tab_is_not_mistaken_for_the_panes(self, session):
+        """The regression. The ribbon's tab is titled 'Animations' and reads "1".
+
+        This is the bug, in full: ``open_animation_pane`` looked for its tab by walking
+        the window for an ``AXRadioButton`` titled ``Animations``, and the ribbon has
+        one. Its value is "1" whenever that ribbon tab is active — which every target
+        makes it, because ``ensure_tab`` selects it to reach the galleries — so the
+        check "a tab titled Animations reads 1" was answered by the ribbon and the pane
+        was reported ``alreadyOpen`` without being opened. The next call then failed on
+        contents that were never there.
+
+        What must happen instead: with the Animations ribbon tab active and no pane
+        open, the pane is recognised as closed and the ribbon **switch** is pressed.
+        """
+        fake = session["fake"]
+        fake.active_tab = planner.ANIMATIONS_TAB
+        assert fake.animation_pane_open is False
+        ribbon_tab = driver._resolve_in(
+            driver.resolve_scope(fake, driver.RIBBON_SCOPE), driver.ANIMATION_PANE_TAB
+        )
+        assert (ribbon_tab.role, ribbon_tab.value) == (driver.PANE_TAB_ROLE, "1"), (
+            "the fake must publish the ribbon tab the way PowerPoint does, or this "
+            "regression cannot be reproduced"
+        )
+
+        assert driver.open_animation_pane(fake, timeout=2.0) == "switched"
+        assert fake.animation_pane_open is True
+        assert fake.animation_pane_switch_presses == 1
+
+    def test_a_closed_pane_is_told_from_one_behind_the_other_tab(self, session):
+        """Three states, three answers. Collapsing them sends a run to the wrong control.
+
+        With only the Selection Pane open the bar lists **no** Animations tab, so the
+        pane is closed and the switch is right. With both open it lists one that reads
+        "0", so the pane is merely behind and the switch would close it.
+        """
+        fake = session["fake"]
+        fake.selection_pane_open = True
+        assert fake.active_pane == driver.SELECTION_PANE_TAB
+        assert driver._pane_tab(fake, driver.ANIMATION_PANE_TAB) is None, (
+            "a closed pane's tab is absent from the bar, not merely unselected"
+        )
+
+        assert driver.open_animation_pane(fake, timeout=2.0) == "switched"
+        assert fake.animation_pane_switch_presses == 1
+
+        # Now both are open and the Animation Pane is in front. Sending the Selection
+        # Pane to the front leaves the Animations tab present but unselected, which is
+        # the state the switch must not be used for.
+        fake.active_pane = driver.SELECTION_PANE_TAB
+        assert driver.open_animation_pane(fake, timeout=2.0) == "tabSelected"
+        assert fake.animation_pane_switch_presses == 1, "the switch would have closed the pane"
+
+    def test_an_already_open_pane_is_left_alone(self, session):
+        """The switch is a toggle, so a pane that is already showing is not touched."""
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        assert driver.open_animation_pane(fake, timeout=2.0) == "alreadyOpen"
+        assert fake.animation_pane_switch_presses == 0
+
+    def test_the_pane_group_is_found_by_its_tab_bar_not_by_its_title(self, session):
+        """The group's title follows the active tab, so the tab bar is what identifies it.
+
+        Pinned against both panes open and the front one swapped, because that is when
+        the group's title changes under a search that trusted it.
+        """
+        fake = session["fake"]
+        fake.selection_pane_open = True
+        fake.animation_pane_open = True
+
+        fake.active_pane = driver.ANIMATION_PANE_TAB
+        group = driver.side_pane_group(fake)
+        assert group is not None and group.title == driver.ANIMATION_PANE_TAB
+        assert driver.animation_pane(fake) is not None
+
+        fake.active_pane = driver.SELECTION_PANE_TAB
+        group = driver.side_pane_group(fake)
+        assert group is not None and group.title == driver.SELECTION_PANE_TAB, (
+            "the group is titled after whichever tab is active"
+        )
+        with pytest.raises(driver.ControlNotFound, match="behind another pane"):
+            driver.animation_pane(fake)
+
+    def test_with_no_side_pane_the_failure_says_so(self, session):
+        """"No side pane" and "pane behind another" are different messages on purpose."""
+        fake = session["fake"]
+        assert driver.side_pane_group(fake) is None
+        with pytest.raises(driver.ControlNotFound, match="no side pane"):
+            driver.animation_pane(fake)
+
+        fake.selection_pane_open = True
+        with pytest.raises(driver.ControlNotFound, match="lists no 'Animations' tab"):
+            driver.animation_pane(fake)
+
+    def test_the_selection_pane_is_still_found_with_the_animation_pane_open(self, session):
+        """The two outlines share a role, and only one of them carries a title.
+
+        The Animation Pane's list is titled ``Animation list``; the Selection Pane's
+        outline is untitled. So the Selection Pane is identified by excluding the named
+        one — and that has to keep working while the pane that owns the impostor is
+        open, which is the only time it matters.
+        """
+        fake = session["fake"]
+        fake.selection_pane_open = True
+        fake.animation_pane_open = True
+
+        fake.active_pane = driver.ANIMATION_PANE_TAB
+        with pytest.raises(driver.ControlNotFound, match="the Selection Pane is not open"):
+            driver.selection_outline(fake)
+
+        fake.active_pane = driver.SELECTION_PANE_TAB
+        pane = driver.selection_outline(fake)
+        assert pane.title is None
+        assert [row for row in pane.children if row.role == driver.SELECTION_ROW_ROLE]
+
+    def test_an_effect_row_is_selected_by_index_and_read_back(self, session):
+        """The rows publish no name, so the index is the only address — and it is checked.
+
+        A row that did not take selection fails here rather than later, as a press on
+        whatever was selected instead.
+        """
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+
+        result = driver.select_pane_effect(fake, row_index=7, timeout=2.0)
+        assert result == {"rowIndex": 7, "rowCount": 8}, "seven effects beneath one header row"
+        assert fake.effect_row_selections == [7]
+        assert fake.selected_effect_row == 7
+
+    def test_a_row_index_the_pane_does_not_publish_is_refused(self, session):
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 3
+        with pytest.raises(driver.ControlNotFound, match="published 4 effect rows"):
+            driver.select_pane_effect(fake, row_index=9, timeout=2.0)
+        assert fake.effect_row_selections == []
+
+    def test_a_row_that_does_not_take_selection_is_a_bounded_failure(self, session):
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+        fake.effect_selection_sticks = False
+        with pytest.raises(driver.TargetFailure, match="row 7 to read back as selected"):
+            driver.select_pane_effect(fake, row_index=7, timeout=0.2)
+
+    def test_the_sections_only_exist_once_an_effect_is_selected(self, session):
+        """Which is why selecting a row comes between selecting the shape and expanding.
+
+        Measured 2026-11-02: a selected shape with no selected effect published none of
+        the four sections.
+        """
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+
+        with pytest.raises(driver.ControlNotFound, match="Effect Options"):
+            driver.expand_pane_section(fake, "Effect Options", timeout=2.0)
+
+        driver.select_pane_effect(fake, row_index=7, timeout=2.0)
+        assert driver.expand_pane_section(fake, "Effect Options", timeout=2.0) == "expanded"
+        assert "Effect Options" in fake.expanded_sections
+
+    def test_an_expanded_section_is_not_pressed_again(self, session):
+        """A section is a disclosure, so pressing an open one closes it and the control
+        underneath becomes unreachable rather than merely slow."""
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+        driver.select_pane_effect(fake, row_index=7, timeout=2.0)
+        driver.expand_pane_section(fake, "Timing", timeout=2.0)
+
+        assert driver.expand_pane_section(fake, "Timing", timeout=2.0) == "alreadyExpanded"
+        assert fake.expanded_sections == {"Timing"}
+
+    def test_a_section_this_build_does_not_have_is_refused_before_anything_is_pressed(
+        self, session
+    ):
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        with pytest.raises(driver.ControlNotFound, match="Animation Pane sections"):
+            driver.expand_pane_section(fake, "Effect Settings", timeout=2.0)
+
+
 # --- consent and refusal ----------------------------------------------------
 class TestConsentAndRefusal:
     """It cannot be started by accident, and it cannot type into the operator's work."""
@@ -3268,26 +3680,45 @@ class TestLookupCost:
         """The pruning rule, stated against the tree rather than against a read count.
 
         A search for the toolbar must not enter the outline, because the outline is where
-        762 of the live window's 907 nodes are. With the pane open, finding the toolbar
-        must therefore cost no more than finding it with the pane shut.
+        762 of the live window's 907 nodes are. The invariant is therefore that the cost
+        of finding the toolbar is **independent of how many rows the pane holds**.
+
+        Not "no more than with the pane shut", which is what this asserted while the fake
+        published the outline as a direct child of the window. An open pane adds its own
+        structure *above* the outline — live, an ``AXSplitGroup``, the pane's group, its
+        tab bar and two nested scroll areas — and that cost is real, constant, and says
+        nothing about whether the rows were crossed. Pinning it was what broke when the
+        fake was corrected to the measured nesting; the row count is the thing that would
+        actually blow up.
         """
         fake = session["fake"]
+        fake.selection_pane_open = True
+
+        def cost_of_finding_the_toolbar(rows: int) -> int:
+            fake._shapes = [(f"Shape {index}", str(index + 2)) for index in range(rows)]
+            fake._spids = dict(fake._shapes)
+            start = fake.attribute_reads
+            found = driver.find_containers(driver.document_window(fake), driver.TOOLBAR_ROLE)
+            assert len(found) == 1
+            return fake.attribute_reads - start
+
+        few = cost_of_finding_the_toolbar(14)
+        many = cost_of_finding_the_toolbar(200)
+        assert many == few, (
+            f"finding the toolbar cost {few} reads with 14 rows open and {many} with 200, so the "
+            "search is descending into the Selection Pane"
+        )
+
+        # The pane's own structure is still bounded, so a pane that grew a dozen nested
+        # groups would be caught rather than absorbed. Measured: 13 reads for the split
+        # group, the pane group, its tab bar with two tabs, and the two scroll areas.
         fake.selection_pane_open = False
         start = fake.attribute_reads
         driver.find_containers(driver.document_window(fake), driver.TOOLBAR_ROLE)
         shut = fake.attribute_reads - start
-
-        fake.selection_pane_open = True
-        fake._shapes = [(f"Shape {index}", str(index + 2)) for index in range(200)]
-        fake._spids = dict(fake._shapes)
-        start = fake.attribute_reads
-        found = driver.find_containers(driver.document_window(fake), driver.TOOLBAR_ROLE)
-        wide_open = fake.attribute_reads - start
-
-        assert len(found) == 1
-        assert wide_open <= shut + 2, (
-            f"finding the toolbar cost {shut} reads with the pane shut and {wide_open} with 200 "
-            "rows open, so the search is descending into the Selection Pane"
+        assert few - shut <= 20, (
+            f"an open pane added {few - shut} reads to a toolbar search that costs {shut} with the "
+            "pane shut; the pane's structure above its outline has grown"
         )
 
     def test_a_container_search_that_becomes_a_tree_walk_is_an_error(self, session):
