@@ -2264,6 +2264,12 @@ class CoverageRecord:
     #: in, the capture-required total could never reach zero and would stop
     #: measuring progress. The 45 ``MsoAnimDirection`` enumerators are these.
     no_sdpm_input: bool = False
+    #: The effect is real but **this** PowerPoint build cannot apply it, so no
+    #: capture taken here can record its form. Separate from
+    #: ``no_sdpm_input``, because the remedy differs: a capture on a platform
+    #: that offers the effect would close this, whereas a direction name can
+    #: never identify a ``presetSubtype`` anywhere.
+    platform_unavailable: bool = False
 
     @property
     def generated(self) -> bool:
@@ -2349,6 +2355,7 @@ def catalog_coverage(
                     elements=elements,
                     message=message,
                     no_sdpm_input=bool(raw.get("noSdpmInput")),
+                    platform_unavailable=bool(raw.get("platformUnavailable")),
                 )
             )
     return tuple(records)

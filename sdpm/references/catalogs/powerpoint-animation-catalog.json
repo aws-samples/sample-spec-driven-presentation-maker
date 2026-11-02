@@ -68817,6 +68817,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 309 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers '4 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -68893,6 +68908,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 298 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers '5 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -68969,6 +68999,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 304 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers '6 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -69045,6 +69090,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 310 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers '8 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -69205,6 +69265,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 330 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'arc down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -69281,6 +69356,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 344 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'arc left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -69357,6 +69447,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 351 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'arc right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -69436,6 +69541,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 255 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'arc up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -69512,6 +69632,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 337 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'arc up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -69591,6 +69726,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 247 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'ascend'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -69667,6 +69817,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 324 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'bean'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -69745,6 +69910,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 272 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'blast'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -70260,6 +70440,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 334 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'bounce left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -70336,6 +70531,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 347 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'bounce right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -70421,6 +70631,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 212 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'box'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -70506,6 +70731,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 274 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'brush on color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -70591,6 +70831,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 275 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'brush on underline'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -70667,6 +70922,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 318 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'buzzsaw'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -70836,6 +71106,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 262 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'change fill color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -70917,6 +71202,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 263 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'change font'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -71002,6 +71302,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 264 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'change font color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -71083,6 +71398,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 265 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'change font size'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -71164,6 +71494,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 266 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'change font style'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -71251,6 +71596,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 268 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'change line color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -71497,6 +71857,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 294 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'circle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -71575,6 +71950,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 276 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'color blend'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -71660,6 +72050,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 235 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'color reveal'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -71738,6 +72143,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 277 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'color wave'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -71999,6 +72419,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 280 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'constrasting color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -72084,6 +72519,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 215 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'crawl'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -72250,6 +72700,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 299 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'crescent moon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -72326,6 +72791,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 313 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'curved square'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -72402,6 +72882,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 314 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'curved x'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -72478,6 +72973,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 341 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'curvy left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -72554,6 +73064,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 354 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'curvy right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -72630,6 +73155,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 316 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'curvy star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -72870,6 +73410,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 353 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'decaying wave'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -73036,6 +73591,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 250 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'descend'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -73112,6 +73682,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 342 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'diagonal down right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -73188,6 +73773,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 349 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'diagonal up right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -73273,6 +73873,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 216 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'diamond'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -73349,6 +73964,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 296 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'diamond'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -73510,6 +74140,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 335 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -73595,6 +74240,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 237 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'ease in'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -73671,6 +74331,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 306 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'equal triangle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -73917,6 +74592,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 256 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'fade zoom'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -73996,6 +74686,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 249 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'faded swivel'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -74072,6 +74777,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 321 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'figure 8 four'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -74158,6 +74878,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 283 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'flash bulb'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -74243,6 +74978,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 219 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'flash once'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -74330,6 +75080,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 284 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'flicker'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -74593,6 +75358,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 210 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'fly'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -74672,6 +75452,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 261 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'fold'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -74748,6 +75543,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 305 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'football'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -74824,6 +75634,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 345 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'funnel'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -74903,6 +75728,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 257 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'glide'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -74994,6 +75834,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 239 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'grow and turn'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -75244,6 +76099,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 302 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'heart'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -75320,6 +76190,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 338 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'heartbeat'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -75396,6 +76281,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 297 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'hexagon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -75472,6 +76372,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 319 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'horizontal figure 8'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -75548,6 +76463,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 327 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'inverted square'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -75624,6 +76554,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 326 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'inverted triangle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -75700,6 +76645,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 328 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -75779,6 +76739,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 240 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'light speed'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -75942,6 +76917,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 317 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'loop de loop'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -76022,6 +77012,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 292 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'media pause'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -76183,6 +77188,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 293 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'media stop'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -76259,6 +77279,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 322 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'neutron'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -76335,6 +77370,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 303 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'octagon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -76411,6 +77461,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 307 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'parallelogram'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -76487,6 +77552,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 320 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'peanut'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -76578,6 +77658,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 220 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'peek'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -76654,6 +77749,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 308 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'pentagon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -76821,6 +77931,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 221 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'plus'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -76897,6 +78022,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 325 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'plus'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -76973,6 +78113,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 312 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'pointy star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -77143,6 +78298,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 232 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'random effect'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -77219,6 +78389,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 357 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -77295,6 +78480,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 295 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'right triangle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -77453,6 +78653,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 352 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 's curve 1'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -77529,6 +78744,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 332 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 's curve 2'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -77687,6 +78917,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 333 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'sine wave'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -77766,6 +79011,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 251 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'sling'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -78099,6 +79359,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 348 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'spiral left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -78175,6 +79450,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 339 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'spiral right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -78336,6 +79626,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 346 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'spring'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -78412,6 +79717,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 300 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'square'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -78488,6 +79808,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 355 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'stairs down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -78823,6 +80158,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 287 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'style emphasis'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -78902,6 +80252,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 243 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'swish'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -79068,6 +80433,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 323 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'swoosh'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -79144,6 +80524,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 311 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'teardrop'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -79308,6 +80703,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 244 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'thin line'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -79470,6 +80880,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 301 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'trapezoid'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -79546,6 +80971,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 343 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'turn down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -79622,6 +81062,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 329 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'turn right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -79698,6 +81153,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 336 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'turn up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -79774,6 +81244,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 350 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'turn up right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -79853,6 +81338,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 245 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'unfold'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -79929,6 +81429,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 356 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -80005,6 +81520,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 315 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'vertical figure 8'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -80083,6 +81613,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 289 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'vertical grow'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -80659,6 +82204,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 331 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'zigzag'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -80738,6 +82298,21 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 254 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "reason": "no gallery or popup of this build offers 'zip'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {

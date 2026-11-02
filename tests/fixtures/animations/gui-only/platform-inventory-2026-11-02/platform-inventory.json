@@ -1,0 +1,130 @@
+{
+  "record": "platformInventory",
+  "application": "Microsoft PowerPoint",
+  "version": "16.113.1",
+  "platform": "macOS",
+  "document": "spin2-deck",
+  "mechanism": "macOS Accessibility API",
+  "readAt": "2026-11-02T02:05:28Z",
+  "noMoreEffectsRoute": {
+    "finding": "no gallery offers a 'More ... Effects' or 'More Motion Paths' item, and this build has no 'Add Animation' control, which is the route Windows uses to reach them. The galleries below are therefore the complete set of effects this build can apply.",
+    "corroboration": [
+      "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+      "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+    ]
+  },
+  "galleryTilesRecordedIn": "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json",
+  "counts": {
+    "galleries": 1,
+    "items": 16,
+    "distinctLabels": 16
+  },
+  "galleries": [
+    {
+      "gallery": "Path Animation",
+      "form": "popupWindow",
+      "closed": "closed",
+      "count": 16,
+      "items": [
+        {
+          "label": "Draw Curve",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Draw Freeform",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Draw Line",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Draw Scribble",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Arcs",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Lines",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Loops",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Shapes",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Turns",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Bounce",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Inverted Shape",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Special Curve",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Special Shape",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Spiral",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Star",
+          "role": "AXRadioButton",
+          "enabled": true
+        },
+        {
+          "label": "Waves",
+          "role": "AXRadioButton",
+          "enabled": true
+        }
+      ]
+    }
+  ],
+  "labels": [
+    "Arcs",
+    "Bounce",
+    "Draw Curve",
+    "Draw Freeform",
+    "Draw Line",
+    "Draw Scribble",
+    "Inverted Shape",
+    "Lines",
+    "Loops",
+    "Shapes",
+    "Special Curve",
+    "Special Shape",
+    "Spiral",
+    "Star",
+    "Turns",
+    "Waves"
+  ]
+}

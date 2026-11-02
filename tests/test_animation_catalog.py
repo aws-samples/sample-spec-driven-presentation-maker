@@ -2098,3 +2098,82 @@ def test_the_gate_counts_only_what_can_be_closed():
     assert "noSdpmInput" not in blockers, report["gate"]["blockers"]
     assert report["gaps"]["noSdpmInput"]["count"] == 90
     assert report["gaps"]["noSdpmInput"]["closes"].startswith("nothing")
+
+
+def test_an_effect_this_build_cannot_apply_is_not_counted_as_awaiting_capture():
+    """`captureRequired` has to list only what a capture here could record.
+
+    Most `MsoAnimEffect` enumerators name Windows-era effects — `bean path`,
+    `light speed`, `zip` — that PowerPoint for Mac cannot apply at all. On
+    Windows the full list is reached through Add Animation; this build has no
+    such control, so its galleries and the Path Animation popup are the whole
+    set. Counting them as awaiting a read-back claimed a capture would close
+    them, and kept the total from ever reaching zero.
+
+    The classification is **derived** from the two committed readings, not
+    hardcoded, so an effect that appears in a future build stops being marked
+    on the next regeneration.
+    """
+    from scripts.animation_catalog.generate import applicable_effect_labels
+    from sdpm.engine.timing import load_capability_index
+    from sdpm.engine.timing.writer import catalog_coverage
+
+    catalog_path = REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    catalog = json.loads(catalog_path.read_text())
+    records = catalog_coverage(load_capability_index(catalog_path), catalog=catalog)
+
+    marked = {record.key for record in records if record.platform_unavailable}
+    assert marked, "nothing was marked, so this guard checks nothing"
+    assert all(key.startswith("MsoAnimEffect.animation type ") for key in marked), sorted(marked)[:5]
+
+    # Every marked entry names an effect no gallery offers, and carries both the
+    # reading it came from and the published corroboration.
+    labels = applicable_effect_labels()
+    assert labels, "the platform inventory is missing, so the marking cannot be checked"
+    by_key = {e["key"]: e for e in catalog["guiItems"] + catalog["candidates"]}
+    import re as _re
+
+    for key in sorted(marked):
+        label = key.removeprefix("MsoAnimEffect.animation type ").removesuffix(" path")
+        assert _re.sub(r"[^a-z0-9]", "", label.lower()) not in labels, (
+            f"{key} was marked unavailable but {label!r} is in this build's galleries"
+        )
+        block = by_key[key]["platformUnavailable"]
+        assert block["platform"] == "macOS"
+        assert len(block["corroboration"]) == 2
+        assert block["readFrom"]
+
+    # And the effects the galleries *do* offer are never marked, however
+    # unusual their names: shimmer, stretchy and wave are reachable here.
+    for reachable in ("shimmer", "stretchy", "wave path"):
+        assert f"MsoAnimEffect.animation type {reachable}" not in marked, reachable
+
+
+def test_the_platform_inventory_records_the_whole_path_animation_popup():
+    """The reading that decides 63 motion-path entries has to be reproducible.
+
+    It used to be an ad-hoc accessibility read in a terminal, which no later
+    reader could repeat. `discover_platform_inventory.py` performs it, and this
+    asserts the committed result still describes the popup it claims to.
+    """
+    inventory = json.loads(
+        (
+            REPO_ROOT
+            / "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02"
+            / "platform-inventory.json"
+        ).read_text()
+    )
+    assert inventory["platform"] == "macOS"
+    assert inventory["version"] == "16.113.1"
+    assert inventory["counts"]["items"] == 16
+    labels = {item["label"] for item in inventory["galleries"][0]["items"]}
+    # Custom needs a drawn path; Basic is measured; Complex is reachable and
+    # has no catalog key at all, which is the gap this reading exposed.
+    assert {"Draw Curve", "Draw Freeform", "Draw Line", "Draw Scribble"} <= labels
+    assert {"Arcs", "Lines", "Loops", "Shapes", "Turns"} <= labels
+    assert {
+        "Bounce", "Inverted Shape", "Special Curve", "Special Shape",
+        "Spiral", "Star", "Waves",
+    } <= labels
+    assert "More Motion Paths..." not in labels and "More Motion Paths…" not in labels
+    assert len(inventory["noMoreEffectsRoute"]["corroboration"]) == 2

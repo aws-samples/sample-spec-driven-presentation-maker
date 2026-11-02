@@ -2931,6 +2931,106 @@ def _resolve_default_from_sibling(options: dict[str, Any]) -> None:
             option["defaultResolvedBy"] = "siblingSetting"
 
 
+#: Where the read of this build's applicable effects lives. Two halves: the
+#: gallery tiles, enumerated by the effect-option discovery, and the ``Path
+#: Animation`` popup, read by ``discover_platform_inventory.py``.
+DEFAULT_PLATFORM_INVENTORY = (
+    REPO_ROOT
+    / "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json"
+)
+DEFAULT_GALLERY_TILES = (
+    REPO_ROOT / "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+)
+
+
+def _label_key(label: str) -> str:
+    """Compare labels by letters and digits only.
+
+    ``Grow/Shrink`` and ``grow shrink``, ``4 Point Star`` and ``4 point star``
+    are the same effect under two spellings — the sdef enumerator and the
+    ribbon label never agree on punctuation or case.
+    """
+    return re.sub(r"[^a-z0-9]", "", label.lower())
+
+
+def applicable_effect_labels(
+    inventory: Path | None = None, tiles: Path | None = None
+) -> set[str]:
+    """Return every effect label this PowerPoint build can apply, normalised."""
+    labels: set[str] = set()
+    inventory_path = inventory or DEFAULT_PLATFORM_INVENTORY
+    if inventory_path.exists():
+        document = json.loads(inventory_path.read_text(encoding="utf-8"))
+        labels.update(_label_key(label) for label in document.get("labels") or ())
+    tiles_path = tiles or DEFAULT_GALLERY_TILES
+    if tiles_path.exists():
+        document = json.loads(tiles_path.read_text(encoding="utf-8"))
+        for gallery in document.values():
+            for item in gallery:
+                label = item.get("label") if isinstance(item, dict) else item
+                if label:
+                    labels.add(_label_key(str(label)))
+    return labels
+
+
+def mark_platform_unavailable(items: list[dict[str, Any]]) -> int:
+    """Flag the enumerators this build has no way to apply, and say why.
+
+    The sdef names 185 animation enumerators. Most of the ``MsoAnimEffect``
+    ones are Windows-era effects — ``bean path``, ``buzzsaw path``, ``light
+    speed``, ``zip`` — and **PowerPoint for Mac cannot apply them at all**: on
+    Windows the full list is reached through ``Add Animation ▸ … ▸ More Entrance
+    Effects…`` / ``More Motion Paths…``, and this build has no ``Add
+    Animation`` control, so the galleries are the whole set.
+
+    Recording them as capture-required claimed a PowerPoint read-back would
+    close them. It would not, on this platform, and the count could never reach
+    zero — the same defect that ``noSdpmInput`` fixed for the direction names,
+    one layer down.
+
+    ``platformUnavailable`` is deliberately **not** ``noSdpmInput``. The reason
+    differs and so does the remedy: a direction name can never identify a
+    ``presetSubtype``, whereas these effects are perfectly real and simply out
+    of reach *here*. A capture on Windows, or a Mac build that gains ``Add
+    Animation``, would close them.
+    """
+    labels = applicable_effect_labels()
+    if not labels:
+        return 0
+    marked = 0
+    for entry in items:
+        key = str(entry.get("key", ""))
+        if not key.startswith("MsoAnimEffect.animation type "):
+            continue
+        ooxml = entry.get("ooxml")
+        if not isinstance(ooxml, dict) or not ooxml.get("requiresCapture"):
+            continue
+        label = key.removeprefix("MsoAnimEffect.animation type ").removesuffix(" path")
+        if _label_key(label) in labels:
+            continue
+        entry["platformUnavailable"] = {
+            "platform": "macOS",
+            "application": BASELINE_APPLICATION,
+            "version": BASELINE_VERSION,
+            "reason": (
+                f"no gallery or popup of this build offers {label!r}. The full effect list is "
+                "reached on Windows through Add Animation, which PowerPoint for Mac does not "
+                "have, so no capture on this platform can record this enumerator's OOXML form"
+            ),
+            "readFrom": [
+                DEFAULT_PLATFORM_INVENTORY.relative_to(REPO_ROOT).as_posix(),
+                DEFAULT_GALLERY_TILES.relative_to(REPO_ROOT).as_posix(),
+            ],
+            "corroboration": [
+                "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+                "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
+            ],
+            "closes": "a capture on a platform whose PowerPoint offers the effect",
+        }
+        marked += 1
+    return marked
+
+
 def promote_all_effect_options(
     items: list[dict[str, Any]],
     evidence: dict[str, dict[str, list[dict[str, Any]]]],
@@ -3109,6 +3209,11 @@ def build_catalog(manifest: dict[str, Any], sdef_enums: dict[str, list[tuple[str
     items.sort(key=lambda entry: entry["key"])
     candidates = align_candidate_durations(candidate_entries(sdef_enums, evidence), items)
     candidates.sort(key=lambda entry: entry["key"])
+    # Last of all, and over **both** groups, so it sees the final
+    # requiresCapture state: an entry a capture has just closed must not then be
+    # labelled unreachable. The MsoAnimEffect enumerators live in `candidates`,
+    # which is why marking only `items` found nothing.
+    mark_platform_unavailable(items + candidates)
     capture_counts = {
         "probed": sum(1 for entry in candidates if "capture" in entry),
         "transitionWritten": sum(

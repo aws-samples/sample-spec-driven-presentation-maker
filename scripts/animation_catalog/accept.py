@@ -1557,10 +1557,18 @@ def run_acceptance(
     no_sdpm_input = sorted(
         record.key for record in records if record.outcome == "refused" and record.no_sdpm_input
     )
+    platform_unavailable = sorted(
+        record.key
+        for record in records
+        if record.platform_unavailable and not record.no_sdpm_input
+    )
     capture_required = sorted(
         record.key
         for record in records
-        if record.outcome == "refused" and not record.elements and not record.no_sdpm_input
+        if record.outcome == "refused"
+        and not record.elements
+        and not record.no_sdpm_input
+        and not record.platform_unavailable
     )
     payload_gaps = sorted(
         (
@@ -1571,10 +1579,20 @@ def run_acceptance(
         key=lambda row: row["key"],
     )
     gallery_payload_gaps = [row for row in payload_gaps if row["group"] == "guiItems"]
+    # An effect this build cannot apply is excluded from both gap counts, not
+    # just the capture one. Its form is unmeasured here, so the reader has
+    # nothing to invert it to, and no work available on this platform changes
+    # that — leaving it in `oneWayOnly` would be the same unreachable-total
+    # defect one column over.
+    unreachable = {
+        record.key for record in records if record.platform_unavailable or record.no_sdpm_input
+    }
     one_way = sorted(
         outcome.key
         for outcome in outcomes.values()
-        if outcome.outcome == "generated" and not outcome.reversible
+        if outcome.outcome == "generated"
+        and not outcome.reversible
+        and outcome.key not in unreachable
     )
     partial = [
         {"key": outcome.key, "paths": list(outcome.diff)}
@@ -1593,6 +1611,19 @@ def run_acceptance(
             "meaning": "accepted catalog mappings whose OOXML element form PowerPoint has not been asked for",
             "closes": "PowerPoint read-back (--powerpoint) recording the element and attributes for each key",
             "keys": capture_required,
+        },
+        "platformUnavailable": {
+            "count": len(platform_unavailable),
+            "meaning": (
+                "effects that are real but which this PowerPoint build cannot apply, so no "
+                "capture taken here can record their OOXML form. On Windows the full effect list "
+                "is reached through Add Animation; PowerPoint for Mac has no such control, so its "
+                "galleries and the Path Animation popup are the complete set. Read from the "
+                "platform inventory and the gallery tiles, and corroborated by Microsoft's own "
+                "motion-path article and a Microsoft Q&A answer; each entry carries both links"
+            ),
+            "closes": "a capture on a platform whose PowerPoint offers the effect",
+            "keys": platform_unavailable,
         },
         "noSdpmInput": {
             "count": len(no_sdpm_input),

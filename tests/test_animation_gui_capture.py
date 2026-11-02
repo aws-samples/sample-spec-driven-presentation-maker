@@ -2208,10 +2208,11 @@ class TestConsentAndRefusal:
         allowed = {
             "scripts/animation_catalog/gui_capture.py",
             "scripts/animation_catalog/gui_capture_plan.py",
-            # The discovery pass drives PowerPoint too — it applies a tile and
-            # opens a window — so it gates on the same token rather than on one
-            # of its own. A second token would be a second thing to remember.
+            # The discovery passes drive PowerPoint too — they apply a tile and
+            # open a window — so they gate on the same token rather than on one
+            # of their own. A second token would be a second thing to remember.
             "scripts/animation_catalog/discover_effect_options.py",
+            "scripts/animation_catalog/discover_platform_inventory.py",
             "scripts/animation_catalog/README.md",
             "scripts/animation_catalog/computer-use.md",
             "tests/fixtures/animations/gui-only/effect-options-2026-11-01/README.md",
