@@ -1430,11 +1430,12 @@ class TestPlanDerivation:
         # `p:cTn/@fill` moving from "hold" to "remove", which the writer emits,
         # so its gap is closed rather than merely unflagged.
         assert "animation.timing.rewind" not in keys
-        # `animation.timing.bounceEnd` is still here, and for a different reason
-        # from the rest: its value IS measured — `p:cTn/@p14:presetBounceEnd` at
-        # 50000 — but PowerPoint pairs the extension attribute with an
-        # `mc:AlternateContent` fallback branch this writer cannot emit.
-        assert "animation.timing.bounceEnd" in keys
+        # `animation.timing.bounceEnd` left too, once the writer learned to emit
+        # the `mc:AlternateContent` wrapper its two `p14` attributes need.
+        assert "animation.timing.bounceEnd" not in keys
+        # What remains is the two effect sounds, which need an audio part and a
+        # package relationship rather than a measurement.
+        assert keys == {"animation.sound.effect", "animation.sound.stopPreviousSound"}
         # `animation.start.none` was listed here until the catalog stopped
         # treating an absent start condition as a value awaiting measurement.
         assert "animation.start.none" not in keys

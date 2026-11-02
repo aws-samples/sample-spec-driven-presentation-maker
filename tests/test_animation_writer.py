@@ -49,6 +49,10 @@ from sdpm.engine.timing import (
 from sdpm.engine.timing.transition import build_transition
 from sdpm.engine.timing.writer import capability_cache_info, default_catalog_path
 
+#: The PowerPoint 2010 extension namespace, which Bounce End's two attributes
+#: live in and which the `mc:AlternateContent` wrapper declares a requirement on.
+P14_NS = "http://schemas.microsoft.com/office/powerpoint/2010/main"
+
 REPO_ROOT = Path(__file__).resolve().parent.parent
 TEMPLATE = REPO_ROOT / "sdpm" / "templates" / "blank-dark.pptx"
 CATALOG_PATH = REPO_ROOT / "sdpm" / "references" / "catalogs" / "powerpoint-animation-catalog.json"
@@ -107,25 +111,30 @@ CATALOG_COVERAGE = {
         # The +1 is the reversed Clock, which writes once the parameter set that
         # selects it is kept apart from the attributes it emits.
         #
-        # The last +8 is the 2026-11-02 Animation Pane measurement, and it is
-        # the same eight keys that left `refused` below: the four After
-        # animation values (p:subTnLst holding a p:set or a p:animClr), their
-        # three MsoAnimAfterEffect mirrors, and Rewind (p:cTn/@fill, "hold" ->
+        # The +8 is the 2026-11-02 Animation Pane measurement, and it is the
+        # same eight keys that left `refused` below: the four After animation
+        # values (p:subTnLst holding a p:set or a p:animClr), their three
+        # MsoAnimAfterEffect mirrors, and Rewind (p:cTn/@fill, "hold" ->
         # "remove"). guiItems takes five of them and candidates the three
         # mirrors, which is what says the eight are accounted for rather than
         # the totals happening to move by eight.
-        "total": 476,
-        "guiItems": 230,
+        #
+        # The last +1 is Bounce End, which needed the writer's first
+        # `mc:AlternateContent`: its two `p14` attributes are extensions, and
+        # PowerPoint pairs them with a fallback branch carrying the same timing
+        # without them.
+        "total": 477,
+        "guiItems": 231,
         "candidates": 246,
-        "animation": 258,
+        "animation": 259,
         "transition": 218,
     },
     "refused": {
-        # 193, not 201: the eight keys named above are written now.
-        "total": 193,
-        "guiItems": 53,
+        # 192, not 201: the nine keys named above are written now.
+        "total": 192,
+        "guiItems": 52,
         "candidates": 140,
-        "animation": 191,
+        "animation": 190,
         "transition": 2,
     },
     "generatedDespiteGap": [
@@ -146,12 +155,12 @@ CATALOG_COVERAGE = {
     #: to 11 and holds no gallery tile at all — only enum candidates whose own
     #: mapping is open, so they resolve to no measured tile.
     #:
-    #: 182, not 190: the eight Animation Pane keys. Note that this number counts
+    #: 181, not 190: the nine Animation Pane keys. Note that this number counts
     #: every mapping refusal, including the ones no capture can close — the 45
     #: MsoAnimDirection names and the Windows-only effects — so the harness's own
-    #: `captureRequired` figure is smaller. Eight of those remain, and seven of
-    #: them are the deferred sound and media keys.
-    "captureRequiredRefusals": 182,
+    #: `captureRequired` figure is smaller — seven, and all seven are the
+    #: deferred sound and media keys.
+    "captureRequiredRefusals": 181,
     "payloadRefusals": {"total": 11, "guiItems": 0, "candidates": 11},
 }
 
@@ -784,11 +793,11 @@ UNWRITTEN_OPTIONS = [
     # emits as `timing.acceleration` / `.deceleration`. They refuse by naming
     # the field to use instead, which a test below asserts.
     #
-    # `bounceEnd` stays, and the reason is the markup rather than the value:
-    # measured, it is `p:cTn/@p14:presetBounceEnd` inside an
-    # `mc:AlternateContent` wrapper, and this writer emits no
-    # `mc:AlternateContent` anywhere.
-    ({"timing": {"durationMs": 500, "bounceEnd": 0.5}}, "animation.timing.bounceEnd"),
+    # `bounceEnd` was here too, as the one whose markup rather than value was
+    # missing. The writer emits `mc:AlternateContent` now, so it is written —
+    # on a motion path, which is the only effect PowerPoint offers it for.
+    # `test_bounce_end_writes_both_attributes_inside_an_alternate_content` and
+    # its siblings assert that.
     (
         {"start": {"type": "withPrevious", "delayMs": 0, "bookmark": "cue1"}},
         "animation.media.bookmarkTrigger",
@@ -1009,6 +1018,105 @@ def test_a_dim_colour_is_rejected_on_a_type_that_cannot_carry_it():
         )
         with pytest.raises(TimingWriteError, match="applies only to type 'dim'"):
             _build(slide_def)
+
+
+def test_bounce_end_writes_both_attributes_inside_an_alternate_content():
+    """Bounce End is two `p14` attributes, and the wrapper that makes them safe.
+
+    Measured 2026-11-02: `p14:presetBounceEnd` on the effect's `p:cTn` — the
+    setting — and `p14:bounceEnd` on its `p:animMotion` — the behaviour that
+    bounces. Both are percentages, so the `0.5` here is `50000`, which is what
+    PowerPoint's own checkbox writes.
+
+    The wrapper is the reason this needed more than an attribute. An extension
+    attribute is invisible to a consumer that does not implement its namespace,
+    and PowerPoint does not rely on that: it emits one `mc:AlternateContent`
+    holding the **whole** timing twice, with `mc:Fallback` carrying the same
+    animation minus the two attributes. The slide root declares no
+    `mc:Ignorable`, so that wrapper is the whole mechanism.
+    """
+    _builder, slide = _build(
+        _slide(animations={
+            "mainSequence": [
+                _effect(
+                    "fx",
+                    "hero",
+                    preset={"category": "motionPath", "effect": "lines"},
+                    timing={"durationMs": 500, "bounceEnd": 0.5},
+                )
+            ],
+            "interactiveSequences": [],
+        })
+    )
+    root = _xml(slide)
+    wrappers = root.xpath(".//*[local-name()='AlternateContent']")
+    assert len(wrappers) == 1, "one wrapper, not one per effect"
+    branches = [etree.QName(child).localname for child in wrappers[0]]
+    assert branches == ["Choice", "Fallback"], "Choice first, as PowerPoint writes it"
+    choice, fallback = wrappers[0]
+    assert choice.get("Requires") == "p14"
+    assert fallback.get("Requires") is None
+    assert [etree.QName(c).localname for c in choice] == ["timing"]
+    assert [etree.QName(c).localname for c in fallback] == ["timing"]
+
+    preset_bounce = choice.xpath(".//*[local-name()='cTn'][@presetID]")[0]
+    assert preset_bounce.get(f"{{{P14_NS}}}presetBounceEnd") == "50000"
+    motion = choice.xpath(".//*[local-name()='animMotion']")[0]
+    assert motion.get(f"{{{P14_NS}}}bounceEnd") == "50000"
+
+    # The fallback is the same animation without the extension, which is the
+    # property that makes the wrapper lossless rather than a second guess at it.
+    assert fallback.xpath(".//*[@*[local-name()='presetBounceEnd']]") == []
+    assert fallback.xpath(".//*[@*[local-name()='bounceEnd']]") == []
+    stripped = etree.tostring(choice[0]).decode()
+    for attribute in ("presetBounceEnd", "bounceEnd"):
+        stripped = re.sub(rf' p14:{attribute}="\d+"', "", stripped)
+    assert stripped == etree.tostring(fallback[0]).decode(), (
+        "the fallback must be the choice minus the two attributes and nothing else"
+    )
+
+    # No wrapper at all when nothing needs one, so an ordinary deck is unchanged.
+    _builder, plain = _build(_slide(animations={
+        "mainSequence": [_effect("fx", "hero")],
+        "interactiveSequences": [],
+    }))
+    assert _xml(plain).xpath(".//*[local-name()='AlternateContent']") == []
+
+
+def test_bounce_end_on_an_effect_with_no_motion_is_refused():
+    """Because PowerPoint does not offer it there, so there is no form to write.
+
+    Measured 2026-11-02: with an entrance Fade selected, the pane publishes a
+    `Bounce End` checkbox and reads it **disabled** — alongside `Smooth Start`,
+    `Smooth End` and `Auto-reverse`. Only `Rewind` is enabled for an entrance
+    effect. Writing the preset attribute alone would invent a value PowerPoint
+    will not produce.
+    """
+    with pytest.raises(TimingWriteError, match="applies to a motion path"):
+        _build(_slide(animations={
+            "mainSequence": [
+                _effect("fx", "hero", timing={"durationMs": 500, "bounceEnd": 0.5})
+            ],
+            "interactiveSequences": [],
+        }))
+
+
+@pytest.mark.parametrize("value", [1.5, 300, -0.1])
+def test_bounce_end_outside_a_fraction_is_refused(value):
+    """It is a percentage, like `acceleration`. The catalog's own example used to
+    say `300`, which would have been 300 times a full bounce."""
+    with pytest.raises(TimingWriteError, match="outside 0..1"):
+        _build(_slide(animations={
+            "mainSequence": [
+                _effect(
+                    "fx",
+                    "hero",
+                    preset={"category": "motionPath", "effect": "lines"},
+                    timing={"durationMs": 500, "bounceEnd": value},
+                )
+            ],
+            "interactiveSequences": [],
+        }))
 
 
 def test_rewind_moves_the_existing_fill_rather_than_adding_an_attribute():

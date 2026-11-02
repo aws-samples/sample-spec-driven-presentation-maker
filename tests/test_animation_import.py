@@ -584,6 +584,34 @@ def test_a_dim_to_an_unmeasured_scheme_colour_is_kept_raw_rather_than_flattened(
     assert b"accent4" in motion.raw_timing.xml
 
 
+def test_bounce_end_round_trips_out_of_the_alternate_content_choice(tmp_path):
+    """The wrapper has to be read back through, not merely written.
+
+    The reader picks the `mc:Choice` branch because it implements `p14`, and the
+    percentage comes back as the `0`–`1` fraction that produced it. The matching
+    `p:animMotion/@p14:bounceEnd` is deliberately **not** reported as a second
+    field: it is the same setting seen on the behaviour, and a JSON carrying it
+    twice would not be the JSON that produced the package.
+    """
+    source = {"durationMs": 500, "bounceEnd": 0.5}
+    package = _package(tmp_path, _slide(animations={
+        "mainSequence": [
+            _effect(
+                preset={"category": "motionPath", "effect": "lines"},
+                timing=dict(source),
+            )
+        ],
+        "interactiveSequences": [],
+    }))
+    assert "AlternateContent" in _slide_xml(package), "the wrapper reached the package"
+
+    motion = _read(package)
+    assert motion.raw_timing is None, "the wrapper must be understood, not preserved raw"
+    effect = motion.animations["mainSequence"][0]
+    assert effect["timing"] == source
+    assert "bounce" not in json.dumps(effect.get("behaviors") or [])
+
+
 def test_rewind_round_trips_through_the_fill_attribute(tmp_path):
     """And its default does not come back as an explicit false.
 

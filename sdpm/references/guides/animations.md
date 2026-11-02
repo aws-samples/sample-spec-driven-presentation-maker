@@ -545,16 +545,22 @@ be written at any duration once an option names one.
 | `rewind` | Boolean. Writes `p:cTn/@fill="remove"` in place of the default `hold`. | yes |
 | `smoothStart` | Boolean. | **no** — use `acceleration` |
 | `smoothEnd` | Boolean. | **no** — use `deceleration` |
-| `bounceEnd` | `0`–`1` fraction, like `acceleration`. | **no** |
+| `bounceEnd` | `0`–`1` fraction, like `acceleration`. **Motion paths only.** | yes |
 
 `smoothStart` and `smoothEnd` are not missing features. They are the Animation Pane's names
 for `p:cTn/@accel` and `@decel` at `50000`, which is `acceleration` / `deceleration` set to
 `0.5` — measured 2026-11-02. Asking for either one is refused with the field to use instead.
 
-`bounceEnd` is refused, and the reason is the markup rather than the value: measured, it is
-`p:cTn/@p14:presetBounceEnd` at `50000`, and PowerPoint pairs that extension attribute with
-an `mc:AlternateContent` fallback branch this writer cannot emit. So it is a `0`–`1` fraction
-like the other two percentages, not a duration.
+`bounceEnd` works only on a **motion path**, and asking for it elsewhere is an error rather
+than a silent no-op. That is PowerPoint's own limit, not sdpm's: with an entrance effect
+selected, the Animation Pane shows a Bounce End checkbox and leaves it disabled — along with
+Smooth Start, Smooth End and Auto-reverse. Only Rewind is enabled there.
+
+It is also the one setting that changes the shape of the slide's XML. Its two attributes are
+in the PowerPoint 2010 extension namespace, so a slide that uses it carries its timing inside
+an `mc:AlternateContent`: one branch with the attributes for PowerPoint, one without them for
+anything else. You do not have to do anything about that — import reads it back — but it is
+why a deck with a bounce looks different from one without when you open the XML.
 
 ### After animation
 
@@ -668,7 +674,6 @@ substitution would lose the user's setting.
 | Effect sound | `animation.sound.effect` |
 | Stop previous sound | `animation.sound.stopPreviousSound` |
 | Trigger "with no trigger" | `animation.start.none` |
-| Timing: bounce end | `animation.timing.bounceEnd` |
 | Timing: smooth end | `animation.timing.smoothEnd` |
 | Timing: smooth start | `animation.timing.smoothStart` |
 | Transition sound | `transition.sound.effect` |

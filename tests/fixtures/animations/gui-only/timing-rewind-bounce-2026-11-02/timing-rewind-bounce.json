@@ -64,7 +64,9 @@
           },
           "note": "the same effect without the extension attribute, so a consumer that ignores p14 plays the motion path with no bounce"
         }
-      }
+      },
+      "appliesTo": "motion paths only. Measured 2026-11-02 on an entrance Fade applied to the same deck: the pane publishes a 'Bounce End' checkbox for it and reads enabled=False, alongside 'Smooth Start', 'Smooth End' and 'Auto-reverse', which are also disabled. Only 'Rewind when done playing' is enabled for an entrance effect. So there is no entrance-effect form of Bounce End to measure, and the catalog's own example for this key -- an entrance fade -- asks for something this build will not do.",
+      "alternateContentPlacement": "p:sld/mc:AlternateContent, wrapping the WHOLE p:timing twice: mc:Choice Requires='p14' carries the timing with p14:presetBounceEnd on the effect's p:cTn and p14:bounceEnd on its p:animMotion, and mc:Fallback carries the byte-identical timing without those two attributes. Measured 2026-11-02 on the saved package: one AlternateContent, two branches, seven effects in each, and the slide root declares no mc:Ignorable -- PowerPoint uses the wrapper instead of marking the namespace ignorable."
     }
   },
   "methodFindings": [
@@ -76,7 +78,8 @@
     "Save works through the Quick Access toolbar button and does not need focus, unlike the menubar route, whose refs cannot be pressed at all: the snapshot resolves the app as 'Microsoft PowerPoint' while the process owning the menubar reports 'PowerPoint', so a click returns STALE_REF on a source_process_identity mismatch.",
     "Counting both mc:AlternateContent branches made one effect read as two, and the duplication is not stable — clearing Bounce End removed the wrapper, so every effect's signature list changed and all seven shapes reported a change for a press that touched one. Signatures now ignore the mc:Fallback branch, and the re-measurement reported exactly one shape.",
     "The effect this run measured was selected by a physical click, not by the driver. Nothing in the accessibility API selects a row in the Animation Pane's list on this build: AXSelected on the row and AXSelectedRows on the outline both report settable, return 0 and never read back; AXPress is not published (-25206); the row's only actions, AXShowDefaultUI and AXShowAlternateUI, do nothing; selecting the shape selects no effect; AXFocused on the outline takes and still selects no row; and agent-desktop's click answers 'Selection was delivered but its effect could not be verified'. The driver therefore reads the selection and refuses when there is none, rather than claiming to make it.",
-    "The effect rows are identifiable after all. The name is not a descendant AXStaticText the way a Selection Pane row's is - which is why a search for one returned nothing and the rows were called nameless - it is the row's AXCell child's own title, and it describes the effect: 'Animation order: 7, Starts: On Click, Path effect, Curvy Left, 007.'"
+    "The effect rows are identifiable after all. The name is not a descendant AXStaticText the way a Selection Pane row's is - which is why a search for one returned nothing and the rows were called nameless - it is the row's AXCell child's own title, and it describes the effect: 'Animation order: 7, Starts: On Click, Path effect, Curvy Left, 007.'",
+    "Bounce End, Smooth Start, Smooth End and Auto-reverse are all disabled in the pane for an entrance effect; Rewind is not. That is what makes Bounce End a motion-path setting rather than a general timing one, and it is why no entrance-effect form of it was measured: the build does not offer one to measure."
   ],
   "notMeasured": {
     "animation.afterAnimation.*": "MEASURED 2026-11-02 in after-effects-2026-11-02/after-effects.json — all four values, with the effect selected by the driver itself rather than by hand. This entry is kept so the reason it was open here is not lost: the popup is a selection rather than a checkbox, and reaching it needs an effect selected, which nothing in the accessibility API does.",

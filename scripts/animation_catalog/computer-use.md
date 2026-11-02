@@ -696,6 +696,34 @@ row 7  Animation order: 7, Starts: On Click, Path effect, Curvy Left, 007.
 So a measurement records *which* effect it measured rather than asserting a row
 number. Read them with `pane_effect_rows`.
 
+### Which Effect Options controls apply to which effect
+
+Measured 2026-11-02 by selecting one motion path and one entrance Fade in the
+same deck and reading the section's controls:
+
+| Control | Motion path | Entrance effect |
+| --- | --- | --- |
+| `Bounce End` | enabled | **disabled** |
+| `Smooth Start` | enabled | **disabled** |
+| `Smooth End` | enabled | **disabled** |
+| `Auto-reverse` | enabled | **disabled** |
+| `Rewind when done playing` | enabled | enabled |
+| `After animation:` | enabled | enabled |
+| `Sound:` | enabled | enabled |
+
+The controls are **published for both** and only the `enabled` flag differs, so
+a capture that read titles and not state would have recorded four settings an
+entrance effect does not have. That is what makes Bounce End a motion-path
+setting rather than a general timing one, and why there is no entrance-effect
+form of it to measure: the build does not offer one.
+
+Bounce End also writes **two** attributes, and the second is on the behaviour:
+`p14:presetBounceEnd` on the effect's `p:cTn` and `p14:bounceEnd` on its
+`p:animMotion`. Both are extensions, so PowerPoint wraps the whole `p:timing`
+once at `p:sld/mc:AlternateContent` — `mc:Choice Requires="p14"` with them,
+`mc:Fallback` with the byte-identical timing without them — and declares no
+`mc:Ignorable` on the slide root. The wrapper is the whole mechanism.
+
 ### Reading a popup inside the pane
 
 Each combobox opens as a `menu` **surface**, not as a separate window the way
@@ -777,7 +805,7 @@ the XML: REQ-5.7 needs the relationship closure. This closes
 `animation.sound.effect`, `animation.sound.stopPreviousSound`,
 `transition.sound.effect` and `transition.sound.loopUntilNext`.
 
-## Step 5 — Timing: rewind, smooth start/end, bounce end — **2 of 4 MEASURED**
+## Step 5 — Timing: rewind, smooth start/end, bounce end — **all 4 MEASURED**
 
 All four are checkboxes, and **two of them default to on**, which inverts the
 usual capture: the value that writes bytes is the *cleared* one.
@@ -786,8 +814,8 @@ usual capture: the value that writes bytes is the *cleared* one.
 | --- | --- | --- | --- | --- |
 | `smoothStart` | checkbox `Smooth Start` | `Effect Options` | **checked** | `p:cTn/@accel="50000"`; cleared, the attribute is **absent** |
 | `smoothEnd` | checkbox `Smooth End` | `Effect Options` | **checked** | `p:cTn/@decel="50000"`; cleared, the attribute is **absent** |
-| `bounceEnd` | checkbox `Bounce End` | `Effect Options` | cleared | not measured |
-| `rewind` | checkbox `Rewind when done playing` | `Timing` | cleared | not measured |
+| `bounceEnd` | checkbox `Bounce End` | `Effect Options` | cleared | `p:cTn/@p14:presetBounceEnd="50000"` **and** `p:animMotion/@p14:bounceEnd="50000"`, inside an `mc:AlternateContent` |
+| `rewind` | checkbox `Rewind when done playing` | `Timing` | cleared | `p:cTn/@fill` moves `hold` → `remove`; **not** `@autoRev`, which the catalog had listed as the other candidate |
 
 The two measured ones are **attributes on the effect's own `p:cTn`**, not
 behaviour children, and every one of the seven effects in the untouched deck
@@ -795,8 +823,15 @@ carried both — so `50000` is the applied default rather than something that on
 effect had been given. Evidence:
 `tests/fixtures/animations/gui-only/timing-smoothness-2026-11-02/`.
 
-A fifth checkbox, `Auto-reverse` (cleared), sits beside them and has no catalog
-entry yet.
+A fifth checkbox, `Auto-reverse` (cleared), sits beside them; it is
+`animation.timing.autoReverse`, which sdpm already writes as `p:cTn/@autoRev`.
+
+Rewind is the one that a "did the shape gain anything?" gate cannot judge: it
+**moves an existing attribute** rather than adding a node, so the effect count
+does not change. That is what `attribute_modified_batch` exists for.
+
+Evidence for the other two:
+`tests/fixtures/animations/gui-only/timing-rewind-bounce-2026-11-02/`.
 
 ### Saving costs the headless promise
 

@@ -1418,17 +1418,30 @@ CONTROL_ITEMS: tuple[tuple[str, str, str, dict[str, Any] | None, dict[str, Any] 
     (
         "animation.timing.bounceEnd",
         "accepted",
-        SEMANTIC,
+        NATIVE,
         {"strategy": "attribute", "attributes": ["p:cTn/@p14:presetBounceEnd", "p:animMotion/@p14:bounceEnd"],
-         "gap": "measured 2026-11-02 as p14:presetBounceEnd=\"50000\" on the effect's p:cTn plus "
-                "p14:bounceEnd on its motion behaviour -- NOT the synthesised p:animScale/p:anim "
-                "behaviours the catalog had guessed. The value is established; what is missing is "
-                "the markup around it. PowerPoint wraps the whole timing tree in "
-                "mc:AlternateContent (mc:Choice Requires=\"p14\" carrying the attribute, "
-                "mc:Fallback holding the same effect without it) and this writer emits no "
-                "mc:AlternateContent anywhere, so writing the extension attribute alone would "
-                "drop the fallback branch PowerPoint pairs it with"},
-        effect_semantic(timing={"bounceEnd": 0.5}),
+         "appliesTo": "motion paths only: the pane publishes a Bounce End checkbox for an "
+                      "entrance effect and reads it disabled, alongside Smooth Start, Smooth End "
+                      "and Auto-reverse. Only Rewind is enabled for an entrance effect. Measured "
+                      "2026-11-02",
+         "note": "measured 2026-11-02. Two attributes, not one: p14:presetBounceEnd on the "
+                 "effect's p:cTn (the setting) and p14:bounceEnd on its p:animMotion (the "
+                 "behaviour that bounces). NOT the synthesised p:animScale/p:anim behaviours "
+                 "this entry used to guess. Both are ST_PositiveFixedPercentage, so the JSON "
+                 "carries a 0..1 fraction and PowerPoint's checkbox writes 50000. Because they "
+                 "are extension attributes, the whole p:timing is wrapped once at "
+                 "p:sld/mc:AlternateContent: mc:Choice Requires=\"p14\" carries them and "
+                 "mc:Fallback carries the byte-identical timing without them. The slide root "
+                 "declares no mc:Ignorable, so that wrapper is the whole mechanism"},
+        # A motion path, not the usual entrance Fade carrier: measured 2026-11-02,
+        # the pane publishes a Bounce End checkbox for an entrance effect and reads
+        # it **disabled**, alongside Smooth Start, Smooth End and Auto-reverse. So
+        # Bounce End is a motion-path setting, and an entrance-fade example asked
+        # for something this build will not do.
+        effect_semantic(
+            preset={"category": "motionPath", "effect": "lines"},
+            timing={"bounceEnd": 0.5},
+        ),
         None,
     ),
     (
@@ -1846,6 +1859,10 @@ CONTROL_EVIDENCE: dict[str, dict[str, Any]] = {
     ),
     "animation.afterAnimation.dimColor": pane_evidence(
         AFTER_EFFECT_EVIDENCE_DIR, AFTER_EFFECT_EVIDENCE_FILE
+    ),
+    "animation.timing.bounceEnd": pane_evidence(
+        REPO_ROOT / "tests/fixtures/animations/gui-only/timing-rewind-bounce-2026-11-02",
+        "timing-rewind-bounce.json",
     ),
     "animation.timing.triggerTarget": {
         "source": NATIVE_REPO, "commit": NATIVE_COMMIT,

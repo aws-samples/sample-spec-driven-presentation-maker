@@ -89,6 +89,7 @@ survive a PowerPoint save (REQ-2.5).
 
 from __future__ import annotations
 
+import copy
 import json
 import re
 from dataclasses import dataclass, field, replace
@@ -858,6 +859,64 @@ def reparse(node: etree._Element) -> etree._Element:
     return parse_xml(etree.tostring(node))
 
 
+#: Extension attributes that commit a timing tree to an ``mc:AlternateContent``
+#: wrapper, as ``prefix -> the attributes that prefix contributes``. Measured
+#: 2026-11-02: Bounce End is the only setting sdpm writes that needs one.
+EXTENSION_ATTRIBUTES: dict[str, tuple[str, ...]] = {
+    "p14": ("p14:presetBounceEnd", "p14:bounceEnd"),
+}
+
+
+def wrap_extension_timing(timing: etree._Element, prefixes: Iterable[str]) -> etree._Element:
+    """Wrap a timing tree in the ``mc:AlternateContent`` PowerPoint pairs it with.
+
+    An extension attribute is invisible to a consumer that does not implement
+    its namespace, and PowerPoint does not rely on that: measured 2026-11-02, a
+    slide carrying Bounce End holds **one** ``p:sld/mc:AlternateContent`` with
+    the whole ``p:timing`` twice —
+
+    * ``mc:Choice Requires="p14"`` with the extension attributes, and
+    * ``mc:Fallback`` with the byte-identical timing without them.
+
+    The slide root declares **no** ``mc:Ignorable``, so the wrapper is the whole
+    mechanism rather than a belt-and-braces addition to one.
+
+    The fallback is built by copying the tree and deleting the attributes, not by
+    building it twice, because "the same effect without the extension" is the
+    property that has to hold: two independent builds could drift, and a reader
+    picking the Fallback branch would then get a different animation rather than
+    the same one without a bounce.
+    """
+    wanted = sorted(set(prefixes))
+    attributes = [
+        qn(name) for prefix in wanted for name in EXTENSION_ATTRIBUTES.get(prefix, ())
+    ]
+    if not attributes:
+        raise TimingWriteError(
+            f"no extension attributes are recorded for {wanted}, so the mc:AlternateContent "
+            "fallback branch cannot be derived"
+        )
+    fallback_timing = copy.deepcopy(timing)
+    stripped = 0
+    for node in fallback_timing.iter():
+        for attribute in attributes:
+            if node.get(attribute) is not None:
+                del node.attrib[attribute]
+                stripped += 1
+    if not stripped:
+        raise TimingWriteError(
+            f"the timing tree carries none of {wanted}'s extension attributes, so wrapping it "
+            "in mc:AlternateContent would duplicate it for no reason"
+        )
+
+    alternate = element("mc:AlternateContent")
+    choice = sub(alternate, "mc:Choice", Requires=" ".join(wanted))
+    choice.append(timing)
+    fallback = sub(alternate, "mc:Fallback")
+    fallback.append(fallback_timing)
+    return alternate
+
+
 # ---------------------------------------------------------------------------
 # Timing writer
 # ---------------------------------------------------------------------------
@@ -890,6 +949,10 @@ class TimingWriter:
         self._builds: list[_BuildEntry] = []
         self._build_seen: set[tuple[str, int, int]] = set()
         self._group_ids: dict[int, int] = {}
+        #: Namespace prefixes this slide's timing needs an `mc:AlternateContent`
+        #: wrapper for. Only extension attributes go in here, and only
+        #: `bounceEnd` writes one today; see :func:`wrap_extension_timing`.
+        self.extensions: set[str] = set()
 
     @property
     def index(self) -> CapabilityIndex:
@@ -1231,6 +1294,7 @@ class TimingWriter:
                 "p:childTnLst would be empty and PowerPoint would reject the package"
             )
         ctn.append(children)
+        self._write_bounce_end(children, timing, label)
         # After p:childTnLst, which is the order CT_TLCommonTimeNodeData fixes.
         self._write_after_effect(
             ctn, after, spid=spid, target=target, ctn_id=ctn_id, label=label
@@ -1270,22 +1334,51 @@ class TimingWriter:
                     f"writer emits as timing.{equivalent}; set timing.{equivalent} to 0.5 for the "
                     "value PowerPoint's checkbox writes"
                 )
-        # `rewind` is written now — see `_timing_attrs`. `bounceEnd` is not, and
-        # the reason is the markup rather than the value: measured 2026-11-02 it
-        # is `p:cTn/@p14:presetBounceEnd` plus `p:animMotion/@p14:bounceEnd`,
-        # and PowerPoint wraps the whole timing tree in `mc:AlternateContent` so
-        # that a consumer which does not know `p14` still gets a playable
-        # effect. This writer emits no `mc:AlternateContent` anywhere, so the
-        # refusal stands until it can.
-        if timing.get("bounceEnd"):
-            refuse_unimplemented(
-                self.index,
-                "animation.timing.bounceEnd",
-                f"slide {self.slide_slug!r}: {label}.timing.bounceEnd",
-                "Bounce End is p:cTn/@p14:presetBounceEnd inside an mc:AlternateContent wrapper "
-                "(measured 2026-11-02); this writer emits no mc:AlternateContent, so the extension "
-                "attribute would be written without the fallback branch PowerPoint pairs it with",
+        # `rewind` and `bounceEnd` are both written now — see `_timing_attrs`
+        # and `_write_bounce_end`.
+        bounce = timing.get("bounceEnd")
+        if bounce is not None and not 0 <= float(bounce) <= 1:
+            raise TimingWriteError(
+                f"slide {self.slide_slug!r}: {label}.timing.bounceEnd {bounce!r} is outside 0..1; "
+                "it is a fraction like timing.acceleration, not a duration — PowerPoint's own "
+                "checkbox writes 50000, which is 0.5"
             )
+
+    def _write_bounce_end(
+        self, children: etree._Element, timing: Mapping[str, Any], label: str
+    ) -> None:
+        """Mark the effect's motion behaviour with Bounce End's second attribute.
+
+        Measured 2026-11-02: Bounce End writes **two** attributes, not one —
+        ``p14:presetBounceEnd`` on the effect's ``p:cTn`` (written in
+        :meth:`_timing_attrs`, because that is the setting) and
+        ``p14:bounceEnd`` on its ``p:animMotion`` (written here, because that is
+        the behaviour that bounces).
+
+        And it is a **motion-path setting**, which is the finding that makes the
+        refusal below right rather than cautious: the pane publishes a Bounce End
+        checkbox for an entrance effect and reads it ``enabled=False``, next to
+        Smooth Start, Smooth End and Auto-reverse. Only Rewind is enabled there.
+        So an effect with no motion behaviour has no measured Bounce End form,
+        and writing the preset attribute alone would invent one.
+        """
+        if not timing.get("bounceEnd"):
+            return
+        motions = [
+            node
+            for node in children.iter()
+            if node.tag == qn("p:animMotion")
+        ]
+        if not motions:
+            raise TimingWriteError(
+                f"slide {self.slide_slug!r}: {label}.timing.bounceEnd applies to a motion path, "
+                "and this effect writes no p:animMotion. Measured 2026-11-02: PowerPoint's own "
+                "Bounce End checkbox is disabled for an entrance effect, so there is no form for "
+                "one — use a motionPath preset, or a behaviors list containing a motion"
+            )
+        scaled = int(round(float(timing["bounceEnd"]) * PERCENT_SCALE))
+        for motion in motions:
+            set_attrs(motion, {"p14:bounceEnd": scaled})
 
     def _check_after_effect(self, after: Mapping[str, Any], label: str) -> None:
         """Reject an after-animation request this writer would answer wrongly.
@@ -1424,6 +1517,14 @@ class TimingWriter:
         if timing.get("autoReverse"):
             self.index.require("animation.timing.autoReverse", what=f"{label} timing.autoReverse")
             attrs["autoRev"] = "1"
+        if timing.get("bounceEnd"):
+            # An extension attribute, so it also commits the slide to an
+            # `mc:AlternateContent` wrapper — see :func:`wrap_extension_timing`.
+            self.index.require("animation.timing.bounceEnd", what=f"{label} timing.bounceEnd")
+            attrs["p14:presetBounceEnd"] = int(
+                round(float(timing["bounceEnd"]) * PERCENT_SCALE)
+            )
+            self.extensions.add("p14")
         if timing.get("rewind"):
             # "Rewind when done playing" is `p:cTn/@fill`, and nothing else:
             # measured 2026-11-02, checking the box changed the effect's
@@ -2408,8 +2509,15 @@ def write_slide_timing(
         "maxCTnId": writer.max_ctn_id,
         "catalogLoaded": writer.catalog_loaded,
     }
+    report["extensions"] = sorted(writer.extensions)
     if timing is not None:
-        insert_in_schema_order(slide_element, reparse(timing), "timing")
+        node = timing
+        if writer.extensions:
+            node = wrap_extension_timing(timing, writer.extensions)
+        # `insert_in_schema_order` already looks inside an `mc:AlternateContent`
+        # for the successor it is ordering against, so the wrapper lands where
+        # the bare `p:timing` would have.
+        insert_in_schema_order(slide_element, reparse(node), "timing")
     return report
 
 

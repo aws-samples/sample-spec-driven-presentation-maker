@@ -73,6 +73,7 @@ from sdpm.engine.timing.writer import (
     MEASURED_DIM_SCHEME_COLOR,
     MOTION_ORIGINS,
     MOTION_PATH_EDIT_MODES,
+    NSMAP,
     PERCENT_SCALE,
     SDPM_EFFECT_EXT_URI,
     TRANSITION_STRATEGIES,
@@ -105,9 +106,14 @@ SEMANTIC_VOCABULARY: dict[str, tuple[str, ...]] = {
     "timing.root": ("p:tnLst", "p:bldLst", "p:extLst"),
     "timing.rootCTn": ("id", "dur", "restart", "nodeType"),
     "sequence": ("p:seq[mainSeq]", "p:seq[interactiveSeq]", "p:video", "p:audio"),
+    # ``p14:presetBounceEnd`` is Bounce End, and it is the one extension
+    # attribute in this table: it is read from the ``mc:Choice`` branch, which is
+    # the only branch that carries it. A prefixed name here is expanded to Clark
+    # notation before the comparison — see :func:`_allowed_attrs`.
     "effectCTn": (
         "id", "fill", "grpId", "nodeType", "presetClass", "presetID", "presetSubtype",
         "repeatCount", "repeatDur", "autoRev", "accel", "decel", "restart",
+        "p14:presetBounceEnd",
     ),
     "behavior": ("p:animEffect", "p:set", "p:cmd"),
     "buildList": ("p:bldP[@spid,@grpId,@animBg]",),
@@ -957,9 +963,32 @@ def _attrs(node: etree._Element) -> dict[str, str]:
     return {str(name): str(value) for name, value in node.attrib.items()}
 
 
+def _allowed_attrs(allowed: Iterable[str]) -> set[str]:
+    """Expand any ``prefix:name`` entry to the Clark notation lxml reports.
+
+    ``node.attrib`` keys a namespaced attribute as ``{uri}local``, so a
+    vocabulary that spelled one ``p14:presetBounceEnd`` would never match it and
+    the attribute would read as unsupported.
+
+    A name **already** in Clark notation is left alone, and that is the whole
+    subtlety: ``{http://...}dur`` contains a colon too, so a plain "has a colon"
+    test sends it through :func:`qn`, which looks up ``{http`` as a prefix and
+    raises. Callers pass both spellings — ``read_transition`` builds its list in
+    Clark notation — so both have to work.
+    """
+    expanded: set[str] = set()
+    for name in allowed:
+        prefix, _, local = name.partition(":")
+        if local and not name.startswith("{") and prefix in NSMAP:
+            expanded.add(qn(name))
+        else:
+            expanded.add(name)
+    return expanded
+
+
 def _require_attrs(node: etree._Element, allowed: Iterable[str], what: str) -> dict[str, str]:
     attrs = _attrs(node)
-    extra = sorted(set(attrs) - set(allowed))
+    extra = sorted(set(attrs) - _allowed_attrs(allowed))
     if extra:
         raise _Unsupported(f"{what} carries unsupported attributes {extra}")
     return attrs
@@ -1572,6 +1601,17 @@ class _TimingReader:
         # produced the package.
         if attrs.get("fill") == "remove":
             timing["rewind"] = True
+        # Bounce End, from the `mc:Choice` branch. The matching
+        # `p:animMotion/@p14:bounceEnd` carries the same percentage and is not
+        # read separately: it is the same setting seen on the behaviour, so
+        # reporting it twice would invent a field the JSON has no place for.
+        bounce = attrs.get(qn("p14:presetBounceEnd"))
+        if bounce is not None:
+            if not bounce.isdigit():
+                raise _Unsupported(
+                    f"{sequence} effect p14:presetBounceEnd {bounce!r} is not a percentage"
+                )
+            timing["bounceEnd"] = round(int(bounce) / PERCENT_SCALE, 6)
         for name, key in (("accel", "acceleration"), ("decel", "deceleration")):
             if name not in attrs:
                 continue

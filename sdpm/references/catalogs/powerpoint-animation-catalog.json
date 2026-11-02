@@ -51981,7 +51981,7 @@
     {
       "key": "animation.timing.bounceEnd",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
+      "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "animations": {
           "mainSequence": [
@@ -51991,8 +51991,8 @@
                 "element": "catalogTarget"
               },
               "preset": {
-                "category": "entrance",
-                "effect": "fade"
+                "category": "motionPath",
+                "effect": "lines"
               },
               "start": {
                 "type": "onPageClick",
@@ -52026,13 +52026,16 @@
           "p:cTn/@p14:presetBounceEnd",
           "p:animMotion/@p14:bounceEnd"
         ],
-        "gap": "measured 2026-11-02 as p14:presetBounceEnd=\"50000\" on the effect's p:cTn plus p14:bounceEnd on its motion behaviour -- NOT the synthesised p:animScale/p:anim behaviours the catalog had guessed. The value is established; what is missing is the markup around it. PowerPoint wraps the whole timing tree in mc:AlternateContent (mc:Choice Requires=\"p14\" carrying the attribute, mc:Fallback holding the same effect without it) and this writer emits no mc:AlternateContent anywhere, so writing the extension attribute alone would drop the fallback branch PowerPoint pairs it with"
+        "appliesTo": "motion paths only: the pane publishes a Bounce End checkbox for an entrance effect and reads it disabled, alongside Smooth Start, Smooth End and Auto-reverse. Only Rewind is enabled for an entrance effect. Measured 2026-11-02",
+        "note": "measured 2026-11-02. Two attributes, not one: p14:presetBounceEnd on the effect's p:cTn (the setting) and p14:bounceEnd on its p:animMotion (the behaviour that bounces). NOT the synthesised p:animScale/p:anim behaviours this entry used to guess. Both are ST_PositiveFixedPercentage, so the JSON carries a 0..1 fraction and PowerPoint's checkbox writes 50000. Because they are extension attributes, the whole p:timing is wrapped once at p:sld/mc:AlternateContent: mc:Choice Requires=\"p14\" carries them and mc:Fallback carries the byte-identical timing without them. The slide root declares no mc:Ignorable, so that wrapper is the whole mechanism"
       },
       "evidence": {
-        "source": "PowerPoint 16.113.1 ribbon/dialog surface",
-        "commit": null
+        "source": "Animation Pane measurement through scripts/animation_catalog/gui_capture.py",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/gui-only/timing-rewind-bounce-2026-11-02/timing-rewind-bounce.json",
+        "capturedApplicationVersion": "16.113.1"
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "nativeCapture"
     },
     {
       "key": "animation.timing.deceleration",
