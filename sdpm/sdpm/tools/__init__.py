@@ -262,6 +262,52 @@ def read_guides(
     return {"documents": read_docs(_REFERENCES_DIR / "guides", names)}
 
 
+def describe_effects(
+    category: Annotated[
+        str | None,
+        Field(description='Limit to one of entrance, emphasis, exit, motionPath.'),
+    ] = None,
+    effect: Annotated[
+        str | None,
+        Field(description='Limit to one effect name, as used in preset.effect.'),
+    ] = None,
+) -> dict[str, Any]:
+    """What a gallery animation does, measured from PowerPoint rather than guessed.
+
+    No arguments returns the routing table: which effects move, resize, recolour,
+    rotate, fade, wipe or follow a path. An effect name returns its expression —
+    every behaviour it writes, with keyframes and durations — and the same for
+    each of its options.
+
+    Use it instead of trying effects to learn what they do, and instead of
+    hand-composing `behaviors`, which is unverified and does not survive import.
+    """
+    from sdpm.engine.timing import load_capability_index
+    from sdpm.engine.timing.describe import axis_table, describe
+
+    index = load_capability_index()
+    if category is None and effect is None:
+        return {
+            "changes": [
+                {"changes": label, "effects": effects} for label, effects in axis_table(index)
+            ],
+            "next": (
+                "call describe_effects(effect='flyIn') for one effect's measured "
+                "behaviours and its options"
+            ),
+        }
+    described = describe(index, category=category, effect=effect)
+    if not described:
+        return {
+            "effects": [],
+            "hint": (
+                "no gallery effect matched; call describe_effects() with no arguments "
+                "for the full list"
+            ),
+        }
+    return {"effects": described}
+
+
 def code_to_slide(
     deck_id: Annotated[str, Field(description='Deck directory path.')],
     code: Annotated[str, Field(description='Source code text.')],

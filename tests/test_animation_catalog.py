@@ -2289,3 +2289,125 @@ def test_the_manifest_no_longer_claims_a_dialog_this_build_lacks():
         assert "not present in this build" in item["control"], item["key"]
         assert "no Add Animation control" in item["sourceEvidence"], item["key"]
         assert item["status"] == "nonPersisted", item["key"]
+
+
+# --- describe_effects: what an effect does, derived not written -------------
+def test_the_guide_table_matches_what_the_catalog_measured():
+    """The routing table is derived, so it must not drift from the catalog.
+
+    It exists because a name does not say what moves, and a reader who has to
+    try effects to find out pays a deck per guess. Hand-maintaining it would
+    reintroduce exactly the gap it closes: an effect whose behaviours changed
+    would keep its old description.
+    """
+    from sdpm.engine.timing import load_capability_index
+    from sdpm.engine.timing.describe import axis_table
+
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    guide = (REPO_ROOT / "sdpm/references/guides/animations.md").read_text()
+    rows = axis_table(index)
+    assert rows, "nothing was derived, so this guard checks nothing"
+    for label, effects in rows:
+        line = f"| {label} | {', '.join(effects)} |"
+        assert line in guide, f"the guide does not carry the derived row: {line}"
+
+    # Cheap enough to keep in a guide that is read every time: the whole table
+    # is about 300 tokens, against about 9,000 for every expression.
+    size = sum(len(f"| {label} | {', '.join(effects)} |") for label, effects in rows)
+    assert size < 2000, f"the routing table has grown to {size} characters"
+
+
+def test_no_effect_name_appears_in_two_rows_of_the_table():
+    """A lookup table that sends a reader to the wrong effect is worse than none.
+
+    `bounce` is an entrance effect that moves and resizes, and a motion path
+    that follows a curve. A name is qualified only when it lands in different
+    rows, so `blinds` — the same thing as both entrance and exit — stays bare
+    and does not cost a third of the table.
+    """
+    from collections import Counter
+
+    from sdpm.engine.timing import load_capability_index
+    from sdpm.engine.timing.describe import axis_table
+
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    rows = axis_table(index)
+    counts = Counter(name for _label, names in rows for name in names)
+    assert [name for name, n in counts.items() if n > 1] == []
+    qualified = {name for name, _ in counts.items() if "." in name}
+    assert qualified == {"entrance.bounce", "exit.bounce", "motionPath.bounce"}, qualified
+
+
+def test_describe_effects_says_what_was_measured_and_nothing_else():
+    """The expression is a transcription, so the values in it are the measured ones."""
+    from sdpm.tools import describe_effects
+
+    table = describe_effects()
+    assert len(table["changes"]) == len(
+        {row["changes"] for row in table["changes"]}
+    ), "a label appears twice"
+    assert any(row["changes"] == "moves" and "flyIn" in row["effects"] for row in table["changes"])
+
+    fly_in = describe_effects(effect="flyIn")["effects"]
+    assert len(fly_in) == 1
+    described = fly_in[0]
+    assert described["category"] == "entrance"
+    assert described["changes"] == ["moves"]
+    assert described["durationMs"] == 500
+    # `1+#ppt_w/2` is the idiom a caller would not guess, which is the whole
+    # reason the expression is worth returning.
+    assert "1+#ppt_w/2" in described["options"]["direction"]["values"]["fromRight"]
+    assert described["options"]["direction"]["default"] == "fromBottom"
+    assert len(described["options"]["direction"]["values"]) == 8
+
+    # A setting carried only by the behaviours still shows its difference.
+    spin = describe_effects(effect="spin")["effects"][0]
+    assert "-21600000" in spin["options"]["direction"]["values"]["counterclockwise"]
+    assert "21600000" in spin["options"]["direction"]["values"]["clockwise"]
+    assert spin["optionsNote"], "the unmeasured combinations are not reported"
+
+    # A path is transcribed rather than summarised.
+    star = describe_effects(category="motionPath", effect="star")["effects"][0]
+    assert "M 0 0 L 0.091 -0.034" in star["expression"]
+
+    assert describe_effects(effect="teleport")["effects"] == []
+
+
+def test_describe_effects_stays_small_enough_to_call_per_effect():
+    """The two layers exist because they cost different amounts.
+
+    Shipping every expression would add about 9,000 tokens to a guide read on
+    every deck. The table is about 300 and one effect about 320, so choosing
+    costs the table and verifying costs only the effects actually considered.
+    """
+    import json
+
+    from sdpm.tools import describe_effects
+
+    assert len(json.dumps(describe_effects())) < 4000
+    for effect in ("flyIn", "spin", "growShrink", "wave"):
+        one = json.dumps(describe_effects(effect=effect))
+        assert len(one) < 6000, f"{effect} describes to {len(one)} characters"
+
+
+def test_the_guide_says_to_prefer_a_preset_over_composing_behaviours():
+    """The two forms are not interchangeable, and the guide has to say which to use.
+
+    A composed `behaviors` list carries no `presetID`: PowerPoint does not name
+    it, its Effect Options do not apply, and sdpm's own reader imports it as
+    raw. That is 16 of the one-way entries. The guide recorded that behaviours
+    are not invertible without ever saying to prefer a preset.
+    """
+    guide = (REPO_ROOT / "sdpm/references/guides/animations.md").read_text()
+    assert "Prefer a `preset`" in guide
+    for token in (
+        "carries no `presetID`",
+        "imports as\nraw",
+        "unverified",
+        "import_attachment",
+    ):
+        assert token in guide, token

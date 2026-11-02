@@ -323,6 +323,71 @@ re-derived.
 `custom` is not a gallery — it is the advanced form, written with a `behaviors` list; a custom
 motion path is a `motion` behavior.
 
+#### Which effect does what
+
+A name does not say what moves. `Boomerang` and `Whip` both move and resize, `Teeter` rotates,
+`Stretch` resizes without moving. This is derived from the measured behaviours, so it says what
+each effect actually writes rather than what its name suggests:
+
+| what it changes | effects |
+| --- | --- |
+| recolours | brushColor, colorPulse, complementaryColor, complementaryColor2, contrastingColor, darken, desaturate, fillColor, fontColor, growWithColor, lighten, lineColor, objectColor |
+| moves + follows a path | arcs, invertedShape, lines, loops, motionPath.bounce, shapes, specialCurve, specialShape, spiral, star, turns, waves |
+| resizes + fades | contract, expand, growTurn, pinwheel, pulse, shrinkTurn, spinner, stretchy, swivel, zoom |
+| wipes/dissolves | blinds, checkerboard, randomBars, shape, split, strips, wheel, wipe |
+| moves + fades | centerRevolve, float, floatIn, floatOut, riseUp, sinkDown |
+| resizes | basicSwivel, basicZoom, collapse, growShrink, stretch |
+| moves | credits, drop, flyIn, flyOut |
+| restyles text | boldFlash, boldReveal, underline |
+| moves + follows a path + resizes + fades | curveDown, curveUp |
+| moves + resizes | spiralIn, spiralOut |
+| moves + resizes + fades | boomerang, whip |
+| moves + resizes + wipes/dissolves | entrance.bounce, exit.bounce |
+| moves + wipes/dissolves | peekIn, peekOut |
+| rotates | spin, teeter |
+| appears/disappears | blink |
+| fades | transparency |
+| moves + resizes + rotates | flip |
+| moves + rotates + follows a path | wave |
+| moves + rotates + resizes | shimmer |
+
+A name is bare where it means the same thing in every category it appears in, and qualified
+where it does not: `entrance.bounce` moves and resizes, `motionPath.bounce` follows a curve.
+
+For the detail — every behaviour an effect writes, with its keyframes, durations and each of
+its options — call the **`describe_effects`** tool. With no arguments it returns this table;
+with `effect="flyIn"` it returns the expression:
+
+```
+set(style.visibility: -> visible)@1
+anim(ppt_x: 1+#ppt_w/2 -> #ppt_x)@500
+anim(ppt_y: #ppt_y -> #ppt_y)@500
+```
+
+`@` is a duration in milliseconds, `+` a delay, and `#ppt_w` the shape's own width. So
+`1+#ppt_w/2` is half a shape-width past the right edge of a slide one unit wide — which is what
+"from the right" means, and is not a thing to guess at. Ask about the two or three effects you
+are choosing between rather than reading all 209 expressions: together they are about 9,000
+tokens, and one is about 300.
+
+#### Prefer a `preset`; reach for `behaviors` only when no effect fits
+
+Both forms are authorable and they are not interchangeable.
+
+A `preset` writes bytes PowerPoint was measured producing, carries a `presetID` so PowerPoint
+names the effect in its own UI, and **comes back as the same JSON on import**.
+
+A `behaviors` list carries no `presetID`. PowerPoint plays it but does not name it, its Effect
+Options do not apply, and sdpm's reader cannot invert it — an explicit behaviour list imports as
+raw. It is also unverified: the writer transcribes a preset's measured values, while a composed
+list is whatever the caller wrote, and the idioms are not obvious. `1+#ppt_w/2` scales with the
+shape; a plausible-looking constant does not.
+
+So: pick a preset when one fits the intent, and compose only when none does. For a deck that is
+generated once and never reopened the round-trip cost does not bite — but `import_attachment`
+and the hand-edit diff both read animations back, so a deck that will be re-imported should use
+presets.
+
 #### `preset.options` — the effect's own settings
 
 Picking a tile is not the whole choice. 33 of the effects above carry a setting of their own,
