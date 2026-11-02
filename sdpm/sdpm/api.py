@@ -789,7 +789,12 @@ def _resolve_config(
         raise ValueError(f"Missing assets ({len(missing)}): {', '.join(sorted(missing)[:10])}")
 
     # Token discipline: fontSize must come from --fs-* tokens in active style
-    from sdpm.engine.checks import check_font_size_tokens, check_includes, check_overlay_textbox
+    from sdpm.engine.checks import (
+        check_font_size_tokens,
+        check_includes,
+        check_morph_pairing,
+        check_overlay_textbox,
+    )
 
     fs_warnings = check_font_size_tokens(data, input_path)
     warnings.extend(fs_warnings)
@@ -801,6 +806,20 @@ def _resolve_config(
     # Include references: a missing/empty include silently drops its content.
     include_warnings = check_includes(data, base_dir)
     warnings.extend(include_warnings)
+
+    # Morph identities that pair with nothing on the adjacent slide. The only
+    # morph rule that has to be deck-level: every other one is checked within a
+    # slide, and the half that parallel composition breaks lives in the next
+    # file. Returns immediately for a deck that names no morph identity, which
+    # is the ordinary case.
+    #
+    # Skipped for a partial build, and that is not a weakening — it is the same
+    # rule applied honestly. `only_slugs` means the neighbouring slide is not in
+    # `data` at all, so every morphId would read as unpaired and a composer
+    # verifying its own slides would be told its correct deck is broken. The
+    # check belongs to the assembly that can see both halves.
+    if only_slugs is None:
+        warnings.extend(check_morph_pairing(data))
 
     # Resolve overrides
     slides = data.get("slides", [])

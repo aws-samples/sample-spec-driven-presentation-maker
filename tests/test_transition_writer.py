@@ -596,3 +596,66 @@ def test_transition_controls_are_counted_in_the_same_pass(coverage):
     refused = {record.key for record in controls if record.refused}
     assert refused == TRANSITION_COVERAGE["refusedControls"]
     assert [record.key for record in controls if record.outcome == "error"] == []
+
+
+def test_every_parameter_set_describe_reports_is_one_the_writer_accepts(index):
+    """`describe_effects(transition=...)` is checked against the writer, not prose.
+
+    The tool exists for one reason: a composer that needs one transition's
+    parameter keys should not have to read an 11,500-token guide to learn them.
+    That is only worth doing if the short answer is the *same* answer — so every
+    set it reports is written here, for all 53 transitions.
+
+    It also pins the normalisation that makes the answer short. `clock`'s
+    reversed form is recorded as `{"spokes": "1", "reverse": "1"}` and reported
+    as `{"reverse": "1"}`, because `spokes: "1"` is the effect's own default and
+    a caller does not have to state it. That shortening is only safe if the
+    shortened form still resolves, which is what this asserts.
+    """
+    from sdpm.engine.timing.describe import describe_transition
+
+    slugs = index.transition_slugs()
+    assert len(slugs) == 53, "the whole transition surface, not a sample"
+
+    checked = 0
+    for slug in slugs:
+        described = describe_transition(index, slug)["transitions"][0]
+        assert described["effect"] == slug
+        assert described["parameterSets"], f"{slug} reported no parameter set at all"
+        for parameters in described["parameterSets"]:
+            # Resolving is what the writer does first, and it is where an
+            # unsupported set is refused, so it is the honest gate.
+            resolve_transition(
+                index,
+                {"effect": slug, "parameters": parameters},
+                slide_slug="describe",
+            )
+            checked += 1
+    assert checked >= len(slugs), "every transition contributed at least one set"
+
+
+def test_describe_omits_the_defaults_a_caller_does_not_have_to_state(index):
+    """The empty set is always offered, because omitting `parameters` is legal."""
+    from sdpm.engine.timing.describe import describe_transition
+
+    push = describe_transition(index, "push")["transitions"][0]
+    assert push["defaultAttributes"] == {"dir": "u"}
+    assert {} in push["parameterSets"], "stating nothing is always a choice"
+    assert {"dir": "u"} not in push["parameterSets"], (
+        "the default is reported as defaultAttributes, not as a set to state"
+    )
+    # The friendly name is reported where one exists, because that is the key
+    # the caller writes: Morph takes `variant`, the attribute is `option`.
+    morph = describe_transition(index, "morph")["transitions"][0]
+    assert morph["defaultAttributes"] == {"option": "byObject"}
+    assert {"variant": "byChar"} in morph["parameterSets"]
+    assert not any("option" in parameters for parameters in morph["parameterSets"])
+
+
+def test_an_unknown_transition_lists_the_accepted_ones(index):
+    from sdpm.engine.timing.describe import describe_transition
+
+    answer = describe_transition(index, "swoosh")
+    assert answer["transitions"] == []
+    assert "swoosh" in answer["hint"]
+    assert "morph" in answer["hint"] and "push" in answer["hint"]

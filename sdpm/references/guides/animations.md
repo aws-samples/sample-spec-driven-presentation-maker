@@ -124,6 +124,32 @@ make PowerPoint's Morph match those two objects deterministically.
 - Without `morphId`, matching is left to PowerPoint's own heuristics. sdpm does not invent a
   match.
 
+#### `morphId` is the one thing that crosses a slide boundary
+
+Everything else on a slide is the slide's own business. A `morphId` is not: it only does
+anything if the **adjacent** slide carries the same string, and that slide is a different
+file — usually a different composer's file, written in parallel without reading yours.
+
+So when slides are split between composers, **the orchestrator assigns morph identities in
+the spec before dispatch.** It is a decision about a pair of slides, which means it belongs
+to whoever owns both, and two composers cannot negotiate it after the fact.
+
+An id that matches nothing is not a weak pairing, it is no pairing: PowerPoint falls back to
+its own matching for that shape and nothing says so. The build warns instead —
+
+```
+slide 'pricing' elements[0].morphId 'pricing-card' pairs with nothing on slide 'detail',
+so Morph will fall back to its own matching for this shape. Unpaired there: ['price-card']
+```
+
+— naming the near-miss on the other side, because a one-character divergence between two
+authors is the failure this exists for. A `morphId` on a slide with no adjacent Morph
+transition is reported too, for the same reason: it cannot do anything.
+
+The warning is **skipped for a partial build** (`generate_pptx` with a slug subset), because
+the neighbouring slide is not in that build at all and every id would read as unpaired. Verify
+pairing on the full assembly, not from inside one composer's subset.
+
 ## `transition`
 
 ```json
@@ -389,6 +415,21 @@ anim(ppt_y: #ppt_y -> #ppt_y)@500
 "from the right" means, and is not a thing to guess at. Ask about the two or three effects you
 are choosing between rather than reading all 209 expressions: together they are about 9,000
 tokens, and one is about 300.
+
+Two things in that answer are instructions rather than description:
+
+- **`durationMs: null` means the effect has no duration to set.** Its own timing is `Auto` in
+  the ribbon and its behaviours carry `dur="indefinite"`, so there is no number to scale from.
+  Passing `timing.durationMs` for such an effect is refused rather than rounded — omit it.
+  `transparency` is one; `growShrink` reports `2000` and takes a duration normally.
+- **`optionsNote` means the options cannot be combined.** Each value was measured with the
+  effect's other setting left at its default, so asking for two settings on one effect is
+  refused. Ask for one at a time.
+
+`describe_effects(transition="push")` answers the other side: which `parameters` sets a slide
+transition accepts, with the effect's own defaults listed separately. The table below has the
+same information for every transition, so reach for the tool when you need one effect's sets
+and not this whole guide — about 140 tokens against 11,500.
 
 #### Prefer a `preset`; reach for `behaviors` only when no effect fits
 

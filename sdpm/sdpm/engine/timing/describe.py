@@ -245,3 +245,79 @@ def describe(index: Any, *, category: str | None = None, effect: str | None = No
                 described["optionsNote"] = combinations.get("gap")
         out.append(described)
     return out
+
+
+def describe_transition(index: Any, slug: str) -> dict[str, Any]:
+    """Return the parameter sets one transition accepts, and what each writes.
+
+    The counterpart of :func:`describe` for the Transitions tab, and it exists
+    because `transition.parameters` is the one part of the motion contract whose
+    vocabulary cannot be guessed. The keys are the **OOXML attribute names**,
+    not the friendly names the animation side uses: Push takes ``{"dir": "d"}``
+    and not ``{"direction": "fromBottom"}``, and Split takes ``{"orient":
+    "vert"}``. Writing a plausible-looking key is refused — correctly, but after
+    a round trip through the writer that this answers without one.
+
+    The sets are derived from the same catalog entries and the same
+    ``selector_attributes`` the writer matches against, so this cannot drift
+    from what will actually be accepted.
+    """
+    from sdpm.engine.timing.transition import PARAMETER_ALIASES, _base_entry
+
+    variants = index.transition_variants(slug)
+    if not variants:
+        return {
+            "transitions": [],
+            "hint": (
+                f"unknown transition effect {slug!r}; accepted: "
+                f"{', '.join(index.transition_slugs())}"
+            ),
+        }
+
+    base = _base_entry(index, slug)
+    base_attributes = base.attributes() if base is not None else {}
+    # `parameters` keys are the attribute names except where an alias exists, so
+    # the reported key is the one a caller actually writes.
+    aliases = {raw: friendly for friendly, raw in PARAMETER_ALIASES.get(slug, {}).items()}
+
+    # Several catalog variants reduce to the same choosable set once the
+    # effect's own defaults are removed — the element differs, the request does
+    # not — so the list is deduplicated. Order is kept so the answer is stable.
+    #
+    # There is no per-variant `writable` flag here, and that is a measurement
+    # rather than an omission: all 53 transitions are writable in every variant,
+    # so a flag reporting it would never vary and would only add noise to an
+    # answer whose entire purpose is to be cheaper than reading the guide.
+    seen: set[tuple[tuple[str, Any], ...]] = set()
+    parameter_sets: list[dict[str, Any]] = []
+    for entry in sorted(variants, key=lambda item: item.key):
+        if not entry.writable:
+            continue
+        # Only what the caller has to state: an attribute already carried by the
+        # effect's own default is not a parameter they choose.
+        chosen = {
+            aliases.get(name, name): value
+            for name, value in sorted(entry.selector_attributes().items())
+            if base_attributes.get(name) != value
+        }
+        fingerprint = tuple(sorted(chosen.items()))
+        if fingerprint in seen:
+            continue
+        seen.add(fingerprint)
+        parameter_sets.append(chosen)
+
+    return {
+        "transitions": [
+            {
+                "effect": slug,
+                # Omitting `parameters` gets this, so it answers "what happens
+                # if I state nothing" without a second call.
+                "defaultAttributes": dict(sorted(base_attributes.items())),
+                "parameterSets": parameter_sets,
+                "note": (
+                    "parameter keys are OOXML attribute names, not the friendly names "
+                    "animation options use"
+                ),
+            }
+        ]
+    }

@@ -271,21 +271,32 @@ def describe_effects(
         str | None,
         Field(description='Limit to one effect name, as used in preset.effect.'),
     ] = None,
+    transition: Annotated[
+        str | None,
+        Field(
+            description='A slide transition name from transition.effect. Returns the '
+            'transition.parameters sets it accepts, whose keys are OOXML attribute '
+            'names and not the friendly names animation options use: Push takes '
+            '{"dir": "d"}, not {"direction": "fromBottom"}.'
+        ),
+    ] = None,
 ) -> dict[str, Any]:
     """What a gallery animation does, measured from PowerPoint rather than guessed.
 
     No arguments returns the routing table: which effects move, resize, recolour,
     rotate, fade, wipe or follow a path. An effect name returns its expression —
-    every behaviour it writes, with keyframes and durations — and the same for
-    each of its options.
+    every behaviour it writes, with keyframes and durations — and the same per
+    option. A `transition` name returns its accepted `parameters` sets instead.
 
-    Use it instead of trying effects to learn what they do, and instead of
-    hand-composing `behaviors`, which is unverified and does not survive import.
+    Use it rather than trying effects, and rather than hand-composing
+    `behaviors`, which is unverified and does not survive import.
     """
     from sdpm.engine.timing import load_capability_index
-    from sdpm.engine.timing.describe import axis_table, describe
+    from sdpm.engine.timing.describe import axis_table, describe, describe_transition
 
     index = load_capability_index()
+    if transition is not None:
+        return describe_transition(index, transition)
     if category is None and effect is None:
         return {
             "changes": [
