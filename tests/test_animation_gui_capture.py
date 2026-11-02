@@ -95,6 +95,18 @@ EXPECTED_SHAPE_PX = (200, 105)
 # --- a package the fake can apply effects to --------------------------------
 #: A preset per gallery tile, so two targets' effects are told apart by their own
 #: ``p:cTn`` attributes rather than only by which shape they sit on.
+#: The seven motion paths the measured scratch deck carried, in pane order, so an
+#: effect row's description reads as the live one does.
+EFFECT_ROW_NAMES = (
+    "Bounce Left",
+    "Inverted Square",
+    "Figure 8 Four",
+    "Bean",
+    "Spiral Left",
+    "4 Point Star",
+    "Curvy Left",
+)
+
 TILE_PRESETS = {
     "Fly In": ("2", "entr"),
     "Fade": ("10", "entr"),
@@ -433,7 +445,7 @@ class FakePowerPoint:
         selection_pane_open: bool = False,
         animation_pane_open: bool = False,
         animation_row_count: int = 0,
-        effect_selection_sticks: bool = True,
+        selected_effect_row: int | None = None,
         active_tab: str = driver.RIBBON_ANCHOR_TAB,
         decoy_windows: int = 4,
     ) -> None:
@@ -506,14 +518,17 @@ class FakePowerPoint:
         #: How many effect rows the Animation Pane's list publishes, over and above its
         #: header row.
         self.animation_row_count = animation_row_count
-        #: Which row of that list is selected, or None. The pane's settings sections only
-        #: exist while one is.
-        self.selected_effect_row: int | None = None
-        #: Every effect row the driver asked for, in order.
+        #: Which row of that list PowerPoint has selected, or None. The pane's settings
+        #: sections only exist while one is.
+        #:
+        #: Set directly, never by the driver, because **nothing in the accessibility API
+        #: selects an effect row on this build** — see `selected_pane_effect`. A test
+        #: setting this models the state a physical click leaves behind, which is the
+        #: only way the pane's settings have ever been reached.
+        self.selected_effect_row: int | None = selected_effect_row
+        #: Every effect row a caller tried to select, in order. The attempts are recorded
+        #: and ignored, as the live rows record and ignore them.
         self.effect_row_selections: list[int] = []
-        #: When false, writing ``AXSelected`` on an effect row is accepted and does
-        #: nothing — the analogue of ``selection_sticks`` for the effect list.
-        self.effect_selection_sticks = effect_selection_sticks
         #: Which pane sections are expanded. A section is a disclosure, so pressing an
         #: already-open one closes it.
         self.expanded_sections: set[str] = set()
@@ -896,6 +911,14 @@ class FakePowerPoint:
     def _toggle_section(self, section: str) -> None:
         self.expanded_sections ^= {section}
 
+    def _effect_row_is_selected(self, position: int) -> bool:
+        """Whether PowerPoint has this row selected. A set models a multi-selection,
+        which a pane setting would apply to all of rather than to the one measured."""
+        selected = self.selected_effect_row
+        if isinstance(selected, (set, frozenset, tuple, list)):
+            return position in selected
+        return position == selected
+
     def _animation_list(self) -> FakeNode:
         """The pane's effect list: a header row, then one row per effect.
 
@@ -909,25 +932,47 @@ class FakePowerPoint:
             return self._node(
                 role=driver.SELECTION_ROW_ROLE,
                 index=position,
-                selected=position == self.selected_effect_row,
+                selected=self._effect_row_is_selected(position),
+                # Writing ``AXSelected`` here is **accepted and does nothing**, which is
+                # the measured behaviour and not a limitation of the fake. Every row of
+                # the live list reports the attribute settable, the write returns 0, and
+                # the row never reads back selected; the outline's ``AXSelectedRows``
+                # does the same. So the fake records the attempt and ignores it, and a
+                # driver that went back to selecting a row this way would fail here
+                # rather than only against live PowerPoint.
                 on_set_selected=(
-                    lambda selected, position=position: self._select_effect_row(position, selected)
+                    lambda selected, position=position: self.effect_row_selections.append(position)
+                ),
+                children=(
+                    []
+                    if position == 0
+                    else [
+                        self._node(
+                            role=driver.PANE_CELL_ROLE,
+                            # Where an effect row's identity lives. Not an
+                            # ``AXStaticText`` the way a Selection Pane row's name is,
+                            # which is why a search for one found nothing and these rows
+                            # were called nameless.
+                            title=(
+                                f"Animation order: {position}, Starts: On Click, "
+                                f"Path effect, {EFFECT_ROW_NAMES[position - 1]}, "
+                                f"{position:03d}."
+                            ),
+                        )
+                    ]
                 ),
             )
 
-        # One header row ahead of the effects, as the live pane publishes: the
-        # measured effect sat at row index 7 of a list holding 7 effects.
+        # One header row ahead of the effects, as the live pane publishes: the measured
+        # list held 9 children — an ``AXColumn`` and 8 ``AXRow`` — for 7 effects.
         return self._node(
             role=driver.SELECTION_PANE_ROLE,
             title=driver.ANIMATION_LIST_TITLE,
-            children=[row(position) for position in range(self.animation_row_count + 1)],
+            children=[
+                *(row(position) for position in range(self.animation_row_count + 1)),
+                self._node(role="AXColumn"),
+            ],
         )
-
-    def _select_effect_row(self, position: int, selected: bool) -> None:
-        self.effect_row_selections.append(position)
-        if not self.effect_selection_sticks:
-            return
-        self.selected_effect_row = position if selected else None
 
     def _selection_pane(self) -> FakeNode:
         """The pane: one row per shape in reverse z-order, named by a descendant label.
@@ -2565,42 +2610,91 @@ class TestTheAnimationPane:
         assert pane.title is None
         assert [row for row in pane.children if row.role == driver.SELECTION_ROW_ROLE]
 
-    def test_an_effect_row_is_selected_by_index_and_read_back(self, session):
-        """The rows publish no name, so the index is the only address — and it is checked.
+    def test_an_effect_row_is_identified_by_its_cell_not_by_a_static_text(self, session):
+        """The rows are not nameless, which is what the first version of this concluded.
 
-        A row that did not take selection fails here rather than later, as a press on
-        whatever was selected instead.
+        A Selection Pane row is named by a descendant ``AXStaticText``; an effect row is
+        not, so a search for one came back ``names=[]`` and the driver fell back to a
+        bare index. The identity is the row's ``AXCell`` child's own title, and it
+        describes the effect — order, start, type and name — so a measurement can record
+        which effect it measured instead of asserting a row number.
         """
         fake = session["fake"]
         fake.animation_pane_open = True
         fake.animation_row_count = 7
 
-        result = driver.select_pane_effect(fake, row_index=7, timeout=2.0)
-        assert result == {"rowIndex": 7, "rowCount": 8}, "seven effects beneath one header row"
-        assert fake.effect_row_selections == [7]
-        assert fake.selected_effect_row == 7
+        rows = driver.pane_effect_rows(fake)
+        assert len(rows) == 8, "seven effects beneath one header row"
+        assert rows[0]["describedAs"] is None, "the ANIMATIONS header carries no cell"
+        assert rows[7]["describedAs"] == (
+            "Animation order: 7, Starts: On Click, Path effect, Curvy Left, 007."
+        )
 
-    def test_a_row_index_the_pane_does_not_publish_is_refused(self, session):
-        fake = session["fake"]
-        fake.animation_pane_open = True
-        fake.animation_row_count = 3
-        with pytest.raises(driver.ControlNotFound, match="published 4 effect rows"):
-            driver.select_pane_effect(fake, row_index=9, timeout=2.0)
-        assert fake.effect_row_selections == []
+    def test_writing_axselected_on_an_effect_row_does_nothing(self, session):
+        """The measured behaviour, pinned so a driver cannot go back to relying on it.
 
-    def test_a_row_that_does_not_take_selection_is_a_bounded_failure(self, session):
+        Every row reports ``AXSelected`` settable, the write returns 0, and the row never
+        reads back selected. The outline's ``AXSelectedRows`` behaves the same way, and
+        ``agent-desktop``'s own ``click`` answers "Selection was delivered but its effect
+        could not be verified". So the attempt is recorded and ignored here too.
+        """
         fake = session["fake"]
         fake.animation_pane_open = True
         fake.animation_row_count = 7
-        fake.effect_selection_sticks = False
-        with pytest.raises(driver.TargetFailure, match="row 7 to read back as selected"):
-            driver.select_pane_effect(fake, row_index=7, timeout=0.2)
+
+        rows = driver.pane_effect_rows(fake)
+        assert all(row["selected"] is False for row in rows)
+
+        pane = driver.animation_pane(fake)
+        outline = next(n for n in driver.walk(pane) if n.role == driver.SELECTION_PANE_ROLE)
+        effect_rows = [c for c in outline.children if c.role == driver.SELECTION_ROW_ROLE]
+        effect_rows[7].set_selected(True)
+
+        assert fake.effect_row_selections == [7], "the write was accepted"
+        assert all(row["selected"] is False for row in driver.pane_effect_rows(fake)), (
+            "and it did nothing"
+        )
+
+    def test_with_no_effect_selected_the_refusal_names_the_mechanism(self, session):
+        """Because the next question is always "then how do I select one?".
+
+        Nothing in the accessibility API does, so the message has to say so rather than
+        read as a transient miss that a retry might clear.
+        """
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+
+        with pytest.raises(driver.ControlNotFound, match="no effect selected") as raised:
+            driver.selected_pane_effect(fake)
+        assert "selected by hand" in str(raised.value)
+
+    def test_the_selected_effect_is_reported_by_what_it_is(self, session):
+        """With an effect selected — as a physical click leaves it — it is named."""
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+        fake.selected_effect_row = 7
+
+        effect = driver.selected_pane_effect(fake)
+        assert effect["rowIndex"] == 7
+        assert effect["describedAs"].endswith("Path effect, Curvy Left, 007.")
+
+    def test_two_selected_effects_are_refused_rather_than_chosen_between(self, session):
+        """A pane setting applies to the selection, so two is not "pick the first"."""
+        fake = session["fake"]
+        fake.animation_pane_open = True
+        fake.animation_row_count = 7
+        fake.selected_effect_row = {6, 7}
+
+        with pytest.raises(driver.AmbiguousControl, match="2 effects selected"):
+            driver.selected_pane_effect(fake)
 
     def test_the_sections_only_exist_once_an_effect_is_selected(self, session):
-        """Which is why selecting a row comes between selecting the shape and expanding.
+        """Which is why an effect being selected is a precondition rather than a step.
 
         Measured 2026-11-02: a selected shape with no selected effect published none of
-        the four sections.
+        the four sections, and selecting the shape never selects an effect.
         """
         fake = session["fake"]
         fake.animation_pane_open = True
@@ -2609,7 +2703,7 @@ class TestTheAnimationPane:
         with pytest.raises(driver.ControlNotFound, match="Effect Options"):
             driver.expand_pane_section(fake, "Effect Options", timeout=2.0)
 
-        driver.select_pane_effect(fake, row_index=7, timeout=2.0)
+        fake.selected_effect_row = 7
         assert driver.expand_pane_section(fake, "Effect Options", timeout=2.0) == "expanded"
         assert "Effect Options" in fake.expanded_sections
 
@@ -2619,7 +2713,7 @@ class TestTheAnimationPane:
         fake = session["fake"]
         fake.animation_pane_open = True
         fake.animation_row_count = 7
-        driver.select_pane_effect(fake, row_index=7, timeout=2.0)
+        fake.selected_effect_row = 7
         driver.expand_pane_section(fake, "Timing", timeout=2.0)
 
         assert driver.expand_pane_section(fake, "Timing", timeout=2.0) == "alreadyExpanded"

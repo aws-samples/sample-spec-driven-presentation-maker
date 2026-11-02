@@ -606,10 +606,27 @@ section answers `AXPress`.
 
 The route, measured 2026-11-02 on a deck with a motion path selected:
 
+0. **An effect must already be selected in the pane's list, and nothing in the
+   accessibility API can select one.** This is a hard precondition, not a step —
+   see "Selecting an effect row" below. Every reading in this section was taken
+   with an effect selected by a physical click.
 1. Ribbon ▸ **Animations** tab. `Animation Pane` is a **`switch`**, not a
    button — toggling it adds a second tab to the pane tab bar
    (`tablist "Tab bar, 2 tabs"`), and the pane's own tab is named
    **`Animations`**, not "Animation Pane".
+
+   **The side pane is identified by that tab bar and by nothing else.** Three
+   live elements are titled `Animations`: the ribbon's own tab, the side pane's
+   group, and the pane's tab. The ribbon's tab reads `AXValue` `"1"` whenever it
+   is the active ribbon tab — which driving any target makes it — so a search of
+   the window for "a radio button titled Animations reading 1" is answered by
+   the **ribbon**, and reports the pane open while the side pane shows something
+   else. The pane's group title is no better: it is named after whichever tab is
+   active (`Animations`, or `Selection Pane`). The tab bar's own title,
+   `Tab bar, N tabs`, is the only stable handle. A closed pane's tab is **absent
+   from the bar** rather than merely unselected, so "no Animations tab" means
+   press the switch, while "a tab reading 0" means select the tab — the switch
+   would close it.
 2. Inside `group:Animations` the lower `scrollarea` carries the AX identifier
    **`SettingsScrollView`**. Its direct children are four `disclosure` controls,
    each offering `Click` / `Expand` / `Collapse`:
@@ -629,6 +646,55 @@ The route, measured 2026-11-02 on a deck with a motion path selected:
 shape options measured for the 133 effect-option values ("Driving mechanics"
 above). The Animation Pane's `Effect Options` **disclosure** is this one. They
 are unrelated; resolving by name alone picks the wrong one.
+
+### Selecting an effect row — **no accessibility path does this**
+
+The four sections exist only while an **effect** is selected. Selecting the
+*shape* is not enough: with `Rounded Rectangle 13` selected through the Selection
+Pane, the list's rows all read unselected and the pane published no section, no
+popup and no checkbox.
+
+Every accessibility mechanism was tried, 2026-11-02 on 16.113.1, and none
+selects a row:
+
+| Attempt | Result |
+| --- | --- |
+| `AXSelected` on the row | reported settable; write returns 0; **never reads back**, on all 8 rows |
+| `AXSelectedRows` on the `outline:Animation list` | reported settable; write returns 0; **never reads back** |
+| `AXPress` on the row | not published — AX error `-25206` |
+| `AXShowDefaultUI`, `AXShowAlternateUI` | the row's only two actions; both return 0 and change nothing |
+| the row's `AXCell` child | no actions at all; only `AXScrollToVisible` settable |
+| selecting the shape | selects the shape, selects no effect |
+| `AXFocused` on the outline | **takes and reads back** — and still selects no row |
+| `agent-desktop click` on the row | `ACTION_FAILED`: "Selection was delivered but its effect could not be verified" |
+| `agent-desktop scroll-to` on the row | `ACTION_FAILED`: "Semantic ancestor scrolling did not bring the target into view" |
+
+Two consequences worth being explicit about:
+
+* `gui_capture.py` has **no** function that selects an effect. An earlier
+  `select_pane_effect` wrote `AXSelected` and waited for the read-back, which can
+  only time out. It is now `selected_pane_effect`, which *reads* the selection and
+  refuses when there is none. The after-animation values measured on 2026-11-02
+  were measured against an effect something outside the driver had selected,
+  which is why that function appeared to work.
+* What is left is **physical input** — a real click, or `AXFocused` on the outline
+  followed by arrow keys. Both cost the headless property the driver is built on,
+  so the choice is a decision about its contract rather than an implementation
+  detail.
+
+The rows **are** identifiable, contrary to the first reading. The name is not a
+descendant `statictext` the way a Selection Pane row's is — which is why a search
+for one returned `names=[]` — it is the row's `AXCell` child's own title, and it
+describes the effect:
+
+```
+row 0  (none)                                                        the ANIMATIONS header
+row 1  Animation order: 1, Starts: On Click, Path effect, Bounce Left, 001.
+row 7  Animation order: 7, Starts: On Click, Path effect, Curvy Left, 007.
+```
+
+So a measurement records *which* effect it measured rather than asserting a row
+number. Read them with `pane_effect_rows`.
 
 ### Reading a popup inside the pane
 

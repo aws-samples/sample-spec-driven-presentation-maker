@@ -1463,8 +1463,16 @@ MENU_ITEM_ROLES = ("AXMenuItem", "AXButton")
 
 #: The Animation Pane's effect list, which shares ``AXOutline`` with the
 #: Selection Pane. Named here so the Selection Pane can be identified by
-#: excluding it; see :func:`selection_pane`.
+#: excluding it; see :func:`selection_outline`.
 ANIMATION_LIST_TITLE = "Animation list"
+
+#: Where an effect row's identity lives. A Selection Pane row is named by a
+#: descendant ``AXStaticText``; an effect row is not, and a search for one comes
+#: back empty — which is how these rows came to be called nameless. The name is
+#: the ``AXCell`` child's own title, and it describes the whole effect:
+#: ``'Animation order: 7, Starts: On Click, Path effect, Curvy Left, 007.'``
+#: Measured 2026-11-02.
+PANE_CELL_ROLE = "AXCell"
 
 #: Both panes share one tab bar once the Selection Pane is open, so the
 #: Animation Pane is revealed by selecting its tab rather than by the ribbon
@@ -2329,53 +2337,111 @@ def animation_pane(backend: AXBackend) -> AXNode:
     return group
 
 
-def select_pane_effect(backend: AXBackend, *, row_index: int, timeout: float) -> dict[str, Any]:
-    """Select one effect in the Animation Pane's list, by its row.
+def pane_effect_rows(backend: AXBackend) -> list[dict[str, Any]]:
+    """Describe every row of the Animation Pane's effect list.
 
-    The pane's settings sections only exist while an **effect** is selected —
-    selecting the shape is not enough, and measured 2026-11-02 the sections were
-    absent with a shape selected and no effect. So this runs between
-    :func:`select_shape` and :func:`expand_pane_section`.
+    An effect **is** identifiable, which the first version of this denied. The
+    name is not a descendant ``AXStaticText`` the way a Selection Pane row's is —
+    that is why a search for one came back empty — it is the row's ``AXCell``
+    child's own title, and it is richer than a name::
 
-    By row index rather than by name, reluctantly: the rows publish no name at
-    all. Every one of the seven read as ``names=[]`` beneath an ``ANIMATIONS``
-    header row, so there is nothing to resolve by and the index is the only
-    address the pane offers. ``AXSelected`` is read back, which is what keeps it
-    honest — a row that did not take selection fails here rather than later as a
-    press on whatever was selected instead.
+        row 0  None                                                        (the ANIMATIONS header)
+        row 1  'Animation order: 1, Starts: On Click, Path effect, Bounce Left, 001.'
+        ...
+        row 7  'Animation order: 7, Starts: On Click, Path effect, Curvy Left, 007.'
+
+    So a measurement can record *which* effect it measured rather than asserting
+    a row number, and a fixture can name it. Measured 2026-11-02.
     """
     view = held(backend)
-
-    def rows() -> list[AXNode]:
-        view.stale()
-        pane = animation_pane(view)
-        for node in walk(pane):
-            if node.role == SELECTION_PANE_ROLE:
-                return [child for child in node.children if child.role == SELECTION_ROW_ROLE]
-        return []
-
-    found = rows()
-    if row_index >= len(found):
-        raise ControlNotFound(
-            f"the Animation Pane published {len(found)} effect rows, so row {row_index} does not "
-            "exist; the pane lists one row per effect beneath a header row",
-            rowIndex=row_index,
-            rowCount=len(found),
-        )
-    found[row_index].set_selected(True)
     view.stale()
+    pane = animation_pane(view)
+    outline: AXNode | None = None
+    for node in walk(pane):
+        if node.role == SELECTION_PANE_ROLE:
+            outline = node
+            break
+    if outline is None:
+        raise ControlNotFound(
+            f"the Animation Pane publishes no {SELECTION_PANE_ROLE}, so it has no effect list"
+        )
+    described: list[dict[str, Any]] = []
+    for index, row in enumerate(
+        child for child in outline.children if child.role == SELECTION_ROW_ROLE
+    ):
+        cell = next((child for child in row.children if child.role == PANE_CELL_ROLE), None)
+        described.append(
+            {
+                "rowIndex": index,
+                "index": row.index,
+                "selected": row.selected,
+                "describedAs": None if cell is None else cell.title,
+            }
+        )
+    return described
 
-    def selected() -> bool:
-        current = rows()
-        return row_index < len(current) and current[row_index].selected
 
-    wait_until(
-        backend,
-        selected,
-        timeout=timeout,
-        what=f"the Animation Pane's effect row {row_index} to read back as selected",
-    )
-    return {"rowIndex": row_index, "rowCount": len(found)}
+def selected_pane_effect(backend: AXBackend) -> dict[str, Any]:
+    """Return the effect the Animation Pane has selected, or refuse saying nothing is.
+
+    **This reads; it does not select.** Selecting an effect row cannot be done
+    through the accessibility API on PowerPoint for Mac 16.113.1, and that was
+    established by exhausting the alternatives rather than assumed — measured
+    2026-11-02:
+
+    ===========================================  ==========================================
+    ``AXSelected`` on the row                    reported settable, write returns 0, never
+                                                 reads back, on every row including the header
+    ``AXSelectedRows`` on the outline            reported settable, write returns 0, never
+                                                 reads back
+    ``AXPress`` on the row                       not published (AX error -25206)
+    ``AXShowDefaultUI`` / ``AXShowAlternateUI``  the row's only two actions; both return 0
+                                                 and change nothing
+    the row's ``AXCell``                         no actions at all
+    selecting the shape                          selects the shape and no effect: rows stay
+                                                 unselected and no section appears
+    ``AXFocused`` on the outline                 **does** take and read back, and still
+                                                 selects no row
+    ===========================================  ==========================================
+
+    ``agent-desktop`` reaches the same wall from the other side and says so:
+    ``click`` on the row answers ``ACTION_FAILED`` — "Selection was delivered but
+    its effect could not be verified".
+
+    An earlier version of this function wrote ``AXSelected`` and waited for it to
+    read back, which can only ever time out. The two after-animation values
+    measured on 2026-11-02 were measured with an effect that something *outside*
+    the driver had selected, which is why they looked like it worked.
+
+    What is left is physical input — a real click, or focusing the list and
+    sending arrow keys — and that is a decision about this driver's contract
+    rather than a detail, so it is not taken here. Until it is taken, the pane's
+    per-effect settings are reachable only with an effect already selected, and
+    this is the precondition check that says whether one is.
+
+    The selection is not load-bearing for correctness, which is worth stating:
+    :func:`attribute_modified_batch` compares the package either side of the save,
+    so a measurement taken against the wrong effect is caught as a stray shape
+    rather than recorded as fact.
+    """
+    rows = pane_effect_rows(backend)
+    selected = [row for row in rows if row["selected"]]
+    if not selected:
+        raise ControlNotFound(
+            "the Animation Pane has no effect selected, so it publishes none of its "
+            f"settings sections {list(PANE_SECTIONS)}; nothing in the accessibility API "
+            "selects one on this build (see selected_pane_effect) so an effect has to be "
+            "selected by hand before this runs",
+            rowCount=len(rows),
+            describedAs=[row["describedAs"] for row in rows],
+        )
+    if len(selected) > 1:
+        raise AmbiguousControl(
+            f"the Animation Pane has {len(selected)} effects selected, so a pane setting would "
+            "apply to more than the effect being measured",
+            describedAs=[row["describedAs"] for row in selected],
+        )
+    return selected[0]
 
 
 def expand_pane_section(backend: AXBackend, section: str, *, timeout: float) -> str:
