@@ -2258,6 +2258,12 @@ class CoverageRecord:
     gap_key: str = ""
     elements: tuple[str, ...] = ()
     message: str = ""
+    #: The catalog marks this entry as outside sdpm's input vocabulary, so no
+    #: JSON can ask for it and no capture closes it. Carried here so coverage
+    #: accounting can report it apart from the gaps a capture does close: mixed
+    #: in, the capture-required total could never reach zero and would stop
+    #: measuring progress. The 45 ``MsoAnimDirection`` enumerators are these.
+    no_sdpm_input: bool = False
 
     @property
     def generated(self) -> bool:
@@ -2342,6 +2348,7 @@ def catalog_coverage(
                     gap_key=gap_key,
                     elements=elements,
                     message=message,
+                    no_sdpm_input=bool(raw.get("noSdpmInput")),
                 )
             )
     return tuple(records)

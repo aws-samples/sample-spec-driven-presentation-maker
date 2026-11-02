@@ -1118,7 +1118,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.bottom",
@@ -1176,7 +1177,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.bottomLeft",
@@ -1234,7 +1236,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.bottomRight",
@@ -1292,7 +1295,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.center",
@@ -1350,7 +1354,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.clockwise",
@@ -1408,7 +1413,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.counterclockwise",
@@ -1466,7 +1472,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.cycleClockwise",
@@ -1524,7 +1531,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.cycleCounterclockwise",
@@ -1582,7 +1590,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.down",
@@ -1640,7 +1649,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.downLeft",
@@ -1698,7 +1708,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.downRight",
@@ -1756,7 +1767,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.fontAllCaps",
@@ -1814,7 +1826,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.fontBold",
@@ -1872,7 +1885,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.fontItalic",
@@ -1930,7 +1944,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.fontShadow",
@@ -1988,7 +2003,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.fontStrikethrough",
@@ -2046,7 +2062,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.fontUnderline",
@@ -2104,7 +2121,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.gradual",
@@ -2162,7 +2180,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.horizontal",
@@ -2220,7 +2239,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.horizontalIn",
@@ -2278,7 +2298,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.horizontalOut",
@@ -2336,7 +2357,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.inBottom",
@@ -2394,7 +2416,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.inCenter",
@@ -2452,7 +2475,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.inSlightly",
@@ -2510,7 +2534,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.instant",
@@ -2568,7 +2593,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.inward",
@@ -2626,7 +2652,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.left",
@@ -2684,7 +2711,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.noDirection",
@@ -2742,7 +2770,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.ordinalMask",
@@ -2800,7 +2829,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.out",
@@ -2858,7 +2888,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.outBottom",
@@ -2916,7 +2947,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.outCenter",
@@ -2974,7 +3006,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.outSlightly",
@@ -3032,7 +3065,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.right",
@@ -3090,7 +3124,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.slightly",
@@ -3148,7 +3183,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.top",
@@ -3206,7 +3242,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.topLeft",
@@ -3264,7 +3301,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.topRight",
@@ -3322,7 +3360,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.up",
@@ -3380,7 +3419,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.upLeft",
@@ -3438,7 +3478,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.upRight",
@@ -3496,7 +3537,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.vertical",
@@ -3554,7 +3596,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.verticalIn",
@@ -3612,7 +3655,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.effectOptions.direction.verticalOut",
@@ -3670,7 +3714,8 @@
         "source": "PowerPoint.sdef (local installation)",
         "commit": null
       },
-      "verification": "powerPointReadBackRequired"
+      "verification": "powerPointReadBackRequired",
+      "noSdpmInput": true
     },
     {
       "key": "animation.gallery.emphasis.blink",
@@ -65921,6 +65966,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.across",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "across",
       "code": "0x00f90012"
@@ -65983,6 +66029,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.bottom",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "bottom",
       "code": "0x00f9000b"
@@ -66045,6 +66092,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.bottomLeft",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "bottom left",
       "code": "0x00f9000f"
@@ -66107,6 +66155,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.bottomRight",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "bottom right",
       "code": "0x00f9000e"
@@ -66169,6 +66218,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.center",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "center",
       "code": "0x00f9001c"
@@ -66231,6 +66281,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.clockwise",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "clockwise",
       "code": "0x00f90015"
@@ -66293,6 +66344,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.counterclockwise",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "counterclockwise",
       "code": "0x00f90016"
@@ -66355,6 +66407,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.cycleClockwise",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "cycle clockwise",
       "code": "0x00f9002b"
@@ -66417,6 +66470,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.cycleCounterclockwise",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "cycle counterclockwise",
       "code": "0x00f9002c"
@@ -66479,6 +66533,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.down",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "down",
       "code": "0x00f90003"
@@ -66541,6 +66596,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.downLeft",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "down left",
       "code": "0x00f90009"
@@ -66603,6 +66659,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.downRight",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "down right",
       "code": "0x00f90008"
@@ -66665,6 +66722,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.fontAllCaps",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "font all caps",
       "code": "0x00f90028"
@@ -66727,6 +66785,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.fontBold",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "font bold",
       "code": "0x00f90023"
@@ -66789,6 +66848,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.fontItalic",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "font italic",
       "code": "0x00f90024"
@@ -66851,6 +66911,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.fontShadow",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "font shadow",
       "code": "0x00f90027"
@@ -66913,6 +66974,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.fontStrikethrough",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "font strikethrough",
       "code": "0x00f90026"
@@ -66975,6 +67037,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.fontUnderline",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "font underline",
       "code": "0x00f90025"
@@ -67037,6 +67100,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.gradual",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "gradual",
       "code": "0x00f9002a"
@@ -67099,6 +67163,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.horizontal",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "horizontal",
       "code": "0x00f90010"
@@ -67161,6 +67226,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.horizontalIn",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "horizontal in",
       "code": "0x00f90017"
@@ -67223,6 +67289,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.horizontalOut",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "horizontal out",
       "code": "0x00f90018"
@@ -67285,6 +67352,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.inBottom",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "in bottom",
       "code": "0x00f9001f"
@@ -67347,6 +67415,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.inCenter",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "in center",
       "code": "0x00f9001e"
@@ -67409,6 +67478,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.inSlightly",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "in slightly",
       "code": "0x00f9001d"
@@ -67471,6 +67541,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.instant",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "instant",
       "code": "0x00f90029"
@@ -67533,6 +67604,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.inward",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "inward",
       "code": "0x00f90013"
@@ -67595,6 +67667,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.left",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "left",
       "code": "0x00f90004"
@@ -67657,6 +67730,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.noDirection",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "no direction",
       "code": "0x00f90000"
@@ -67719,6 +67793,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.ordinalMask",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "ordinal mask",
       "code": "0x00f90005"
@@ -67781,6 +67856,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.out",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "out",
       "code": "0x00f90014"
@@ -67843,6 +67919,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.outBottom",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "out bottom",
       "code": "0x00f90022"
@@ -67905,6 +67982,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.outCenter",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "out center",
       "code": "0x00f90021"
@@ -67967,6 +68045,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.outSlightly",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "out slightly",
       "code": "0x00f90020"
@@ -68029,6 +68108,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.right",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "right",
       "code": "0x00f90002"
@@ -68091,6 +68171,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.slightly",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "slightly",
       "code": "0x00f9001b"
@@ -68153,6 +68234,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.top",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "top",
       "code": "0x00f9000a"
@@ -68215,6 +68297,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.topLeft",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "top left",
       "code": "0x00f9000c"
@@ -68277,6 +68360,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.topRight",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "top right",
       "code": "0x00f9000d"
@@ -68339,6 +68423,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.up",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "up",
       "code": "0x00f90001"
@@ -68401,6 +68486,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.upLeft",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "up left",
       "code": "0x00f90006"
@@ -68463,6 +68549,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.upRight",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "up right",
       "code": "0x00f90007"
@@ -68525,6 +68612,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.vertical",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "vertical",
       "code": "0x00f90011"
@@ -68587,6 +68675,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.verticalIn",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "vertical in",
       "code": "0x00f90019"
@@ -68649,6 +68738,7 @@
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.effectOptions.direction.verticalOut",
+      "noSdpmInput": true,
       "enum": "MsoAnimDirection",
       "enumerator": "vertical out",
       "code": "0x00f9001a"

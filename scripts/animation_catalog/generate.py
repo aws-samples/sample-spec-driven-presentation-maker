@@ -1862,9 +1862,15 @@ def enum_value_items(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict[
             # gap. Without that the example would write a plain Fly In — the
             # tile's default direction — and the entry would report itself
             # generated while demonstrating nothing it describes.
+            # The example asks for the enumerator by name through the new
+            # vocabulary, so the writer refuses it and quotes this entry's own
+            # gap. Without that the example would write a plain Fly In — the
+            # tile's default direction — and the entry would report itself
+            # generated while demonstrating nothing it describes.
             effect_semantic(preset={"category": "entrance", "effect": "flyIn",
                                     "options": {"direction": semantic}}),
             {"source": SDEF_SOURCE, "commit": None},
+            noSdpmInput=True,
         ))
 
     for value, level in RESTART_VALUES.items():
@@ -3005,6 +3011,7 @@ def candidate_entries(sdef_enums: dict[str, list[tuple[str, str]]],
                                             "options": {"direction": semantic}}),
                     {"source": SDEF_SOURCE, "commit": None},
                     guiKey=f"animation.effectOptions.direction.{semantic}",
+                    noSdpmInput=True,
                 )
             elif enum_name == "MsoAnimTriggerType":
                 semantic, node_type, level = TRIGGER_MAP[enumerator]

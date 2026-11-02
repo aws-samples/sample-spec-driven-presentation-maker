@@ -1534,8 +1534,18 @@ def run_acceptance(
     # --- the gaps ---------------------------------------------------------
     records = catalog_coverage(index, catalog=catalog)
     writer_summary = coverage_summary(records)
+    # Split off the entries no capture can ever close. They are tracked so the
+    # sdef enumeration is accounted for, but counting them as "awaiting a
+    # PowerPoint read-back" asserts something their own recorded gap denies —
+    # and it means the capture-required total can never reach zero, so it stops
+    # being a measure of progress.
+    no_sdpm_input = sorted(
+        record.key for record in records if record.outcome == "refused" and record.no_sdpm_input
+    )
     capture_required = sorted(
-        record.key for record in records if record.outcome == "refused" and not record.elements
+        record.key
+        for record in records
+        if record.outcome == "refused" and not record.elements and not record.no_sdpm_input
     )
     payload_gaps = sorted(
         (
@@ -1568,6 +1578,18 @@ def run_acceptance(
             "meaning": "accepted catalog mappings whose OOXML element form PowerPoint has not been asked for",
             "closes": "PowerPoint read-back (--powerpoint) recording the element and attributes for each key",
             "keys": capture_required,
+        },
+        "noSdpmInput": {
+            "count": len(no_sdpm_input),
+            "meaning": (
+                "enumerators tracked for sdef coverage that no sdpm JSON can ask for, so no "
+                "capture closes them. The 45 MsoAnimDirection names are these: a direction is "
+                "measured per effect and written as preset.options.direction, and the enumerator "
+                "name does not identify a presetSubtype — 33 of the 45 are not offered by any "
+                "gallery tile, and the same label means different subtypes on different effects"
+            ),
+            "closes": "nothing; these are recorded as out of the input vocabulary, not as a gap",
+            "keys": no_sdpm_input,
         },
         "behaviorPayloads": {
             "count": len(gallery_payload_gaps),
@@ -1612,6 +1634,8 @@ def run_acceptance(
             blockers.append(f"check {check.id} failed")
         elif check.status == "blockedOnPowerPoint":
             blockers.append(f"check {check.id} is blocked on PowerPoint")
+    # ``noSdpmInput`` is deliberately not a blocker: it counts entries nothing
+    # can close, so gating on it would make the gate unpassable by design.
     for name in ("captureRequired", "behaviorPayloads", "oneWayOnly", "partialRoundTrip"):
         if gaps[name]["count"]:
             blockers.append(f"{gaps[name]['count']} {name} gap(s) remain")

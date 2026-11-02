@@ -1997,3 +1997,39 @@ def test_shape_takes_its_default_from_its_sibling_setting():
         if option.get("default") is None
     ]
     assert not unresolved, unresolved
+
+
+def test_an_entry_no_json_can_ask_for_is_not_counted_as_awaiting_capture():
+    """The capture-required total has to be able to reach zero.
+
+    The 45 `MsoAnimDirection` enumerators, in both the item and candidate
+    groups, record a scripting name that no sdpm JSON can ask for: a direction
+    is measured per effect and written as `preset.options.direction`, and the
+    enumerator name does not identify a `presetSubtype`. Counting them as
+    "awaiting a PowerPoint read-back" asserts the opposite of their own
+    recorded gap, and it made the total permanently non-zero — so it stopped
+    measuring anything.
+    """
+    from sdpm.engine.timing import load_capability_index
+    from sdpm.engine.timing.writer import catalog_coverage
+
+    catalog = json.loads(
+        (REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json").read_text()
+    )
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    records = catalog_coverage(index, catalog=catalog)
+    flagged = {record.key for record in records if record.no_sdpm_input}
+    assert len(flagged) == 90, sorted(flagged)[:5]
+    assert all(
+        key.startswith("MsoAnimDirection.")
+        or key.startswith("animation.effectOptions.direction.")
+        for key in flagged
+    ), sorted(flagged)[:5]
+    # Every one is still refused by the writer: not an input is not the same as
+    # writable, and an entry that started generating would be writing the
+    # tile's default direction while claiming to be a specific one.
+    assert all(
+        record.outcome == "refused" for record in records if record.no_sdpm_input
+    )
