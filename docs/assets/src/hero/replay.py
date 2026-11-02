@@ -31,7 +31,8 @@ and the content composers do. The server builds each time and writes the compose
 with sdpm.engine.preview.compose, including the `changed` flags of the final payloads
 against the layout pass, and preview/<slug>.png (what the grid view shows). Those files are
 what the recording places. The deck's art direction is the bundled style named in
-style.txt (render.copy_deck).
+style.txt (render.copy_deck). deck-ja holds no slides of its own: translate_deck makes both
+states from deck-en's with its translation.json and patch.json, in a temporary directory.
 
 record.cjs cuts the idle time between placing a file and the animation starting; the GIF
 opens OPEN_AT_S into the first animation. ffmpeg turns the frames (padded to one size)
@@ -70,7 +71,7 @@ ASSETS = REPO / "docs" / "assets"
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(REPO / "sdpm"))
 
-from render import BUILDER, WIDTH, copy_deck, run  # noqa: E402
+from render import BUILDER, WIDTH, copy_deck, isolated_config, run  # noqa: E402
 
 # Part 1 viewport: the full-view slide is width-bound (952 x 536 px) and ends 12 px above
 # the bottom edge, so the whole cover is in view and the next slide is not.
@@ -124,6 +125,60 @@ STORIES = {
 # Pairs of slides animated in view in part 2, and the slides finished out of view.
 PAIRS = [["blank-slide", "spec-first"], ["parallel-build", "two-outputs"]]
 OUT_OF_VIEW = ["fix-by-drawing", "get-started"]
+
+# A translated deck (deck-ja) holds no slides: they are made from this deck's.
+TRANSLATED_FROM = HERE / "deck-en"
+# The files of a translated deck that are not part of the deck it makes.
+TRANSLATION_FILES = ("translation.json", "patch.json", "README.md")
+
+
+def translate_deck(src: Path, dest: Path) -> Path:
+    """Make a translated deck in dest: src's own files plus TRANSLATED_FROM's slides, translated.
+
+    Every string in TRANSLATED_FROM's slides/ and layout/ that is a key of src/translation.json
+    becomes its value. src/patch.json then sets fields of single elements, for what is not
+    text: {"<state>/<slug>": {"<element index>": {field: value}}}.
+    """
+    tmap = json.loads((src / "translation.json").read_text(encoding="utf-8"))
+    patch = json.loads((src / "patch.json").read_text(encoding="utf-8"))
+    used: set[str] = set()
+
+    def translate(node):
+        if isinstance(node, dict):
+            return {k: translate(v) for k, v in node.items()}
+        if isinstance(node, list):
+            return [translate(v) for v in node]
+        if isinstance(node, str) and node in tmap:
+            used.add(node)
+            return tmap[node]
+        return node
+
+    shutil.rmtree(dest, ignore_errors=True)
+    shutil.copytree(src, dest, ignore=shutil.ignore_patterns(*TRANSLATION_FILES, "slides", "layout"))
+    for state in ("slides", "layout"):
+        (dest / state).mkdir()
+        for p in sorted((TRANSLATED_FROM / state).glob("*.json")):
+            slide = translate(json.loads(p.read_text(encoding="utf-8")))
+            for index, fields in patch.pop(f"{state}/{p.stem}", {}).items():
+                element = slide["elements"][int(index)]
+                for key, value in fields.items():
+                    if key not in element:
+                        raise SystemExit(f"{src.name}/patch.json: {state}/{p.stem} element {index} has no {key!r}")
+                    element[key] = value
+            (dest / state / p.name).write_text(json.dumps(slide, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+    if patch:
+        raise SystemExit(f"{src.name}/patch.json: no such slides {sorted(patch)}")
+    if unused := set(tmap) - used:
+        raise SystemExit(f"{src.name}/translation.json: strings not in {TRANSLATED_FROM.name}: {sorted(unused)}")
+    return dest
+
+
+def source_deck(name: str, tmp: Path) -> Path:
+    """The deck directory to build: deck-en as committed, a translated deck made into tmp."""
+    src = HERE / name
+    if (src / "translation.json").is_file():
+        return translate_deck(src, tmp / name)
+    return src
 
 
 def outline_slugs(deck: Path) -> list[str]:
@@ -190,7 +245,7 @@ def render_pages(src: Path, width: int, tmp: Path) -> list[Path]:
 
 def build_plan(lang: str, story: dict, work: Path, port: int) -> dict:
     """Build the compose payloads, stage the scratch deck; return the recorder's plan."""
-    src = HERE / story["deck"]
+    src = source_deck(story["deck"], work / "source")
     deck_id = "spec-driven-presentation-maker"
     root = work / "decks"
     deck = root / deck_id
@@ -405,7 +460,8 @@ def stills(lang: str) -> None:
     """Cover large on top, the other slides in rows of three below."""
     story = STORIES[lang]
     with tempfile.TemporaryDirectory(prefix=f"sdpm-hero-{lang}-") as tmp:
-        pages = [Image.open(p).convert("RGB") for p in render_pages(HERE / story["deck"], WIDTH, Path(tmp))]
+        src = source_deck(story["deck"], Path(tmp) / "source")
+        pages = [Image.open(p).convert("RGB") for p in render_pages(src, WIDTH, Path(tmp))]
 
     width, gap, cols = 1760, 24, 3
     inner = width - 2 * gap
@@ -439,20 +495,19 @@ def main() -> None:
     parser.add_argument("--no-gif", action="store_true", help="skip the recording")
     parser.add_argument("--no-stills", action="store_true", help="skip the stills")
     args = parser.parse_args()
-    # User templates and styles shadow the bundled ones: read none of the user's sdpm config.
-    os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="sdpm-hero-config-")
     for lang in args.langs:
         if lang not in STORIES:
             raise SystemExit(f"unknown language: {lang} (have {list(STORIES)})")
-    for lang in args.langs or list(STORIES):
-        if not args.no_gif:
-            if args.keep:
-                record(lang, Path(args.keep) / lang, args.port)
-            else:
-                with tempfile.TemporaryDirectory(prefix=f"sdpm-hero-{lang}-") as tmp:
-                    record(lang, Path(tmp), args.port)
-        if not args.no_stills:
-            stills(lang)
+    with isolated_config():
+        for lang in args.langs or list(STORIES):
+            if not args.no_gif:
+                if args.keep:
+                    record(lang, Path(args.keep) / lang, args.port)
+                else:
+                    with tempfile.TemporaryDirectory(prefix=f"sdpm-hero-{lang}-") as tmp:
+                        record(lang, Path(tmp), args.port)
+            if not args.no_stills:
+                stills(lang)
 
 
 if __name__ == "__main__":

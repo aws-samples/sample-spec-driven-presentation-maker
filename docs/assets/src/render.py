@@ -36,7 +36,9 @@ Usage (from the repository root):
 from __future__ import annotations
 
 import argparse
+import contextlib
 import json
+import os
 import re
 import shutil
 import subprocess  # nosec B404
@@ -57,6 +59,30 @@ WIDTH = 1920
 NOT_DECK = ("style.txt", "layout", "compose", "preview", "_work", "output.pptx", "README.md")
 
 sys.path.insert(0, str(REPO / "sdpm"))
+
+
+@contextlib.contextmanager
+def isolated_config():
+    """Hide the user's sdpm config while building: user templates and styles shadow the bundled ones.
+
+    XDG_CONFIG_HOME points at an empty temporary directory (removed afterwards) and the
+    SDPM_TEMPLATES_DIR / SDPM_STYLES_DIR overrides are unset, for this process and the
+    builds it starts.
+    """
+    names = ("XDG_CONFIG_HOME", "SDPM_TEMPLATES_DIR", "SDPM_STYLES_DIR")
+    saved = {k: os.environ.get(k) for k in names}
+    with tempfile.TemporaryDirectory(prefix="sdpm-docs-config-") as tmp:
+        os.environ["XDG_CONFIG_HOME"] = tmp
+        for k in names[1:]:
+            os.environ.pop(k, None)
+        try:
+            yield Path(tmp)
+        finally:
+            for k, v in saved.items():
+                if v is None:
+                    os.environ.pop(k, None)
+                else:
+                    os.environ[k] = v
 
 
 def copy_deck(src: Path, dest: Path, *skip: str) -> Path:
@@ -241,10 +267,12 @@ def main() -> None:
     parser.add_argument("names", nargs="*", help=f"diagrams to render (default: all of {diagrams()})")
     parser.add_argument("--keep-pptx", metavar="DIR", help="also copy each built .pptx into DIR")
     args = parser.parse_args()
-    for name in args.names or diagrams():
+    for name in args.names:
         if name not in diagrams():
             raise SystemExit(f"unknown diagram: {name} (have {diagrams()})")
-        render(name, args.keep_pptx)
+    with isolated_config():
+        for name in args.names or diagrams():
+            render(name, args.keep_pptx)
 
 
 if __name__ == "__main__":

@@ -1,2 +1,4 @@
 # Vendored files are checked against upstream SHA256SUMS; keep their bytes unchanged on checkout.
 sdpm/vendor/** -text
+# Slide JSON of the documentation diagrams and the key visual: collapsed in GitHub diffs.
+docs/assets/src/**/*.json linguist-generated

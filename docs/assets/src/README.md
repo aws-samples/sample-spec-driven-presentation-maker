@@ -94,9 +94,12 @@ place their shapes by hand.
 
 `hero/` holds the deck at the top of the README (`deck-en/`, and `deck-ja/` made from it with
 the translate role) and the scripts that turn it into `hero-en.gif` / `hero-ja.gif` and the
-stills `hero-slides-en.png` / `hero-slides-ja.png`. Each deck has two states of every slide:
+stills `hero-slides-en.png` / `hero-slides-ja.png`. `deck-en` has two states of every slide:
 `layout/<slug>.json` (the layout pass) and `slides/<slug>.json` (the final slide), and a
-`style.txt` naming its bundled style. No compose files are committed: `replay.py` writes both
+`style.txt` naming its bundled style. `deck-ja` holds no slides: `replay.py` makes both states
+from `deck-en` with an English-to-Japanese string map (`translation.json`) and a short patch
+of element fields that are not text (`patch.json`), described in `hero/deck-ja/README.md`.
+No compose files are committed: `replay.py` writes both
 states into a scratch copy of the deck through the Local server's `run_python`, which builds
 them and writes the compose payloads (with the `changed` flags of the final slides against
 the layout pass) and the previews, as it does for a composer. It then runs the Local Web UI on
@@ -110,9 +113,11 @@ uv run python docs/assets/src/hero/replay.py ja --no-stills
 uv run python docs/assets/src/hero/replay.py --keep /tmp/hero-replay   # keep frames and payloads
 ```
 
-Everything is written to temporary directories (or the `--keep` directory): a scratch deck
-root and config directory for the Web UI, and an empty `XDG_CONFIG_HOME` so user templates
-and styles do not replace the bundled ones. Only the GIFs and stills in `docs/assets/` change.
+Everything is written to temporary directories (or the `--keep` directory): the Japanese
+deck, a scratch deck root and config directory for the Web UI, and an empty
+`XDG_CONFIG_HOME` so user templates and styles do not replace the bundled ones (`render.py`
+builds with the same empty config, and both remove it when they finish). Only the GIFs and
+stills in `docs/assets/` change.
 The recording runs in real time, so two runs differ by a few frames of animation timing.
 
 ## Screenshots
