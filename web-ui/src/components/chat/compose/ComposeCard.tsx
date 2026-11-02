@@ -14,62 +14,36 @@
 "use client"
 
 import { useMemo, useState } from "react"
-import { AlertCircle, Check, RefreshCw, X } from "lucide-react"
+import { AlertCircle, Check } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { parseComposeState, type ComposeState } from "./parseComposeState"
-import { stopComposeSlides } from "@/services/agentCoreService"
 import { STATE, C, MONO } from "./composeTokens"
 import { AgentCard } from "./AgentCard"
-import { StopSummary } from "./StopSummary"
 
 interface ComposeCardProps {
   input?: Record<string, unknown>
   status?: "success" | "error"
-  result?: Record<string, unknown> | string
   isActive: boolean
   streamMessages?: Record<string, unknown>[]
-  toolUseId?: string
-  sessionId?: string
-  accessToken?: string
 }
 
 export function ComposeCard({
   input,
   status,
-  result,
   isActive,
   streamMessages = [],
-  toolUseId,
-  sessionId,
-  accessToken,
 }: ComposeCardProps) {
   const t = useTranslations("compose")
-  const [stopping, setStopping] = useState(false)
   const [expandedGroup, setExpandedGroup] = useState<number | null>(null)
   const state: ComposeState = useMemo(
     () => parseComposeState(streamMessages, input, t),
     [streamMessages, input, t],
   )
 
-  const report = useMemo(() => {
-    if (!result) return null
-    try {
-      const raw = typeof result === "string" ? result : JSON.stringify(result)
-      const object = typeof result === "object" && result !== null
-        ? result as Record<string, unknown>
-        : JSON.parse(raw)
-      return object as { stopped?: boolean; notice?: string; summaries?: Record<string, string>; stopped_at?: string }
-    } catch {
-      return null
-    }
-  }, [result])
-
   const hasError = status === "error" || state.agents.some((agent) => agent.status === "error")
-  const isSoftStopped = !!report?.stopped
-  const isHardStopped = !isActive && !hasError && !status && state.agents.length > 0
-  const isStopped = isHardStopped || isSoftStopped
+  // The turn was stopped (main stop button) while this tool was running.
+  const isStopped = !isActive && !hasError && !status && state.agents.length > 0
   const isDone = !isActive && !isStopped && !hasError && (status === "success" || state.phase === "done")
-  const rushedCount = state.agents.filter((agent) => agent.budgetReached).length
   // Tool completion is the source of truth: a lane with no terminal stream state is done.
   const agents = isDone
     ? state.agents.map((a) => a.status === "starting" || a.status === "working" ? { ...a, status: "done" as const } : a)
@@ -111,15 +85,7 @@ export function ComposeCard({
         hasError={hasError}
         totalSlides={totalSlides}
         doneSlides={doneSlides}
-        rushedCount={rushedCount}
         isActive={isActive}
-        canCancel={isActive && !stopping && !!(toolUseId && sessionId && accessToken)}
-        stopping={stopping}
-        onCancel={async () => {
-          if (!toolUseId || !sessionId || !accessToken) return
-          setStopping(true)
-          await stopComposeSlides(sessionId, toolUseId, accessToken)
-        }}
       />
 
       {totalSlides > 0 && (
@@ -159,16 +125,11 @@ export function ComposeCard({
             existingSlugs={createdSlugs}
             indexDelay={index}
             parentStopped={isStopped}
-            parentStopping={stopping && isActive}
             expanded={expandedGroup === agent.groupIndex}
             onToggle={() => setExpandedGroup((current) => current === agent.groupIndex ? null : agent.groupIndex)}
           />
         ))}
       </div>
-
-      {isSoftStopped && (report?.notice || report?.summaries) && (
-        <StopSummary notice={report.notice} summaries={report.summaries} />
-      )}
 
       <span className="sr-only" aria-live="polite">
         {t("srCreationProgress", { created: createdSlides, total: totalSlides })}
@@ -198,11 +159,7 @@ function Header({
   hasError,
   totalSlides,
   doneSlides,
-  rushedCount,
   isActive,
-  canCancel,
-  onCancel,
-  stopping,
 }: {
   state: ComposeState
   isDone: boolean
@@ -210,29 +167,22 @@ function Header({
   hasError: boolean
   totalSlides: number
   doneSlides: number
-  rushedCount: number
   isActive: boolean
-  canCancel: boolean
-  onCancel: () => void
-  stopping: boolean
 }) {
   const t = useTranslations("compose")
   const hasAgents = state.totalGroups > 0
   const isFinished = isDone || (hasError && !isActive) || isStopped
-  const isStopping = stopping && isActive
-  const label = isStopping
-    ? t("stopping")
-    : isStopped
-      ? doneSlides > 0 ? t("stoppedPartial", { done: doneSlides, total: totalSlides }) : t("stopped")
-      : hasError && !isActive
-        ? doneSlides > 0 ? t("composedPartialFailed", { done: doneSlides, total: totalSlides }) : t("failed")
-        : isDone
-          ? t("composed", { count: totalSlides || state.totalGroups })
-          : hasAgents
-            ? t("inProduction", { count: totalSlides })
-            : state.statusMessage || t("preparing")
+  const label = isStopped
+    ? doneSlides > 0 ? t("stoppedPartial", { done: doneSlides, total: totalSlides }) : t("stopped")
+    : hasError && !isActive
+      ? doneSlides > 0 ? t("composedPartialFailed", { done: doneSlides, total: totalSlides }) : t("failed")
+      : isDone
+        ? t("composed", { count: totalSlides || state.totalGroups })
+        : hasAgents
+          ? t("inProduction", { count: totalSlides })
+          : state.statusMessage || t("preparing")
 
-  const accent = hasError ? STATE.error : isStopping ? STATE.retry : isStopped ? C.fgMuted : C.fgLabel
+  const accent = hasError ? STATE.error : isStopped ? C.fgMuted : C.fgLabel
 
   return (
     <header className="flex items-start gap-3 px-4 pb-2 pt-4">
@@ -244,29 +194,9 @@ function Header({
         )}
       </div>
 
-      {rushedCount > 0 && !isStopping && (
-        <span
-          className="mt-0.5 flex-none rounded-md px-1.5 py-0.5 text-[11px] font-medium"
-          style={{ color: STATE.retry, background: `color-mix(in oklch, ${STATE.retry} 10%, transparent)`, fontFamily: MONO }}
-          title={t("rushedBadgeTitle", { count: rushedCount })}
-        >
-          {t("rushedBadge", { count: rushedCount })}
-        </span>
-      )}
-
-      {isStopping ? (
-        <span className="flex-none inline-flex min-h-11 items-center gap-1 rounded-md px-2 text-[11px] font-medium" style={{ color: STATE.retry }} aria-label={t("cancelRequestedAria")}>
-          <RefreshCw className="h-3 w-3" style={{ animation: "tool-spinner 1.2s linear infinite" }} aria-hidden="true" />
-          {t("stoppingShort")}
-        </span>
-      ) : canCancel ? (
-        <button type="button" onClick={onCancel} className="touch-target flex-none inline-flex items-center justify-center gap-1 rounded-md px-2 text-[11px] font-medium text-foreground/70 hover:bg-foreground/5 hover:text-foreground/95 transition-colors" aria-label={t("cancelAria")}>
-          <X className="h-3 w-3" aria-hidden="true" />
-          {t("cancel")}
-        </button>
-      ) : hasError && !isActive ? (
+      {hasError && !isActive && (
         <AlertCircle className="mt-1 h-4 w-4 flex-none text-state-error" aria-hidden="true" />
-      ) : null}
+      )}
     </header>
   )
 }

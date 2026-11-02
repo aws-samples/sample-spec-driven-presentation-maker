@@ -13,7 +13,7 @@ Before dispatch, `compose_slides` validates deck.json and outline.md and returns
 
 It returns a JSON report:
 
-- `status`: `"completed"` / `"partial"` / `"failed"` / `"cancelled"`
+- `status`: `"completed"` / `"partial"` / `"failed"`
 - `generated_slides`: slugs successfully written
 - `failed_groups`: per-group failures with `slugs`, `instruction`, and `error` —
   on retry, call `compose_slides` again with ONLY these groups (reuse their
@@ -22,9 +22,6 @@ It returns a JSON report:
   decide whether to retry the missing slugs or inform the user
 - `summaries`: each composer's own completion summary
 - `notice`: harness guidance for the current status — follow it
-
-`status: "cancelled"` means the user intentionally stopped the run: relay
-`notice` and `summaries` in plain text, do NOT retry or call further tools.
 
 ### Post-compose verification (this environment)
 

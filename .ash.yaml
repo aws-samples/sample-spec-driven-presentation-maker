@@ -110,13 +110,6 @@ global_settings:
     # --- Bandit B108: /tmp usage in local/container code ---
 
     - rule_id: "B108"
-      path: "agent/modes/composer.py"
-      reason: >
-        /tmp/compose_stops is used for inter-agent stop signalling inside
-        a Fargate container. Not shared with untrusted processes.
-      expiration: "2027-03-29"
-
-    - rule_id: "B108"
       path: "servers/local/server_acp.py"
       reason: >
         /tmp/pptx-preview is used for transient preview files in the local

@@ -168,8 +168,6 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
                 attachments={msg.attachments}
                 isStreaming={stream.isLoading && i === stream.messages.length - 1}
                 idToken={auth.user?.id_token}
-                accessToken={auth.user?.access_token}
-                sessionId={sessionId}
                 onSend={(text: string) => handleSend(text, [], [], [])}
                 hearingDisabled={i < lastUserIdx}
               />

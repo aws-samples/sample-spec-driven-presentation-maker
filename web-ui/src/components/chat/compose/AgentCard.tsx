@@ -21,7 +21,6 @@ interface AgentCardProps {
   existingSlugs: Set<string>
   indexDelay: number
   parentStopped: boolean
-  parentStopping: boolean
   expanded: boolean
   onToggle: () => void
 }
@@ -31,20 +30,18 @@ export function AgentCard({
   existingSlugs,
   indexDelay,
   parentStopped,
-  parentStopping,
   expanded,
   onToggle,
 }: AgentCardProps) {
   const t = useTranslations("compose")
   const isStopped = parentStopped && agent.status !== "done" && agent.status !== "error"
-  const isStoppingInFlight = parentStopping && agent.status !== "done" && agent.status !== "error"
   const isWorking = agent.status === "working" && !isStopped
   const isRetrying = agent.status === "retrying" && !isStopped
   const isError = agent.status === "error"
   const latestActivity = agent.activity.at(-1) ?? null
   const latestColor = isError
     ? STATE.error
-    : isRetrying || isStoppingInFlight
+    : isRetrying
       ? STATE.retry
       : latestActivity
         ? CAT[latestActivity.category].accent
@@ -100,7 +97,6 @@ export function AgentCard({
             agent={agent}
             latestActivity={latestActivity}
             isStopped={isStopped}
-            isStoppingInFlight={isStoppingInFlight}
             createdCount={createdCount}
           />
         </span>
@@ -142,7 +138,7 @@ export function AgentCard({
             <span className="text-foreground-secondary">
               {agent.retryAttempt > 0 ? t("currentRetryAttempt", { count: agent.retryAttempt }) : t("currentAttempt")}
             </span>
-            <span className="text-foreground-muted">{statusLabel(agent, isStopped, isStoppingInFlight, t)}</span>
+            <span className="text-foreground-muted">{statusLabel(agent, isStopped, t)}</span>
           </div>
 
           {agent.instruction && (
@@ -166,10 +162,6 @@ export function AgentCard({
               {agent.errorMsg}
             </div>
           )}
-
-          {agent.budgetReached && (
-            <div className="mt-2 text-[11px] text-agent-data" title={t("rushedAgentTitle")}>{t("rushedAgent")}</div>
-          )}
         </div>
       </div>
     </div>
@@ -179,10 +171,8 @@ export function AgentCard({
 function statusLabel(
   agent: AgentState,
   isStopped: boolean,
-  isStopping: boolean,
   t: ReturnType<typeof useTranslations<"compose">>,
 ): string {
-  if (isStopping) return t("stoppingBare")
   if (isStopped) return t("stopped")
   if (agent.status === "error") return t("agentFailed")
   if (agent.status === "retrying") return t("retrying", { count: agent.retryAttempt })
@@ -195,19 +185,16 @@ function LatestActivityInline({
   agent,
   latestActivity,
   isStopped,
-  isStoppingInFlight,
   createdCount,
 }: {
   agent: AgentState
   latestActivity: AgentState["activity"][number] | null
   isStopped: boolean
-  isStoppingInFlight: boolean
   createdCount: number
 }) {
   const t = useTranslations("compose")
 
   if (isStopped) return <StateActivity icon={AlertCircle} label={t("stopped")} color={C.fgMuted} />
-  if (isStoppingInFlight) return <StateActivity icon={RefreshCw} label={t("stoppingBare")} color={STATE.retry} spin />
   if (agent.status === "error") return <StateActivity icon={AlertCircle} label={agent.errorMsg || t("agentFailed")} color={STATE.error} />
   if (agent.status === "retrying") return <StateActivity icon={RefreshCw} label={t("retrying", { count: agent.retryAttempt })} color={STATE.retry} spin />
 

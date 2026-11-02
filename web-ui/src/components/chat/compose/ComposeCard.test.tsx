@@ -80,26 +80,14 @@ describe("ComposeCard production board", () => {
     expect(screen.getAllByText("1/1 created")).toHaveLength(2)
   })
 
-  it("renders cancel only when all credentials are present", () => {
-    const { rerender } = renderWithIntl(
-      <ComposeCard input={twoGroups} isActive streamMessages={twoStarted} />
-    )
-    expect(screen.queryByLabelText("Cancel compose slides")).toBeNull()
-
-    rerender(
-      <ComposeCard
-        input={twoGroups}
-        isActive
-        streamMessages={twoStarted}
-        toolUseId="tu-123"
-        sessionId="sess-123"
-        accessToken="token-123"
-      />
-    )
-    expect(screen.getByLabelText("Cancel compose slides")).toBeTruthy()
+  it("has no stop control of its own: only lane toggles are buttons", () => {
+    renderWithIntl(<ComposeCard input={twoGroups} isActive streamMessages={twoStarted} />)
+    const buttons = screen.getAllByRole("button")
+    expect(buttons).toHaveLength(2)
+    buttons.forEach((button) => expect(button.getAttribute("aria-label")).toBe("Expand details"))
   })
 
-  it("shows rushed and real error states", () => {
+  it("shows real error state", () => {
     const { container } = renderWithIntl(
       <ComposeCard
         input={{ slide_groups: [{ slugs: ["intro"], instruction: "test" }] }}
@@ -107,27 +95,12 @@ describe("ComposeCard production board", () => {
         isActive={false}
         streamMessages={[
           { group: 1, status: "starting", total_groups: 1, slugs: "intro" },
-          { group: 1, status: "budget_reached", slugs: "intro" },
           { group: 1, status: "error", error: "API timeout", slugs: "intro" },
         ]}
       />
     )
     expect(container.textContent).toContain("Failed")
-    expect(container.textContent).toContain("rushed")
     expect((container.querySelector("section") as HTMLElement).style.background).toContain("--state-error")
-  })
-
-  it("renders StopSummary on soft stop", () => {
-    const { container } = renderWithIntl(
-      <ComposeCard
-        input={{ slide_groups: [{ slugs: ["intro"], instruction: "test" }] }}
-        isActive={false}
-        status="success"
-        result={{ stopped: true, notice: "Stopped by user", summaries: { "Group 1": "Completed intro" } }}
-        streamMessages={[{ group: 1, status: "done", slugs: "intro" }]}
-      />
-    )
-    expect(container.textContent).toContain("Stopped by user")
   })
 
   it("keeps lane order neutral and does not expose invented roles", () => {

@@ -9,7 +9,7 @@
 
 "use client"
 
-import { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback, useMemo } from "react"
+import { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
 import { loadRuntimeConfig } from "@/lib/runtimeConfig"
@@ -549,16 +549,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     })
   }, [configLoaded, hasReviewDrafts, handleSend, tReview])
 
-  // --- Compose in-flight detection (for stop tooltip) ---
-  const composeInFlight = useMemo(() => {
-    if (!stream.isLoading) return false
-    const last = stream.messages[stream.messages.length - 1]
-    if (!last || last.role !== "assistant") return false
-    const lastTool = last.toolUses[last.toolUses.length - 1]
-    if (!lastTool || lastTool.status) return false
-    return lastTool.name === "compose_slides" || lastTool.name.endsWith("_compose_slides")
-  }, [stream.isLoading, stream.messages])
-
   const isLoading = stream.isLoading || reconnectLoading || forkingSession !== null
 
   // Sync streaming flag and flush any deferred sessionId swap once
@@ -705,8 +695,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   attachments={msg.attachments}
                   isStreaming={stream.isLoading && i === stream.messages.length - 1}
                   idToken={auth.user?.id_token}
-                  accessToken={auth.user?.access_token}
-                  sessionId={sessionId}
                   onSend={(text: string) => handleSend(text, [], [], [])}
                   hearingDisabled={i < lastUserIdx}
                   deckId={deckId}
@@ -734,7 +722,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           deckId={deckId}
           onContinueFromSession={() => setSessionPickerOpen(true)}
           continueFromSessionDisabled={deckId !== "new" || stream.messages.length > 0}
-          stopTitle={composeInFlight ? t("forceStop") : undefined}
           slashItems={slashPickerItems.items}
           slashLoading={slashPickerItems.loading}
           onSlashOpen={slashPickerItems.ensure}
