@@ -1,0 +1,4 @@
+- [spec-first] Agree on the content first
+  - body: One supporting line, verbatim: "You approve each one before the next." Three short documents are agreed in this order before any slide is built: the Brief (who it is for, what they should do), the Style (how every slide looks), the Outline (one message per slide).
+  - visual: A three-step flow, Brief to Style to Outline, left to right, an icon and one short line per step.
+  - evidence: sdpm/references/workflows/orchestrator.md (specs in the order brief, style, outline); README.md "Spec first, then slides"

@@ -12,6 +12,12 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **`agent-spectrum` style.** A bundled concept style made to be watched rather than presented
+  (screen recordings, animated previews, README stills): a flat near-black ground, light type,
+  and the Web UI's five builder colours (blue, teal, violet, amber, pink) in a fixed order, used
+  only to tell the parts of a figure apart. Every slide carries a five-segment stripe; labels and
+  tags are monospaced at 16pt so they stay legible when a slide is shown at README width. The
+  README key visual is built in it.
 - **Comments on the preview.** Mark what to change directly on the slides and send it as one
   change request (修正依頼). Turn on the **Comment** tool from the preview header, with `C`,
   or from the button that appears when hovering a slide. Drag to outline an area, or click
@@ -41,6 +47,14 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **The README opens with the key visual.** An animation of the Web UI composing a seven-slide
+  deck about SDPM (in `agent-spectrum`), the install commands right under it, then the same
+  slide in seven bundled styles. The deck page, comment and Styles screenshots are retaken on
+  that deck, and its slides replace the old six-slide sample. The deck (with the layout-pass
+  version of each slide) and the scripts that build it through the Local server, replay the
+  builds in the Local Web UI and record the GIF are in `docs/assets/src/hero/`; the gallery is
+  built from `docs/assets/src/style-gallery/`. Both read the bundled styles at build time.
+  `README_ja.md` shows the Japanese deck.
 - **Documentation reorganized for first-time readers.** The README now shows example output
   and the three ways to use SDPM (your AI agent, the Web UI on your computer, a team server
   on AWS). `docs/en/getting-started.md` is the user guide; checkout setup and CDK deployment

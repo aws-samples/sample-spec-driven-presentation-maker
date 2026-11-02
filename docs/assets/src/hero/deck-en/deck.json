@@ -1,0 +1,14 @@
+{
+  "template": "blank-dark",
+  "fonts": {
+    "halfwidth": "Avenir Next",
+    "fullwidth": "Hiragino Sans"
+  },
+  "defaultTextColor": "#EEF0F4",
+  "slideSize": {
+    "width": 1920,
+    "height": 1080,
+    "ptPerPx": 0.5
+  },
+  "defaultBackground": "#0B0D12"
+}

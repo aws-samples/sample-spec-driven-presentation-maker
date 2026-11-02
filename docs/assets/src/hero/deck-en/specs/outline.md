@@ -1,0 +1,28 @@
+- [cover] Spec-Driven Presentation Maker
+  - body: The product name is the cover title. One supporting line, verbatim: "Decide what to say. AI builds how to show it." Nothing else competes with them; the reader knows in one glance what the tool is for.
+  - visual: A slide being assembled: a slide frame whose regions are dashed outlines in the five builder colours, each with its tag (title, step-1, step-2, step-3, takeaway); some regions already filled with their content, others still empty.
+  - evidence: brief.md (Flow 1); README.md tagline
+- [blank-slide] Stop starting from a blank slide
+  - body: One supporting line, verbatim: "Decide the message first; the layout follows." Two ways to start a deck side by side: pushing boxes around an empty canvas, or writing down what each slide must say and getting the slide built from it. No numbers and no claims about time saved.
+  - visual: A before-after. Before (muted): an empty slide canvas with alignment guides and a cursor nudging boxes. After: three short spec cards with an arrow into one finished slide.
+  - evidence: brief.md (Flow 2; generic framing, no numbers)
+- [spec-first] Agree on the content first
+  - body: One supporting line, verbatim: "You approve each one before the next." Three short documents are agreed in this order before any slide is built: the Brief (who it is for, what they should do), the Style (how every slide looks), the Outline (one message per slide).
+  - visual: A three-step flow, Brief to Style to Outline, left to right, an icon and one short line per step.
+  - evidence: sdpm/references/workflows/orchestrator.md (specs in the order brief, style, outline); README.md "Spec first, then slides"
+- [parallel-build] Then every slide is built at once
+  - body: One supporting line, verbatim: "First the frame for every slide, then several AI agents fill them at once." Two passes: one pass draws the frame and the regions of every slide, then several agents work in parallel, each filling its own slides.
+  - visual: Top: a row of wireframe slides with dashed regions, drawn by the layout pass. Below: lanes in the builder colours (the same colours as the Web UI's live preview), one lane per agent, each lane filling its slides; some slides finished, some still filling.
+  - evidence: sdpm/references/workflows/orchestrator.md (Delegation: layout pass, then content composers in parallel); README.md "Spec first, then slides"
+- [two-outputs] One spec, two decks
+  - body: One supporting line, verbatim: "An editable PowerPoint file, or an interactive HTML deck." The same spec becomes either output; the PowerPoint file is built on your template.
+  - visual: A branch: the spec (a document) in the middle, branching to a .pptx thumbnail (built on your template) on one side and a browser window holding a clickable deck on the other.
+  - evidence: README.md "PowerPoint or HTML"; sdpm/references/workflows/composer-html.md (HTML output, v0.11.0)
+- [fix-by-drawing] Point at what to change
+  - body: One supporting line, verbatim: "Draw frames, comment, send them as one request." On a slide preview the user draws two frames, A and B, writes a short generic comment for each, and sends both at once with Request changes.
+  - visual: A slide preview with two dashed frames tagged A and B, each joined to a short comment card, and a "Request changes" button that sends them together.
+  - evidence: README.md "Review by drawing on the slides"; CHANGELOG.md [Unreleased] "Comments on the preview" (#473)
+- [get-started] Try it in one command
+  - body: One supporting line, verbatim: "Then ask your AI agent, run `sdpm webui`, or deploy on AWS." The install one-liner, shortened to `curl -fsSL …/install.sh | bash` (the full line sits right below the GIF in the README), then the three ways to continue.
+  - visual: A command block with the one line, then three cards with an icon each: AI agent, Web UI, AWS.
+  - evidence: README.md Quick Start (install one-liner, next steps) and One-Click Deploy
