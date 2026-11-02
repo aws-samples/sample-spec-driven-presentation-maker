@@ -356,7 +356,6 @@ def _deck_format(deck_id: str) -> str:
         return "pptx"
     if not isinstance(deck_json, dict):
         logger.warning("deck.json of %s is not an object, treating it as PPTX", deck_id)
-        return "pptx"
     return deck_output_format(deck_json)
 
 
@@ -436,7 +435,7 @@ def start_composing(
     """
     import tempfile
 
-    from sdpm.engine.schema import deck_output_format
+    from sdpm.engine.schema import read_deck_format
     from sdpm.entry import start_composing as _start
 
     if not deck_id or not deck_id.strip():
@@ -448,10 +447,10 @@ def start_composing(
         _materialize_deck(deck_id, root)
         if mode == "html":
             try:
-                deck_json = json.loads((root / "deck.json").read_text(encoding="utf-8"))
-                is_html = deck_output_format(deck_json) == "html"
-            except Exception:  # the core reports an unreadable / invalid deck.json
-                deck_json, is_html = {}, False
+                is_html = read_deck_format(root) == "html"
+            except ValueError:  # the core reports an invalid outputFormat
+                is_html = False
+            deck_json = json.loads((root / "deck.json").read_text(encoding="utf-8")) if is_html else {}
             template_html = _template_html(deck_id, deck_json, root) if is_html else None
             payload = _start(root, assigned_slugs, deck_id=deck_id, template_html=template_html, mode="html")
             return json.dumps(payload, ensure_ascii=False)

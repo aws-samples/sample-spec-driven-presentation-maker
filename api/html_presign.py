@@ -93,8 +93,13 @@ def presigned_html_url(client: Any, bucket: str, key: str, purpose: str, deck_na
 
 
 def is_html_deck(deck_json: Any) -> bool:
-    """True when deck.json declares outputFormat "html" (absent or anything else → PPTX)."""
-    return isinstance(deck_json, dict) and deck_json.get("outputFormat") == "html"
+    """True when deck.json declares outputFormat "html" (absent, invalid or not an object → PPTX)."""
+    from sdpm.engine.schema import deck_output_format
+
+    try:
+        return deck_output_format(deck_json) == "html"
+    except ValueError:  # an invalid outputFormat keeps the PPTX view; the builds report it
+        return False
 
 
 def slide_size(deck_json: Any) -> Dict[str, Any]:

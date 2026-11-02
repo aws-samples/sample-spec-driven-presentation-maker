@@ -79,16 +79,12 @@ def _html_deck_dir(input_path):
     An unreadable deck.json keeps the PPTX path; an explicit invalid outputFormat stops the
     command with exit code 1.
     """
-    from sdpm.engine.schema import deck_output_format
+    from sdpm.engine.schema import read_deck_format
 
     if not input_path or input_path == "-" or not Path(input_path).is_dir():
         return None
     try:
-        deck_json = read_json(Path(input_path) / "deck.json")
-    except (OSError, ValueError):
-        return None
-    try:
-        output_format = deck_output_format(deck_json)
+        output_format = read_deck_format(input_path)
     except ValueError as e:
         print(f"Error: {e}", file=sys.stderr)
         sys.exit(1)

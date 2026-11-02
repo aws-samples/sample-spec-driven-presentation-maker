@@ -4,8 +4,10 @@
 
 from __future__ import annotations
 
+import json
 import re
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Literal
 
 from sdpm.engine.schema.lint_outline import lint_outline
@@ -73,12 +75,29 @@ def is_html_build_input(rel: str) -> bool:
     return rel in _HTML_BUILD_FILES or bool(_HTML_SLIDE_RE.match(rel))
 
 
-def deck_output_format(deck_json: dict) -> Literal["pptx", "html"]:
-    """Return the deck's output format: "pptx" when outputFormat is absent or None.
+_PPTX_BUILD_FILES = frozenset({"deck.json", "presentation.json", "specs/outline.md"})
+
+
+def is_pptx_build_input(rel: str) -> bool:
+    """True when a deck-relative path is an input of the PPTX build (a rebuild is due).
+
+    deck.json, presentation.json, specs/outline.md, slides/* and includes/*.
+    """
+    rel = (rel or "").replace("\\", "/")
+    if rel.startswith("./"):
+        rel = rel[2:]
+    return rel in _PPTX_BUILD_FILES or rel.startswith(("slides/", "includes/"))
+
+
+def deck_output_format(deck_json: Any) -> Literal["pptx", "html"]:
+    """Return the deck's output format: "pptx" when outputFormat is absent or None, or
+    when deck.json is not an object.
 
     Raises ValueError naming the value when outputFormat is anything other than
     "pptx" or "html".
     """
+    if not isinstance(deck_json, dict):
+        return "pptx"
     value = deck_json.get("outputFormat")
     if value is None:
         return "pptx"
@@ -87,6 +106,20 @@ def deck_output_format(deck_json: dict) -> Literal["pptx", "html"]:
     if value == "html":
         return "html"
     raise ValueError(f'deck.json outputFormat must be "pptx" or "html", got {value!r}')
+
+
+def read_deck_format(deck_dir: str | Path) -> Literal["pptx", "html"]:
+    """Output format of the deck in ``deck_dir``, read from its deck.json.
+
+    "pptx" when deck.json is missing, unreadable, not JSON or not an object (the PPTX
+    build then reports the problem). Raises ValueError for an explicit invalid
+    outputFormat, which stops every build.
+    """
+    try:
+        deck_json = json.loads((Path(deck_dir) / "deck.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "pptx"
+    return deck_output_format(deck_json)
 
 
 def _is_non_empty(value: object) -> bool:

@@ -29,20 +29,6 @@ def _rejection_message(violations: list[str]) -> str:
     return "\n".join(lines)
 
 
-def _deck_format(deck_dir: Path) -> str:
-    """deck.json outputFormat; "pptx" when deck.json is unreadable.
-
-    Raises ValueError for an explicit invalid value; run_python then stops before any build.
-    """
-    from sdpm.engine.schema import deck_output_format
-
-    try:
-        deck_json = json.loads((deck_dir / "deck.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return "pptx"
-    return deck_output_format(deck_json) if isinstance(deck_json, dict) else "pptx"
-
-
 def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
     """Snapshot (mtime_ns, size) of files that affect the built PPTX.
 
@@ -51,9 +37,11 @@ def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
     included because slide order comes from the outline. HTML decks also
     watch slides/*.html, specs/art-direction.html and deck.css (output.html).
     """
+    from sdpm.engine.schema import read_deck_format
+
     snap: dict[str, tuple[int, int]] = {}
     try:
-        html_deck = _deck_format(deck_dir) == "html"
+        html_deck = read_deck_format(deck_dir) == "html"
     except ValueError:
         html_deck = False
     rels = ["deck.json", "presentation.json", "specs/outline.md"]
@@ -203,8 +191,10 @@ def run_python(
                 "Read workflow `orchestrator` for the outline format."
             )
 
+    from sdpm.engine.schema import read_deck_format
+
     try:
-        deck_format = _deck_format(deck_dir)
+        deck_format = read_deck_format(deck_dir)
     except ValueError as e:
         # An explicit invalid outputFormat stops the build: no PPTX is produced.
         result.setdefault("errors", {})["outputFormat"] = str(e)

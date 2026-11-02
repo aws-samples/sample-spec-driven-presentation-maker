@@ -149,14 +149,9 @@ def _is_html_deck(deck_id: str) -> bool:
 
     Raises ValueError when deck.json names an invalid outputFormat.
     """
-    from sdpm.engine.schema import deck_output_format
-    from sdpm.utils.io import read_json
+    from sdpm.engine.schema import read_deck_format
 
-    try:
-        deck_json = read_json(Path(deck_id) / "deck.json")
-    except (OSError, ValueError):
-        return False
-    return isinstance(deck_json, dict) and deck_output_format(deck_json) == "html"
+    return read_deck_format(deck_id) == "html"
 
 
 def generate_pptx(deck_id: Annotated[str, Field(description='Deck directory path.')]) -> dict[str, Any]:

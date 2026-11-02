@@ -1582,12 +1582,11 @@ def load_slides_json_or_pptx(path) -> dict:
 
     path_obj = Path(path)
     if path_obj.is_dir():
-        from sdpm.engine.schema import deck_output_format
+        from sdpm.engine.schema import read_deck_format
 
-        deck_json = path_obj / "deck.json"
         try:
-            is_html = deck_output_format(json.loads(deck_json.read_text(encoding="utf-8"))) == "html"
-        except (OSError, ValueError):  # unreadable or invalid: the build below reports it
+            is_html = read_deck_format(path_obj) == "html"
+        except ValueError:  # invalid outputFormat: the build below reports it
             is_html = False
         if is_html:
             raise ValueError("diff_pptx / hand-edit sync support PPTX decks only; this deck has outputFormat html")
