@@ -2753,12 +2753,22 @@ def promote_effect_options(
         measured behaviours, so there is nothing to compare. The subtype the
         catalog already holds from native fixtures identifies the value instead,
         and only when it matches **exactly one** of them.
+    ``siblingSetting``
+        Neither worked, but **another setting of the same effect** resolved its
+        own default — and pressing a setting's default value leaves the effect
+        at the tile's default, so that value's bytes *are* the tile's bytes.
+        Comparing against them resolves what the tile alone could not.
+
+        This is what settles ``Shape``'s ``Shapes``. Its four values all carry
+        the tile's subtype, because the shape lives in ``p:animEffect/@filter``
+        rather than in the subtype, and ``Shape`` is one of the 19 tiles with no
+        measured behaviours of its own. But its ``Direction`` default resolved
+        to ``in``, and ``direction=in`` measured ``circle(in)`` — identical to
+        ``shapes=circle``. So Circle is the default, derived from measurement
+        rather than assumed.
+
     ``None``
-        Neither worked, and the catalog says so rather than picking. This is the
-        honest answer for ``Shape``'s ``Shapes`` setting, whose four values all
-        carry the tile's subtype because the shape lives in
-        ``p:animEffect/@filter`` — without the tile's behaviours there is no way
-        to tell which of Box, Circle, Diamond and Plus is the default.
+        None of the three worked, and the catalog says so rather than picking.
     """
     ooxml = entry.get("ooxml")
     if not isinstance(ooxml, dict) or entry.get("status") != "accepted":
@@ -2815,6 +2825,8 @@ def promote_effect_options(
             "values": values,
         }
 
+    _resolve_default_from_sibling(options)
+
     ooxml["effectOptions"] = options
     # Measured one setting at a time: each value was applied with every *other*
     # setting left at its default. For the four effects offering two settings at
@@ -2853,6 +2865,64 @@ def promote_effect_options(
         ),
     }
     return entry
+
+
+def _behaviour_signature(behaviors: list[dict[str, Any]]) -> str:
+    """The part of a behaviour list that identifies a value, timings excluded.
+
+    ``dur`` and ``delay`` are left out because they belong to the duration the
+    capture ran at, and two captures of the same effect at different durations
+    would otherwise look like different values.
+    """
+    return json.dumps(
+        [
+            {
+                "element": behavior.get("element"),
+                "attributes": behavior.get("attributes") or {},
+                "attrNames": behavior.get("attrNames") or [],
+                "values": behavior.get("values") or {},
+            }
+            for behavior in behaviors
+        ],
+        sort_keys=True,
+    )
+
+
+def _resolve_default_from_sibling(options: dict[str, Any]) -> None:
+    """Resolve a setting's default from another setting of the same effect.
+
+    Pressing a setting's **default** value leaves the effect exactly as pressing
+    the tile alone does, so a resolved default's bytes are the tile's bytes.
+    That makes it a usable reference for a sibling setting the tile itself could
+    not resolve — which is the only way ``Shape``'s ``Shapes`` can be resolved
+    at all, since ``Shape`` has no measured behaviours and all four of its
+    shapes carry the tile's subtype.
+    """
+    references = [
+        option["values"][option["default"]]
+        for option in options.values()
+        if option.get("default") and option.get("defaultResolvedBy") in ("signature", "presetSubtype")
+    ]
+    if not references:
+        return
+    signatures = {_behaviour_signature(reference.get("behaviors") or []) for reference in references}
+    if len(signatures) != 1:
+        # Two settings disagree about what the tile's default bytes are, so
+        # neither can serve as a reference. Nothing is resolved rather than
+        # picking one.
+        return
+    (reference_signature,) = signatures
+    for option in options.values():
+        if option.get("default") is not None:
+            continue
+        matches = [
+            value
+            for value, measured in option["values"].items()
+            if _behaviour_signature(measured.get("behaviors") or []) == reference_signature
+        ]
+        if len(matches) == 1:
+            option["default"] = matches[0]
+            option["defaultResolvedBy"] = "siblingSetting"
 
 
 def promote_all_effect_options(

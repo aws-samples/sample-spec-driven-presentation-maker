@@ -1838,3 +1838,162 @@ def test_a_retired_scripting_direction_name_is_refused_with_the_reason():
         _options_slide(
             {"category": "entrance", "effect": "flyIn", "options": {"direction": "right"}}
         )
+
+
+def test_every_measured_effect_option_reads_back_as_itself():
+    """All 133 round-trip, which needs two different ways of recognising one.
+
+    87 of them change `presetSubtype` and are found by it. The other 46 do not:
+    Spin's two directions are both subtype 0, Grow/Shrink's amounts differ only
+    in `p:animScale/p:by`, Transparency's in `p:animEffect/@prLst`. Those are
+    found by comparing the behaviours, which is exact rather than approximate
+    because the writer transcribes them.
+
+    A value equal to its effect's default reads back **without** `options`, and
+    that counts as a round-trip: it is the same JSON that was written.
+    """
+    from sdpm.engine.timing import load_capability_index
+
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    explicit = 0
+    as_default = 0
+    failures: list[str] = []
+    for entry in sorted(index.items.values(), key=lambda e: e.key):
+        options = entry.ooxml.get("effectOptions")
+        if not options:
+            continue
+        semantic = (
+            (entry.semantic.get("animations") or {}).get("mainSequence") or [{}]
+        )[0].get("preset") or {}
+        for setting, option in sorted(options.items()):
+            for value in sorted((option.get("values") or {})):
+                _node, motion = _options_slide(
+                    {
+                        "category": semantic.get("category"),
+                        "effect": semantic.get("effect"),
+                        "options": {setting: value},
+                    }
+                )
+                effects = (motion.animations or {}).get("mainSequence") or []
+                if not effects:
+                    failures.append(f"{entry.key} {setting}={value}: did not import at all")
+                    continue
+                got = effects[0]["preset"].get("options")
+                if got == {setting: value}:
+                    explicit += 1
+                elif got is None and value == option.get("default"):
+                    as_default += 1
+                else:
+                    failures.append(f"{entry.key} {setting}={value}: read {got}")
+    assert not failures, failures
+    assert explicit + as_default == 133, (explicit, as_default)
+    assert as_default == 37, f"one default per setting, got {as_default}"
+
+
+def test_an_option_only_the_behaviours_identify_reads_back():
+    """The cases the subtype cannot distinguish, named individually.
+
+    Each of these pairs carries one `presetSubtype` across both values, so
+    before the behaviour comparison they imported as the effect's default and
+    the asked-for value was lost.
+    """
+    for preset, option in (
+        ({"category": "emphasis", "effect": "spin"}, {"direction": "counterclockwise"}),
+        ({"category": "emphasis", "effect": "spin"}, {"amount": "twoSpins"}),
+        ({"category": "emphasis", "effect": "growShrink"}, {"direction": "vertical"}),
+        ({"category": "emphasis", "effect": "growShrink"}, {"amount": "tiny"}),
+        ({"category": "emphasis", "effect": "transparency"}, {"amount": "percent25"}),
+        ({"category": "entrance", "effect": "floatIn"}, {"direction": "floatDown"}),
+        ({"category": "exit", "effect": "floatOut"}, {"direction": "floatUp"}),
+        ({"category": "entrance", "effect": "shape"}, {"shapes": "diamond"}),
+        ({"category": "exit", "effect": "shape"}, {"shapes": "plus"}),
+    ):
+        _node, motion = _options_slide({**preset, "options": option})
+        effects = (motion.animations or {}).get("mainSequence") or []
+        assert effects, f"{preset} {option} did not import"
+        assert effects[0]["preset"].get("options") == option, (
+            f"{preset} {option} read {effects[0]['preset'].get('options')}"
+        )
+
+
+def test_an_effect_asked_for_without_options_never_reads_back_with_them():
+    """The behaviour comparison must not label a plain effect.
+
+    A setting's default has the same bytes as the effect alone, so registering
+    it for comparison would make every plain preset read back carrying an
+    option it was not asked for — and the 248 invertible catalog entries would
+    stop round-tripping. The default is excluded for exactly that reason, and
+    this is the guard.
+    """
+    from sdpm.engine.timing import MotionWriteError, load_capability_index
+
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    labelled: list[str] = []
+    checked = 0
+    for entry in sorted(index.items.values(), key=lambda e: e.key):
+        if not entry.ooxml.get("effectOptions"):
+            continue
+        semantic = (
+            (entry.semantic.get("animations") or {}).get("mainSequence") or [{}]
+        )[0].get("preset") or {}
+        try:
+            _node, motion = _options_slide(
+                {"category": semantic.get("category"), "effect": semantic.get("effect")}
+            )
+        except MotionWriteError:
+            # Eight exit tiles need an explicit duration to derive the
+            # visibility delay. Unrelated to options, and covered by accept.py
+            # through the catalog's own examples, which carry one.
+            continue
+        effects = (motion.animations or {}).get("mainSequence") or []
+        checked += 1
+        if effects and effects[0]["preset"].get("options") is not None:
+            labelled.append(f"{entry.key}: read {effects[0]['preset']['options']}")
+    assert not labelled, labelled
+    assert checked >= 17, f"only {checked} plain forms were exercised"
+
+
+def test_shape_takes_its_default_from_its_sibling_setting():
+    """Circle is derived from measurement, not assumed.
+
+    `Shape` has no measured behaviours of its own and all four of its shapes
+    carry the tile's subtype, because the shape lives in
+    `p:animEffect/@filter`. So neither the signature nor the subtype rule can
+    say which is the default. Its `Direction` default did resolve, and pressing
+    a setting's default leaves the effect at the tile's default — so
+    `direction=in`'s bytes are the tile's bytes, and they are `circle(in)`.
+    """
+    from sdpm.engine.timing import load_capability_index
+
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    for key, direction in (
+        ("animation.gallery.entrance.shape", "in"),
+        ("animation.gallery.exit.shape", "out"),
+    ):
+        options = index.items[key].ooxml["effectOptions"]
+        assert options["direction"]["default"] == direction
+        shapes = options["shapes"]
+        assert shapes["default"] == "circle"
+        assert shapes["defaultResolvedBy"] == "siblingSetting"
+        # The derivation itself: the sibling default and circle are the same bytes.
+        reference = options["direction"]["values"][direction]["behaviors"]
+        assert [
+            b.get("attributes", {}).get("filter") for b in reference
+        ] == [
+            b.get("attributes", {}).get("filter")
+            for b in shapes["values"]["circle"]["behaviors"]
+        ]
+    # And every setting now has a default, so nothing is left unresolvable.
+    unresolved = [
+        f"{entry.key} {setting}"
+        for entry in index.items.values()
+        for setting, option in (entry.ooxml.get("effectOptions") or {}).items()
+        if option.get("default") is None
+    ]
+    assert not unresolved, unresolved

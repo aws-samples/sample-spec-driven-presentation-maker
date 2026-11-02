@@ -20793,8 +20793,8 @@
           },
           "shapes": {
             "setting": "Shapes",
-            "default": null,
-            "defaultResolvedBy": null,
+            "default": "circle",
+            "defaultResolvedBy": "siblingSetting",
             "values": {
               "box": {
                 "label": "Box",
@@ -40406,8 +40406,8 @@
           },
           "shapes": {
             "setting": "Shapes",
-            "default": null,
-            "defaultResolvedBy": null,
+            "default": "circle",
+            "defaultResolvedBy": "siblingSetting",
             "values": {
               "box": {
                 "label": "Box",

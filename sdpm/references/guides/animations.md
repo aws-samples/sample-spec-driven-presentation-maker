@@ -363,11 +363,16 @@ labels the tiles do offer have no name in it, and the same label means different
 different effects. Writing `variant` now fails with a pointer to `options`, and one of its old
 names fails with the reason.
 
-On import, 111 of the 133 read back as the option they were written from. The other 22 are the
-settings PowerPoint persists **only** in the behaviour payload, leaving `presetSubtype`
-unchanged — Spin's two directions are both subtype 0 — so the identifier the reader matches on
-cannot tell them apart. Those import as the effect at its default rather than as a guess; the
-XML is still read, and nothing is lost but the label.
+All 133 round-trip. Import recognises an option two ways, because one is not enough: 87 change
+`presetSubtype` and are found by it, and the other 46 do not — Spin's two directions are both
+subtype 0, Grow/Shrink's amounts differ only in `p:animScale/p:by`, Transparency's in
+`p:animEffect/@prLst` — so those are found by comparing the behaviours. The comparison is an
+exact match on the measured bytes, not a nearest one, because the writer transcribes them.
+
+A value that **is** its effect's default reads back without `options`, which is the same JSON
+it was written from. That is also why a default is never matched by behaviour: it has the same
+bytes as the effect alone, so matching it would label every plain preset with an option nobody
+asked for.
 
 A `media` command other than `mediaPlay`, and a custom motion path, are still refused by name
 rather than approximated. Asking for one fails with its catalog key:
@@ -585,8 +590,9 @@ part sdpm does not understand would be silent data loss.
 
 Recognized semantically today: slide transitions with their catalogued option sets and all
 three Morph variants, duration, advance-on-click and advance-after-time, `morphId`, the
-authorable entrance/exit/media presets, the 111 effect-option values whose `presetSubtype`
-identifies them (read back as `preset.options`), main and interactive
+authorable entrance/exit/media presets, all 133 effect-option values (read back as
+`preset.options`, by subtype where it identifies them and by behaviour comparison where it
+does not), main and interactive
 sequences and their order, the four writable triggers, delay, duration, repeat count, repeat
 duration, auto-reverse, acceleration, deceleration, restart, catalogued paragraph builds, and
 stable effect IDs.
@@ -595,10 +601,8 @@ Kept as raw rather than semantic JSON — preserved and replayable, but not auth
 
 - a preset the catalog records as capture-required (reading it semantically would produce
   JSON the writer then refuses, so the round-trip would break on content the file carried);
-- an effect option PowerPoint persists only in the behaviour payload, leaving `presetSubtype`
-  at the tile's own value — 22 of the 133, such as Spin's two directions, which are both
-  subtype 0 and differ in the sign of `p:animRot/@by`. These import as the effect at its
-  default: the XML is read, only the option's name is not recovered;
+- an effect whose behaviours match no measured form at all — a hand-edited payload, or one
+  from a PowerPoint build this catalog was not measured against;
 - an effect with no `presetClass` / `presetID` — an explicit behavior list whose payload sdpm
   does not invert;
 - behaviors that do not match the catalog entry's recorded children exactly, or whose

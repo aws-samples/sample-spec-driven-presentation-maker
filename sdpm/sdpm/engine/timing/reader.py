@@ -240,6 +240,11 @@ class _Reverse:
     preset_options: Mapping[tuple[str, str, str], tuple[Any, str, str]] = field(
         default_factory=dict
     )
+    #: ``(presetClass, presetID, presetSubtype, payload) -> (entry, setting, value)``
+    #: for the options no subtype identifies, matched on the behaviours instead.
+    preset_option_payloads: Mapping[
+        tuple[str, str, str, tuple[Any, ...]], tuple[Any, str, str]
+    ] = field(default_factory=dict)
 
 
 def _preference(entry: Any) -> tuple[int, int, str]:
@@ -262,6 +267,9 @@ def reverse_index(index: CapabilityIndex) -> _Reverse:
     """Return (and cache) the OOXML → semantic lookups for one catalog."""
     presets: dict[tuple[str, str, str], Any] = {}
     preset_options: dict[tuple[str, str, str], tuple[Any, str, str]] = {}
+    preset_option_payloads: dict[
+        tuple[str, str, str, tuple[Any, ...]], tuple[Any, str, str]
+    ] = {}
     transitions: dict[tuple[str, tuple[tuple[str, str], ...]], Any] = {}
     for entry in sorted(
         [*index.items.values(), *index.candidates.values()], key=_preference
@@ -302,6 +310,10 @@ def reverse_index(index: CapabilityIndex) -> _Reverse:
                 preset_options.setdefault(
                     (one, str(ooxml["presetId"]), subtype), (entry, setting, value)
                 )
+            for setting, value, subtype, payload in _option_payloads(ooxml):
+                preset_option_payloads.setdefault(
+                    (one, str(ooxml["presetId"]), subtype, payload), (entry, setting, value)
+                )
     requires = tuple(
         str(row.get("requires"))
         for row in index.alternate_content.get("supported", ())
@@ -312,7 +324,164 @@ def reverse_index(index: CapabilityIndex) -> _Reverse:
         transitions=transitions,
         requires=requires,
         preset_options=preset_options,
+        preset_option_payloads=preset_option_payloads,
     )
+
+
+#: Attributes a payload signature leaves out, because the writer is allowed to
+#: change them: ``id`` is allocated per document, and ``dur``/``delay`` scale
+#: with the requested effect duration. Everything else is transcribed verbatim
+#: from the capture, which is what makes the comparison exact rather than
+#: approximate.
+_VOLATILE_ATTRS = frozenset({"id", "dur", "delay"})
+
+
+def _subtree_signature(node: Mapping[str, Any]) -> tuple[Any, ...]:
+    """Signature of a measured ``{element, attributes, children}`` value subtree."""
+    return (
+        str(node.get("element", "")).split(":")[-1],
+        tuple(
+            sorted(
+                (str(name), str(value))
+                for name, value in (node.get("attributes") or {}).items()
+                if name not in _VOLATILE_ATTRS
+            )
+        ),
+        tuple(_subtree_signature(child) for child in node.get("children") or ()),
+    )
+
+
+def _catalog_payload(behaviors: Sequence[Mapping[str, Any]]) -> tuple[Any, ...]:
+    """Signature of an effect's behaviours as the catalog records them.
+
+    Local names only, without the namespace prefix, so this agrees with the
+    signature taken from XML without the reader having to invert lxml's prefix
+    map. Two value elements that differ only by namespace would collide, and
+    none do: the point is to tell one measured value of one setting from
+    another, and those differ in ``@by``, ``@filter``, ``@prLst`` or a keyframe.
+    """
+    return tuple(
+        (
+            str(behavior.get("element", "")).split(":")[-1],
+            tuple(
+                sorted(
+                    (str(name), str(value))
+                    for name, value in (behavior.get("attributes") or {}).items()
+                    if name not in _VOLATILE_ATTRS
+                )
+            ),
+            tuple(str(name) for name in behavior.get("attrNames") or ()),
+            tuple(
+                _subtree_signature((behavior.get("values") or {})[key])
+                # The writer appends these in this order, so the XML side can
+                # walk children in document order and agree.
+                for key in ("to", "from", "by", "tavLst")
+                if (behavior.get("values") or {}).get(key) is not None
+            ),
+        )
+        for behavior in behaviors
+    )
+
+
+def _xml_subtree_signature(node: etree._Element) -> tuple[Any, ...]:
+    return (
+        _local(node),
+        tuple(
+            sorted(
+                (str(name), str(value))
+                for name, value in node.attrib.items()
+                if name not in _VOLATILE_ATTRS
+            )
+        ),
+        tuple(
+            _xml_subtree_signature(child)
+            for child in node
+            if isinstance(child.tag, str)
+        ),
+    )
+
+
+def _xml_payload(children: etree._Element) -> tuple[Any, ...]:
+    """Signature of what was actually written, comparable with :func:`_catalog_payload`."""
+    out: list[tuple[Any, ...]] = []
+    for node in children:
+        if not isinstance(node.tag, str):
+            continue
+        carrier = _child(node, "cBhvr")
+        names: list[str] = []
+        if carrier is not None:
+            name_list = _child(carrier, "attrNameLst")
+            if name_list is not None:
+                names = [(child.text or "") for child in name_list if isinstance(child.tag, str)]
+        out.append(
+            (
+                _local(node),
+                tuple(
+                    sorted(
+                        (str(name), str(value))
+                        for name, value in node.attrib.items()
+                        if name not in _VOLATILE_ATTRS
+                    )
+                ),
+                tuple(names),
+                tuple(
+                    _xml_subtree_signature(child)
+                    for child in node
+                    if isinstance(child.tag, str) and _local(child) != "cBhvr"
+                ),
+            )
+        )
+    return tuple(out)
+
+
+def _option_payloads(
+    ooxml: Mapping[str, Any],
+) -> list[tuple[str, str, str, tuple[Any, ...]]]:
+    """Return ``(setting, value, subtype, payload)`` for options only a payload identifies.
+
+    9 of the 37 measured groups never move ``presetSubtype``: Spin's two
+    directions are both 0 and differ in the sign of ``p:animRot/@by``,
+    Grow/Shrink's amounts differ in ``p:animScale/p:by``, Transparency's in
+    ``p:animEffect/@prLst``. The subtype cannot tell those apart, so the
+    behaviours are compared instead — and because the writer transcribes them,
+    the comparison is exact rather than a nearest match.
+
+    The setting's **default** value is left out. Its payload is what a plain
+    effect writes, so registering it would make an effect asked for without
+    options read back with them, and every existing preset entry would stop
+    round-tripping. A setting whose default could not be resolved is left out
+    entirely for the same reason: without knowing which payload is the default
+    there is no way to avoid labelling it.
+    """
+    options = ooxml.get("effectOptions")
+    if not isinstance(options, Mapping):
+        return []
+    rows: list[tuple[str, str, str, tuple[Any, ...]]] = []
+    for setting, option in options.items():
+        default = option.get("default")
+        if default is None:
+            continue
+        values = option.get("values") or {}
+        subtypes = {measured.get("presetSubtype") for measured in values.values()}
+        if len(values) < 2 or len(subtypes) > 1:
+            # The subtype already identifies these, and that path is cheaper
+            # and does not depend on the behaviours surviving unchanged.
+            continue
+        for value, measured in values.items():
+            if value == default:
+                continue
+            behaviors = measured.get("behaviors") or []
+            if not behaviors:
+                continue
+            rows.append(
+                (
+                    str(setting),
+                    str(value),
+                    str(measured.get("presetSubtype")),
+                    _catalog_payload(behaviors),
+                )
+            )
+    return rows
 
 
 def _option_subtypes(ooxml: Mapping[str, Any]) -> list[tuple[str, str, str]]:
@@ -1064,11 +1233,13 @@ class _TimingReader:
         _only_children(ctn, {"stCondLst", "childTnLst"}, f"{sequence} effect p:cTn")
         node_type = attrs.get("nodeType")
         start_type = self._start_type(node_type, interactive, click_index, opens_click_group)
-        entry, options = self._preset_entry(attrs, sequence)
-        preset = dict(_semantic_preset(entry) or {})
         behaviors = _child(ctn, "childTnLst")
         if behaviors is None:
             raise _Unsupported(f"{sequence} effect has no p:childTnLst behaviors")
+        # Resolved after the behaviours are in hand, not before: an option the
+        # subtype cannot identify is found by comparing them.
+        entry, options = self._preset_entry(attrs, sequence, behaviors)
+        preset = dict(_semantic_preset(entry) or {})
         target, duration = self._read_behaviors(behaviors, entry, preset, sequence)
         grp_id = int(attrs.get("grpId", 0))
         self._preset_build[(self._spid_of(target), grp_id)] = _animates_background(entry)
@@ -1108,7 +1279,10 @@ class _TimingReader:
         raise _Unsupported(f"effect p:cTn has unsupported nodeType {node_type!r}")
 
     def _preset_entry(
-        self, attrs: Mapping[str, str], sequence: str
+        self,
+        attrs: Mapping[str, str],
+        sequence: str,
+        children: etree._Element | None = None,
     ) -> tuple[Any, dict[str, str] | None]:
         """Return the catalog entry for these preset attributes, and the option they name.
 
@@ -1134,6 +1308,11 @@ class _TimingReader:
                 f"presetID={preset_id!r} presetSubtype={attrs.get('presetSubtype', '0')!r}"
             )
         found = self.reverse.preset_options.get(token)
+        if found is None and children is not None:
+            # No subtype says which option this is, so the behaviours do. The
+            # writer transcribes them, so a hit here is an exact match on the
+            # measured bytes rather than a nearest guess.
+            found = self.reverse.preset_option_payloads.get((*token, _xml_payload(children)))
         if found is None:
             return entry, None
         _owner, setting, value = found
