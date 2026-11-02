@@ -176,6 +176,18 @@ Entries before v0.5.0 were written retroactively as summaries.
   together with the `include=slideJson` option of `GET /decks/{id}` (now ignored), the local
   Web UI's `/api/agent/config` route and the API Lambda's direct document-parser
   dependencies. The Web UI used none of them. (#478)
+- **The compose card's own stop button.** The **Cancel** button on the compose card (Cloud
+  only), its "Stopping…" state and the summary of what each composer did before stopping are
+  gone. To stop, use the main stop button next to the chat input: it stops the whole turn,
+  compose included (Cloud ends the runtime session, Local sends ACP `session/cancel`). Its
+  tooltip no longer changes to "Force stop" while slides are being composed. The cancel used a
+  marker file written into the agent's microVM through the runtime's `/commands` API, and the
+  agent told the composers to stop through a special tool result; both side channels are
+  removed, and the `compose_slides` report no longer has a `cancelled` status.
+- **The composers' per-slide time budget.** Composers no longer get a deadline (90 s per slide,
+  `COMPOSER_SECONDS_PER_SLIDE`) or the "Time budget reached" notice that told them to stop
+  polishing, and the compose card no longer shows composers as "rushed". The runaway guards
+  stay: a composer is still stopped after 5 consecutive tool errors or a tool-call loop / cap.
 
 ### Fixed
 

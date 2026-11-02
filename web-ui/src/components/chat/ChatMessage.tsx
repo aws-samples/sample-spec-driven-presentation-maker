@@ -175,10 +175,6 @@ interface ChatMessageProps {
   isStreaming?: boolean
   /** Cognito ID token for fetching slide previews. */
   idToken?: string
-  /** Session ID — forwarded to ComposeCard for soft-stop calls. */
-  sessionId?: string
-  /** Cognito Access Token — forwarded to ComposeCard for soft-stop (client_id claim lives on the access token). */
-  accessToken?: string
   /** Callback to send a message (used by HearingCard). */
   onSend?: (text: string) => void
   /** Whether hearing cards should be disabled (a new message was sent). */
@@ -187,7 +183,7 @@ interface ChatMessageProps {
   deckId?: string
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, sessionId, accessToken, onSend, hearingDisabled = false, deckId }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, onSend, hearingDisabled = false, deckId }: ChatMessageProps) {
   const t = useTranslations("chat")
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
@@ -339,15 +335,12 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 <ToolCard
                   key={block.tool.toolUseId}
                   name={block.tool.name}
-                  toolUseId={block.tool.toolUseId}
                   input={block.tool.input}
                   status={block.tool.status}
                   result={block.tool.result}
                   isActive={isStreaming && !block.tool.status && (i === blocks.length - 1 || (block.tool.streamMessages?.length ?? 0) > 0)}
                   streamMessages={block.tool.streamMessages}
-                  sessionId={sessionId}
                   idToken={idToken}
-                  accessToken={accessToken}
                 />
               )
             )}
@@ -391,15 +384,12 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 {latestTool && (
                   <ToolCard
                     name={latestTool.name}
-                    toolUseId={latestTool.toolUseId}
                     input={latestTool.input}
                     status={latestTool.status}
                     result={latestTool.result}
                     isActive={isStreaming && !latestTool.status}
                     streamMessages={latestTool.streamMessages}
-                    sessionId={sessionId}
                     idToken={idToken}
-                    accessToken={accessToken}
                   />
                 )}
                 {olderTools.length > 0 && (

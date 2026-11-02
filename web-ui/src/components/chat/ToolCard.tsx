@@ -171,13 +171,8 @@ interface ToolCardProps {
   isActive?: boolean
   /** Streaming progress events from tool execution. */
   streamMessages?: Record<string, unknown>[]
-  /** tool use id — forwarded to ComposeCard for soft-stop. */
-  toolUseId?: string
-  /** Session ID — forwarded to ComposeCard for soft-stop. */
-  sessionId?: string
-  /** Auth token — forwarded to ComposeCard (ID token: previews) / (Access token: cancel). */
+  /** Cognito ID token. */
   idToken?: string
-  accessToken?: string
 }
 
 /** Strip MCP prefix from tool name for display lookup. */
@@ -195,7 +190,7 @@ function labelKey(name: string, deckFormat: "pptx" | "html" | undefined, result?
   return key
 }
 
-export function ToolCard({ name, input, status, result, isActive = false, streamMessages, toolUseId, sessionId, idToken, accessToken }: ToolCardProps) {
+export function ToolCard({ name, input, status, result, isActive = false, streamMessages, idToken }: ToolCardProps) {
   const t = useTranslations("tools")
   const deckFormat = useDeckFormat()
   // Dispatch: compose_slides has a dedicated rich card.
@@ -204,12 +199,8 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
       <ComposeCard
         input={input}
         status={status}
-        result={result}
         isActive={isActive}
         streamMessages={streamMessages}
-        toolUseId={toolUseId}
-        sessionId={sessionId}
-        accessToken={accessToken}
       />
     )
   }

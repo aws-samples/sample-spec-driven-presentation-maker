@@ -63,8 +63,6 @@ export interface ChatInputProps {
   onContinueFromSession?: () => void
   /** Disabled once this chat already has messages. */
   continueFromSessionDisabled?: boolean
-  /** Stop button tooltip override. */
-  stopTitle?: string
   /** Called on every input change (e.g., for @mention detection). */
   onInputChange?: (value: string) => void
   /** Template/style candidates. Omit to disable the slash picker. */
@@ -88,7 +86,7 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, stopTitle, onInputChange, slashItems, slashLoading, onSlashOpen, onTextareaFocus },
+  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, onInputChange, slashItems, slashLoading, onSlashOpen, onTextareaFocus },
   ref,
 ) {
   const t = useTranslations("chatInput")
@@ -377,9 +375,9 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               <button
                 type="button"
                 onClick={onStop}
-                title={stopTitle ?? t("stopGeneration")}
+                title={t("stopGeneration")}
                 className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-foreground/10 hover:bg-foreground/20"
-                aria-label={stopTitle ?? t("stopGeneration")}
+                aria-label={t("stopGeneration")}
               >
                 <Square className="h-3 w-3 fill-current" />
               </button>
