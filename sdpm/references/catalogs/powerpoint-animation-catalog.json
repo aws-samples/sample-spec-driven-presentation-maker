@@ -6456,6 +6456,7 @@
                 "behaviorChildren": [
                   "p:animScale"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json"
               },
               "larger": {
@@ -6485,6 +6486,7 @@
                 "behaviorChildren": [
                   "p:animScale"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json"
               },
               "smaller": {
@@ -6514,6 +6516,7 @@
                 "behaviorChildren": [
                   "p:animScale"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json"
               },
               "tiny": {
@@ -6543,6 +6546,7 @@
                 "behaviorChildren": [
                   "p:animScale"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json"
               }
             }
@@ -6579,6 +6583,7 @@
                 "behaviorChildren": [
                   "p:animScale"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "horizontal": {
@@ -6608,6 +6613,7 @@
                 "behaviorChildren": [
                   "p:animScale"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "vertical": {
@@ -6637,6 +6643,7 @@
                 "behaviorChildren": [
                   "p:animScale"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -8084,6 +8091,7 @@
                 "behaviorChildren": [
                   "p:animRot"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json"
               },
               "halfSpin": {
@@ -8107,6 +8115,7 @@
                 "behaviorChildren": [
                   "p:animRot"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/spin-amounts/resolved.json"
               },
               "quarterSpin": {
@@ -8130,6 +8139,7 @@
                 "behaviorChildren": [
                   "p:animRot"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/spin-amounts/resolved.json"
               },
               "twoSpins": {
@@ -8153,6 +8163,7 @@
                 "behaviorChildren": [
                   "p:animRot"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/resolved.json"
               }
             }
@@ -8183,6 +8194,7 @@
                 "behaviorChildren": [
                   "p:animRot"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "counterclockwise": {
@@ -8206,6 +8218,7 @@
                 "behaviorChildren": [
                   "p:animRot"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -8624,6 +8637,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": null,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "percent25": {
@@ -8674,6 +8688,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": null,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/transparency-25/resolved.json"
               },
               "percent50": {
@@ -8724,6 +8739,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": null,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "percent75": {
@@ -8774,6 +8790,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": null,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -9683,6 +9700,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 5000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "vertical": {
@@ -9850,6 +9868,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 5000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -10315,6 +10334,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "inFromScreenCenter": {
@@ -10609,6 +10629,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "inSlightly": {
@@ -10775,6 +10796,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "out": {
@@ -10941,6 +10963,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "outFromScreenBottom": {
@@ -11235,6 +11258,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "outSlightly": {
@@ -11401,6 +11425,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -11513,6 +11538,65 @@
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Blinds (0_1)",
+        "behaviors": [
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 0,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "visible"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "blinds(horizontal)",
+              "transition": "in"
+            },
+            "attrNames": [],
+            "durMs": 500
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -11564,6 +11648,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "vertical": {
@@ -11611,6 +11696,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -11623,9 +11709,15 @@
         "fixture": "test/fixtures/native/animations/entrance/02-blinds.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Blinds",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "horizontal",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -14175,6 +14267,65 @@
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Checkerboard (0_2)",
+        "behaviors": [
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 0,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "visible"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "checkerboard(across)",
+              "transition": "in"
+            },
+            "attrNames": [],
+            "durMs": 500
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -14226,6 +14377,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "down": {
@@ -14273,6 +14425,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -14285,9 +14438,15 @@
         "fixture": "test/fixtures/native/animations/entrance/03-checkerboard.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Checkerboard",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "across",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -16832,6 +16991,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 1000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "floatUp": {
@@ -17008,6 +17168,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 1000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -17485,6 +17646,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromBottomLeft": {
@@ -17657,6 +17819,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromBottomRight": {
@@ -17829,6 +17992,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromLeft": {
@@ -18001,6 +18165,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromRight": {
@@ -18173,6 +18338,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/from-right/resolved.json"
               },
               "fromTop": {
@@ -18345,6 +18511,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromTopLeft": {
@@ -18517,6 +18684,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromTopRight": {
@@ -18689,6 +18857,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -19397,6 +19566,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromLeft": {
@@ -19509,6 +19679,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromRight": {
@@ -19621,6 +19792,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromTop": {
@@ -19733,6 +19905,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -20196,6 +20369,65 @@
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Random Bars (0_6)",
+        "behaviors": [
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 0,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "visible"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "randombar(horizontal)",
+              "transition": "in"
+            },
+            "attrNames": [],
+            "durMs": 500
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -20247,6 +20479,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "vertical": {
@@ -20294,6 +20527,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -20306,9 +20540,15 @@
         "fixture": "test/fixtures/native/animations/entrance/07-random-bars.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Random Bars",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "horizontal",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -20734,6 +20974,65 @@
         "observedChildDurationMs": 2000,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Shape (0_7)",
+        "behaviors": [
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 0,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "visible"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "circle(in)",
+              "transition": "in"
+            },
+            "attrNames": [],
+            "durMs": 2000
+          }
+        ],
+        "measuredDurationMs": 2000,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -20785,6 +21084,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "out": {
@@ -20832,6 +21132,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -20886,6 +21187,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "circle": {
@@ -20933,6 +21235,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "diamond": {
@@ -20980,6 +21283,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "plus": {
@@ -21027,6 +21331,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -21048,9 +21353,15 @@
         "fixture": "test/fixtures/native/animations/entrance/08-shape.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Shape",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "in",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -21882,6 +22193,65 @@
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Split (0_8)",
+        "behaviors": [
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 0,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "visible"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "barn(inVertical)",
+              "transition": "in"
+            },
+            "attrNames": [],
+            "durMs": 500
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -21933,6 +22303,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "horizontalOut": {
@@ -21980,6 +22351,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "verticalIn": {
@@ -22027,6 +22399,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "verticalOut": {
@@ -22074,6 +22447,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -22086,9 +22460,15 @@
         "fixture": "test/fixtures/native/animations/entrance/09-split.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Split",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "verticalIn",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -22513,6 +22893,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromBottom": {
@@ -22807,6 +23188,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromLeft": {
@@ -23101,6 +23483,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromRight": {
@@ -23395,6 +23778,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromTop": {
@@ -23689,6 +24073,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-remeasure-2026-11-02/stretch-from-top/resolved.json"
               }
             }
@@ -23801,6 +24186,65 @@
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Strips (0_9)",
+        "behaviors": [
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 0,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "visible"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "strips(downLeft)",
+              "transition": "in"
+            },
+            "attrNames": [],
+            "durMs": 500
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -23852,6 +24296,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "leftUp": {
@@ -23899,6 +24344,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "rightDown": {
@@ -23946,6 +24392,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "rightUp": {
@@ -23993,6 +24440,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -24005,9 +24453,15 @@
         "fixture": "test/fixtures/native/animations/entrance/10-strips.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Strips",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "leftDown",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -24433,6 +24887,65 @@
         "observedChildDurationMs": 2000,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Wheel (0_11)",
+        "behaviors": [
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 0,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "visible"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "wheel(1)",
+              "transition": "in"
+            },
+            "attrNames": [],
+            "durMs": 2000
+          }
+        ],
+        "measuredDurationMs": 2000,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "spokes": {
             "setting": "Spokes",
@@ -24484,6 +24997,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "spokes2": {
@@ -24531,6 +25045,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "spokes3": {
@@ -24578,6 +25093,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "spokes4": {
@@ -24625,6 +25141,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "spokes8": {
@@ -24672,6 +25189,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -24684,9 +25202,15 @@
         "fixture": "test/fixtures/native/animations/entrance/12-wheel.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Wheel",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "spokes",
+          "value": "spoke1",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -25253,6 +25777,65 @@
         "observedChildDurationMs": 500,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Wipe (0_12)",
+        "behaviors": [
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 0,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "visible"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "wipe(down)",
+              "transition": "in"
+            },
+            "attrNames": [],
+            "durMs": 500
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -25304,6 +25887,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromLeft": {
@@ -25351,6 +25935,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromRight": {
@@ -25398,6 +25983,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromTop": {
@@ -25445,6 +26031,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -25457,9 +26044,15 @@
         "fixture": "test/fixtures/native/animations/entrance/13-wipe.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Wipe",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "fromBottom",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -25904,6 +26497,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "slideCenter": {
@@ -26208,6 +26802,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -27459,6 +28054,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 5000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "vertical": {
@@ -28018,6 +28614,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 5000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -28471,6 +29068,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "inSlightly": {
@@ -28631,6 +29229,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "inToScreenBottom": {
@@ -28852,6 +29451,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "out": {
@@ -29012,6 +29612,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "outSlightly": {
@@ -29172,6 +29773,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "outToScreenCenter": {
@@ -29454,6 +30056,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -29566,6 +30169,65 @@
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Blinds (0_0)",
+        "behaviors": [
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "blinds(horizontal)",
+              "transition": "out"
+            },
+            "attrNames": [],
+            "durMs": 500
+          },
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 499,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "hidden"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -29617,6 +30279,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "vertical": {
@@ -29664,6 +30327,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -29676,9 +30340,15 @@
         "fixture": "test/fixtures/native/animations/exit/36-blinds.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Blinds",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "horizontal",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -33138,6 +33808,65 @@
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Checkerboard (0_1)",
+        "behaviors": [
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "checkerboard(across)",
+              "transition": "out"
+            },
+            "attrNames": [],
+            "durMs": 500
+          },
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 499,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "hidden"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -33189,6 +33918,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "up": {
@@ -33236,6 +33966,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -33248,9 +33979,15 @@
         "fixture": "test/fixtures/native/animations/exit/37-checkerboard.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Checkerboard",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "across",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -33663,6 +34400,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toBottom": {
@@ -33945,6 +34683,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toLeft": {
@@ -34227,6 +34966,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toRight": {
@@ -34509,6 +35249,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toTop": {
@@ -34791,6 +35532,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -37219,6 +37961,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 1000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "floatUp": {
@@ -37389,6 +38132,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 1000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -37854,6 +38598,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toBottomLeft": {
@@ -38020,6 +38765,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toBottomRight": {
@@ -38186,6 +38932,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toLeft": {
@@ -38352,6 +39099,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toRight": {
@@ -38518,6 +39266,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toTop": {
@@ -38684,6 +39433,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toTopLeft": {
@@ -38850,6 +39600,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toTopRight": {
@@ -39016,6 +39767,7 @@
                   "p:anim",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -39373,6 +40125,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toLeft": {
@@ -39485,6 +40238,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toRight": {
@@ -39597,6 +40351,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "toTop": {
@@ -39709,6 +40464,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -40163,6 +40919,65 @@
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Random Bars (0_6)",
+        "behaviors": [
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "randombar(horizontal)",
+              "transition": "out"
+            },
+            "attrNames": [],
+            "durMs": 500
+          },
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 499,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "hidden"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -40214,6 +41029,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "vertical": {
@@ -40261,6 +41077,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -40273,9 +41090,15 @@
         "fixture": "test/fixtures/native/animations/exit/42-random-bars.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Random Bars",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "horizontal",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -40347,6 +41170,65 @@
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Shape (0_7)",
+        "behaviors": [
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "circle(out)",
+              "transition": "out"
+            },
+            "attrNames": [],
+            "durMs": 2000
+          },
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 1999,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "hidden"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "measuredDurationMs": 2000,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -40398,6 +41280,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "out": {
@@ -40445,6 +41328,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -40499,6 +41383,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "circle": {
@@ -40546,6 +41431,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "diamond": {
@@ -40593,6 +41479,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "plus": {
@@ -40640,6 +41527,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -40661,9 +41549,15 @@
         "fixture": "test/fixtures/native/animations/exit/43-shape.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Shape",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "out",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -42961,6 +43855,65 @@
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Split (0_8)",
+        "behaviors": [
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "barn(inVertical)",
+              "transition": "out"
+            },
+            "attrNames": [],
+            "durMs": 500
+          },
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 499,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "hidden"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -43012,6 +43965,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "horizontalOut": {
@@ -43059,6 +44013,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "verticalIn": {
@@ -43106,6 +44061,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "verticalOut": {
@@ -43153,6 +44109,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -43165,9 +44122,15 @@
         "fixture": "test/fixtures/native/animations/exit/44-split.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Split",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "verticalIn",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -43521,6 +44484,65 @@
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Strips (0_9)",
+        "behaviors": [
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "strips(downLeft)",
+              "transition": "out"
+            },
+            "attrNames": [],
+            "durMs": 500
+          },
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 499,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "hidden"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -43572,6 +44594,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "leftUp": {
@@ -43619,6 +44642,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "rightDown": {
@@ -43666,6 +44690,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "rightUp": {
@@ -43713,6 +44738,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -43725,9 +44751,15 @@
         "fixture": "test/fixtures/native/animations/exit/45-strips.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Strips",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "leftDown",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -44545,6 +45577,65 @@
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Wheel (0_11)",
+        "behaviors": [
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "wheel(1)",
+              "transition": "out"
+            },
+            "attrNames": [],
+            "durMs": 2000
+          },
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 1999,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "hidden"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "measuredDurationMs": 2000,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "spokes": {
             "setting": "Spokes",
@@ -44596,6 +45687,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "spokes2": {
@@ -44643,6 +45735,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "spokes3": {
@@ -44690,6 +45783,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "spokes4": {
@@ -44737,6 +45831,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "spokes8": {
@@ -44784,6 +45879,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 2000,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -44796,9 +45892,15 @@
         "fixture": "test/fixtures/native/animations/exit/47-wheel.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Wheel",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "spokes",
+          "value": "spoke1",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -45353,6 +46455,65 @@
         "observedChildDurationMs": null,
         "buildList": "p:bldP/@animBg=1",
         "galleryTile": "Wipe (0_12)",
+        "behaviors": [
+          {
+            "element": "p:animEffect",
+            "attributes": {
+              "filter": "wipe(down)",
+              "transition": "out"
+            },
+            "attrNames": [],
+            "durMs": 500
+          },
+          {
+            "element": "p:set",
+            "attributes": {},
+            "attrNames": [
+              "style.visibility"
+            ],
+            "durMs": 1,
+            "delayMs": 499,
+            "timingAttributes": {
+              "fill": "hold"
+            },
+            "values": {
+              "to": {
+                "element": "p:to",
+                "attributes": {},
+                "children": [
+                  {
+                    "element": "p:strVal",
+                    "attributes": {
+                      "val": "hidden"
+                    },
+                    "children": []
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "measuredDurationMs": 500,
+        "durationScaling": {
+          "rule": "proportional",
+          "scales": [
+            "durMs",
+            "delayMs"
+          ],
+          "exempt": {
+            "element": "p:set",
+            "attrName": "style.visibility",
+            "durMs": 1,
+            "delayMs": "0 for an entrance; measured recomputed as duration - 1 for an exit, not scaled"
+          },
+          "unchanged": [
+            "every behaviour attribute (@path, @by, @filter, @calcmode, @valueType)",
+            "presetClass, presetId, presetSubtype",
+            "the behaviour count and their order"
+          ],
+          "accuracy": "byte-exact at measuredDurationMs, because the measured integers are written as they stand. At another duration the product may land on an exact half, and PowerPoint's own float precision then rounds those both ways - 580 -> 652 down and 1324 -> 1490 up at the same ratio - so a scaled value may differ from PowerPoint by 1 ms. Measured, not estimated.",
+          "evidence": "scripts/animation_catalog/computer-use.md, 'What the Duration field does to an effect's XML'"
+        },
         "effectOptions": {
           "direction": {
             "setting": "Direction",
@@ -45404,6 +46565,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromLeft": {
@@ -45451,6 +46613,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromRight": {
@@ -45498,6 +46661,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "fromTop": {
@@ -45545,6 +46709,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }
@@ -45557,9 +46722,15 @@
         "fixture": "test/fixtures/native/animations/exit/48-wipe.xml",
         "capturedApplicationVersion": "16.113.3"
       },
-      "verification": "nativeCapture",
+      "verification": "guiCapture",
       "label": "Wipe",
       "capture": {
+        "behavioursLiftedFrom": {
+          "setting": "direction",
+          "value": "fromBottom",
+          "resolvedBy": "presetSubtype",
+          "why": "pressing a setting's default value leaves the effect at the tile's own default, so this value's measured behaviours are the tile's"
+        },
         "effectOptions": {
           "source": "sdpm GUI capture",
           "application": "Microsoft PowerPoint",
@@ -45992,6 +47163,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               },
               "slideCenter": {
@@ -46284,6 +47456,7 @@
                   "p:animEffect",
                   "p:set"
                 ],
+                "measuredDurationMs": 500,
                 "measuredIn": "tests/fixtures/animations/gui-only/effect-options-capture-2026-11-02/resolved.json"
               }
             }

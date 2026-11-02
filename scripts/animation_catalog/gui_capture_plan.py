@@ -141,6 +141,20 @@ LABEL_HEIGHT_PX = 16.0
 #: at the 92% zoom the 2026-10-31 session measured.
 CLICK_MARGIN_PX = 20.0
 
+#: The smallest short side a shape may have, in deck pixels — 80 px at 2 px per
+#: point, so 40 pt.
+#:
+#: Twice the click margin is only 40 px, or 20 pt, and that is the size that
+#: broke a live run: a grid of 22 pt shapes took 71 presses and landed them on
+#: five shapes. Doubling it fixed that, and the number then lived in a test
+#: assertion rather than here — so the planner stayed free to derive a grid the
+#: test would reject, which is exactly what happened when 16 more tiles became
+#: capturable and 92 targets were laid out at 36.5 pt.
+#:
+#: Enforced as a layout constraint instead, so a target count that cannot be
+#: clicked at this size costs a second slide rather than a failed capture.
+MIN_SHAPE_SHORT_SIDE_PX = 80.0
+
 #: The distance a click point must keep from **every other** shape on its slide. This is
 #: the constraint that makes a mis-aimed click miss rather than silently select the
 #: neighbour, which would apply the right effect to the wrong target.
@@ -437,8 +451,10 @@ def _candidate_grids(per_slide: int, basis: tuple[float, float]) -> list[tuple[f
     """Return every column count that fits ``per_slide`` cells, best aspect ratio first.
 
     A candidate only counts when the shape it implies is at least twice
-    :data:`CLICK_MARGIN_PX` on both sides, which is the whole point of deriving the grid:
-    a cell too small to be clicked in the middle is not a layout, it is a trap.
+    :data:`CLICK_MARGIN_PX` on both sides **and** at least
+    :data:`MIN_SHAPE_SHORT_SIDE_PX` on its short one, which is the whole point of
+    deriving the grid: a cell too small to be clicked in the middle is not a
+    layout, it is a trap — and one measured at 22 pt per shape.
     """
     usable_w, usable_h = _usable(basis)
     candidates: list[tuple[float, int, int]] = []
@@ -449,6 +465,8 @@ def _candidate_grids(per_slide: int, basis: tuple[float, float]) -> list[tuple[f
         shape_h = cell_h - CELL_GAP_Y_PX - LABEL_HEIGHT_PX
         if shape_w < 2 * CLICK_MARGIN_PX or shape_h < 2 * CLICK_MARGIN_PX:
             continue
+        if min(shape_w, shape_h) < MIN_SHAPE_SHORT_SIDE_PX:
+            continue
         candidates.append((abs(cell_w / cell_h - CELL_ASPECT), columns, rows))
     return sorted(candidates)
 
@@ -456,14 +474,16 @@ def _candidate_grids(per_slide: int, basis: tuple[float, float]) -> list[tuple[f
 def max_targets_per_slide(*, basis: tuple[float, float] = DECK_BASIS_PX) -> int:
     """How many clickable shapes one slide can carry under the separation constraints.
 
-    A cell has to be at least ``2 * CLICK_MARGIN_PX`` wide once its horizontal gap is
-    removed, and that much tall once its vertical gap and its label are, so the capacity
-    is just how many such cells fit the usable area. Stated here rather than found by
-    search so "as few slides as possible" is arithmetic a reader can check.
+    A cell has to hold a shape at least :data:`MIN_SHAPE_SHORT_SIDE_PX` on its short
+    side — which is the binding constraint, being twice ``2 * CLICK_MARGIN_PX`` — once
+    its gaps and its label are removed, so the capacity is just how many such cells fit
+    the usable area. Stated here rather than found by search so "as few slides as
+    possible" is arithmetic a reader can check.
     """
     usable_w, usable_h = _usable(basis)
-    columns = int(usable_w // (2 * CLICK_MARGIN_PX + CELL_GAP_X_PX))
-    rows = int(usable_h // (2 * CLICK_MARGIN_PX + CELL_GAP_Y_PX + LABEL_HEIGHT_PX))
+    short = max(2 * CLICK_MARGIN_PX, MIN_SHAPE_SHORT_SIDE_PX)
+    columns = int(usable_w // (short + CELL_GAP_X_PX))
+    rows = int(usable_h // (short + CELL_GAP_Y_PX + LABEL_HEIGHT_PX))
     return columns * rows
 
 

@@ -2802,6 +2802,12 @@ def promote_effect_options(
                 "presetSubtype": subtype,
                 "behaviors": behaviors,
                 "behaviorChildren": sorted({b["element"] for b in behaviors}),
+                # The duration the option's own timings belong to, read off the
+                # ribbon when it was captured. Omitting it was a defect: the
+                # writer's overlay reads this field to let an option be written
+                # at another duration, and without it every option fell back to
+                # its effect's duration — which 19 of the 95 tiles do not have.
+                "measuredDurationMs": target.get("measuredDurationMs"),
                 "measuredIn": target.get("measuredIn"),
             }
             signature = json.dumps(
@@ -2832,6 +2838,7 @@ def promote_effect_options(
         }
 
     _resolve_default_from_sibling(options)
+    _lift_tile_behaviours_from_default(entry, options)
 
     ooxml["effectOptions"] = options
     # Measured one setting at a time: each value was applied with every *other*
@@ -3029,6 +3036,67 @@ def mark_platform_unavailable(items: list[dict[str, Any]]) -> int:
         }
         marked += 1
     return marked
+
+
+def _lift_tile_behaviours_from_default(
+    entry: dict[str, Any], options: dict[str, Any]
+) -> None:
+    """Give a tile the measured behaviours of its own default option.
+
+    19 of the 95 tiles fell outside the gallery capture's plan and carry no
+    measured behaviours, so the writer builds theirs from the catalog's general
+    rules instead of transcribing them. For 8 exit tiles that is not merely
+    less exact, it is a refusal: the synthesised form has to derive where the
+    visibility ``p:set`` ends from a duration the entry does not record, so
+    ``blinds``, ``checkerboard``, ``randomBars``, ``shape``, ``split``,
+    ``strips``, ``wheel`` and ``wipe`` reject a plain write unless the caller
+    names ``timing.durationMs`` — while the *same effect with an option* writes
+    happily, because the option supplies measured behaviours. One effect, two
+    requirements, decided by an unrelated field.
+
+    Nothing new has to be measured to fix it. Pressing a setting's **default**
+    value leaves the effect exactly as pressing the tile alone does, so that
+    value's behaviours are the tile's behaviours. They were captured; they were
+    just filed one level down.
+
+    Only a resolved default is used, and only when the tile has none of its
+    own, so this never overwrites a measurement with an inference.
+    """
+    ooxml = entry.get("ooxml")
+    if not isinstance(ooxml, dict) or (ooxml.get("behaviors") or []):
+        return
+    for setting, option in sorted(options.items()):
+        default = option.get("default")
+        if not default or option.get("defaultResolvedBy") not in (
+            "signature",
+            "presetSubtype",
+            "siblingSetting",
+        ):
+            continue
+        measured = option["values"][default]
+        behaviors = measured.get("behaviors") or []
+        if not behaviors:
+            continue
+        ooxml["behaviors"] = behaviors
+        ooxml["behaviorChildren"] = sorted({b["element"] for b in behaviors})
+        if measured.get("measuredDurationMs") is not None:
+            ooxml["measuredDurationMs"] = measured["measuredDurationMs"]
+            ooxml["durationScaling"] = GUI_DURATION_SCALING
+        ooxml.pop("unresolvedPayloads", None)
+        ooxml.pop("requiresCapture", None)
+        ooxml.pop("gap", None)
+        entry.setdefault("capture", {})["behavioursLiftedFrom"] = {
+            "setting": setting,
+            "value": default,
+            "resolvedBy": option.get("defaultResolvedBy"),
+            "why": (
+                "pressing a setting's default value leaves the effect at the tile's own "
+                "default, so this value's measured behaviours are the tile's"
+            ),
+        }
+        entry["capabilityLevel"] = NATIVE
+        entry["verification"] = GUI_CAPTURE_VERIFICATION
+        return
 
 
 def promote_all_effect_options(

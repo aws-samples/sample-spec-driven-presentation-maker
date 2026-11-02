@@ -71,14 +71,19 @@ MEASURED_PANE_HEAD = ("TextBox 152", "Rounded Rectangle 151", "TextBox 150")
 
 #: The target count the checked-in catalog derives today, and the grid it fits on one
 #: slide. Both are asserted against the plan rather than trusted.
-EXPECTED_TARGETS = 76
+#: What the planner derives when every gallery gap is reopened. It is 92 rather
+#: than the 76 captured on 2026-11-01 because 16 more tiles now carry measured
+#: behaviours: they were outside that plan, and the effect-option capture
+#: reached them through their own default option, whose behaviours are the
+#: tile's. The live plan derives **0** — every gallery gap is closed.
+EXPECTED_TARGETS = 92
 #: 10 columns by 8 rows, not the 8x10 first chosen. A click's accuracy is bounded by the
 #: shape's SHORT side, which was 22 pt at a 2.2 cell aspect with a two-line label. A live
 #: run then put 71 presses onto five shapes, because a click that lands on empty canvas
 #: leaves the previous shape selected and the next press overwrites ITS effect. Squarer
 #: cells and a one-line label take the short side to 43.5 pt.
-EXPECTED_GRID = (10, 8)
-EXPECTED_SHAPE_PX = (154, 87)
+EXPECTED_GRID = (12, 8)
+EXPECTED_SHAPE_PX = (124, 87)
 
 
 # --- a package the fake can apply effects to --------------------------------
@@ -3510,3 +3515,47 @@ class TestDocsMatchTheCode:
         assert "--with lxml" in readme
         assert "Quartz is not among them" in readme
         assert "**stderr**" in readme and "stdout stays pure JSON" in readme
+
+
+class TestTheClickableFloorIsAPlannerConstraint:
+    """The size that broke a live run has to bind the planner, not just a test.
+
+    A grid of 22 pt shapes took 71 presses and landed them on five shapes. The
+    fix doubled the short side, and the number then lived only in
+    `test_the_whole_catalog_fits_one_slide` — so the planner stayed free to
+    derive a grid that assertion would reject. It did: when 16 more tiles became
+    capturable, 92 targets came out at 36.5 pt on one slide.
+    """
+
+    def test_no_target_count_is_ever_laid_out_below_the_floor(self):
+        floor = planner.MIN_SHAPE_SHORT_SIDE_PX
+        for targets in (1, 2, 5, 20, 76, 92, 128, 129, 200, 400):
+            deck = planner.grid_layout(targets).as_dict()
+            short = min(deck["shapePx"])
+            assert short >= floor, (
+                f"{targets} targets were laid out at {short} px "
+                f"({short / 2} pt), under the {floor} px floor"
+            )
+
+    def test_a_count_over_capacity_costs_a_slide_rather_than_a_smaller_shape(self):
+        capacity = planner.max_targets_per_slide()
+        assert planner.grid_layout(capacity).as_dict()["slides"] == 1
+        over = planner.grid_layout(capacity + 1).as_dict()
+        assert over["slides"] == 2, over
+        assert min(over["shapePx"]) >= planner.MIN_SHAPE_SHORT_SIDE_PX
+
+    def test_the_capacity_is_the_floor_rather_than_the_click_margin(self):
+        """Capacity used to be derived from twice the click margin, which is 20 pt.
+
+        That made it claim 286 shapes per slide, a number no capture could have
+        clicked. It is 128 under the real constraint.
+        """
+        assert planner.MIN_SHAPE_SHORT_SIDE_PX > 2 * planner.CLICK_MARGIN_PX
+        assert planner.max_targets_per_slide() == 128
+
+    def test_the_captured_seventy_six_still_lay_out_exactly_as_they_were(self):
+        """The floor must not have moved the grid the committed evidence was captured on."""
+        deck = planner.grid_layout(76).as_dict()
+        assert (deck["columns"], deck["rows"]) == (10, 8)
+        assert tuple(deck["shapePx"]) == (154, 87)
+        assert deck["slides"] == 1

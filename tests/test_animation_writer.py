@@ -142,14 +142,14 @@ GALLERY_PAYLOADS = {
 #: A fully captured entrance tile: presetID 10, ``p:animEffect`` filter "fade"
 #: and the normative visibility ``p:set``. Tests that are about something else
 #: use it so the carrier preset never becomes the reason a case fails.
-WRITABLE_PRESET = {"category": "entrance", "effect": "fade", "variant": None}
+WRITABLE_PRESET = {"category": "entrance", "effect": "fade"}
 
 
 def _effect(effect_id="fx", element="hero", **patch):
     effect = {
         "id": effect_id,
         "target": {"element": element},
-        "preset": {"category": "entrance", "effect": "fade", "variant": None},
+        "preset": {"category": "entrance", "effect": "fade"},
         "start": {"type": "onPageClick", "delayMs": 0},
         "timing": {"durationMs": 500},
         "afterEffect": {"type": "none"},
@@ -677,7 +677,7 @@ def test_timing_values_are_written_with_their_ooxml_scales():
                 _effect(
                     "fx",
                     "hero",
-                    preset={"category": "entrance", "effect": "blinds", "variant": None},
+                    preset={"category": "entrance", "effect": "blinds"},
                     timing={
                         "durationMs": 1200,
                         "repeatCount": 3,
@@ -715,7 +715,7 @@ def test_catalog_duration_default_is_used_when_json_omits_it():
         _slide(
             animations={
                 "mainSequence": [
-                    _effect("fx", "hero", preset={"category": "entrance", "effect": "wedge", "variant": None}, timing={})
+                    _effect("fx", "hero", preset={"category": "entrance", "effect": "wedge"}, timing={})
                 ],
                 "interactiveSequences": [],
             }
@@ -997,7 +997,7 @@ def test_a_motion_path_preset_writes_the_path_powerpoint_wrote():
             "mainSequence": [
                 _effect(
                     "fx", "hero",
-                    preset={"category": "motionPath", "effect": "arcs", "variant": None},
+                    preset={"category": "motionPath", "effect": "arcs"},
                     timing={"durationMs": 2000},
                 )
             ],
@@ -1025,7 +1025,7 @@ def test_captured_preset_identity_and_behavior_children_are_reproduced():
         _slide(
             animations={
                 "mainSequence": [
-                    _effect("fx", "hero", preset={"category": "entrance", "effect": "blinds", "variant": None})
+                    _effect("fx", "hero", preset={"category": "entrance", "effect": "blinds"})
                 ],
                 "interactiveSequences": [],
             }
@@ -1034,7 +1034,12 @@ def test_captured_preset_identity_and_behavior_children_are_reproduced():
     ctn = _timing(slide).xpath(".//p:cTn[@presetID]", namespaces=NS)[0]
     assert (ctn.get("presetID"), ctn.get("presetClass"), ctn.get("presetSubtype")) == ("3", "entr", "10")
     children = [etree.QName(node).localname for node in ctn.xpath("./p:childTnLst/*", namespaces=NS)]
-    assert children == ["animEffect", "set"]
+    # The order PowerPoint wrote, not the alphabetical one. Blinds was outside
+    # the gallery capture's plan, so this used to be synthesised from the
+    # distinct `behaviorChildren` names and came out sorted. The tile's own
+    # default option measured `p:set` first, and a setting's default leaves the
+    # effect at the tile's default, so those behaviours were lifted into it.
+    assert children == ["set", "animEffect"]
     anim_effect = ctn.xpath("./p:childTnLst/p:animEffect", namespaces=NS)[0]
     assert anim_effect.get("filter") == "blinds(horizontal)"
     assert anim_effect.get("transition") == "in"
@@ -1055,7 +1060,7 @@ def test_an_entrance_makes_the_shape_visible_at_the_effect_start():
                     _effect(
                         "fx",
                         "hero",
-                        preset={"category": "entrance", "effect": "fade", "variant": None},
+                        preset={"category": "entrance", "effect": "fade"},
                         timing={"durationMs": 500},
                     )
                 ],
@@ -1079,7 +1084,7 @@ def test_an_exit_hides_the_shape_in_the_last_millisecond_of_its_duration():
                     _effect(
                         "fx",
                         "hero",
-                        preset={"category": "exit", "effect": "wipe", "variant": None},
+                        preset={"category": "exit", "effect": "wipe"},
                         timing={"durationMs": 500},
                     )
                 ],
@@ -1106,12 +1111,23 @@ def test_the_visibility_timing_rule_comes_from_the_catalog(index):
 
 
 def test_an_exit_preset_without_a_resolvable_duration_is_rejected():
-    """Nothing is written when the hide instant cannot be derived: Wipe (Exit)
-    records no ``observedChildDurationMs``, so the JSON has to supply one."""
+    """Nothing is written when the hide instant cannot be derived.
+
+    An exit effect built from the catalog's general rules has to work out where
+    the visibility ``p:set`` ends, and only a duration tells it. Three exit
+    tiles still record none — Fade, Dissolve Out and Wedge — because the gallery
+    capture skipped them and they offer no Effect Options to take measured
+    behaviours from.
+
+    This used to name Wipe (Exit), which no longer qualifies: Wipe offers a
+    Direction, so its default value's measured behaviours are the tile's own and
+    were lifted into it. Eight exit tiles were fixed that way, which is why the
+    example moved rather than the assertion.
+    """
     slide_def = _slide(
         animations={
             "mainSequence": [
-                _effect("fx", "hero", preset={"category": "exit", "effect": "wipe", "variant": None}, timing={})
+                _effect("fx", "hero", preset={"category": "exit", "effect": "fade"}, timing={})
             ],
             "interactiveSequences": [],
         }
@@ -1124,7 +1140,7 @@ def test_exit_presets_hide_the_shape_and_run_the_filter_outward():
     _, slide = _build(
         _slide(
             animations={
-                "mainSequence": [_effect("fx", "hero", preset={"category": "exit", "effect": "wipe", "variant": None})],
+                "mainSequence": [_effect("fx", "hero", preset={"category": "exit", "effect": "wipe"})],
                 "interactiveSequences": [],
             }
         )
@@ -1140,7 +1156,7 @@ def test_media_play_preset_writes_the_captured_command():
         _slide(
             animations={
                 "mainSequence": [
-                    _effect("fx", "hero", preset={"category": "media", "effect": "mediaPlay", "variant": None})
+                    _effect("fx", "hero", preset={"category": "media", "effect": "mediaPlay"})
                 ],
                 "interactiveSequences": [],
             }
@@ -1165,7 +1181,7 @@ def test_a_presets_measured_payload_is_transcribed_rather_than_approximated():
     slide_def = _slide(
         animations={
             "mainSequence": [
-                _effect("fx", "hero", preset={"category": "entrance", "effect": "flyIn", "variant": None})
+                _effect("fx", "hero", preset={"category": "entrance", "effect": "flyIn"})
             ],
             "interactiveSequences": [],
         }
@@ -1199,7 +1215,7 @@ def test_a_longer_duration_scales_every_measured_behaviour_in_proportion():
             "mainSequence": [
                 _effect(
                     "fx", "hero",
-                    preset={"category": "emphasis", "effect": "wave", "variant": None},
+                    preset={"category": "emphasis", "effect": "wave"},
                     timing={"durationMs": 1000},
                 )
             ],
@@ -1235,7 +1251,7 @@ def test_the_visibility_toggle_is_exempt_from_the_scaling_and_recomputed():
                 "mainSequence": [
                     _effect(
                         "fx", "hero",
-                        preset={"category": "exit", "effect": "flyOut", "variant": None},
+                        preset={"category": "exit", "effect": "flyOut"},
                         timing={"durationMs": duration},
                     )
                 ],
@@ -1262,7 +1278,7 @@ def test_an_effect_with_no_numeric_duration_refuses_one_rather_than_ignoring_it(
             "mainSequence": [
                 _effect(
                     "fx", "hero",
-                    preset={"category": "emphasis", "effect": "boldReveal", "variant": None},
+                    preset={"category": "emphasis", "effect": "boldReveal"},
                     timing={"durationMs": 1000},
                 )
             ],
@@ -1280,7 +1296,7 @@ def test_an_effect_with_no_numeric_duration_writes_its_measured_form():
             "mainSequence": [
                 _effect(
                     "fx", "hero",
-                    preset={"category": "emphasis", "effect": "boldReveal", "variant": None},
+                    preset={"category": "emphasis", "effect": "boldReveal"},
                     timing={"durationMs": None},
                 )
             ],
@@ -1303,7 +1319,7 @@ def test_an_emphasis_set_writes_the_font_attribute_the_capture_names():
     slide_def = _slide(
         animations={
             "mainSequence": [
-                _effect("fx", "hero", preset={"category": "emphasis", "effect": "underline", "variant": None})
+                _effect("fx", "hero", preset={"category": "emphasis", "effect": "underline"})
             ],
             "interactiveSequences": [],
         }
@@ -1352,7 +1368,7 @@ def test_the_writer_refuses_an_unresolved_payload_even_without_a_catalog_gap(reg
                     _effect(
                         "fx",
                         "catalogTarget",
-                        preset={"category": "entrance", "effect": "flyIn", "variant": None},
+                        preset={"category": "entrance", "effect": "flyIn"},
                     )
                 ],
                 "interactiveSequences": [],
@@ -2024,7 +2040,7 @@ def test_a_media_preset_gets_no_invented_paragraph_build():
         _slide(
             animations={
                 "mainSequence": [
-                    _effect("fx", "hero", preset={"category": "media", "effect": "mediaPlay", "variant": None})
+                    _effect("fx", "hero", preset={"category": "media", "effect": "mediaPlay"})
                 ],
                 "interactiveSequences": [],
             }
@@ -2066,7 +2082,7 @@ def test_an_explicit_request_still_animates_the_attached_shape():
                     _effect(
                         "fx",
                         "hero",
-                        preset={"category": "media", "effect": "mediaPlay", "variant": None},
+                        preset={"category": "media", "effect": "mediaPlay"},
                         text={"animateBackground": True},
                     )
                 ],
@@ -2336,7 +2352,7 @@ def test_effect_identity_ignores_position_timing_and_trigger():
     other_target = effect_identity(sequence="mainSequence", target="aside", effect=first)
     other_preset = effect_identity(
         **identity,
-        effect=_anonymous(preset={"category": "entrance", "effect": "blinds", "variant": None}),
+        effect=_anonymous(preset={"category": "entrance", "effect": "blinds"}),
     )
     other_sequence = effect_identity(
         sequence="interactive:details", target="catalogTarget", effect=first
@@ -2360,7 +2376,7 @@ def test_inserting_a_different_effect_does_not_renumber_the_following_ids(regist
     leaves every other ID untouched — which is what makes the diff by stable ID
     usable after an edit."""
     before = _fallback_ids(index, registry, [_anonymous(), _anonymous()])
-    different = _anonymous(preset={"category": "entrance", "effect": "blinds", "variant": None})
+    different = _anonymous(preset={"category": "entrance", "effect": "blinds"})
     after = _fallback_ids(index, registry, [different, _anonymous(), _anonymous()])
     assert after[1:] == before
     assert after[0] not in before
@@ -3092,3 +3108,64 @@ def test_generate_succeeds_for_a_fully_captured_effect(tmp_path):
     timing = root.findall("{%s}timing" % NS["p"])
     assert len(timing) == 1
     assert timing[0].xpath(".//p:animEffect/@filter", namespaces=NS) == ["fade"]
+
+
+def test_an_exit_tile_needs_no_duration_whether_or_not_an_option_is_asked_for():
+    """One effect must not have two requirements decided by an unrelated field.
+
+    Wipe (Exit) rejected a plain write while **the same effect with an option**
+    wrote happily: the option supplied measured behaviours and the plain form
+    had to synthesise them, and only the synthesised path needs a duration to
+    place the visibility `p:set`. So whether `timing.durationMs` was required
+    depended on whether `options` happened to be present.
+
+    Eight exit tiles behaved that way. Nothing new had to be measured to fix
+    it, because pressing a setting's default leaves the effect at the tile's
+    default — so the default option's behaviours **are** the tile's, and were
+    lifted into it.
+    """
+    for preset in (
+        {"category": "exit", "effect": "wipe"},
+        {"category": "exit", "effect": "wipe", "options": {"direction": "fromLeft"}},
+        {"category": "exit", "effect": "blinds"},
+        {"category": "exit", "effect": "wheel", "options": {"spokes": "spokes4"}},
+    ):
+        _builder, slide = _build(
+            _slide(
+                animations={
+                    "mainSequence": [_effect("fx", "hero", preset=preset, timing={})],
+                    "interactiveSequences": [],
+                }
+            )
+        )
+        hidden = _timing(slide).xpath(".//p:set/p:to/p:strVal/@val", namespaces=NS)
+        assert hidden == ["hidden"], f"{preset} wrote {hidden}"
+
+
+def test_a_lifted_tile_keeps_the_duration_its_option_was_measured_at():
+    """A lifted tile becomes scalable, which is half the point of lifting it.
+
+    Before, these tiles recorded no `measuredDurationMs`, so asking for a
+    duration was refused as unscalable. The option the behaviours came from was
+    captured at a known duration, and that duration comes with them.
+    """
+    _builder, slide = _build(
+        _slide(
+            animations={
+                "mainSequence": [
+                    _effect(
+                        "fx", "hero",
+                        preset={"category": "exit", "effect": "wipe"},
+                        timing={"durationMs": 1000},
+                    )
+                ],
+                "interactiveSequences": [],
+            }
+        )
+    )
+    # Measured at 500 ms, asked for 1000, so the animated behaviour doubles
+    # while the visibility `p:set` keeps its 1 ms and has its delay recomputed.
+    durations = _timing(slide).xpath(
+        ".//p:animEffect/p:cBhvr/p:cTn/@dur", namespaces=NS
+    )
+    assert durations == ["1000"], durations
