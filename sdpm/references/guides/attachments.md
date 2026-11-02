@@ -25,7 +25,7 @@ Returns a `header` (JSON metadata) and a `body` of line-numbered text. Nothing i
 Paging: `offset` is a UTF-8 byte offset into the text projection, `limit` the maximum bytes
 returned (header + body; 512–10240, default 10240). The header says whether more follows;
 continue with the next offset. Read only the parts your slides need — the brief's Sources
-list says which section or page range matters.
+list says which section, page range or line range matters.
 
 ## import_attachment — commit into the deck
 
@@ -41,8 +41,10 @@ bundle is never modified.
 | pptx | the full deck structure — `deck.json`, `slides/`, `template.pptx` (see the `import-pptx` guide) |
 | URL | downloaded, then handled as one of the above |
 
-The result lists `importKey`, `sourceHash`, `files` and `imageMapping`. Reference an imported
-image from a slide by its path under `attachments/`.
+The result lists `importKey`, `sourceHash`, `bundlePath` (deck-relative, the same on Local and
+Cloud) and, relative to it, `files` and `imageMapping`. Refer to imported material by
+`bundlePath` plus the listed path — from a slide, from the brief's Sources and from the
+outline's `evidence`.
 
 ### Retry
 
