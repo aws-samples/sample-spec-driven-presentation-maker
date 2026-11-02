@@ -1285,7 +1285,11 @@ class PptxRefresh:
     """What ``refresh_pptx`` built: the agent-facing result, and the render of the
     affected slides that ``compose()`` and ``previews()`` read.
 
-    The render lives in ``<deck>/_work/measure-*``; use the object as a context
+    The render (a partial build of the affected slides, exported to SVG by
+    LibreOffice) is made in ``refresh_pptx`` when there are measure_slides, and
+    otherwise on the first ``compose()`` / ``previews()`` / ``compose_slugs``, so a
+    caller can move its cost off the tool call (the remote server's background
+    task). It lives in ``<deck>/_work/measure-*``; use the object as a context
     manager or call ``close()`` (idempotent) to remove it.
 
     Attributes:
@@ -1299,8 +1303,9 @@ class PptxRefresh:
         pptx_path: ``<deck>/output.pptx``; None when the full build failed.
         render_slugs: slides that get fresh compose and previews, in deck order.
         compose_slugs: render_slugs plus ``compose_also``, without slides whose layout
-            fell back (an invalid layout name), in deck order.
-        render_error: why the render (partial build or SVG export) failed, if it did.
+            fell back (an invalid layout name), in deck order. Reading it makes the render.
+        render_error: why the render (partial build or SVG export) failed, if it did;
+            known once the render ran.
     """
 
     def __init__(self, deck_dir: Path, plan: dict[str, bool]):
@@ -1309,10 +1314,16 @@ class PptxRefresh:
         self.result: dict[str, Any] = {}
         self.pptx_path: Path | None = None
         self.render_slugs: list[str] = []
-        self.compose_slugs: list[str] = []
         self.render_error: str | None = None
+        self._compose_slugs: list[str] = []
         self._slides: dict[str, dict] = {}
         self._pages: list[str] = []  # slugs of the partial build, in page order
+        self._deck_input = ""  # what generate() reads: the deck dir or its presentation.json
+        self._targets: set[str] = set()  # render_slugs + compose_also
+        self._invalid: list[dict] = []  # invalid layouts (full build, or the render without one)
+        self._full_build_failed = False
+        self._rendered = False
+        self._closed = False
         self._work: Path | None = None
         self._pptx: Path | None = None
         self._svg: Path | None = None
@@ -1324,12 +1335,45 @@ class PptxRefresh:
         self.close()
 
     def close(self) -> None:
-        """Remove the render's temp dir."""
+        """Remove the render's temp dir; no render is made after this."""
         import shutil
 
+        self._closed = True
         if self._work is not None:
             shutil.rmtree(self._work, ignore_errors=True)
             self._work = None
+
+    @property
+    def compose_slugs(self) -> list[str]:
+        self._ensure_render()
+        return self._compose_slugs
+
+    def _ensure_render(self) -> None:
+        """Make the render once: partial build of ``_pages`` and its SVG export.
+        A failure goes to ``render_error``; never raises."""
+        import tempfile
+
+        if self._rendered or self._closed:
+            return
+        self._rendered = True
+        if self.render_slugs:
+            from sdpm.engine.preview import get_work_dir
+            from sdpm.engine.preview.backend import detect_backend
+
+            self._work = Path(tempfile.mkdtemp(prefix="measure-", dir=get_work_dir(self.deck_dir)))
+            try:
+                iso = self._work / "iso.pptx"
+                partial = generate(json_path=self._deck_input, output_path=str(iso),
+                                   only_slugs=set(self._pages), include_checks=True)
+                self._pptx = iso
+                if self._full_build_failed:  # no full build: the render knows the invalid layouts
+                    self._invalid = partial.get("checks", {}).get("invalid_layouts", [])
+                backend = detect_backend()
+                self._svg = backend.export_svg(iso, work_dir=self._work) if backend else None
+            except Exception as exc:  # the re-render never fails the tool call
+                self.render_error = str(exc)
+        invalid_slugs = {e.get("slug") for e in self._invalid}
+        self._compose_slugs = [s for s in self._pages if s in self._targets and s not in invalid_slugs]
 
     def merge_into(self, result: dict[str, Any]) -> None:
         """Add ``self.result`` to a run_python result: ``warnings`` / ``errors`` merge
@@ -1344,6 +1388,7 @@ class PptxRefresh:
         """Compose payloads of ``compose_slugs``; ``previous`` maps slug → the slug's
         last payload, for ``changed``. Never raises."""
         out = PptxCompose()
+        self._ensure_render()
         if self._svg is None or not self.compose_slugs:
             return out
         try:
@@ -1396,6 +1441,7 @@ class PptxRefresh:
         import subprocess
 
         out = PptxPreviews()
+        self._ensure_render()
         if self._pptx is None or not self._pptx.is_file() or not self.render_slugs:
             return out
         from sdpm.engine.preview.environment import preview_unavailable
@@ -1460,13 +1506,14 @@ def refresh_pptx(
     Per ``pptx_refresh_plan``: builds ``<deck>/output.pptx``; renders the slides the
     change can alter plus measure_slides (a partial build with their override bases,
     exported to SVG by LibreOffice); measures measure_slides on that render and
-    reports their layout bias, build warnings and invalid layouts. ``compose_also``
-    adds slugs to the compose set when something is rendered (the remote server's
-    slides that have no compose yet). A legacy ``presentation.json`` deck has no
-    per-slide files and gets output.pptx only. Never raises; see ``PptxRefresh``.
+    reports their layout bias, build warnings and invalid layouts. Without
+    measure_slides the render waits for the first ``compose()`` / ``previews()``.
+    ``compose_also`` adds slugs to the compose set when something is rendered (the
+    remote server's slides that have no compose yet). A legacy ``presentation.json``
+    deck has no per-slide files and gets output.pptx only. Never raises; see
+    ``PptxRefresh``.
     """
     import json
-    import tempfile
 
     from sdpm.engine.schema import affected_slugs, with_override_bases
 
@@ -1499,28 +1546,15 @@ def refresh_pptx(
     build_set = set(with_override_bases([s for s in slides if s in targets], slides))
     refresh._pages = [s for s in slides if s in build_set]
     refresh.render_slugs = [s for s in refresh._pages if s in set(render)]
-    invalid = checks.get("invalid_layouts", [])
-
-    if refresh.render_slugs:
-        from sdpm.engine.preview import get_work_dir
-        from sdpm.engine.preview.backend import detect_backend
-
-        refresh._work = Path(tempfile.mkdtemp(prefix="measure-", dir=get_work_dir(deck)))
-        try:
-            iso = refresh._work / "iso.pptx"
-            partial = generate(json_path=deck_input, output_path=str(iso), only_slugs=build_set, include_checks=True)
-            refresh._pptx = iso
-            if "pptx_error" in result:  # no full build: the render knows the invalid layouts
-                invalid = partial.get("checks", {}).get("invalid_layouts", [])
-            backend = detect_backend()
-            refresh._svg = backend.export_svg(iso, work_dir=refresh._work) if backend else None
-        except Exception as exc:  # the re-render never fails the tool call
-            refresh.render_error = str(exc)
-    invalid_slugs = {e.get("slug") for e in invalid}
-    refresh.compose_slugs = [s for s in refresh._pages if s in targets and s not in invalid_slugs]
+    refresh._deck_input = deck_input
+    refresh._targets = targets
+    refresh._invalid = checks.get("invalid_layouts", [])
+    refresh._full_build_failed = "pptx_error" in result
 
     if not measure:
         return refresh
+    refresh._ensure_render()
+    invalid = refresh._invalid
     measured = [s for s in refresh._pages if s in set(measure)]
     if not measured:
         result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})

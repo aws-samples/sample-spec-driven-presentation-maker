@@ -761,9 +761,14 @@ class TestRemoteRunPythonBranching:
         # Artifact refreshed
         assert any(k.startswith("pptx/d1/") for k in storage.uploads)
         assert storage.deck_updates and "pptxS3Key" in storage.deck_updates[0]
-        # The changed slide is re-rendered (compose + preview) in the background
+        # The changed slide is re-rendered (compose + preview) in the background,
+        # LibreOffice included: the call itself does not wait on the SVG export.
         assert len(fake_execute.background) == 1
         assert "a" in out["previewHint"]
+        assert calls["export_svg"] == 0
+        fake_execute.background[0]()
+        assert calls["export_svg"] >= 1
+        assert any(k.startswith("decks/d1/compose/a_") for k in storage.uploads)
 
     def test_non_slide_change_without_measure_renders_nothing(self, remote_rig):
         fake_execute, storage, calls = remote_rig
@@ -786,8 +791,19 @@ class TestRemoteRunPythonBranching:
         fake_execute.changed_paths = ["slides/a.json"]
         out = self._run(measure_slides=["a"])
         assert calls["build"] == 1 and calls["measure"] == 1
+        assert calls["export_svg"] == 1  # measurement needs the render in the call
         assert "measure" in out
         assert any(k.startswith("pptx/d1/") for k in storage.uploads)
+        fake_execute.background[0]()
+        assert calls["export_svg"] == 1  # the background reuses it
+
+    def test_failed_render_promises_no_previews(self, remote_rig):
+        fake_execute, storage, calls = remote_rig
+        fake_execute.changed_paths = ["slides/a.json"]
+        fake_execute.slides = {"a": {"layout": "Blank", "elements": [{"type": "image", "src": "assets:none/missing"}]}}
+        out = self._run(measure_slides=["a"])
+        assert "Missing assets" in out["pptx_error"] and "Missing assets" in out["measure"]
+        assert "previewHint" not in out
 
     def test_artifact_failure_surfaces_and_compensates(self, remote_rig):
         fake_execute, storage, calls = remote_rig

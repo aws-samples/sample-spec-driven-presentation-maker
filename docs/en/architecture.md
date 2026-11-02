@@ -197,8 +197,8 @@ For PPTX decks this post-processing is one core function, `sdpm.api.refresh_pptx
 bases) and its SVG export, the measurement, and the compose payloads and PNGs
 (`PptxRefresh.compose()` / `previews()`). Both servers only do the I/O around it: the local
 server writes `compose/` and `preview/` in the deck directory; the remote server materializes
-the S3 workspace, uploads the PPTX artifact and finishes the WebP previews and compose upload
-in the background.
+the S3 workspace, uploads the PPTX artifact and finishes the render (unless `measure_slides`
+needs it in the call), the WebP previews and the compose upload in the background.
 
 ### HTML Deck Security
 

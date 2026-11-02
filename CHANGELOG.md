@@ -94,7 +94,9 @@ Entries before v0.5.0 were written retroactively as summaries.
   auto-set `defaultTextColor` instead of a failure), and previews are rendered from the changed
   slides instead of the whole deck, as locally (a template whose master shows the slide number
   as a plain text field then shows the partial render's number in those previews and compose
-  files, as the local ones always did). `sdpm.engine.schema.read_deck_format` replaces five
+  files, as the local ones always did). In the cloud, `previewHint` is left out when the
+  render of the changed slides failed (the same result's `pptx_error` / `measure` says why).
+  `sdpm.engine.schema.read_deck_format` replaces five
   separate deck.json format readers; the CLI no longer crashes on a deck.json that is not an
   object.
 - **The README opens with the key visual.** An animation of the Web UI composing a seven-slide

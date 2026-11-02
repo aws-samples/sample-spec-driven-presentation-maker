@@ -1031,8 +1031,6 @@ def _refresh_pptx_deck(
         refresh.merge_into(result)
         if "pptx_error" in refresh.result:
             result["pptx_error"] = f"PPTX build failed — the downloadable PPTX may be stale: {refresh.result['pptx_error']}"
-        if refresh.render_error:
-            logger.warning("run_python render failed for deck %s: %s", deck_id, refresh.render_error)
 
         t = time.monotonic()
         if plan["artifact"] and refresh.pptx_path is not None:
@@ -1040,13 +1038,15 @@ def _refresh_pptx_deck(
         phase["artifact_s3"] = time.monotonic() - t
 
         if refresh.render_slugs:
-            # Everything the composer needs is in `result` now. Compose (Web UI live
-            # preview) and the rendered slugs' WebP take 5-10 s; they finish in the
-            # background, which owns tmpdir from here on.
-            result["previewHint"] = (
-                f"Preview images are being generated for {', '.join(refresh.render_slugs)} "
-                f"(ready within seconds). Call get_preview(deck_id=\"{deck_id}\", slugs=[...]) to view."
-            )
+            # Everything the composer needs is in `result` now. The render (unless
+            # measure_slides made it), compose (Web UI live preview) and the rendered
+            # slugs' WebP take 5-10 s; they finish in the background, which owns
+            # tmpdir from here on.
+            if not refresh.render_error:  # a failed render makes no previews to wait for
+                result["previewHint"] = (
+                    f"Preview images are being generated for {', '.join(refresh.render_slugs)} "
+                    f"(ready within seconds). Call get_preview(deck_id=\"{deck_id}\", slugs=[...]) to view."
+                )
             pending = _register_pending_preview(deck_id)
             job = (deck_id, refresh, tmpdir, epoch, old_keys, latest, pending)
             in_background = True
@@ -1138,8 +1138,9 @@ def _refresh_pptx_artifact(deck_id: str, user_id: str, pptx_path: Path, slide_co
 
 def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old_keys: list[str],
                                  latest: dict[str, str], pending: threading.Event) -> None:
-    """Background part of run_python: WebP previews first (the composer's next
-    get_preview waits on ``pending``), then the compose payloads for the Web UI."""
+    """Background part of run_python: the render (unless measure_slides made it in
+    the call), WebP previews first (the composer's next get_preview waits on
+    ``pending``), then the compose payloads for the Web UI."""
     import shutil
     from concurrent.futures import ThreadPoolExecutor
 
@@ -1212,6 +1213,8 @@ def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old
             logger.error("compose failed", exc_info=True)
     finally:
         _clear_pending_preview(deck_id, pending)
+        if refresh.render_error:
+            logger.warning("run_python render failed for deck %s: %s", deck_id, refresh.render_error)
         refresh.close()
         shutil.rmtree(tmpdir, ignore_errors=True)
         logger.info("run_python background compose/previews for deck %s took %.1fs", deck_id, time.monotonic() - t0)

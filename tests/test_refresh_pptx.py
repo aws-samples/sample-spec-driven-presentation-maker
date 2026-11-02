@@ -72,9 +72,20 @@ def test_change_renders_the_affected_slide_without_measuring(tmp_path, office, p
     deck = _deck(tmp_path)
     with refresh_pptx(deck, ["slides/body.json"]) as r:
         assert r.pptx_path == deck / "output.pptx" and r.pptx_path.read_bytes()[:2] == b"PK"
-        assert r.render_slugs == ["body"] and r.compose_slugs == ["body"]
+        assert r.render_slugs == ["body"]
         assert r.result == {}  # no measure_slides: no measure, warnings or errors
+        # The render waits for its first reader (the remote server's background task).
+        assert partial_builds == [] and office.calls == []
+        assert r.compose_slugs == ["body"]
+        assert ("soffice", "svg") in office.calls
     assert partial_builds == [{"body"}]
+
+
+def test_a_closed_refresh_renders_nothing(tmp_path, office, partial_builds):
+    r = refresh_pptx(_deck(tmp_path), ["slides/body.json"])
+    r.close()
+    assert r.compose(None).defs is None and r.previews().rendered is False
+    assert partial_builds == [] and office.calls == []
 
 
 def test_override_child_renders_with_its_base(tmp_path, office, partial_builds):
