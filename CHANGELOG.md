@@ -100,12 +100,14 @@ Entries before v0.5.0 were written retroactively as summaries.
   and cites them in the brief and outline now lives only in `orchestrator.md` and the
   `attachments` guide, which every client reads: read with `read_attachment` first, list
   each source under the brief's **Sources** with the part the slides need (section, page or
-  `read_attachment` line range), point each slide's `evidence` at that part, and refer to
-  imported material by the returned `bundlePath` plus the listed path. The AWS stack's agent
-  prompt keeps only the `[Attached:…]` marker format (`agent/prompts/common/attachments.md`);
-  its extra rules (summaries and line pointers in the brief, citation examples, importing
-  only when composers need the file) are gone, so Cloud briefs follow the same rules as
-  Local clients.
+  `read_attachment` line range), naming an attached file by its file name and `attachments/`
+  path, point each slide's `evidence` at that part, and refer to imported material by the
+  returned `bundlePath` plus the listed path. The AWS stack's agent prompt keeps only the
+  `[Attached:…]` marker format (`agent/prompts/common/attachments.md`); its extra rules
+  (content summaries in the brief, citation examples, importing only when composers need the
+  file) are gone, so Cloud briefs follow the same rules as Local clients and every attached
+  file is imported. Line references stay, now as the `read_attachment` line range in Sources
+  and `evidence`.
 
 ### Removed
 
