@@ -2118,8 +2118,16 @@ def test_an_effect_this_build_cannot_apply_is_not_counted_as_awaiting_capture():
     The classification is **derived** from the two committed readings, not
     hardcoded, so an effect that appears in a future build stops being marked
     on the next regeneration.
+
+    Reachability is judged **per surface**. A motion path is offered only by the
+    Path Animation popup and an entrance/emphasis/exit effect only by its
+    gallery, so a label found on one surface says nothing about the other.
+    Matching the two together is not a shortcut, it is wrong, and it spared two
+    enumerators this build cannot apply: `wave path` was vouched for by the
+    Emphasis tile `Wave` when the popup's path is `Waves`, and `spiral` by the
+    popup's `Spiral` path when no gallery offers it.
     """
-    from scripts.animation_catalog.generate import applicable_effect_labels
+    from scripts.animation_catalog.generate import applicable_labels_by_surface
     from sdpm.engine.timing import load_capability_index
     from sdpm.engine.timing.writer import catalog_coverage
 
@@ -2131,27 +2139,38 @@ def test_an_effect_this_build_cannot_apply_is_not_counted_as_awaiting_capture():
     assert marked, "nothing was marked, so this guard checks nothing"
     assert all(key.startswith("MsoAnimEffect.animation type ") for key in marked), sorted(marked)[:5]
 
-    # Every marked entry names an effect no gallery offers, and carries both the
-    # reading it came from and the published corroboration.
-    labels = applicable_effect_labels()
-    assert labels, "the platform inventory is missing, so the marking cannot be checked"
+    by_surface = applicable_labels_by_surface()
+    assert by_surface["path"], "the platform inventory is missing"
+    assert by_surface["gallery"], "the gallery tiles reading is missing"
     by_key = {e["key"]: e for e in catalog["guiItems"] + catalog["candidates"]}
     import re as _re
 
+    # Every marked entry names an effect its own surface does not offer, and
+    # carries both the reading it came from and the published corroboration.
     for key in sorted(marked):
-        label = key.removeprefix("MsoAnimEffect.animation type ").removesuffix(" path")
-        assert _re.sub(r"[^a-z0-9]", "", label.lower()) not in labels, (
-            f"{key} was marked unavailable but {label!r} is in this build's galleries"
+        enumerator = key.removeprefix("MsoAnimEffect.animation type ")
+        surface = "path" if enumerator.endswith(" path") else "gallery"
+        label = enumerator.removesuffix(" path")
+        assert _re.sub(r"[^a-z0-9]", "", label.lower()) not in by_surface[surface], (
+            f"{key} was marked unavailable but {label!r} is on this build's {surface} surface"
         )
         block = by_key[key]["platformUnavailable"]
         assert block["platform"] == "macOS"
+        assert block["surface"] == surface
         assert len(block["corroboration"]) == 2
         assert block["readFrom"]
 
-    # And the effects the galleries *do* offer are never marked, however
-    # unusual their names: shimmer, stretchy and wave are reachable here.
-    for reachable in ("shimmer", "stretchy", "wave path"):
+    # The gallery effects this build does offer are never marked, however
+    # unusual their names.
+    for reachable in ("shimmer", "stretchy"):
         assert f"MsoAnimEffect.animation type {reachable}" not in marked, reachable
+
+    # And the two the union rule used to spare are marked now. `bounce` is the
+    # control: it is genuinely on both surfaces, so it must stay unmarked
+    # whichever surface it is judged against.
+    for unreachable in ("wave path", "spiral"):
+        assert f"MsoAnimEffect.animation type {unreachable}" in marked, unreachable
+    assert "MsoAnimEffect.animation type bounce" not in marked
 
 
 def test_the_platform_inventory_records_the_whole_path_animation_popup():

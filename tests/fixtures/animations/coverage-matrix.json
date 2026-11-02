@@ -13,7 +13,7 @@
   },
   "source": {
     "catalog": "sdpm/references/catalogs/powerpoint-animation-catalog.json",
-    "catalogDigest": "sha256:01c6485b2ee38845762daf39bc3bba963fcaeb0641238dab0307bb5e48ac33a9",
+    "catalogDigest": "sha256:0ebd8fd50eee34db2e490ad2886ce0be2558c893b4906ee161aa2dc6db417424",
     "catalogGeneratedAt": "2026-10-30T00:00:00Z",
     "guiManifest": "powerpoint-gui-surface-16.113.1.json@2026-11-02.1",
     "baseline": {

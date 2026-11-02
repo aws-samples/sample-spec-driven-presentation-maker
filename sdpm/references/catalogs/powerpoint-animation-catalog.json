@@ -71030,7 +71030,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers '4 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers '4 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -71121,7 +71122,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers '5 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers '5 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -71212,7 +71214,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers '6 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers '6 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -71303,7 +71306,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers '8 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers '8 point star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -71478,7 +71482,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'arc down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'arc down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -71569,7 +71574,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'arc left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'arc left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -71660,7 +71666,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'arc right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'arc right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -71754,7 +71761,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'arc up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'arc up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -71845,7 +71853,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'arc up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'arc up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -71939,7 +71948,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'ascend'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'ascend'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -72030,7 +72040,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'bean'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'bean'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -72123,7 +72134,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'blast'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'blast'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -72653,7 +72665,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'bounce left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'bounce left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -72744,7 +72757,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'bounce right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'bounce right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -72844,7 +72858,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'box'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'box'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -72944,7 +72959,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'brush on color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'brush on color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -73044,7 +73060,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'brush on underline'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'brush on underline'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -73135,7 +73152,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'buzzsaw'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'buzzsaw'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -73319,7 +73337,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'change fill color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'change fill color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -73415,7 +73434,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'change font'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'change font'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -73515,7 +73535,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'change font color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'change font color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -73611,7 +73632,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'change font size'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'change font size'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -73707,7 +73729,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'change font style'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'change font style'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -73809,7 +73832,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'change line color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'change line color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -74070,7 +74094,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'circle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'circle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -74163,7 +74188,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'color blend'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'color blend'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -74263,7 +74289,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'color reveal'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'color reveal'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -74356,7 +74383,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'color wave'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'color wave'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -74632,7 +74660,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'constrasting color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'constrasting color'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -74732,7 +74761,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'crawl'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'crawl'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -74913,7 +74943,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'crescent moon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'crescent moon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -75004,7 +75035,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'curved square'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'curved square'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -75095,7 +75127,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'curved x'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'curved x'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -75186,7 +75219,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'curvy left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'curvy left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -75277,7 +75311,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'curvy right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'curvy right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -75368,7 +75403,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'curvy star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'curvy star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -75623,7 +75659,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'decaying wave'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'decaying wave'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -75804,7 +75841,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'descend'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'descend'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -75895,7 +75933,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'diagonal down right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'diagonal down right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -75986,7 +76025,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'diagonal up right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'diagonal up right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -76086,7 +76126,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'diamond'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'diamond'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -76177,7 +76218,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'diamond'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'diamond'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -76353,7 +76395,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -76453,7 +76496,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'ease in'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'ease in'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -76544,7 +76588,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'equal triangle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'equal triangle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -76805,7 +76850,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'fade zoom'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'fade zoom'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -76899,7 +76945,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'faded swivel'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'faded swivel'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -76990,7 +77037,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'figure 8 four'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'figure 8 four'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -77091,7 +77139,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'flash bulb'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'flash bulb'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -77191,7 +77240,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'flash once'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'flash once'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -77293,7 +77343,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'flicker'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'flicker'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -77571,7 +77622,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'fly'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'fly'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -77665,7 +77717,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'fold'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'fold'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -77756,7 +77809,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'football'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'football'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -77847,7 +77901,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'funnel'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'funnel'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -77941,7 +77996,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'glide'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'glide'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -78047,7 +78103,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'grow and turn'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'grow and turn'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -78312,7 +78369,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'heart'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'heart'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -78403,7 +78461,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'heartbeat'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'heartbeat'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -78494,7 +78553,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'hexagon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'hexagon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -78585,7 +78645,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'horizontal figure 8'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'horizontal figure 8'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -78676,7 +78737,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'inverted square'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'inverted square'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -78767,7 +78829,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'inverted triangle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'inverted triangle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -78858,7 +78921,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -78952,7 +79016,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'light speed'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'light speed'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -79130,7 +79195,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'loop de loop'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'loop de loop'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -79225,7 +79291,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'media pause'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'media pause'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -79401,7 +79468,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'media stop'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'media stop'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -79492,7 +79560,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'neutron'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'neutron'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -79583,7 +79652,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'octagon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'octagon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -79674,7 +79744,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'parallelogram'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'parallelogram'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -79765,7 +79836,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'peanut'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'peanut'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -79871,7 +79943,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'peek'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'peek'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -79962,7 +80035,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'pentagon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'pentagon'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -80144,7 +80218,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'plus'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'plus'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -80235,7 +80310,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'plus'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'plus'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -80326,7 +80402,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'pointy star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'pointy star'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -80511,7 +80588,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'random effect'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'random effect'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -80602,7 +80680,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -80693,7 +80772,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'right triangle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'right triangle'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -80866,7 +80946,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 's curve 1'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 's curve 1'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -80957,7 +81038,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 's curve 2'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 's curve 2'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -81130,7 +81212,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'sine wave'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'sine wave'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -81224,7 +81307,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'sling'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'sling'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -81491,6 +81575,22 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 223 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'spiral'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -81572,7 +81672,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'spiral left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'spiral left'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -81663,7 +81764,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'spiral right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'spiral right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -81839,7 +81941,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'spring'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'spring'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -81930,7 +82033,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'square'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'square'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -82021,7 +82125,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'stairs down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'stairs down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -82371,7 +82476,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'style emphasis'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'style emphasis'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -82465,7 +82571,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'swish'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'swish'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -82646,7 +82753,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'swoosh'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'swoosh'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -82737,7 +82845,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'teardrop'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'teardrop'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -82916,7 +83025,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'thin line'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'thin line'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -83093,7 +83203,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'trapezoid'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'trapezoid'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -83184,7 +83295,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'turn down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'turn down'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -83275,7 +83387,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'turn right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'turn right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -83366,7 +83479,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'turn up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'turn up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -83457,7 +83571,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'turn up right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'turn up right'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -83551,7 +83666,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'unfold'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'unfold'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -83642,7 +83758,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'up'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -83733,7 +83850,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'vertical figure 8'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'vertical figure 8'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -83826,7 +83944,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'vertical grow'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'vertical grow'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -83999,6 +84118,22 @@
         "outcome": "rejectedByPowerPoint",
         "error": "Microsoft PowerPoint got an error: main sequence of timeline of slide 340 of presentation \"Presentation1\" doesn’t understand the “add effect” message.",
         "classification": "the dictionary does not implement add effect on main sequence in this build, so no animation value could be applied at all; this says nothing about the value's OOXML mapping"
+      },
+      "platformUnavailable": {
+        "platform": "macOS",
+        "application": "Microsoft PowerPoint",
+        "version": "16.113.1",
+        "surface": "path",
+        "reason": "no popup of this build offers 'wave'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "readFrom": [
+          "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
+          "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
+        ],
+        "corroboration": [
+          "https://support.microsoft.com/en-us/office/add-a-motion-path-animation-effect-f3174300-0d24-4671-a1c2-e286b41efba6",
+          "https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point"
+        ],
+        "closes": "a capture on a platform whose PowerPoint offers the effect"
       }
     },
     {
@@ -84417,7 +84552,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'zigzag'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "path",
+        "reason": "no popup of this build offers 'zigzag'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"
@@ -84511,7 +84647,8 @@
         "platform": "macOS",
         "application": "Microsoft PowerPoint",
         "version": "16.113.1",
-        "reason": "no gallery or popup of this build offers 'zip'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
+        "surface": "gallery",
+        "reason": "no gallery of this build offers 'zip'. The full effect list is reached on Windows through Add Animation, which PowerPoint for Mac does not have, so no capture on this platform can record this enumerator's OOXML form",
         "readFrom": [
           "tests/fixtures/animations/gui-only/platform-inventory-2026-11-02/platform-inventory.json",
           "tests/fixtures/animations/gui-only/effect-options-2026-11-01/tiles.json"

@@ -3028,15 +3028,29 @@ def _label_key(label: str) -> str:
     return re.sub(r"[^a-z0-9]", "", label.lower())
 
 
-def applicable_effect_labels(
+def applicable_labels_by_surface(
     inventory: Path | None = None, tiles: Path | None = None
-) -> set[str]:
-    """Return every effect label this PowerPoint build can apply, normalised."""
-    labels: set[str] = set()
+) -> dict[str, set[str]]:
+    """Return the applicable effect labels, kept apart by the surface offering them.
+
+    The two surfaces must not be merged. A motion path is offered only by the
+    ``Path Animation`` popup and an entrance/emphasis/exit effect only by its
+    gallery, so a label found on one says nothing about the other — and the
+    names do collide. ``Wave`` is an Emphasis tile while the popup's path is
+    ``Waves``; ``Spiral`` is a popup path and no gallery offers it.
+    """
+    paths: set[str] = set()
     inventory_path = inventory or DEFAULT_PLATFORM_INVENTORY
     if inventory_path.exists():
         document = json.loads(inventory_path.read_text(encoding="utf-8"))
-        labels.update(_label_key(label) for label in document.get("labels") or ())
+        paths.update(_label_key(label) for label in document.get("labels") or ())
+        for gallery in document.get("galleries") or ():
+            for item in gallery.get("items") or ():
+                label = item.get("label") if isinstance(item, dict) else item
+                if label:
+                    paths.add(_label_key(str(label)))
+
+    galleries: set[str] = set()
     tiles_path = tiles or DEFAULT_GALLERY_TILES
     if tiles_path.exists():
         document = json.loads(tiles_path.read_text(encoding="utf-8"))
@@ -3044,8 +3058,21 @@ def applicable_effect_labels(
             for item in gallery:
                 label = item.get("label") if isinstance(item, dict) else item
                 if label:
-                    labels.add(_label_key(str(label)))
-    return labels
+                    galleries.add(_label_key(str(label)))
+    return {"path": paths, "gallery": galleries}
+
+
+def applicable_effect_labels(
+    inventory: Path | None = None, tiles: Path | None = None
+) -> set[str]:
+    """Every effect label this build can apply, both surfaces together.
+
+    Kept for callers that only need "is this reachable at all". Classification
+    must use :func:`applicable_labels_by_surface` instead: matching against the
+    union lets a gallery effect vouch for a motion path of the same name.
+    """
+    by_surface = applicable_labels_by_surface(inventory, tiles)
+    return by_surface["path"] | by_surface["gallery"]
 
 
 def mark_platform_unavailable(items: list[dict[str, Any]]) -> int:
@@ -3069,8 +3096,8 @@ def mark_platform_unavailable(items: list[dict[str, Any]]) -> int:
     of reach *here*. A capture on Windows, or a Mac build that gains ``Add
     Animation``, would close them.
     """
-    labels = applicable_effect_labels()
-    if not labels:
+    by_surface = applicable_labels_by_surface()
+    if not any(by_surface.values()):
         return 0
     marked = 0
     for entry in items:
@@ -3080,15 +3107,25 @@ def mark_platform_unavailable(items: list[dict[str, Any]]) -> int:
         ooxml = entry.get("ooxml")
         if not isinstance(ooxml, dict) or not ooxml.get("requiresCapture"):
             continue
-        label = key.removeprefix("MsoAnimEffect.animation type ").removesuffix(" path")
-        if _label_key(label) in labels:
+        enumerator = key.removeprefix("MsoAnimEffect.animation type ")
+        # A motion path is reachable only through the Path Animation popup and
+        # an entrance/emphasis/exit effect only through its gallery, so each is
+        # checked against its own surface. Matching the union spared two
+        # enumerators this build cannot apply: `wave path` was vouched for by
+        # the Emphasis tile `Wave` (the popup's path is `Waves`), and `spiral`
+        # by the popup's `Spiral` path (no gallery offers it).
+        surface = "path" if enumerator.endswith(" path") else "gallery"
+        label = enumerator.removesuffix(" path")
+        if _label_key(label) in by_surface[surface]:
             continue
+        offered = "popup" if surface == "path" else "gallery"
         entry["platformUnavailable"] = {
             "platform": "macOS",
             "application": BASELINE_APPLICATION,
             "version": BASELINE_VERSION,
+            "surface": surface,
             "reason": (
-                f"no gallery or popup of this build offers {label!r}. The full effect list is "
+                f"no {offered} of this build offers {label!r}. The full effect list is "
                 "reached on Windows through Add Animation, which PowerPoint for Mac does not "
                 "have, so no capture on this platform can record this enumerator's OOXML form"
             ),
