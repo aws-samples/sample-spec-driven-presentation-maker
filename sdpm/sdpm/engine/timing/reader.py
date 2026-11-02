@@ -1021,6 +1021,11 @@ class _TimingReader:
         #: registers it from the first effect that asks.
         self._builds_used: set[tuple[int, int]] = set()
         self._preset_build: dict[tuple[int, int], bool] = {}
+        #: The paragraph range the behaviour targets just named, if any.
+        #: `p:pRg` sits inside `p:spTgt`, which is read per behaviour, while the
+        #: JSON carries it once on the effect's target — so it is handed up
+        #: here rather than threaded through every target read.
+        self._paragraph_range: dict[str, int] | None = None
 
     # -- entry point ---------------------------------------------------
     def read(self, timing: etree._Element) -> dict[str, Any] | None:
@@ -1302,8 +1307,18 @@ class _TimingReader:
         iterate = self._read_iterate(ctn, sequence)
         text = {**(build_fields.pop("text", None) or {}), **iterate}
 
+        # Set while the behaviours' targets were read, so it is in hand before
+        # the effect dict — and therefore before the effect ID is allocated
+        # from it, which is what the writer fingerprints.
+        paragraph_range = self._paragraph_range
+        self._paragraph_range = None
+
         effect: dict[str, Any] = {
-            "target": {"element": target},
+            "target": (
+                {"element": target, "paragraphRange": paragraph_range}
+                if paragraph_range is not None
+                else {"element": target}
+            ),
             **named,
             "start": {"type": start_type, "delayMs": self._delay(ctn, f"{sequence} effect")},
             "timing": self._read_timing(attrs, duration, sequence),
@@ -1822,12 +1837,37 @@ class _TimingReader:
                 "so neither a semantic target nor a raw remapping can be built"
             )
         nested = _only_children(sp_tgt, {"txEl"} if allow_range else set(), "p:spTgt")
+        self._paragraph_range = None
         if nested:
-            raise _Unsupported(
-                "p:spTgt carries a paragraph/text sub-target, which sdpm does not invert yet"
-            )
+            self._paragraph_range = self._read_paragraph_range(nested)
         self.targets.add(spid)
         return identity.element_id
+
+    def _read_paragraph_range(self, nested: list[etree._Element]) -> dict[str, int]:
+        """Invert ``p:spTgt/p:txEl/p:pRg`` into ``target.paragraphRange``.
+
+        The reader used to refuse any text sub-target outright, which sent the
+        whole slide's timing to the raw fallback. Only the paragraph range is
+        inverted: ``p:txEl`` can also carry a character range or a whole-text
+        reference, and those have no field in the JSON, so they keep the raw
+        fallback rather than importing as a range they are not.
+        """
+        if len(nested) != 1:
+            raise _Unsupported("p:spTgt carries more than one p:txEl")
+        _only_children(nested[0], {"pRg"}, "p:txEl")
+        rng = _child(nested[0], "pRg")
+        if rng is None:
+            raise _Unsupported(
+                "p:txEl carries no p:pRg, so it names a text range sdpm has no field for"
+            )
+        attrs = _require_attrs(rng, ("st", "end"), "p:pRg")
+        bounds: dict[str, int] = {}
+        for attribute, name in (("st", "start"), ("end", "end")):
+            raw = attrs.get(attribute)
+            if raw is None or not raw.lstrip("-").isdigit():
+                raise _Unsupported(f"p:pRg/@{attribute} {raw!r} is not a paragraph index")
+            bounds[name] = int(raw)
+        return bounds
 
     def _spid_of(self, element_id: str) -> int:
         for spid, identity in self.identities.items():

@@ -425,11 +425,14 @@ def _behavior_slide(effect: dict) -> tuple[etree._Element, etree._Element]:
         REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
     )
     slide, registry, _spids = acceptance.catalog_slide()
+    # The target is defaulted, not forced: a caller passing one of its own —
+    # a paragraph range, say — would otherwise have it silently discarded, and
+    # the test would then be asserting against an effect it did not describe.
+    prepared = dict(effect)
+    prepared.setdefault("id", "e1")
+    prepared.setdefault("target", {"element": CATALOG_TARGET_ID})
     node = TimingWriter(registry, index=index, slide_slug="behaviors").build(
-        {
-            "mainSequence": [dict(effect, id="e1", target={"element": CATALOG_TARGET_ID})],
-            "interactiveSequences": [],
-        }
+        {"mainSequence": [prepared], "interactiveSequences": []}
     )
     slide.append(node)
     return slide, node
@@ -685,3 +688,65 @@ def test_a_presets_own_animate_background_is_not_restated_on_import():
     assert imported({"text": {"animateBackground": False}})["text"] == {
         "animateBackground": False
     }
+
+
+def test_a_paragraph_range_target_round_trips():
+    """A text sub-target comes back as `target.paragraphRange`.
+
+    The reader refused every `p:spTgt/p:txEl` outright — "which sdpm does not
+    invert yet" — so a deck animating one paragraph of a text box dropped its
+    whole timing to the raw sidecar. The range itself is two integers.
+    """
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    effect = {
+        "target": {"element": CATALOG_TARGET_ID, "paragraphRange": {"start": 1, "end": 2}},
+        "preset": {"category": "entrance", "effect": "fade"},
+        "start": {"type": "onPageClick", "delayMs": 0},
+        "timing": {"durationMs": 500},
+    }
+    slide, written = _behavior_slide(effect)
+    first = etree.tostring(written)
+    assert b'<p:pRg st="1" end="2"/>' in first
+
+    motion = read_slide_motion(slide, slide_slug="behaviors", index=index)
+    assert motion.animations is not None, motion.reasons
+    imported = motion.animations["mainSequence"][0]
+    assert imported["target"] == {
+        "element": CATALOG_TARGET_ID,
+        "paragraphRange": {"start": 1, "end": 2},
+    }
+    _slide, rewritten = _behavior_slide({k: v for k, v in imported.items() if k != "id"})
+    assert etree.tostring(rewritten) == first
+
+
+def test_a_text_sub_target_without_a_paragraph_range_stays_raw():
+    """Only the paragraph range is inverted, because only it has a JSON field.
+
+    `p:txEl` can also name a character range or the whole text body. Importing
+    one of those as a paragraph range would claim something the package does
+    not say, so they keep the raw fallback.
+    """
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    slide, written = _behavior_slide(
+        {
+            "target": {"element": CATALOG_TARGET_ID, "paragraphRange": {"start": 0, "end": 0}},
+            "preset": {"category": "entrance", "effect": "fade"},
+            "start": {"type": "onPageClick", "delayMs": 0},
+            "timing": {"durationMs": 500},
+        }
+    )
+    # Replace the paragraph range with a character range, the way another
+    # producer would.
+    for node in written.iter():
+        if etree.QName(node).localname == "pRg":
+            parent = node.getparent()
+            parent.remove(node)
+            etree.SubElement(parent, f"{{{P}}}charRg", st="0", end="3")
+    motion = read_slide_motion(slide, slide_slug="behaviors", index=index)
+    assert motion.animations is None
+    assert motion.raw_timing is not None
+    assert any("charRg" in reason or "p:txEl" in reason for reason in motion.reasons), motion.reasons

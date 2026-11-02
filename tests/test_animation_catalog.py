@@ -2148,8 +2148,13 @@ def test_reversibility_is_measured_rather_than_looked_up():
     #
     # The ninth, `animation.target.paragraphRange`, is a real reader gap: the
     # reader refuses a `p:spTgt` carrying a `p:txEl` paragraph sub-target.
-    assert len(one_way) == 9, (len(one_way), one_way[:5])
-    irreducible = {
+    # And the last reader gap, `animation.target.paragraphRange`, closed when
+    # the reader learned to invert `p:spTgt/p:txEl/p:pRg` instead of refusing
+    # every text sub-target. So **every remaining entry is irreducible**: each
+    # writes bytes another entry also writes, and the count is a floor rather
+    # than a backlog.
+    assert len(one_way) == 8, (len(one_way), one_way[:5])
+    assert set(one_way) == {
         "MsoAnimTextUnitEffect.by paragraph",
         "MsoAnimateByLevel.text by all levels",
         "MsoAnimateByLevel.text by no levels",
@@ -2159,7 +2164,6 @@ def test_reversibility_is_measured_rather_than_looked_up():
         "animation.textOptions.sequence.asOneObject",
         "animation.textOptions.unit.byParagraph",
     }
-    assert set(one_way) == irreducible | {"animation.target.paragraphRange"}
     assert not any(key.startswith("EPPEntryEffect.") for key in one_way), (
         "transition enumerators corroborate a gallery tile and round-trip; "
         "none should be left counted one-way"
