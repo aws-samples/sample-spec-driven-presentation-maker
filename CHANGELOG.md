@@ -111,6 +111,15 @@ Entries before v0.5.0 were written retroactively as summaries.
   local server answered with 404, and every new deck sent a `PATCH` the local server does not
   have (405). The deck folder is no longer taken for a deck, and Local mode skips the `PATCH`
   (it already links the chat session to the deck on its own). (#480)
+- **Local Web UI frees a deck's agent process when its turn ends.** After a turn that used
+  composer sub-agents, or the first turn on a reopened deck whose process had been stopped,
+  the local server kept marking the kiro-cli process as busy: kiro-cli sends no end-of-turn
+  notice for sub-agent sessions, and reopening a session replays its history under its own
+  id, which the server took for a sub-agent that never finished. Busy processes are never
+  stopped to make room, so the limit of three processes stopped the most recently used idle
+  one instead of the oldest, or was not enforced at all once every process looked busy. The
+  turn now ends when kiro-cli answers the chat's prompt, and sub-agent sessions are tracked
+  only within the turn (the stop button still cancels them).
 - **Cloud `read_attachment` works again.** Since 2026-10-08 every call failed with
   `validation error for read_attachmentOutput — Input should be a valid string`: the remote
   server declared the tool as returning a string while it returns the result object, and the

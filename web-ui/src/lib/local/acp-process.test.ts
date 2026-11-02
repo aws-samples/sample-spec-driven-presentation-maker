@@ -5,7 +5,9 @@
  * The process map: a new chat's process is reachable under the client id (C) and its kiro
  * session id (K, what the deck's `.session` stores); close and eviction drop every key of a
  * process; the size limit counts processes, not keys; a prompt to a session still answering
- * is refused. kiro-cli is replaced by a fake child that answers the ACP requests.
+ * is refused; a turn ends with the answer to its session/prompt (result or error), whatever the
+ * sub-agent sessions or other requests sent. kiro-cli is replaced by a fake child that answers
+ * the ACP requests.
  */
 
 import { EventEmitter } from "events"
@@ -26,6 +28,9 @@ class FakeChild extends EventEmitter {
   stdin = { write: (line: string) => { this.handle(JSON.parse(line)); return true } }
   killed = false
   prompts: number[] = []
+  cancelled: string[] = []
+  /** Methods answered with a JSON-RPC error instead of a result. */
+  failing = new Set<string>()
   constructor(private readonly sessionId: string, private readonly lockedSessions: Set<string>) { super() }
 
   private send(msg: Record<string, unknown>) {
@@ -34,16 +39,39 @@ class FakeChild extends EventEmitter {
   }
 
   private handle(req: Rpc) {
+    if (req.method === "session/cancel") this.cancelled.push(req.params.sessionId as string)
     if (req.id == null) return
     if (req.method === "session/new") this.send({ id: req.id, result: { sessionId: this.sessionId } })
     else if (req.method === "session/load" && this.lockedSessions.has(req.params.sessionId as string)) {
       this.send({ id: req.id, error: { message: "Internal error", data: "Failed to start session: Session is active in another process (PID 1)" } })
+    } else if (req.method === "session/load") {
+      // kiro-cli replays the loaded session's history under its id before answering.
+      this.update(req.params.sessionId as string, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "earlier" } })
+      this.send({ id: req.id, result: {} })
     } else if (req.method === "session/prompt") this.prompts.push(req.id)
+    else if (this.failing.has(req.method)) this.send({ id: req.id, error: { message: "Internal error", data: `${req.method} failed` } })
     else this.send({ id: req.id, result: {} })
   }
 
-  endTurn() {
-    this.send({ id: this.prompts.shift(), result: { stopReason: "end_turn" } })
+  update(sessionId: string, update: Record<string, unknown>) {
+    this.send({ method: "session/update", params: { sessionId, update } })
+  }
+
+  /** What kiro-cli 2.37 sends for a use_subagent call: sub-session updates and list_update, no turn_end. */
+  runSubagent(subSessionId: string) {
+    this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [{ sessionId: subSessionId, status: { type: "working" } }] } })
+    this.update(subSessionId, { sessionUpdate: "tool_call", toolCallId: `${subSessionId}-t`, title: "Running: @sdpm/generate_pptx" })
+    this.update(subSessionId, { sessionUpdate: "tool_call_update", toolCallId: `${subSessionId}-t`, status: "completed" })
+    this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [{ sessionId: subSessionId, status: { type: "terminated" } }] } })
+    this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [] } })
+  }
+
+  endTurn(stopReason = "end_turn") {
+    this.send({ id: this.prompts.shift(), result: { stopReason } })
+  }
+
+  failPrompt() {
+    this.send({ id: this.prompts.shift(), error: { message: "Internal error", data: "model stream failed" } })
   }
 
   kill() {
@@ -56,6 +84,7 @@ class FakeChild extends EventEmitter {
 }
 
 const tick = () => new Promise((r) => setImmediate(r))
+const settle = async () => { for (let i = 0; i < 10; i++) await tick() }
 
 let children: FakeChild[]
 let locked: Set<string>
@@ -134,6 +163,115 @@ describe("sendPrompt", () => {
     const next = await acp.sendPrompt("K1", "after the turn")
     expect(next.sessionId).toBe("K1")
     expect(spawn).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("turn state", () => {
+  /** One turn on a session: prompt, optional sub-agents, then the prompt's answer. */
+  async function turn(child: FakeChild, sessionId: string, subSessions: string[] = []) {
+    const prompted = await acp.sendPrompt(sessionId, "build the deck")
+    prompted.send()
+    for (const sub of subSessions) child.runSubagent(sub)
+    await settle()
+    expect(acp.isSessionRunning(sessionId)).toBe(true)
+    child.endTurn()
+    await settle()
+  }
+
+  it("is no longer running once the prompt is answered after a turn that used sub-agents", async () => {
+    await acp.createNewProcessFor("C1")
+    await turn(children[0], "C1", ["S1", "S2"])
+    expect(acp.isSessionRunning("C1")).toBe(false)
+    expect(acp.isSessionRunning("K1")).toBe(false)
+
+    // The next send goes through (no SessionBusyError → 409) and its turn also ends.
+    await turn(children[0], "K1")
+    expect(acp.isSessionRunning("K1")).toBe(false)
+    expect(spawn).toHaveBeenCalledTimes(1)
+  })
+
+  it("is no longer running after a turn on a session restored with session/load", async () => {
+    await acp.getOrCreateProcess("K9")
+    await turn(children[0], "K9")
+    expect(acp.isSessionRunning("K9")).toBe(false)
+  })
+
+  it("evicts the oldest idle process, including one whose last turn used sub-agents", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] })
+    try {
+      vi.setSystemTime(1_000)
+      for (const id of ["C1", "C2", "C3"]) await acp.createNewProcessFor(id)
+      vi.setSystemTime(2_000)
+      await turn(children[0], "C1", ["S1"])
+      vi.setSystemTime(3_000)
+      await turn(children[1], "C2")
+      vi.setSystemTime(4_000)
+      await turn(children[2], "C3")
+
+      await acp.createNewProcessFor("C4")
+      expect(children.map((c) => c.killed)).toEqual([true, false, false, false])
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("cancel reaches the main session and this turn's sub-agents, and ends the turn", async () => {
+    await acp.createNewProcessFor("C1")
+    const child = children[0]
+    await turn(child, "C1", ["S1"])
+
+    const prompted = await acp.sendPrompt("C1", "again")
+    prompted.send()
+    child.runSubagent("S2")
+    await settle()
+    acp.cancelSession("C1")
+    expect(child.cancelled).toEqual(["K1", "S2"])
+
+    child.endTurn("cancelled")
+    await settle()
+    expect(acp.isSessionRunning("C1")).toBe(false)
+    await expect(acp.sendPrompt("C1", "after cancel")).resolves.toMatchObject({ sessionId: "K1" })
+  })
+
+  it("ends the turn when session/prompt is answered with an error, and accepts the next send", async () => {
+    await acp.createNewProcessFor("C1")
+    const child = children[0]
+    const prompted = await acp.sendPrompt("C1", "build the deck")
+    const errors: unknown[] = []
+    prompted.subscribe((msg) => { if (msg.error) errors.push(msg.error) })
+    prompted.send()
+    child.runSubagent("S1")
+    await settle()
+    expect(acp.isSessionRunning("C1")).toBe(true)
+
+    child.failPrompt()
+    await settle()
+    expect(errors).toHaveLength(1)
+    expect(acp.isSessionRunning("C1")).toBe(false)
+    expect(acp.isSessionRunning("K1")).toBe(false)
+
+    // No SessionBusyError (→ 409): the failed prompt released the session.
+    await turn(child, "K1")
+    expect(acp.isSessionRunning("K1")).toBe(false)
+    expect(spawn).toHaveBeenCalledTimes(1)
+  })
+
+  it("keeps the turn running when another request fails mid-turn, until the prompt is answered", async () => {
+    await acp.createNewProcessFor("C1")
+    const child = children[0]
+    child.failing.add("session/set_config_option")
+    const prompted = await acp.sendPrompt("C1", "build the deck")
+    prompted.send()
+    await settle()
+
+    await expect(acp.setConfigOption("C1", "model", "unknown")).rejects.toThrow(/session\/set_config_option failed/)
+    await settle()
+    expect(acp.isSessionRunning("C1")).toBe(true)
+    await expect(acp.sendPrompt("C1", "again")).rejects.toThrow(/still answering/)
+
+    child.endTurn()
+    await settle()
+    expect(acp.isSessionRunning("C1")).toBe(false)
   })
 })
 
