@@ -7,9 +7,9 @@ tool contract (:mod:`sdpm.tools`) from bundled data baked into the image.
 Only user styles are infrastructure-dependent (S3 + DynamoDB pins).
 """
 
-import re
 from typing import Any
 
+from shared.user_library import merge_styles
 from storage import Storage
 
 
@@ -17,8 +17,9 @@ def list_styles(storage: Storage, user_id: str = "", include_all: bool = False) 
     """List available design styles with pin/source metadata.
 
     Combines bundled styles (references/examples/styles/, baked into the
-    image) and user styles (user-styles/{user_id}/ on S3). Uses Engine
-    filter_styles() for filtering.
+    image) and user styles (user-styles/{user_id}/ on S3), one entry per name:
+    a user style replaces the bundled style of the same name (the same rule as
+    Local and the Web UI). Uses Engine build_styles_listing() for filtering.
 
     Args:
         storage: Storage backend instance.
@@ -41,30 +42,12 @@ def list_styles(storage: Storage, user_id: str = "", include_all: bool = False) 
         {**s, "source": "builtin"} for s in _list_bundled_styles(BUNDLED_STYLES_DIR)
     ]
 
-    # 2. User styles from pptx bucket
-    user_styles: list[dict[str, str]] = []
-    if user_id:
-        user_prefix = f"user-styles/{user_id}/"
-        user_files = storage.list_files(prefix=user_prefix, bucket=storage.pptx_bucket)
-        for f in user_files:
-            if not f.endswith(".html"):
-                continue
-            name = f.removeprefix(user_prefix).removesuffix(".html")
-            description = ""
-            try:
-                content = storage.download_file_from_pptx_bucket(key=f).decode("utf-8")
-                m = re.search(r"<title>(.*?)</title>", content, re.IGNORECASE)
-                if m:
-                    description = m.group(1).strip()
-            except Exception:
-                pass
-            user_styles.append({"name": name, "description": description, "source": "user"})
-
-    # 3. Get pins
+    # 2. User styles and pins (pptx bucket + DDB)
+    user_styles: list[dict] = []
     pinned_names: list[str] = []
     if user_id:
+        user_styles = storage.list_user_styles(user_id)
         pinned_names = storage.get_style_pins(user_id)
 
-    # 4. Build payload via Engine (filter + hidden-style names/hint)
-    all_styles = user_styles + builtin_styles
-    return build_styles_listing(all_styles, pinned_names, include_all)
+    # 3. Build payload via Engine (filter + hidden-style names/hint)
+    return build_styles_listing(merge_styles(user_styles, builtin_styles), pinned_names, include_all)

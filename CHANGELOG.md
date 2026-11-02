@@ -87,6 +87,15 @@ Entries before v0.5.0 were written retroactively as summaries.
   attachments now lives in `sdpm.tools.attachment.ingest` (formerly `shared.ingest`), so
   `sdpm-skill` now depends on `pypdf>=6.15.0`, `pdfplumber`, `python-docx` and `openpyxl`.
   Conversion results are unchanged. (#477)
+- **One style per name in the AWS style lists.** When a user saves a style under the name of
+  a bundled style (for example `report`), the Web UI style gallery (`GET /styles`) and the MCP
+  Runtime's `list_styles` and `start_style` catalogue now list it once, as the user's style,
+  instead of listing both. This is the rule Local already followed, and the style that
+  `apply_style` and the gallery preview load was already the user's, so applied styles do not
+  change. Agents on the AWS stack see one `report` entry (`"source": "user"`) where they used
+  to see two. The Web UI gallery lists the user's styles before the bundled ones. The style,
+  pin and template code of the API Lambda and the MCP Runtime now shares
+  `shared/user_library.py`; DynamoDB keys and S3 paths are unchanged.
 
 ### Removed
 
@@ -106,6 +115,10 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **The API Lambda no longer leaves template copies in `/tmp`.** Listing templates (when a
+  builtin template had to be analysed) and registering an uploaded template downloaded the
+  `.pptx` into a temporary directory that was never removed, so a warm Lambda container
+  collected them. The download now goes to a directory that is removed after the analysis.
 - **Local Web UI no longer opens the deck folder as a deck.** Starting a new chat briefly
   switched the view to a deck named after the deck folder (`SDPM-Presentations`), which the
   local server answered with 404, and every new deck sent a `PATCH` the local server does not

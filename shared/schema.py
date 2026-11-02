@@ -16,6 +16,18 @@ instead of hardcoding key strings.
 # ---------------------------------------------------------------------------
 
 
+def user_pk(user_id: str) -> str:
+    """Partition key for everything a user owns (decks, pins, templates, notes).
+
+    Args:
+        user_id: User identifier (JWT sub).
+
+    Returns:
+        PK string in format USER#{user_id}.
+    """
+    return f"USER#{user_id}"
+
+
 def deck_pk(user_id: str) -> str:
     """Partition key for a user's deck records.
 
@@ -25,7 +37,7 @@ def deck_pk(user_id: str) -> str:
     Returns:
         PK string in format USER#{user_id}.
     """
-    return f"USER#{user_id}"
+    return user_pk(user_id)
 
 
 def deck_sk(deck_id: str) -> str:
@@ -50,6 +62,41 @@ def fav_sk(deck_id: str) -> str:
         SK string in format FAV#{deck_id}.
     """
     return f"FAV#{deck_id}"
+
+
+# ---------------------------------------------------------------------------
+# User library keys (style pins, templates, builtin-template notes)
+# ---------------------------------------------------------------------------
+
+STYLE_PINS_SK = "STYLE_PINS"
+USER_TEMPLATE_SK_PREFIX = "TEMPLATE#"
+BUILTIN_NOTE_SK_PREFIX = "BUILTIN_NOTE#"
+BUILTIN_TEMPLATE_SK = "META"
+
+
+def style_pins_key(user_id: str) -> dict[str, str]:
+    """Primary key of the user's pinned-style list (attribute ``pinned_styles``)."""
+    return {"PK": user_pk(user_id), "SK": STYLE_PINS_SK}
+
+
+def user_template_sk(name: str) -> str:
+    """Sort key of a user template record: TEMPLATE#{name}."""
+    return f"{USER_TEMPLATE_SK_PREFIX}{name}"
+
+
+def user_template_key(user_id: str, name: str) -> dict[str, str]:
+    """Primary key of a user template record."""
+    return {"PK": user_pk(user_id), "SK": user_template_sk(name)}
+
+
+def builtin_note_key(user_id: str, name: str) -> dict[str, str]:
+    """Primary key of the user's note on a builtin template: BUILTIN_NOTE#{name}."""
+    return {"PK": user_pk(user_id), "SK": f"{BUILTIN_NOTE_SK_PREFIX}{name}"}
+
+
+def builtin_template_key(name: str) -> dict[str, str]:
+    """Primary key of the shared analysis-cache row of a builtin template."""
+    return {"PK": f"TEMPLATE#{name}", "SK": BUILTIN_TEMPLATE_SK}
 
 
 # ---------------------------------------------------------------------------

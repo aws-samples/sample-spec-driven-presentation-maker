@@ -32,6 +32,7 @@ from boto_config import LONG_CALL, SHORT_API  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from shared.authz import authorize  # noqa: E402
+from shared import user_library  # noqa: E402
 from storage.aws import AwsStorage  # noqa: E402
 from tools import assets, reference, preview, generate  # noqa: E402
 from tools import sandbox as sandbox_mod  # noqa: E402
@@ -482,10 +483,10 @@ def start_style(
     styles = reference.list_styles(storage=_storage, user_id=user_id, include_all=True).get("styles", [])
     base_html: str | None = None
     if base:
-        if not re.fullmatch(r"[a-zA-Z0-9_-]+", base):
+        if not user_library.is_valid_style_name(base):
             raise ValueError("Invalid style name")
         try:
-            base_html = _storage.download_file_from_pptx_bucket(key=f"user-styles/{user_id}/{base}.html").decode("utf-8")
+            base_html = _storage.download_file_from_pptx_bucket(key=user_library.user_style_key(user_id, base)).decode("utf-8")
         except Exception:
             base_html = None  # fall through to the bundled lookup inside sdpm.entry
     return json.dumps(_start(base, styles=styles, base_html=base_html), ensure_ascii=False)
@@ -820,14 +821,14 @@ def apply_style(
     style file for reading the parts you need with run_python read_text.
     """
     _check_deck_access(deck_id, action="edit_slide")
-    if not re.fullmatch(r"[a-zA-Z0-9_-]+", style):
+    if not user_library.is_valid_style_name(style):
         raise ValueError("Invalid style name")
 
     user_id = _get_user_id()
     html_bytes = None
 
     # Try user style first
-    user_key = f"user-styles/{user_id}/{style}.html"
+    user_key = user_library.user_style_key(user_id, style)
     try:
         html_bytes = _storage.download_file_from_pptx_bucket(key=user_key)
     except Exception:
@@ -1499,7 +1500,7 @@ def run_style_python(
                 # print() appends a newline — compare newline-insensitively
                 and style_html.rstrip("\n") != (baseline_style or "").rstrip("\n")
             ):
-                key = f"user-styles/{user_id}/{style_name}.html"
+                key = user_library.user_style_key(user_id, style_name)
                 _storage.upload_file(key=key, data=style_html.encode("utf-8"), content_type="text/html")
                 result["saved"] = {"filename": f"{style_name}.html", "key": key}
         else:
@@ -1528,16 +1529,16 @@ def run_style_python(
 
 def _load_style_html(user_id: str, name: str) -> str | None:
     """Load style HTML from S3 (user styles first, then builtin)."""
-    if not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
+    if not user_library.is_valid_style_name(name):
         return None
     # Try user style
-    user_key = f"user-styles/{user_id}/{name}.html"
+    user_key = user_library.user_style_key(user_id, name)
     try:
         return _storage.download_file_from_pptx_bucket(key=user_key).decode("utf-8")
     except Exception:
         pass
     # Try builtin
-    builtin_key = f"references/examples/styles/{name}.html"
+    builtin_key = user_library.builtin_style_key(name)
     try:
         return _storage.download_file(key=builtin_key).decode("utf-8")
     except Exception:
