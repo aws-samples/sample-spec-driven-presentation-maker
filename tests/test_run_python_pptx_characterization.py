@@ -175,20 +175,28 @@ def remote(monkeypatch):
     return run, storage, office
 
 
-def _assert_remote_measure_format(out: dict) -> None:
-    """Measured body + bad: report text, structured layout bias, invalid layout per slug."""
+def _assert_measure_format(out: dict) -> None:
+    """Measured body + bad, the same on both servers: report text with the judge
+    findings, structured layout bias and the measured pages' build warnings, invalid
+    layout per slug."""
     assert out["measure"].startswith("📐 Text measurement")
     assert "Slide body:" in out["measure"] and "Slide bad:" in out["measure"]
     assert '"First block"' in out["measure"]
-    assert "⚠ Layout issues" not in out["measure"]  # no judge on the remote server
-    assert set(out["warnings"]) == {"layoutBias"}
+    assert "⚠ Layout issues" in out["measure"] and "[collision]" in out["measure"]
+    assert {"layoutBias", "build"} <= set(out["warnings"])
     assert [(b["slide"], b["layout"], b["direction"]) for b in out["warnings"]["layoutBias"]] == [
         (2, "Title Only", "top-heavy"),
         (3, "No Such Layout", "top-heavy"),
     ]
+    build = out["warnings"]["build"]
+    assert any("page02(body)" in w and "includes/missing.json" in w for w in build)
+    assert not any("offset:" in w or "auto-detected" in w or "auto-set" in w for w in build)
     assert out["errors"]["bad"]["invalidLayout"] == "No Such Layout"
     assert "Title Only" in out["errors"]["bad"]["available"]
     assert "lint_diagnostics" not in out
+
+
+_assert_remote_measure_format = _assert_measure_format
 
 
 def test_remote_edit_with_measure(remote):
@@ -268,8 +276,9 @@ def test_remote_outline_warning_with_layout_bias(remote):
 
 
 def _assert_remote_outline_with_bias(out: dict) -> None:
-    # The layout bias replaces the outline warning.
-    assert set(out["warnings"]) == {"layoutBias"}
+    # The outline warning stays next to the measured slide's warnings.
+    assert set(out["warnings"]) == {"outline", "layoutBias", "build"}
+    assert out["warnings"]["outline"].startswith("outline.md format violation")
 
 
 # --------------------------------------------------------------------------- Local

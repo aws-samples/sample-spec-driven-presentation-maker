@@ -464,27 +464,22 @@ _spec.loader.exec_module(remote_server)
 
 
 class TestPostProcessingPlan:
-    """The contract matrix, as a pure decision table."""
+    """The contract matrix, as a pure decision table (sdpm.api.pptx_refresh_plan)."""
 
     @pytest.mark.parametrize(
         "changed,measure,expected",
         [
-            (False, None, {"build": False, "artifact": False, "verify": False}),
-            (True, None, {"build": True, "artifact": True, "verify": False}),
-            (False, ["a"], {"build": True, "artifact": False, "verify": True}),
-            (True, ["a"], {"build": True, "artifact": True, "verify": True}),
+            ([], None, {"build": False, "artifact": False, "verify": False}),
+            (["specs/brief.md"], None, {"build": False, "artifact": False, "verify": False}),
+            (["slides/a.json"], None, {"build": True, "artifact": True, "verify": False}),
+            (["specs/brief.md"], ["a"], {"build": True, "artifact": False, "verify": True}),
+            (["specs/outline.md"], ["a"], {"build": True, "artifact": True, "verify": True}),
         ],
     )
     def test_matrix(self, changed, measure, expected):
-        assert remote_server._post_processing_plan(changed, measure) == expected
+        from sdpm.api import pptx_refresh_plan
 
-    def test_build_relevant_paths(self):
-        assert remote_server._build_relevant("deck.json")
-        assert remote_server._build_relevant("slides/title.json")
-        assert remote_server._build_relevant("includes/code.json")
-        assert remote_server._build_relevant("specs/outline.md")
-        assert not remote_server._build_relevant("specs/brief.md")
-        assert not remote_server._build_relevant("attachments/x/data.csv")
+        assert pptx_refresh_plan(changed, measure) == expected
 
 
 class TestRemoteCheckSpecs:
@@ -658,43 +653,70 @@ class _ArtifactStorage(_FakeStorage):
 
 @pytest.fixture()
 def remote_rig(monkeypatch, tmp_path):
-    """Monkeypatched harness to exercise run_python's real branch wiring."""
-    calls = {"prepare": 0, "build": 0, "measure": 0, "export_svg": 0}
+    """The real run_python wiring and the real sdpm.api.refresh_pptx on a one-slide
+    workspace; LibreOffice is faked (tests/fake_libreoffice.py)."""
+    import shutil
+    import tempfile
+
+    import fake_libreoffice
+    import sdpm.api
+    import sdpm.engine.preview.measure as measure_mod
+    import tools.generate as gen_mod
+
     storage = _ArtifactStorage()
+    office = fake_libreoffice.install(monkeypatch)
+
+    class _Calls(dict):
+        """prepare / build (full) / measure counts; export_svg comes from the fake soffice."""
+
+        def __getitem__(self, key):
+            if key == "export_svg":
+                return office.calls.count(("soffice", "svg"))
+            return super().__getitem__(key)
+
+        def __eq__(self, other):
+            return {**self, "export_svg": self["export_svg"]} == other
+
+    calls = _Calls(prepare=0, build=0, measure=0)
 
     def fake_execute(code, storage, region, deck_id=None, persist_writes=True, files=None):
         return ("ok", [], [], fake_execute.changed_paths)
 
     fake_execute.changed_paths = []
+    fake_execute.slides = {"a": {"layout": "Blank", "elements": []}}
 
     def fake_prepare(deck_id, user_id, storage):
         calls["prepare"] += 1
-        return tmp_path, [{"id": "a"}], {}
+        ws = Path(tempfile.mkdtemp(dir=tmp_path))
+        (ws / "slides").mkdir()
+        (ws / "specs").mkdir()
+        shutil.copy(_root / "sdpm" / "templates" / "blank-dark.pptx", ws / "template.pptx")
+        (ws / "deck.json").write_text(json.dumps({"template": "blank-dark"}))
+        (ws / "specs" / "outline.md").write_text("".join(f"- [{s}] {s}\n" for s in fake_execute.slides))
+        slides = []
+        for slug, data in fake_execute.slides.items():
+            (ws / "slides" / f"{slug}.json").write_text(json.dumps(data))
+            slides.append({**data, "id": slug})
+        kwargs = {"template_path": ws / "template.pptx", "custom_template": True, "base_dir": ws,
+                  "fonts": {"fullwidth": "Noto Sans JP", "halfwidth": "Arial"}, "default_text_color": "#FFFFFF"}
+        return ws, slides, kwargs
 
-    def fake_build(tmpdir, slides, build_kwargs):
-        calls["build"] += 1
-        p = tmp_path / "out.pptx"
-        p.write_bytes(b"pptx")
-        return p, []
+    real_generate = sdpm.api.generate
 
-    def fake_measure(tmpdir, pptx_path, page_numbers, page_to_slug=None):
+    def counting_generate(*args, **kwargs):
+        if kwargs.get("only_slugs") is None:
+            calls["build"] += 1
+        return real_generate(*args, **kwargs)
+
+    real_measure = measure_mod.measure_from_svg
+
+    def counting_measure(*args, **kwargs):
         calls["measure"] += 1
-        return "{}"
-
-    def fake_export_svg(tmpdir, pptx_path):
-        calls["export_svg"] += 1
-        return tmp_path / "measure.svg"  # never created → compose skipped
-
-    import tools.generate as gen_mod
+        return real_measure(*args, **kwargs)
 
     monkeypatch.setattr(gen_mod, "_prepare_workspace", fake_prepare)
-    monkeypatch.setattr(gen_mod, "generate_previews", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lo")))
-    monkeypatch.setattr(
-        gen_mod, "generate_previews_for_pages", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lo"))
-    )
-    monkeypatch.setattr(remote_server, "_build_pptx", fake_build)
-    monkeypatch.setattr(remote_server, "_run_measure", fake_measure)
-    monkeypatch.setattr(remote_server, "_export_svg", fake_export_svg)
+    monkeypatch.setattr(sdpm.api, "generate", counting_generate)
+    monkeypatch.setattr(measure_mod, "measure_from_svg", counting_measure)
     monkeypatch.setattr(remote_server, "_storage", storage)
     monkeypatch.setattr(remote_server, "_check_deck_access", lambda *a, **k: None)
     monkeypatch.setattr(remote_server, "_get_user_id", lambda: "user1")
@@ -794,38 +816,19 @@ class TestRemoteRunPythonBranching:
 
 
 
-def test_remote_compose_output_includes_regions(remote_rig, monkeypatch, tmp_path):
+_REGION_SLIDE = {
+    "layout": "Blank",
+    "elements": [
+        {"_comment": "content region", "x": 80, "y": 90, "width": 1200, "height": 800},
+    ],
+}
+
+
+def test_remote_compose_output_includes_regions(remote_rig, monkeypatch):
     monkeypatch.setattr(remote_server, "_run_in_background", lambda target, *, name: target())
     fake_execute, storage, calls = remote_rig
     fake_execute.changed_paths = ["specs/brief.md"]
-    slide = {
-        "id": "a",
-        "elements": [
-            {"_comment": "content region", "x": 80, "y": 90, "width": 1200, "height": 800},
-        ],
-    }
-
-    import sdpm.engine.preview.compose as compose_mod
-    import tools.generate as generate_mod
-
-    def fake_prepare(deck_id, user_id, storage):
-        calls["prepare"] += 1
-        return tmp_path, [slide], {}
-
-    monkeypatch.setattr(generate_mod, "_prepare_workspace", fake_prepare)
-    monkeypatch.setattr(compose_mod, "extract_optimized_defs", lambda path: {"version": 1, "defs": ""})
-    monkeypatch.setattr(
-        compose_mod,
-        "split_slide_components",
-        lambda path, slide_num: {
-            "version": 1,
-            "viewBox": "0 0 1920 1080",
-            "bgFill": "#000",
-            "bgSvg": None,
-            "components": [],
-        },
-    )
-    (tmp_path / "measure.svg").write_text("<svg />", encoding="utf-8")
+    fake_execute.slides = {"a": _REGION_SLIDE}
 
     remote_server.run_python(
         purpose="verify a",
@@ -845,39 +848,12 @@ def test_remote_compose_output_includes_regions(remote_rig, monkeypatch, tmp_pat
     ]
 
 
-def test_remote_compose_is_deferred_until_background_task_runs(remote_rig, monkeypatch, tmp_path):
+def test_remote_compose_is_deferred_until_background_task_runs(remote_rig, monkeypatch):
     deferred = []
     monkeypatch.setattr(remote_server, "_run_in_background", lambda target, *, name: deferred.append(target))
     fake_execute, storage, calls = remote_rig
     fake_execute.changed_paths = ["specs/brief.md"]
-    slide = {
-        "id": "a",
-        "elements": [
-            {"_comment": "content region", "x": 80, "y": 90, "width": 1200, "height": 800},
-        ],
-    }
-
-    import sdpm.engine.preview.compose as compose_mod
-    import tools.generate as generate_mod
-
-    def fake_prepare(deck_id, user_id, storage):
-        calls["prepare"] += 1
-        return tmp_path, [slide], {}
-
-    monkeypatch.setattr(generate_mod, "_prepare_workspace", fake_prepare)
-    monkeypatch.setattr(compose_mod, "extract_optimized_defs", lambda path: {"version": 1, "defs": ""})
-    monkeypatch.setattr(
-        compose_mod,
-        "split_slide_components",
-        lambda path, slide_num: {
-            "version": 1,
-            "viewBox": "0 0 1920 1080",
-            "bgFill": "#000",
-            "bgSvg": None,
-            "components": [],
-        },
-    )
-    (tmp_path / "measure.svg").write_text("<svg />", encoding="utf-8")
+    fake_execute.slides = {"a": _REGION_SLIDE}
 
     out = json.loads(
         remote_server.run_python(

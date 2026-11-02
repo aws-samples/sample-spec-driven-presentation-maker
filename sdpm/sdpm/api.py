@@ -6,13 +6,17 @@ These functions encapsulate the full workflow that the CLI (pptx_builder.py) per
 mcp-local and other consumers should call these instead of assembling low-level APIs.
 """
 
+import logging
 import os
 import tempfile
+from collections.abc import Iterable, Mapping
 from copy import deepcopy
 from dataclasses import dataclass, field
 from datetime import datetime
 from pathlib import Path
 from typing import Any
+
+_log = logging.getLogger("sdpm.api")
 
 
 def get_templates_dirs() -> list[Path]:
@@ -840,6 +844,8 @@ def generate(
     json_path: str | Path,
     output_path: str | Path | None = None,
     only_slugs: set[str] | None = None,
+    *,
+    include_checks: bool = False,
 ) -> dict[str, Any]:
     """Generate PPTX from JSON.
 
@@ -849,6 +855,10 @@ def generate(
         json_path: Path to the slides JSON file.
         output_path: Output .pptx path. Auto-generated if None.
         only_slugs: When set, build only the specified slugs (for iso.pptx).
+        include_checks: Also return the layout checks as data, ``checks``:
+            ``{"layout_bias": [{slide, layout, bbox, offset, direction}],
+            "invalid_layouts": [{slug, attempted, used, available}]}``; the layout
+            bias lines are then left out of ``warnings``.
 
     Returns:
         Dict with output_path, slide_count, slides summary, warnings.
@@ -869,7 +879,7 @@ def generate(
     _, invalid_layouts = _build(config, out)
 
     imbalance = check_layout_imbalance_data(out, config.slides)
-    if imbalance:
+    if imbalance and not include_checks:
         for a in imbalance:
             config.warnings.append(f"page{a['slide']:02d} ({a['layout']}) offset: {a['offset']} ({a['direction']})")
 
@@ -893,6 +903,8 @@ def generate(
         ]
     if config.lint_diagnostics:
         result["errors"] = {"lintDiagnostics": config.lint_diagnostics}
+    if include_checks:
+        result["checks"] = {"layout_bias": imbalance, "invalid_layouts": [dict(e) for e in invalid_layouts]}
     return result
 
 
@@ -1210,6 +1222,355 @@ def refresh_html(
         if built.get("decorations") is not None:
             result["decorations"] = built["decorations"]
     return result
+
+
+# ── PPTX decks: run_python post-processing ───────────────────────────────
+
+
+def pptx_refresh_plan(changed_paths: list[str] | None, measure_slides: list[str] | None) -> dict[str, bool]:
+    """What run_python's post-processing does for a PPTX deck.
+
+    - build:    the python-pptx build, needed by both of the others
+    - artifact: the deck's PPTX follows the change (``changed_paths`` holds a
+                PPTX build input, see ``is_pptx_build_input``)
+    - verify:   measurement, layout bias, invalid layouts — measure_slides and
+                only measure_slides. Compose and previews follow the change: every
+                slide it can alter, plus measure_slides.
+
+    Contract matrix (pinned by tests/test_run_python_semantics.py):
+        no build input changed, measure=None → nothing
+        build input changed,    measure=None → build + artifact
+        no build input changed, measure=[..] → build + verify
+        build input changed,    measure=[..] → build + artifact + verify
+    """
+    from sdpm.engine.schema import is_pptx_build_input
+
+    deck_changed = any(is_pptx_build_input(p) for p in changed_paths or [])
+    return {"build": deck_changed or bool(measure_slides), "artifact": deck_changed, "verify": bool(measure_slides)}
+
+
+@dataclass
+class PptxCompose:
+    """Live-preview compose payloads of a refresh (``PptxRefresh.compose``).
+
+    ``defs`` is None when there was nothing to compose (no SVG or no slugs); ``slides``
+    maps slug → payload (``split_slide_components`` + ``regions`` + ``sourceHash``,
+    components marked ``changed`` against the previous payload); ``shortfall`` says
+    LibreOffice exported fewer slides than were rendered.
+    """
+
+    defs: dict | None = None
+    slides: dict[str, dict] = field(default_factory=dict)
+    error: str | None = None
+    shortfall: str | None = None
+
+
+@dataclass
+class PptxPreviews:
+    """PNG previews of a refresh (``PptxRefresh.previews``).
+
+    ``rendered`` is True when the PDF was exported and rasterised; ``files`` maps
+    slug → PNG path (inside the refresh's temp dir, gone after ``close()``);
+    ``missing`` lists slugs without a PNG, ``produced`` the PNG names that exist.
+    """
+
+    rendered: bool = False
+    files: dict[str, Path] = field(default_factory=dict)
+    missing: list[str] = field(default_factory=list)
+    produced: list[str] = field(default_factory=list)
+    error: str | None = None
+
+
+class PptxRefresh:
+    """What ``refresh_pptx`` built: the agent-facing result, and the render of the
+    affected slides that ``compose()`` and ``previews()`` read.
+
+    The render lives in ``<deck>/_work/measure-*``; use the object as a context
+    manager or call ``close()`` (idempotent) to remove it.
+
+    Attributes:
+        plan: ``pptx_refresh_plan`` of the call.
+        result: what to merge into the run_python result (``merge_into``):
+            ``measure`` (``format_measure_report`` text, judge findings included, or
+            ``json.dumps({"error": …})``), ``warnings`` (``{"layoutBias": [...],
+            "build": [...]}``), ``errors`` (``{<slug>: {"invalidLayout", "available"}}``)
+            and ``preview`` (``preview_unavailable``) — all only with measure_slides,
+            for the measured slugs — and ``pptx_error`` when the full build failed.
+        pptx_path: ``<deck>/output.pptx``; None when the full build failed.
+        render_slugs: slides that get fresh compose and previews, in deck order.
+        compose_slugs: render_slugs plus ``compose_also``, without slides whose layout
+            fell back (an invalid layout name), in deck order.
+        render_error: why the render (partial build or SVG export) failed, if it did.
+    """
+
+    def __init__(self, deck_dir: Path, plan: dict[str, bool]):
+        self.deck_dir = deck_dir
+        self.plan = plan
+        self.result: dict[str, Any] = {}
+        self.pptx_path: Path | None = None
+        self.render_slugs: list[str] = []
+        self.compose_slugs: list[str] = []
+        self.render_error: str | None = None
+        self._slides: dict[str, dict] = {}
+        self._pages: list[str] = []  # slugs of the partial build, in page order
+        self._work: Path | None = None
+        self._pptx: Path | None = None
+        self._svg: Path | None = None
+
+    def __enter__(self) -> "PptxRefresh":
+        return self
+
+    def __exit__(self, *_exc: object) -> None:
+        self.close()
+
+    def close(self) -> None:
+        """Remove the render's temp dir."""
+        import shutil
+
+        if self._work is not None:
+            shutil.rmtree(self._work, ignore_errors=True)
+            self._work = None
+
+    def merge_into(self, result: dict[str, Any]) -> None:
+        """Add ``self.result`` to a run_python result: ``warnings`` / ``errors`` merge
+        into the dicts already there (outline lint, write-time lint), the rest is set."""
+        for key, value in self.result.items():
+            if key in ("warnings", "errors"):
+                result.setdefault(key, {}).update(value)
+            else:
+                result[key] = value
+
+    def compose(self, previous: Mapping[str, dict] | None = None) -> PptxCompose:
+        """Compose payloads of ``compose_slugs``; ``previous`` maps slug → the slug's
+        last payload, for ``changed``. Never raises."""
+        out = PptxCompose()
+        if self._svg is None or not self.compose_slugs:
+            return out
+        try:
+            from sdpm.engine.preview.compose import (
+                count_slides,
+                extract_optimized_defs,
+                load_svg,
+                mark_changed,
+                source_hash,
+                split_slide_components,
+            )
+            from sdpm.engine.schema import extract_regions
+
+            tree = load_svg(self._svg)
+            n = count_slides(tree)  # + the dummy slide LibreOffice puts first
+            out.defs = extract_optimized_defs(tree)
+            pages = {slug: i + 1 for i, slug in enumerate(self._pages)}
+            for slug in self.compose_slugs:
+                if pages[slug] >= n:
+                    continue
+                try:
+                    payload = split_slide_components(tree, pages[slug])
+                    slide = self._slides.get(slug, {})
+                    payload["regions"] = extract_regions(slide)
+                    payload["sourceHash"] = source_hash({**slide, "id": slide.get("id", slug)})
+                    prev = (previous or {}).get(slug)
+                    if prev is None:
+                        mark_changed(payload["components"], None)
+                    else:
+                        mark_changed(payload["components"], prev.get("components"),
+                                     payload["sourceHash"], prev.get("sourceHash"))
+                    out.slides[slug] = payload
+                except Exception:  # one slide's compose never blocks the others
+                    _log.warning("compose failed for slug %s", slug, exc_info=True)
+            if n - 1 < len(self._pages) and len(self._pages) > 1:
+                out.shortfall = (
+                    f"LibreOffice exported only {n - 1} slide(s) to SVG but {len(self._pages)} "
+                    f"were rendered. Upgrade LibreOffice to 25.8.6+ (macOS multi-slide SVG fix)."
+                )
+        except Exception as exc:
+            out.error = str(exc)
+        return out
+
+    def previews(self, *, scale_to: int | None = 1280, dpi: int | None = None) -> PptxPreviews:
+        """PNG of each of ``render_slugs`` (``pdftoppm -scale-to`` px wide, or ``-r dpi``).
+
+        Nothing is rendered when LibreOffice or poppler is missing (the result's
+        ``preview`` says so to measure_slides). Never raises.
+        """
+        import subprocess
+
+        out = PptxPreviews()
+        if self._pptx is None or not self._pptx.is_file() or not self.render_slugs:
+            return out
+        from sdpm.engine.preview.environment import preview_unavailable
+
+        if preview_unavailable() is not None:
+            return out
+        try:
+            from sdpm.engine.preview import export_pdf
+
+            pdf = self._work / "slides.pdf"
+            if not export_pdf(self._pptx, pdf, work_dir=self._work):
+                return out
+            png_dir = self._work / "pngs"
+            png_dir.mkdir(exist_ok=True)
+            size = ["-scale-to", str(scale_to)] if scale_to else ["-r", str(dpi or 150)]
+            pages = {slug: i + 1 for i, slug in enumerate(self._pages)}
+            for slug in self.render_slugs:
+                page = str(pages[slug])
+                stem = png_dir / f"page-{page}"
+                subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+                    ["pdftoppm", "-png", *size, "-f", page, "-l", page, "-singlefile", str(pdf), str(stem)],
+                    capture_output=True, text=True, timeout=120, check=False, stdin=subprocess.DEVNULL,
+                )
+                png = png_dir / f"page-{page}.png"
+                if png.is_file():
+                    out.files[slug] = png
+                else:
+                    out.missing.append(slug)
+            out.rendered = True
+            out.produced = sorted(p.name for p in png_dir.glob("*.png"))
+        except Exception as exc:
+            out.error = str(exc)
+        return out
+
+
+def _deck_slide_files(deck_dir: Path) -> dict[str, dict]:
+    """Slide JSON of the deck by slug, in outline order; slides without a file are left out."""
+    import json
+
+    slides: dict[str, dict] = {}
+    for slug in parse_outline_slugs(deck_dir / "specs" / "outline.md"):
+        path = deck_dir / "slides" / f"{slug}.json"
+        if not path.is_file():
+            continue
+        try:
+            data = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            data = {}
+        slides[slug] = data if isinstance(data, dict) else {}
+    return slides
+
+
+def refresh_pptx(
+    deck_dir: str | Path,
+    changed_paths: list[str] | None = None,
+    measure_slides: list[str] | None = None,
+    *,
+    compose_also: Iterable[str] = (),
+) -> PptxRefresh:
+    """Rebuild a PPTX deck after an edit (the run_python post-processing for PPTX decks).
+
+    Per ``pptx_refresh_plan``: builds ``<deck>/output.pptx``; renders the slides the
+    change can alter plus measure_slides (a partial build with their override bases,
+    exported to SVG by LibreOffice); measures measure_slides on that render and
+    reports their layout bias, build warnings and invalid layouts. ``compose_also``
+    adds slugs to the compose set when something is rendered (the remote server's
+    slides that have no compose yet). A legacy ``presentation.json`` deck has no
+    per-slide files and gets output.pptx only. Never raises; see ``PptxRefresh``.
+    """
+    import json
+    import tempfile
+
+    from sdpm.engine.schema import affected_slugs, with_override_bases
+
+    deck = Path(deck_dir)
+    refresh = PptxRefresh(deck, pptx_refresh_plan(changed_paths, measure_slides))
+    if not refresh.plan["build"]:
+        return refresh
+    result = refresh.result
+    measure = list(dict.fromkeys(measure_slides or []))
+    legacy = (deck / "presentation.json").is_file()
+    deck_input = str(deck / "presentation.json") if legacy else str(deck)
+
+    build_warnings: list[str] = []
+    checks: dict[str, list] = {}
+    try:
+        built = generate(json_path=deck_input, output_path=str(deck / "output.pptx"), include_checks=True)
+        refresh.pptx_path = Path(built.get("output_path", deck / "output.pptx"))
+        build_warnings = built.get("warnings", [])
+        checks = built.get("checks", {})
+    except Exception as exc:
+        result["pptx_error"] = str(exc)
+
+    slides = {} if legacy else _deck_slide_files(deck)
+    refresh._slides = slides
+    wanted = set(measure) | set(affected_slugs(changed_paths or [], slides))
+    render = [s for s in slides if s in wanted]
+    targets = set(render)
+    if render:
+        targets |= {s for s in compose_also if s in slides}
+    build_set = set(with_override_bases([s for s in slides if s in targets], slides))
+    refresh._pages = [s for s in slides if s in build_set]
+    refresh.render_slugs = [s for s in refresh._pages if s in set(render)]
+    invalid = checks.get("invalid_layouts", [])
+
+    if refresh.render_slugs:
+        from sdpm.engine.preview import get_work_dir
+        from sdpm.engine.preview.backend import detect_backend
+
+        refresh._work = Path(tempfile.mkdtemp(prefix="measure-", dir=get_work_dir(deck)))
+        try:
+            iso = refresh._work / "iso.pptx"
+            partial = generate(json_path=deck_input, output_path=str(iso), only_slugs=build_set, include_checks=True)
+            refresh._pptx = iso
+            if "pptx_error" in result:  # no full build: the render knows the invalid layouts
+                invalid = partial.get("checks", {}).get("invalid_layouts", [])
+            backend = detect_backend()
+            refresh._svg = backend.export_svg(iso, work_dir=refresh._work) if backend else None
+        except Exception as exc:  # the re-render never fails the tool call
+            refresh.render_error = str(exc)
+    invalid_slugs = {e.get("slug") for e in invalid}
+    refresh.compose_slugs = [s for s in refresh._pages if s in targets and s not in invalid_slugs]
+
+    if not measure:
+        return refresh
+    measured = [s for s in refresh._pages if s in set(measure)]
+    if not measured:
+        result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})
+    elif refresh._svg is None:
+        result["measure"] = json.dumps({"error": refresh.render_error or "LibreOffice SVG export failed"})
+    else:
+        try:
+            from sdpm.engine.preview.measure import format_measure_report, measure_from_svg
+
+            pages = {slug: i + 1 for i, slug in enumerate(refresh._pages)}
+            indices = [pages[s] for s in measured]
+            try:
+                from sdpm.engine.preview.judge import judge_from_svg
+
+                judgments = judge_from_svg(refresh._svg, indices)
+            except Exception:  # best effort: never break measure
+                judgments = None
+            result["measure"] = format_measure_report(
+                measure_from_svg(refresh._svg, indices),
+                page_to_slug={pages[s]: s for s in measured},
+                judgments=judgments,
+            )
+        except Exception as exc:
+            result["measure"] = json.dumps({"error": str(exc)})
+
+    # Bias and warning lines carry full-deck page numbers.
+    deck_pages = {f"page{i:02d}": slug for i, slug in enumerate(slides, 1)}
+    measured_pages = {page for page, slug in deck_pages.items() if slug in set(measure)}
+    warnings: dict[str, list] = {}
+    bias = [b for b in checks.get("layout_bias", []) if f"page{b.get('slide', 0):02d}" in measured_pages]
+    if bias:
+        warnings["layoutBias"] = bias
+    lines = [w for w in build_warnings if any(page in w for page in measured_pages)]
+    if lines:
+        warnings["build"] = lines
+    if warnings:
+        result["warnings"] = warnings
+    errors = {
+        e["slug"]: {"invalidLayout": e.get("attempted"), "available": e.get("available", [])}
+        for e in invalid if e.get("slug") in set(measure)
+    }
+    if errors:
+        result["errors"] = errors
+    if refresh.render_slugs:
+        from sdpm.engine.preview.environment import preview_unavailable
+
+        unavailable = preview_unavailable()
+        if unavailable is not None:
+            result["preview"] = unavailable
+    return refresh
 
 
 def _outline_slide_texts(deck_dir: Path) -> list[tuple[str, str]]:

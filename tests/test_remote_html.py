@@ -181,7 +181,7 @@ def _no_pptx(monkeypatch):
         raise AssertionError("PPTX post-processing must not run for an HTML deck")
 
     monkeypatch.setattr(gen_mod, "_prepare_workspace", boom)
-    monkeypatch.setattr(remote_server, "_build_pptx", boom)
+    monkeypatch.setattr(api, "refresh_pptx", boom)
 
 
 # --- init_deck_workspace -----------------------------------------------------

@@ -714,55 +714,6 @@ def get_preview(
         raise
 
 
-def _build_pptx(tmpdir: Path, slides: list[dict], build_kwargs: dict) -> tuple[Path, list[dict]]:
-    """Build PPTX from slides JSON. Returns (pptx_path, invalid_layouts)."""
-    from sdpm.engine.builder import PPTXBuilder, resolve_override
-
-    builder = PPTXBuilder(**build_kwargs)
-    id_map: dict[str, dict] = {}
-    for s in slides:
-        if "id" in s:
-            id_map[s["id"]] = s
-    for s in slides:
-        builder.add_slide(resolve_override(s, id_map))
-    pptx_path = tmpdir / "measure.pptx"
-    builder.save(pptx_path)
-    return pptx_path, list(builder.invalid_layouts)
-
-
-def _export_svg(tmpdir: Path, pptx_path: Path) -> Path:
-    """PPTX → SVG via LibreOffice. Returns svg_path."""
-    import subprocess
-
-    env = os.environ.copy()
-    env["HOME"] = str(tmpdir)
-    t0 = time.monotonic()
-    subprocess.run(
-        ["soffice", "--headless", "--convert-to", "svg", "--outdir", str(tmpdir), str(pptx_path)],
-        env=env,
-        capture_output=True,
-        text=True,
-        timeout=120,
-        check=True,
-    )
-    logger.info("soffice svg export took %.1fs (%s)", time.monotonic() - t0, pptx_path.name)
-    return tmpdir / "measure.svg"
-
-
-def _run_measure(
-    tmpdir: Path, pptx_path: Path, slide_numbers: list[int], page_to_slug: dict[int, str] | None = None
-) -> str:
-    """PPTX → SVG → bbox measurement → report string."""
-    from sdpm.engine.preview.measure import measure_from_svg, format_measure_report
-
-    svg_path = _export_svg(tmpdir, pptx_path)
-    if not svg_path.exists():
-        return json.dumps({"error": "LibreOffice SVG export failed"})
-
-    results = measure_from_svg(svg_path=svg_path, slide_indices=slide_numbers)
-    return format_measure_report(results, page_to_slug=page_to_slug)
-
-
 # --- Asset Tools ---
 
 
@@ -948,36 +899,6 @@ def code_to_slide(
 # --- Code Execution (Code Interpreter) ---
 
 
-def _build_relevant(p: str) -> bool:
-    """True if a workspace path affects the built PPTX artifact."""
-    return p in ("deck.json", "presentation.json", "specs/outline.md") or p.startswith(("slides/", "includes/"))
-
-
-def _post_processing_plan(deck_changed: bool, measure_slides: list[str] | None) -> dict[str, bool]:
-    """Decide run_python post-processing actions (the unified contract).
-
-    - build:    cheap python-pptx build — prerequisite for both the artifact
-                refresh and the verification pass
-    - artifact: refresh the deck's PPTX artifact (follows deck changes
-                automatically; failure must surface in the result)
-    - verify:   expensive verification (measure / layout bias / invalid
-                layout) — triggered by measure_slides and ONLY by measure_slides.
-                Compose and preview images are decided after the build:
-                every slide the change affects, plus measure_slides.
-
-    Contract matrix (pinned by tests/test_run_python_semantics.py):
-        changed=False, measure=None → nothing
-        changed=True,  measure=None → build + artifact only
-        changed=False, measure=[..] → build + verify only
-        changed=True,  measure=[..] → build + artifact + verify
-    """
-    return {
-        "build": bool(deck_changed or measure_slides),
-        "artifact": bool(deck_changed),
-        "verify": bool(measure_slides),
-    }
-
-
 @offloaded_tool
 def run_python(
     purpose: Annotated[str, Field(description="One line on what this code does, in the user's language (shown in the UI).")],
@@ -1062,347 +983,238 @@ def run_python(
             result.update(refreshed)
         return json.dumps(result, ensure_ascii=False)
 
-    # Post-processing: rebuild the PPTX artifact whenever build-relevant files
-    # changed (the artifact follows the deck automatically); measure_slides
-    # (and ONLY measure_slides) triggers measurement. Compose + preview images
-    # follow the change: affected slides plus measure_slides (see below).
-    deck_changed = any(_build_relevant(p) for p in changed_paths)
-    plan = _post_processing_plan(deck_changed, measure_slides)
+    # Post-processing: the PPTX artifact follows build-input changes; measure_slides
+    # (and only measure_slides) triggers measurement; compose + preview images
+    # follow the change (sdpm.api.refresh_pptx).
+    from sdpm.api import pptx_refresh_plan
+
+    plan = pptx_refresh_plan(changed_paths, measure_slides)
     if plan["build"]:
-        import shutil
-        import traceback
+        _refresh_pptx_deck(deck_id, changed_paths, measure_slides, plan, result)
+    return json.dumps(result, ensure_ascii=False)
+
+
+def _refresh_pptx_deck(
+    deck_id: str, changed_paths: list[str], measure_slides: list[str] | None, plan: dict[str, bool], result: dict
+) -> None:
+    """run_python post-processing of a PPTX deck: materialize the S3 workspace, run
+    ``sdpm.api.refresh_pptx`` on it, refresh the PPTX artifact, and finish compose +
+    WebP previews in the background. Merges into ``result``."""
+    import shutil
+    import traceback
+
+    from sdpm.api import refresh_pptx
+    from tools.generate import _prepare_workspace, pin_workspace_build_config
+
+    user_id = _get_user_id()
+    epoch = int(time.time())  # snapshot time: the composer with the newest slides/ wins on defs
+    phase: dict[str, float] = {}
+    tmpdir: Path | None = None
+    refresh = None
+    in_background = False
+    t = time.monotonic()
+    try:
+        tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
+        pin_workspace_build_config(tmpdir, build_kwargs)
+        compose_prefix = f"decks/{deck_id}/compose/"
+        old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
+        latest = _latest_compose_keys(old_keys, compose_prefix)
+        phase["prepare_s3"] = time.monotonic() - t
+
+        t = time.monotonic()
+        # Slides with no compose yet (first build, migration) are composed too.
+        refresh = refresh_pptx(
+            tmpdir, changed_paths, measure_slides,
+            compose_also=[s["id"] for s in slides if s.get("id") and s["id"] not in latest],
+        )
+        phase["build"] = time.monotonic() - t
+        refresh.merge_into(result)
+        if "pptx_error" in refresh.result:
+            result["pptx_error"] = f"PPTX build failed — the downloadable PPTX may be stale: {refresh.result['pptx_error']}"
+        if refresh.render_error:
+            logger.warning("run_python render failed for deck %s: %s", deck_id, refresh.render_error)
+
+        t = time.monotonic()
+        if plan["artifact"] and refresh.pptx_path is not None:
+            _refresh_pptx_artifact(deck_id, user_id, refresh.pptx_path, len(slides), result)
+        phase["artifact_s3"] = time.monotonic() - t
+
+        if refresh.render_slugs:
+            # Everything the composer needs is in `result` now. Compose (Web UI live
+            # preview) and the rendered slugs' WebP take 5-10 s; they finish in the
+            # background, which owns tmpdir from here on.
+            result["previewHint"] = (
+                f"Preview images are being generated for {', '.join(refresh.render_slugs)} "
+                f"(ready within seconds). Call get_preview(deck_id=\"{deck_id}\", slugs=[...]) to view."
+            )
+            pending = _register_pending_preview(deck_id)
+            job = (deck_id, refresh, tmpdir, epoch, old_keys, latest, pending)
+            in_background = True
+            _run_in_background(lambda: _finish_compose_and_previews(*job), name=f"compose-{deck_id}")
+    except Exception as e:
+        msg = str(e)
+        # "No slides found" is expected during early phases (outline/brief
+        # editing before any slide JSON exists). Silently skip measure.
+        if "No slides found" not in msg and "has no slides" not in msg:
+            logger.exception("run_python post-processing failed: deck=%s", deck_id)
+            if plan["verify"]:
+                result["measure"] = json.dumps({"error": msg, "traceback": traceback.format_exc()})
+            else:
+                result["pptx_error"] = f"PPTX build failed — the downloadable PPTX may be stale: {msg}"
+    finally:
+        if not in_background:
+            if refresh is not None:
+                refresh.close()
+            if tmpdir is not None:
+                shutil.rmtree(tmpdir, ignore_errors=True)
+        if phase:
+            logger.info(
+                "run_python post-processing for deck %s: %s",
+                deck_id, " ".join(f"{k}={v:.1f}s" for k, v in phase.items()),
+            )
+
+
+_COMPOSE_KEY = re.compile(r"^(?P<slug>.+)_(?P<epoch>\d+)\.json$")
+
+
+def _latest_compose_keys(keys: list[str], prefix: str) -> dict[str, str]:
+    """{slug: its newest ``<prefix><slug>_<epoch>.json`` key} (defs excluded)."""
+    best: dict[str, tuple[int, str]] = {}
+    for key in keys:
+        m = _COMPOSE_KEY.match(key.removeprefix(prefix))
+        if not key.startswith(prefix) or not m or m["slug"] == "defs":
+            continue
+        epoch = int(m["epoch"])
+        if m["slug"] not in best or best[m["slug"]][0] < epoch:
+            best[m["slug"]] = (epoch, key)
+    return {slug: key for slug, (_, key) in best.items()}
+
+
+def _key_epoch(key: str) -> int | None:
+    m = re.search(r"_(\d+)\.json$", key)
+    return int(m.group(1)) if m else None
+
+
+def _delete_quietly(key: str) -> None:
+    try:
+        _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=key)
+    except Exception:
+        pass
+
+
+def _refresh_pptx_artifact(deck_id: str, user_id: str, pptx_path: Path, slide_count: int, result: dict) -> None:
+    """Upload the rebuilt PPTX and point the deck record at it (same shape as
+    generate_pptx). A failure leaves the download artifact STALE, so it goes into
+    ``result["pptx_error"]``, not only the log."""
+    import uuid
+    from datetime import datetime, timezone
+
+    key = None
+    try:
+        key = f"pptx/{deck_id}/{uuid.uuid4()}.pptx"
+        _storage.upload_file(
+            key=key,
+            data=pptx_path.read_bytes(),
+            content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
+        )
+        old = _storage.update_deck(
+            deck_id=deck_id,
+            user_id=user_id,
+            updates={"pptxS3Key": key, "updatedAt": datetime.now(timezone.utc).isoformat(), "slideCount": slide_count},
+        )
+        # The record points at the new artifact: delete the superseded one so the
+        # auto-refresh does not pile up orphans (best effort; lifecycle rules are the backstop).
+        old_key = (old or {}).get("pptxS3Key")
+        if old_key and old_key != key:
+            _delete_quietly(old_key)
+    except Exception as e:
+        logger.warning("PPTX artifact refresh failed: %s", e)
+        result["pptx_error"] = (
+            f"PPTX artifact refresh failed — the downloadable PPTX is stale. Run generate_pptx to refresh it. ({e})"
+        )
+        if key:  # the record update may have failed after the upload: delete the orphan
+            _delete_quietly(key)
+
+
+def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old_keys: list[str],
+                                 latest: dict[str, str], pending: threading.Event) -> None:
+    """Background part of run_python: WebP previews first (the composer's next
+    get_preview waits on ``pending``), then the compose payloads for the Web UI."""
+    import shutil
+    from concurrent.futures import ThreadPoolExecutor
+
+    t0 = time.monotonic()
+    try:
+        try:
+            from PIL import Image
+
+            shots = refresh.previews(scale_to=None, dpi=200)
+            if shots.error:
+                logger.warning("preview generation failed: %s", shots.error)
+            uploaded = []
+            for slug, png in shots.files.items():
+                webp = png.with_suffix(".webp")
+                Image.open(png).save(webp, "WEBP", quality=85)
+                _storage.upload_file(
+                    key=f"previews/{deck_id}/{slug}_{epoch}.webp", data=webp.read_bytes(), content_type="image/webp",
+                )
+                uploaded.append(slug)
+            logger.info("previews uploaded for %s: %s", deck_id, ", ".join(uploaded))
+        except Exception:
+            logger.warning("preview generation failed", exc_info=True)
+        _clear_pending_preview(deck_id, pending)
 
         try:
-            from tools.generate import _prepare_workspace
+            prefix = f"decks/{deck_id}/compose/"
 
-            user_id = _get_user_id()
-            _prepare_epoch = int(time.time())
-            _phase: dict[str, float] = {}
-            _t = time.monotonic()
-            tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, _storage)
-            _phase["prepare_s3"] = time.monotonic() - _t
-            _t = time.monotonic()
-            pptx_path, invalid_layouts = _build_pptx(tmpdir, slides, build_kwargs)
-            _phase["build"] = time.monotonic() - _t
-            invalid_slug_set = {e["slug"] for e in invalid_layouts if e.get("slug")}
-
-            # Build slug → page number mapping
-            slug_to_page: dict[str, int] = {}
-            for i, s in enumerate(slides):
-                sid = s.get("id", "")
-                if sid:
-                    slug_to_page[sid] = i + 1
-            page_numbers = [slug_to_page[slug] for slug in (measure_slides or []) if slug in slug_to_page]
-            page_to_slug = {v: k for k, v in slug_to_page.items()}
-
-            # Live-preview data and preview images follow the change: every
-            # slide it can alter is re-rendered, plus the measured slugs.
-            from sdpm.engine.schema import affected_slugs
-
-            _slides_by_slug = {s["id"]: s for s in slides if s.get("id")}
-            _render_set = set(measure_slides or []) | set(affected_slugs(changed_paths, _slides_by_slug))
-            render_slugs = [s for s in slug_to_page if s in _render_set]
-
-            if plan["verify"]:
-                # Measure
+            def previous(slug: str) -> tuple[str, dict | None]:
+                key = latest.get(slug)
+                if not key:
+                    return slug, None
                 try:
-                    if page_numbers:
-                        _t = time.monotonic()
-                        measure_result = _run_measure(tmpdir, pptx_path, page_numbers, page_to_slug=page_to_slug)
-                        _phase["measure"] = time.monotonic() - _t
-                        result["measure"] = measure_result
-                    else:
-                        result["measure"] = json.dumps({"error": "No matching slides found for given slugs"})
-                except Exception as e:
-                    result["measure"] = json.dumps({"error": str(e)})
+                    return slug, json.loads(_storage.download_file_from_pptx_bucket(key))
+                except Exception:
+                    return slug, None
 
-                # Layout bias (filter to measured slides; bias uses 1-based)
-                try:
-                    from sdpm.engine.preview import check_layout_imbalance_data
+            # Each slug is independent (own S3 keys); the S3 round trips dominate.
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                prev = {slug: data for slug, data in pool.map(previous, refresh.compose_slugs) if data is not None}
+            composed = refresh.compose(prev)
+            if composed.error:
+                logger.error("compose failed: %s", composed.error)
+            if composed.shortfall:
+                logger.warning("compose for %s: %s", deck_id, composed.shortfall)
+            if composed.defs is not None:
+                _storage.upload_file(
+                    key=f"{prefix}defs_{epoch}.json",
+                    data=json.dumps(composed.defs, ensure_ascii=False).encode(),
+                    content_type="application/json",
+                )
+                # Older defs (only older than this snapshot) and legacy slide_{N}_*.json go.
+                for k in old_keys:
+                    if ("/defs_" in k and (_key_epoch(k) or 0) < epoch) or re.search(r"/slide_\d+_\d+\.json$", k):
+                        _delete_quietly(k)
 
-                    layout_bias = [
-                        b
-                        for b in check_layout_imbalance_data(pptx_path, slide_defs=slides)
-                        if b.get("slide") in set(page_numbers)
-                    ]
-                    if layout_bias:
-                        result["warnings"] = {"layoutBias": layout_bias}
-                except Exception as e:
-                    logger.warning("Layout bias check failed: %s", e)
+            def upload(item: tuple[str, dict]) -> None:
+                slug, payload = item
+                _storage.upload_file(
+                    key=f"{prefix}{slug}_{epoch}.json",
+                    data=json.dumps(payload, ensure_ascii=False).encode(),
+                    content_type="application/json",
+                )
+                for k in old_keys:  # older compose of this slug only
+                    if k.startswith(f"{prefix}{slug}_") and (_key_epoch(k) or epoch) < epoch:
+                        _delete_quietly(k)
 
-                # Invalid-layout errors scoped to measured slugs only. Each
-                # composer owns a subset of slides, so leaking another group's
-                # mistake would be noise (they cannot fix it anyway).
-                measured_set = set(measure_slides or [])
-                my_invalids = [e for e in invalid_layouts if e.get("slug") in measured_set]
-                if my_invalids:
-                    errs = result.setdefault("errors", {})
-                    for e in my_invalids:
-                        errs[e["slug"]] = {
-                            "invalidLayout": e["attempted"],
-                            "available": e["available"],
-                        }
-
-            _t = time.monotonic()
-            if plan["artifact"]:
-                # Refresh the download artifact — the deck's PPTX follows deck
-                # changes automatically (same upload/record shape as
-                # generate_pptx; WebP previews and KB sync stay with
-                # generate_pptx, the explicit finalize/handoff step).
-                # A failure here means the download artifact is STALE — that
-                # must be visible to the caller, not just logged.
-                _pptx_key = None
-                try:
-                    import uuid as _uuid
-                    from datetime import datetime as _dt, timezone as _tz
-
-                    _pptx_key = f"pptx/{deck_id}/{_uuid.uuid4()}.pptx"
-                    _storage.upload_file(
-                        key=_pptx_key,
-                        data=Path(pptx_path).read_bytes(),
-                        content_type=("application/vnd.openxmlformats-officedocument.presentationml.presentation"),
-                    )
-                    _old = _storage.update_deck(
-                        deck_id=deck_id,
-                        user_id=user_id,
-                        updates={
-                            "pptxS3Key": _pptx_key,
-                            "updatedAt": _dt.now(_tz.utc).isoformat(),
-                            "slideCount": len(slides),
-                        },
-                    )
-                    # The record now points at the new artifact — delete the
-                    # superseded one so auto-refresh doesn't accumulate
-                    # orphaned PPTX objects (best effort; lifecycle rules
-                    # are the backstop).
-                    _old_key = (_old or {}).get("pptxS3Key")
-                    if _old_key and _old_key != _pptx_key:
-                        try:
-                            _storage._s3.delete_object(
-                                Bucket=_storage.pptx_bucket,
-                                Key=_old_key,
-                            )
-                        except Exception:
-                            pass
-                except Exception as e:
-                    logger.warning("PPTX artifact refresh failed: %s", e)
-                    result["pptx_error"] = (
-                        f"PPTX artifact refresh failed — the downloadable "
-                        f"PPTX is stale. Run generate_pptx to refresh it. "
-                        f"({e})"
-                    )
-                    if _pptx_key:
-                        # The record update may have failed after the upload
-                        # succeeded — delete the orphaned object (best effort).
-                        try:
-                            _storage._s3.delete_object(
-                                Bucket=_storage.pptx_bucket,
-                                Key=_pptx_key,
-                            )
-                        except Exception:
-                            pass
-
-            _phase["artifact_s3"] = time.monotonic() - _t
-            if render_slugs:
-                # Everything the composer needs is in `result` now. The live
-                # preview JSON (compose) and the rendered slugs' WebP are for
-                # the Web UI / the next get_preview, and take 5-10s; finish them
-                # in the background so the tool returns after measure.
-                # The task owns tmpdir and removes it when done.
-                _bg_t0 = time.monotonic()
-                _bg_slugs = list(render_slugs)
-                _pending_event = _register_pending_preview(deck_id)
-
-                def _finish_compose_and_previews() -> None:
-                    try:
-                        # Previews first: the composer's next get_preview waits on
-                        # _pending_event, so the images must be on S3 as early as
-                        # possible; compose (Web UI) follows.
-                        if _bg_slugs:
-                            try:
-                                from tools.generate import generate_previews_for_pages
-
-                                preview_dir = tmpdir / "preview_out"
-                                preview_dir.mkdir(exist_ok=True)
-                                wanted = {s: slug_to_page[s] for s in _bg_slugs if slug_to_page.get(s)}
-                                webp_by_page = generate_previews_for_pages(pptx_path, preview_dir, list(wanted.values()))
-                                uploaded = []
-                                for slug, page in wanted.items():
-                                    if page in webp_by_page:
-                                        _storage.upload_file(
-                                            key=f"previews/{deck_id}/{slug}_{_prepare_epoch}.webp",
-                                            data=webp_by_page[page].read_bytes(),
-                                            content_type="image/webp",
-                                        )
-                                        uploaded.append(slug)
-                                logger.info("previews uploaded for %s: %s", deck_id, ", ".join(uploaded))
-                            except Exception:
-                                logger.warning("preview generation failed", exc_info=True)
-                        _clear_pending_preview(deck_id, _pending_event)
-
-                        # Only generates compose for measure_slides slugs (parallel-safe).
-                        # Uses _prepare_epoch (snapshot time) so the composer with the
-                        # newest slides/ snapshot wins on defs via epoch comparison.
-                        try:
-                            from sdpm.engine.preview.compose import (
-                                extract_optimized_defs,
-                                load_svg,
-                                mark_changed,
-                                source_hash,
-                                split_slide_components,
-                            )
-
-                            svg_path = tmpdir / "measure.svg"
-                            if not svg_path.exists():
-                                _export_svg(tmpdir, pptx_path)
-                            if svg_path.exists():
-                                import json as _json
-                                import re as _re
-
-                                compose_prefix = f"decks/{deck_id}/compose/"
-
-                                # List existing compose keys (for prev data + cleanup)
-                                old_keys = _storage.list_files(prefix=compose_prefix, bucket=_storage.pptx_bucket)
-
-                                def _latest_key(prefix: str) -> str | None:
-                                    best_ep, best_k = -1, None
-                                    for k in old_keys:
-                                        if not k.startswith(prefix):
-                                            continue
-                                        m = _re.search(r"_(\d+)\.json$", k)
-                                        ep = int(m.group(1)) if m else 0
-                                        if ep > best_ep:
-                                            best_ep, best_k = ep, k
-                                    return best_k
-
-                                # Determine which slugs to generate compose for:
-                                # the rendered slugs, plus any slug with no compose
-                                # yet (migration + first build)
-                                compose_slugs = set(_bg_slugs)
-                                for s in slug_to_page:
-                                    if not _latest_key(f"{compose_prefix}{s}_"):
-                                        compose_slugs.add(s)
-
-                                # Upload defs (prepare epoch — newest snapshot wins)
-                                svg_tree = load_svg(svg_path)
-                                defs_data = extract_optimized_defs(svg_tree)
-                                _storage.upload_file(
-                                    key=f"{compose_prefix}defs_{_prepare_epoch}.json",
-                                    data=_json.dumps(defs_data, ensure_ascii=False).encode(),
-                                    content_type="application/json",
-                                )
-                                # Cleanup old defs (only delete defs older than our epoch)
-                                # Also remove legacy slide_{N}_*.json files
-                                for k in old_keys:
-                                    if "/defs_" in k:
-                                        m = _re.search(r"_(\d+)\.json$", k)
-                                        if m and int(m.group(1)) < _prepare_epoch:
-                                            try:
-                                                _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
-                                            except Exception:
-                                                pass
-                                    elif _re.search(r"/slide_\d+_\d+\.json$", k):
-                                        try:
-                                            _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
-                                        except Exception:
-                                            pass
-
-                                # Generate compose for each measured slug
-                                def _compose_one(slug: str) -> None:
-                                    if slug in invalid_slug_set:
-                                        # Do not surface a fallback-rendered slide as a
-                                        # live-preview artifact. The composer for this
-                                        # slug will see the error and fix the layout.
-                                        return
-                                    pn = slug_to_page.get(slug)
-                                    if not pn:
-                                        return
-                                    try:
-                                        comp_data = split_slide_components(svg_tree, pn)
-                                        from sdpm.engine.schema import extract_regions
-
-                                        slide = slides[pn - 1] if pn <= len(slides) else {}
-                                        comp_data["regions"] = extract_regions(slide)
-
-                                        # sourceHash from slide JSON (content-based diff)
-                                        src_hash = source_hash(slides[pn - 1]) if pn <= len(slides) else ""
-                                        comp_data["sourceHash"] = src_hash
-
-                                        # Diff against previous compose for same slug
-                                        prev_key = _latest_key(f"{compose_prefix}{slug}_")
-                                        prev_comps = None
-                                        prev_hash = None
-                                        if prev_key:
-                                            try:
-                                                raw = _storage.download_file_from_pptx_bucket(prev_key)
-                                                prev_data = _json.loads(raw)
-                                                prev_comps = prev_data.get("components")
-                                                prev_hash = prev_data.get("sourceHash")
-                                            except Exception:
-                                                pass
-
-                                        mark_changed(comp_data["components"], prev_comps, src_hash, prev_hash)
-
-                                        _storage.upload_file(
-                                            key=f"{compose_prefix}{slug}_{_prepare_epoch}.json",
-                                            data=_json.dumps(comp_data, ensure_ascii=False).encode(),
-                                            content_type="application/json",
-                                        )
-
-                                        # Cleanup old compose for this slug only
-                                        for k in old_keys:
-                                            _m = _re.search(r"_(\d+)\.json$", k)
-                                            if k.startswith(f"{compose_prefix}{slug}_") and _m and int(_m.group(1)) < _prepare_epoch:
-                                                try:
-                                                    _storage._s3.delete_object(Bucket=_storage.pptx_bucket, Key=k)
-                                                except Exception:
-                                                    pass
-                                    except Exception:
-                                        logger.error("compose failed for slug %s", slug, exc_info=True)
-
-                                # Each slug is independent (own S3 keys); the S3 round
-                                # trips dominate, so run them side by side.
-                                from concurrent.futures import ThreadPoolExecutor
-                                with ThreadPoolExecutor(max_workers=8) as pool:
-                                    list(pool.map(_compose_one, sorted(compose_slugs)))
-                        except Exception:
-                            logger.error("compose failed", exc_info=True)
-
-                    finally:
-                        _clear_pending_preview(deck_id, _pending_event)
-                        shutil.rmtree(tmpdir, ignore_errors=True)
-                        logger.info(
-                            "run_python background compose/previews for deck %s took %.1fs",
-                            deck_id, time.monotonic() - _bg_t0,
-                        )
-
-                if _bg_slugs:
-                    result["previewHint"] = (
-                        f"Preview images are being generated for {', '.join(_bg_slugs)} "
-                        f"(ready within seconds). Call get_preview(deck_id=\"{deck_id}\", slugs=[...]) to view."
-                    )
-                _run_in_background(_finish_compose_and_previews, name=f"compose-{deck_id}")
-            else:
-                shutil.rmtree(tmpdir, ignore_errors=True)
-        except Exception as e:
-            msg = str(e)
-            # "No slides found" is expected during early phases (outline/brief
-            # editing before any slide JSON exists). Silently skip measure.
-            if "No slides found" in msg or "has no slides" in msg:
-                pass
-            else:
-                logger.exception("run_python post-processing failed: deck=%s", deck_id)
-                if plan["verify"]:
-                    result["measure"] = json.dumps({"error": msg, "traceback": traceback.format_exc()})
-                else:
-                    result["pptx_error"] = f"PPTX build failed — the downloadable PPTX may be stale: {msg}"
-
-    if "_phase" in locals():
-        logger.info(
-            "run_python post-processing for deck %s: %s",
-            deck_id, " ".join(f"{k}={v:.1f}s" for k, v in _phase.items()),
-        )
-    return json.dumps(result, ensure_ascii=False)
+            with ThreadPoolExecutor(max_workers=8) as pool:
+                list(pool.map(upload, sorted(composed.slides.items())))
+        except Exception:
+            logger.error("compose failed", exc_info=True)
+    finally:
+        _clear_pending_preview(deck_id, pending)
+        refresh.close()
+        shutil.rmtree(tmpdir, ignore_errors=True)
+        logger.info("run_python background compose/previews for deck %s took %.1fs", deck_id, time.monotonic() - t0)
 
 
 # --- Layout tools (bound from the shared contract) ---
