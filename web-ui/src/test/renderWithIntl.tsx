@@ -16,13 +16,17 @@ const MESSAGES = { en, ja }
 
 type IntlRenderOptions = Omit<RenderOptions, "wrapper"> & { locale?: keyof typeof MESSAGES }
 
-export function renderWithIntl(ui: ReactElement, { locale = "en", ...options }: IntlRenderOptions = {}) {
-  function IntlWrapper({ children }: { children: ReactNode }) {
+/** NextIntlClientProvider wrapper for renderHook (hooks that call useTranslations()). */
+export function intlWrapper(locale: keyof typeof MESSAGES = "en") {
+  return function IntlWrapper({ children }: { children: ReactNode }) {
     return (
       <NextIntlClientProvider locale={locale} messages={MESSAGES[locale]} timeZone="UTC">
         {children}
       </NextIntlClientProvider>
     )
   }
-  return render(ui, { wrapper: IntlWrapper, ...options })
+}
+
+export function renderWithIntl(ui: ReactElement, { locale = "en", ...options }: IntlRenderOptions = {}) {
+  return render(ui, { wrapper: intlWrapper(locale), ...options })
 }

@@ -1,6 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import { WebStorageStateStore } from "oidc-client-ts"
+import { loadRuntimeConfig, type RuntimeConfig } from "@/lib/runtimeConfig"
 
 // Configuration type matching the cognitoAuthConfig structure
 type AwsExportsConfig = {
@@ -21,45 +22,19 @@ type AwsExportsConfig = {
  * 3. Default values
  */
 
-// Cache for loaded config
-let configCache: AwsExportsConfig | null = null
-let configPromise: Promise<AwsExportsConfig | null> | null = null
-
-// Load configuration from aws-exports.json at runtime
-async function loadAwsConfig(): Promise<AwsExportsConfig | null> {
-  if (configCache) {
-    return configCache
+// Load configuration from aws-exports.json at runtime (shared, cached load)
+async function loadAwsConfig(): Promise<RuntimeConfig> {
+  try {
+    return await loadRuntimeConfig()
+  } catch (error) {
+    console.error("Failed to load aws-exports.json:", error)
+    throw error
   }
-
-  if (configPromise) {
-    return configPromise
-  }
-
-  configPromise = (async () => {
-    try {
-      const response = await fetch("/aws-exports.json")
-      if (!response.ok) {
-        throw new Error(`Failed to load aws-exports.json: ${response.status}`)
-      }
-      const config = await response.json()
-      configCache = config
-      return config
-    } catch (error) {
-      console.error("Failed to load aws-exports.json:", error)
-      throw error
-    }
-  })()
-
-  return configPromise
 }
 
 // Create auth config factory function that loads config dynamically
 export async function createCognitoAuthConfig(): Promise<AwsExportsConfig> {
   const awsConfig = await loadAwsConfig()
-
-  if (awsConfig === null) {
-    throw Error("aws-exports.json file not found")
-  }
 
   // Get environment variables
   const userPoolId = process.env.NEXT_PUBLIC_COGNITO_USER_POOL_ID

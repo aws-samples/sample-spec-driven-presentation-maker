@@ -22,6 +22,7 @@
 import { useState, useEffect, useRef, useCallback } from "react"
 import { AnimatePresence, motion } from "motion/react"
 import { SlidePreview, fetchHtmlUrl } from "@/services/deckService"
+import { openInOs } from "@/services/localService"
 import type { ScriptWarning, SpecFiles } from "@/services/deckService"
 import { Download, ExternalLink, Layers, LayoutGrid, Presentation, Printer, Rows3, FolderOpen } from "lucide-react"
 import { usePreferences } from "@/hooks/usePreferences"
@@ -298,13 +299,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   /** Local: open deck directory in Finder/Explorer */
   async function handleFolderOpen() {
     if (!deckId || !IS_LOCAL) return
-    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch((err) => notifyError(t("errorOpenFolder"), err, { retry: handleFolderOpen }))
+    openInOs(deckId).catch((err) => notifyError(t("errorOpenFolder"), err, { retry: handleFolderOpen }))
   }
 
   /** Local: open output.pptx with default app */
   async function handlePptxOpen() {
     if (!deckId || !IS_LOCAL) return
-    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch((err) => notifyError(t("errorOpenPptx"), err, { retry: handlePptxOpen }))
+    openInOs(deckId, "output.pptx").catch((err) => notifyError(t("errorOpenPptx"), err, { retry: handlePptxOpen }))
   }
 
   /**
@@ -342,8 +343,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   async function handleHtmlOpen() {
     if (!deckId || !IS_LOCAL) return
     try {
-      const res = await fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.html" }) })
-      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      await openInOs(deckId, "output.html")
     } catch (err) {
       notifyError(t("errorOpenHtml"), err, { retry: handleHtmlOpen })
     }

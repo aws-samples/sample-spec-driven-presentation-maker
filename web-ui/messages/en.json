@@ -59,7 +59,20 @@
     "textSizeDescription": "Scale text and interface spacing",
     "textScaleLabel": "{scale}% text size",
     "language": "Language",
-    "languageDescription": "Display language for the interface"
+    "languageDescription": "Display language for the interface",
+    "errorLoadAgents": "Failed to load agent definitions",
+    "errorLoadModels": "Failed to load model list",
+    "agentUpdated": "{role} agent updated",
+    "agentUpdatedDescription": "Now using {name}. Takes effect on next chat — current chat is not affected.",
+    "errorUpdateAgent": "Failed to update {role} agent",
+    "localModelUpdated": "Model: {name}",
+    "localModelDefault": "Model: default",
+    "takesEffectNextChat": "Takes effect on next chat.",
+    "errorUpdateModel": "Failed to update model",
+    "chatModelUpdated": "Chat: {name}",
+    "chatModelDefault": "Chat: default",
+    "createModelUpdated": "Create: {name}",
+    "createModelDefault": "Create: default"
   },
   "deckCard": {
     "addToFavorites": "Add to favorites",
@@ -259,7 +272,8 @@
     "fetchWebImages": "Fetch web images",
     "fetchWebImagesDescription": "Include images from websites in presentations",
     "sessionBusy": "This chat is still answering in another tab or panel. Wait for it to finish, then send again.",
-    "sessionLocked": "This chat is in use by another kiro-cli process, such as a terminal session. Close it there, then send again."
+    "sessionLocked": "This chat is in use by another kiro-cli process, such as a terminal session. Close it there, then send again.",
+    "errorStopGeneration": "Failed to stop generation"
   },
   "snippet": {
     "title": "Text Snippet",
@@ -405,7 +419,9 @@
     "bulkDeleteTitle": "Delete {count, plural, one {# deck} other {# decks}}?",
     "bulkDeleteDescription": "The selected decks will be permanently deleted after 30 days. This action cannot be undone.",
     "bulkDeleteFailed": "{count, plural, one {# deck} other {# decks}} could not be deleted.",
-    "bulkDeleteDescriptionLocal": "The selected deck folders will be deleted immediately. This action cannot be undone."
+    "bulkDeleteDescriptionLocal": "The selected deck folders will be deleted immediately. This action cannot be undone.",
+    "errorUpdateVisibility": "Failed to update visibility.",
+    "errorDeleteDeck": "Failed to delete deck."
   },
   "mcp": {
     "connected": "Connected: {names}",

@@ -3,6 +3,9 @@
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook } from "@testing-library/react"
+import { toast } from "sonner"
+import { intlWrapper } from "@/test/renderWithIntl"
+import en from "../../messages/en.json"
 
 vi.mock("@/lib/mode", () => ({ IS_LOCAL: false }))
 vi.mock("sonner", () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
@@ -47,6 +50,7 @@ describe("useDeckList — HTML preview URL re-signing", () => {
   async function searchOnce(activeDeckId: string | null = null) {
     const hook = renderHook(({ active }) => useDeckList("token", true, active), {
       initialProps: { active: activeDeckId },
+      wrapper: intlWrapper(),
     })
     await flush()
     act(() => hook.result.current.setSearchQuery("cover"))
@@ -82,5 +86,27 @@ describe("useDeckList — HTML preview URL re-signing", () => {
     hook.rerender({ active: null })
     await flush()
     expect(api.searchSlides).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe("useDeckList — translated action errors", () => {
+  beforeEach(() => {
+    api.listDecks.mockResolvedValue({ decks: [], favoriteIds: [] } as never)
+    api.listPublicDecks.mockResolvedValue([] as never)
+    api.listFavorites.mockResolvedValue([] as never)
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it.each([
+    ["en", en.decksPage.errorUpdateVisibility],
+    ["ja", "公開範囲を更新できませんでした"],
+  ] as const)("shows the %s message when visibility cannot be updated", async (locale, expected) => {
+    api.updateVisibility.mockRejectedValueOnce(new Error("HTTP 500"))
+    const { result } = renderHook(() => useDeckList("token", true, null), { wrapper: intlWrapper(locale) })
+    await act(async () => { await result.current.handleToggleVisibility("d1", "public") })
+    expect(toast.error).toHaveBeenCalledWith(expected)
   })
 })

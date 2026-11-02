@@ -6,6 +6,7 @@ import { createCognitoAuthConfig } from "@/lib/auth"
 import { useEffect, useState, useRef, PropsWithChildren } from "react"
 import { AuthProvider as OidcAuthProvider } from "react-oidc-context"
 import { WebStorageStateStore } from "oidc-client-ts"
+import { IS_LOCAL } from "@/lib/mode"
 import { AutoSignin } from "./AutoSignin"
 
 interface CognitoAuthConfig {
@@ -18,8 +19,6 @@ interface CognitoAuthConfig {
   automaticSilentRenew?: boolean
   userStore?: WebStorageStateStore
 }
-
-const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === 'local'
 
 const AuthProvider = ({ children }: PropsWithChildren) => {
   // Local mode: skip Cognito entirely

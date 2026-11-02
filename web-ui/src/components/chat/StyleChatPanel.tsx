@@ -19,6 +19,8 @@ import { ChatMessage } from "./ChatMessage"
 import { FileDropZone } from "./FileDropZone"
 import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
 import { IS_LOCAL } from "@/lib/mode"
+import { loadRuntimeConfig } from "@/lib/runtimeConfig"
+import { saveLocalChat } from "@/services/localService"
 import { Sparkles, MessageSquare, Image, Palette } from "lucide-react"
 import type { UploadedFile } from "@/services/uploadService"
 import { buildAttachedMarkers } from "@/lib/attachmentMarker"
@@ -65,8 +67,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
     if (IS_LOCAL) return
     async function loadConfig() {
       try {
-        const response = await fetch("/aws-exports.json")
-        const config = await response.json()
+        const config = await loadRuntimeConfig()
         await setAgentConfig(config.agentRuntimeArn, config.awsRegion || "us-east-1")
         setConfigLoaded(true)
       } catch (err) {
@@ -79,11 +80,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
   // Save chat after each send (Local mode)
   useEffect(() => {
     if (!stream.isLoading && stream.messages.length > 0 && IS_LOCAL && styleId) {
-      fetch("/api/agent/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deckId: styleId, messages: stream.messages }),
-      }).catch((err) => notifyError(t("saveChatFailed"), err))
+      saveLocalChat(styleId, stream.messages).catch((err) => notifyError(t("saveChatFailed"), err))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isLoading])

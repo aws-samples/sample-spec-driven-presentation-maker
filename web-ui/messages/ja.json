@@ -59,7 +59,20 @@
     "textSizeDescription": "文字とインターフェースの間隔を拡大・縮小します",
     "textScaleLabel": "文字サイズ {scale}%",
     "language": "言語",
-    "languageDescription": "インターフェースの表示言語"
+    "languageDescription": "インターフェースの表示言語",
+    "errorLoadAgents": "エージェント定義を読み込めませんでした",
+    "errorLoadModels": "モデル一覧を読み込めませんでした",
+    "agentUpdated": "{role} エージェントを更新しました",
+    "agentUpdatedDescription": "{name} を使用します。次のチャットから反映され、現在のチャットには影響しません。",
+    "errorUpdateAgent": "{role} エージェントを更新できませんでした",
+    "localModelUpdated": "モデル: {name}",
+    "localModelDefault": "モデル: デフォルト",
+    "takesEffectNextChat": "次のチャットから反映されます。",
+    "errorUpdateModel": "モデルを更新できませんでした",
+    "chatModelUpdated": "チャット: {name}",
+    "chatModelDefault": "チャット: デフォルト",
+    "createModelUpdated": "作成: {name}",
+    "createModelDefault": "作成: デフォルト"
   },
   "deckCard": {
     "addToFavorites": "お気に入りに追加",
@@ -259,7 +272,8 @@
     "fetchWebImages": "Web 画像を取得",
     "fetchWebImagesDescription": "Web サイトの画像をプレゼンテーションに取り込みます",
     "sessionBusy": "このチャットは別のタブまたはパネルで応答中です。応答が終わってから、もう一度送信してください。",
-    "sessionLocked": "このチャットは別の kiro-cli プロセス（ターミナルなど）で使用中です。そちらを終了してから、もう一度送信してください。"
+    "sessionLocked": "このチャットは別の kiro-cli プロセス（ターミナルなど）で使用中です。そちらを終了してから、もう一度送信してください。",
+    "errorStopGeneration": "生成を停止できませんでした"
   },
   "snippet": {
     "title": "テキストスニペット",
@@ -405,7 +419,9 @@
     "bulkDeleteTitle": "{count, plural, other {# 件のデッキを削除しますか?}}",
     "bulkDeleteDescription": "選択したデッキは 30 日後に完全に削除されます。この操作は元に戻せません。",
     "bulkDeleteFailed": "{count, plural, other {# 件のデッキを削除できませんでした。}}",
-    "bulkDeleteDescriptionLocal": "選択したデッキのフォルダを即時に削除します。この操作は元に戻せません。"
+    "bulkDeleteDescriptionLocal": "選択したデッキのフォルダを即時に削除します。この操作は元に戻せません。",
+    "errorUpdateVisibility": "公開範囲を更新できませんでした",
+    "errorDeleteDeck": "デッキを削除できませんでした"
   },
   "mcp": {
     "connected": "接続済み: {names}",

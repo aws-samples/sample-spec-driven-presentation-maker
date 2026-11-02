@@ -6,8 +6,7 @@ import { useAuth as useOidcAuth } from "react-oidc-context"
 import { useEffect, useState } from "react"
 import { WebStorageStateStore } from "oidc-client-ts"
 import { createCognitoAuthConfig } from "@/lib/auth"
-
-const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === "local"
+import { IS_LOCAL } from "@/lib/mode"
 
 interface CognitoAuthConfig {
   authority?: string
