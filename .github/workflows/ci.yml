@@ -137,6 +137,9 @@ jobs:
       - name: Type check
         run: npx tsc --noEmit
         working-directory: infra
+      - name: Test
+        run: npm test
+        working-directory: infra
       # cdk synth catches template-level errors that tsc cannot (e.g. invalid
       # lifecycle rule combinations only fail at CloudFormation/S3 API time,
       # but synth at least validates construct-level constraints and config).

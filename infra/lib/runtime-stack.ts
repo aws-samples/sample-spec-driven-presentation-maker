@@ -22,6 +22,7 @@ import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import * as path from "path";
 import { AUTH_SSM_PARAMS } from "./auth-stack";
+import { RuntimeResourcePolicy } from "./construct/runtime-resource-policy";
 
 interface RuntimeStackProps extends cdk.StackProps {
   /** Amazon DynamoDB table from DataStack. */
@@ -284,6 +285,13 @@ export class RuntimeStack extends cdk.Stack {
       }
     );
     endpoint.addDependency(runtime);
+
+    // Allow only invoke and stop on the runtime and its endpoints. The agent and
+    // the McpHttpApi proxy reach this runtime with InvokeAgentRuntime only.
+    new RuntimeResourcePolicy(this, "SdpmRuntimeResourcePolicy", {
+      runtimeArn: runtime.attrAgentRuntimeArn,
+      endpointArns: { SdpmEndpoint: endpoint.attrAgentRuntimeEndpointArn },
+    });
 
     // --- Outputs ---
     this.runtimeArn = runtime.attrAgentRuntimeArn;

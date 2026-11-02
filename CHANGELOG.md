@@ -176,6 +176,18 @@ Entries before v0.5.0 were written retroactively as summaries.
   together with the `include=slideJson` option of `GET /decks/{id}` (now ignored), the local
   Web UI's `/api/agent/config` route and the API Lambda's direct document-parser
   dependencies. The Web UI used none of them. (#478)
+- **The compose card's own stop button.** The **Cancel** button on the compose card (Cloud
+  only), its "Stopping…" state and the summary of what each composer did before stopping are
+  gone. To stop, use the main stop button next to the chat input: it stops the whole turn,
+  compose included (Cloud ends the runtime session, Local sends ACP `session/cancel`). Its
+  tooltip no longer changes to "Force stop" while slides are being composed. The cancel used a
+  marker file written into the agent's microVM through the runtime's `/commands` API, and the
+  agent told the composers to stop through a special tool result; both side channels are
+  removed, and the `compose_slides` report no longer has a `cancelled` status.
+- **The composers' per-slide time budget.** Composers no longer get a deadline (90 s per slide,
+  `COMPOSER_SECONDS_PER_SLIDE`) or the "Time budget reached" notice that told them to stop
+  polishing, and the compose card no longer shows composers as "rushed". The runaway guards
+  stay: a composer is still stopped after 5 consecutive tool errors or a tool-call loop / cap.
 
 ### Fixed
 
@@ -230,6 +242,14 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Security
 
+- **The AgentCore runtimes allow only the operations the app uses.** The agent and MCP
+  runtimes, their `DEFAULT` endpoints and the named endpoints `sdpm_agent_endpoint` and
+  `sdpm_endpoint` now carry a resource-based policy (`AWS::BedrockAgentCore::ResourcePolicy`,
+  managed in `infra/`) that allows `InvokeAgentRuntime` and `StopRuntimeSession` and denies
+  `InvokeAgentRuntimeCommand`. Any other runtime operation is refused. Chat, the stop
+  button, the agent's calls to the MCP runtime and external MCP clients keep working; a
+  caller that ran commands in a runtime session through `InvokeAgentRuntimeCommand` now gets
+  403.
 - **The agent no longer sees the user's id in Cloud attachments.** The upload handle the API
   returns and the Web UI puts in the `[Attached:…]` marker is now `uploads/{uuid}/{name}`
   instead of the S3 key `uploads/{userId}/{uuid}/{name}`. The MCP server builds the S3 key from

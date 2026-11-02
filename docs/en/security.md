@@ -27,7 +27,9 @@ These settings come with every deployment of the CDK stacks in `infra/`:
 - **CloudFront**: Origin Access Control for the site bucket and for slide previews, and a
   redirect from HTTP to HTTPS.
 - **AgentCore Runtime**: the agent and MCP runtimes validate a JWT on every call
-  (`customJwtAuthorizer`). The user ID comes from the token's `sub` claim.
+  (`customJwtAuthorizer`). The user ID comes from the token's `sub` claim. A resource-based
+  policy on each runtime and its endpoints allows only `InvokeAgentRuntime` and
+  `StopRuntimeSession`, the operations the app uses.
 - **Per-deck authorization**: a user is the deck's owner, a viewer (the deck is public), or
   has no access. The rules live in one place, `shared/authz.py`, used by both the API and the
   MCP server. See [Architecture — Authorization](architecture.md#authorization-role-based-access-control).
