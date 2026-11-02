@@ -93,7 +93,10 @@ CATALOG_COVERAGE = {
     # "no trigger" spellings and the Custom motion-path group — because each
     # names an absence or a selection surface rather than a value, so coverage
     # has nothing to generate or refuse for them.
-    "total": 671,
+    # 669, not 671: Smooth Start and Smooth End followed them, being the
+    # Animation Pane's names for `p:cTn/@accel` and `@decel` at 50000 — the two
+    # attributes `timing.acceleration` / `.deceleration` already write.
+    "total": 669,
     "generated": {
         # Each +7 is the Complex motion paths: new guiItems entries that
         # generate because their geometry was measured rather than inferred.
@@ -109,10 +112,10 @@ CATALOG_COVERAGE = {
         "transition": 218,
     },
     "refused": {
-        "total": 203,
-        "guiItems": 60,
+        "total": 201,
+        "guiItems": 58,
         "candidates": 143,
-        "animation": 201,
+        "animation": 199,
         "transition": 2,
     },
     "generatedDespiteGap": [
@@ -132,7 +135,7 @@ CATALOG_COVERAGE = {
     #: behavior *payload* was never captured. The payload slice is down from 121
     #: to 11 and holds no gallery tile at all — only enum candidates whose own
     #: mapping is open, so they resolve to no measured tile.
-    "captureRequiredRefusals": 192,
+    "captureRequiredRefusals": 190,
     "payloadRefusals": {"total": 11, "guiItems": 0, "candidates": 11},
 }
 
@@ -756,8 +759,11 @@ UNWRITTEN_OPTIONS = [
     ({"afterEffect": {"type": "hideOnNextClick"}}, "animation.afterAnimation.hideOnNextClick"),
     ({"afterEffect": {"type": "none", "color": "#808080"}}, "animation.afterAnimation.dimColor"),
     ({"timing": {"durationMs": 500, "rewind": True}}, "animation.timing.rewind"),
-    ({"timing": {"durationMs": 500, "smoothStart": True}}, "animation.timing.smoothStart"),
-    ({"timing": {"durationMs": 500, "smoothEnd": True}}, "animation.timing.smoothEnd"),
+    # `smoothStart` and `smoothEnd` were here. They are not unwritten options:
+    # the 2026-11-02 measurement shows they are the Animation Pane's name for
+    # `p:cTn/@accel` and `@decel` at 50000, which this writer already emits as
+    # `timing.acceleration` / `.deceleration`. They now refuse by naming the
+    # field to use instead, which the test below asserts.
     ({"timing": {"durationMs": 500, "bounceEnd": 300}}, "animation.timing.bounceEnd"),
     (
         {"start": {"type": "withPrevious", "delayMs": 0, "bookmark": "cue1"}},
@@ -765,6 +771,51 @@ UNWRITTEN_OPTIONS = [
     ),
     ({"sound": {"src": "audio/click.wav", "mediaType": "audio/wav"}}, "animation.sound.effect"),
 ]
+
+
+@pytest.mark.parametrize(
+    "field,attribute,equivalent",
+    [("smoothStart", "accel", "acceleration"), ("smoothEnd", "decel", "deceleration")],
+)
+def test_a_smoothness_option_is_refused_by_naming_the_field_that_writes_it(
+    field, attribute, equivalent
+):
+    """These two are not missing features, and the refusal has to say so.
+
+    Measured 2026-11-02: checking Smooth Start writes `p:cTn/@accel="50000"`
+    and clearing it removes the attribute; Smooth End is `@decel` the same way.
+    Those are the two attributes `timing.acceleration` and `.deceleration`
+    already carry, so sdpm has been able to write the Animation Pane's
+    checkboxes all along under a different name.
+
+    They used to refuse as unwritten options, which sent a caller looking for a
+    feature that exists. A refusal that names the equivalent is the whole point
+    of the change, so it is asserted rather than left to the message.
+    """
+    slide_def = _slide(
+        animations={
+            "mainSequence": [_effect("fx", "hero", timing={"durationMs": 500, field: True})],
+            "interactiveSequences": [],
+        }
+    )
+    with pytest.raises(TimingWriteError) as error:
+        _build(slide_def)
+    message = str(error.value)
+    assert f"p:cTn/@{attribute}" in message
+    assert f"timing.{equivalent}" in message
+    assert "0.5" in message
+    # And the equivalent really does write the measured bytes.
+    _builder, slide = _build(
+        _slide(
+            animations={
+                "mainSequence": [
+                    _effect("fx", "hero", timing={"durationMs": 500, equivalent: 0.5})
+                ],
+                "interactiveSequences": [],
+            }
+        )
+    )
+    assert f'{attribute}="50000"' in etree.tostring(_xml(slide)).decode()
 
 
 @pytest.mark.parametrize("patch,key", UNWRITTEN_OPTIONS)

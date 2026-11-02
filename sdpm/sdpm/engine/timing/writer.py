@@ -1227,22 +1227,29 @@ class TimingWriter:
         closes the catalog gap, and the option would then be dropped in silence
         instead of being written.
         """
+        # `smoothStart` and `smoothEnd` are refused by naming what to use
+        # instead, not as unimplemented. They are the Animation Pane's name for
+        # `p:cTn/@accel` and `@decel` at 50000 — measured 2026-11-02 — which is
+        # `timing.acceleration` / `.deceleration`, written and read here
+        # already. Saying "not implemented" sent a caller looking for a feature
+        # that exists under another name.
+        for name, equivalent in (
+            ("smoothStart", "acceleration"),
+            ("smoothEnd", "deceleration"),
+        ):
+            if timing.get(name):
+                raise TimingWriteError(
+                    f"slide {self.slide_slug!r}: {label}.timing.{name} is the Animation Pane's "
+                    f"name for p:cTn/@{'accel' if name == 'smoothStart' else 'decel'}, which this "
+                    f"writer emits as timing.{equivalent}; set timing.{equivalent} to 0.5 for the "
+                    "value PowerPoint's checkbox writes"
+                )
         for name, key, reason in (
             (
                 "rewind",
                 "animation.timing.rewind",
                 "the p:cTn fill/autoRev combination PowerPoint writes for Rewind when done playing "
                 "is not implemented here",
-            ),
-            (
-                "smoothStart",
-                "animation.timing.smoothStart",
-                "Smooth start is a motion-path acceleration this writer does not emit",
-            ),
-            (
-                "smoothEnd",
-                "animation.timing.smoothEnd",
-                "Smooth end is a motion-path deceleration this writer does not emit",
             ),
             (
                 "bounceEnd",

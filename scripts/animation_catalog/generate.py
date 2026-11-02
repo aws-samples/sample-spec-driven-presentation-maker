@@ -1308,23 +1308,39 @@ CONTROL_ITEMS: tuple[tuple[str, str, str, dict[str, Any] | None, dict[str, Any] 
         effect_semantic(timing={"rewind": True}),
         None,
     ),
+    # Smooth Start and Smooth End were tracked as two more settings awaiting a
+    # capture. The 2026-11-02 measurement
+    # (tests/fixtures/animations/gui-only/timing-smoothness-2026-11-02) shows
+    # they are the GUI's name for `p:cTn/@accel` and `@decel` at 50000 — the two
+    # attributes `animation.timing.acceleration` and `.deceleration` already
+    # carry, which sdpm has written and read all along. The catalog had guessed
+    # the right attributes; only the value was missing, and with it the fact
+    # that there is nothing separate here to support.
+    #
+    # So they are recorded the way every other "the value persists through
+    # another key" entry is, rather than left asking for a read-back that has
+    # happened and would change nothing.
     (
         "animation.timing.smoothStart",
-        "accepted",
-        SEMANTIC,
-        {"strategy": "attribute", "attributes": ["p:cTn/@accel"],
-         "gap": "Smooth start is a motion-path option; its persisted form is not captured here"},
-        effect_semantic(timing={"smoothStart": True}),
+        "nonPersisted",
+        "",
         None,
+        None,
+        "Smooth Start is the Animation Pane's name for p:cTn/@accel: checking it writes "
+        "accel=\"50000\" and clearing it removes the attribute, measured 2026-11-02. That is "
+        "animation.timing.acceleration, which sdpm writes and reads, so the setting persists "
+        "through timing.acceleration = 0.5 and nothing separate is authorable here.",
     ),
     (
         "animation.timing.smoothEnd",
-        "accepted",
-        SEMANTIC,
-        {"strategy": "attribute", "attributes": ["p:cTn/@decel"],
-         "gap": "Smooth end is a motion-path option; its persisted form is not captured here"},
-        effect_semantic(timing={"smoothEnd": True}),
+        "nonPersisted",
+        "",
         None,
+        None,
+        "Smooth End is the Animation Pane's name for p:cTn/@decel: checking it writes "
+        "decel=\"50000\" and clearing it removes the attribute, measured 2026-11-02. That is "
+        "animation.timing.deceleration, which sdpm writes and reads, so the setting persists "
+        "through timing.deceleration = 0.5 and nothing separate is authorable here.",
     ),
     (
         "animation.timing.bounceEnd",

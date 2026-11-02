@@ -2450,9 +2450,9 @@
       "value": "smoothEnd",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
-      "persisted": true,
+      "persisted": false,
       "verificationMethod": "powerPointReadBackRequired",
-      "status": "accepted"
+      "status": "nonPersisted"
     },
     {
       "key": "animation.timing.smoothStart",
@@ -2460,9 +2460,9 @@
       "value": "smoothStart",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
-      "persisted": true,
+      "persisted": false,
       "verificationMethod": "powerPointReadBackRequired",
-      "status": "accepted"
+      "status": "nonPersisted"
     },
     {
       "key": "animation.timing.triggerTarget",

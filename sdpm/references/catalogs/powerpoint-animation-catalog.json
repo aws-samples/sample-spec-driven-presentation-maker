@@ -231,9 +231,9 @@
     },
     "guiItemTotal": 300,
     "guiItemStatusCounts": {
-      "accepted": 285,
+      "accepted": 283,
       "rejected": 0,
-      "nonPersisted": 13,
+      "nonPersisted": 15,
       "outOfScope": 2
     },
     "openQuestions": 4,
@@ -52523,113 +52523,15 @@
     },
     {
       "key": "animation.timing.smoothEnd",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "semanticJson": {
-        "animations": {
-          "mainSequence": [
-            {
-              "id": "catalogEffect",
-              "target": {
-                "element": "catalogTarget"
-              },
-              "preset": {
-                "category": "entrance",
-                "effect": "fade"
-              },
-              "start": {
-                "type": "onPageClick",
-                "delayMs": 0
-              },
-              "timing": {
-                "durationMs": 500,
-                "repeatCount": 1,
-                "repeatDurationMs": null,
-                "autoReverse": false,
-                "acceleration": 0,
-                "deceleration": 0,
-                "restart": "always",
-                "rewind": false,
-                "smoothStart": false,
-                "smoothEnd": true,
-                "bounceEnd": 0
-              },
-              "afterEffect": {
-                "type": "none"
-              },
-              "sound": null
-            }
-          ],
-          "interactiveSequences": []
-        }
-      },
-      "ooxml": {
-        "strategy": "attribute",
-        "attributes": [
-          "p:cTn/@decel"
-        ],
-        "gap": "Smooth end is a motion-path option; its persisted form is not captured here"
-      },
-      "evidence": {
-        "source": "PowerPoint 16.113.1 ribbon/dialog surface",
-        "commit": null
-      },
-      "verification": "powerPointReadBackRequired"
+      "status": "nonPersisted",
+      "reason": "Smooth End is the Animation Pane's name for p:cTn/@decel: checking it writes decel=\"50000\" and clearing it removes the attribute, measured 2026-11-02. That is animation.timing.deceleration, which sdpm writes and reads, so the setting persists through timing.deceleration = 0.5 and nothing separate is authorable here.",
+      "verification": "deterministic"
     },
     {
       "key": "animation.timing.smoothStart",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "semanticJson": {
-        "animations": {
-          "mainSequence": [
-            {
-              "id": "catalogEffect",
-              "target": {
-                "element": "catalogTarget"
-              },
-              "preset": {
-                "category": "entrance",
-                "effect": "fade"
-              },
-              "start": {
-                "type": "onPageClick",
-                "delayMs": 0
-              },
-              "timing": {
-                "durationMs": 500,
-                "repeatCount": 1,
-                "repeatDurationMs": null,
-                "autoReverse": false,
-                "acceleration": 0,
-                "deceleration": 0,
-                "restart": "always",
-                "rewind": false,
-                "smoothStart": true,
-                "smoothEnd": false,
-                "bounceEnd": 0
-              },
-              "afterEffect": {
-                "type": "none"
-              },
-              "sound": null
-            }
-          ],
-          "interactiveSequences": []
-        }
-      },
-      "ooxml": {
-        "strategy": "attribute",
-        "attributes": [
-          "p:cTn/@accel"
-        ],
-        "gap": "Smooth start is a motion-path option; its persisted form is not captured here"
-      },
-      "evidence": {
-        "source": "PowerPoint 16.113.1 ribbon/dialog surface",
-        "commit": null
-      },
-      "verification": "powerPointReadBackRequired"
+      "status": "nonPersisted",
+      "reason": "Smooth Start is the Animation Pane's name for p:cTn/@accel: checking it writes accel=\"50000\" and clearing it removes the attribute, measured 2026-11-02. That is animation.timing.acceleration, which sdpm writes and reads, so the setting persists through timing.acceleration = 0.5 and nothing separate is authorable here.",
+      "verification": "deterministic"
     },
     {
       "key": "animation.timing.triggerTarget",
