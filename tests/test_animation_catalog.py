@@ -2184,6 +2184,45 @@ def test_the_platform_inventory_records_the_whole_path_animation_popup():
     assert len(inventory["noMoreEffectsRoute"]["corroboration"]) == 2
 
 
+def test_the_misspelled_chart_level_enumerator_is_kept_verbatim():
+    """`chart by ctageory elements` is PowerPoint's spelling, not ours.
+
+    This one reads as an obvious typo and invites a drive-by correction, which
+    would break the AppleScript oracle silently: the enumerator is the literal
+    string PowerPoint for Mac 16.113.1 publishes in its own scripting
+    definition, so a corrected spelling simply would not resolve.
+
+    What makes it look wrong is that Microsoft's VBA documentation spells the
+    Windows constant correctly, as `msoAnimateChartByCategoryElements`. The two
+    surfaces disagree, and the catalog has to follow the one it talks to.
+
+    The guard is this test rather than a comment alone, because a comment does
+    not fail.
+    """
+    catalog = json.loads(
+        (REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json").read_text()
+    )
+    keys = {candidate["key"] for candidate in catalog["candidates"]}
+    enumerators = {
+        candidate["enumerator"]
+        for candidate in catalog["candidates"]
+        if candidate.get("enum") == "MsoAnimateByLevel"
+    }
+
+    misspelled = "MsoAnimateByLevel.chart by ctageory elements"
+    assert misspelled in keys, (
+        f"{misspelled!r} is gone. If it was 'corrected' to 'category', revert "
+        "that: PowerPoint.sdef spells it 'ctageory' and the oracle passes this "
+        "string through verbatim."
+    )
+    assert "chart by ctageory elements" in enumerators
+    assert "MsoAnimateByLevel.chart by category elements" not in keys
+
+    # The correctly spelled siblings are the evidence that each enumerator is
+    # copied from the .sdef individually rather than mangled wholesale.
+    assert {"chart by category", "chart by series", "chart by series elements"} <= enumerators
+
+
 def test_the_pane_settings_reading_records_a_route_with_no_dialog():
     """The after-effect, sound and timing settings are not behind a dialog here.
 

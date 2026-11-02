@@ -729,6 +729,17 @@ TEXT_UNIT_MAP: dict[str, tuple[str, str | None, str]] = {
 }
 
 #: MsoAnimateByLevel -> semantic value and OOXML build attributes.
+#:
+#: Twelve members, where Microsoft's VBA documentation lists 28. The difference
+#: is not an omission: the missing 16 are the 15 ``msoAnimateDiagram*`` members
+#: plus the read-only ``msoAnimateLevelMixed`` sentinel, and PowerPoint for Mac
+#: 16.113.1 publishes none of them in its scripting definition — ``grep
+#: 'diagram'`` over PowerPoint.sdef returns nothing. So this map covers the
+#: whole enumeration *this platform exposes*: 5 chart levels and 7 text levels.
+#:
+#: SmartArt build values therefore do not arrive through this enumeration at
+#: all. They are the six ``animation.smartArt.build.*`` entries, mapped from the
+#: OOXML side (``p:bldDgm/@build``) instead.
 LEVEL_MAP: dict[str, tuple[str, str, dict[str, str], str]] = {
     "text by no levels": ("asOneObject", "bldP", {}, NATIVE),
     "text by all levels": ("allParagraphLevels", "bldP", {"build": "allAtOnce"}, NATIVE),
@@ -739,6 +750,13 @@ LEVEL_MAP: dict[str, tuple[str, str, dict[str, str], str]] = {
     "text by fifth level": ("byParagraphLevel5", "bldP", {"build": "p", "bldLvl": "5"}, PRESET),
     "chart all at once": ("chartAllAtOnce", "bldGraphic", {"build": "allAtOnce"}, PRESET),
     "chart by category": ("chartByCategory", "bldGraphic", {"build": "category"}, PRESET),
+    # "ctageory" is **not** a typo in this file. PowerPoint for Mac 16.113.1
+    # ships that spelling in its own scripting definition
+    # (/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef),
+    # so it is the literal string the AppleScript interface accepts. Microsoft's
+    # VBA documentation spells the Windows constant correctly
+    # (msoAnimateChartByCategoryElements), which is what makes this look wrong.
+    # Correcting it here would break the oracle; see the test that guards it.
     "chart by ctageory elements": ("chartByCategoryElement", "bldGraphic", {"build": "catElem"}, PRESET),
     "chart by series": ("chartBySeries", "bldGraphic", {"build": "series"}, PRESET),
     "chart by series elements": ("chartBySeriesElement", "bldGraphic", {"build": "seriesEl"}, PRESET),
