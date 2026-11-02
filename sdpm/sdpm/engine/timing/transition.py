@@ -133,10 +133,16 @@ def resolve_transition(
     # standard element that merely shares the name (the "zoom" tile is
     # p14:warp, while ECMA-376 also defines an unused p:zoom).
     ordered = sorted(variants, key=lambda e: (0 if "galleryTile" in e.ooxml else 1, e.key))
-    matches = [entry for entry in ordered if entry.attributes() == merged]
+    # Selecting and writing are the same attribute set for every entry but one.
+    # `p14:wheelReverse` carries "reverse" in its element name, so it is
+    # selected with {spokes, reverse} and written with {spokes} alone; matching
+    # on `merged` and then writing `merged` would put a `reverse` attribute on
+    # an element that has none.
+    matches = [entry for entry in ordered if entry.selector_attributes() == merged]
     writable = [entry for entry in matches if entry.writable]
     if writable:
-        return writable[0], merged
+        chosen = writable[0]
+        return chosen, (chosen.attributes() if chosen.selects_by_element_name else merged)
     if matches:
         gap = matches[0].gap or "no established OOXML form"
         raise CapabilityGapError(
@@ -158,9 +164,11 @@ def resolve_transition(
 def _parameter_summary(slug: str, entry: CapabilityEntry, base: CapabilityEntry | None) -> str:
     aliases = {v: k for k, v in PARAMETER_ALIASES.get(slug, {}).items()}
     base_attrs = base.attributes() if base is not None else {}
+    # The selector, so the "supported parameter sets" message lists what the
+    # caller would have to pass rather than what lands on the element.
     attrs = {
         aliases.get(name, name): value
-        for name, value in entry.attributes().items()
+        for name, value in entry.selector_attributes().items()
         if base_attrs.get(name) != value or name in aliases
     }
     return str(attrs)

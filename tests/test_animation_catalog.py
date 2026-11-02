@@ -1041,21 +1041,18 @@ def test_every_captured_transition_is_promoted_and_names_its_evidence(catalog, c
     promoted = [
         entry for entry in catalog["candidates"] if entry.get("verification") == ORACLE_VERIFICATION
     ]
-    # Every captured candidate whose entry is an accepted mapping is promoted,
-    # except the one whose measured element sdpm cannot select from a parameter
-    # set (asserted on its own below). The rest of the captured candidates are
-    # the legacy values the catalog holds as outOfScope.
+    # Every captured candidate whose entry is an accepted mapping is promoted.
+    # The reversed Clock used to be the one exception, held back because its
+    # measured element carries "reverse" in its name; it is promoted now that
+    # selecting and writing are recorded as two attribute sets (asserted on its
+    # own below). The rest of the captured candidates are the legacy values the
+    # catalog holds as outOfScope.
     expected = {
         key for key in captured
         if next(e for e in catalog["candidates"] if e["key"] == key)["status"] == "accepted"
     }
-    not_authorable = {
-        entry["key"] for entry in catalog["candidates"]
-        if entry.get("capture", {}).get("attributeRelation") == "measuredButNotAuthorable"
-    }
-    assert not_authorable == {"EPPEntryEffect.entry effect wheel reverse 1 spoke"}
-    assert {entry["key"] for entry in promoted} == expected - not_authorable
-    assert len(promoted) == 156
+    assert {entry["key"] for entry in promoted} == expected
+    assert len(promoted) == 157
     for entry in promoted:
         form = captured[entry["key"]]
         ooxml = entry["ooxml"]
@@ -1102,6 +1099,10 @@ def test_a_promoted_attribute_set_is_the_captured_one_or_states_what_was_left_ou
         "keepsOmittedDefaults": 15,
         "correctsValues": 12,
         "correctsValuesAndKeepsOmittedDefaults": 3,
+        # The reversed Clock, and only it: the measured element carries part of
+        # the value in its name, so selecting and writing are two attribute
+        # sets. See the test that owns it below.
+        "selectsByParameterWritesElement": 1,
     }
 
 
@@ -1153,29 +1154,66 @@ def test_a_measured_form_sdpm_cannot_select_is_recorded_and_still_refused(catalo
 
     The catalog had the reversed Clock variant as a ``reverse`` attribute on
     the standard ``p:wheel``. PowerPoint writes ``<p14:wheelReverse
-    spokes="1"/>``: "reverse" is the element name, and no attribute carries it.
-    sdpm's transition JSON selects a value by its parameters, so the measured
-    form cannot be reached from one - promoting it would either emit an
-    attribute the element does not have or collapse the value onto the plain
-    Clock tile, which writes a different element. The entry records the
-    measurement and stays refused, which is a different gap from a missing
-    capture and says so.
+    spokes="1"/>``: "reverse" is the element *name*, and no attribute carries
+    it. So the parameter set that selects this value is not the attribute set
+    that goes on the element, and conflating the two leaves only wrong answers
+    — emit a ``reverse`` attribute the element does not have, or collapse the
+    value onto the plain Clock tile, which writes a different element.
+
+    They are recorded separately instead. ``selectorAttributes`` is what the
+    JSON selects with, ``attributes`` is what is written, and the entry is
+    promoted to the measured form rather than refused.
     """
     key = "EPPEntryEffect.entry effect wheel reverse 1 spoke"
     wheel = next(entry for entry in catalog["candidates"] if entry["key"] == key)
-    assert wheel["capture"]["attributeRelation"] == "measuredButNotAuthorable"
+    assert wheel["capture"]["attributeRelation"] == "selectsByParameterWritesElement"
+    assert wheel["capture"]["elementCarriesAsName"] == ["reverse"]
     assert wheel["capture"]["element"] == captured[key]["element"] == "p14:wheelReverse"
     assert wheel["capture"]["attributes"] == captured[key]["attributes"] == {"spokes": "1"}
-    assert "semantic model that can select an element" in wheel["capture"]["notPromoted"]
-    # Not promoted: the mapping the writer would use is untouched, the entry is
-    # still refused, and its gap names the measurement instead of asking for
-    # the read-back that has already happened.
-    assert wheel["ooxml"]["element"] == "p:wheel"
-    assert wheel["ooxml"]["attributes"] == {"spokes": "1", "reverse": "1"}
+    # What is written is the measured element with only the attribute it has.
+    assert wheel["ooxml"]["element"] == "p14:wheelReverse"
+    assert wheel["ooxml"]["attributes"] == {"spokes": "1"}
+    assert wheel["ooxml"]["fallbackElement"] == "p:fade"
+    # What selects it keeps `reverse`, and so does the example — deriving the
+    # example from the written attributes would drop it and leave the entry
+    # selecting the plain Clock tile.
+    assert wheel["ooxml"]["selectorAttributes"] == {"spokes": "1", "reverse": "1"}
+    assert wheel["semanticJson"]["transition"]["parameters"] == {"spokes": "1", "reverse": "1"}
     assert "requiresCapture" not in wheel["ooxml"]
-    assert "p14:wheelReverse" in wheel["ooxml"]["gap"]
-    assert wheel["capabilityLevel"] == SEMANTIC
-    assert wheel["verification"] == "powerPointReadBackRequired"
+    assert "gap" not in wheel["ooxml"]
+    assert wheel["capabilityLevel"] == NATIVE
+    assert wheel["verification"] == ORACLE_VERIFICATION
+    # And it writes: the selector reaches the measured element, the plain tile
+    # is still reachable without `reverse`, and neither leaks into the other.
+    import lxml.etree as etree
+
+    from sdpm.engine.timing import load_capability_index
+    from sdpm.engine.timing.transition import build_transition
+
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+
+    def emitted(parameters):
+        node, _ = build_transition(
+            {
+                "effect": "clock",
+                "parameters": parameters,
+                "durationMs": 1000,
+                "advance": {"onClick": True, "afterMs": None},
+                "sound": None,
+            },
+            index=index,
+            slide_slug="wheel",
+        )
+        return etree.tostring(node).decode()
+
+    reversed_xml = emitted({"spokes": "1", "reverse": "1"})
+    assert '<p14:wheelReverse spokes="1"/>' in reversed_xml
+    assert "reverse=" not in reversed_xml.replace("wheelReverse", "")
+    plain_xml = emitted({"spokes": "1"})
+    assert '<p:wheel spokes="1"/>' in plain_xml
+    assert "wheelReverse" not in plain_xml
 
 
 def test_a_promoted_entry_keeps_its_semantic_json_in_step_with_its_ooxml(catalog):
@@ -1188,7 +1226,11 @@ def test_a_promoted_entry_keeps_its_semantic_json_in_step_with_its_ooxml(catalog
             continue
         ooxml = entry["ooxml"]
         if entry["key"].startswith("EPPEntryEffect.") and "attributes" in ooxml:
-            expected = dict(ooxml["attributes"])
+            # The example has to carry what *selects* the entry, which is the
+            # attribute set for every entry but the reversed Clock: its element
+            # carries "reverse" in its name, so the example keeps `reverse`
+            # while the element does not.
+            expected = dict(ooxml.get("selectorAttributes") or ooxml["attributes"])
             if transition["effect"] == "morph":
                 expected = {"variant": expected["option"]}
             assert transition["parameters"] == expected, entry["key"]
@@ -1327,7 +1369,7 @@ def test_the_catalog_no_longer_says_powerpoint_was_never_driven(catalog):
         "transitionWritten": 160,
         "rejectedByPowerPoint": 196,
         "appliedWithoutPersistedForm": 1,
-        "promoted": 156,
+        "promoted": 157,
     }
 
 

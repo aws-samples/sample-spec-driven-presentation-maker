@@ -2489,33 +2489,57 @@ def promote_oracle_capture(entry: dict[str, Any], record: dict[str, Any],
             name: value for name, value in catalogued.items() if name not in form["attributes"]
         }
         if unexpressible:
-            # The catalogued attribute set is what selects this value in the
-            # semantic JSON, and the element PowerPoint writes has no attribute
-            # for part of it: a reversed Clock is ``p14:wheelReverse``, where
-            # "reverse" is the element name rather than an attribute, so the
-            # measured form cannot be reached from a parameter set. Record the
-            # measurement, keep the entry out of the writer, and say why -
-            # promoting the form here would either emit an attribute the
-            # element does not have, or collapse this value onto the plain
-            # Clock tile, which writes a different element.
-            entry["capture"]["attributeRelation"] = "measuredButNotAuthorable"
-            entry["capture"]["notPromoted"] = (
-                f"PowerPoint writes <{form['element']}> with {form['attributes'] or 'no attributes'} for this "
-                f"value, so the element is measured. It is not promoted: the catalogued "
-                f"{', '.join(sorted(unexpressible))} is what selects this value in the semantic JSON, and "
-                f"<{form['element']}> has no attribute for it, so sdpm cannot reach the measured form from a "
-                "parameter set. Resolving it needs a semantic model that can select an element, not another "
-                "capture"
-            )
+            # The element PowerPoint writes has no attribute for part of what
+            # selects this value: a reversed Clock is ``p14:wheelReverse``,
+            # where "reverse" is the element *name*. So selecting and writing
+            # are two different attribute sets, and conflating them leaves only
+            # bad options — emit an attribute the element does not have, or
+            # collapse the value onto the plain Clock tile, which writes a
+            # different element.
+            #
+            # They are therefore recorded separately. ``selectorAttributes`` is
+            # the parameter set the semantic JSON selects this entry with, and
+            # ``attributes`` is what goes on the element. The writer matches on
+            # the first and emits the second, so the measured form is reachable
+            # from a parameter set after all.
+            entry["capture"]["attributeRelation"] = "selectsByParameterWritesElement"
+            entry["capture"]["elementCarriesAsName"] = sorted(unexpressible)
+            entry["capture"]["supersededElement"] = ooxml.get("element")
+            entry["capture"]["supersededAttributes"] = dict(catalogued)
             ooxml.pop("requiresCapture", None)
-            ooxml["gap"] = (
-                f"the OOXML form is measured - PowerPoint writes <{form['element']}> with "
-                f"{form['attributes'] or 'no attributes'}, see capture - but sdpm's transition JSON selects a "
-                f"value by its parameters, and this element carries "
-                f"{', '.join(sorted(unexpressible))} in its element name rather than as an attribute. The "
-                "writer refuses it rather than emitting an attribute the element does not have or collapsing "
-                "it onto the plain tile."
+            ooxml.pop("gap", None)
+            ooxml["selectorAttributes"] = dict(catalogued)
+            ooxml["selectorNote"] = (
+                f"<{form['element']}> carries {', '.join(sorted(unexpressible))} in its element name rather "
+                f"than as an attribute, so the parameter set that selects this value is not the attribute "
+                f"set written onto the element. selectorAttributes is the former, attributes the latter."
             )
+            ooxml["element"] = form["element"]
+            ooxml["alternateContent"] = requires is not None or form["fallbackElement"] is not None
+            ooxml["fallbackElement"] = form["fallbackElement"]
+            ooxml["attributes"] = dict(form["attributes"])
+            ooxml["strategy"] = strategy
+            if namespace:
+                ooxml["namespace"] = namespace
+            if requires is not None:
+                ooxml["requires"] = requires
+            entry["capabilityLevel"] = NATIVE
+            entry["verification"] = ORACLE_VERIFICATION
+            entry["evidence"] = {
+                "source": ORACLE_SOURCE,
+                "commit": None,
+                "fixture": entry["capture"]["fixture"],
+                "capturedApplicationVersion": BASELINE_VERSION,
+                "slideIndex": record.get("slideIndex"),
+            }
+            # The example keeps the **selector** parameters. Deriving them from
+            # the written attributes, as the ordinary promotion does, would drop
+            # `reverse` and leave the example selecting the plain Clock tile.
+            semantic = entry.get("semanticJson", {}).get("transition")
+            if isinstance(semantic, dict):
+                semantic["parameters"] = semantic_parameters(
+                    str(semantic.get("effect")), dict(ooxml["selectorAttributes"])
+                )
             return entry
         attributes = dict(form["attributes"])
         entry["capture"]["attributeRelation"] = "replacesElementAndAttributes"

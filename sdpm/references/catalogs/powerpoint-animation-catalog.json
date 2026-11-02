@@ -242,7 +242,7 @@
       "transitionWritten": 160,
       "rejectedByPowerPoint": 196,
       "appliedWithoutPersistedForm": 1,
-      "promoted": 156
+      "promoted": 157
     }
   },
   "guiItems": [
@@ -66970,7 +66970,7 @@
     {
       "key": "EPPEntryEffect.entry effect wheel reverse 1 spoke",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
+      "capabilityLevel": "nativeTemplate",
       "semanticJson": {
         "transition": {
           "effect": "clock",
@@ -66987,28 +66987,32 @@
         }
       },
       "ooxml": {
-        "strategy": "standard",
-        "element": "p:wheel",
+        "strategy": "p14",
+        "element": "p14:wheelReverse",
         "attributes": {
-          "spokes": "1",
-          "reverse": "1"
+          "spokes": "1"
         },
-        "requires": null,
-        "namespace": "http://schemas.openxmlformats.org/presentationml/2006/main",
-        "alternateContent": false,
-        "fallbackElement": null,
+        "requires": "p14",
+        "namespace": "http://schemas.microsoft.com/office/powerpoint/2010/main",
+        "alternateContent": true,
+        "fallbackElement": "p:fade",
         "defaultDurationMs": 1000,
         "legacySpeed": "slow",
         "galleryTile": "Clock (1_14)",
-        "gap": "the OOXML form is measured - PowerPoint writes <p14:wheelReverse> with {'spokes': '1'}, see capture - but sdpm's transition JSON selects a value by its parameters, and this element carries reverse in its element name rather than as an attribute. The writer refuses it rather than emitting an attribute the element does not have or collapsing it onto the plain tile."
+        "selectorAttributes": {
+          "spokes": "1",
+          "reverse": "1"
+        },
+        "selectorNote": "<p14:wheelReverse> carries reverse in its element name rather than as an attribute, so the parameter set that selects this value is not the attribute set written onto the element. selectorAttributes is the former, attributes the latter."
       },
       "evidence": {
-        "source": "office-kit/pptx",
-        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
-        "fixture": "test/fixtures/native/transitions/28-clock.xml",
-        "capturedApplicationVersion": "16.113.3"
+        "source": "sdpm scripting oracle capture",
+        "commit": null,
+        "fixture": "tests/fixtures/animations/oracle-16.113.1/powerpoint-oracle.pptx",
+        "capturedApplicationVersion": "16.113.1",
+        "slideIndex": 193
       },
-      "verification": "powerPointReadBackRequired",
+      "verification": "scriptingOracleCapture",
       "guiKey": "transition.gallery.clock",
       "enum": "EPPEntryEffect",
       "enumerator": "entry effect wheel reverse 1 spoke",
@@ -67036,8 +67040,15 @@
         "alternateContentBranch": "Choice",
         "choiceRequires": "p14",
         "fallbackElement": "p:fade",
-        "attributeRelation": "measuredButNotAuthorable",
-        "notPromoted": "PowerPoint writes <p14:wheelReverse> with {'spokes': '1'} for this value, so the element is measured. It is not promoted: the catalogued reverse is what selects this value in the semantic JSON, and <p14:wheelReverse> has no attribute for it, so sdpm cannot reach the measured form from a parameter set. Resolving it needs a semantic model that can select an element, not another capture"
+        "attributeRelation": "selectsByParameterWritesElement",
+        "elementCarriesAsName": [
+          "reverse"
+        ],
+        "supersededElement": "p:wheel",
+        "supersededAttributes": {
+          "spokes": "1",
+          "reverse": "1"
+        }
       }
     },
     {

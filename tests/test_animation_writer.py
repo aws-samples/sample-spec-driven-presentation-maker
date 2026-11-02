@@ -100,18 +100,20 @@ CATALOG_COVERAGE = {
         # The last +2 is `shimmer` and `stretchy`, which generate now that
         # their example carries the gallery their own guiKey names instead of
         # a hardcoded `entrance`.
-        "total": 467,
+        # The last +1 is the reversed Clock, which writes once the parameter
+        # set that selects it is kept apart from the attributes it emits.
+        "total": 468,
         "guiItems": 225,
-        "candidates": 242,
+        "candidates": 243,
         "animation": 250,
-        "transition": 217,
+        "transition": 218,
     },
     "refused": {
-        "total": 204,
+        "total": 203,
         "guiItems": 60,
-        "candidates": 144,
+        "candidates": 143,
         "animation": 201,
-        "transition": 3,
+        "transition": 2,
     },
     "generatedDespiteGap": [
         f"MsoAnimEffect.animation type {name}"
@@ -130,7 +132,7 @@ CATALOG_COVERAGE = {
     #: behavior *payload* was never captured. The payload slice is down from 121
     #: to 11 and holds no gallery tile at all — only enum candidates whose own
     #: mapping is open, so they resolve to no measured tile.
-    "captureRequiredRefusals": 193,
+    "captureRequiredRefusals": 192,
     "payloadRefusals": {"total": 11, "guiItems": 0, "candidates": 11},
 }
 

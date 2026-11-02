@@ -53,7 +53,9 @@ A = "http://schemas.openxmlformats.org/drawingml/2006/main"
 #: refused for their payloads.
 #: 108 presets, not 101: the 7 Complex motion paths were captured on 2026-11-02
 #: and are invertible like the Basic five.
-BIDIRECTIONAL_COVERAGE = {"transitions": 147, "presets": 108}
+#: 148 transitions, not 147: the reversed Clock joined them when its selector
+#: parameters stopped being conflated with the attributes it writes.
+BIDIRECTIONAL_COVERAGE = {"transitions": 148, "presets": 108}
 
 FADE = {"category": "entrance", "effect": "fade"}
 

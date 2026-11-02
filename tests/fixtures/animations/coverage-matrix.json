@@ -13,7 +13,7 @@
   },
   "source": {
     "catalog": "sdpm/references/catalogs/powerpoint-animation-catalog.json",
-    "catalogDigest": "sha256:cf6d28328d4f5c26c2354b7dc84b7b825c52bd1ded75a2eda3ae7d291a14c2a3",
+    "catalogDigest": "sha256:0a597a20fc0a2a867ab6f0cbe54534aa2ec4f3573666a4693e399e8fe36284bd",
     "catalogGeneratedAt": "2026-10-30T00:00:00Z",
     "guiManifest": "powerpoint-gui-surface-16.113.1.json@2026-11-02.1",
     "baseline": {
@@ -2066,7 +2066,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 56,
-      "formEstablishedMembers": 55,
+      "formEstablishedMembers": 56,
       "formEstablishedCatalogKey": "transition.gallery.clock",
       "note": "catalog-pinned value 1000; the catalog establishes 21 distinct value(s) for this path"
     },
@@ -2183,8 +2183,8 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
-      "members": 95,
-      "formEstablishedMembers": 95,
+      "members": 96,
+      "formEstablishedMembers": 96,
       "formEstablishedCatalogKey": "transition.gallery.box"
     },
     {
@@ -2274,7 +2274,7 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
-      "members": 84,
+      "members": 83,
       "formEstablishedMembers": 83,
       "formEstablishedCatalogKey": "transition.gallery.blinds"
     },
@@ -2313,8 +2313,8 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
-      "members": 95,
-      "formEstablishedMembers": 95,
+      "members": 96,
+      "formEstablishedMembers": 96,
       "formEstablishedCatalogKey": "transition.gallery.box"
     },
     {
@@ -2365,7 +2365,7 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
-      "members": 517,
+      "members": 516,
       "formEstablishedMembers": 272,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink"
     },
@@ -2378,8 +2378,8 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
-      "members": 95,
-      "formEstablishedMembers": 95,
+      "members": 96,
+      "formEstablishedMembers": 96,
       "formEstablishedCatalogKey": "transition.gallery.box"
     },
     {
@@ -2578,7 +2578,7 @@
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
       "members": 7,
-      "formEstablishedMembers": 6,
+      "formEstablishedMembers": 7,
       "formEstablishedCatalogKey": "transition.gallery.clock"
     },
     {
@@ -3433,11 +3433,11 @@
       "catalogKey": "EPPEntryEffect.entry effect wheel reverse 1 spoke",
       "catalogGroup": "candidates",
       "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "verification": "powerPointReadBackRequired",
+      "capabilityLevel": "nativeTemplate",
+      "verification": "scriptingOracleCapture",
       "members": 1,
-      "formEstablishedMembers": 0,
-      "formEstablishedCatalogKey": null
+      "formEstablishedMembers": 1,
+      "formEstablishedCatalogKey": "EPPEntryEffect.entry effect wheel reverse 1 spoke"
     },
     {
       "id": "transitionParameters:spokes",

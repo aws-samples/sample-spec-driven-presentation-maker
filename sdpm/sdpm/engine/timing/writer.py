@@ -333,6 +333,25 @@ class CapabilityEntry:
             return {}
         return {str(k): str(v) for k, v in attributes.items()}
 
+    def selector_attributes(self) -> dict[str, str]:
+        """Return the parameter set that selects this entry, not what it writes.
+
+        The two differ when the element carries part of the value in its
+        *name*: a reversed Clock is ``p14:wheelReverse`` with only ``spokes``,
+        while the JSON selects it with ``spokes`` **and** ``reverse``. Every
+        other entry selects by exactly the attributes it writes, so this falls
+        back to :meth:`attributes`.
+        """
+        selector = self.ooxml.get("selectorAttributes")
+        if not isinstance(selector, Mapping):
+            return self.attributes()
+        return {str(k): str(v) for k, v in selector.items()}
+
+    @property
+    def selects_by_element_name(self) -> bool:
+        """True when selecting this entry needs more than its attributes."""
+        return isinstance(self.ooxml.get("selectorAttributes"), Mapping)
+
 
 class CapabilityIndex:
     """Indexed view over the 1.2 MB capability catalog.

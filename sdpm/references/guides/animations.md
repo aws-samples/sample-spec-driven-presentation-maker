@@ -158,7 +158,7 @@ alternative value of `parameters`. Parameter names are the persisted option name
 | `blinds` | `{}`, `{"dir": "horz"}` |
 | `box` | `{}` |
 | `checker` | `{}`, `{"dir": "vert"}` |
-| `clock` | `{}`, `{"spokes": "2"}`, `{"spokes": "3"}`, `{"spokes": "4"}`, `{"spokes": "8"}` |
+| `clock` | `{}`, `{"spokes": "2"}`, `{"spokes": "3"}`, `{"spokes": "4"}`, `{"spokes": "8"}`, `{"spokes": "1", "reverse": "1"}` |
 | `comb` | `{}`, `{"dir": "vert"}` |
 | `conveyor` | `{}` |
 | `cover` | `{}`, `{"dir": "d"}`, `{"dir": "ld"}`, `{"dir": "lu"}`, `{"dir": "r"}`, `{"dir": "rd"}`, `{"dir": "ru"}`, `{"dir": "u"}` |
@@ -211,6 +211,26 @@ alternative value of `parameters`. Parameter names are the persisted option name
 An option a PowerPoint menu offers but this table does not is not authorable: the writer
 refuses it with the supported sets rather than writing the effect's default and dropping
 your choice.
+
+### One parameter names an element rather than an attribute
+
+`clock` with `{"spokes": "1", "reverse": "1"}` is the only option set whose parameters are not
+the attributes that get written. PowerPoint persists a reversed Clock as
+
+```xml
+<mc:AlternateContent>
+  <mc:Choice Requires="p14"><p14:wheelReverse spokes="1"/></mc:Choice>
+  <mc:Fallback><p:fade/></mc:Fallback>
+</mc:AlternateContent>
+```
+
+so "reverse" is carried by the **element name**, and `p14:wheelReverse` has no `reverse`
+attribute at all. Pass `reverse` anyway: it is how the value is selected, and the writer emits
+the element with `spokes` alone. Reading the package back returns the same two parameters.
+
+Every other effect selects by exactly the attributes it writes. The catalog records the
+difference per entry as `ooxml.selectorAttributes` beside `ooxml.attributes`, so nothing has to
+special-case Clock by name.
 
 ### Morph
 

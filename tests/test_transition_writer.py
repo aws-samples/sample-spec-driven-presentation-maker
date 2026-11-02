@@ -57,9 +57,12 @@ NS = {
 TRANSITION_COVERAGE = {
     "galleryTiles": 49,
     "acceptedTiles": 48,
-    "generated": 213,
-    "refused": 1,
-    "refusedByStrategy": {"standard": 1},
+    # 214, not 213: the reversed Clock writes once the parameter set that
+    # selects it is kept apart from the attributes it emits, which leaves no
+    # refused transition element at all.
+    "generated": 214,
+    "refused": 0,
+    "refusedByStrategy": {},
     "controls": 6,
     "controlStrategies": {"attribute", "shapeName", "relationship"},
     "refusedControls": {"transition.sound.effect", "transition.sound.loopUntilNext"},
@@ -562,18 +565,20 @@ def test_catalog_transition_coverage_is_counted(coverage, index):
         assert index.entry(record.key).gap
         by_strategy[record.strategy] = by_strategy.get(record.strategy, 0) + 1
     assert by_strategy == TRANSITION_COVERAGE["refusedByStrategy"]
-    # Wheel Reverse is the single refused standard element, and it is the only
-    # transition element entry left. The catalog had guessed a reverse
-    # attribute on p:wheel; the scripting-oracle capture shows PowerPoint
-    # writing p14:wheelReverse, where "reverse" is the element name and no
-    # attribute carries it, so a parameter set cannot select the measured form.
-    # The gap is therefore about authoring rather than about capture.
-    standard = [record.key for record in refused if record.strategy == "standard"]
-    assert standard == ["EPPEntryEffect.entry effect wheel reverse 1 spoke"]
-    wheel_reverse = index.entry(standard[0])
-    assert wheel_reverse.ooxml["element"] == "p:wheel"
-    assert "p14:wheelReverse" in wheel_reverse.gap
-    assert not wheel_reverse.writable
+    # Wheel Reverse used to be the single refused standard element, and now no
+    # transition element is refused. The catalog had guessed a `reverse`
+    # attribute on `p:wheel`; the scripting-oracle capture shows PowerPoint
+    # writing `p14:wheelReverse`, where "reverse" is the element *name*. That
+    # is not a capture gap and never was — it is that selecting and writing
+    # were held as one attribute set. They are two now, so the measured form is
+    # reachable from a parameter set.
+    assert [record.key for record in refused if record.strategy == "standard"] == []
+    wheel_reverse = index.entry("EPPEntryEffect.entry effect wheel reverse 1 spoke")
+    assert wheel_reverse.writable
+    assert wheel_reverse.ooxml["element"] == "p14:wheelReverse"
+    assert wheel_reverse.attributes() == {"spokes": "1"}
+    assert wheel_reverse.selector_attributes() == {"spokes": "1", "reverse": "1"}
+    assert wheel_reverse.selects_by_element_name
 
 
 def test_transition_controls_are_counted_in_the_same_pass(coverage):
