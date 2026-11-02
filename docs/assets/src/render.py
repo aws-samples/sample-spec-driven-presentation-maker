@@ -24,6 +24,9 @@ from other decks under docs/assets/src/:
 
 Each tile's deck is built with only that slide in its outline, rendered the same way (no
 trim), scaled to tile_width and placed in rows of `columns`, with its label underneath.
+A tile deck holds no art direction of its own: its style.txt names a bundled style
+(sdpm/references/examples/styles/<name>.html), copied to specs/art-direction.html of the
+build copy, as apply_style does.
 
 Usage (from the repository root):
     uv run python docs/assets/src/render.py            # all diagrams and galleries
@@ -49,8 +52,27 @@ BUILDER = REPO / "sdpm" / "scripts" / "pptx_builder.py"
 KEY = re.compile(r"\{\{([a-z][a-z0-9_]*)\}\}")
 MARGIN = 24
 WIDTH = 1920
+# Files in a source deck that are not part of the deck: the bundled style's name, the
+# key visual's layout-pass slides, and what a build leaves behind.
+NOT_DECK = ("style.txt", "layout", "compose", "preview", "_work", "output.pptx", "README.md")
 
 sys.path.insert(0, str(REPO / "sdpm"))
+
+
+def copy_deck(src: Path, dest: Path, *skip: str) -> Path:
+    """Copy a source deck for a build; style.txt's bundled style becomes its art direction."""
+    shutil.copytree(src, dest, ignore=shutil.ignore_patterns(*NOT_DECK, *skip))
+    style = src / "style.txt"
+    if style.is_file():
+        from sdpm.knowledge.reference import BUNDLED_STYLES_DIR
+
+        name = style.read_text(encoding="utf-8").strip()
+        html = BUNDLED_STYLES_DIR / f"{name}.html"
+        if not html.is_file():
+            raise SystemExit(f"{src}: no bundled style {name!r} ({html})")
+        (dest / "specs").mkdir(parents=True, exist_ok=True)
+        shutil.copy(html, dest / "specs" / "art-direction.html")
+    return dest
 
 
 def diagrams() -> list[str]:
@@ -156,10 +178,7 @@ def slide_png(deck_src: Path, slug: str, tmp: Path, keep: str | None, keep_name:
     """Build one slide of a deck and return it as a 1920 px wide image."""
     from sdpm.engine.preview import export_pdf
 
-    deck = tmp / deck_src.name
-    shutil.copytree(
-        deck_src, deck, ignore=shutil.ignore_patterns("compose", "preview", "_work", "output.pptx", "README.md")
-    )
+    deck = copy_deck(deck_src, tmp / deck_src.name)
     outline = deck / "specs" / "outline.md"
     outline.write_text(one_slide(outline.read_text(encoding="utf-8"), slug), encoding="utf-8")
     pptx = tmp / "out.pptx"

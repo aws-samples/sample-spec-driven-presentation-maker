@@ -50,9 +50,10 @@ Entries before v0.5.0 were written retroactively as summaries.
 - **The README opens with the key visual.** An animation of the Web UI composing a seven-slide
   deck about SDPM (in `agent-spectrum`), the install commands right under it, then the same
   slide in seven bundled styles. The deck page, comment and Styles screenshots are retaken on
-  that deck, and its slides replace the old six-slide sample. The deck, its compose history and
-  the scripts that replay it in the Local Web UI and record the GIF are in
-  `docs/assets/src/hero/`; the gallery is built from `docs/assets/src/style-gallery/`.
+  that deck, and its slides replace the old six-slide sample. The deck (with the layout-pass
+  version of each slide) and the scripts that build it through the Local server, replay the
+  builds in the Local Web UI and record the GIF are in `docs/assets/src/hero/`; the gallery is
+  built from `docs/assets/src/style-gallery/`. Both read the bundled styles at build time.
   `README_ja.md` shows the Japanese deck.
 - **Documentation reorganized for first-time readers.** The README now shows example output
   and the three ways to use SDPM (your AI agent, the Web UI on your computer, a team server

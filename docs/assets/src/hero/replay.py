@@ -1,14 +1,14 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Record the README key visual: replay a deck's compose history in the Local Web UI.
+"""Record the README key visual: replay a deck's builds in the Local Web UI.
 
 The Local server writes compose/<slug>_<epoch>.json after every build of a slide, and the
 Web UI animates the components marked `changed` when a slide's newest compose file changes.
-This script stages that history again in a scratch deck folder, runs the Local Web UI on it
-(`npm run dev:local`, bound to 127.0.0.1), places the files one step at a time and records
-the browser with Playwright (record.cjs). Nothing in the product is changed or mocked; the
-only difference from a live run is that the files come from the committed history instead
-of a composer.
+This script makes those files from the committed slide JSON, runs the Local Web UI on a
+scratch deck folder (`npm run dev:local`, bound to 127.0.0.1), places the files there one
+step at a time and records the browser with Playwright (record.cjs). Nothing in the product
+is changed or mocked; the only difference from a live run is that the builds happen before
+the recording instead of while a composer works.
 
 The GIF has two parts (ACTIONS below), the same for every language:
 
@@ -23,16 +23,15 @@ The GIF has two parts (ACTIONS below), the same for every language:
    following the updates to slide 7. The grid view then shows all seven slides (it shows the
    preview PNGs) and holds.
 
-Payloads: "first" / "last" are the oldest / newest file of a slug's history, the first one
-being the layout pass. deck-ja was translated from deck-en and has no layout pass: its cover
-uses deck-en's (no translatable text in it) and for the other slides one is made the same
-way the orchestrator makes one: each slide reduced to its regions plus the elements that
-deck-en's layout pass drew (top bar, label, title), written through the Local server's
-run_python in a scratch copy, which renders the compose payloads. The `changed` flag of each
-placed payload is recomputed against the one placed before it for the same slug
-(sdpm.engine.preview.compose.mark_changed, the server's rule), because the replay skips the
-intermediate builds. preview/<slug>.png (what the grid view shows) is rendered from the deck
-like the server does: PDF, then pdftoppm at 1280 px.
+Payloads: each deck has two states of every slide, layout/<slug>.json (the layout pass:
+the regions plus the top bar, label and title) and slides/<slug>.json (the final slide).
+compose_states() writes them into a scratch copy of the deck through the Local server's
+run_python, the layout pass first and then the final slides, the way a layout-pass composer
+and the content composers do. The server builds each time and writes the compose payloads
+with sdpm.engine.preview.compose, including the `changed` flags of the final payloads
+against the layout pass, and preview/<slug>.png (what the grid view shows). Those files are
+what the recording places. The deck's art direction is the bundled style named in
+style.txt (render.copy_deck).
 
 record.cjs cuts the idle time between placing a file and the animation starting; the GIF
 opens OPEN_AT_S into the first animation. ffmpeg turns the frames (padded to one size)
@@ -71,9 +70,7 @@ ASSETS = REPO / "docs" / "assets"
 sys.path.insert(0, str(HERE.parent))
 sys.path.insert(0, str(REPO / "sdpm"))
 
-from render import BUILDER, WIDTH, run  # noqa: E402
-
-from sdpm.engine.preview.compose import mark_changed  # noqa: E402
+from render import BUILDER, WIDTH, copy_deck, run  # noqa: E402
 
 # Part 1 viewport: the full-view slide is width-bound (952 x 536 px) and ends 12 px above
 # the bottom edge, so the whole cover is in view and the next slide is not.
@@ -112,7 +109,6 @@ STORIES = {
         "name": "Spec-Driven Presentation Maker",
         "gif": "hero-en.gif",
         "still": "hero-slides-en.png",
-        "layout": {"*": "first"},
     },
     "ja": {
         "deck": "deck-ja",
@@ -122,7 +118,6 @@ STORIES = {
         "name": "Spec-Driven Presentation Maker",
         "gif": "hero-ja.gif",
         "still": "hero-slides-ja.png",
-        "layout": {"cover": "deck-en:first", "*": "made"},
     },
 }
 
@@ -139,58 +134,51 @@ def outline_slugs(deck: Path) -> list[str]:
     return slugs
 
 
-def history(deck: Path, slug: str) -> list[Path]:
-    """The slug's compose files, oldest first."""
-    files = [p for p in (deck / "compose").glob(f"{slug}_*.json") if p.stem[len(slug) + 1 :].isdigit()]
-    return sorted(files, key=lambda p: int(p.stem.rsplit("_", 1)[1]))
-
-
-def latest_defs(deck: Path) -> Path:
-    return max((deck / "compose").glob("defs_*.json"), key=lambda p: int(p.stem.split("_")[1]))
-
-
-def pick(deck: Path, slug: str, how: str) -> Path:
-    src, _, which = how.rpartition(":")
-    files = history(HERE / src if src else deck, slug)
+def newest(compose: Path, slug: str) -> Path:
+    """The slug's newest compose file (compose/<slug>_<epoch>.json)."""
+    files = [p for p in compose.glob(f"{slug}_*.json") if p.stem[len(slug) + 1 :].isdigit()]
     if not files:
-        raise SystemExit(f"{deck.name}: no compose history for {slug}")
-    return files[0] if which == "first" else files[-1]
+        raise SystemExit(f"no compose file for {slug}")
+    return max(files, key=lambda p: int(p.stem.rsplit("_", 1)[1]))
 
 
-def is_region(element: dict) -> bool:
-    return str(element.get("_comment", "")).startswith("region:")
+def compose_states(src: Path, work: Path) -> Path:
+    """Build the layout pass, then the final slides, through the Local server's run_python.
 
-
-def make_layout_pass(src: Path, slugs: list[str], work: Path) -> Path:
-    """Render a layout pass of `slugs` through the Local server; return the scratch deck."""
+    Returns a directory with layout/<slug>.json and slides/<slug>.json (the compose payloads
+    of each build), defs.json and preview/<slug>.png (from the final build).
+    """
     sys.path.insert(0, str(REPO / "servers" / "local"))
     from sandbox_tools import run_python
 
-    deck = work / "layout-pass"
-    shutil.rmtree(deck, ignore_errors=True)
-    shutil.copytree(
-        src, deck, ignore=shutil.ignore_patterns("compose", "translate", "preview", "_work", "*.pptx", "README.md")
-    )
-    layout = {}
-    for slug in slugs:
-        slide = json.loads((deck / "slides" / f"{slug}.json").read_text(encoding="utf-8"))
-        drawn = len(json.loads(pick(src, slug, "deck-en:first").read_text(encoding="utf-8"))["components"])
-        regions = [e for e in slide["elements"] if is_region(e)]
-        others = [e for e in slide["elements"] if not is_region(e)]
-        layout[slug] = {**slide, "elements": regions + others[:drawn]}
-    code = f"slides = {layout!r}\nfor slug, slide in slides.items():\n    write_json(f'slides/{{slug}}.json', slide)\n"
-    res = json.loads(run_python("Layout pass: frames and titles of every slide", code, str(deck)))
-    if res.get("compose") != f"{len(slugs)} slides composed":
-        raise SystemExit(f"layout pass failed: {json.dumps(res, ensure_ascii=False)[:2000]}")
-    return deck
+    deck = work / "build"
+    states = work / "states"
+    for d in (deck, states):
+        shutil.rmtree(d, ignore_errors=True)
+    copy_deck(src, deck, "slides")
+    for state, purpose in (("layout", "Layout pass: frames and titles of every slide"), ("slides", "Final slides")):
+        slides = {p.stem: json.loads(p.read_text(encoding="utf-8")) for p in sorted((src / state).glob("*.json"))}
+        code = (
+            f"slides = {slides!r}\nfor slug, slide in slides.items():\n    write_json(f'slides/{{slug}}.json', slide)\n"
+        )
+        res = json.loads(run_python(purpose, code, str(deck)))
+        if res.get("compose") != f"{len(slides)} slides composed" or res.get("compose_error"):
+            raise SystemExit(f"{src.name} {state}: {json.dumps(res, ensure_ascii=False)[:2000]}")
+        (states / state).mkdir(parents=True)
+        # Copied before the next build: two builds in the same second share a file name.
+        for slug in slides:
+            shutil.copy(newest(deck / "compose", slug), states / state / f"{slug}.json")
+    (defs,) = deck.glob("compose/defs_*.json")
+    shutil.copy(defs, states / "defs.json")
+    shutil.copytree(deck / "preview", states / "preview")
+    return states
 
 
 def render_pages(src: Path, width: int, tmp: Path) -> list[Path]:
     """The deck's slides as PNGs `width` px wide, in order."""
     from sdpm.engine.preview import export_pdf
 
-    deck = tmp / "deck"
-    shutil.copytree(src, deck, ignore=shutil.ignore_patterns("compose", "translate", "preview", "_work", "README.md"))
+    deck = copy_deck(src, tmp / "deck")
     pptx = tmp / "out.pptx"
     run([sys.executable, str(BUILDER), "generate_pptx", str(deck), "-o", str(pptx)])
     pdf = tmp / "out.pdf"
@@ -201,47 +189,33 @@ def render_pages(src: Path, width: int, tmp: Path) -> list[Path]:
 
 
 def build_plan(lang: str, story: dict, work: Path, port: int) -> dict:
-    """Stage the scratch deck and the recomputed payloads; return the recorder's plan."""
+    """Build the compose payloads, stage the scratch deck; return the recorder's plan."""
     src = HERE / story["deck"]
     deck_id = "spec-driven-presentation-maker"
     root = work / "decks"
     deck = root / deck_id
-    stage = work / "stage"
-    for d in (root, stage):
-        shutil.rmtree(d, ignore_errors=True)
-    shutil.copytree(src / "specs", deck / "specs")
+    shutil.rmtree(root, ignore_errors=True)
+    copy_deck(src, deck, "slides")
     meta = json.loads((src / "deck.json").read_text(encoding="utf-8"))
     meta["name"] = story["name"]
     (deck / "deck.json").write_text(json.dumps(meta, indent=2, ensure_ascii=False), encoding="utf-8")
-    stage.mkdir(parents=True)
 
     slugs = outline_slugs(src)
-    made = None
-    if "made" in story["layout"].values():
-        made = make_layout_pass(src, [s for s in slugs if story["layout"].get(s, story["layout"]["*"]) == "made"], work)
-    with tempfile.TemporaryDirectory(prefix=f"sdpm-hero-{lang}-preview-") as tmp:
-        for slug, png in zip(slugs, render_pages(src, 1280, Path(tmp)), strict=True):
-            shutil.copy(png, stage / f"{slug}.png")
-
+    states = compose_states(src, work)
     epoch = int(time.time())
-    previous: dict[str, list[dict]] = {}
 
-    def payload(slug: str, how: str, n: int) -> list[str]:
-        path = history(made, slug)[-1] if how == "made" else pick(src, slug, how)
-        data = json.loads(path.read_text(encoding="utf-8"))
-        mark_changed(data["components"], previous.get(slug))
-        previous[slug] = data["components"]
-        out = stage / f"{slug}_{epoch + n}.json"
-        out.write_text(json.dumps(data, ensure_ascii=False), encoding="utf-8")
-        changed = sum(c["changed"] for c in data["components"])
-        print(f"  {lang} {n}: {slug} <- {how} ({changed}/{len(data['components'])} changed)")
-        return [str(out), str(deck / "compose" / out.name)]
+    def payload(slug: str, state: str, n: int) -> list[str]:
+        path = states / state / f"{slug}.json"
+        components = json.loads(path.read_text(encoding="utf-8"))["components"]
+        changed = sum(c["changed"] for c in components)
+        print(f"  {lang} {n}: {slug} <- {state} ({changed}/{len(components)} changed)")
+        return [str(path), str(deck / "compose" / f"{slug}_{epoch + n}.json")]
 
     # Slides appear together with their layout pass and their previews.
     first = [[str(p), str(deck / "slides" / p.name)] for p in sorted((src / "slides").glob("*.json"))]
-    first.append([str(latest_defs(src)), str(deck / "compose" / f"defs_{epoch}.json")])
-    first += [[str(stage / f"{s}.png"), str(deck / "preview" / f"{s}.png")] for s in slugs]
-    first += [payload(s, story["layout"].get(s, story["layout"]["*"]), 0) for s in slugs]
+    first.append([str(states / "defs.json"), str(deck / "compose" / f"defs_{epoch}.json")])
+    first += [[str(states / "preview" / f"{s}.png"), str(deck / "preview" / f"{s}.png")] for s in slugs]
+    first += [payload(s, "layout", 0) for s in slugs]
     zoom = [
         [VIEWPORT[0], round(VIEWPORT[1] + (LIST_VIEWPORT[1] - VIEWPORT[1]) * (i + 1) / ZOOM_STEPS)]
         for i in range(ZOOM_STEPS)
@@ -249,14 +223,14 @@ def build_plan(lang: str, story: dict, work: Path, port: int) -> dict:
     actions = [
         {"speed": FIRST_SPEED},
         {"place": first, "tail_cut_ms": TAIL_CUT_MS},
-        {"place": [payload("cover", "last", 1)], "tail_cut_ms": TAIL_CUT_MS},
+        {"place": [payload("cover", "slides", 1)], "tail_cut_ms": TAIL_CUT_MS},
         {"speed": 1},
         {"resize": zoom, "step_ms": 40},
         {"sleep": 150},
         {"scroll": PAIRS[0][0], "ms": 650},
-        {"place": [payload(s, "last", 2) for s in PAIRS[0]], "show_ms": SHOW_MS, "pin": True},
+        {"place": [payload(s, "slides", 2) for s in PAIRS[0]], "show_ms": SHOW_MS, "pin": True},
         {"scroll": PAIRS[1][0], "ms": 650},
-        {"place": [payload(s, "last", 3) for s in PAIRS[1] + OUT_OF_VIEW], "show_ms": SHOW_MS, "pin": True},
+        {"place": [payload(s, "slides", 3) for s in PAIRS[1] + OUT_OF_VIEW], "show_ms": SHOW_MS, "pin": True},
         {"click": story["grid_button"], "ms": GRID_HOLD_MS, "cut_until_images": True},
     ]
     return {
@@ -465,6 +439,8 @@ def main() -> None:
     parser.add_argument("--no-gif", action="store_true", help="skip the recording")
     parser.add_argument("--no-stills", action="store_true", help="skip the stills")
     args = parser.parse_args()
+    # User templates and styles shadow the bundled ones: read none of the user's sdpm config.
+    os.environ["XDG_CONFIG_HOME"] = tempfile.mkdtemp(prefix="sdpm-hero-config-")
     for lang in args.langs:
         if lang not in STORIES:
             raise SystemExit(f"unknown language: {lang} (have {list(STORIES)})")

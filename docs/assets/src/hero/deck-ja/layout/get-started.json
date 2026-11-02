@@ -1,0 +1,96 @@
+{
+  "layout": "Title Only",
+  "placeholders": {
+    "0": ""
+  },
+  "notes": "1 コマンドで試せます。あとは AI エージェントにスライドを頼むか、sdpm webui でブラウザから使うか、チーム向けに AWS にデプロイします。インストールの完全なコマンドは README にあります。",
+  "elements": [
+    {
+      "_comment": "region: code",
+      "x": 96,
+      "y": 380,
+      "w": 1728,
+      "h": 160
+    },
+    {
+      "_comment": "region: lead",
+      "x": 96,
+      "y": 572,
+      "w": 1728,
+      "h": 64
+    },
+    {
+      "_comment": "region: options",
+      "x": 96,
+      "y": 690,
+      "w": 1728,
+      "h": 210
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 96,
+      "y": 120,
+      "width": 336,
+      "height": 12,
+      "fill": "#6095FA",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 444,
+      "y": 120,
+      "width": 336,
+      "height": 12,
+      "fill": "#3BC59E",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 792,
+      "y": 120,
+      "width": 336,
+      "height": 12,
+      "fill": "#B385FB",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 1140,
+      "y": 120,
+      "width": 336,
+      "height": 12,
+      "fill": "#EFAC44",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "shape",
+      "shape": "rectangle",
+      "x": 1488,
+      "y": 120,
+      "width": 336,
+      "height": 12,
+      "fill": "#DB7CD4",
+      "_comment": "frame: stripe"
+    },
+    {
+      "type": "textbox",
+      "x": 96,
+      "y": 164,
+      "width": 1728,
+      "height": 150,
+      "text": "{{bold:1 コマンドで試す}}",
+      "fontSize": 60,
+      "fontColor": "#EEF0F4",
+      "verticalAlign": "top",
+      "_comment": "frame: title",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    }
+  ]
+}

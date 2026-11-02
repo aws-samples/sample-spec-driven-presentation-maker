@@ -55,11 +55,20 @@ next to the same slide in six bundled styles. Each of `style-gallery/<style>/` i
 sdpm deck made with the local MCP server: `apply_style` with that style (`blank-dark` for
 `aws-dark` and `duotone`, `blank-light` for the rest), the font of the style in
 `deck.json`, then a composer wrote `slides/spec-first.json` from the style's process and
-column patterns with the hero slide's wording. `specs/art-direction.html` is the bundled
-style as `apply_style` copied it.
+column patterns with the hero slide's wording.
 
 `render.py` builds each tile's deck with only that slide in the outline, scales the 1920 px
-render to `tile_width` and centres a short last row. The labels use Menlo (macOS) or another
+render to `tile_width` and centres a short last row. The tile decks carry no copy of their
+style: `style.txt` names a bundled style, and `render.py` copies
+`sdpm/references/examples/styles/<style>.html` into the build copy as
+`specs/art-direction.html`, as `apply_style` does. A change to a bundled style therefore
+shows up the next time the gallery is rendered:
+
+```bash
+uv run python docs/assets/src/render.py style-gallery
+```
+
+The labels use Menlo (macOS) or another
 monospace font found on the machine. The 16 pt rule below does not apply: the gallery shows
 how each style looks, and the full slides are one click away.
 
@@ -84,16 +93,27 @@ place their shapes by hand.
 ## Key visual
 
 `hero/` holds the deck at the top of the README (`deck-en/`, and `deck-ja/` made from it with
-the translate role) with its compose history, and the scripts that turn it into
-`hero-en.gif` / `hero-ja.gif` and the stills `hero-slides-en.png` / `hero-slides-ja.png`:
-`replay.py` places the history again, step by step, in a scratch deck folder that the Local
-Web UI shows, and `record.cjs` records the browser with Playwright. The docstring of
-`replay.py` describes the two parts of the GIF and the requirements.
+the translate role) and the scripts that turn it into `hero-en.gif` / `hero-ja.gif` and the
+stills `hero-slides-en.png` / `hero-slides-ja.png`. Each deck has two states of every slide:
+`layout/<slug>.json` (the layout pass) and `slides/<slug>.json` (the final slide), and a
+`style.txt` naming its bundled style. No compose files are committed: `replay.py` writes both
+states into a scratch copy of the deck through the Local server's `run_python`, which builds
+them and writes the compose payloads (with the `changed` flags of the final slides against
+the layout pass) and the previews, as it does for a composer. It then runs the Local Web UI on
+a scratch deck folder, places those files there step by step, and `record.cjs` records the
+browser with Playwright. The docstring of `replay.py` describes the two parts of the GIF and
+the requirements.
 
 ```bash
 uv run python docs/assets/src/hero/replay.py               # en and ja, GIFs and stills
 uv run python docs/assets/src/hero/replay.py ja --no-stills
+uv run python docs/assets/src/hero/replay.py --keep /tmp/hero-replay   # keep frames and payloads
 ```
+
+Everything is written to temporary directories (or the `--keep` directory): a scratch deck
+root and config directory for the Web UI, and an empty `XDG_CONFIG_HOME` so user templates
+and styles do not replace the bundled ones. Only the GIFs and stills in `docs/assets/` change.
+The recording runs in real time, so two runs differ by a few frames of animation timing.
 
 ## Screenshots
 
