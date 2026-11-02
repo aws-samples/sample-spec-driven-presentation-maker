@@ -13,7 +13,7 @@
   },
   "source": {
     "catalog": "sdpm/references/catalogs/powerpoint-animation-catalog.json",
-    "catalogDigest": "sha256:a2ca5f97d8d4ee3ba53a0aa63f1ebfccdfef22be181887f0b2683a638d037156",
+    "catalogDigest": "sha256:8dde16d90f46fde9274eab6e9ab0d4f20eae0d20fa4052480440b13f7b8aaf3b",
     "catalogGeneratedAt": "2026-10-30T00:00:00Z",
     "guiManifest": "powerpoint-gui-surface-16.113.1.json@2026-11-02.1",
     "baseline": {
@@ -1883,8 +1883,8 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
-      "members": 382,
-      "formEstablishedMembers": 144,
+      "members": 381,
+      "formEstablishedMembers": 143,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.brushColor",
       "note": "catalog-pinned value 500; the catalog establishes 5 distinct value(s) for this path"
     },
@@ -1897,8 +1897,8 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
-      "members": 382,
-      "formEstablishedMembers": 144,
+      "members": 381,
+      "formEstablishedMembers": 143,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.brushColor",
       "note": "catalog-pinned value 500; the catalog establishes 5 distinct value(s) for this path"
     },

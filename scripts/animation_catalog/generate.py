@@ -985,8 +985,20 @@ def effect_semantic(**patch: Any) -> dict[str, Any]:
 
 
 def interactive_semantic(effect: dict[str, Any] | None = None) -> dict[str, Any]:
-    """Return a semantic fragment whose only effect sits in an interactive sequence."""
+    """Return a semantic fragment whose only effect sits in an interactive sequence.
+
+    The effect's own ``start`` is the sequence's trigger, not ``onPageClick``.
+    Reusing the main-sequence example here claimed otherwise, and the package
+    cannot tell the two apart: inside an interactive ``p:seq`` both spellings
+    write the same ``clickEffect`` node, verified by writing each. So the
+    example carried a start condition that does not survive a save, and four
+    entries — the shape-click trigger, its target, the interactive sequence and
+    the scripting enumerator for it — were counted one-way for saying something
+    untrue rather than for anything the reader could not do.
+    """
     effect = effect or effect_semantic()["animations"]["mainSequence"][0]
+    effect = dict(effect)
+    effect["start"] = {"type": "onShapeClick", "delayMs": 0, "target": CATALOG_TARGET}
     return {
         "animations": {
             "mainSequence": [],
@@ -2114,8 +2126,19 @@ def _effect_candidate(key: str, enumerator: str, code: str) -> dict[str, Any]:
             )
             extra: dict[str, Any] = {"guiKey": f"animation.gallery.{tile[0]}.{tile[1]}" if tile
                                      else "animation.moreEffects.entrance"}
+            # Only the instantaneous case overrides the carrier default, not
+            # the tile's own duration: `tile_duration_ms` returns `None` when a
+            # tile's single behaviour is the normative visibility `p:set`, which
+            # the reader skips as a duration source because it is 1 ms at every
+            # effect duration. Appear and Disappear therefore persist no
+            # duration, and the carrier default claimed 500 ms that no save
+            # carries. Passing the tile's duration through instead would move
+            # the problem: a tile measured at 2000 ms does not round-trip from
+            # an enumerator example either.
+            timing = {} if tile is None or tile_duration_ms(tile) is not None else {"durationMs": None}
             return _accepted(key, level, ooxml, effect_semantic(
-                preset={"category": "entrance", "effect": tile[1] if tile else camel(enumerator.replace("animation type", ""))}), evidence, **extra)
+                preset={"category": "entrance", "effect": tile[1] if tile else camel(enumerator.replace("animation type", ""))},
+                timing=timing), evidence, **extra)
 
         match = EFFECT_NAME_MATCH.get(enumerator)
         ooxml = {

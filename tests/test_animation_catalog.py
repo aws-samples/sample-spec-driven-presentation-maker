@@ -2126,12 +2126,16 @@ def test_reversibility_is_measured_rather_than_looked_up():
     # The remaining one-way entries are real reader gaps, not aliases: every one
     # is a form the reader does not invert at all.
     one_way = report["gaps"]["oneWayOnly"]["keys"]
-    # 14, down from 48: the build families are inverted now — paragraph levels,
-    # the chart and SmartArt builds, the text units and the reverse-order flag.
+    # 9, down from 48. The build families are inverted, and five more entries
+    # turned out to be measuring an example's wrong claim rather than a reader
+    # gap: four interactive-sequence entries whose effect carried
+    # `start: onPageClick` where the package writes the sequence's own trigger,
+    # and `animation type appear`, whose carrier default claimed 500 ms for an
+    # effect that persists no duration at all.
     #
-    # The eight build entries that remain are **irreducible**, not unfinished.
-    # Each writes bytes another entry also writes, so one OOXML form would have
-    # to resolve to two different JSON spellings:
+    # Eight of the nine that remain are **irreducible**, not unfinished. Each
+    # writes bytes another entry also writes, so one OOXML form would have to
+    # resolve to two different JSON spellings:
     #
     #   level.asOneObject / sequence.asOneObject / text by no levels
     #       an empty p:bldP, which is also what a preset's bare build marker is
@@ -2142,8 +2146,20 @@ def test_reversibility_is_measured_rather_than_looked_up():
     #   animateAttachedShape
     #       an explicit true on a preset that already animates its background
     #
-    # The other six are the interactive-sequence and paragraph-range area.
-    assert len(one_way) == 14, (len(one_way), one_way[:5])
+    # The ninth, `animation.target.paragraphRange`, is a real reader gap: the
+    # reader refuses a `p:spTgt` carrying a `p:txEl` paragraph sub-target.
+    assert len(one_way) == 9, (len(one_way), one_way[:5])
+    irreducible = {
+        "MsoAnimTextUnitEffect.by paragraph",
+        "MsoAnimateByLevel.text by all levels",
+        "MsoAnimateByLevel.text by no levels",
+        "animation.textOptions.animateAttachedShape",
+        "animation.textOptions.level.allParagraphLevels",
+        "animation.textOptions.level.asOneObject",
+        "animation.textOptions.sequence.asOneObject",
+        "animation.textOptions.unit.byParagraph",
+    }
+    assert set(one_way) == irreducible | {"animation.target.paragraphRange"}
     assert not any(key.startswith("EPPEntryEffect.") for key in one_way), (
         "transition enumerators corroborate a gallery tile and round-trip; "
         "none should be left counted one-way"

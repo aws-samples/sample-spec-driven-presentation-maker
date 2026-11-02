@@ -651,6 +651,34 @@ def normalize_effect(effect: Mapping[str, Any]) -> dict[str, Any]:
     return normalize(pruned)
 
 
+def interactive_diff(expected: Mapping[str, Any], motion: Any) -> list[str]:
+    """Return where one written interactive sequence and the re-import disagree.
+
+    An interactive sequence is a trigger plus its effects, so both halves are
+    compared: a reader that recovered the effects but lost the shape the click
+    is bound to has not round-tripped the sequence.
+    """
+    read = (getattr(motion, "animations", None) or {}).get("interactiveSequences") or []
+    if not read:
+        return ["interactiveSequences: wrote 1, read none"]
+    actual = read[0]
+    findings: list[str] = []
+    want_trigger = expected.get("trigger") or {}
+    got_trigger = actual.get("trigger") or {}
+    for name in sorted(set(want_trigger) | set(got_trigger)):
+        if want_trigger.get(name) != got_trigger.get(name):
+            findings.append(
+                f"trigger.{name}: wrote {want_trigger.get(name)!r}, read {got_trigger.get(name)!r}"
+            )
+    want_effects = expected.get("effects") or []
+    got_effects = actual.get("effects") or []
+    if len(want_effects) != len(got_effects):
+        findings.append(f"effects: wrote {len(want_effects)}, read {len(got_effects)}")
+    elif want_effects:
+        findings.extend(effect_diff(want_effects[0], got_effects[0]))
+    return findings
+
+
 def effect_diff(expected: Mapping[str, Any], actual: Mapping[str, Any]) -> list[str]:
     """Return the JSON paths where two normalized effects disagree."""
     left, right = normalize_effect(expected), normalize_effect(actual)
@@ -882,11 +910,23 @@ def walk_entry(
             outcome.diff = (f"transition: wrote {expected!r}, read {actual!r}",)
         return outcome
 
-    written_sequence = (semantic.get("animations") or {}).get("mainSequence") or []
+    written_animations = semantic.get("animations") or {}
+    written_sequence = written_animations.get("mainSequence") or []
+    written_interactive = written_animations.get("interactiveSequences") or []
+    if not written_sequence and written_interactive:
+        # An interactive sequence animates something, and comparing only
+        # `mainSequence` said otherwise. Four entries — the shape-click
+        # trigger, its target, the interactive sequence itself and the
+        # scripting enumerator for it — were counted one-way because their
+        # examples put the effect here and nothing ever looked.
+        outcome.diff = tuple(interactive_diff(written_interactive[0], motion))
+        outcome.equal = not outcome.diff
+        outcome.reversible = outcome.equal or key in reversible_presets
+        return outcome
     if not written_sequence:
-        # An entry whose example animates nothing — an interactive-sequence or
-        # pane-ordering record. There is no effect to compare, so reversibility
-        # stays whatever the index says.
+        # An entry whose example animates nothing — a pane-ordering record.
+        # There is no effect to compare, so reversibility stays whatever the
+        # index says.
         outcome.reversible = key in reversible_presets
         return outcome
     expected_effect = written_sequence[0]

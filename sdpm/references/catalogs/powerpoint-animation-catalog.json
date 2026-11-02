@@ -49649,8 +49649,9 @@
                     "effect": "fade"
                   },
                   "start": {
-                    "type": "onPageClick",
-                    "delayMs": 0
+                    "type": "onShapeClick",
+                    "delayMs": 0,
+                    "target": "catalogTarget"
                   },
                   "timing": {
                     "durationMs": 500,
@@ -50353,8 +50354,9 @@
                     "effect": "fade"
                   },
                   "start": {
-                    "type": "onPageClick",
-                    "delayMs": 0
+                    "type": "onShapeClick",
+                    "delayMs": 0,
+                    "target": "catalogTarget"
                   },
                   "timing": {
                     "durationMs": 500,
@@ -52559,8 +52561,9 @@
                     "effect": "fade"
                   },
                   "start": {
-                    "type": "onPageClick",
-                    "delayMs": 0
+                    "type": "onShapeClick",
+                    "delayMs": 0,
+                    "target": "catalogTarget"
                   },
                   "timing": {
                     "durationMs": 500,
@@ -71157,7 +71160,7 @@
                 "delayMs": 0
               },
               "timing": {
-                "durationMs": 500,
+                "durationMs": null,
                 "repeatCount": 1,
                 "repeatDurationMs": null,
                 "autoReverse": false,
@@ -84913,8 +84916,9 @@
                     "effect": "fade"
                   },
                   "start": {
-                    "type": "onPageClick",
-                    "delayMs": 0
+                    "type": "onShapeClick",
+                    "delayMs": 0,
+                    "target": "catalogTarget"
                   },
                   "timing": {
                     "durationMs": 500,
