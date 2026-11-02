@@ -52,9 +52,12 @@ interface ProcessState {
   running: boolean
   /** A session/prompt request has been sent and has not been answered yet. */
   promptInFlight: boolean
+  /** JSON-RPC id of the current turn's session/prompt; its response (result or error) ends the turn. */
+  promptRequestId: number | null
   notifications: { id: number; msg: Record<string, unknown> }[]
   eventIdCounter: number
   lastActivity: number
+  /** Sub-agent sessions seen during the current turn; used only as session/cancel targets. */
   subSessionIds: Set<string>
 }
 
@@ -74,19 +77,24 @@ function handleLine(ps: ProcessState, line: string) {
   let msg: Record<string, unknown>
   try { msg = JSON.parse(line) } catch { return }
 
-  // JSON-RPC response — resolve the pending promise, then fall through
-  // so the end_turn detection below can flip ps.running back to false.
-  // Returning here would short-circuit reuse: each turn would spawn a fresh
-  // process, dropping the prior turn's context (read_guides, upload result,
-  // hearing answers) and making the agent appear to drift back into Phase 1.
+  // JSON-RPC response — resolve the pending promise, then fall through to the
+  // listeners. Returning here would short-circuit reuse: each turn would spawn
+  // a fresh process, dropping the prior turn's context (read_guides, upload
+  // result, hearing answers) and making the agent appear to drift back into Phase 1.
   if (msg.id != null && ps.pending.has(msg.id as number)) {
     const pending = ps.pending.get(msg.id as number)!
     ps.pending.delete(msg.id as number)
+    // The answer to the main session's session/prompt is the end of the turn.
+    // kiro-cli sends no turn_end for sub-agent sessions, so they cannot hold it open.
+    if (msg.id === ps.promptRequestId) {
+      ps.promptRequestId = null
+      ps.running = false
+      ps.subSessionIds.clear()
+    }
     if (msg.error) {
       const error = msg.error as { message?: string; data?: unknown }
       // kiro-cli puts the actual cause in `data` ("Internal error" alone is useless in logs)
       const detail = error.data === undefined ? "" : `: ${typeof error.data === "string" ? error.data : JSON.stringify(error.data)}`
-      ps.running = false
       pending.reject(new Error(`${error.message || "ACP request failed"}${detail}`))
     } else {
       pending.resolve(msg.result)
@@ -108,8 +116,10 @@ function handleLine(ps: ProcessState, line: string) {
   if (msg.method === "session/update" || msg.method === "_kiro.dev/session/update") {
     const p = msg.params as Record<string, unknown>
     const sid = p?.sessionId as string
-    if (sid && sid !== ps.sessionId) ps.subSessionIds.add(sid)
-    // Detect subagent turn_end → remove from active set
+    // Only a turn's own updates name sub-agents; session/load replays the loaded
+    // session under its id before ps.sessionId switches to it.
+    if (sid && sid !== ps.sessionId && ps.promptRequestId !== null) ps.subSessionIds.add(sid)
+    // A sub-agent that reports turn_end no longer needs a cancel
     const upd = p?.update as Record<string, unknown> | undefined
     const updType = upd?.sessionUpdate as string | undefined
     if ((updType === "turn_end" || updType === "end_turn") && sid && sid !== ps.sessionId) {
@@ -119,24 +129,18 @@ function handleLine(ps: ProcessState, line: string) {
     if (ps.notifications.length > 2000) ps.notifications.shift()
   }
 
-  // Detect end_turn
-  if (msg.id != null && msg.result) {
-    const r = msg.result as Record<string, unknown>
-    if (r.stopReason === "end_turn" || r.stopReason === "cancelled") {
-      if (ps.subSessionIds.size === 0) {
-        ps.running = false
-      }
-    }
-  }
-
   for (const fn of ps.listeners) fn(msg)
 }
 
-function rpcRequestTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+function startRequest(ps: ProcessState, method: string, params: Record<string, unknown> = {}): { id: number; response: Promise<unknown> } {
   if (!ps.child) throw new Error("Process not running")
   const id = ++ps.requestId
   ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n")
-  return new Promise((resolve, reject) => { ps.pending.set(id, { resolve, reject }) })
+  return { id, response: new Promise((resolve, reject) => { ps.pending.set(id, { resolve, reject }) }) }
+}
+
+function rpcRequestTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}): Promise<unknown> {
+  return startRequest(ps, method, params).response
 }
 
 function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}): void {
@@ -176,7 +180,7 @@ async function spawnProcess(
   const ps: ProcessState = {
     child, deckId: "", sessionId: null, agentName,
     requestId: 0, pending: new Map(), listeners: new Set(),
-    lineBuffer: "", running: false, promptInFlight: false, notifications: [], eventIdCounter: 0,
+    lineBuffer: "", running: false, promptInFlight: false, promptRequestId: null, notifications: [], eventIdCounter: 0,
     lastActivity: Date.now(), subSessionIds: new Set(),
   }
 
@@ -378,6 +382,7 @@ export async function sendPrompt(sessionId: string, text: string, agentName?: st
   if (ps.promptInFlight) throw new SessionBusyError()
   ps.promptInFlight = true
   ps.running = true
+  ps.subSessionIds.clear()
   ps.notifications = []; ps.eventIdCounter = 0
   ps.lastActivity = Date.now()
 
@@ -388,10 +393,12 @@ export async function sendPrompt(sessionId: string, text: string, agentName?: st
       return () => { ps.listeners.delete(fn) }
     },
     send: () => {
-      void rpcRequestTo(ps, "session/prompt", {
+      const { id, response } = startRequest(ps, "session/prompt", {
         sessionId: ps.sessionId,
         prompt: [{ type: "text", text }],
-      }).catch(() => {
+      })
+      ps.promptRequestId = id
+      void response.catch(() => {
         // handleLine forwards the same JSON-RPC error to the subscribed SSE bridge.
       }).finally(() => { ps.promptInFlight = false })
     },
