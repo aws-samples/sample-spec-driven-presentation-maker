@@ -13,7 +13,7 @@
   },
   "source": {
     "catalog": "sdpm/references/catalogs/powerpoint-animation-catalog.json",
-    "catalogDigest": "sha256:0ebd8fd50eee34db2e490ad2886ce0be2558c893b4906ee161aa2dc6db417424",
+    "catalogDigest": "sha256:268ffe133fc2b84d0eaed8ff81de7a13dcebbb744040b4c0a1e42781438d08d8",
     "catalogGeneratedAt": "2026-10-30T00:00:00Z",
     "guiManifest": "powerpoint-gui-surface-16.113.1.json@2026-11-02.1",
     "baseline": {
@@ -63,7 +63,7 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
-      "members": 53,
+      "members": 54,
       "formEstablishedMembers": 24,
       "formEstablishedCatalogKey": "animation.gallery.emphasis.blink"
     },
@@ -76,7 +76,7 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "nativeCapture",
-      "members": 259,
+      "members": 257,
       "formEstablishedMembers": 112,
       "formEstablishedCatalogKey": "animation.gallery.entrance.appear"
     },
@@ -89,7 +89,7 @@
       "status": "accepted",
       "capabilityLevel": "nativeTemplate",
       "verification": "guiCapture",
-      "members": 36,
+      "members": 37,
       "formEstablishedMembers": 36,
       "formEstablishedCatalogKey": "animation.gallery.exit.basicSwivel"
     },

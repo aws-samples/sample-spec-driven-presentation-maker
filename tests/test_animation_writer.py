@@ -93,17 +93,20 @@ CATALOG_COVERAGE = {
     "generated": {
         # Each +7 is the Complex motion paths: new guiItems entries that
         # generate because their geometry was measured rather than inferred.
-        "total": 465,
+        # The last +2 is `shimmer` and `stretchy`, which generate now that
+        # their example carries the gallery their own guiKey names instead of
+        # a hardcoded `entrance`.
+        "total": 467,
         "guiItems": 225,
-        "candidates": 240,
-        "animation": 248,
+        "candidates": 242,
+        "animation": 250,
         "transition": 217,
     },
     "refused": {
-        "total": 209,
+        "total": 207,
         "guiItems": 62,
-        "candidates": 147,
-        "animation": 206,
+        "candidates": 145,
+        "animation": 204,
         "transition": 3,
     },
     "generatedDespiteGap": [
@@ -114,8 +117,8 @@ CATALOG_COVERAGE = {
             "change line color", "complementary color", "complementary color 2",
             "constrasting color", "credits", "darken", "desaturate", "expand", "flash bulb",
             "flicker", "flip", "float", "fly", "grow and turn", "grow shrink", "grow with color",
-            "lighten", "peek", "pinwheel", "rise up", "spin", "spinner", "spiral", "stretch",
-            "swivel", "teeter", "transparency", "wave", "whip", "zoom",
+            "lighten", "peek", "pinwheel", "rise up", "shimmer", "spin", "spinner", "spiral",
+            "stretch", "stretchy", "swivel", "teeter", "transparency", "wave", "whip", "zoom",
         )
     ],
     #: The two numbers Task 8 has to drive to zero, as slices of the same pass:
@@ -123,7 +126,7 @@ CATALOG_COVERAGE = {
     #: behavior *payload* was never captured. The payload slice is down from 121
     #: to 11 and holds no gallery tile at all — only enum candidates whose own
     #: mapping is open, so they resolve to no measured tile.
-    "captureRequiredRefusals": 198,
+    "captureRequiredRefusals": 196,
     "payloadRefusals": {"total": 11, "guiItems": 0, "candidates": 11},
 }
 

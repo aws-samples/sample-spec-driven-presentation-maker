@@ -73211,8 +73211,7 @@
         "strategy": "preset",
         "element": "p:cTn",
         "presetClass": [
-          "entr",
-          "exit"
+          "entr"
         ],
         "presetId": null,
         "presetSubtype": null,
@@ -73223,8 +73222,10 @@
         "nameMatchConfidence": "nameMatchOnly: the COM-derived reference warns that the MsoAnimEffect constant does not reliably land on the catalog's assumed id for a gallery name above 26"
       },
       "evidence": {
-        "source": "PowerPoint.sdef (local installation)",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/entrance/18-center-revolve.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.gallery.entrance.centerRevolve",
@@ -76647,8 +76648,7 @@
         "strategy": "preset",
         "element": "p:cTn",
         "presetClass": [
-          "entr",
-          "exit"
+          "entr"
         ],
         "presetId": null,
         "presetSubtype": null,
@@ -76659,8 +76659,10 @@
         "nameMatchConfidence": "nameMatchOnly: the COM-derived reference warns that the MsoAnimEffect constant does not reliably land on the catalog's assumed id for a gallery name above 26"
       },
       "evidence": {
-        "source": "PowerPoint.sdef (local installation)",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/entrance/14-expand.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.gallery.entrance.expand",
@@ -77402,8 +77404,7 @@
         "strategy": "preset",
         "element": "p:cTn",
         "presetClass": [
-          "entr",
-          "exit"
+          "entr"
         ],
         "presetId": null,
         "presetSubtype": null,
@@ -77414,8 +77415,10 @@
         "nameMatchConfidence": "nameMatchOnly: the COM-derived reference warns that the MsoAnimEffect constant does not reliably land on the catalog's assumed id for a gallery name above 26"
       },
       "evidence": {
-        "source": "PowerPoint.sdef (local installation)",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/entrance/30-flip.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.gallery.entrance.flip",
@@ -80094,8 +80097,7 @@
         "strategy": "preset",
         "element": "p:cTn",
         "presetClass": [
-          "entr",
-          "exit"
+          "entr"
         ],
         "presetId": null,
         "presetSubtype": null,
@@ -80106,8 +80108,10 @@
         "nameMatchConfidence": "nameMatchOnly: the COM-derived reference warns that the MsoAnimEffect constant does not reliably land on the catalog's assumed id for a gallery name above 26"
       },
       "evidence": {
-        "source": "PowerPoint.sdef (local installation)",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/entrance/32-pinwheel.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.gallery.entrance.pinwheel",
@@ -80831,8 +80835,7 @@
         "strategy": "preset",
         "element": "p:cTn",
         "presetClass": [
-          "entr",
-          "exit"
+          "entr"
         ],
         "presetId": null,
         "presetSubtype": null,
@@ -80843,8 +80846,10 @@
         "nameMatchConfidence": "nameMatchOnly: the COM-derived reference warns that the MsoAnimEffect constant does not reliably land on the catalog's assumed id for a gallery name above 26"
       },
       "evidence": {
-        "source": "PowerPoint.sdef (local installation)",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/entrance/21-rise-up.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.gallery.entrance.riseUp",
@@ -81064,7 +81069,7 @@
                 "element": "catalogTarget"
               },
               "preset": {
-                "category": "entrance",
+                "category": "emphasis",
                 "effect": "shimmer"
               },
               "start": {
@@ -81097,8 +81102,7 @@
         "strategy": "preset",
         "element": "p:cTn",
         "presetClass": [
-          "entr",
-          "exit"
+          "emph"
         ],
         "presetId": null,
         "presetSubtype": null,
@@ -81109,8 +81113,10 @@
         "nameMatchConfidence": "nameMatchOnly: the COM-derived reference warns that the MsoAnimEffect constant does not reliably land on the catalog's assumed id for a gallery name above 26"
       },
       "evidence": {
-        "source": "PowerPoint.sdef (local installation)",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/emphasis/91-shimmer.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.gallery.emphasis.shimmer",
@@ -81451,8 +81457,7 @@
         "strategy": "preset",
         "element": "p:cTn",
         "presetClass": [
-          "entr",
-          "exit"
+          "entr"
         ],
         "presetId": null,
         "presetSubtype": null,
@@ -81463,8 +81468,10 @@
         "nameMatchConfidence": "nameMatchOnly: the COM-derived reference warns that the MsoAnimEffect constant does not reliably land on the catalog's assumed id for a gallery name above 26"
       },
       "evidence": {
-        "source": "PowerPoint.sdef (local installation)",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/entrance/22-spinner.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.gallery.entrance.spinner",
@@ -82241,7 +82248,7 @@
                 "element": "catalogTarget"
               },
               "preset": {
-                "category": "entrance",
+                "category": "exit",
                 "effect": "stretchy"
               },
               "start": {
@@ -82274,7 +82281,6 @@
         "strategy": "preset",
         "element": "p:cTn",
         "presetClass": [
-          "entr",
           "exit"
         ],
         "presetId": null,
@@ -82286,8 +82292,10 @@
         "nameMatchConfidence": "nameMatchOnly: the COM-derived reference warns that the MsoAnimEffect constant does not reliably land on the catalog's assumed id for a gallery name above 26"
       },
       "evidence": {
-        "source": "PowerPoint.sdef (local installation)",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/exit/60-stretchy.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.gallery.exit.stretchy",
@@ -84352,8 +84360,7 @@
         "strategy": "preset",
         "element": "p:cTn",
         "presetClass": [
-          "entr",
-          "exit"
+          "entr"
         ],
         "presetId": null,
         "presetSubtype": null,
@@ -84364,8 +84371,10 @@
         "nameMatchConfidence": "nameMatchOnly: the COM-derived reference warns that the MsoAnimEffect constant does not reliably land on the catalog's assumed id for a gallery name above 26"
       },
       "evidence": {
-        "source": "PowerPoint.sdef (local installation)",
-        "commit": null
+        "source": "office-kit/pptx",
+        "commit": "18b7e75cfa7fd1c6e9891ce1285a76c7889b644b",
+        "fixture": "test/fixtures/native/animations/entrance/35-whip.xml",
+        "capturedApplicationVersion": "16.113.3"
       },
       "verification": "powerPointReadBackRequired",
       "guiKey": "animation.gallery.entrance.whip",

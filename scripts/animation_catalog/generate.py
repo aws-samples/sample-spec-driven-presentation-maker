@@ -2089,11 +2089,28 @@ def _effect_candidate(key: str, enumerator: str, code: str) -> dict[str, Any]:
                 "nameMatchOnly: the COM-derived reference warns that the MsoAnimEffect constant does not "
                 "reliably land on the catalog's assumed id for a gallery name above 26"
             )
+            ooxml["presetClass"] = [tile_row[3]]
+        # The category comes from the matched tile, never from the assumption
+        # that an MsoAnimEffect ordinal in this band names an entrance effect.
+        # Seven of the nine matches happen to be entrance effects and the
+        # hardcoded value was right by luck; `shimmer` is **emphasis** and
+        # `stretchy` is **exit**, so for those two the example asked the writer
+        # for an entrance effect that does not exist, it was refused, and the
+        # entry was counted as awaiting a PowerPoint read-back. Nothing needed
+        # measuring: both tiles were already measured, under the gallery this
+        # entry's own `guiKey` names.
+        preset = (
+            {"category": match[0], "effect": match[1]} if match
+            else {"category": "entrance", "effect": camel(enumerator.replace("animation type", ""))}
+        )
+        evidence = (
+            native_evidence(ANIMATION_BY_KEY[match][10], f"animations/{match[0]}") if match
+            else {"source": SDEF_SOURCE, "commit": None}
+        )
         return _accepted(
             key, SEMANTIC, ooxml,
-            effect_semantic(preset={"category": "entrance",
-                                    "effect": camel(enumerator.replace("animation type", ""))}),
-            {"source": SDEF_SOURCE, "commit": None},
+            effect_semantic(preset=preset),
+            evidence,
             guiKey=(f"animation.gallery.{match[0]}.{match[1]}" if match else "animation.moreEffects.entrance"),
         )
 
