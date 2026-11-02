@@ -7,7 +7,9 @@ from sdpm.engine.schema.deck_spec import (
     complete_deck_skeleton,
     deck_output_format,
     is_html_build_input,
+    is_pptx_build_input,
     new_deck_json,
+    read_deck_format,
     validate_specs,
 )
 from sdpm.engine.schema.regions import extract_regions, is_comment_element
@@ -22,7 +24,9 @@ __all__ = [
     "extract_regions",
     "is_comment_element",
     "is_html_build_input",
+    "is_pptx_build_input",
     "new_deck_json",
+    "read_deck_format",
     "validate_specs",
     "with_override_bases",
 ]

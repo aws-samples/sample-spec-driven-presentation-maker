@@ -71,46 +71,6 @@ def generate_previews(pptx_path: Path, output_dir: Path) -> list[Path]:
     return webp_files
 
 
-def generate_previews_for_pages(pptx_path: Path, output_dir: Path, pages: list[int]) -> dict[int, Path]:
-    """Render only ``pages`` (1-based) to WebP.
-
-    LibreOffice still exports the whole deck to PDF (there is no page
-    selection), but pdftoppm and the WebP encode run per requested page
-    instead of for every slide — for a 13-slide deck with 2 measured slugs
-    that is 1s instead of 9s locally.
-
-    Returns {page: webp_path}; pages beyond the PDF are skipped.
-    """
-    from PIL import Image
-
-    env = os.environ.copy()
-    env["HOME"] = str(output_dir)
-    t0 = time.monotonic()
-    subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-        ["soffice", "--headless", "--convert-to", "pdf", "--outdir", str(output_dir), str(pptx_path)],
-        env=env, capture_output=True, text=True, timeout=120, check=True,
-    )
-    logger.info("soffice pdf export took %.1fs (%s)", time.monotonic() - t0, pptx_path.name)
-    pdf_path = output_dir / pptx_path.with_suffix(".pdf").name
-    if not pdf_path.exists():
-        raise FileNotFoundError("LibreOffice did not produce PDF")
-
-    out: dict[int, Path] = {}
-    for page in sorted(set(pages)):
-        stem = output_dir / f"slide-{page}"
-        r = subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-            ["pdftoppm", "-png", "-r", "200", "-f", str(page), "-l", str(page), "-singlefile", str(pdf_path), str(stem)],
-            capture_output=True, text=True, timeout=120, check=False,
-        )
-        png_path = stem.with_suffix(".png")
-        if r.returncode != 0 or not png_path.exists():
-            continue  # page out of range
-        webp_path = png_path.with_suffix(".webp")
-        Image.open(png_path).save(webp_path, "WEBP", quality=85)
-        out[page] = webp_path
-    return out
-
-
 def _assemble_slides(tmpdir: Path) -> list[dict]:
     """Assemble slide list from workspace directory.
 
@@ -246,6 +206,17 @@ def _prepare_workspace(
         "base_dir": tmpdir,
         "default_text_color": presentation.get("defaultTextColor"),
     }
+
+
+def pin_workspace_build_config(tmpdir: Path, build_kwargs: dict) -> None:
+    """Rewrite the workspace deck.json so ``sdpm.api`` builds with exactly what
+    ``_prepare_workspace`` materialized (template file, fonts, text color)."""
+    deck_meta = json.loads((tmpdir / "deck.json").read_text(encoding="utf-8"))
+    deck_meta["template"] = str(Path(build_kwargs["template_path"]).name)
+    deck_meta["fonts"] = build_kwargs["fonts"]
+    if build_kwargs.get("default_text_color"):
+        deck_meta["defaultTextColor"] = build_kwargs["default_text_color"]
+    (tmpdir / "deck.json").write_text(json.dumps(deck_meta, ensure_ascii=False), encoding="utf-8")
 
 
 def materialize_assets(refs: set[str], storage: Storage, dest_dir: Path) -> None:
@@ -391,16 +362,7 @@ def generate_pptx(
     tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, storage)
     _t_prepare = time.monotonic() - _t0
     try:
-        # Rewrite deck.json so api.generate resolves exactly what the
-        # workspace materialized (template file, fonts, text color).
-        deck_meta = json.loads((tmpdir / "deck.json").read_text(encoding="utf-8"))
-        deck_meta["template"] = str(Path(build_kwargs["template_path"]).name)
-        deck_meta["fonts"] = build_kwargs["fonts"]
-        if build_kwargs.get("default_text_color"):
-            deck_meta["defaultTextColor"] = build_kwargs["default_text_color"]
-        (tmpdir / "deck.json").write_text(
-            json.dumps(deck_meta, ensure_ascii=False), encoding="utf-8"
-        )
+        pin_workspace_build_config(tmpdir, build_kwargs)
 
         out = tmpdir / "output.pptx"
         gen_result = api_generate(json_path=tmpdir, output_path=out)

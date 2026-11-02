@@ -192,6 +192,14 @@ that reference a changed `includes/` file, slides that inherit from an affected 
 `override`, and every slide when `deck.json` or `specs/outline.md` changed
 (`sdpm.engine.schema.affected_slugs`) — plus the `measure_slides` slugs.
 
+For PPTX decks this post-processing is one core function, `sdpm.api.refresh_pptx`: the
+`output.pptx` build, the partial build of the slides to render (with their `override`
+bases) and its SVG export, the measurement, and the compose payloads and PNGs
+(`PptxRefresh.compose()` / `previews()`). Both servers only do the I/O around it: the local
+server writes `compose/` and `preview/` in the deck directory; the remote server materializes
+the S3 workspace, uploads the PPTX artifact and finishes the render (unless `measure_slides`
+needs it in the call), the WebP previews and the compose upload in the background.
+
 ### HTML Deck Security
 
 An HTML deck runs scripts, so it is never served from the Web UI's origin:
@@ -276,7 +284,11 @@ Accepted risks:
 
 The `run_python(measure_slides=[...])` parameter triggers LibreOffice SVG export to measure text bounding boxes,
 enabling overflow detection during the Build loop without visual review. Measurement (overflow,
-layout bias, invalid layouts) covers only those slugs.
+layout bias, invalid layouts) covers only those slugs. The result is the same on both servers:
+`measure` (the text report, with a "⚠ Layout issues" section when the judge finds collisions,
+overflow or low contrast; `{"error": …}` JSON when nothing could be measured),
+`warnings.layoutBias` and `warnings.build` (the measured pages' build warnings) and
+`errors.<slug>.invalidLayout`.
 
 ---
 

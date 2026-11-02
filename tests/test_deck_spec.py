@@ -321,3 +321,54 @@ def test_is_html_build_input(rel: str, expected: bool) -> None:
     from sdpm.engine.schema import is_html_build_input
 
     assert is_html_build_input(rel) is expected
+
+
+@pytest.mark.parametrize("rel, expected", [
+    ("deck.json", True),
+    ("presentation.json", True),
+    ("specs/outline.md", True),
+    ("slides/title.json", True),
+    ("./slides/title.json", True),
+    ("slides\\title.json", True),
+    ("includes/code.json", True),
+    ("specs/brief.md", False),
+    ("specs/art-direction.html", False),
+    ("deck.css", False),
+    ("attachments/x/data.csv", False),
+    ("output.pptx", False),
+    ("", False),
+])
+def test_is_pptx_build_input(rel: str, expected: bool) -> None:
+    from sdpm.engine.schema import is_pptx_build_input
+
+    assert is_pptx_build_input(rel) is expected
+
+
+@pytest.mark.parametrize("payload", [[], "deck", 3, None])
+def test_deck_output_format_treats_a_non_object_as_pptx(payload: object) -> None:
+    assert deck_output_format(payload) == "pptx"
+
+
+@pytest.mark.parametrize("text, expected", [
+    (None, "pptx"),  # no deck.json
+    ("{not json", "pptx"),
+    ("[]", "pptx"),
+    ("{}", "pptx"),
+    ('{"outputFormat": "pptx"}', "pptx"),
+    ('{"outputFormat": "html"}', "html"),
+])
+def test_read_deck_format(tmp_path: Path, text: str | None, expected: str) -> None:
+    from sdpm.engine.schema import read_deck_format
+
+    if text is not None:
+        (tmp_path / "deck.json").write_text(text, encoding="utf-8")
+    assert read_deck_format(tmp_path) == expected
+    assert read_deck_format(str(tmp_path)) == expected
+
+
+def test_read_deck_format_rejects_an_invalid_output_format(tmp_path: Path) -> None:
+    from sdpm.engine.schema import read_deck_format
+
+    (tmp_path / "deck.json").write_text('{"outputFormat": "htlm"}', encoding="utf-8")
+    with pytest.raises(ValueError, match="htlm"):
+        read_deck_format(tmp_path)

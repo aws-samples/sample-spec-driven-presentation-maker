@@ -47,6 +47,58 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **`run_python` returns the same result for PPTX decks locally and in the cloud.** The
+  post-processing after a PPTX deck edit (full build, render of the affected slides,
+  measurement, compose, previews) now lives in `sdpm.api.refresh_pptx`; both servers only do
+  the I/O around it. The measurement and warnings part of the result follows the cloud format.
+  Before:
+
+  ```
+  Local  warnings          ["fonts auto-detected from template", "page02 (Title Only) offset: -35.2% (top-heavy)", "  page02(body) …"]
+                           (every build warning without measure_slides, the measured pages' lines with it;
+                           the list replaced {"outline": …})
+         lint_diagnostics  [{slide, element, rule, message}]   (copy of errors.lintDiagnostics)
+         measure           "📐 Text measurement …" (with "⚠ Layout issues") | "No matching slides found for given slugs"
+                           | "Measure error: …"
+         invalid layouts   not reported
+  Cloud  warnings          {"layoutBias": [{slide, layout, bbox, offset, direction}]}   (replaced {"outline": …})
+         measure           "📐 Text measurement …" (no "⚠ Layout issues") | '{"error": "…"}'
+         errors.<slug>     {"invalidLayout": "…", "available": […]}   (measured slugs)
+         build warnings    not reported
+  ```
+
+  After, on both servers:
+
+  ```
+  warnings   {"outline": "…",                                  (outline lint; always kept)
+              "layoutBias": [{slide, layout, bbox, offset, direction}],
+              "build": ["  page02(body) element[4]: include src …"]}
+             layoutBias and build come with measure_slides only, for the measured pages
+             (full-deck page numbers); build holds the "pageNN" lines, not the layout-bias lines
+  measure    "📐 Text measurement …" plus the "⚠ Layout issues" section when the judge finds any
+             | '{"error": "No matching slides found for given slugs"}'
+             | '{"error": "LibreOffice SVG export failed"}' | '{"error": "…"}'
+  errors     {"lintDiagnostics": […], "<slug>": {"invalidLayout": "…", "available": […]}}
+  ```
+
+  Migration: read build warnings from `warnings["build"]` (a dict now, not a list) and lint
+  results from `errors.lintDiagnostics` (`lint_diagnostics` is gone); parse `measure` as JSON
+  when it does not start with `📐`. Transport keys stay as they were: locally `pptx`,
+  `compose`, `compose_error`, `preview_files`, `preview_error`, `render_error`, `preview`
+  (`unavailable`, with measure_slides); in the cloud `previewHint`, `readOnly`, and the
+  `pptx_error` texts. The role documents are unchanged (none of them names these fields).
+  Side effects: the local live preview's compose files now carry `sourceHash` and are not
+  written for a slide whose layout name is invalid (it showed the fallback layout), and a
+  written slide's older compose files are removed. In the cloud, the rebuilt PPTX goes through
+  the same build as `generate_pptx` (icon check, `autoSpacing`, `defaultBackground`, an
+  auto-set `defaultTextColor` instead of a failure), and previews are rendered from the changed
+  slides instead of the whole deck, as locally (a template whose master shows the slide number
+  as a plain text field then shows the partial render's number in those previews and compose
+  files, as the local ones always did). In the cloud, `previewHint` is left out when the
+  render of the changed slides failed (the same result's `pptx_error` / `measure` says why).
+  `sdpm.engine.schema.read_deck_format` replaces five
+  separate deck.json format readers; the CLI no longer crashes on a deck.json that is not an
+  object.
 - **The README opens with the key visual.** An animation of the Web UI composing a seven-slide
   deck about SDPM (in `agent-spectrum`), the install commands right under it, then the same
   slide in seven bundled styles. The deck page, comment and Styles screenshots are retaken on
