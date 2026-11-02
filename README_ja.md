@@ -6,16 +6,37 @@
 [![CI](https://github.com/aws-samples/sample-spec-driven-presentation-maker/actions/workflows/ci.yml/badge.svg)](https://github.com/aws-samples/sample-spec-driven-presentation-maker/actions/workflows/ci.yml)
 [![AWS Blog](https://img.shields.io/badge/AWS%20Blog-read-orange?logo=amazonaws)](https://aws.amazon.com/jp/blogs/news/spec-driven-presentation-maker-ja/)
 
+![SDPM 自身を紹介するデッキを Web UI が組み上げるアニメーション。レイアウトパスが表紙の枠を描き、エージェントがそれぞれの色で中身を埋め、続いて 2 枚ずつ作り、最後にグリッドで完成した 7 枚を表示](docs/assets/hero-ja.gif)
+
 手元の資料から、AI エージェントがスライドを作ります。エージェントはまず短いスペック（誰に向けた
 発表か、どんな見た目にするか、各スライドで何を言うか）を書き、それをもとに PowerPoint ファイルか
 ブラウザで見せる HTML プレゼンテーションを組み立てます。
 
+## インストール
+
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
+```
+
+```powershell
+# Windows（PowerShell。CI での検証のみ）
+irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
+```
+
+終わったら、AI エージェントに **「〜のスライドを作って」** と頼むか、最初に 1 度 `kiro-cli login` を
+実行してから `sdpm webui` でブラウザから使います。チームで使うなら、自分の AWS アカウントに
+[ワンクリックデプロイ](#aws-にワンクリックデプロイ)できます。インストーラーが聞くことと、エージェントごとの
+始め方は[クイックスタート](#クイックスタート)にあります。
+
+## 同じスペックを、どのスタイルでも
+
+![「Agree on the content first」のスライドを同梱スタイル 7 つで作ったもの: agent-spectrum、newspaper、aws-dark、neo-brutalist、bento、duotone、swiss-poster](docs/assets/style-gallery-en.png)
+
+*同じ文言の同じスライドを、同梱スタイルのうち 7 つで作ったもの。配色、フォント、レイアウトはスタイルが決め、
+スライドで何を言うかはスペックが決めます。*
+
 > 📝 コンセプトと背景は AWS ブログ [Spec-Driven Presentation Maker — 伝えたいことを先に設計し、スライド構築は AI に任せる](https://aws.amazon.com/jp/blogs/news/spec-driven-presentation-maker-ja/) もあわせてご覧ください。
-
-![イベント駆動アーキテクチャを紹介するサンプルデッキの 6 枚のスライド（同梱の aws-light スタイル）](docs/assets/screenshots/example-pptx.png)
-
-*SDPM で作ったサンプルデッキ。イベント駆動アーキテクチャを紹介する 6 枚で、同梱の `aws-light`
-スタイルを使っています。*
 
 ---
 
@@ -62,6 +83,10 @@
 どのブラウザでもオフラインで開ける `output.html` の 1 ファイルになり、スピーカーノートも使えます。
 HTML のスライドには操作できるグラフも入れられます。
 
+![上のアニメーションのデッキの 7 枚。表紙を大きく、残りの 6 枚をその下に並べたもの](docs/assets/hero-slides-ja.png)
+
+*アニメーションのデッキを `.pptx` にしたもの。同梱の `agent-spectrum` スタイルです。*
+
 ![サワードウのパン作りを紹介する HTML デッキのスライド 3 枚（操作できるグラフを含む）](docs/assets/screenshots/example-html.png)
 
 ### スライドに描いてレビュー
@@ -90,7 +115,7 @@ Web UI やエージェントへの依頼で AI に新しいスタイルを作ら
 | **手元の Web UI** | ブラウザで使うチャットアプリ。スペック、スライド、コメントを並べて扱えます。ローカルで動き、AWS アカウントは不要です。 | Node.js 20+ と、エージェントを動かす Kiro CLI（インストーラーが入れます） | [クイックスタート](#クイックスタート)の後に `sdpm webui` |
 | **AWS 上のチームサーバー** | Web UI と MCP サーバーを自分の AWS アカウントにデプロイします。サインインは Amazon Cognito です。 | AWS アカウント。ワンクリックデプロイならローカルのツールは不要 | [ワンクリックデプロイ](#aws-にワンクリックデプロイ) |
 
-![Web UI のデッキ画面。左にスライド、右にチャット（修正依頼とエージェントの返答）](docs/assets/screenshots/webui-deck.png)
+![Web UI のデッキ画面。左にグリッド表示の 7 枚のスライド、右にチャット（修正依頼とエージェントの返答）](docs/assets/screenshots/webui-deck.png)
 
 ### AWS にワンクリックデプロイ
 

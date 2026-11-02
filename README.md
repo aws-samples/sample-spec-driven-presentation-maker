@@ -5,14 +5,35 @@
 [![License: MIT-0](https://img.shields.io/badge/License-MIT--0-yellow.svg)](LICENSE)
 [![CI](https://github.com/aws-samples/sample-spec-driven-presentation-maker/actions/workflows/ci.yml/badge.svg)](https://github.com/aws-samples/sample-spec-driven-presentation-maker/actions/workflows/ci.yml)
 
+![Animation of the Web UI building a deck about SDPM: the layout pass draws the frame of the cover, agents fill it in their colours, then two slides at a time, and the grid shows all seven finished slides](docs/assets/hero-en.gif)
+
 Turn your material into slides with an AI agent. The agent first writes a short spec (who
 the talk is for, how it looks, what each slide says), then builds a PowerPoint file or a
 browser (HTML) presentation from it.
 
-![Six slides of a sample deck about event-driven architecture, made with the bundled aws-light style](docs/assets/screenshots/example-pptx.png)
+## Install
 
-*A sample deck made with SDPM: a six-slide introduction to event-driven architecture, in
-the bundled `aws-light` style.*
+```bash
+# macOS / Linux
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
+```
+
+```powershell
+# Windows (PowerShell; verified in CI only)
+irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
+```
+
+Then ask your AI agent **"Make slides about …"**, or run `kiro-cli login` once and then
+`sdpm webui` to work in your browser. To run it for a team in your AWS account, use
+[One-Click Deploy](#one-click-deploy-on-aws). The [Quick Start](#quick-start) explains what
+the installer asks and how to start with each agent.
+
+## Same spec, any style
+
+![The slide "Agree on the content first" in seven bundled styles: agent-spectrum, newspaper, aws-dark, neo-brutalist, bento, duotone and swiss-poster](docs/assets/style-gallery-en.png)
+
+*The same slide with the same words in seven of the bundled styles. The style decides the
+colours, fonts and layout; the spec decides what the slide says.*
 
 ---
 
@@ -62,6 +83,10 @@ By default the agent builds a `.pptx` file that you can edit in PowerPoint. Ask 
 deck and you get a single `output.html` that runs in any browser, offline, with speaker
 notes. HTML slides can include interactive charts.
 
+![The seven slides of the deck in the animation above, the cover large and the other six below it](docs/assets/hero-slides-en.png)
+
+*The deck in the animation as a `.pptx`, in the bundled `agent-spectrum` style.*
+
 ![Three slides of a sample HTML deck about sourdough baking, including an interactive chart](docs/assets/screenshots/example-html.png)
 
 ### Review by drawing on the slides
@@ -90,7 +115,7 @@ and create new styles with AI in the Web UI or by asking your agent. See
 | **The Web UI on your computer** | A chat app in your browser, with the spec, the slides and comments side by side. Runs locally, no AWS account. | The installer adds Node.js 20+ and Kiro CLI, which runs the agent | [Quick Start](#quick-start), then `sdpm webui` |
 | **A team server on AWS** | The Web UI and the MCP server deployed in your AWS account, with sign-in through Amazon Cognito. | An AWS account. No local tools for One-Click Deploy | [One-Click Deploy](#one-click-deploy-on-aws) |
 
-![The Web UI deck page: the slides on the left, the chat with a change request and the agent's reply on the right](docs/assets/screenshots/webui-deck.png)
+![The Web UI deck page: the seven slides in the grid view on the left, the chat with a change request and the agent's reply on the right](docs/assets/screenshots/webui-deck.png)
 
 ### One-Click Deploy on AWS
 

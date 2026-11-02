@@ -81,24 +81,39 @@ The `arch_diagram` layout engine draws icon labels at 11 pt and arrow labels at 
 for a full-screen slide. At README width that text is too small to read, so these diagrams
 place their shapes by hand.
 
+## Key visual
+
+`hero/` holds the deck at the top of the README (`deck-en/`, and `deck-ja/` made from it with
+the translate role) with its compose history, and the scripts that turn it into
+`hero-en.gif` / `hero-ja.gif` and the stills `hero-slides-en.png` / `hero-slides-ja.png`:
+`replay.py` places the history again, step by step, in a scratch deck folder that the Local
+Web UI shows, and `record.cjs` records the browser with Playwright. The docstring of
+`replay.py` describes the two parts of the GIF and the requirements.
+
+```bash
+uv run python docs/assets/src/hero/replay.py               # en and ja, GIFs and stills
+uv run python docs/assets/src/hero/replay.py ja --no-stills
+```
+
 ## Screenshots
 
 `docs/assets/screenshots/` is not generated here. Those images are captures of a running Web
 UI and of real decks:
 
-- `example-pptx.png`: the six slides of a PPTX deck made in the Local Web UI on the Fast path
-  (prompt: a 6-slide introduction to event-driven architecture, `@template:blank-light
-  @style:aws-light`), rendered with `pptx_builder.py preview --no-grid` and tiled 3 × 2 with
-  `magick montage`.
-- `example-html.png`: three slides of an HTML deck made the same way with **Build as HTML**
-  (prompt: a 5-slide sourdough introduction with an interactive temperature chart,
-  `@style:prism-light`), from the deck's browser-check PNGs.
-- `webui-comments.png`, `webui-deck.png`, `webui-styles.png`: Playwright captures of the
-  Local Web UI at 1600 px wide, English locale, with a scratch deck folder and config
-  directory so no personal decks or styles appear.
+- `example-html.png`: three slides of an HTML deck made in the Local Web UI on the Fast path
+  with **Build as HTML** (prompt: a 5-slide sourdough introduction with an interactive
+  temperature chart, `@style:prism-light`), from the deck's browser-check PNGs.
+- `webui-comments.png`, `webui-deck.png`: Playwright captures of the Local Web UI at 1600 px
+  wide, English locale, on a copy of `hero/deck-en` (with `preview/` and `output.pptx` built
+  from it) in a scratch deck folder and config directory. The comment frames were drawn with
+  the **Comment** tool; the change request in `webui-deck.png` was sent to a real agent, which
+  had a composer update the slide.
+- `webui-styles.png`: the Styles page of the same Web UI, 1280 px wide, cropped to the page
+  content.
 
 To retake them, run the Local Web UI from a checkout (`cd web-ui && npm run dev:local`) with
-`SDPM_DECK_ROOT` and `XDG_CONFIG_HOME` pointing at empty directories, and use generic topics.
-The slides use Calibri. On a machine without it the browser falls back to a wider font and long
-titles overflow, so the captures load LibreOffice's metric-compatible Carlito under the name
-Calibri, as LibreOffice does for the PNG previews.
+`SDPM_DECK_ROOT` and `XDG_CONFIG_HOME` pointing at scratch directories, and use generic topics.
+The key visual deck uses Avenir Next and Menlo (macOS), so take the Web UI captures on macOS.
+The HTML deck's slides use Calibri. On a machine without it the browser falls back to a wider
+font and long titles overflow, so that capture loaded LibreOffice's metric-compatible Carlito
+under the name Calibri, as LibreOffice does for the PNG previews.
