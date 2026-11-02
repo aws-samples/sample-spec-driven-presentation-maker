@@ -138,7 +138,7 @@
       "y": 572,
       "width": 1728,
       "height": 64,
-      "text": "あとは AI エージェントに頼むか {{font=Menlo,#EEF0F4:sdpm webui}} {{font=Hiragino Sans:を実行、または}} AWS にデプロイ。",
+      "text": "あとは AI エージェントに頼むか {{font=Menlo,#EEF0F4:sdpm webui}}{{font=Hiragino Sans: を実行、または }}AWS{{font=Hiragino Sans: にデプロイ。}}",
       "fontSize": 22,
       "fontColor": "#9AA3B2",
       "align": "left",
