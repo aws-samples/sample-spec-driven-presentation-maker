@@ -2184,6 +2184,74 @@ def test_the_platform_inventory_records_the_whole_path_animation_popup():
     assert len(inventory["noMoreEffectsRoute"]["corroboration"]) == 2
 
 
+def test_the_pane_settings_reading_records_a_route_with_no_dialog():
+    """The after-effect, sound and timing settings are not behind a dialog here.
+
+    The capture plan for those 11 values was written from the Windows
+    documentation: open the Animation Pane, **double-click** the effect, pick
+    the **Effect** or **Timing** tab. Two things are wrong with that on this
+    build. There is no such dialog — the settings are inline in the Animation
+    Pane as disclosure sections. And a double-click is not something this driver
+    can deliver, since it presses semantically and posts no mouse events, so a
+    plan requiring one is unreachable rather than merely slow.
+
+    So the surface is asserted from a committed reading, not from the plan.
+    """
+    settings = json.loads(
+        (
+            REPO_ROOT
+            / "tests/fixtures/animations/gui-only/pane-settings-2026-11-02"
+            / "pane-settings.json"
+        ).read_text()
+    )
+    assert settings["platform"] == "macOS"
+    assert settings["version"] == "16.113.1"
+
+    structure = settings["structure"]["motionPathOnRectangle"]
+    sections = {section["name"]: section for section in structure["sections"]}
+    assert set(sections) == {"Effect Options", "Timing", "Text Animations", "Triggers"}
+    # Every section answers a press, which is what makes the route reachable at
+    # all. If one ever stops offering Expand, the plan needs rewriting again.
+    for name, section in sections.items():
+        assert "Expand" in section["actions"], f"{name} offers no Expand"
+
+    # Two timing settings are ON by default, so for those it is the *cleared*
+    # state that has to be captured — the opposite of every other value in this
+    # feature. Losing this would send a capture run after the wrong halves.
+    assert structure["defaultsOn"] == ["Smooth End", "Smooth Start"]
+    checkboxes = {box["label"] for box in structure["checkboxes"]}
+    assert {"Smooth Start", "Smooth End", "Bounce End", "Rewind when done playing"} <= checkboxes
+
+    popups = {popup["label"]: popup for popup in settings["popups"].values()}
+    assert not [p for p in popups.values() if p["error"]], "a popup read failed"
+
+    after = popups["After animation: "]
+    labels = {item["label"] for item in after["items"]}
+    assert after["current"] == "Don't Dim"
+    # Eight *scheme* swatches, so a dim records a theme reference; More Colors
+    # is the arbitrary-RGB route. Both forms need capturing to tell them apart.
+    swatches = [item for item in after["items"] if item["label"].endswith("Scheme Color")]
+    assert len(swatches) == 8
+    assert {"More Colors...", "Hide After Animation", "Hide on Next Mouse Click"} <= labels
+
+    sounds = {item["label"] for item in popups["Sound:"]["items"]}
+    assert {"[No Sound]", "[Stop Previous Sound]", "Other Sound..."} <= sounds
+    assert len(sounds) == 22
+
+    starts = [item["label"] for item in popups["Start:"]["items"]]
+    assert starts == ["On Click", "With Previous", "After Previous"]
+
+    repeats = {item["label"] for item in popups["Repeat:"]["items"]}
+    assert {"(none)", "Custom:", "Until Next Click", "Until End of Slide"} <= repeats
+
+    # Property is selection-dependent, which is why it is keyed by selection
+    # above: a SmartArt graphic offers something else entirely.
+    assert {item["label"] for item in popups["Property:"]["items"]} == {
+        "Not Anchored",
+        "Anchored to Object",
+    }
+
+
 def test_the_complex_motion_paths_are_measured_and_writable():
     """Seven paths this build applies, which the catalog had no key for.
 

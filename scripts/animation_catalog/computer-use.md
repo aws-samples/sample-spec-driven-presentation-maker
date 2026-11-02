@@ -595,35 +595,127 @@ Closed by the same run. `entry effect page curl single left/right` write
 variant is carried by `invX="1"` on the **left**-hand enumerator, which is the
 opposite of what the catalog had inferred for Airplane, Origami and Wind.
 
+## The per-effect settings surface — **there is no modal dialog on Mac**
+
+Steps 3 to 5 all read the same surface, and it is not the one the Windows
+documentation describes. **PowerPoint for Mac 16.113.1 has no "Effect Options"
+dialog with Effect / Timing / Text Animations tabs.** Those settings sit inline
+in the Animation Pane as four collapsible sections, so **no double-click is
+needed and none is available**: this driver posts no mouse events, and every
+section answers `AXPress`.
+
+The route, measured 2026-11-02 on a deck with a motion path selected:
+
+1. Ribbon ▸ **Animations** tab. `Animation Pane` is a **`switch`**, not a
+   button — toggling it adds a second tab to the pane tab bar
+   (`tablist "Tab bar, 2 tabs"`), and the pane's own tab is named
+   **`Animations`**, not "Animation Pane".
+2. Inside `group:Animations` the lower `scrollarea` carries the AX identifier
+   **`SettingsScrollView`**. Its direct children are four `disclosure` controls,
+   each offering `Click` / `Expand` / `Collapse`:
+
+   | Disclosure | AX identifier | What it holds |
+   | --- | --- | --- |
+   | `Effect Options` | `_NS:236` | `Property:`, `After animation:`, `Sound:`, and 4 checkboxes |
+   | `Timing` | `_NS:843` | `Start:`, `Duration:`, `Delay:`, `Repeat:`, `Rewind when done playing` |
+   | `Text Animations` | `_NS:774` | text build levels (Step 7) |
+   | `Triggers` | `_NS:732` | trigger conditions |
+
+3. `expand` each section you need. Both `Effect Options` and `Timing` verified
+   `delivered_verified` with `states: ["expanded"]`, `value "1"`.
+
+**Two different surfaces are both named `Effect Options`.** The ribbon's
+`Effect Options` **menubutton** opens its own window and carries the direction /
+shape options measured for the 133 effect-option values ("Driving mechanics"
+above). The Animation Pane's `Effect Options` **disclosure** is this one. They
+are unrelated; resolving by name alone picks the wrong one.
+
+### Reading a popup inside the pane
+
+Each combobox opens as a `menu` **surface**, not as a separate window the way
+the ribbon's popups do. Click the combobox, let it settle, then
+`snapshot --surface menu`. Two cautions, both hit during the 2026-11-02 pass:
+
+* A snapshot issued immediately after the click returns `TIMEOUT`
+  (`surface_read`, `ax_error -25204`). Allow ~1.2 s.
+* Under memory pressure a single write-type call held its lease 5–10 s. Six
+  popups chained into one process ran past the tool timeout and produced
+  nothing. **Enumerate one popup per process** — `enum_anim_pane.py --index N`.
+
+Close every popup with `escape` before touching the next control.
+
 ## Step 3 — After animation (dim, hide, hide on next click)
 
-1. Apply **Animations ▸ Fade** to a rectangle.
-2. Open the **Animation Pane**, double-click the effect, open the **Effect** tab.
-3. Set **After animation** to each of: *Don't Dim*, a dim colour, *Hide After
-   Animation*, *Hide on Next Mouse Click*.
-4. Capture evidence per value.
+**The route is measured; the values are not yet captured.**
+`Effect Options ▸ After animation:` defaults to `Don't Dim` and offers 12 items:
+
+| Item | Role | Closes |
+| --- | --- | --- |
+| 8 scheme swatches: Background, Text and Lines, Shadows, Title Text, Fills, Accent, Accent and Hyperlink, Accent and Followed Hyperlink | `button` | `animation.afterAnimation.dim` |
+| `More Colors...` | `menuitem` | `animation.afterAnimation.dimColor` |
+| `Don't Dim` | `menuitem` | the default |
+| `Hide After Animation` | `menuitem` | `animation.afterAnimation.hide` |
+| `Hide on Next Mouse Click` | `menuitem` | `animation.afterAnimation.hideOnNextClick` |
+
+The 8 swatches are the **scheme** colours, so a dim records a theme-colour
+reference rather than an RGB literal; `More Colors...` is the arbitrary-RGB
+route. Capture one swatch and one `More Colors...` value to tell the two
+storage forms apart.
 
 What to look for: whether PowerPoint writes `p:cTn/@afterEffect`, an extra
 `p:set` on `style.visibility`, or a trailing `p:animClr`, and where the dim
-colour lives. This closes
-`animation.afterAnimation.{dim,hide,hideOnNextClick}` and
-`animation.afterAnimation.dimColor`.
+colour lives.
 
 ## Step 4 — Effect sound and Stop previous sound
 
-Same dialog, **Effect** tab, **Sound** dropdown. Capture one built-in sound and
-one *Other Sound…* WAV, plus *Stop Previous Sound*. Record the media part path,
-the content type and the relationship type, not just the XML: REQ-5.7 needs the
-relationship closure. This closes `animation.sound.effect`,
-`animation.sound.stopPreviousSound`, `transition.sound.effect` and
-`transition.sound.loopUntilNext`.
+Same section, `Sound:` dropdown, default `[No Sound]`. The popup offers **22
+items**: `[No Sound]`, `[Stop Previous Sound]`, 19 named built-ins (Applause,
+Arrow, Bomb, Breeze, Camera, Cash Register, Chime, Click, Coin, Drum Roll,
+Explosion, Hammer, Laser, Push, Suction, Typewriter, Voltage, Whoosh, Wind) and
+`Other Sound...`.
+
+Capture one built-in and one `Other Sound…` WAV, plus `[Stop Previous Sound]`.
+Record the media part path, the content type and the relationship type, not just
+the XML: REQ-5.7 needs the relationship closure. This closes
+`animation.sound.effect`, `animation.sound.stopPreviousSound`,
+`transition.sound.effect` and `transition.sound.loopUntilNext`.
 
 ## Step 5 — Timing: rewind, smooth start/end, bounce end
 
-**Effect Options ▸ Timing** for rewind; **Effect Options ▸ Effect** for a motion
-path's smooth start, smooth end and bounce end. Apply a non-default value for
-each, one per slide, and diff the saved `p:cTn` attributes against a slide with
-the default. This closes `animation.timing.{rewind,smoothStart,smoothEnd,bounceEnd}`.
+All four are checkboxes, and **two of them default to on**, which inverts the
+usual capture: the value that writes bytes is the *cleared* one.
+
+| Setting | Control | Section | Default on a motion path |
+| --- | --- | --- | --- |
+| `smoothStart` | checkbox `Smooth Start` | `Effect Options` | **checked** |
+| `smoothEnd` | checkbox `Smooth End` | `Effect Options` | **checked** |
+| `bounceEnd` | checkbox `Bounce End` | `Effect Options` | cleared |
+| `rewind` | checkbox `Rewind when done playing` | `Timing` | cleared |
+
+So capture **both** states of each, not just the non-default one: a default-on
+setting's cleared state is what has to be identified on read-back. A fifth
+checkbox, `Auto-reverse` (cleared), sits beside them and has no catalog entry
+yet. This closes `animation.timing.{rewind,smoothStart,smoothEnd,bounceEnd}`.
+
+Two neighbouring popups are already fully enumerated and need no discovery
+pass, only measurement:
+
+* `Timing ▸ Repeat:` — `(none)` (default), `2`, `3`, `4`, `5`, `10`, `Custom:`,
+  `Until Next Click`, `Until End of Slide`.
+* `Timing ▸ Duration:` — `5 seconds (Very Slow)`, `3 seconds (Slow)`,
+  `2 seconds (Medium)` (default), `1 seconds (Fast)`,
+  `0.5 seconds (Very Fast)`, plus a free `seconds` field.
+
+`Timing ▸ Start:` offers exactly the three conditions already supported: `On
+Click`, `With Previous`, `After Previous`.
+
+### `Property:` is effect-type-dependent
+
+The first combobox under `Effect Options` is labelled `Property:` and its
+contents change with the selected effect's type. With a motion path selected it
+offers `Not Anchored` / `Anchored to Object` (the default). **Do not plan one
+target list for it** — read it per effect type, the same way the galleries were
+read rather than assumed.
 
 ## Step 6 — Motion paths
 
@@ -763,10 +855,19 @@ verify by re-listing, because PowerPoint answers that click with
 
 ## Step 9 — SmartArt and chart builds
 
-**Effect Options ▸ SmartArt Animation ▸ Group graphic** for each value, and
-**Chart Animation ▸ Group chart** on a clustered-column chart. Confirm the
-`p:bldDgm/@build` and `p:bldGraphic` forms the catalog predicts from
-`ST_AnimationDgmBuildType` and `ST_AnimationChartBuildType`.
+Reached through the Animation Pane's settings sections, not a dialog — see "The
+per-effect settings surface". **Which sections exist depends on what is
+selected**: the 2026-11-02 read, with a motion path on a plain rectangle,
+returned exactly four (`Effect Options`, `Timing`, `Text Animations`,
+`Triggers`) and **no SmartArt or Chart section**. So the first move here is to
+select a SmartArt graphic and re-read the disclosure list, the same way
+`Property:` has to be re-read per effect type. Do not assume a
+`SmartArt Animation` section until a read returns one.
+
+Then set **Group graphic** for each value, and **Group chart** on a
+clustered-column chart, and confirm the `p:bldDgm/@build` and `p:bldGraphic`
+forms the catalog predicts from `ST_AnimationDgmBuildType` and
+`ST_AnimationChartBuildType`.
 
 ## Step 10 — Non-persisted controls
 
