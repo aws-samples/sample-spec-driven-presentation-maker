@@ -12,9 +12,11 @@
 import { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback, useMemo } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
+import { loadRuntimeConfig } from "@/lib/runtimeConfig"
 import { buildAttachedMarkers } from "@/lib/attachmentMarker"
 import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
 import { getChatHistory, patchDeck } from "@/services/deckService"
+import * as localService from "@/services/localService"
 import type { UploadedFile } from "@/services/uploadService"
 import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { useSlashPickerItems } from "@/hooks/useSlashPickerItems"
@@ -162,11 +164,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const saveLocalChat = useCallback((overrideDeckId?: string) => {
     const did = overrideDeckId || currentDeckId.current
     if (!IS_LOCAL || !did || reconnectingRef.current) return
-    fetch("/api/agent/chat", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ deckId: did, messages: stream.messagesRef.current }),
-    }).catch((err) => notifyError(t("errorSaveHistory"), err))
+    localService.saveLocalChat(did, stream.messagesRef.current).catch((err) => notifyError(t("errorSaveHistory"), err))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -292,8 +290,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (IS_LOCAL) { setConfigLoaded(true); return }
     async function loadConfig() {
       try {
-        const response = await fetch("/aws-exports.json")
-        const config = await response.json()
+        const config = await loadRuntimeConfig()
         await setAgentConfig(config.agentRuntimeArn, config.awsRegion || "us-east-1")
         setConfigLoaded(true)
       } catch (err) {
@@ -368,12 +365,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     const timer = setTimeout(async () => {
       const sid = sessionId
       if (!sid) return
-      try {
-        const check = await fetch(`/api/agent/stream?sessionId=${encodeURIComponent(sid)}`)
-        const ct = check.headers.get("content-type") || ""
-        try { check.body?.getReader()?.cancel() } catch {}
-        if (!ct.includes("text/event-stream")) return
-      } catch { return }
+      const streamUrl = localService.localStreamUrl(sid)
+      if (!streamUrl || !(await localService.hasLocalStream(sid))) return
 
       setReconnectLoading(true)
 
@@ -381,7 +374,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       if (resetParserState) resetParserState()
 
       reconnectingRef.current = true
-      es = new EventSource(`/api/agent/stream?sessionId=${encodeURIComponent(sid)}`)
+      es = new EventSource(streamUrl)
 
       let receivedData = false
       let replayDone = false

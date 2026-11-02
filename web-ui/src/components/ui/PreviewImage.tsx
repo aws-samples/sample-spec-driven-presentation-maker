@@ -9,6 +9,7 @@
 "use client"
 
 import { useState, useCallback, ImgHTMLAttributes } from "react"
+import { getDeck } from "@/services/deckService"
 
 interface PreviewImageProps extends ImgHTMLAttributes<HTMLImageElement> {
   /** Deck ID for refreshing the URL via API. */
@@ -30,14 +31,8 @@ export function PreviewImage({ deckId, slug, idToken, src, onError, ...props }: 
     }
     setRetried(true)
     try {
-      const resp = await fetch("/aws-exports.json")
-      const config = await resp.json()
-      const deckResp = await fetch(`${config.apiBaseUrl}decks/${deckId}`, {
-        headers: { Authorization: `Bearer ${idToken}` },
-      })
-      if (!deckResp.ok) return
-      const deck = await deckResp.json()
-      const slide = deck.slides?.find((s: { slug: string; previewUrl?: string }) => s.slug === slug)
+      const deck = await getDeck(deckId, idToken)
+      const slide = deck.slides?.find((s) => s.slug === slug)
       if (slide?.previewUrl) {
         setCurrentSrc(slide.previewUrl)
       }

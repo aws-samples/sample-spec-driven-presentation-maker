@@ -3,6 +3,7 @@
 /** Stateless raw attachment upload service. Conversion happens on read/import. */
 
 import { IS_LOCAL } from "@/lib/mode"
+import { loadRuntimeConfig } from "@/lib/runtimeConfig"
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024
 const MAX_FILES = 5
@@ -32,15 +33,13 @@ export interface UploadedFile {
   status: "uploading" | "completed" | "failed"
 }
 
-let apiBaseUrl = ""
-
 async function getApiBaseUrl(): Promise<string> {
-  if (apiBaseUrl) return apiBaseUrl
-  const response = await fetch("/aws-exports.json")
-  if (!response.ok) throw new Error("Failed to load API configuration")
-  const config = await response.json()
-  apiBaseUrl = config.apiBaseUrl || ""
-  return apiBaseUrl
+  try {
+    const config = await loadRuntimeConfig()
+    return config.apiBaseUrl || ""
+  } catch {
+    throw new Error("Failed to load API configuration")
+  }
 }
 
 export function validateFile(file: File): string | null {

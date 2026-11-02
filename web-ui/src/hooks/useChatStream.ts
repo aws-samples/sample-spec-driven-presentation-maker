@@ -17,6 +17,7 @@ import { useTranslations } from "next-intl"
 import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
 import { invokeAgentCore, stopRuntimeSession } from "@/services/agentCoreService"
+import { stopLocalAgent } from "@/services/localService"
 import type { ToolUse } from "@/components/chat/ChatMessage"
 import type { McpServerStatus } from "@/components/chat/McpStatusBar"
 import type { UploadedFile } from "@/services/uploadService"
@@ -119,12 +120,12 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const stopGeneration = useCallback(() => {
     abortControllerRef.current?.abort()
     if (IS_LOCAL) {
-      fetch("/api/agent/stop", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId }) }).catch((err) => notifyError("Failed to stop generation", err))
+      stopLocalAgent({ sessionId }).catch((err) => notifyError(t("errorStopGeneration"), err))
     } else {
       const token = auth.user?.access_token
       if (token) stopRuntimeSession(sessionId, token)
     }
-  }, [sessionId, auth.user?.access_token])
+  }, [sessionId, auth.user?.access_token, t])
 
   const sendMessage = useCallback(async (
     userMessage: string,
