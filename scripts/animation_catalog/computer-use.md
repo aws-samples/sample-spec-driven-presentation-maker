@@ -680,22 +680,53 @@ the XML: REQ-5.7 needs the relationship closure. This closes
 `animation.sound.effect`, `animation.sound.stopPreviousSound`,
 `transition.sound.effect` and `transition.sound.loopUntilNext`.
 
-## Step 5 — Timing: rewind, smooth start/end, bounce end
+## Step 5 — Timing: rewind, smooth start/end, bounce end — **2 of 4 MEASURED**
 
 All four are checkboxes, and **two of them default to on**, which inverts the
 usual capture: the value that writes bytes is the *cleared* one.
 
-| Setting | Control | Section | Default on a motion path |
-| --- | --- | --- | --- |
-| `smoothStart` | checkbox `Smooth Start` | `Effect Options` | **checked** |
-| `smoothEnd` | checkbox `Smooth End` | `Effect Options` | **checked** |
-| `bounceEnd` | checkbox `Bounce End` | `Effect Options` | cleared |
-| `rewind` | checkbox `Rewind when done playing` | `Timing` | cleared |
+| Setting | Control | Section | Default on a motion path | Measured form |
+| --- | --- | --- | --- | --- |
+| `smoothStart` | checkbox `Smooth Start` | `Effect Options` | **checked** | `p:cTn/@accel="50000"`; cleared, the attribute is **absent** |
+| `smoothEnd` | checkbox `Smooth End` | `Effect Options` | **checked** | `p:cTn/@decel="50000"`; cleared, the attribute is **absent** |
+| `bounceEnd` | checkbox `Bounce End` | `Effect Options` | cleared | not measured |
+| `rewind` | checkbox `Rewind when done playing` | `Timing` | cleared | not measured |
 
-So capture **both** states of each, not just the non-default one: a default-on
-setting's cleared state is what has to be identified on read-back. A fifth
-checkbox, `Auto-reverse` (cleared), sits beside them and has no catalog entry
-yet. This closes `animation.timing.{rewind,smoothStart,smoothEnd,bounceEnd}`.
+The two measured ones are **attributes on the effect's own `p:cTn`**, not
+behaviour children, and every one of the seven effects in the untouched deck
+carried both — so `50000` is the applied default rather than something that one
+effect had been given. Evidence:
+`tests/fixtures/animations/gui-only/timing-smoothness-2026-11-02/`.
+
+A fifth checkbox, `Auto-reverse` (cleared), sits beside them and has no catalog
+entry yet.
+
+### Saving costs the headless promise
+
+`File > Save` is readable on the menubar surface but its refs **cannot be
+pressed**: the snapshot resolves the app as `Microsoft PowerPoint` while the
+process owning the menubar reports `PowerPoint`, so a click returns
+`STALE_REF` on a `source_process_identity` mismatch — and `--app PowerPoint` is
+`APP_NOT_FOUND`, so neither spelling satisfies both sides. `cmd+s` is posted
+physically and goes to the focused app, so the window has to be focused first.
+Reading the pane stays headless; only the save does not.
+
+A landed toggle is also often reported as `TIMEOUT` (`ax_error -25204`) with
+`postcondition_satisfied: true`, so the error has to be read rather than
+trusted.
+
+### Why the other two are not measured: drive this pane from the driver
+
+Toggling `Bounce End` **removed every `p:timing` element from the slide**. The
+pane's `Delete` button sits beside these checkboxes, and refs on this pane were
+mis-resolving under memory pressure, so the likeliest cause is a ref landing on
+the wrong control rather than anything about Bounce End. Committed fixtures were
+unaffected — the damage was confined to a scratch deck.
+
+The lesson is about the route, not the value: a surface that can mis-resolve
+onto `Delete` should be driven through `gui_capture.py`, which attributes every
+press to the effect it changed and fails a target rather than silently altering
+a different one. Ad-hoc pressing measured two values and then cost a deck.
 
 Two neighbouring popups are already fully enumerated and need no discovery
 pass, only measurement:

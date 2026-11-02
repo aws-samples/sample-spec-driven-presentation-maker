@@ -2309,6 +2309,64 @@ def test_the_misspelled_chart_level_enumerator_is_kept_verbatim():
     assert {"chart by category", "chart by series", "chart by series elements"} <= enumerators
 
 
+def test_smooth_start_and_smooth_end_are_measured_as_ctn_attributes():
+    """Two of the four timing options are measured, and they are attributes.
+
+    The plan had them as behaviour-level settings to be captured like the other
+    133 effect options. They are neither: `Smooth Start` is `p:cTn/@accel` and
+    `Smooth End` is `p:cTn/@decel`, both on the effect's own node, and **both
+    are on by default** on a motion path. So the measurement that matters is
+    the *cleared* one — the attribute is simply absent — which is the opposite
+    of every other value in this feature.
+
+    All seven effects in the untouched deck carried both attributes, which is
+    what rules out "this one effect happened to have them".
+    """
+    measured = json.loads(
+        (
+            REPO_ROOT
+            / "tests/fixtures/animations/gui-only/timing-smoothness-2026-11-02"
+            / "timing-smoothness.json"
+        ).read_text()
+    )
+    assert measured["platform"] == "macOS"
+    assert measured["version"] == "16.113.1"
+
+    settings = measured["settings"]
+    assert set(settings) == {"animation.timing.smoothStart", "animation.timing.smoothEnd"}
+    for key, attribute in (
+        ("animation.timing.smoothStart", "accel"),
+        ("animation.timing.smoothEnd", "decel"),
+    ):
+        setting = settings[key]
+        assert setting["element"] == "p:cTn"
+        assert setting["attribute"] == attribute
+        assert setting["checkedValue"] == "50000"
+        assert setting["defaultChecked"] is True
+        # The evidence is the two saved forms, and the cleared one has to
+        # actually lack the attribute rather than carry it as 0.
+        assert f'{attribute}="50000"' in setting["evidence"]["checked"]
+        assert f"{attribute}=" not in setting["evidence"]["cleared"]
+
+    assert measured["defaultsAcrossEveryEffect"]["accel=50000"] == 7
+    assert measured["defaultsAcrossEveryEffect"]["decel=50000"] == 7
+
+    # The same deck independently confirms why an "as one object" build cannot
+    # be recovered: PowerPoint itself writes an attribute-free p:bldP per
+    # animated shape, which is the form that spelling would have to be read out
+    # of. See the one-way count test.
+    observed = measured["corroborationForTheEmptyBuildEntry"]["observed"]
+    assert len(observed) == 7
+    assert all(entry.startswith("<p:bldP spid=") and "build=" not in entry for entry in observed)
+
+    # What is not measured says so, rather than being absent and looking done.
+    assert set(measured["notMeasured"]) >= {
+        "animation.timing.bounceEnd",
+        "animation.timing.rewind",
+    }
+    assert any("Delete" in caveat for caveat in measured["methodCaveats"])
+
+
 def test_the_pane_settings_reading_records_a_route_with_no_dialog():
     """The after-effect, sound and timing settings are not behind a dialog here.
 
