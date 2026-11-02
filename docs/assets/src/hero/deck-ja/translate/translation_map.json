@@ -32,7 +32,7 @@
   "Try it in one command. Then ask your AI agent for slides, run sdpm webui to work in the browser, or deploy it on AWS for your team. The full install line is in the README.": "1 コマンドで試せます。あとは AI エージェントにスライドを頼むか、sdpm webui でブラウザから使うか、チーム向けに AWS にデプロイします。インストールの完全なコマンドは README にあります。",
   "{{bold:Try it in one command}}": "{{bold:1 コマンドで試す}}",
   "{{font=Menlo:{{#3BC59E:$}} curl -fsSL …/install.sh | bash}}": "",
-  "Then ask your AI agent, run {{font=Menlo,#EEF0F4:sdpm webui}}, or deploy on AWS.": "あとは AI エージェントに頼むか {{font=Menlo,#EEF0F4:sdpm webui}} を実行、または AWS にデプロイ。",
+  "Then ask your AI agent, run {{font=Menlo,#EEF0F4:sdpm webui}}, or deploy on AWS.": "あとは AI エージェントに頼むか {{font=Menlo,#EEF0F4:sdpm webui}} {{font=Hiragino Sans:を実行、または}} AWS にデプロイ。",
   "{{bold:Your AI agent}}": "{{bold:AI エージェント}}",
   "“Make slides about …”": "「スライドを作って」",
   "{{bold:Web UI}}": "",
