@@ -293,6 +293,10 @@ class CapabilityEntry:
     ooxml: Mapping[str, Any]
     semantic: Mapping[str, Any]
     group: str
+    #: Why a non-accepted entry cannot be generated. The catalog records it per
+    #: entry, so a refusal can name the authorable route instead of sending the
+    #: caller after a capture that would not help.
+    reason: str = ""
 
     @property
     def gap(self) -> str | None:
@@ -357,6 +361,7 @@ class CapabilityIndex:
                     ooxml=raw.get("ooxml") or {},
                     semantic=raw.get("semanticJson") or {},
                     group=group,
+                    reason=str(raw.get("reason") or ""),
                 )
                 bucket[entry.key] = entry
                 self._index_semantics(entry)
@@ -433,9 +438,10 @@ class CapabilityIndex:
         entry = self.entry(key)
         if entry is None:
             raise TimingWriteError(f"{what or key}: no catalog entry {key!r} exists")
-        if entry.status in {"rejected", "outOfScope"}:
+        if entry.status in {"rejected", "outOfScope", "nonPersisted"}:
             raise TimingWriteError(
                 f"{what or key}: catalog entry {key!r} is {entry.status} and cannot be generated"
+                + (f" ({entry.reason})" if entry.reason else "")
             )
         gap = entry.gap
         if gap is not None:
@@ -451,6 +457,15 @@ class CapabilityIndex:
             raise TimingWriteError(
                 f"unknown {category} animation effect {effect!r}; "
                 f"supported: {', '.join(self.preset_names(category)) or 'none'}"
+            )
+        if entry.status in {"rejected", "outOfScope", "nonPersisted"}:
+            # Not a capability gap: the entry names a selection surface or an
+            # absence, so no capture would make it writable. Say what it is and
+            # let the recorded reason point at the route that does work.
+            raise TimingWriteError(
+                f"{category} effect {effect!r}: catalog entry {entry.key!r} is {entry.status} "
+                f"and cannot be generated"
+                + (f" ({entry.reason})" if entry.reason else "")
             )
         gap = entry.gap
         if gap is not None:

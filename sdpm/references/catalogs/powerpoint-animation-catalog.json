@@ -224,16 +224,16 @@
     },
     "candidateTotal": 435,
     "candidateStatusCounts": {
-      "accepted": 387,
+      "accepted": 386,
       "rejected": 1,
-      "nonPersisted": 2,
+      "nonPersisted": 3,
       "outOfScope": 45
     },
     "guiItemTotal": 300,
     "guiItemStatusCounts": {
-      "accepted": 287,
+      "accepted": 285,
       "rejected": 0,
-      "nonPersisted": 11,
+      "nonPersisted": 13,
       "outOfScope": 2
     },
     "openQuestions": 4,
@@ -48044,58 +48044,9 @@
     },
     {
       "key": "animation.gallery.motionPath.custom",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "semanticJson": {
-        "animations": {
-          "mainSequence": [
-            {
-              "id": "catalogEffect",
-              "target": {
-                "element": "catalogTarget"
-              },
-              "preset": {
-                "category": "motionPath",
-                "effect": "custom"
-              },
-              "start": {
-                "type": "onPageClick",
-                "delayMs": 0
-              },
-              "timing": {
-                "durationMs": 500,
-                "repeatCount": 1,
-                "repeatDurationMs": null,
-                "autoReverse": false,
-                "acceleration": 0,
-                "deceleration": 0,
-                "restart": "always",
-                "rewind": false,
-                "smoothStart": false,
-                "smoothEnd": false,
-                "bounceEnd": 0
-              },
-              "afterEffect": {
-                "type": "none"
-              },
-              "sound": null
-            }
-          ],
-          "interactiveSequences": []
-        }
-      },
-      "ooxml": {
-        "strategy": "animMotion",
-        "element": "p:animMotion",
-        "pathAttribute": "p:animMotion/@path",
-        "requiresCapture": true,
-        "gap": "PowerPoint carries preset motion paths as literal SVG path data in p:animMotion/@path; that geometry is not present in the available evidence, so the writer must emit a custom path or defer until Task 8 captures it"
-      },
-      "evidence": {
-        "source": "Animations ribbon gallery, Motion Paths group",
-        "commit": null
-      },
-      "verification": "powerPointReadBackRequired"
+      "status": "nonPersisted",
+      "reason": "the Custom group is a selection surface for the four Draw tools, whose geometry is drawn rather than preset; a drawn path persists through a motion behaviour carrying it as p:animMotion/@path, so no fixed geometry belongs to this key",
+      "verification": "deterministic"
     },
     {
       "key": "animation.gallery.motionPath.invertedShape",
@@ -50318,56 +50269,9 @@
     },
     {
       "key": "animation.start.none",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "semanticJson": {
-        "animations": {
-          "mainSequence": [
-            {
-              "id": "catalogEffect",
-              "target": {
-                "element": "catalogTarget"
-              },
-              "preset": {
-                "category": "entrance",
-                "effect": "fade"
-              },
-              "start": {
-                "type": "none",
-                "delayMs": 0
-              },
-              "timing": {
-                "durationMs": 500,
-                "repeatCount": 1,
-                "repeatDurationMs": null,
-                "autoReverse": false,
-                "acceleration": 0,
-                "deceleration": 0,
-                "restart": "always",
-                "rewind": false,
-                "smoothStart": false,
-                "smoothEnd": false,
-                "bounceEnd": 0
-              },
-              "afterEffect": {
-                "type": "none"
-              },
-              "sound": null
-            }
-          ],
-          "interactiveSequences": []
-        }
-      },
-      "ooxml": {
-        "strategy": "timingNode",
-        "nodeType": null,
-        "gap": "msoAnimTriggerNone reports an effect with no trigger; the persisted form is the absence of a start condition and is not captured here"
-      },
-      "evidence": {
-        "source": "ECMA-376 ST_TLTimeNodeType",
-        "commit": null
-      },
-      "verification": "powerPointReadBackRequired"
+      "status": "nonPersisted",
+      "reason": "msoAnimTriggerNone reports an effect with no trigger; its persisted form is the absence of a start condition, so PowerPoint writes no p:cond and sdpm has no value to author",
+      "verification": "deterministic"
     },
     {
       "key": "animation.start.onPageClick",
@@ -85004,57 +84908,9 @@
     },
     {
       "key": "MsoAnimTriggerType.no trigger",
-      "status": "accepted",
-      "capabilityLevel": "semanticPreservationOnly",
-      "semanticJson": {
-        "animations": {
-          "mainSequence": [
-            {
-              "id": "catalogEffect",
-              "target": {
-                "element": "catalogTarget"
-              },
-              "preset": {
-                "category": "entrance",
-                "effect": "fade"
-              },
-              "start": {
-                "type": "none",
-                "delayMs": 0
-              },
-              "timing": {
-                "durationMs": 500,
-                "repeatCount": 1,
-                "repeatDurationMs": null,
-                "autoReverse": false,
-                "acceleration": 0,
-                "deceleration": 0,
-                "restart": "always",
-                "rewind": false,
-                "smoothStart": false,
-                "smoothEnd": false,
-                "bounceEnd": 0
-              },
-              "afterEffect": {
-                "type": "none"
-              },
-              "sound": null
-            }
-          ],
-          "interactiveSequences": []
-        }
-      },
-      "ooxml": {
-        "strategy": "timingNode",
-        "nodeType": null,
-        "requiresCapture": true,
-        "gap": "msoAnimTriggerNone reports an effect with no trigger; its persisted form is not captured here"
-      },
-      "evidence": {
-        "source": "ECMA-376 ST_TLTimeNodeType",
-        "commit": null
-      },
-      "verification": "powerPointReadBackRequired",
+      "status": "nonPersisted",
+      "reason": "msoAnimTriggerNone reports an effect with no trigger; its persisted form is the absence of a start condition, so PowerPoint writes no p:cond and sdpm has no value to author",
+      "verification": "deterministic",
       "guiKey": "animation.start.none",
       "enum": "MsoAnimTriggerType",
       "enumerator": "no trigger",

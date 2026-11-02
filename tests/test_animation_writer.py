@@ -89,7 +89,11 @@ NS = {
 CATALOG_COVERAGE = {
     # 674, not 667: the 7 Complex motion paths are new catalog entries, and they
     # generate rather than refuse because the capture measured their geometry.
-    "total": 674,
+    # 671, not 674: three keys left the accepted set for `nonPersisted` — two
+    # "no trigger" spellings and the Custom motion-path group — because each
+    # names an absence or a selection surface rather than a value, so coverage
+    # has nothing to generate or refuse for them.
+    "total": 671,
     "generated": {
         # Each +7 is the Complex motion paths: new guiItems entries that
         # generate because their geometry was measured rather than inferred.
@@ -103,10 +107,10 @@ CATALOG_COVERAGE = {
         "transition": 217,
     },
     "refused": {
-        "total": 207,
-        "guiItems": 62,
-        "candidates": 145,
-        "animation": 204,
+        "total": 204,
+        "guiItems": 60,
+        "candidates": 144,
+        "animation": 201,
         "transition": 3,
     },
     "generatedDespiteGap": [
@@ -126,7 +130,7 @@ CATALOG_COVERAGE = {
     #: behavior *payload* was never captured. The payload slice is down from 121
     #: to 11 and holds no gallery tile at all — only enum candidates whose own
     #: mapping is open, so they resolve to no measured tile.
-    "captureRequiredRefusals": 196,
+    "captureRequiredRefusals": 193,
     "payloadRefusals": {"total": 11, "guiItems": 0, "candidates": 11},
 }
 
@@ -2016,6 +2020,10 @@ def test_the_capture_records_a_build_list_only_for_shape_level_tiles(index, cata
     for entry in catalog["guiItems"]:
         if not entry["key"].startswith("animation.gallery."):
             continue
+        if entry["status"] != "accepted":
+            # The Custom motion-path group carries no OOXML at all: it is a
+            # selection surface for the Draw tools, not a preset.
+            continue
         category = entry["key"].split(".")[2]
         if "buildList" in entry["ooxml"]:
             assert entry["ooxml"]["buildList"] == "p:bldP/@animBg=1"
@@ -2023,9 +2031,10 @@ def test_the_capture_records_a_build_list_only_for_shape_level_tiles(index, cata
         else:
             missing.append(category)
     assert len(recorded) == 95 and set(recorded) == {"entrance", "emphasis", "exit"}
-    # 13 motion paths, not 6: a build list belongs to a shape-level tile, and the
-    # 7 Complex paths joined the 6 that already had none.
-    assert sorted(missing) == ["media"] * 3 + ["motionPath"] * 13
+    # 12 motion paths: a build list belongs to a shape-level tile, and the 7
+    # Complex paths joined the 5 Basic ones that already had none. Custom is
+    # not among them — it carries no OOXML at all and is skipped above.
+    assert sorted(missing) == ["media"] * 3 + ["motionPath"] * 12
     assert index.entry("animation.gallery.entrance.fade").ooxml["buildList"] == "p:bldP/@animBg=1"
 
 
@@ -3091,19 +3100,20 @@ def test_generate_fails_on_a_capability_gap_instead_of_warning(tmp_path):
 
     deck = _deck(tmp_path, animations=True, transitions=False)
     slide = json.loads((deck / "slides" / "motion.json").read_text(encoding="utf-8"))
-    # Was Fly In, which the GUI capture measured and the writer now emits. A
-    # custom motion path is still capture-required — its geometry comes from the
-    # author, not from a preset — so it is what the refusal is tested through.
+    # Was Fly In, which the GUI capture measured and the writer now emits, then
+    # the Custom motion path, which stopped being a capability gap when the
+    # catalog recorded it as a selection surface rather than a preset. Media
+    # Stop is a real one: its presetID is genuinely unmeasured, because the
+    # capture deck has no media object to apply it to.
     slide["animations"]["mainSequence"][0]["preset"] = {
-        "category": "motionPath",
-        "effect": "custom",
-        "variant": None,
+        "category": "media",
+        "effect": "mediaStop",
     }
     (deck / "slides" / "motion.json").write_text(json.dumps(slide), encoding="utf-8")
     output = tmp_path / "gapped.pptx"
     with pytest.raises(CapabilityGapError) as error:
         generate(deck, output_path=output)
-    assert error.value.key == "animation.gallery.motionPath.custom"
+    assert error.value.key == "animation.gallery.media.mediaStop"
     assert not output.exists(), "no package is published for a refused effect"
 
 

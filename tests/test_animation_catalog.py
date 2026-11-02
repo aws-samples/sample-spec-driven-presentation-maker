@@ -377,6 +377,14 @@ def test_every_trigger_type_is_accounted(catalog):
     entries = [entry for entry in catalog["candidates"] if entry["enum"] == "MsoAnimTriggerType"]
     triggers = set()
     for entry in entries:
+        if entry["status"] == "nonPersisted":
+            # msoAnimTriggerNone reports an absence, so it has no example to
+            # read a trigger type out of. It is still accounted for here, by
+            # its status rather than by a value.
+            assert entry["key"].endswith("no trigger")
+            assert "absence of a start condition" in entry["reason"]
+            triggers.add("none")
+            continue
         animations = entry["semanticJson"]["animations"]
         sequences = animations["interactiveSequences"]
         triggers.add(

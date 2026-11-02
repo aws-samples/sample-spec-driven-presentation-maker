@@ -1064,7 +1064,11 @@ class TestPlanDerivation:
 
     def test_the_other_deferrals_each_say_why(self, real_plan):
         reasons = {entry["key"]: entry["reason"] for entry in real_plan["deferredTargets"]}
-        assert "drawn on the canvas" in reasons["animation.gallery.motionPath.custom"]
+        # `animation.gallery.motionPath.custom` used to be deferred here. It is
+        # no longer a target at all: the Custom group is a selection surface
+        # for the four Draw tools, so the catalog records it nonPersisted and a
+        # capture has nothing to aim at.
+        assert "animation.gallery.motionPath.custom" not in reasons
         assert "media object" in reasons["animation.gallery.media.mediaStop"]
         assert "effect dialog" in reasons["animation.afterAnimation.dim"]
         assert all(reasons.values())
@@ -1074,7 +1078,9 @@ class TestPlanDerivation:
         # computer-use.md Steps 3 to 5 are exactly these, and none carries requiresCapture.
         assert "animation.timing.rewind" in keys
         assert "animation.sound.effect" in keys
-        assert "animation.start.none" in keys
+        # `animation.start.none` was listed here until the catalog stopped
+        # treating an absent start condition as a value awaiting measurement.
+        assert "animation.start.none" not in keys
         assert all(entry["gap"] for entry in real_plan["gapsWithoutCaptureFlag"])
 
     def test_no_target_is_outside_the_gui_namespaces(self, real_plan):

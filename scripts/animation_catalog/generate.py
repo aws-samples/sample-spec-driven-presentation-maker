@@ -1806,6 +1806,20 @@ def gui_items() -> list[dict[str, Any]]:
         ))
 
     for group in MOTION_PATH_GROUPS:
+        if group == "custom":
+            # Custom is not one path. It is the popup's four Draw tools, whose
+            # geometry the user draws on the canvas, so there is no fixed value
+            # for a capture to record — capturing one drawing would catalog
+            # that drawing, not the tile. The drawn path is authorable and does
+            # persist, through a `motion` behaviour whose `path` sdpm writes
+            # verbatim; it just does not belong to this preset key.
+            items.append(_unaccepted(
+                f"animation.gallery.motionPath.{group}", "nonPersisted",
+                "the Custom group is a selection surface for the four Draw tools, whose geometry is drawn "
+                "rather than preset; a drawn path persists through a motion behaviour carrying it as "
+                "p:animMotion/@path, so no fixed geometry belongs to this key",
+            ))
+            continue
         items.append(_accepted(
             f"animation.gallery.motionPath.{group}", SEMANTIC,
             {"strategy": "animMotion", "element": "p:animMotion", "pathAttribute": "p:animMotion/@path",
@@ -1840,14 +1854,22 @@ def enum_value_items(sdef_enums: dict[str, list[tuple[str, str]]]) -> list[dict[
     items: list[dict[str, Any]] = []
 
     for name, (semantic, node_type, level) in TRIGGER_MAP.items():
-        ooxml = {"strategy": "timingNode", "nodeType": node_type}
         if node_type is None:
-            ooxml["gap"] = (
-                "msoAnimTriggerNone reports an effect with no trigger; the persisted form is the absence of "
-                "a start condition and is not captured here"
-            )
+            # Exactly parallel to ``animation.behavior.none``: the enumerator
+            # reports an absence, not a value. There is no start condition in
+            # the package to measure, so filing it as awaiting a capture asks
+            # PowerPoint to produce the bytes of a thing that has none. An
+            # effect with no start condition also never plays, so there is
+            # nothing for sdpm to author either.
+            items.append(_unaccepted(
+                f"animation.start.{semantic}", "nonPersisted",
+                "msoAnimTriggerNone reports an effect with no trigger; its persisted form is the absence of "
+                "a start condition, so PowerPoint writes no p:cond and sdpm has no value to author",
+            ))
+            continue
         items.append(_accepted(
-            f"animation.start.{semantic}", level, ooxml,
+            f"animation.start.{semantic}", level,
+            {"strategy": "timingNode", "nodeType": node_type},
             trigger_semantic(semantic),
             native_evidence("05-fly-in", "animations/entrance") if level == NATIVE
             else {"source": "ECMA-376 ST_TLTimeNodeType", "commit": None},
@@ -3305,19 +3327,25 @@ def candidate_entries(sdef_enums: dict[str, list[tuple[str, str]]],
                 )
             elif enum_name == "MsoAnimTriggerType":
                 semantic, node_type, level = TRIGGER_MAP[enumerator]
-                ooxml = {"strategy": "timingNode", "nodeType": node_type}
                 if node_type is None:
-                    ooxml["requiresCapture"] = True
-                    ooxml["gap"] = (
-                        "msoAnimTriggerNone reports an effect with no trigger; its persisted form is not "
-                        "captured here"
+                    # See the matching branch in enum_value_items: an absence
+                    # is not a value awaiting measurement.
+                    entry = _unaccepted(
+                        key, "nonPersisted",
+                        "msoAnimTriggerNone reports an effect with no trigger; its persisted form is the "
+                        "absence of a start condition, so PowerPoint writes no p:cond and sdpm has no value "
+                        "to author",
+                        guiKey=f"animation.start.{semantic}",
                     )
-                entry = _accepted(
-                    key, level, ooxml, trigger_semantic(semantic),
-                    native_evidence("05-fly-in", "animations/entrance") if level == NATIVE
-                    else {"source": "ECMA-376 ST_TLTimeNodeType", "commit": None},
-                    guiKey=f"animation.start.{semantic}",
-                )
+                else:
+                    entry = _accepted(
+                        key, level,
+                        {"strategy": "timingNode", "nodeType": node_type},
+                        trigger_semantic(semantic),
+                        native_evidence("05-fly-in", "animations/entrance") if level == NATIVE
+                        else {"source": "ECMA-376 ST_TLTimeNodeType", "commit": None},
+                        guiKey=f"animation.start.{semantic}",
+                    )
             elif enum_name == "MsoAnimateByLevel":
                 semantic, element, attrs, level = LEVEL_MAP[enumerator]
                 entry = _accepted(

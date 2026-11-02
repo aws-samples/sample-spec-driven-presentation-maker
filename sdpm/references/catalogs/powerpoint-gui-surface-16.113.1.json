@@ -17,42 +17,42 @@
     {
       "enum": "MsoAnimEffect",
       "expectedCount": 150,
-      "guiSurface": "Animations tab ▸ Animation gallery and Add Animation ▸ More … Effects dialogs"
+      "guiSurface": "Animations tab \u25b8 Animation gallery and Add Animation \u25b8 More \u2026 Effects dialogs"
     },
     {
       "enum": "MsoAnimDirection",
       "expectedCount": 45,
-      "guiSurface": "Animations tab ▸ Effect Options ▸ Direction"
+      "guiSurface": "Animations tab \u25b8 Effect Options \u25b8 Direction"
     },
     {
       "enum": "MsoAnimTriggerType",
       "expectedCount": 5,
-      "guiSurface": "Animations tab ▸ Start"
+      "guiSurface": "Animations tab \u25b8 Start"
     },
     {
       "enum": "MsoAnimateByLevel",
       "expectedCount": 12,
-      "guiSurface": "Effect Options ▸ Text Animation / Chart Animation ▸ Group"
+      "guiSurface": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group"
     },
     {
       "enum": "MsoAnimTextUnitEffect",
       "expectedCount": 3,
-      "guiSurface": "Effect Options ▸ Effect ▸ Animate text"
+      "guiSurface": "Effect Options \u25b8 Effect \u25b8 Animate text"
     },
     {
       "enum": "MsoAnimAfterEffect",
       "expectedCount": 4,
-      "guiSurface": "Effect Options ▸ Effect ▸ After animation"
+      "guiSurface": "Effect Options \u25b8 Effect \u25b8 After animation"
     },
     {
       "enum": "MsoAnimType",
       "expectedCount": 9,
-      "guiSurface": "Animation Pane ▸ behaviour primitives"
+      "guiSurface": "Animation Pane \u25b8 behaviour primitives"
     },
     {
       "enum": "EPPEntryEffect",
       "expectedCount": 207,
-      "guiSurface": "Transitions tab ▸ Transition to This Slide gallery and Effect Options"
+      "guiSurface": "Transitions tab \u25b8 Transition to This Slide gallery and Effect Options"
     }
   ],
   "supplementaryEnums": [
@@ -126,7 +126,7 @@
   "items": [
     {
       "key": "animation.addAnimation.customBehavior",
-      "control": "Animation Pane ▸ custom behaviour primitives",
+      "control": "Animation Pane \u25b8 custom behaviour primitives",
       "value": "customBehavior",
       "surface": "Animation Pane",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -136,7 +136,7 @@
     },
     {
       "key": "animation.afterAnimation.dim",
-      "control": "Effect Options ▸ Effect ▸ After animation",
+      "control": "Effect Options \u25b8 Effect \u25b8 After animation",
       "value": "dim",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -146,7 +146,7 @@
     },
     {
       "key": "animation.afterAnimation.dimColor",
-      "control": "Effect Options ▸ Effect ▸ After animation colour picker",
+      "control": "Effect Options \u25b8 Effect \u25b8 After animation colour picker",
       "value": "dimColor",
       "surface": "dialog colour picker",
       "sourceEvidence": "PowerPoint 16.113.1 Effect Options dialog inspection",
@@ -156,7 +156,7 @@
     },
     {
       "key": "animation.afterAnimation.hide",
-      "control": "Effect Options ▸ Effect ▸ After animation",
+      "control": "Effect Options \u25b8 Effect \u25b8 After animation",
       "value": "hide",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -166,7 +166,7 @@
     },
     {
       "key": "animation.afterAnimation.hideOnNextClick",
-      "control": "Effect Options ▸ Effect ▸ After animation",
+      "control": "Effect Options \u25b8 Effect \u25b8 After animation",
       "value": "hideOnNextClick",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -176,7 +176,7 @@
     },
     {
       "key": "animation.afterAnimation.none",
-      "control": "Effect Options ▸ Effect ▸ After animation",
+      "control": "Effect Options \u25b8 Effect \u25b8 After animation",
       "value": "none",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -186,7 +186,7 @@
     },
     {
       "key": "animation.animationPainter",
-      "control": "Animations tab ▸ Animation Painter",
+      "control": "Animations tab \u25b8 Animation Painter",
       "value": "animationPainter",
       "surface": "ribbon command",
       "sourceEvidence": "ribbon inspection",
@@ -196,7 +196,7 @@
     },
     {
       "key": "animation.behavior.color",
-      "control": "Animation Pane ▸ behaviour primitive",
+      "control": "Animation Pane \u25b8 behaviour primitive",
       "value": "color",
       "surface": "advanced timeline value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -206,7 +206,7 @@
     },
     {
       "key": "animation.behavior.command",
-      "control": "Animation Pane ▸ behaviour primitive",
+      "control": "Animation Pane \u25b8 behaviour primitive",
       "value": "command",
       "surface": "advanced timeline value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -216,7 +216,7 @@
     },
     {
       "key": "animation.behavior.filter",
-      "control": "Animation Pane ▸ behaviour primitive",
+      "control": "Animation Pane \u25b8 behaviour primitive",
       "value": "filter",
       "surface": "advanced timeline value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -226,7 +226,7 @@
     },
     {
       "key": "animation.behavior.motion",
-      "control": "Animation Pane ▸ behaviour primitive",
+      "control": "Animation Pane \u25b8 behaviour primitive",
       "value": "motion",
       "surface": "advanced timeline value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -236,7 +236,7 @@
     },
     {
       "key": "animation.behavior.none",
-      "control": "Animation Pane ▸ behaviour primitive ▸ none",
+      "control": "Animation Pane \u25b8 behaviour primitive \u25b8 none",
       "value": "none",
       "surface": "advanced timeline value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -246,7 +246,7 @@
     },
     {
       "key": "animation.behavior.property",
-      "control": "Animation Pane ▸ behaviour primitive",
+      "control": "Animation Pane \u25b8 behaviour primitive",
       "value": "property",
       "surface": "advanced timeline value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -256,7 +256,7 @@
     },
     {
       "key": "animation.behavior.rotation",
-      "control": "Animation Pane ▸ behaviour primitive",
+      "control": "Animation Pane \u25b8 behaviour primitive",
       "value": "rotation",
       "surface": "advanced timeline value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -266,7 +266,7 @@
     },
     {
       "key": "animation.behavior.scale",
-      "control": "Animation Pane ▸ behaviour primitive",
+      "control": "Animation Pane \u25b8 behaviour primitive",
       "value": "scale",
       "surface": "advanced timeline value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -276,7 +276,7 @@
     },
     {
       "key": "animation.behavior.set",
-      "control": "Animation Pane ▸ behaviour primitive",
+      "control": "Animation Pane \u25b8 behaviour primitive",
       "value": "set",
       "surface": "advanced timeline value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -286,7 +286,7 @@
     },
     {
       "key": "animation.effectOptions.direction.across",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "across",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -296,7 +296,7 @@
     },
     {
       "key": "animation.effectOptions.direction.bottom",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "bottom",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -306,7 +306,7 @@
     },
     {
       "key": "animation.effectOptions.direction.bottomLeft",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "bottomLeft",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -316,7 +316,7 @@
     },
     {
       "key": "animation.effectOptions.direction.bottomRight",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "bottomRight",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -326,7 +326,7 @@
     },
     {
       "key": "animation.effectOptions.direction.center",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "center",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -336,7 +336,7 @@
     },
     {
       "key": "animation.effectOptions.direction.clockwise",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "clockwise",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -346,7 +346,7 @@
     },
     {
       "key": "animation.effectOptions.direction.counterclockwise",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "counterclockwise",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -356,7 +356,7 @@
     },
     {
       "key": "animation.effectOptions.direction.cycleClockwise",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "cycleClockwise",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -366,7 +366,7 @@
     },
     {
       "key": "animation.effectOptions.direction.cycleCounterclockwise",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "cycleCounterclockwise",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -376,7 +376,7 @@
     },
     {
       "key": "animation.effectOptions.direction.down",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "down",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -386,7 +386,7 @@
     },
     {
       "key": "animation.effectOptions.direction.downLeft",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "downLeft",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -396,7 +396,7 @@
     },
     {
       "key": "animation.effectOptions.direction.downRight",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "downRight",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -406,7 +406,7 @@
     },
     {
       "key": "animation.effectOptions.direction.fontAllCaps",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "fontAllCaps",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -416,7 +416,7 @@
     },
     {
       "key": "animation.effectOptions.direction.fontBold",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "fontBold",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -426,7 +426,7 @@
     },
     {
       "key": "animation.effectOptions.direction.fontItalic",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "fontItalic",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -436,7 +436,7 @@
     },
     {
       "key": "animation.effectOptions.direction.fontShadow",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "fontShadow",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -446,7 +446,7 @@
     },
     {
       "key": "animation.effectOptions.direction.fontStrikethrough",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "fontStrikethrough",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -456,7 +456,7 @@
     },
     {
       "key": "animation.effectOptions.direction.fontUnderline",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "fontUnderline",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -466,7 +466,7 @@
     },
     {
       "key": "animation.effectOptions.direction.gradual",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "gradual",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -476,7 +476,7 @@
     },
     {
       "key": "animation.effectOptions.direction.horizontal",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "horizontal",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -486,7 +486,7 @@
     },
     {
       "key": "animation.effectOptions.direction.horizontalIn",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "horizontalIn",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -496,7 +496,7 @@
     },
     {
       "key": "animation.effectOptions.direction.horizontalOut",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "horizontalOut",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -506,7 +506,7 @@
     },
     {
       "key": "animation.effectOptions.direction.inBottom",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "inBottom",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -516,7 +516,7 @@
     },
     {
       "key": "animation.effectOptions.direction.inCenter",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "inCenter",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -526,7 +526,7 @@
     },
     {
       "key": "animation.effectOptions.direction.inSlightly",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "inSlightly",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -536,7 +536,7 @@
     },
     {
       "key": "animation.effectOptions.direction.instant",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "instant",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -546,7 +546,7 @@
     },
     {
       "key": "animation.effectOptions.direction.inward",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "inward",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -556,7 +556,7 @@
     },
     {
       "key": "animation.effectOptions.direction.left",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "left",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -566,7 +566,7 @@
     },
     {
       "key": "animation.effectOptions.direction.noDirection",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "noDirection",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -576,7 +576,7 @@
     },
     {
       "key": "animation.effectOptions.direction.ordinalMask",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "ordinalMask",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -586,7 +586,7 @@
     },
     {
       "key": "animation.effectOptions.direction.out",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "out",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -596,7 +596,7 @@
     },
     {
       "key": "animation.effectOptions.direction.outBottom",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "outBottom",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -606,7 +606,7 @@
     },
     {
       "key": "animation.effectOptions.direction.outCenter",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "outCenter",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -616,7 +616,7 @@
     },
     {
       "key": "animation.effectOptions.direction.outSlightly",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "outSlightly",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -626,7 +626,7 @@
     },
     {
       "key": "animation.effectOptions.direction.right",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "right",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -636,7 +636,7 @@
     },
     {
       "key": "animation.effectOptions.direction.slightly",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "slightly",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -646,7 +646,7 @@
     },
     {
       "key": "animation.effectOptions.direction.top",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "top",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -656,7 +656,7 @@
     },
     {
       "key": "animation.effectOptions.direction.topLeft",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "topLeft",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -666,7 +666,7 @@
     },
     {
       "key": "animation.effectOptions.direction.topRight",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "topRight",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -676,7 +676,7 @@
     },
     {
       "key": "animation.effectOptions.direction.up",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "up",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -686,7 +686,7 @@
     },
     {
       "key": "animation.effectOptions.direction.upLeft",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "upLeft",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -696,7 +696,7 @@
     },
     {
       "key": "animation.effectOptions.direction.upRight",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "upRight",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -706,7 +706,7 @@
     },
     {
       "key": "animation.effectOptions.direction.vertical",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "vertical",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -716,7 +716,7 @@
     },
     {
       "key": "animation.effectOptions.direction.verticalIn",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "verticalIn",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -726,7 +726,7 @@
     },
     {
       "key": "animation.effectOptions.direction.verticalOut",
-      "control": "Animations tab ▸ Effect Options ▸ Direction",
+      "control": "Animations tab \u25b8 Effect Options \u25b8 Direction",
       "value": "verticalOut",
       "surface": "ribbon menu value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -736,7 +736,7 @@
     },
     {
       "key": "animation.gallery.emphasis.blink",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "blink",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -746,7 +746,7 @@
     },
     {
       "key": "animation.gallery.emphasis.boldFlash",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "boldFlash",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -756,7 +756,7 @@
     },
     {
       "key": "animation.gallery.emphasis.boldReveal",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "boldReveal",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -766,7 +766,7 @@
     },
     {
       "key": "animation.gallery.emphasis.brushColor",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "brushColor",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -776,7 +776,7 @@
     },
     {
       "key": "animation.gallery.emphasis.colorPulse",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "colorPulse",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -786,7 +786,7 @@
     },
     {
       "key": "animation.gallery.emphasis.complementaryColor",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "complementaryColor",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -796,7 +796,7 @@
     },
     {
       "key": "animation.gallery.emphasis.complementaryColor2",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "complementaryColor2",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -806,7 +806,7 @@
     },
     {
       "key": "animation.gallery.emphasis.contrastingColor",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "contrastingColor",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -816,7 +816,7 @@
     },
     {
       "key": "animation.gallery.emphasis.darken",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "darken",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -826,7 +826,7 @@
     },
     {
       "key": "animation.gallery.emphasis.desaturate",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "desaturate",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -836,7 +836,7 @@
     },
     {
       "key": "animation.gallery.emphasis.fillColor",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "fillColor",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -846,7 +846,7 @@
     },
     {
       "key": "animation.gallery.emphasis.fontColor",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "fontColor",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -856,7 +856,7 @@
     },
     {
       "key": "animation.gallery.emphasis.growShrink",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "growShrink",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -866,7 +866,7 @@
     },
     {
       "key": "animation.gallery.emphasis.growWithColor",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "growWithColor",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -876,7 +876,7 @@
     },
     {
       "key": "animation.gallery.emphasis.lighten",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "lighten",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -886,7 +886,7 @@
     },
     {
       "key": "animation.gallery.emphasis.lineColor",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "lineColor",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -896,7 +896,7 @@
     },
     {
       "key": "animation.gallery.emphasis.objectColor",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "objectColor",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -906,7 +906,7 @@
     },
     {
       "key": "animation.gallery.emphasis.pulse",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "pulse",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -916,7 +916,7 @@
     },
     {
       "key": "animation.gallery.emphasis.shimmer",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "shimmer",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -926,7 +926,7 @@
     },
     {
       "key": "animation.gallery.emphasis.spin",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "spin",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -936,7 +936,7 @@
     },
     {
       "key": "animation.gallery.emphasis.teeter",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "teeter",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -946,7 +946,7 @@
     },
     {
       "key": "animation.gallery.emphasis.transparency",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "transparency",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -956,7 +956,7 @@
     },
     {
       "key": "animation.gallery.emphasis.underline",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "underline",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -966,7 +966,7 @@
     },
     {
       "key": "animation.gallery.emphasis.wave",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "wave",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -976,7 +976,7 @@
     },
     {
       "key": "animation.gallery.entrance.appear",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "appear",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -986,7 +986,7 @@
     },
     {
       "key": "animation.gallery.entrance.basicSwivel",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "basicSwivel",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -996,7 +996,7 @@
     },
     {
       "key": "animation.gallery.entrance.basicZoom",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "basicZoom",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1006,7 +1006,7 @@
     },
     {
       "key": "animation.gallery.entrance.blinds",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "blinds",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1016,7 +1016,7 @@
     },
     {
       "key": "animation.gallery.entrance.boomerang",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "boomerang",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1026,7 +1026,7 @@
     },
     {
       "key": "animation.gallery.entrance.bounce",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "bounce",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1036,7 +1036,7 @@
     },
     {
       "key": "animation.gallery.entrance.centerRevolve",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "centerRevolve",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1046,7 +1046,7 @@
     },
     {
       "key": "animation.gallery.entrance.checkerboard",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "checkerboard",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1056,7 +1056,7 @@
     },
     {
       "key": "animation.gallery.entrance.credits",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "credits",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1066,7 +1066,7 @@
     },
     {
       "key": "animation.gallery.entrance.curveUp",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "curveUp",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1076,7 +1076,7 @@
     },
     {
       "key": "animation.gallery.entrance.dissolveIn",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "dissolveIn",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1086,7 +1086,7 @@
     },
     {
       "key": "animation.gallery.entrance.drop",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "drop",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1096,7 +1096,7 @@
     },
     {
       "key": "animation.gallery.entrance.expand",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "expand",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1106,7 +1106,7 @@
     },
     {
       "key": "animation.gallery.entrance.fade",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "fade",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1116,7 +1116,7 @@
     },
     {
       "key": "animation.gallery.entrance.flip",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "flip",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1126,7 +1126,7 @@
     },
     {
       "key": "animation.gallery.entrance.float",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "float",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1136,7 +1136,7 @@
     },
     {
       "key": "animation.gallery.entrance.floatIn",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "floatIn",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1146,7 +1146,7 @@
     },
     {
       "key": "animation.gallery.entrance.flyIn",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "flyIn",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1156,7 +1156,7 @@
     },
     {
       "key": "animation.gallery.entrance.growTurn",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "growTurn",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1166,7 +1166,7 @@
     },
     {
       "key": "animation.gallery.entrance.peekIn",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "peekIn",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1176,7 +1176,7 @@
     },
     {
       "key": "animation.gallery.entrance.pinwheel",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "pinwheel",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1186,7 +1186,7 @@
     },
     {
       "key": "animation.gallery.entrance.randomBars",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "randomBars",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1196,7 +1196,7 @@
     },
     {
       "key": "animation.gallery.entrance.riseUp",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "riseUp",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1206,7 +1206,7 @@
     },
     {
       "key": "animation.gallery.entrance.shape",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "shape",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1216,7 +1216,7 @@
     },
     {
       "key": "animation.gallery.entrance.spinner",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "spinner",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1226,7 +1226,7 @@
     },
     {
       "key": "animation.gallery.entrance.spiralIn",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "spiralIn",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1236,7 +1236,7 @@
     },
     {
       "key": "animation.gallery.entrance.split",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "split",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1246,7 +1246,7 @@
     },
     {
       "key": "animation.gallery.entrance.stretch",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "stretch",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1256,7 +1256,7 @@
     },
     {
       "key": "animation.gallery.entrance.strips",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "strips",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1266,7 +1266,7 @@
     },
     {
       "key": "animation.gallery.entrance.swivel",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "swivel",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1276,7 +1276,7 @@
     },
     {
       "key": "animation.gallery.entrance.wedge",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "wedge",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1286,7 +1286,7 @@
     },
     {
       "key": "animation.gallery.entrance.wheel",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "wheel",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1296,7 +1296,7 @@
     },
     {
       "key": "animation.gallery.entrance.whip",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "whip",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1306,7 +1306,7 @@
     },
     {
       "key": "animation.gallery.entrance.wipe",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "wipe",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1316,7 +1316,7 @@
     },
     {
       "key": "animation.gallery.entrance.zoom",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "zoom",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1326,7 +1326,7 @@
     },
     {
       "key": "animation.gallery.exit.basicSwivel",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "basicSwivel",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1336,7 +1336,7 @@
     },
     {
       "key": "animation.gallery.exit.basicZoom",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "basicZoom",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1346,7 +1346,7 @@
     },
     {
       "key": "animation.gallery.exit.blinds",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "blinds",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1356,7 +1356,7 @@
     },
     {
       "key": "animation.gallery.exit.boomerang",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "boomerang",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1366,7 +1366,7 @@
     },
     {
       "key": "animation.gallery.exit.bounce",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "bounce",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1376,7 +1376,7 @@
     },
     {
       "key": "animation.gallery.exit.centerRevolve",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "centerRevolve",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1386,7 +1386,7 @@
     },
     {
       "key": "animation.gallery.exit.checkerboard",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "checkerboard",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1396,7 +1396,7 @@
     },
     {
       "key": "animation.gallery.exit.collapse",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "collapse",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1406,7 +1406,7 @@
     },
     {
       "key": "animation.gallery.exit.contract",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "contract",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1416,7 +1416,7 @@
     },
     {
       "key": "animation.gallery.exit.credits",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "credits",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1426,7 +1426,7 @@
     },
     {
       "key": "animation.gallery.exit.curveDown",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "curveDown",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1436,7 +1436,7 @@
     },
     {
       "key": "animation.gallery.exit.disappear",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "disappear",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1446,7 +1446,7 @@
     },
     {
       "key": "animation.gallery.exit.dissolveOut",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "dissolveOut",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1456,7 +1456,7 @@
     },
     {
       "key": "animation.gallery.exit.drop",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "drop",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1466,7 +1466,7 @@
     },
     {
       "key": "animation.gallery.exit.fade",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "fade",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1476,7 +1476,7 @@
     },
     {
       "key": "animation.gallery.exit.flip",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "flip",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1486,7 +1486,7 @@
     },
     {
       "key": "animation.gallery.exit.float",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "float",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1496,7 +1496,7 @@
     },
     {
       "key": "animation.gallery.exit.floatOut",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "floatOut",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1506,7 +1506,7 @@
     },
     {
       "key": "animation.gallery.exit.flyOut",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "flyOut",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1516,7 +1516,7 @@
     },
     {
       "key": "animation.gallery.exit.peekOut",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "peekOut",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1526,7 +1526,7 @@
     },
     {
       "key": "animation.gallery.exit.pinwheel",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "pinwheel",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1536,7 +1536,7 @@
     },
     {
       "key": "animation.gallery.exit.randomBars",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "randomBars",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1546,7 +1546,7 @@
     },
     {
       "key": "animation.gallery.exit.shape",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "shape",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1556,7 +1556,7 @@
     },
     {
       "key": "animation.gallery.exit.shrinkTurn",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "shrinkTurn",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1566,7 +1566,7 @@
     },
     {
       "key": "animation.gallery.exit.sinkDown",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "sinkDown",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1576,7 +1576,7 @@
     },
     {
       "key": "animation.gallery.exit.spinner",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "spinner",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1586,7 +1586,7 @@
     },
     {
       "key": "animation.gallery.exit.spiralOut",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "spiralOut",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1596,7 +1596,7 @@
     },
     {
       "key": "animation.gallery.exit.split",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "split",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1606,7 +1606,7 @@
     },
     {
       "key": "animation.gallery.exit.stretchy",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "stretchy",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1616,7 +1616,7 @@
     },
     {
       "key": "animation.gallery.exit.strips",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "strips",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1626,7 +1626,7 @@
     },
     {
       "key": "animation.gallery.exit.swivel",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "swivel",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1636,7 +1636,7 @@
     },
     {
       "key": "animation.gallery.exit.wedge",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "wedge",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1646,7 +1646,7 @@
     },
     {
       "key": "animation.gallery.exit.wheel",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "wheel",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1656,7 +1656,7 @@
     },
     {
       "key": "animation.gallery.exit.whip",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "whip",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1666,7 +1666,7 @@
     },
     {
       "key": "animation.gallery.exit.wipe",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "wipe",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1676,7 +1676,7 @@
     },
     {
       "key": "animation.gallery.exit.zoom",
-      "control": "Animations tab ▸ Animation gallery",
+      "control": "Animations tab \u25b8 Animation gallery",
       "value": "zoom",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "one gallery effect per slide, saved, p:timing and p:bldLst copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1686,7 +1686,7 @@
     },
     {
       "key": "animation.gallery.media.mediaPause",
-      "control": "Animations tab ▸ Animation gallery (Media)",
+      "control": "Animations tab \u25b8 Animation gallery (Media)",
       "value": "mediaPause",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1) plus the native media timing capture (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1696,7 +1696,7 @@
     },
     {
       "key": "animation.gallery.media.mediaPlay",
-      "control": "Animations tab ▸ Animation gallery (Media)",
+      "control": "Animations tab \u25b8 Animation gallery (Media)",
       "value": "mediaPlay",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1) plus the native media timing capture (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1706,7 +1706,7 @@
     },
     {
       "key": "animation.gallery.media.mediaStop",
-      "control": "Animations tab ▸ Animation gallery (Media)",
+      "control": "Animations tab \u25b8 Animation gallery (Media)",
       "value": "mediaStop",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1) plus the native media timing capture (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -1716,7 +1716,7 @@
     },
     {
       "key": "animation.gallery.motionPath.arcs",
-      "control": "Animations tab ▸ Animation gallery (Motion Paths)",
+      "control": "Animations tab \u25b8 Animation gallery (Motion Paths)",
       "value": "arcs",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Animations ribbon inspection",
@@ -1726,7 +1726,7 @@
     },
     {
       "key": "animation.gallery.motionPath.bounce",
-      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "control": "Animations tab \u25b8 Path Animation \u25b8 Complex",
       "value": "bounce",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
@@ -1736,17 +1736,17 @@
     },
     {
       "key": "animation.gallery.motionPath.custom",
-      "control": "Animations tab ▸ Animation gallery (Motion Paths)",
+      "control": "Animations tab \u25b8 Animation gallery (Motion Paths)",
       "value": "custom",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Animations ribbon inspection",
-      "persisted": true,
+      "persisted": false,
       "verificationMethod": "powerPointReadBackRequired",
-      "status": "accepted"
+      "status": "nonPersisted"
     },
     {
       "key": "animation.gallery.motionPath.invertedShape",
-      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "control": "Animations tab \u25b8 Path Animation \u25b8 Complex",
       "value": "invertedShape",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
@@ -1756,7 +1756,7 @@
     },
     {
       "key": "animation.gallery.motionPath.lines",
-      "control": "Animations tab ▸ Animation gallery (Motion Paths)",
+      "control": "Animations tab \u25b8 Animation gallery (Motion Paths)",
       "value": "lines",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Animations ribbon inspection",
@@ -1766,7 +1766,7 @@
     },
     {
       "key": "animation.gallery.motionPath.loops",
-      "control": "Animations tab ▸ Animation gallery (Motion Paths)",
+      "control": "Animations tab \u25b8 Animation gallery (Motion Paths)",
       "value": "loops",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Animations ribbon inspection",
@@ -1776,7 +1776,7 @@
     },
     {
       "key": "animation.gallery.motionPath.shapes",
-      "control": "Animations tab ▸ Animation gallery (Motion Paths)",
+      "control": "Animations tab \u25b8 Animation gallery (Motion Paths)",
       "value": "shapes",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Animations ribbon inspection",
@@ -1786,7 +1786,7 @@
     },
     {
       "key": "animation.gallery.motionPath.specialCurve",
-      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "control": "Animations tab \u25b8 Path Animation \u25b8 Complex",
       "value": "specialCurve",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
@@ -1796,7 +1796,7 @@
     },
     {
       "key": "animation.gallery.motionPath.specialShape",
-      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "control": "Animations tab \u25b8 Path Animation \u25b8 Complex",
       "value": "specialShape",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
@@ -1806,7 +1806,7 @@
     },
     {
       "key": "animation.gallery.motionPath.spiral",
-      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "control": "Animations tab \u25b8 Path Animation \u25b8 Complex",
       "value": "spiral",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
@@ -1816,7 +1816,7 @@
     },
     {
       "key": "animation.gallery.motionPath.star",
-      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "control": "Animations tab \u25b8 Path Animation \u25b8 Complex",
       "value": "star",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
@@ -1826,7 +1826,7 @@
     },
     {
       "key": "animation.gallery.motionPath.turns",
-      "control": "Animations tab ▸ Animation gallery (Motion Paths)",
+      "control": "Animations tab \u25b8 Animation gallery (Motion Paths)",
       "value": "turns",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Animations ribbon inspection",
@@ -1836,7 +1836,7 @@
     },
     {
       "key": "animation.gallery.motionPath.waves",
-      "control": "Animations tab ▸ Path Animation ▸ Complex",
+      "control": "Animations tab \u25b8 Path Animation \u25b8 Complex",
       "value": "waves",
       "surface": "ribbon gallery group",
       "sourceEvidence": "PowerPoint 16.113.1 Path Animation popup, read by scripts/animation_catalog/discover_platform_inventory.py (tests/fixtures/animations/gui-only/platform-inventory-2026-11-02)",
@@ -1856,7 +1856,7 @@
     },
     {
       "key": "animation.media.bookmarkTrigger",
-      "control": "Playback tab ▸ bookmarks and Effect Options ▸ Timing triggers",
+      "control": "Playback tab \u25b8 bookmarks and Effect Options \u25b8 Timing triggers",
       "value": "bookmarkTrigger",
       "surface": "ribbon / dialog",
       "sourceEvidence": "PowerPoint 16.113.1 Playback tab inspection",
@@ -1866,7 +1866,7 @@
     },
     {
       "key": "animation.media.playFromBookmark",
-      "control": "Playback tab ▸ bookmarks and Effect Options ▸ Timing triggers",
+      "control": "Playback tab \u25b8 bookmarks and Effect Options \u25b8 Timing triggers",
       "value": "playFromBookmark",
       "surface": "ribbon / dialog",
       "sourceEvidence": "PowerPoint 16.113.1 Playback tab inspection",
@@ -1876,47 +1876,47 @@
     },
     {
       "key": "animation.moreEffects.emphasis",
-      "control": "not present in this build — on Windows, Add Animation ▸ More … Effects…",
+      "control": "not present in this build \u2014 on Windows, Add Animation \u25b8 More \u2026 Effects\u2026",
       "value": "emphasis",
       "surface": "absent on macOS",
-      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More … Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
+      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More \u2026 Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
       "persisted": false,
       "verificationMethod": "guiInspection",
       "status": "nonPersisted"
     },
     {
       "key": "animation.moreEffects.entrance",
-      "control": "not present in this build — on Windows, Add Animation ▸ More … Effects…",
+      "control": "not present in this build \u2014 on Windows, Add Animation \u25b8 More \u2026 Effects\u2026",
       "value": "entrance",
       "surface": "absent on macOS",
-      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More … Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
+      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More \u2026 Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
       "persisted": false,
       "verificationMethod": "guiInspection",
       "status": "nonPersisted"
     },
     {
       "key": "animation.moreEffects.exit",
-      "control": "not present in this build — on Windows, Add Animation ▸ More … Effects…",
+      "control": "not present in this build \u2014 on Windows, Add Animation \u25b8 More \u2026 Effects\u2026",
       "value": "exit",
       "surface": "absent on macOS",
-      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More … Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
+      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More \u2026 Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
       "persisted": false,
       "verificationMethod": "guiInspection",
       "status": "nonPersisted"
     },
     {
       "key": "animation.moreEffects.motionPath",
-      "control": "not present in this build — on Windows, Add Animation ▸ More … Effects…",
+      "control": "not present in this build \u2014 on Windows, Add Animation \u25b8 More \u2026 Effects\u2026",
       "value": "motionPath",
       "surface": "absent on macOS",
-      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More … Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
+      "sourceEvidence": "PowerPoint 16.113.1: no gallery or popup offers a More \u2026 Effects item and there is no Add Animation control to reach one from; read by scripts/animation_catalog/discover_platform_inventory.py. Corroborated by https://learn.microsoft.com/en-us/answers/questions/5314795/where-is-more-motion-paths-in-newest-power-point",
       "persisted": false,
       "verificationMethod": "guiInspection",
       "status": "nonPersisted"
     },
     {
       "key": "animation.pane.order",
-      "control": "Animation Pane ▸ Reorder",
+      "control": "Animation Pane \u25b8 Reorder",
       "value": "order",
       "surface": "Animation Pane buttons",
       "sourceEvidence": "effect order is p:par document order in every captured fixture",
@@ -1926,7 +1926,7 @@
     },
     {
       "key": "animation.pane.preview",
-      "control": "Animations tab ▸ Preview / Play From",
+      "control": "Animations tab \u25b8 Preview / Play From",
       "value": "preview",
       "surface": "ribbon command",
       "sourceEvidence": "ribbon inspection",
@@ -1956,7 +1956,7 @@
     },
     {
       "key": "animation.smartArt.build.allAtOnce",
-      "control": "Effect Options ▸ SmartArt Animation ▸ Group graphic",
+      "control": "Effect Options \u25b8 SmartArt Animation \u25b8 Group graphic",
       "value": "allAtOnce",
       "surface": "dialog dropdown value",
       "sourceEvidence": "ECMA-376 ST_AnimationDgmBuildType plus PowerPoint dialog inspection",
@@ -1966,7 +1966,7 @@
     },
     {
       "key": "animation.smartArt.build.asOneObject",
-      "control": "Effect Options ▸ SmartArt Animation ▸ Group graphic",
+      "control": "Effect Options \u25b8 SmartArt Animation \u25b8 Group graphic",
       "value": "asOneObject",
       "surface": "dialog dropdown value",
       "sourceEvidence": "ECMA-376 ST_AnimationDgmBuildType plus PowerPoint dialog inspection",
@@ -1976,7 +1976,7 @@
     },
     {
       "key": "animation.smartArt.build.byBranchOneByOne",
-      "control": "Effect Options ▸ SmartArt Animation ▸ Group graphic",
+      "control": "Effect Options \u25b8 SmartArt Animation \u25b8 Group graphic",
       "value": "byBranchOneByOne",
       "surface": "dialog dropdown value",
       "sourceEvidence": "ECMA-376 ST_AnimationDgmBuildType plus PowerPoint dialog inspection",
@@ -1986,7 +1986,7 @@
     },
     {
       "key": "animation.smartArt.build.byLevelAtOnce",
-      "control": "Effect Options ▸ SmartArt Animation ▸ Group graphic",
+      "control": "Effect Options \u25b8 SmartArt Animation \u25b8 Group graphic",
       "value": "byLevelAtOnce",
       "surface": "dialog dropdown value",
       "sourceEvidence": "ECMA-376 ST_AnimationDgmBuildType plus PowerPoint dialog inspection",
@@ -1996,7 +1996,7 @@
     },
     {
       "key": "animation.smartArt.build.byLevelOneByOne",
-      "control": "Effect Options ▸ SmartArt Animation ▸ Group graphic",
+      "control": "Effect Options \u25b8 SmartArt Animation \u25b8 Group graphic",
       "value": "byLevelOneByOne",
       "surface": "dialog dropdown value",
       "sourceEvidence": "ECMA-376 ST_AnimationDgmBuildType plus PowerPoint dialog inspection",
@@ -2006,7 +2006,7 @@
     },
     {
       "key": "animation.smartArt.build.oneByOne",
-      "control": "Effect Options ▸ SmartArt Animation ▸ Group graphic",
+      "control": "Effect Options \u25b8 SmartArt Animation \u25b8 Group graphic",
       "value": "oneByOne",
       "surface": "dialog dropdown value",
       "sourceEvidence": "ECMA-376 ST_AnimationDgmBuildType plus PowerPoint dialog inspection",
@@ -2016,7 +2016,7 @@
     },
     {
       "key": "animation.sound.effect",
-      "control": "Effect Options ▸ Effect ▸ Sound",
+      "control": "Effect Options \u25b8 Effect \u25b8 Sound",
       "value": "effect",
       "surface": "dialog dropdown",
       "sourceEvidence": "PowerPoint 16.113.1 Effect Options dialog inspection",
@@ -2026,7 +2026,7 @@
     },
     {
       "key": "animation.sound.stopPreviousSound",
-      "control": "Effect Options ▸ Effect ▸ Sound",
+      "control": "Effect Options \u25b8 Effect \u25b8 Sound",
       "value": "stopPreviousSound",
       "surface": "dialog dropdown",
       "sourceEvidence": "PowerPoint 16.113.1 Effect Options dialog inspection",
@@ -2036,7 +2036,7 @@
     },
     {
       "key": "animation.start.afterPrevious",
-      "control": "Animations tab ▸ Start",
+      "control": "Animations tab \u25b8 Start",
       "value": "afterPrevious",
       "surface": "ribbon dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2046,17 +2046,17 @@
     },
     {
       "key": "animation.start.none",
-      "control": "Animations tab ▸ Start",
+      "control": "Animations tab \u25b8 Start",
       "value": "none",
       "surface": "ribbon dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
-      "persisted": true,
+      "persisted": false,
       "verificationMethod": "powerPointReadBackRequired",
-      "status": "accepted"
+      "status": "nonPersisted"
     },
     {
       "key": "animation.start.onPageClick",
-      "control": "Animations tab ▸ Start",
+      "control": "Animations tab \u25b8 Start",
       "value": "onPageClick",
       "surface": "ribbon dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2066,7 +2066,7 @@
     },
     {
       "key": "animation.start.onShapeClick",
-      "control": "Animations tab ▸ Start",
+      "control": "Animations tab \u25b8 Start",
       "value": "onShapeClick",
       "surface": "ribbon dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2076,7 +2076,7 @@
     },
     {
       "key": "animation.start.withPrevious",
-      "control": "Animations tab ▸ Start",
+      "control": "Animations tab \u25b8 Start",
       "value": "withPrevious",
       "surface": "ribbon dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2086,7 +2086,7 @@
     },
     {
       "key": "animation.target.buildList",
-      "control": "Animation Pane ▸ effect target",
+      "control": "Animation Pane \u25b8 effect target",
       "value": "buildList",
       "surface": "Animation Pane",
       "sourceEvidence": "p:spTgt, p:txEl/p:pRg and p:bldLst observed in the native captures (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2096,7 +2096,7 @@
     },
     {
       "key": "animation.target.paragraphRange",
-      "control": "Animation Pane ▸ effect target",
+      "control": "Animation Pane \u25b8 effect target",
       "value": "paragraphRange",
       "surface": "Animation Pane",
       "sourceEvidence": "p:spTgt, p:txEl/p:pRg and p:bldLst observed in the native captures (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2106,7 +2106,7 @@
     },
     {
       "key": "animation.target.shape",
-      "control": "Animation Pane ▸ effect target",
+      "control": "Animation Pane \u25b8 effect target",
       "value": "shape",
       "surface": "Animation Pane",
       "sourceEvidence": "p:spTgt, p:txEl/p:pRg and p:bldLst observed in the native captures (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2116,7 +2116,7 @@
     },
     {
       "key": "animation.textOptions.animateAttachedShape",
-      "control": "Effect Options ▸ Text Animation",
+      "control": "Effect Options \u25b8 Text Animation",
       "value": "animateAttachedShape",
       "surface": "dialog checkbox / spinner",
       "sourceEvidence": "p:bldP attributes observed on every captured gallery fixture (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2126,7 +2126,7 @@
     },
     {
       "key": "animation.textOptions.interItemDelayPercent",
-      "control": "Effect Options ▸ Text Animation",
+      "control": "Effect Options \u25b8 Text Animation",
       "value": "interItemDelayPercent",
       "surface": "dialog checkbox / spinner",
       "sourceEvidence": "p:bldP attributes observed on every captured gallery fixture (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2136,7 +2136,7 @@
     },
     {
       "key": "animation.textOptions.level.allParagraphLevels",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "allParagraphLevels",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2146,7 +2146,7 @@
     },
     {
       "key": "animation.textOptions.level.asOneObject",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "asOneObject",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2156,7 +2156,7 @@
     },
     {
       "key": "animation.textOptions.level.byParagraphLevel1",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "byParagraphLevel1",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2166,7 +2166,7 @@
     },
     {
       "key": "animation.textOptions.level.byParagraphLevel2",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "byParagraphLevel2",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2176,7 +2176,7 @@
     },
     {
       "key": "animation.textOptions.level.byParagraphLevel3",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "byParagraphLevel3",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2186,7 +2186,7 @@
     },
     {
       "key": "animation.textOptions.level.byParagraphLevel4",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "byParagraphLevel4",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2196,7 +2196,7 @@
     },
     {
       "key": "animation.textOptions.level.byParagraphLevel5",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "byParagraphLevel5",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2206,7 +2206,7 @@
     },
     {
       "key": "animation.textOptions.level.chartAllAtOnce",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "chartAllAtOnce",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2216,7 +2216,7 @@
     },
     {
       "key": "animation.textOptions.level.chartByCategory",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "chartByCategory",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2226,7 +2226,7 @@
     },
     {
       "key": "animation.textOptions.level.chartByCategoryElement",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "chartByCategoryElement",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2236,7 +2236,7 @@
     },
     {
       "key": "animation.textOptions.level.chartBySeries",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "chartBySeries",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2246,7 +2246,7 @@
     },
     {
       "key": "animation.textOptions.level.chartBySeriesElement",
-      "control": "Effect Options ▸ Text Animation / Chart Animation ▸ Group",
+      "control": "Effect Options \u25b8 Text Animation / Chart Animation \u25b8 Group",
       "value": "chartBySeriesElement",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2256,7 +2256,7 @@
     },
     {
       "key": "animation.textOptions.reverseOrder",
-      "control": "Effect Options ▸ Text Animation",
+      "control": "Effect Options \u25b8 Text Animation",
       "value": "reverseOrder",
       "surface": "dialog checkbox / spinner",
       "sourceEvidence": "p:bldP attributes observed on every captured gallery fixture (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2266,7 +2266,7 @@
     },
     {
       "key": "animation.textOptions.sequence.allAtOnce",
-      "control": "Effect Options ▸ Text Animation ▸ Group text",
+      "control": "Effect Options \u25b8 Text Animation \u25b8 Group text",
       "value": "allAtOnce",
       "surface": "dialog dropdown value",
       "sourceEvidence": "three-paragraph text box captured per sequence option (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2276,7 +2276,7 @@
     },
     {
       "key": "animation.textOptions.sequence.asOneObject",
-      "control": "Effect Options ▸ Text Animation ▸ Group text",
+      "control": "Effect Options \u25b8 Text Animation \u25b8 Group text",
       "value": "asOneObject",
       "surface": "dialog dropdown value",
       "sourceEvidence": "three-paragraph text box captured per sequence option (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2286,7 +2286,7 @@
     },
     {
       "key": "animation.textOptions.sequence.byParagraph",
-      "control": "Effect Options ▸ Text Animation ▸ Group text",
+      "control": "Effect Options \u25b8 Text Animation \u25b8 Group text",
       "value": "byParagraph",
       "surface": "dialog dropdown value",
       "sourceEvidence": "three-paragraph text box captured per sequence option (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2296,7 +2296,7 @@
     },
     {
       "key": "animation.textOptions.unit.byCharacter",
-      "control": "Effect Options ▸ Effect ▸ Animate text",
+      "control": "Effect Options \u25b8 Effect \u25b8 Animate text",
       "value": "byCharacter",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2306,7 +2306,7 @@
     },
     {
       "key": "animation.textOptions.unit.byParagraph",
-      "control": "Effect Options ▸ Effect ▸ Animate text",
+      "control": "Effect Options \u25b8 Effect \u25b8 Animate text",
       "value": "byParagraph",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2316,7 +2316,7 @@
     },
     {
       "key": "animation.textOptions.unit.byWord",
-      "control": "Effect Options ▸ Effect ▸ Animate text",
+      "control": "Effect Options \u25b8 Effect \u25b8 Animate text",
       "value": "byWord",
       "surface": "dialog dropdown value",
       "sourceEvidence": "/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef (PowerPoint for Mac 16.113.1)",
@@ -2326,7 +2326,7 @@
     },
     {
       "key": "animation.timing.acceleration",
-      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "control": "Animations tab \u25b8 Timing group and Effect Options \u25b8 Timing",
       "value": "acceleration",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
@@ -2336,7 +2336,7 @@
     },
     {
       "key": "animation.timing.autoReverse",
-      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "control": "Animations tab \u25b8 Timing group and Effect Options \u25b8 Timing",
       "value": "autoReverse",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
@@ -2346,7 +2346,7 @@
     },
     {
       "key": "animation.timing.bounceEnd",
-      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "control": "Animations tab \u25b8 Timing group and Effect Options \u25b8 Timing",
       "value": "bounceEnd",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
@@ -2356,7 +2356,7 @@
     },
     {
       "key": "animation.timing.deceleration",
-      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "control": "Animations tab \u25b8 Timing group and Effect Options \u25b8 Timing",
       "value": "deceleration",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
@@ -2366,7 +2366,7 @@
     },
     {
       "key": "animation.timing.delayMs",
-      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "control": "Animations tab \u25b8 Timing group and Effect Options \u25b8 Timing",
       "value": "delayMs",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
@@ -2376,7 +2376,7 @@
     },
     {
       "key": "animation.timing.durationMs",
-      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "control": "Animations tab \u25b8 Timing group and Effect Options \u25b8 Timing",
       "value": "durationMs",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
@@ -2386,7 +2386,7 @@
     },
     {
       "key": "animation.timing.repeatCount",
-      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "control": "Animations tab \u25b8 Timing group and Effect Options \u25b8 Timing",
       "value": "repeatCount",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
@@ -2396,7 +2396,7 @@
     },
     {
       "key": "animation.timing.repeatDurationMs",
-      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "control": "Animations tab \u25b8 Timing group and Effect Options \u25b8 Timing",
       "value": "repeatDurationMs",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
@@ -2406,7 +2406,7 @@
     },
     {
       "key": "animation.timing.restart.always",
-      "control": "Effect Options ▸ Timing ▸ Repeat / restart",
+      "control": "Effect Options \u25b8 Timing \u25b8 Repeat / restart",
       "value": "always",
       "surface": "dialog dropdown value",
       "sourceEvidence": "ECMA-376 ST_TLTimeNodeRestartType; restart=\"never\" observed on every captured tmRoot",
@@ -2416,7 +2416,7 @@
     },
     {
       "key": "animation.timing.restart.never",
-      "control": "Effect Options ▸ Timing ▸ Repeat / restart",
+      "control": "Effect Options \u25b8 Timing \u25b8 Repeat / restart",
       "value": "never",
       "surface": "dialog dropdown value",
       "sourceEvidence": "ECMA-376 ST_TLTimeNodeRestartType; restart=\"never\" observed on every captured tmRoot",
@@ -2426,7 +2426,7 @@
     },
     {
       "key": "animation.timing.restart.whenNotActive",
-      "control": "Effect Options ▸ Timing ▸ Repeat / restart",
+      "control": "Effect Options \u25b8 Timing \u25b8 Repeat / restart",
       "value": "whenNotActive",
       "surface": "dialog dropdown value",
       "sourceEvidence": "ECMA-376 ST_TLTimeNodeRestartType; restart=\"never\" observed on every captured tmRoot",
@@ -2436,7 +2436,7 @@
     },
     {
       "key": "animation.timing.rewind",
-      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "control": "Animations tab \u25b8 Timing group and Effect Options \u25b8 Timing",
       "value": "rewind",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
@@ -2446,7 +2446,7 @@
     },
     {
       "key": "animation.timing.smoothEnd",
-      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "control": "Animations tab \u25b8 Timing group and Effect Options \u25b8 Timing",
       "value": "smoothEnd",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
@@ -2456,7 +2456,7 @@
     },
     {
       "key": "animation.timing.smoothStart",
-      "control": "Animations tab ▸ Timing group and Effect Options ▸ Timing",
+      "control": "Animations tab \u25b8 Timing group and Effect Options \u25b8 Timing",
       "value": "smoothStart",
       "surface": "ribbon spinner / dialog field",
       "sourceEvidence": "PowerPoint 16.113.1 Timing group and Effect Options dialog inspection",
@@ -2466,7 +2466,7 @@
     },
     {
       "key": "animation.timing.triggerTarget",
-      "control": "Effect Options ▸ Timing ▸ Triggers ▸ Start effect on click of",
+      "control": "Effect Options \u25b8 Timing \u25b8 Triggers \u25b8 Start effect on click of",
       "value": "triggerTarget",
       "surface": "dialog dropdown",
       "sourceEvidence": "p:cond/p:tgtEl/p:spTgt captured in the native interactive media timing",
@@ -2476,7 +2476,7 @@
     },
     {
       "key": "transition.advance.afterTime",
-      "control": "Transitions tab ▸ Advance Slide",
+      "control": "Transitions tab \u25b8 Advance Slide",
       "value": "afterTime",
       "surface": "ribbon checkbox / spinner",
       "sourceEvidence": "ECMA-376 p:transition/@advClick and @advTm",
@@ -2486,7 +2486,7 @@
     },
     {
       "key": "transition.advance.onMouseClick",
-      "control": "Transitions tab ▸ Advance Slide",
+      "control": "Transitions tab \u25b8 Advance Slide",
       "value": "onMouseClick",
       "surface": "ribbon checkbox / spinner",
       "sourceEvidence": "ECMA-376 p:transition/@advClick and @advTm",
@@ -2496,7 +2496,7 @@
     },
     {
       "key": "transition.applyToAll",
-      "control": "Transitions tab ▸ Apply To All",
+      "control": "Transitions tab \u25b8 Apply To All",
       "value": "applyToAll",
       "surface": "ribbon command",
       "sourceEvidence": "ribbon inspection",
@@ -2506,7 +2506,7 @@
     },
     {
       "key": "transition.duration",
-      "control": "Transitions tab ▸ Duration",
+      "control": "Transitions tab \u25b8 Duration",
       "value": "duration",
       "surface": "ribbon spinner",
       "sourceEvidence": "ribbon Duration recorded next to every captured tile (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2516,7 +2516,7 @@
     },
     {
       "key": "transition.effectOptions.menu",
-      "control": "Transitions tab ▸ Effect Options",
+      "control": "Transitions tab \u25b8 Effect Options",
       "value": "menu",
       "surface": "ribbon menu container",
       "sourceEvidence": "ribbon inspection",
@@ -2526,7 +2526,7 @@
     },
     {
       "key": "transition.gallery.airplane",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "airplane",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2536,7 +2536,7 @@
     },
     {
       "key": "transition.gallery.blinds",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "blinds",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2546,7 +2546,7 @@
     },
     {
       "key": "transition.gallery.box",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "box",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2556,7 +2556,7 @@
     },
     {
       "key": "transition.gallery.checker",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "checker",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2566,7 +2566,7 @@
     },
     {
       "key": "transition.gallery.clock",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "clock",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2576,7 +2576,7 @@
     },
     {
       "key": "transition.gallery.comb",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "comb",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2586,7 +2586,7 @@
     },
     {
       "key": "transition.gallery.conveyor",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "conveyor",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2596,7 +2596,7 @@
     },
     {
       "key": "transition.gallery.cover",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "cover",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2606,7 +2606,7 @@
     },
     {
       "key": "transition.gallery.crush",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "crush",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2616,7 +2616,7 @@
     },
     {
       "key": "transition.gallery.cube",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "cube",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2626,7 +2626,7 @@
     },
     {
       "key": "transition.gallery.curtains",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "curtains",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2636,7 +2636,7 @@
     },
     {
       "key": "transition.gallery.cut",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "cut",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2646,7 +2646,7 @@
     },
     {
       "key": "transition.gallery.dissolve",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "dissolve",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2656,7 +2656,7 @@
     },
     {
       "key": "transition.gallery.doors",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "doors",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2666,7 +2666,7 @@
     },
     {
       "key": "transition.gallery.drape",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "drape",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2676,7 +2676,7 @@
     },
     {
       "key": "transition.gallery.fade",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "fade",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2686,7 +2686,7 @@
     },
     {
       "key": "transition.gallery.fallOver",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "fallOver",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2696,7 +2696,7 @@
     },
     {
       "key": "transition.gallery.ferris",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "ferris",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2706,7 +2706,7 @@
     },
     {
       "key": "transition.gallery.flash",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "flash",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2716,7 +2716,7 @@
     },
     {
       "key": "transition.gallery.flip",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "flip",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2726,7 +2726,7 @@
     },
     {
       "key": "transition.gallery.flythrough",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "flythrough",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2736,7 +2736,7 @@
     },
     {
       "key": "transition.gallery.fracture",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "fracture",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2746,7 +2746,7 @@
     },
     {
       "key": "transition.gallery.gallery",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "gallery",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2756,7 +2756,7 @@
     },
     {
       "key": "transition.gallery.glitter",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "glitter",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2766,7 +2766,7 @@
     },
     {
       "key": "transition.gallery.honeycomb",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "honeycomb",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2776,7 +2776,7 @@
     },
     {
       "key": "transition.gallery.morph",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "morph",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2786,7 +2786,7 @@
     },
     {
       "key": "transition.gallery.none",
-      "control": "Transitions tab ▸ Transition to This Slide gallery ▸ None",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery \u25b8 None",
       "value": "none",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "the None tile removes the transition; the native capture records \"(no transition)\"",
@@ -2796,7 +2796,7 @@
     },
     {
       "key": "transition.gallery.orbit",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "orbit",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2806,7 +2806,7 @@
     },
     {
       "key": "transition.gallery.origami",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "origami",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2816,7 +2816,7 @@
     },
     {
       "key": "transition.gallery.pageCurl",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "pageCurl",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2826,7 +2826,7 @@
     },
     {
       "key": "transition.gallery.pan",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "pan",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2836,7 +2836,7 @@
     },
     {
       "key": "transition.gallery.peelOff",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "peelOff",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2846,7 +2846,7 @@
     },
     {
       "key": "transition.gallery.prestige",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "prestige",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2856,7 +2856,7 @@
     },
     {
       "key": "transition.gallery.push",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "push",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2866,7 +2866,7 @@
     },
     {
       "key": "transition.gallery.random",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "random",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2876,7 +2876,7 @@
     },
     {
       "key": "transition.gallery.randomBar",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "randomBar",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2886,7 +2886,7 @@
     },
     {
       "key": "transition.gallery.reveal",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "reveal",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2896,7 +2896,7 @@
     },
     {
       "key": "transition.gallery.ripple",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "ripple",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2906,7 +2906,7 @@
     },
     {
       "key": "transition.gallery.rotate",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "rotate",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2916,7 +2916,7 @@
     },
     {
       "key": "transition.gallery.shape",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "shape",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2926,7 +2926,7 @@
     },
     {
       "key": "transition.gallery.shred",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "shred",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2936,7 +2936,7 @@
     },
     {
       "key": "transition.gallery.split",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "split",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2946,7 +2946,7 @@
     },
     {
       "key": "transition.gallery.switch",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "switch",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2956,7 +2956,7 @@
     },
     {
       "key": "transition.gallery.uncover",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "uncover",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2966,7 +2966,7 @@
     },
     {
       "key": "transition.gallery.vortex",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "vortex",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2976,7 +2976,7 @@
     },
     {
       "key": "transition.gallery.wind",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "wind",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2986,7 +2986,7 @@
     },
     {
       "key": "transition.gallery.window",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "window",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -2996,7 +2996,7 @@
     },
     {
       "key": "transition.gallery.wipe",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "wipe",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -3006,7 +3006,7 @@
     },
     {
       "key": "transition.gallery.zoom",
-      "control": "Transitions tab ▸ Transition to This Slide gallery",
+      "control": "Transitions tab \u25b8 Transition to This Slide gallery",
       "value": "zoom",
       "surface": "ribbon gallery tile",
       "sourceEvidence": "tile applied on a blank deck, saved, and the slide's p:transition copied out (office-kit/pptx@18b7e75cfa7fd1c6e9891ce1285a76c7889b644b)",
@@ -3026,7 +3026,7 @@
     },
     {
       "key": "transition.morph.objectMatching",
-      "control": "Home tab ▸ Arrange ▸ Selection Pane object name",
+      "control": "Home tab \u25b8 Arrange \u25b8 Selection Pane object name",
       "value": "objectMatching",
       "surface": "Selection Pane",
       "sourceEvidence": "Microsoft's documented forced-Morph '!!' naming convention, proven by the Task 1 spike",
@@ -3036,7 +3036,7 @@
     },
     {
       "key": "transition.preview",
-      "control": "Transitions tab ▸ Preview",
+      "control": "Transitions tab \u25b8 Preview",
       "value": "preview",
       "surface": "ribbon command",
       "sourceEvidence": "ribbon inspection",
@@ -3046,7 +3046,7 @@
     },
     {
       "key": "transition.sound.effect",
-      "control": "Transitions tab ▸ Sound",
+      "control": "Transitions tab \u25b8 Sound",
       "value": "effect",
       "surface": "ribbon dropdown / checkbox",
       "sourceEvidence": "PowerPoint 16.113.1 Transitions ribbon inspection",
@@ -3056,7 +3056,7 @@
     },
     {
       "key": "transition.sound.loopUntilNext",
-      "control": "Transitions tab ▸ Sound",
+      "control": "Transitions tab \u25b8 Sound",
       "value": "loopUntilNext",
       "surface": "ribbon dropdown / checkbox",
       "sourceEvidence": "PowerPoint 16.113.1 Transitions ribbon inspection",
@@ -6412,7 +6412,8 @@
       "enumerator": "no trigger",
       "code": "0x01000000",
       "guiKey": "animation.start.none",
-      "status": "accepted"
+      "status": "nonPersisted",
+      "persisted": false
     },
     {
       "key": "MsoAnimTriggerType.on page click",
