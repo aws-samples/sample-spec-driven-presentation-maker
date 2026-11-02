@@ -226,6 +226,19 @@ class Storage(ABC):
             pins: List of style names to pin.
         """
 
+    # --- User Styles ---
+
+    @abstractmethod
+    def list_user_styles(self, user_id: str) -> list[dict]:
+        """List the user's own styles, sorted by name.
+
+        Args:
+            user_id: User identifier.
+
+        Returns:
+            List of {name, description, source: "user"} dicts.
+        """
+
     # --- User Templates ---
 
     @abstractmethod

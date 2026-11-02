@@ -6,6 +6,8 @@ Reference data is used to guide AI-generated slide content.
 See docs/internal/DATASET_COMPLIANCE.md for dataset provenance.
 
 Reference: unified access to design patterns, components, schemas, rules, and reviews."""
+import re
+from collections.abc import Iterable
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +16,18 @@ from sdpm.knowledge.reference.providers import FileProvider, ReferenceProvider  
 
 # Package-bundled styles directory (for user-local style search fallback).
 BUNDLED_STYLES_DIR = REFERENCES_DIR / "examples" / "styles"
+
+_HTML_TITLE_RE = re.compile(r"<title>(.*?)</title>", re.IGNORECASE)
+
+
+def html_title(html: str) -> str:
+    """Return the stripped ``<title>`` text of an HTML document, or "" when it has none.
+
+    A style's description is its ``<title>``. Pure function, so the cloud listings
+    (S3 bodies) use the same rule as the filesystem listing.
+    """
+    m = _HTML_TITLE_RE.search(html)
+    return m.group(1).strip() if m else ""
 
 
 def _get_description(path: Path) -> str:
@@ -37,11 +51,7 @@ def _get_description(path: Path) -> str:
         text = path.read_text(encoding="utf-8")
         # HTML — extract <title>
         if path.suffix == '.html':
-            import re
-            m = re.search(r'<title>(.*?)</title>', text, re.IGNORECASE)
-            if m:
-                return m.group(1).strip()
-            return ""
+            return html_title(text)
         lines = text.splitlines()
         # Parse YAML frontmatter for description
         if lines and lines[0].strip() == '---':
@@ -333,10 +343,21 @@ def list_styles_merged(styles_dirs: list[Path]) -> list[dict[str, str]]:
     given directories is kept. Typically callers pass the result of
     ``api.get_styles_dirs()`` which orders env-overrides → user-local → bundled.
     """
+    return merge_style_lists(*(list_styles(d) for d in styles_dirs))
+
+
+def merge_style_lists(*groups: Iterable[dict]) -> list[dict]:
+    """Merge style lists in priority order: the first style of each name wins.
+
+    Pure function — the one shadowing rule for every style listing. Pass the
+    user's styles before the bundled ones so a user style replaces the bundled
+    style of the same name (filesystem: :func:`list_styles_merged`; cloud: S3
+    listings in ``shared.user_library``).
+    """
     seen: set[str] = set()
-    result: list[dict[str, str]] = []
-    for styles_dir in styles_dirs:
-        for item in list_styles(styles_dir):
+    result: list[dict] = []
+    for group in groups:
+        for item in group:
             if item["name"] not in seen:
                 seen.add(item["name"])
                 result.append(item)

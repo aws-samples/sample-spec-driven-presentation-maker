@@ -8,6 +8,7 @@ Used by api/ and servers/remote/ to avoid duplication.
 - preview: slide preview key resolution
 - html_artifacts: S3 key layout of HTML deck artifacts
 - review: change request contract of the Web UI comment tool
+- user_library: the user's style / template library (S3 layout, pins, template lists)
 
 Upload file conversion (PDF/DOCX/XLSX/PPTX → Markdown/JSON) lives in the core,
 ``sdpm.tools.attachment.ingest``.
