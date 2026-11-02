@@ -601,8 +601,8 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 )}
               </div>
               <p className="text-xs text-muted-foreground">
-                {slidesWithPreview.length} {slidesWithPreview.length === 1 ? "slide" : "slides"}
-                {ownerAlias && <span> · by {ownerAlias}</span>}
+                {t("slideCount", { count: slidesWithPreview.length })}
+                {ownerAlias && <span> · {t("byOwner", { owner: ownerAlias })}</span>}
               </p>
             </div>
             {headerActions}
@@ -633,7 +633,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 aria-label={t("openFolder")}
               >
                 <FolderOpen className="h-3.5 w-3.5" />
-                Folder
+                {t("folder")}
               </button>
             )}
             {isHtml && htmlUrl && (
