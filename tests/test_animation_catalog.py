@@ -2126,10 +2126,24 @@ def test_reversibility_is_measured_rather_than_looked_up():
     # The remaining one-way entries are real reader gaps, not aliases: every one
     # is a form the reader does not invert at all.
     one_way = report["gaps"]["oneWayOnly"]["keys"]
-    # 48, down from 67: the eight behaviour primitives are inverted now, which
-    # closed their 16 entries (one semantic key and one scripting enumerator
-    # each) plus three that resolved through them.
-    assert len(one_way) == 48, (len(one_way), one_way[:5])
+    # 14, down from 48: the build families are inverted now — paragraph levels,
+    # the chart and SmartArt builds, the text units and the reverse-order flag.
+    #
+    # The eight build entries that remain are **irreducible**, not unfinished.
+    # Each writes bytes another entry also writes, so one OOXML form would have
+    # to resolve to two different JSON spellings:
+    #
+    #   level.asOneObject / sequence.asOneObject / text by no levels
+    #       an empty p:bldP, which is also what a preset's bare build marker is
+    #   level.allParagraphLevels / text by all levels
+    #       build="allAtOnce", which sequence.allAtOnce wins
+    #   unit.byParagraph / by paragraph
+    #       writes no p:iterate at all
+    #   animateAttachedShape
+    #       an explicit true on a preset that already animates its background
+    #
+    # The other six are the interactive-sequence and paragraph-range area.
+    assert len(one_way) == 14, (len(one_way), one_way[:5])
     assert not any(key.startswith("EPPEntryEffect.") for key in one_way), (
         "transition enumerators corroborate a gallery tile and round-trip; "
         "none should be left counted one-way"

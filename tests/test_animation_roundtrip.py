@@ -553,3 +553,135 @@ def test_a_behavior_outside_the_writers_vocabulary_still_falls_back_to_raw():
     assert motion.animations is None
     assert motion.raw_timing is not None
     assert any("sideways" in reason for reason in motion.reasons), motion.reasons
+
+
+#: One case per build family, with the OOXML each must produce.
+BUILD_CASES = {
+    "paragraph level": (
+        {"text": {"level": "byParagraphLevel2"}},
+        b'<p:bldP spid="2" grpId="0" build="p" bldLvl="2"',
+    ),
+    "paragraph sequence": (
+        {"text": {"sequence": "byParagraph"}},
+        b'<p:bldP spid="2" grpId="0" build="p"',
+    ),
+    "reverse order": (
+        {"text": {"sequence": "byParagraph", "reverseOrder": True}},
+        b'rev="1"',
+    ),
+    "chart build": (
+        {"chart": {"build": "chartBySeriesElement"}},
+        b'<a:bldChart bld="seriesEl"/>',
+    ),
+    "smartArt build": (
+        {"smartArt": {"build": "byLevelOneByOne"}},
+        b'<p:bldDgm spid="2" grpId="0" bld="lvlOne"/>',
+    ),
+    "text unit": (
+        {"text": {"unit": "byWord", "interItemDelayPercent": 10}},
+        b'<p:iterate type="wd"',
+    ),
+}
+
+
+@pytest.mark.parametrize("name", sorted(BUILD_CASES))
+def test_every_build_family_round_trips(name):
+    """``p:bldLst`` and ``p:iterate`` come back as JSON, not as a raw sidecar.
+
+    The reader used to accept ``p:bldP`` alone, allow only the three attributes
+    a preset's own build list carries, and read nothing into the JSON. So a
+    chart build, a SmartArt build, a paragraph level and a by-word text unit
+    each sent the whole slide's timing to the raw fallback — on the element or
+    the attribute, before any value was even looked at.
+
+    The expected OOXML is asserted as well as the JSON, because a reader that
+    agrees with a *wrong* writer would pass a JSON-only comparison.
+    """
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    fields, expected_xml = BUILD_CASES[name]
+    effect = {
+        "preset": {"category": "entrance", "effect": "fade"},
+        "start": {"type": "onPageClick", "delayMs": 0},
+        "timing": {"durationMs": 500},
+        **fields,
+    }
+    slide, written = _behavior_slide(effect)
+    first = etree.tostring(written)
+    assert expected_xml in first, f"{name}: {first.decode()}"
+
+    motion = read_slide_motion(slide, slide_slug="behaviors", index=index)
+    assert motion.animations is not None, f"{name} fell back to raw: {motion.reasons}"
+    imported = motion.animations["mainSequence"][0]
+    for field, value in fields.items():
+        assert imported.get(field) == value, f"{name}: {field} came back {imported.get(field)!r}"
+
+    _slide, rewritten = _behavior_slide({k: v for k, v in imported.items() if k != "id"})
+    assert etree.tostring(rewritten) == first, name
+
+
+def test_a_build_list_value_outside_the_catalog_falls_back_to_raw():
+    """Inverting the build families must not widen what import accepts.
+
+    A build token the catalog does not record would import as a value the
+    writer then refuses, so the round-trip would break on content the file
+    carried. The raw fallback is what keeps that replayable.
+    """
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    slide, written = _behavior_slide(
+        {
+            "preset": {"category": "entrance", "effect": "fade"},
+            "start": {"type": "onPageClick", "delayMs": 0},
+            "timing": {"durationMs": 500},
+            "smartArt": {"build": "byLevelOneByOne"},
+        }
+    )
+    for node in written.iter():
+        if etree.QName(node).localname == "bldDgm":
+            node.set("bld", "lvlSeventeen")
+    motion = read_slide_motion(slide, slide_slug="behaviors", index=index)
+    assert motion.animations is None
+    assert motion.raw_timing is not None
+    assert any("lvlSeventeen" in reason for reason in motion.reasons), motion.reasons
+
+
+def test_a_presets_own_animate_background_is_not_restated_on_import():
+    """``text.animateBackground`` is tri-state, and the preset makes it readable.
+
+    Absent, it means "whatever this preset's capture records"; set, it
+    overrides. So it belongs in the imported JSON only when it **disagrees**
+    with the preset — restating agreement would add a field the caller never
+    wrote to every one of the 95 tiles whose capture records a build list.
+
+    The cost of that rule is exact and worth naming: an explicit
+    ``animateBackground: true`` on a preset that already animates its
+    background writes the same bytes as writing nothing, so it cannot be
+    recovered. That is one of the eight irreducible build entries.
+    """
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+
+    def imported(fields):
+        slide, _written = _behavior_slide(
+            {
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "onPageClick", "delayMs": 0},
+                "timing": {"durationMs": 500},
+                **fields,
+            }
+        )
+        motion = read_slide_motion(slide, slide_slug="behaviors", index=index)
+        assert motion.animations is not None, motion.reasons
+        return motion.animations["mainSequence"][0]
+
+    # Fade's own capture records p:bldP/@animBg=1, so agreement says nothing.
+    assert "text" not in imported({})
+    assert "text" not in imported({"text": {"animateBackground": True}})
+    # Disagreement is the author's answer and survives.
+    assert imported({"text": {"animateBackground": False}})["text"] == {
+        "animateBackground": False
+    }

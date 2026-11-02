@@ -704,12 +704,31 @@ Kept as raw rather than semantic JSON — preserved and replayable, but not auth
   `p:set` / `p:animEffect` / `p:cmd` payload differs from the captured one;
 - an after-effect or dim node;
 - a `p:spTgt` carrying a paragraph/text sub-target;
-- a build list (`p:bldP` / `p:bldGraphic` / `p:bldDgm`) with attributes beyond
-  `@spid`, `@grpId`, `@animBg`, or whose `@animBg` disagrees with the catalogued build of the
-  preset it belongs to;
+- a build list carrying something sdpm does not write — a `p:bldP` attribute beyond `@spid`,
+  `@grpId`, `@build`, `@bldLvl`, `@rev` and `@animBg`, a build token the catalog does not
+  record, `a:bldChart/@animBg`, `p:iterate/@backwards`, or the absolute `p:iterate/p:tmAbs`
+  interval the JSON has no field for (the build families themselves — paragraph levels, chart
+  builds, SmartArt builds and the text units — now import into `text`, `chart` and
+  `smartArt`);
 - a bookmark start condition;
 - an effect sound;
 - one effect animating more than one shape.
+
+### Eight build spellings normalise rather than survive
+
+These write bytes another spelling also writes, so import returns the other one. Nothing is
+lost from the package — the animation is identical — but the JSON comes back differently:
+
+| Written | Comes back as | Why |
+|---|---|---|
+| `text.level: "asOneObject"` | nothing | an empty `p:bldP`, which is also a preset's bare build marker |
+| `text.sequence: "asOneObject"` | nothing | the same empty `p:bldP` |
+| `text.level: "allParagraphLevels"` | `text.sequence: "allAtOnce"` | both write `build="allAtOnce"` |
+| `text.unit: "byParagraph"` | nothing | writes no `p:iterate` at all |
+| `text.animateBackground: true` on a preset that already animates its background | nothing | identical to writing nothing |
+
+`bldLvl` is what decides between the two paragraph families: `build="p"` alone is
+`text.sequence`, and the same token with a level is `text.level`.
 
 A **transition** sound is the one exception in the other direction: import reads it
 semantically into `transition.sound` and copies the audio part into the bundle, but the

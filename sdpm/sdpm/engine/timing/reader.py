@@ -1010,7 +1010,16 @@ class _TimingReader:
         self.targets: set[int] = set()
         self._effect_ids = EffectIdAllocator()
         self._ext_ids: dict[str, str] = {}
-        self._builds: dict[tuple[int, int], dict[str, str]] = {}
+        #: ``p:bldLst`` decoded ahead of the sequences, keyed the way the build
+        #: list itself keys a build. It has to be decoded first: the writer
+        #: allocates an effect ID from the JSON *including* its build fields, so
+        #: an effect that learned its ``text`` afterwards would fingerprint
+        #: differently and come back with the wrong ID.
+        self._builds: dict[tuple[int, int], dict[str, Any]] = {}
+        #: The build tokens an effect claimed. One build per spid + grpId, so
+        #: the first effect on that pair takes it, exactly as the writer
+        #: registers it from the first effect that asks.
+        self._builds_used: set[tuple[int, int]] = set()
         self._preset_build: dict[tuple[int, int], bool] = {}
 
     # -- entry point ---------------------------------------------------
@@ -1018,6 +1027,7 @@ class _TimingReader:
         _require_attrs(timing, (), "p:timing")
         _only_children(timing, {"tnLst", "bldLst", "extLst"}, "p:timing")
         self._read_extension(timing)
+        self._decode_build_list(timing)
         root = time_root(timing)
         if root is None:
             raise _Unsupported("p:timing has no p:cTn[@nodeType='tmRoot']")
@@ -1050,7 +1060,13 @@ class _TimingReader:
                 interactive.append(self._read_interactive(child, len(interactive)))
             else:
                 raise _Unsupported(f"p:seq has unsupported nodeType {node_type!r}")
-        self._read_build_list(timing)
+        unclaimed = sorted(set(self._builds) - self._builds_used)
+        if unclaimed:
+            spid, grp_id = unclaimed[0]
+            raise _Unsupported(
+                f"p:bldLst carries a build for spid {spid} group {grp_id}, which no imported "
+                "effect animates"
+            )
         if not main and not interactive:
             return None
         return {"mainSequence": main, "interactiveSequences": interactive}
@@ -1246,7 +1262,10 @@ class _TimingReader:
             raise _Unsupported(f"{sequence} effect has no p:cTn")
         _only_children(par, {"cTn"}, f"{sequence} effect p:par")
         attrs = _require_attrs(ctn, SEMANTIC_VOCABULARY["effectCTn"], f"{sequence} effect p:cTn")
-        _only_children(ctn, {"stCondLst", "childTnLst"}, f"{sequence} effect p:cTn")
+        # `p:iterate` used to be unlisted here, so a by-word or by-character
+        # text animation — the three `animation.textOptions.unit` values — sent
+        # the whole slide's timing to the raw fallback on the element alone.
+        _only_children(ctn, {"stCondLst", "childTnLst", "iterate"}, f"{sequence} effect p:cTn")
         node_type = attrs.get("nodeType")
         start_type = self._start_type(node_type, interactive, click_index, opens_click_group)
         behaviors = _child(ctn, "childTnLst")
@@ -1273,11 +1292,23 @@ class _TimingReader:
             grp_id = int(attrs.get("grpId", 0))
             self._preset_build[(self._spid_of(target), grp_id)] = _animates_background(entry)
 
+        # Both before the effect dict is built, because the writer allocates an
+        # effect ID from the JSON *including* its text and build fields: an
+        # effect that learned them afterwards would fingerprint differently and
+        # come back with the wrong ID.
+        build_fields = self._claim_build(
+            target, grp_id, self._preset_build.get((self._spid_of(target), grp_id), False)
+        )
+        iterate = self._read_iterate(ctn, sequence)
+        text = {**(build_fields.pop("text", None) or {}), **iterate}
+
         effect: dict[str, Any] = {
             "target": {"element": target},
             **named,
             "start": {"type": start_type, "delayMs": self._delay(ctn, f"{sequence} effect")},
             "timing": self._read_timing(attrs, duration, sequence),
+            **({"text": text} if text else {}),
+            **build_fields,
             "afterEffect": {"type": "none"},
             "sound": None,
         }
@@ -1822,30 +1853,207 @@ class _TimingReader:
             return int(token)
         raise _Unsupported(f"{what} start delay {token!r} is not a millisecond value")
 
-    def _read_build_list(self, timing: etree._Element) -> None:
+    def _read_iterate(self, ctn: etree._Element, sequence: str) -> dict[str, Any]:
+        """Invert ``p:iterate`` into ``text.unit`` and the inter-item delay.
+
+        ``CT_TLIterateData`` is a choice of exactly one ``p:tmAbs`` or
+        ``p:tmPct``. The writer emits only ``p:tmPct``, because the absolute
+        form has no field in the JSON, so a package carrying ``p:tmAbs`` stays
+        raw rather than importing as a percentage it is not.
+        """
+        from sdpm.engine.timing.writer import TIME_PERCENT_SCALE
+
+        node = _child(ctn, "iterate")
+        if node is None:
+            return {}
+        attrs = _require_attrs(node, ("type", "backwards"), f"{sequence} p:iterate")
+        if attrs.get("backwards") is not None:
+            raise _Unsupported("p:iterate/@backwards is not a value sdpm writes back")
+        wanted = attrs.get("type")
+        unit = None
+        for value in ("byParagraph", "byWord", "byCharacter"):
+            entry = self.index.entry(f"animation.textOptions.unit.{value}")
+            if entry is not None and entry.ooxml.get("type") == wanted:
+                unit = value
+                break
+        if unit is None:
+            raise _Unsupported(f"p:iterate/@type {wanted!r} is not a catalogued text unit")
+        children = _only_children(node, {"tmPct", "tmAbs"}, f"{sequence} p:iterate")
+        if len(children) != 1:
+            raise _Unsupported("p:iterate must carry exactly one interval")
+        interval = children[0]
+        if _local(interval) != "tmPct":
+            raise _Unsupported(
+                "p:iterate carries p:tmAbs, an absolute interval sdpm has no JSON field for"
+            )
+        raw = interval.get("val")
+        if raw is None or not raw.lstrip("-").isdigit():
+            raise _Unsupported(f"p:tmPct/@val {raw!r} is not a percentage")
+        scaled = int(raw) / TIME_PERCENT_SCALE * 100
+        percent = int(scaled) if float(scaled).is_integer() else scaled
+        return {"unit": unit, "interItemDelayPercent": percent}
+
+    def _build_value(
+        self, family: str, element_name: str, child: str | None, attrs: Mapping[str, str]
+    ) -> str | None:
+        """Return the catalogued build value whose recorded form is ``attrs``.
+
+        Resolved against the catalog rather than against a table repeated here,
+        so a build value added to the catalog is readable without touching the
+        reader. An entry records its form either as an ``attributes`` mapping
+        (the ``p:bldP`` levels) or as a single ``attribute``/``value`` pair
+        (``p:bldDgm`` and ``a:bldChart``), and both shapes are compared.
+        """
+        wanted = {str(k): str(v) for k, v in attrs.items()}
+        for value in self.index.build_values(family, element=element_name, child=child):
+            entry = self.index.build_entry(family, value, element=element_name, child=child)
+            if entry is None:
+                continue
+            recorded = entry.ooxml.get("attributes")
+            if isinstance(recorded, Mapping):
+                form = {str(k): str(v) for k, v in recorded.items()}
+            else:
+                name, token = entry.ooxml.get("attribute"), entry.ooxml.get("value")
+                form = {str(name): str(token)} if name and token is not None else {}
+            if form == wanted:
+                return value
+        return None
+
+    def _decode_build_list(self, timing: etree._Element) -> None:
+        """Invert ``p:bldLst`` into per-token ``text``/``chart``/``smartArt``.
+
+        The old reader accepted ``p:bldP`` alone, allowed only the three
+        attributes a preset's own build list carries, and read nothing into the
+        JSON — it validated ``@animBg`` against the preset and stopped. So a
+        chart build (``p:bldGraphic``), a SmartArt build (``p:bldDgm``) and even
+        a plain paragraph level (``p:bldP/@build``) each sent the whole slide's
+        timing to the raw fallback on an unexpected element or attribute, and
+        the builds it did accept came back as no JSON at all.
+
+        Decoding happens here, before the sequences, and the fields are merged
+        into the effect in :meth:`_read_effect`. ``@animBg`` cannot be resolved
+        yet, because whether it is a JSON request or the preset's own
+        catalogued form depends on the preset — so the raw flag is carried and
+        settled there.
+        """
         bld_lst = _child(timing, "bldLst")
         if bld_lst is None:
             return
-        for build in _only_children(bld_lst, {"bldP"}, "p:bldLst"):
-            attrs = _require_attrs(build, ("spid", "grpId", "animBg"), "p:bldP")
-            _only_children(build, (), "p:bldP")
-            spid = _int_attr(build, "spid", "p:bldP")
+        allowed = {
+            "bldP": ("spid", "grpId", "build", "bldLvl", "rev", "animBg"),
+            "bldGraphic": ("spid", "grpId"),
+            "bldDgm": ("spid", "grpId", "bld"),
+        }
+        for build in _only_children(bld_lst, set(allowed), "p:bldLst"):
+            local = _local(build)
+            tag = f"p:{local}"
+            attrs = _require_attrs(build, allowed[local], tag)
+            spid = _int_attr(build, "spid", tag)
             if spid not in self.identities:
                 raise MotionReadError(
-                    f"slide {self.slide_slug!r}: p:bldP/@spid {spid} names no shape on the slide"
+                    f"slide {self.slide_slug!r}: {tag}/@spid {spid} names no shape on the slide"
                 )
             token = (spid, int(attrs.get("grpId", 0)))
-            animates = attrs.get("animBg") in {"1", "true"}
-            expected = self._preset_build.get(token)
-            if expected is None:
+            if token in self._builds:
                 raise _Unsupported(
-                    f"p:bldP targets spid {spid} group {token[1]}, which no imported effect animates"
+                    f"p:bldLst carries two builds for spid {spid} group {token[1]}"
                 )
-            if animates != expected:
+            if local == "bldP":
+                self._builds[token] = self._decode_paragraph_build(build, attrs, tag)
+            elif local == "bldGraphic":
+                self._builds[token] = {"chart": self._decode_chart_build(build, tag)}
+            else:
+                self._builds[token] = {"smartArt": self._decode_diagram_build(attrs, tag)}
+
+    def _decode_paragraph_build(
+        self, build: etree._Element, attrs: Mapping[str, str], tag: str
+    ) -> dict[str, Any]:
+        _only_children(build, (), tag)
+        text: dict[str, Any] = {}
+        form = {name: attrs[name] for name in ("build", "bldLvl") if name in attrs}
+        if form:
+            # ``bldLvl`` is what makes a build a *level*: ``build="p"`` alone is
+            # the by-paragraph sequence, and the same token with a level is one
+            # of the five paragraph levels. The two families record identical
+            # forms for "as one object" and "all at once", so without this rule
+            # one OOXML form would resolve to two different JSON fields.
+            family, field = (
+                ("animation.textOptions.level", "level") if "bldLvl" in form
+                else ("animation.textOptions.sequence", "sequence")
+            )
+            value = self._build_value(family, "p:bldP", None, form)
+            if value is None:
                 raise _Unsupported(
-                    f"p:bldP/@animBg for spid {spid} disagrees with the catalogued build list of "
-                    "its preset, so the paragraph build is not fully understood"
+                    f"{tag} carries {form}, which no catalogued text build records"
                 )
+            text[field] = value
+        if attrs.get("rev") in {"1", "true"}:
+            text["reverseOrder"] = True
+        return {"text": text, "animBg": attrs.get("animBg") in {"1", "true"}}
+
+    def _decode_chart_build(self, build: etree._Element, tag: str) -> dict[str, Any]:
+        _only_children(build, {"bldSub"}, tag)
+        sub_build = _child(build, "bldSub")
+        if sub_build is None:
+            raise _Unsupported(f"{tag} carries no p:bldSub, so its chart build is unknown")
+        # a:bldChart is DrawingML, so it is not in the p: namespace the rest of
+        # a timing tree lives in.
+        chart = sub_build.find(f"{{{A_NS}}}bldChart")
+        if chart is None:
+            raise _Unsupported(f"{tag}/p:bldSub carries no a:bldChart")
+        attrs = _require_attrs(chart, ("bld", "animBg"), "a:bldChart")
+        if attrs.get("animBg") is not None:
+            raise _Unsupported("a:bldChart/@animBg is not a value sdpm writes back")
+        value = self._build_value(
+            "animation.textOptions.level", "p:bldGraphic", "p:bldSub/a:bldChart",
+            {"bld": attrs.get("bld", "")},
+        )
+        if value is None:
+            raise _Unsupported(
+                f"a:bldChart/@bld {attrs.get('bld')!r} is not a catalogued chart build"
+            )
+        return {"build": value}
+
+    def _decode_diagram_build(self, attrs: Mapping[str, str], tag: str) -> dict[str, Any]:
+        value = self._build_value(
+            "animation.smartArt.build", "p:bldDgm", None, {"bld": attrs.get("bld", "")}
+        )
+        if value is None:
+            raise _Unsupported(
+                f"{tag}/@bld {attrs.get('bld')!r} is not a catalogued SmartArt build"
+            )
+        return {"build": value}
+
+    def _claim_build(
+        self, target: str, grp_id: int, animates_background: bool
+    ) -> dict[str, Any]:
+        """Return the build fields belonging to one effect, settling ``@animBg``.
+
+        ``text.animateBackground`` is tri-state and the preset is what makes it
+        readable. Absent, it means "whatever this preset's own capture records";
+        set, it overrides. So ``@animBg`` only belongs in the imported JSON when
+        it **disagrees** with the preset — restating agreement would add a field
+        the caller never wrote, to every one of the 95 tiles whose capture
+        records a build list.
+
+        That is also why this runs here rather than in the decoder: the
+        disagreement is not visible until the preset is known.
+        """
+        token = (self._spid_of(target), grp_id)
+        decoded = self._builds.get(token)
+        if decoded is None or token in self._builds_used:
+            return {}
+        self._builds_used.add(token)
+        fields = {key: value for key, value in decoded.items() if key != "animBg"}
+        if "text" in fields:
+            text = dict(fields["text"])
+            written = bool(decoded.get("animBg"))
+            if written != animates_background:
+                text["animateBackground"] = written
+            fields["text"] = text
+            if not text:
+                del fields["text"]
+        return fields
 
 
 def _animates_background(entry: Any) -> bool:
