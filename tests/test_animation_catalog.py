@@ -2033,3 +2033,68 @@ def test_an_entry_no_json_can_ask_for_is_not_counted_as_awaiting_capture():
     assert all(
         record.outcome == "refused" for record in records if record.no_sdpm_input
     )
+
+
+def test_reversibility_is_measured_rather_than_looked_up():
+    """An entry round-trips if its own JSON comes back, whatever key the reader used.
+
+    This was membership in the reader's reverse index, which maps each OOXML
+    form to exactly **one** preferred key — so `MsoAnimEffect.animation type
+    fly` counted as one-way because `animation.gallery.entrance.flyIn` is the
+    form's inverse target, even though writing the enumerator's own example and
+    reading it back produced byte-identical JSON. 143 of the 210 one-way
+    entries were that.
+
+    The weaker-looking definition cannot hide a failure, and that is the point:
+    an entry is only counted reversible when its JSON actually comes back
+    equal, *or* when the index names it as the inverse target — in which case
+    an unequal read is reported as a partial round-trip instead of vanishing.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, "scripts/animation_catalog/accept.py", "--all", "--json"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+    )
+    report = json.loads(result.stdout)
+
+    round_trip = report["roundTrip"]
+    assert round_trip["invertibleEntries"] == round_trip["equal"], (
+        "an entry counted invertible did not come back equal, which the "
+        f"partialRoundTrip gap should have caught: {round_trip}"
+    )
+    assert round_trip["invertibleEntries"] >= 391, round_trip
+    assert report["gaps"]["partialRoundTrip"]["count"] == 0
+
+    # The remaining one-way entries are real reader gaps, not aliases: every one
+    # is a form the reader does not invert at all.
+    one_way = report["gaps"]["oneWayOnly"]["keys"]
+    assert len(one_way) == 67, (len(one_way), one_way[:5])
+    assert not any(key.startswith("EPPEntryEffect.") for key in one_way), (
+        "transition enumerators corroborate a gallery tile and round-trip; "
+        "none should be left counted one-way"
+    )
+
+
+def test_the_gate_counts_only_what_can_be_closed():
+    """Every blocker has to name something an action would change.
+
+    `noSdpmInput` is reported and deliberately not gated: it counts entries
+    nothing can close, so gating on it would make the gate unpassable by
+    design and the blocker list would stop being a to-do list.
+    """
+    import subprocess
+
+    result = subprocess.run(
+        [sys.executable, "scripts/animation_catalog/accept.py", "--all", "--json"],
+        capture_output=True,
+        text=True,
+        cwd=REPO_ROOT,
+    )
+    report = json.loads(result.stdout)
+    blockers = " ".join(report["gate"]["blockers"])
+    assert "noSdpmInput" not in blockers, report["gate"]["blockers"]
+    assert report["gaps"]["noSdpmInput"]["count"] == 90
+    assert report["gaps"]["noSdpmInput"]["closes"].startswith("nothing")

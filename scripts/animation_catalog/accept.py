@@ -868,25 +868,40 @@ def walk_entry(
         outcome.findings = outcome.findings + (f"{key}: the reader raised {type(error).__name__}: {error}",)
         return outcome
 
+    # Reversibility is **measured**, not looked up. It used to be membership in
+    # the reader's reverse index, and that index maps each OOXML form to exactly
+    # one preferred key — so every other key describing the same form was
+    # counted one-way even when its own example round-tripped perfectly. 143 of
+    # the 210 did. The property that matters is `JSON -> PPTX -> the same JSON`,
+    # and which catalog key the reader resolved on the way is not part of it.
     if kind == "transition":
-        outcome.reversible = key in reversible_transitions
-        if outcome.reversible:
-            expected, actual = normalize(transition), normalize(motion.transition or {})
-            outcome.equal = expected == actual
-            if not outcome.equal:
-                outcome.diff = (f"transition: wrote {expected!r}, read {actual!r}",)
+        expected, actual = normalize(transition), normalize(motion.transition or {})
+        outcome.equal = expected == actual
+        outcome.reversible = outcome.equal or key in reversible_transitions
+        if outcome.reversible and not outcome.equal:
+            outcome.diff = (f"transition: wrote {expected!r}, read {actual!r}",)
         return outcome
 
-    outcome.reversible = key in reversible_presets
-    if not outcome.reversible:
+    written_sequence = (semantic.get("animations") or {}).get("mainSequence") or []
+    if not written_sequence:
+        # An entry whose example animates nothing — an interactive-sequence or
+        # pane-ordering record. There is no effect to compare, so reversibility
+        # stays whatever the index says.
+        outcome.reversible = key in reversible_presets
         return outcome
-    expected_effect = (semantic.get("animations") or {}).get("mainSequence")[0]
+    expected_effect = written_sequence[0]
     read_sequence = (motion.animations or {}).get("mainSequence") or []
     if not read_sequence:
-        outcome.diff = (f"{key}: the reader returned no mainSequence effect",)
+        # Nothing came back, so there is nothing to compare. Claimed reversible
+        # only if the index says this key is the form's inverse target, which
+        # makes the empty read a reportable failure rather than a silent pass.
+        outcome.reversible = key in reversible_presets
+        if outcome.reversible:
+            outcome.diff = (f"{key}: the reader returned no mainSequence effect",)
         return outcome
     diff = effect_diff(expected_effect, read_sequence[0])
     outcome.equal = not diff
+    outcome.reversible = outcome.equal or key in reversible_presets
     outcome.diff = tuple(diff)
     return outcome
 
