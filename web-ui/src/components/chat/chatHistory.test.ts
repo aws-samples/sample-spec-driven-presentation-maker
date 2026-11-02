@@ -91,4 +91,11 @@ describe("parseCloudHistory", () => {
     ]))
     expect(out[0].attachments).toEqual([{ fileName: "report.pdf", fileType: "application/pdf" }])
   })
+
+  it("derives attachments from markers with the upload handle", () => {
+    const out = parseCloudHistory(asHistory([
+      { role: "user", content: '[Attached:{"v":1,"name":"report.pdf","source":"uploads/123e4567-e89b-12d3-a456-426614174000/report.pdf"}] summarize this' },
+    ]))
+    expect(out[0].attachments).toEqual([{ fileName: "report.pdf", fileType: "application/pdf" }])
+  })
 })

@@ -264,7 +264,6 @@ def _deck_summary(item: Dict, extras: Dict[str, Dict]) -> Dict[str, Any]:
         "updatedAt": item.get("updatedAt", ""),
         "thumbnailUrl": ex.get("thumbnailUrl"),
         "visibility": item.get("visibility", "private"),
-        "createdBy": item.get("createdBy", ""),
     }
 
 
@@ -914,6 +913,11 @@ def _script_warnings(raw: Any) -> List[Dict[str, Any]]:
     return out
 
 
+def _owner_chat_session_id(decision: Any) -> Optional[str]:
+    """The deck's chat session id for its owner; None for anyone else."""
+    return decision.deck.get("chatSessionId") if decision.role == "owner" else None
+
+
 def _get_html_deck(deck_id: str, decision: Any, deck_json: Dict[str, Any]) -> Dict[str, Any]:
     """get_deck response for an HTML deck (outputFormat "html").
 
@@ -947,7 +951,7 @@ def _get_html_deck(deck_id: str, decision: Any, deck_json: Dict[str, Any]) -> Di
         "scriptWarnings": _script_warnings(deck.get("htmlScriptExternal")),
         "slideSize": slide_size(deck_json),
         "updatedAt": deck.get("updatedAt", ""),
-        "chatSessionId": deck.get("chatSessionId"),
+        "chatSessionId": _owner_chat_session_id(decision),
         "isOwner": decision.role == "owner",
         "role": decision.role,
         "visibility": deck.get("visibility", "private"),
@@ -1092,7 +1096,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         "pptxUrl": (_cf_signed_url(pptx_key) or presigned_url(s3_client, BUCKET_NAME, pptx_key)) if pptx_key else None,
         "slideSize": slide_size(deck_json),
         "updatedAt": deck.get("updatedAt", ""),
-        "chatSessionId": deck.get("chatSessionId"),
+        "chatSessionId": _owner_chat_session_id(decision),
         "isOwner": decision.role == "owner",
         "role": decision.role,
         "visibility": deck.get("visibility", "private"),
@@ -1671,12 +1675,15 @@ def presign_attachment() -> Dict[str, Any]:
     if object_count >= CLOUD_RAW_MAX_OBJECTS or stored_bytes + file_size > CLOUD_RAW_MAX_BYTES:
         return {"error": "Raw attachment quota exceeded"}, 429
 
-    source = f"uploads/{user_id}/{uuid.uuid4()}/{file_name}"
+    # The S3 key is per user; the browser and the agent get the handle without the
+    # user id, which the MCP server resolves back to this key for the same caller.
+    upload_id = uuid.uuid4()
+    key = f"uploads/{user_id}/{upload_id}/{file_name}"
     presigned_url = s3_client.generate_presigned_url(
         "put_object",
         Params={
             "Bucket": BUCKET_NAME,
-            "Key": source,
+            "Key": key,
             "ContentType": content_type,
             "IfNoneMatch": "*",
             "Tagging": "sdpm-class=attachment-source",
@@ -1684,7 +1691,7 @@ def presign_attachment() -> Dict[str, Any]:
         ExpiresIn=PRESIGNED_URL_EXPIRY,
     )
     return {
-        "source": source,
+        "source": f"uploads/{upload_id}/{file_name}",
         "presignedUrl": presigned_url,
         "requiredHeaders": {
             "Content-Type": content_type,

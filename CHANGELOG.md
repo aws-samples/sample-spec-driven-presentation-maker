@@ -197,6 +197,9 @@ Entries before v0.5.0 were written retroactively as summaries.
   one instead of the oldest, or was not enforced at all once every process looked busy. The
   turn now ends when kiro-cli answers the chat's prompt, and sub-agent sessions are tracked
   only within the turn (the stop button still cancels them).
+- **Cloud `import_attachment` reports conversion errors.** A failed conversion (for example a
+  limit hit while extracting) came back as `IMPORT_ERROR` with the message `'importKey'`; the
+  tool now returns the actual error code and message.
 - **Cloud `read_attachment` works again.** Since 2026-10-08 every call failed with
   `validation error for read_attachmentOutput — Input should be a valid string`: the remote
   server declared the tool as returning a string while it returns the result object, and the
@@ -221,6 +224,25 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Security
 
+- **The agent no longer sees the user's id in Cloud attachments.** The upload handle the API
+  returns and the Web UI puts in the `[Attached:…]` marker is now `uploads/{uuid}/{name}`
+  instead of the S3 key `uploads/{userId}/{uuid}/{name}`. The MCP server builds the S3 key from
+  the signed-in caller, so a handle can only name the caller's own uploads; `read_attachment`
+  and `import_attachment` return the handle in their results and errors, and errors that
+  name an S3 key under the user's prefix have the id removed. The S3 layout, the per-user
+  quota and the 90-day expiry are unchanged, so nothing is migrated. During a transition the
+  previous form is still accepted for the caller's own uploads (and answered with the new
+  handle); another user's id in it is refused without repeating the id. The previous form
+  will be removed in the first minor release after 90 days from this release, when every
+  upload it can name has expired.
+- **Public decks no longer reveal their owner.** `GET /decks/public` and the other deck lists
+  no longer return `createdBy` (the owner's user id); nothing in the Web UI used it.
+- **`GET /decks/{id}` returns `chatSessionId` to the owner only.** Viewers of a public deck get
+  `null`.
+- **`run_style_python` no longer returns the style's S3 key.** `saved` is now
+  `{filename, name}`.
+- **Composers see only their deck tools.** The Presentation Maker client each composer group
+  gets now carries the composer's tool allowlist, as the orchestrator's already did.
 - **Local Web UI refuses cross-site POSTs.** Every POST route of the local server (`sdpm webui`,
   `npm run dev:local`) now answers 403 when the browser's `Origin` is another site, so a page
   open in the same browser can no longer drive the local agent, upload files or change styles

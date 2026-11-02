@@ -64,7 +64,7 @@ class _ReadStorage:
 
 
 def test_read_attachment_over_mcp_returns_structured_result() -> None:
-    source = "uploads/user-1/123e4567-e89b-12d3-a456-426614174000/report.txt"
+    source = "uploads/123e4567-e89b-12d3-a456-426614174000/report.txt"
 
     async def call():
         async with create_connected_server_and_client_session(remote_server.mcp) as session:
