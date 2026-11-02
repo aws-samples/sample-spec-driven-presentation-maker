@@ -384,3 +384,172 @@ class TestSequencingWithoutAnAuthoredDuration:
         # hero carries three effects, so its three group ids are 0, 1 and 2.
         assert {"0", "1", "2"} <= set(by_group), sorted(by_group)
         assert len(effects) == 5, "four main-sequence effects plus the triggered one"
+
+
+#: One case per behaviour primitive, each exercising every field that primitive
+#: accepts. The eight are the whole vocabulary of the advanced form, so this is
+#: coverage rather than a sample.
+BEHAVIOR_CASES: dict[str, dict] = {
+    "motion": {
+        "type": "motion",
+        "path": "M 0 0 L 0.25 0",
+        "pathEditMode": "relative",
+        "origin": "layout",
+        "rotationAngle": 45,
+        "pointTypes": "AA",
+    },
+    "color": {"type": "color", "to": "FF0000"},
+    "scale": {"type": "scale", "to": {"x": 1.5, "y": 2}},
+    "rotation": {"type": "rotation", "by": 90},
+    "property": {
+        "type": "property",
+        "attrName": "style.opacity",
+        "to": "0.5",
+        "calcMode": "lin",
+        "valueType": "num",
+    },
+    "command": {"type": "command", "command": "playFrom", "value": "0.0"},
+    "filter": {"type": "filter", "filter": "fade", "transition": "in"},
+    "set": {"type": "set", "attrName": "style.visibility", "to": "visible"},
+}
+
+
+def _behavior_slide(effect: dict) -> tuple[etree._Element, etree._Element]:
+    """Write one effect onto a catalog slide; return the slide and its timing."""
+    import sys
+
+    sys.path.insert(0, str(REPO_ROOT / "scripts" / "animation_catalog"))
+    import accept as acceptance
+
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    slide, registry, _spids = acceptance.catalog_slide()
+    node = TimingWriter(registry, index=index, slide_slug="behaviors").build(
+        {
+            "mainSequence": [dict(effect, id="e1", target={"element": CATALOG_TARGET_ID})],
+            "interactiveSequences": [],
+        }
+    )
+    slide.append(node)
+    return slide, node
+
+
+@pytest.mark.parametrize("name", sorted(BEHAVIOR_CASES))
+def test_every_behavior_primitive_round_trips_byte_for_byte(name):
+    """The advanced form comes back as JSON, not as a raw sidecar.
+
+    An effect with no ``presetClass``/``presetID`` is a list of behaviour
+    primitives PowerPoint plays without naming. It used to drop the whole
+    slide's timing to the raw fallback: replayable, so nothing was lost from
+    the *package*, but the JSON handed back held an opaque reference that no
+    one could read or edit. An imported deck's hand-made animations were
+    therefore carry-only.
+
+    Equality of the re-emitted XML is the assertion, not equality of the JSON.
+    Reading something that merely *looks* right is the failure mode worth
+    catching, and only the bytes settle it.
+    """
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    effect = {
+        "behaviors": [dict(BEHAVIOR_CASES[name], durationMs=700)],
+        "start": {"type": "onPageClick", "delayMs": 0},
+        "timing": {"durationMs": 700},
+    }
+    slide, written = _behavior_slide(effect)
+    first = etree.tostring(written)
+
+    motion = read_slide_motion(slide, slide_slug="behaviors", index=index)
+    assert motion.animations is not None, f"{name} fell back to raw: {motion.reasons}"
+    assert motion.raw_timing is None, name
+    imported = motion.animations["mainSequence"][0]
+    assert imported["behaviors"][0]["type"] == name
+
+    _slide, rewritten = _behavior_slide({k: v for k, v in imported.items() if k != "id"})
+    assert etree.tostring(rewritten) == first, (
+        f"{name} did not survive the round trip\n"
+        f"  wrote: {first.decode()}\n"
+        f"  again: {etree.tostring(rewritten).decode()}"
+    )
+
+
+def test_a_behavior_duration_is_reported_once_on_import():
+    """A behaviour's duration is the effect's, and import says it once.
+
+    The effect's own ``p:cTn`` carries **no** ``dur`` for a behaviour list —
+    only the behaviour's does. So a behaviour that states no duration inherits
+    the effect's, and one that states a different duration simply *is* the
+    effect's duration: there is nowhere in the package for an effect-level
+    value a behaviour does not use, and the writer does not invent one.
+
+    Import therefore reports it on the effect and omits it from the behaviour,
+    for both spellings. The JSON normalises; the bytes do not move, which the
+    byte-equality test above is what proves.
+    """
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+
+    def imported(effect):
+        slide, written = _behavior_slide(effect)
+        motion = read_slide_motion(slide, slide_slug="behaviors", index=index)
+        assert motion.animations is not None
+        return motion.animations["mainSequence"][0], etree.tostring(written)
+
+    # Inherited: the behaviour omits it, and import must not restate it — that
+    # restatement would read as a round-trip failure for the 16 catalog entries
+    # whose examples omit it.
+    effect, inherited_xml = imported(
+        {
+            "behaviors": [{"type": "rotation", "by": 360}],
+            "start": {"type": "onPageClick", "delayMs": 0},
+            "timing": {"durationMs": 500},
+        }
+    )
+    assert "durationMs" not in effect["behaviors"][0], effect["behaviors"][0]
+    assert effect["timing"]["durationMs"] == 500
+
+    # Stated on the behaviour: the same place, because that is the only place
+    # the package has. The effect-level 500 was never persisted.
+    effect, overridden_xml = imported(
+        {
+            "behaviors": [{"type": "rotation", "by": 360, "durationMs": 250}],
+            "start": {"type": "onPageClick", "delayMs": 0},
+            "timing": {"durationMs": 500},
+        }
+    )
+    assert "durationMs" not in effect["behaviors"][0], effect["behaviors"][0]
+    assert effect["timing"]["durationMs"] == 250
+    assert b'dur="250"' in overridden_xml and b'dur="500"' not in overridden_xml
+    assert b'dur="500"' in inherited_xml
+
+
+def test_a_behavior_outside_the_writers_vocabulary_still_falls_back_to_raw():
+    """Inverting the eight primitives must not widen what import accepts.
+
+    The raw fallback is what keeps a package replayable when sdpm cannot write
+    the content back. An out-of-enum attribute value is exactly that case: the
+    writer would refuse it, so importing it as a value would produce JSON that
+    fails on the way out.
+    """
+    index = load_capability_index(
+        REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+    )
+    slide, written = _behavior_slide(
+        {
+            "behaviors": [{"type": "filter", "filter": "fade", "transition": "in"}],
+            "start": {"type": "onPageClick", "delayMs": 0},
+            "timing": {"durationMs": 700},
+        }
+    )
+    # Corrupt the enumerated attribute in place, the way a hand edit or another
+    # producer would.
+    for node in written.iter():
+        if etree.QName(node).localname == "animEffect":
+            node.set("transition", "sideways")
+    motion = read_slide_motion(slide, slide_slug="behaviors", index=index)
+    assert motion.animations is None
+    assert motion.raw_timing is not None
+    assert any("sideways" in reason for reason in motion.reasons), motion.reasons

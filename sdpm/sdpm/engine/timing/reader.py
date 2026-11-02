@@ -64,12 +64,28 @@ from sdpm.engine.timing.model import (
 )
 from sdpm.engine.timing.transition import LEGACY_SPEED_MS
 from sdpm.engine.timing.writer import (
+    ANGLE_SCALE,
+    ANIM_CALC_MODES,
+    ANIM_EFFECT_TRANSITIONS,
+    ANIM_VALUE_TYPES,
+    BEHAVIOR_ELEMENTS,
+    CMD_TYPES,
+    MOTION_ORIGINS,
+    MOTION_PATH_EDIT_MODES,
+    PERCENT_SCALE,
     SDPM_EFFECT_EXT_URI,
     TRANSITION_STRATEGIES,
     CapabilityIndex,
     load_capability_index,
     qn,
 )
+
+#: OOXML element -> ``behaviors[].type``, inverted from the writer's own table
+#: so the two directions cannot drift. ``none`` writes no node, so it has no
+#: element to come back from.
+BEHAVIOR_TYPE_BY_TAG: dict[str, str] = {
+    tag: name for name, tag in BEHAVIOR_ELEMENTS.items() if tag is not None
+}
 
 A_NS = "http://schemas.openxmlformats.org/drawingml/2006/main"
 P_NS = "http://schemas.openxmlformats.org/presentationml/2006/main"
@@ -1236,22 +1252,44 @@ class _TimingReader:
         behaviors = _child(ctn, "childTnLst")
         if behaviors is None:
             raise _Unsupported(f"{sequence} effect has no p:childTnLst behaviors")
-        # Resolved after the behaviours are in hand, not before: an option the
-        # subtype cannot identify is found by comparing them.
-        entry, options = self._preset_entry(attrs, sequence, behaviors)
-        preset = dict(_semantic_preset(entry) or {})
-        target, duration = self._read_behaviors(behaviors, entry, preset, sequence)
-        grp_id = int(attrs.get("grpId", 0))
-        self._preset_build[(self._spid_of(target), grp_id)] = _animates_background(entry)
+        # An effect with no presetClass/presetID is the advanced form — a list
+        # of behaviour primitives PowerPoint plays without naming — so it is
+        # inverted as one rather than looked up as a preset.
+        behavior_list: list[dict[str, Any]] | None = None
+        if attrs.get("presetClass") is None or attrs.get("presetID") is None:
+            behavior_list, target, duration = self._read_behavior_list(behaviors, sequence)
+            named: dict[str, Any] = {"behaviors": behavior_list}
+            grp_id = int(attrs.get("grpId", 0))
+            # No preset means no measured build list, so the shape animates
+            # without its text, which is what `p:bldP/@animBg` would have said.
+            self._preset_build[(self._spid_of(target), grp_id)] = False
+        else:
+            # Resolved after the behaviours are in hand, not before: an option the
+            # subtype cannot identify is found by comparing them.
+            entry, options = self._preset_entry(attrs, sequence, behaviors)
+            preset = dict(_semantic_preset(entry) or {})
+            target, duration = self._read_behaviors(behaviors, entry, preset, sequence)
+            named = {"preset": self._read_preset(preset, options)}
+            grp_id = int(attrs.get("grpId", 0))
+            self._preset_build[(self._spid_of(target), grp_id)] = _animates_background(entry)
 
         effect: dict[str, Any] = {
             "target": {"element": target},
-            "preset": self._read_preset(preset, options),
+            **named,
             "start": {"type": start_type, "delayMs": self._delay(ctn, f"{sequence} effect")},
             "timing": self._read_timing(attrs, duration, sequence),
             "afterEffect": {"type": "none"},
             "sound": None,
         }
+        if behavior_list is not None:
+            # A behaviour inherits the effect's duration when it states none, so
+            # restating the inherited value would hand back JSON that differs
+            # from the JSON that produced the package while writing the same
+            # bytes. Only a behaviour that really times differently keeps it.
+            effect_duration = effect["timing"].get("durationMs")
+            for behavior in behavior_list:
+                if behavior.get("durationMs") == effect_duration:
+                    behavior.pop("durationMs")
         if start_type == "onShapeClick" and trigger_target is not None:
             effect["start"]["target"] = trigger_target
         explicit = self._ext_ids.get(attrs.get("id", ""))
@@ -1385,6 +1423,194 @@ class _TimingReader:
         return timing
 
     # -- behaviors -----------------------------------------------------
+    # -- the advanced form: an explicit behaviour list ------------------
+    def _unscale(self, raw: str, scale: int, what: str, *, whole: bool) -> int | float:
+        """Divide a scaled integer attribute back out.
+
+        An angle is written as whole degrees times 60000, so one that does not
+        divide exactly was not written by this writer and inverting it would
+        invent a number the package never carried — the raw fallback keeps that
+        replayable instead. A scale factor is a *fraction* times 100000, so 1.5
+        is the ordinary case and a remainder says nothing is wrong.
+        """
+        try:
+            value = int(raw)
+        except ValueError:
+            raise _Unsupported(f"{what} {raw!r} is not an integer") from None
+        if whole:
+            if value % scale:
+                raise _Unsupported(f"{what} {raw!r} is not a whole multiple of {scale}")
+            return value // scale
+        divided = value / scale
+        # An integral factor comes back as an int so the JSON reads as `2`
+        # rather than `2.0`; both write the same bytes.
+        return int(divided) if divided.is_integer() else divided
+
+    def _read_attr_name(self, behavior: etree._Element) -> str | None:
+        names = _child(behavior, "attrNameLst")
+        if names is None:
+            return None
+        found = [child.text for child in names if isinstance(child.tag, str)]
+        if len(found) != 1 or not found[0]:
+            raise _Unsupported("p:attrNameLst does not carry exactly one attribute name")
+        return str(found[0])
+
+    def _behavior_payload(self, node: etree._Element, tag: str) -> Any:
+        """Return the ``p:to`` payload for the three behaviours that carry one."""
+        to = _child(node, "to")
+        if to is None:
+            raise _Unsupported(f"{tag} has no p:to payload")
+        if tag == "p:animClr":
+            # The colour is DrawingML, so it is not in the p: namespace the
+            # rest of a timing tree lives in.
+            colour = to.find(f"{{{A_NS}}}srgbClr")
+            if colour is None or not colour.get("val"):
+                raise _Unsupported("p:animClr/p:to carries no a:srgbClr/@val")
+            return str(colour.get("val"))
+        if tag == "p:animScale":
+            factors: dict[str, Any] = {}
+            for axis in ("x", "y"):
+                raw = to.get(axis)
+                if raw is None:
+                    raise _Unsupported(f"p:animScale/p:to has no @{axis}")
+                factors[axis] = self._unscale(
+                    raw, PERCENT_SCALE, f"p:animScale/p:to/@{axis}", whole=False
+                )
+            return factors
+        value = _child(to, "strVal")
+        if value is None or value.get("val") is None:
+            raise _Unsupported("p:set/p:to carries no p:strVal/@val")
+        return str(value.get("val"))
+
+    def _behavior_fields(self, node: etree._Element, tag: str) -> dict[str, Any]:
+        """Invert one behaviour element's own attributes.
+
+        The mirror of the writer's ``_behavior_attrs``. Every enumerated value
+        is checked against the same vocabulary the writer validates against, so
+        a package carrying something outside it falls back to raw rather than
+        importing as a value sdpm would refuse to write back.
+        """
+        fields: dict[str, Any] = {}
+
+        def enumerated(attr: str, allowed: frozenset[str], key: str) -> None:
+            raw = node.get(attr)
+            if raw is None:
+                return
+            if raw not in allowed:
+                raise _Unsupported(f"{tag}/@{attr} {raw!r} is not one of {sorted(allowed)}")
+            fields[key] = raw
+
+        if tag == "p:animMotion":
+            path = node.get("path")
+            if not path:
+                raise _Unsupported("p:animMotion has no @path")
+            fields["path"] = path
+            enumerated("pathEditMode", MOTION_PATH_EDIT_MODES, "pathEditMode")
+            enumerated("origin", MOTION_ORIGINS, "origin")
+            if node.get("rAng") is not None:
+                fields["rotationAngle"] = self._unscale(
+                    str(node.get("rAng")), ANGLE_SCALE, "p:animMotion/@rAng", whole=True
+                )
+            if node.get("ptsTypes") is not None:
+                fields["pointTypes"] = str(node.get("ptsTypes"))
+        elif tag == "p:animRot":
+            for attr, key in (("by", "by"), ("from", "fromValue"), ("to", "to")):
+                if node.get(attr) is not None:
+                    fields[key] = self._unscale(
+                        str(node.get(attr)), ANGLE_SCALE, f"p:animRot/@{attr}", whole=True
+                    )
+        elif tag == "p:anim":
+            enumerated("calcmode", ANIM_CALC_MODES, "calcMode")
+            enumerated("valueType", ANIM_VALUE_TYPES, "valueType")
+            for attr, key in (("by", "by"), ("from", "fromValue"), ("to", "to")):
+                if node.get(attr) is not None:
+                    fields[key] = str(node.get(attr))
+        elif tag == "p:animEffect":
+            enumerated("transition", ANIM_EFFECT_TRANSITIONS, "transition")
+            if node.get("filter") is not None:
+                fields["filter"] = str(node.get("filter"))
+        elif tag == "p:cmd":
+            raw_type = node.get("type")
+            if raw_type is not None and raw_type not in CMD_TYPES:
+                raise _Unsupported(f"p:cmd/@type {raw_type!r} is not one of {sorted(CMD_TYPES)}")
+            command = node.get("cmd")
+            if not command:
+                raise _Unsupported("p:cmd has no @cmd")
+            # The writer composes `cmd` as `command(value)`, and a PowerPoint
+            # command's bracket always delimits its argument — `playFrom(0.0)`,
+            # against bare `pause` or `stop`. So the two parts are split back
+            # out, which is what makes the documented `command` + `value` form
+            # come back as it was written.
+            text = str(command)
+            if text.endswith(")") and "(" in text:
+                name, _, argument = text[:-1].partition("(")
+                fields["command"] = name
+                fields["value"] = argument
+            else:
+                fields["command"] = text
+            # `call` is the writer's default, so restating it would hand back
+            # JSON that differs from the JSON that produced these bytes.
+            if raw_type is not None and raw_type != "call":
+                fields["commandType"] = raw_type
+        return fields
+
+    def _read_behavior_list(
+        self, children: etree._Element, sequence: str
+    ) -> tuple[list[dict[str, Any]], str, int | None]:
+        """Invert an effect written as explicit behaviour primitives.
+
+        An effect with no ``presetClass``/``presetID`` is the advanced form: a
+        list of behaviours PowerPoint plays but does not name. It used to drop
+        the whole slide's timing to the raw fallback, which round-trips the
+        package but hands back no JSON anyone can read or edit. Each of the
+        eight primitives is inverted here instead.
+
+        Anything outside the writer's own vocabulary still raises, so the raw
+        fallback keeps covering what cannot be written back.
+        """
+        behaviors: list[dict[str, Any]] = []
+        targets: set[str] = set()
+        duration: int | None = None
+        for node in children:
+            if not isinstance(node.tag, str):
+                continue
+            tag = f"p:{_local(node)}"
+            kind = BEHAVIOR_TYPE_BY_TAG.get(tag)
+            if kind is None:
+                raise _Unsupported(f"{sequence} effect writes {tag}, which is not a behavior")
+            common = _child(node, "cBhvr")
+            if common is None:
+                raise _Unsupported(f"{sequence} behavior {tag} has no p:cBhvr")
+            _only_children(common, {"cTn", "tgtEl", "attrNameLst"}, f"{tag}/p:cBhvr")
+            common_ctn = _child(common, "cTn")
+            if common_ctn is None:
+                raise _Unsupported(f"{tag}/p:cBhvr has no p:cTn")
+            _require_attrs(common_ctn, ("id", "dur", "fill"), f"{tag}/p:cBhvr/p:cTn")
+            targets.add(self._read_target(common, allow_range=True))
+
+            behavior: dict[str, Any] = {"type": kind}
+            behavior.update(self._behavior_fields(node, tag))
+            if tag in ("p:animClr", "p:animScale", "p:set"):
+                behavior["to"] = self._behavior_payload(node, tag)
+            attr_name = self._read_attr_name(common)
+            if attr_name is not None:
+                behavior["attrName"] = attr_name
+            raw = common_ctn.get("dur")
+            if raw is not None:
+                if not raw.isdigit():
+                    raise _Unsupported(f"{tag} duration {raw!r} is not a millisecond value")
+                behavior["durationMs"] = int(raw)
+                duration = int(raw)
+            behaviors.append(behavior)
+
+        if not behaviors:
+            raise _Unsupported(f"{sequence} effect has an empty behavior list")
+        if len(targets) != 1:
+            raise _Unsupported(
+                f"{sequence} behaviors animate {len(targets)} targets; sdpm models one per effect"
+            )
+        return behaviors, targets.pop(), duration
+
     def _read_behaviors(
         self,
         children: etree._Element,

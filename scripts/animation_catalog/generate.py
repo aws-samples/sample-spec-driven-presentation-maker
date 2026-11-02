@@ -1038,7 +1038,11 @@ def text_unit_semantic(unit: str) -> dict[str, Any]:
 #: unresolved under ``BEHAVIOR_PAYLOADS['unresolved']``.
 BEHAVIOR_EXAMPLE_PAYLOADS: dict[str, dict[str, Any]] = {
     "motion": {"path": "M 0 0 L 0.25 0 E", "pathEditMode": "relative", "origin": "layout"},
-    "color": {"to": "#FF8800"},
+    # Six digits, no leading hash. The writer tolerates `#FF8800` and strips
+    # it, so the package carries `FF8800` and that is what import returns —
+    # the hash cannot be recovered, and the example should be the form that
+    # round-trips rather than the form that merely writes.
+    "color": {"to": "FF8800"},
     "scale": {"to": {"x": 1.5, "y": 1.5}},
     "rotation": {"by": 360},
     "property": {"attrName": "ppt_x", "to": "0.75", "calcMode": "lin", "valueType": "num"},

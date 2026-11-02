@@ -2126,7 +2126,10 @@ def test_reversibility_is_measured_rather_than_looked_up():
     # The remaining one-way entries are real reader gaps, not aliases: every one
     # is a form the reader does not invert at all.
     one_way = report["gaps"]["oneWayOnly"]["keys"]
-    assert len(one_way) == 67, (len(one_way), one_way[:5])
+    # 48, down from 67: the eight behaviour primitives are inverted now, which
+    # closed their 16 entries (one semantic key and one scripting enumerator
+    # each) plus three that resolved through them.
+    assert len(one_way) == 48, (len(one_way), one_way[:5])
     assert not any(key.startswith("EPPEntryEffect.") for key in one_way), (
         "transition enumerators corroborate a gallery tile and round-trip; "
         "none should be left counted one-way"
@@ -2573,17 +2576,24 @@ def test_describe_effects_stays_small_enough_to_call_per_effect():
 def test_the_guide_says_to_prefer_a_preset_over_composing_behaviours():
     """The two forms are not interchangeable, and the guide has to say which to use.
 
-    A composed `behaviors` list carries no `presetID`: PowerPoint does not name
-    it, its Effect Options do not apply, and sdpm's own reader imports it as
-    raw. That is 16 of the one-way entries. The guide recorded that behaviours
-    are not invertible without ever saying to prefer a preset.
+    The reason changed and the recommendation did not. A composed `behaviors`
+    list used to import as raw, which was the strongest argument against it;
+    the eight primitives are inverted now, so that argument is gone and the
+    guide must not keep making it. What remains is that the list carries no
+    `presetID` — PowerPoint plays it without naming it and its Effect Options
+    do not apply — and that its values are **unverified**, where a preset's
+    were measured.
     """
     guide = (REPO_ROOT / "sdpm/references/guides/animations.md").read_text()
     assert "Prefer a `preset`" in guide
     for token in (
-        "carries no `presetID`",
-        "imports as\nraw",
+        "does not carry is a `presetID`",
+        "round-trip byte-for-byte",
         "unverified",
         "import_attachment",
     ):
         assert token in guide, token
+    # The claim that a behaviour list imports as raw must be gone, not merely
+    # softened: it is no longer true and would send a caller the wrong way.
+    assert "imports as\nraw" not in guide
+    assert "cannot invert it" not in guide

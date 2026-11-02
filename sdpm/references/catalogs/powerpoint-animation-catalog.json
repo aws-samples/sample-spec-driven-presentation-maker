@@ -633,7 +633,7 @@
               "behaviors": [
                 {
                   "type": "color",
-                  "to": "#FF8800"
+                  "to": "FF8800"
                 }
               ]
             }
@@ -85145,7 +85145,7 @@
               "behaviors": [
                 {
                   "type": "color",
-                  "to": "#FF8800"
+                  "to": "FF8800"
                 }
               ]
             }

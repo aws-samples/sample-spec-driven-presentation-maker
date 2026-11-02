@@ -397,11 +397,17 @@ Both forms are authorable and they are not interchangeable.
 A `preset` writes bytes PowerPoint was measured producing, carries a `presetID` so PowerPoint
 names the effect in its own UI, and **comes back as the same JSON on import**.
 
-A `behaviors` list carries no `presetID`. PowerPoint plays it but does not name it, its Effect
-Options do not apply, and sdpm's reader cannot invert it — an explicit behaviour list imports as
-raw. It is also unverified: the writer transcribes a preset's measured values, while a composed
-list is whatever the caller wrote, and the idioms are not obvious. `1+#ppt_w/2` scales with the
-shape; a plausible-looking constant does not.
+A `behaviors` list also comes back as the same JSON — each of the eight primitives is inverted,
+and all eight round-trip byte-for-byte. What it does not carry is a `presetID`: PowerPoint plays
+the list but does not name the effect in its own UI, and its Effect Options do not apply. It is
+also unverified, which is the substantive difference: the writer transcribes a preset's measured
+values, while a composed list is whatever the caller wrote, and the idioms are not obvious.
+`1+#ppt_w/2` scales with the shape; a plausible-looking constant does not.
+
+Two spellings normalise rather than survive, because the package does not carry the difference.
+A colour comes back as six digits with no leading `#`, and `command` + `value` come back split
+at the bracket however they were written. Both forms write the same bytes; import returns the
+canonical one.
 
 So: pick a preset when one fits the intent, and compose only when none does. For a deck that is
 generated once and never reopened the round-trip cost does not bite — but `import_attachment`
@@ -690,8 +696,10 @@ Kept as raw rather than semantic JSON — preserved and replayable, but not auth
   JSON the writer then refuses, so the round-trip would break on content the file carried);
 - an effect whose behaviours match no measured form at all — a hand-edited payload, or one
   from a PowerPoint build this catalog was not measured against;
-- an effect with no `presetClass` / `presetID` — an explicit behavior list whose payload sdpm
-  does not invert;
+- an explicit behavior list using something outside the eight primitives' own vocabulary — an
+  out-of-enum attribute value, a payload-free node, an angle that is not a whole number of
+  degrees, or behaviours animating more than one target (the eight primitives themselves now
+  import as `behaviors`, so only what the writer would refuse to write back stays raw);
 - behaviors that do not match the catalog entry's recorded children exactly, or whose
   `p:set` / `p:animEffect` / `p:cmd` payload differs from the captured one;
 - an after-effect or dim node;
