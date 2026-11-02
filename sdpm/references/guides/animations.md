@@ -717,7 +717,37 @@ Kept as raw rather than semantic JSON — preserved and replayable, but not auth
 ### Eight build spellings normalise rather than survive
 
 These write bytes another spelling also writes, so import returns the other one. Nothing is
-lost from the package — the animation is identical — but the JSON comes back differently:
+lost from the package — the animation is identical — but the JSON comes back differently.
+
+**What was measured about the cost, 2026-11-02.** Writing each spelling with and without the
+field, on an entrance preset and on a motion path:
+
+| Spelling | On an entrance preset | On a motion path |
+| --- | --- | --- |
+| `text.unit: "byParagraph"` | identical bytes | adds a bare `p:bldP` |
+| `text.animateBackground: true` | identical bytes | adds `p:bldP/@animBg="1"` |
+| `text.sequence: "asOneObject"` | identical bytes | adds a bare `p:bldP` |
+
+So on an entrance preset these fields are inert: they write nothing, and losing them on import
+costs nothing. On a **motion path** they add a `p:bldLst` entry that import does not return, so
+a round trip drops it.
+
+**What that entry costs is not established, and is not guessed here.** PowerPoint itself writes
+a bare `p:bldP` for every animated shape that has text — seven of seven in the Complex
+motion-path capture, none of which asked for a text build — so the divergence may be on the
+*writer's* side rather than the reader's: sdpm emits it only when asked. Matching PowerPoint
+and always emitting it would make the field inert on motion paths too, and remove the drop.
+
+Two things have to be known before doing that, and neither is:
+
+* whether a bare `p:bldP` changes playback at all. ECMA-376's default for
+  `CT_TLBuildParagraph/@build` would answer it, and this catalog does not record that default,
+  so it is an open question rather than a settled one.
+* what reading it back would do to the 95 gallery tiles. Every `p:bldP` the tiles write also
+  lacks `@build`, so a reader that resolved the bare form to `asOneObject` would hand that
+  field to all of them — entries that currently round-trip exactly.
+
+Until both are measured, the drop stands and is recorded here rather than papered over.
 
 | Written | Comes back as | Why |
 |---|---|---|
