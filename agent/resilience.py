@@ -2,9 +2,9 @@
 # SPDX-License-Identifier: MIT-0
 """Hard-stop guards for agent tool loops (fingerprint + hard cap).
 
-Complements the soft-stop prompts (STOP_PROMPT, BUDGET_PROMPT, ERROR_LIMIT_PROMPT)
-which nudge the LLM. These enforce termination via agent.cancel() when the LLM
-ignores those prompts (observed in production logs).
+Complements ERROR_LIMIT_PROMPT (agent/modes/composer.py), which nudges the LLM.
+These enforce termination via agent.cancel() when the LLM ignores that prompt
+(observed in production logs).
 """
 
 import hashlib

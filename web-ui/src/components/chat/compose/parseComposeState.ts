@@ -28,7 +28,6 @@ export interface AgentState {
   retryAttempt: number
   errorMsg?: string
   previousAttemptError?: string
-  budgetReached?: boolean
   activity: ComposeActivity[]
 }
 
@@ -132,8 +131,6 @@ export function parseComposeState(
     } else if (event.status === "error") {
       agent.status = "error"
       if (typeof event.error === "string") agent.errorMsg = event.error
-    } else if (event.status === "budget_reached") {
-      agent.budgetReached = true
     } else if (event.tool) {
       const toolName = String(event.tool)
       const toolUseId = String(event.toolUseId || "")
