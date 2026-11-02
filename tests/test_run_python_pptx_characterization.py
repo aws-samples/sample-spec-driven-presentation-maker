@@ -312,18 +312,7 @@ def _compose_files(deck: Path) -> dict[str, list[Path]]:
     return files
 
 
-def _assert_local_measure_format(out: dict) -> None:
-    """Measured body + bad: report text with judge, build warnings of the measured pages."""
-    assert out["measure"].startswith("📐 Text measurement")
-    assert "Slide body:" in out["measure"] and "Slide bad:" in out["measure"]
-    assert "⚠ Layout issues" in out["measure"] and "[collision]" in out["measure"]
-    assert isinstance(out["warnings"], list)
-    assert any(w.startswith("page02 (Title Only) offset:") for w in out["warnings"])
-    assert any(w.startswith("page03 (No Such Layout) offset:") for w in out["warnings"])
-    assert any("page02(body)" in w and "includes/missing.json" in w for w in out["warnings"])
-    assert not any("fonts auto-detected" in w for w in out["warnings"])
-    assert out.get("lint_diagnostics", []) == []
-    assert "bad" not in out.get("errors", {})
+_assert_local_measure_format = _assert_measure_format
 
 
 def test_local_edit_with_measure(local_deck: Path, monkeypatch):
@@ -345,14 +334,27 @@ def test_local_edit_with_measure(local_deck: Path, monkeypatch):
 
 
 def _assert_local_compose(out: dict, deck: Path) -> None:
-    # Every rendered slug is composed (a fallback-layout slide too); no sourceHash.
-    assert out["compose"] == "2 slides composed"
+    # Rendered slugs are composed, except a slide whose layout fell back; with sourceHash.
+    assert out["compose"] == "1 slides composed"
     files = _compose_files(deck)
-    assert sorted(files) == ["bad", "body", "defs"]
+    assert sorted(files) == ["body", "defs"]
     body = json.loads(files["body"][-1].read_text(encoding="utf-8"))
     assert body["regions"] == [{"name": "content", "x": 60, "y": 160, "w": 900, "h": 400}]
-    assert "sourceHash" not in body
+    assert body["sourceHash"]
     assert body["components"] and all(c["changed"] is True for c in body["components"])
+
+
+def test_local_compose_replaces_older_files_of_the_written_slugs(local_deck: Path, monkeypatch):
+    fake_libreoffice.install(monkeypatch)
+    compose = local_deck / "compose"
+    compose.mkdir()
+    for name in ("body_100.json", "cover_100.json", "defs_100.json"):
+        (compose / name).write_text("{}", encoding="utf-8")
+    _local_run(local_deck, {"slides/body.json": EDITED_BODY})
+    files = _compose_files(local_deck)
+    assert [p.name for p in files["cover"]] == ["cover_100.json"]  # not re-rendered: kept
+    assert len(files["body"]) == 1 and files["body"][0].name != "body_100.json"
+    assert len(files["defs"]) == 1 and files["defs"][0].name != "defs_100.json"
 
 
 def test_local_compose_keeps_fill_rule_of_icons(local_deck: Path, monkeypatch):
@@ -374,10 +376,8 @@ def test_local_edit_without_measure(local_deck: Path, monkeypatch):
 
 
 def _assert_local_unmeasured_warnings(out: dict) -> None:
-    # Every build warning of the deck, as a list.
-    assert isinstance(out["warnings"], list)
-    assert "fonts auto-detected from template" in out["warnings"]
-    assert any(w.startswith("page03 (No Such Layout) offset:") for w in out["warnings"])
+    # Build warnings come with measure_slides only.
+    assert "warnings" not in out and "lint_diagnostics" not in out
 
 
 def test_local_without_libreoffice(local_deck: Path, monkeypatch):
@@ -391,7 +391,7 @@ def test_local_without_libreoffice(local_deck: Path, monkeypatch):
 
 
 def _assert_local_no_libreoffice_measure(out: dict) -> None:
-    assert out["measure"].startswith("Measure error: ")
+    assert out["measure"] == json.dumps({"error": "LibreOffice SVG export failed"})
 
 
 def test_local_measure_of_an_unknown_slug(local_deck: Path, monkeypatch):
@@ -401,7 +401,7 @@ def test_local_measure_of_an_unknown_slug(local_deck: Path, monkeypatch):
 
 
 def _assert_local_no_match(out: dict) -> None:
-    assert out["measure"] == "No matching slides found for given slugs"
+    assert out["measure"] == json.dumps({"error": "No matching slides found for given slugs"})
 
 
 def test_local_outline_warning_with_build_warnings(local_deck: Path, monkeypatch):
@@ -411,5 +411,6 @@ def test_local_outline_warning_with_build_warnings(local_deck: Path, monkeypatch
 
 
 def _assert_local_outline_with_build_warnings(out: dict) -> None:
-    # The build warnings list replaces the outline warning.
-    assert isinstance(out["warnings"], list)
+    # The outline warning stays next to the measured slide's warnings.
+    assert set(out["warnings"]) == {"outline", "layoutBias", "build"}
+    assert out["warnings"]["outline"].startswith("outline.md format violation")
