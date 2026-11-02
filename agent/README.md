@@ -141,8 +141,6 @@ In addition to MCP tools, the agent includes built-in tools defined locally:
 | `MEMORY_ID` | Bedrock AgentCore Memory ID | `""` |
 | `MODEL_ID` | Bedrock model ID | `global.anthropic.claude-sonnet-4-6` |
 | `AWS_REGION` / `AWS_DEFAULT_REGION` | AWS region | `us-east-1` |
-| `DECKS_TABLE` | DynamoDB table name | (required) |
-| `PPTX_BUCKET` | S3 bucket name | (required) |
 
 ---
 
