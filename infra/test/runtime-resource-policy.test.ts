@@ -37,8 +37,6 @@ function synth(): { runtime: Template; agent: Template } {
   });
   const agent = new AgentStack(app, "Agent", {
     env,
-    table,
-    pptxBucket,
     mcpRuntimeArn: runtime.runtimeArn,
     allowedClients: [],
     useAuthStack: true,
