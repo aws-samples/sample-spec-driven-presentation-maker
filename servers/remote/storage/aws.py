@@ -16,7 +16,30 @@ from typing import Any, Optional
 
 from shared import user_library
 from shared.schema import user_template_key, user_template_sk
-from storage import Storage
+from storage import Storage, write_fence
+
+
+class _FencedS3:
+    """The S3 client behind AwsStorage: every write first passes the request's write
+    fence (storage/write_fence.py). Without a fence (no generation in the request, or no
+    deck) it is the plain client. Reads and everything else pass straight through."""
+
+    _WRITES = frozenset({"put_object", "delete_object", "delete_objects", "copy_object"})
+
+    def __init__(self, client: Any, table: Callable[[], Any]) -> None:
+        self._client = client
+        self._table = table
+
+    def __getattr__(self, name: str) -> Any:
+        attr = getattr(self._client, name)
+        if name not in self._WRITES:
+            return attr
+
+        def fenced(*args: Any, **kwargs: Any) -> Any:
+            write_fence.check(self._table())
+            return attr(*args, **kwargs)
+
+        return fenced
 
 
 class AwsStorage(Storage):
@@ -44,7 +67,7 @@ class AwsStorage(Storage):
         if s3_client is None and s3_factory is None:
             raise ValueError("s3_client or s3_factory is required")
         self._table_obj = table
-        self._s3_obj = s3_client
+        self._s3_obj = _FencedS3(s3_client, lambda: self._table) if s3_client is not None else None
         self._table_factory = table_factory
         self._s3_factory = s3_factory
         self._lock = threading.Lock()
@@ -71,7 +94,7 @@ class AwsStorage(Storage):
         if self._s3_obj is None:
             with self._lock:
                 if self._s3_obj is None:
-                    self._s3_obj = self._s3_factory()  # type: ignore[misc]
+                    self._s3_obj = _FencedS3(self._s3_factory(), lambda: self._table)  # type: ignore[misc]
         return self._s3_obj
 
     @property
@@ -111,6 +134,10 @@ class AwsStorage(Storage):
             Previous values of the updated attributes (UPDATED_OLD) — lets
             callers clean up superseded S3 objects (e.g. the old pptxS3Key)
             without an extra read.
+
+        Raises:
+            write_fence.StaleTurn: The request's turn was stopped (the update is
+                conditional on the write fence, so it cannot race the fence).
         """
         set_parts = []
         remove_parts = []
@@ -132,10 +159,21 @@ class AwsStorage(Storage):
             "Key": {"PK": f"USER#{user_id}", "SK": f"DECK#{deck_id}"},
             "UpdateExpression": " ".join(expression_parts),
         }
+        fenced = write_fence.update_condition()
+        if fenced is not None:
+            fence, condition = fenced
+            kwargs["ConditionExpression"] = condition["ConditionExpression"]
+            kwargs["ExpressionAttributeNames"] = condition["ExpressionAttributeNames"]
+            values.update(condition["ExpressionAttributeValues"])
         if values:
             kwargs["ExpressionAttributeValues"] = values
         kwargs["ReturnValues"] = "UPDATED_OLD"
-        response = self._table.update_item(**kwargs)
+        try:
+            response = self._table.update_item(**kwargs)
+        except Exception as e:
+            if fenced is not None and write_fence.is_conditional_check_failure(e):
+                raise write_fence.condition_failed(fenced[0]) from e
+            raise
         return response.get("Attributes", {})
 
     # --- Presentation JSON (S3) ---

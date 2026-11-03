@@ -33,6 +33,7 @@ from modes import MODES
 from modes.composer import make_compose_slides
 from resilience import LoopGuard, gate_tool_call
 from session import fix_excess_tool_results
+from turn_fence import TurnFence
 from tools.hearing_tool import hearing
 from tools.web_tools import web_fetch
 
@@ -64,7 +65,7 @@ def _resolve_model_id(requested: str | None, default: str) -> str:
 
 
 _MCP_FACTORIES = [
-    lambda jwt_token, session_id="", tool_filters=None: mcp_agentcore_runtime(jwt_token=jwt_token, session_id=session_id, tool_filters=tool_filters),
+    lambda jwt_token, session_id="", tool_filters=None, **kwargs: mcp_agentcore_runtime(jwt_token=jwt_token, session_id=session_id, tool_filters=tool_filters, **kwargs),
     lambda jwt_token, session_id="", tool_filters=None: mcp_aws_knowledge(),
     lambda jwt_token, session_id="", tool_filters=None: mcp_aws_pricing(),
 ]
@@ -221,8 +222,12 @@ def _session_manager(memory_id: str, session_id: str, user_id: str, region: str)
 # Unified factory
 # ---------------------------------------------------------------------------
 
-def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_model_id: str | None = None, create_model_id: str | None = None) -> tuple[Agent, list[dict]]:
+def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_model_id: str | None = None, create_model_id: str | None = None, fence: TurnFence | None = None) -> tuple[Agent, list[dict]]:
     """Create a Strands Agent for the given mode.
+
+    ``fence`` (turn_fence.py): its generation goes into the ``_meta`` of every
+    Presentation Maker call (orchestrator and composers), and it learns the decks the
+    turn's tool calls name.
 
     Returns:
         Tuple of (Configured Strands Agent, MCP status list).
@@ -251,6 +256,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
 
     # MCP servers — Presentation Maker built per turn (it carries the JWT), AWS
     # Knowledge / AWS Pricing reused from the process; all connected concurrently below.
+    fence_kwargs = {"meta": fence.meta} if fence is not None else {}
     built = []
     names = []
     required_flags = []
@@ -260,7 +266,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         else:
             # Apply tool_filters only to the Presentation Maker server (index 0)
             filters = {"allowed": cfg.allowed_tools} if (i == 0 and cfg.allowed_tools) else None
-            built.append(factory_fn(jwt_token, session_id=session_id, tool_filters=filters))
+            built.append(factory_fn(jwt_token, session_id=session_id, tool_filters=filters, **fence_kwargs))
         names.append(name)
         required_flags.append(required)
 
@@ -311,7 +317,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         # Composers get their own Presentation Maker client per group; it carries the
         # composer allowlist so a composer sees only the deck tools.
         composer_filters = {"allowed": MODES["composer"].allowed_tools}
-        composer_mcp_factory = lambda mcp_session_id="": mcp_agentcore_runtime(jwt_token=jwt_token, session_id=mcp_session_id, tool_filters=composer_filters)  # noqa: E731
+        composer_mcp_factory = lambda mcp_session_id="": mcp_agentcore_runtime(jwt_token=jwt_token, session_id=mcp_session_id, tool_filters=composer_filters, **fence_kwargs)  # noqa: E731
         compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create, user_id=user_id, session_id=session_id)
         tools.append(compose_slides)
 
@@ -380,6 +386,11 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
 
     # Write gate: no tool runs once the process is stopping (SIGTERM, stop_guard.py)
     agent.hooks.add_callback(BeforeToolCallEvent, gate_tool_call)
+
+    # Write fence: the decks this turn touches, and the client that fences them on a stop
+    if fence is not None:
+        agent.hooks.add_callback(BeforeToolCallEvent, fence.note_tool_call)
+        fence.bind(mcp_servers[0] if mcp_servers else None)
 
     # Cost logger
     agent.hooks.add_callback(AfterInvocationEvent, log_usage)

@@ -33,6 +33,7 @@ from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from shared.authz import authorize  # noqa: E402
 from shared import user_library  # noqa: E402
+from storage import write_fence  # noqa: E402
 from storage.aws import AwsStorage  # noqa: E402
 from tools import assets, reference, preview, generate  # noqa: E402
 from tools import sandbox as sandbox_mod  # noqa: E402
@@ -66,8 +67,8 @@ mcp = FastMCP(
 
 
 def _run_in_background(target, *, name: str) -> None:
-    """Start ``target`` on a daemon thread. Tests patch this to run inline."""
-    threading.Thread(target=target, name=name, daemon=True).start()
+    """Start ``target`` on a daemon thread, under the request's write fence. Tests patch this to run inline."""
+    threading.Thread(target=write_fence.carry(target), name=name, daemon=True).start()
 
 
 # Background work that get_preview may need to wait for. Keyed by deck so a
@@ -122,13 +123,21 @@ def offloaded_tool(fn):
 
     The original function is returned unchanged so it stays callable (and
     testable) as a plain function.
+
+    A call that carries the agent's turn generation and names a deck runs under
+    that deck's write fence (storage/write_fence.py).
     """
     import asyncio
     import functools
     import inspect
 
     async def _runner(**kwargs):
-        return await asyncio.to_thread(functools.partial(fn, **kwargs))
+        token = _bind_write_fence(kwargs.get("deck_id"))
+        try:
+            return await asyncio.to_thread(functools.partial(fn, **kwargs))
+        finally:
+            if token is not None:
+                write_fence.reset(token)
 
     _runner.__name__ = fn.__name__
     _runner.__qualname__ = fn.__qualname__
@@ -137,6 +146,30 @@ def offloaded_tool(fn):
     _runner.__annotations__ = dict(getattr(fn, "__annotations__", {}))
     mcp.tool()(_runner)
     return fn
+
+
+def _request_meta():
+    """``_meta`` of the MCP request being handled, or None outside a request."""
+    from mcp.server.lowlevel.server import request_ctx
+
+    ctx = request_ctx.get(None)
+    return ctx.meta if ctx is not None else None
+
+
+def _bind_write_fence(deck_id):
+    """Bind the write fence for a call that carries a turn generation and names a deck.
+
+    Returns the ContextVar token, or None when the call is not fenced (no generation:
+    other MCP clients and older agents keep today's behaviour).
+    """
+    generation = write_fence.generation_from_meta(_request_meta())
+    if generation is None or not isinstance(deck_id, str) or not deck_id.strip():
+        return None
+    try:
+        user_id = _get_user_id()
+    except ValueError:
+        return None  # the tool rejects the call itself
+    return write_fence.bind(write_fence.Fence(generation=generation, user_id=user_id, deck_id=deck_id))
 
 # --- HTTP Request ContextVar (for extracting user_id from Runtime header) ---
 _current_request_headers: ContextVar[dict] = ContextVar("_current_request_headers", default={})
@@ -684,6 +717,33 @@ def import_attachment(
         storage=_storage,
         filename=filename,
     )
+
+
+# --- Write fence (agent plumbing) ---
+
+
+@offloaded_tool
+def fence_turn(
+    deck_ids: Annotated[list[str], Field(description="Decks the stopped turn worked on.", max_length=50)],
+) -> str:
+    """Agent plumbing, not a slide tool: the agent calls it when one of its turns is
+    stopped. Writes that the stopped turn's calls still make to these decks are skipped
+    from now on. The turn is the generation in this request's _meta.
+    """
+    generation = write_fence.generation_from_meta(_request_meta())
+    if generation is None:
+        return json.dumps({"error": f"fence_turn needs the turn generation in _meta[{write_fence.GENERATION_META_KEY!r}]"})
+    user_id = _get_user_id()
+    fenced: list[str] = []
+    unchanged: list[str] = []
+    for deck_id in dict.fromkeys(d.strip() for d in deck_ids if isinstance(d, str) and 0 < len(d.strip()) <= 64):
+        # Keyed by the caller's own sub: only the owner's deck item can be fenced.
+        if write_fence.advance(_storage.table, user_id, deck_id, generation):
+            fenced.append(deck_id)
+        else:
+            unchanged.append(deck_id)
+    logger.info("fence_turn: generation %s fenced=%s unchanged=%s", generation, fenced, unchanged)
+    return json.dumps({"generation": generation, "fenced": fenced, "unchanged": unchanged})
 
 
 # --- Generation Tools ---
@@ -1236,7 +1296,7 @@ def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old
                     _delete_quietly(k)
 
             with ThreadPoolExecutor(max_workers=8) as pool:
-                list(pool.map(upload, sorted(composed.slides.items())))
+                list(pool.map(write_fence.carry(upload), sorted(composed.slides.items())))
         except Exception:
             logger.error("compose failed", exc_info=True)
     finally:

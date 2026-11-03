@@ -24,8 +24,11 @@ class Recorder:
         self.path = Path(path)
         self._lock = threading.Lock()
 
-    def log(self, kind: str, name: str, who: str = "") -> None:
-        line = json.dumps({"t": time.time(), "kind": kind, "name": name, "who": who})
+    def log(self, kind: str, name: str, who: str = "", detail: dict | None = None) -> None:
+        record = {"t": time.time(), "kind": kind, "name": name, "who": who}
+        if detail is not None:
+            record["detail"] = detail
+        line = json.dumps(record)
         with self._lock, self.path.open("a", encoding="utf-8") as f:
             f.write(line + "\n")
 
@@ -92,13 +95,18 @@ class FakeMCP(ToolProvider):
 
     hold_loop: write_slide blocks the calling agent's event loop for its whole duration,
     so nothing else on that loop (Strands' cancel watcher) runs meanwhile.
+    meta: the client-level ``_meta`` the factory gave it (the turn's write-fence
+    generation); recorded at construction and with every direct call.
     """
 
     server_instructions = ""
 
-    def __init__(self, recorder: Recorder, who: str, tool_seconds: float = 0.5, hold_loop: bool = False):
+    def __init__(self, recorder: Recorder, who: str, tool_seconds: float = 0.5, hold_loop: bool = False,
+                 meta: dict | None = None):
         self.recorder = recorder
         self.who = who
+        self.meta = meta
+        recorder.log("client", "created", who, detail={"meta": meta})
 
         if hold_loop:
             @tool(name="write_slide")
@@ -130,7 +138,7 @@ class FakeMCP(ToolProvider):
         pass
 
     def call_tool_sync(self, tool_use_id, name, arguments, **kwargs):
-        self.recorder.log("mcp", name, self.who)
+        self.recorder.log("mcp", name, self.who, detail={"arguments": arguments, "meta": self.meta})
         return {"status": "success", "toolUseId": tool_use_id, "content": [{"text": json.dumps(_PAYLOAD)}]}
 
 

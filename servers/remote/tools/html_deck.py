@@ -42,7 +42,7 @@ from shared.artifact_keys import (
     preview_key,
     preview_prefix,
 )
-from storage import Storage
+from storage import Storage, write_fence
 from tools import template_html_cache
 
 logger = logging.getLogger("sdpm.html_deck")
@@ -164,7 +164,7 @@ def _upload_all(
     if not files:
         return {}
     with ThreadPoolExecutor(max_workers=_UPLOAD_WORKERS) as pool:
-        done = list(pool.map(_one, files))
+        done = list(pool.map(write_fence.carry(_one), files))
     return {slug: key for slug, key in done if key}
 
 

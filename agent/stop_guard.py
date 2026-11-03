@@ -26,6 +26,7 @@ import signal
 import sys
 import threading
 import time
+from typing import Callable
 
 from bedrock_agentcore.memory.integrations.strands.session_manager import AgentCoreMemorySessionManager
 
@@ -39,18 +40,21 @@ EXIT_AFTER_S = 3.0
 
 # Re-entrant: the SIGTERM handler takes it on the main thread, which may hold it already.
 _lock = threading.RLock()
-_running: set[threading.Event] = set()
+# Running turns: stop event -> what to call when the turn is stopped (or None).
+_running: dict[threading.Event, Callable[[], object] | None] = {}
 _exiting = threading.Event()
 
 
-def begin_turn() -> threading.Event:
+def begin_turn(on_stop: Callable[[], object] | None = None) -> threading.Event:
     """Register a running turn and return its stop event (set on SIGTERM).
 
+    ``on_stop`` runs when SIGTERM stops the turn (on the signal handler's thread, so it
+    must not block: turn_fence.TurnFence.advance hands its call to a thread).
     Pair with end_turn() in a finally block.
     """
     stop = threading.Event()
     with _lock:
-        _running.add(stop)
+        _running[stop] = on_stop
     if writes_closed():
         stop.set()  # the process is already stopping
     return stop
@@ -58,16 +62,21 @@ def begin_turn() -> threading.Event:
 
 def end_turn(stop: threading.Event) -> None:
     with _lock:
-        _running.discard(stop)
+        _running.pop(stop, None)
 
 
 def stop_all() -> int:
     """Close the write gate and set the stop event of every running turn."""
     close_writes()
     with _lock:
-        running = list(_running)
-    for stop in running:
+        running = list(_running.items())
+    for stop, on_stop in running:
         stop.set()
+        if on_stop is not None:
+            try:
+                on_stop()
+            except Exception as e:  # noqa: BLE001 - the other turns still stop
+                logger.warning("SIGTERM guard: a turn's stop callback failed: %s", e)
     return len(running)
 
 

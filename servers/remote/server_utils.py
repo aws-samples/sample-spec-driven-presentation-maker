@@ -9,7 +9,7 @@ import shutil
 import tempfile
 from pathlib import Path
 
-from storage import Storage
+from storage import Storage, write_fence
 
 logger = logging.getLogger("sdpm.mcp")
 
@@ -82,7 +82,7 @@ def schedule_webp_background(
     """
     try:
         threading.Thread(
-            target=_generate_webp_background,
+            target=write_fence.carry(_generate_webp_background),
             args=(deck_id, pptx_path, tmpdir, storage, slugs),
             kwargs={"user_id": user_id},
             name=f"webp-{deck_id}",
