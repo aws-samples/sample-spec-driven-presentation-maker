@@ -26,6 +26,8 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any, Callable, Literal, Union
 
+from resilience import WritesClosed, writes_closed
+
 SourceType = Literal["file", "mcp", "callable"]
 Target = Literal["system", "history:user", "history:assistant", "history:tool_result"]
 
@@ -84,9 +86,15 @@ def _read_file(name: str) -> str:
 
 
 def _call_mcp(mcp_client, tool_name: str, args: dict) -> str:
-    """Call an MCP tool synchronously and concatenate text content."""
+    """Call an MCP tool synchronously and concatenate text content.
+
+    Raises WritesClosed instead of calling once the write gate is closed (stop_guard.py):
+    compose_slides prefetches the composer prompt this way after check_specs.
+    """
     if mcp_client is None:
         return ""
+    if writes_closed():
+        raise WritesClosed(f"{tool_name} not called: the agent is shutting down")
     result = mcp_client.call_tool_sync(
         tool_use_id=f"resolve-{uuid.uuid4().hex[:8]}",
         name=tool_name,

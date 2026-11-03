@@ -1,22 +1,53 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Hard-stop guards for agent tool loops (fingerprint + hard cap).
+"""Hard-stop guards for agent tool loops (fingerprint + hard cap) and the write gate.
 
 Complements ERROR_LIMIT_PROMPT (agent/modes/composer.py), which nudges the LLM.
 These enforce termination via agent.cancel() when the LLM ignores that prompt
 (observed in production logs).
+
+The write gate closes once the process is told to stop (SIGTERM, see stop_guard.py).
+From then on tool calls, compose's direct MCP calls and Memory events are dropped.
 """
 
 import hashlib
 import json
 import logging
 import random
+import threading
 import time
 from dataclasses import dataclass, field
 
-from strands.hooks.events import AfterToolCallEvent
+from strands.hooks.events import AfterToolCallEvent, BeforeToolCallEvent
 
 logger = logging.getLogger("sdpm.agent")
+
+# invocation_state key of the turn's stop event (a threading.Event owned by the turn).
+# Strands clears the agent's own cancel_signal when the parent invocation ends, so
+# compose_slides hands this one to its composers instead: it stays set after a cancel.
+TURN_STOP_KEY = "sdpm_turn_stop"
+
+_SHUTTING_DOWN = "Stopped: the agent is shutting down."
+_writes_closed = threading.Event()
+
+
+class WritesClosed(RuntimeError):
+    """A direct MCP call was refused because the write gate is closed."""
+
+
+def close_writes() -> None:
+    """Close the write gate for the rest of the process's life."""
+    _writes_closed.set()
+
+
+def writes_closed() -> bool:
+    return _writes_closed.is_set()
+
+
+def gate_tool_call(event: BeforeToolCallEvent) -> None:
+    """BeforeToolCallEvent hook: cancel the tool call once the write gate is closed."""
+    if _writes_closed.is_set():
+        event.cancel_tool = _SHUTTING_DOWN
 
 
 def call_tool_with_retry(mcp_client, *, tool_use_id: str, name: str, arguments: dict,
@@ -26,10 +57,13 @@ def call_tool_with_retry(mcp_client, *, tool_use_id: str, name: str, arguments: 
     Retries only on transport-level exceptions (connection drops, timeouts).
     A result with status="error" is a tool-level failure the caller must
     handle — retrying it would repeat the same deterministic error.
+    Raises WritesClosed instead of calling once the write gate is closed.
     """
     if max_attempts < 1:
         raise ValueError(f"max_attempts must be >= 1, got {max_attempts}")
     for attempt in range(max_attempts):
+        if _writes_closed.is_set():
+            raise WritesClosed(f"{name} not called: the agent is shutting down")
         try:
             return mcp_client.call_tool_sync(tool_use_id=tool_use_id, name=name, arguments=arguments)
         except Exception as e:
