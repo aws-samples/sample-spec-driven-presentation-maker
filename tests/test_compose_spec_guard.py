@@ -8,6 +8,7 @@ import asyncio
 import importlib.util
 import json
 import sys
+import threading
 
 import pytest
 from pathlib import Path
@@ -52,6 +53,8 @@ def _load_composer(monkeypatch):
         monkeypatch,
         "resilience",
         call_tool_with_retry=lambda client, **kwargs: client.call_tool_sync(**kwargs),
+        gate_tool_call=lambda _event: None,
+        TURN_STOP_KEY="turn_stop",
     )
 
     root = Path(__file__).resolve().parents[1]
@@ -63,6 +66,12 @@ def _load_composer(monkeypatch):
     assert spec.loader is not None
     spec.loader.exec_module(module)
     return module
+
+
+def _tool_context(tool_use_id: str) -> SimpleNamespace:
+    return SimpleNamespace(
+        tool_use={"toolUseId": tool_use_id}, invocation_state={}, cancel_signal=threading.Event(),
+    )
 
 
 def test_compose_slides_rejects_invalid_specs_before_dispatch(monkeypatch) -> None:
@@ -84,7 +93,7 @@ def test_compose_slides_rejects_invalid_specs_before_dispatch(monkeypatch) -> No
         ],
     }
     compose_slides = composer.make_compose_slides([client], model=object())
-    tool_context = SimpleNamespace(tool_use={"toolUseId": "parent-1"})
+    tool_context = _tool_context("parent-1")
 
     async def collect() -> list:
         return [
@@ -201,7 +210,7 @@ def _dispatch(monkeypatch, output_format: str | None) -> tuple[MagicMock, list, 
             async for item in compose_slides(
                 deck_id="deck-1",
                 slide_groups=[{"slugs": ["a"], "instruction": "Layout pass."}],
-                tool_context=SimpleNamespace(tool_use={"toolUseId": "parent-html"}),
+                tool_context=_tool_context("parent-html"),
             )
         ]
 

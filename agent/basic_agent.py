@@ -19,13 +19,15 @@ import os
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
+import stop_guard
 from errors import BAD_INPUT, AUTH, error_event
 from factory import create_agent
 from streaming import stream_agent
 
 logger = logging.getLogger("sdpm.agent")
 
-app = BedrockAgentCoreApp()
+# The lifespan installs the SIGTERM guard (stop_guard.py) in front of uvicorn's handler.
+app = BedrockAgentCoreApp(lifespan=stop_guard.lifespan)
 
 # Cancel registry: session_id → asyncio.Event.
 _cancel_events: dict[str, asyncio.Event] = {}
@@ -85,6 +87,8 @@ async def agent_stream(payload, context):
 
     cancel = asyncio.Event()
     _cancel_events[session_id] = cancel
+    # The turn's stop event: set on SIGTERM, observed by Strands and the composers.
+    stop = stop_guard.begin_turn()
 
     try:
         os.environ["_CURRENT_SESSION_ID"] = session_id
@@ -102,16 +106,23 @@ async def agent_stream(payload, context):
 
         yield {"mcp_status": mcp_status}
 
-        async for event in stream_agent(agent, user_query, session_id, cancel):
+        async for event in stream_agent(agent, user_query, session_id, cancel, stop):
             yield event
 
     except Exception as e:
         logger.exception("Agent stream error for session %s", session_id[:12])
         yield error_event(e)
     finally:
+        stop_guard.end_turn(stop)
         if _cancel_events.get(session_id) is cancel:
             del _cancel_events[session_id]
 
 
+def main(port: int = 8080) -> None:
+    # Bounded graceful shutdown: on SIGTERM uvicorn would otherwise wait for the running
+    # /invocations without limit (see stop_guard.py).
+    app.run(port=port, timeout_graceful_shutdown=stop_guard.GRACEFUL_SHUTDOWN_S)
+
+
 if __name__ == "__main__":
-    app.run()
+    main()
