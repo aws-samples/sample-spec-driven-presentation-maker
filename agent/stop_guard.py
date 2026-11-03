@@ -13,7 +13,9 @@ The guard, installed through the app's lifespan so it runs before uvicorn's own 
      calls and Memory events (GatedMemorySessionManager) are dropped from then on;
   2. sets every running turn's stop event, which Strands and the composers observe;
   3. starts a watchdog that flushes OpenTelemetry and exits the process after
-     EXIT_AFTER_S, whatever is still running (a composer thread blocked in a read).
+     EXIT_AFTER_S, whatever is still running (a composer thread blocked in a read);
+  4. closes the process's resident MCP clients (AWS Knowledge, and AWS Pricing's stdio
+     subprocess) on a side thread, best effort: the watchdog's exit bounds it.
 basic_agent passes GRACEFUL_SHUTDOWN_S to uvicorn so it stops waiting before that.
 """
 
@@ -27,6 +29,7 @@ import time
 
 from bedrock_agentcore.memory.integrations.strands.session_manager import AgentCoreMemorySessionManager
 
+import mcp_clients
 from resilience import close_writes, writes_closed
 
 logger = logging.getLogger("sdpm.agent")
@@ -106,6 +109,13 @@ def _exit_after(delay: float) -> None:
     os._exit(0)
 
 
+def _close_resident_clients() -> None:
+    try:
+        mcp_clients.close_resident_clients()
+    except Exception as e:  # noqa: BLE001 - best effort, the process is exiting anyway
+        logger.warning("SIGTERM guard: closing the resident MCP clients failed: %s", e)
+
+
 def _on_sigterm(previous):
     def handler(signum, frame):
         stopped = stop_all()
@@ -113,6 +123,8 @@ def _on_sigterm(previous):
             _exiting.set()
             logger.warning("SIGTERM: stopping %d running turn(s); writes are closed", stopped)
             threading.Thread(target=_exit_after, args=(EXIT_AFTER_S,), daemon=True, name="stop-guard-exit").start()
+            # After the watchdog: closing can block (a stdio subprocess that does not exit).
+            threading.Thread(target=_close_resident_clients, daemon=True, name="stop-guard-close").start()
         if callable(previous):
             previous(signum, frame)  # uvicorn's handle_exit: begin the graceful shutdown
     return handler

@@ -178,3 +178,108 @@ def test_prompt_prefetch_does_not_call_mcp_once_writes_are_closed(monkeypatch):
     with pytest.raises(resilience.WritesClosed):
         resolve_parts([Part(Source.mcp("start_composing", {}), target="system")], mcp_client=Client())
     assert calls == []
+
+
+def test_sigterm_closes_the_resident_mcp_clients_without_holding_the_handler(monkeypatch):
+    # AWS Knowledge and AWS Pricing (a stdio subprocess) stay connected for the process;
+    # SIGTERM closes them on a side thread, so a slow close never delays the exit path.
+    monkeypatch.syspath_prepend(str(AGENT_DIR))
+    import mcp_clients
+    import resilience
+    import stop_guard
+
+    monkeypatch.setattr(resilience, "_writes_closed", threading.Event())
+    monkeypatch.setattr(stop_guard, "_exiting", threading.Event())
+    monkeypatch.setattr(mcp_clients, "_RESIDENT_CLIENTS", {})
+    watchdog = threading.Event()
+    monkeypatch.setattr(stop_guard, "_exit_after", lambda delay: watchdog.set())  # no os._exit here
+
+    class Client:
+        """AWS Pricing's client: stop() waits for its stdio subprocess."""
+
+        def __init__(self):
+            self.stopped = threading.Event()
+
+        def add_consumer(self, consumer_id, **kwargs):
+            pass
+
+        async def load_tools(self, **kwargs):
+            return []
+
+        def stop(self, *exc):
+            time.sleep(1.0)
+            self.stopped.set()
+
+    client = Client()
+    resident = mcp_clients.resident_client("AWS Pricing", lambda: client)
+    assert resident.connect() is client
+    uvicorn = []
+
+    handler = stop_guard._on_sigterm(lambda signum, frame: uvicorn.append(signum))
+    started = time.monotonic()
+    handler(signal.SIGTERM, None)
+    took = time.monotonic() - started
+
+    assert took < 0.5
+    assert uvicorn == [signal.SIGTERM]
+    assert watchdog.wait(1)
+    assert client.stopped.wait(3)
+    assert resident.connected is None
+    assert mcp_clients._RESIDENT_CLIENTS == {}
+
+
+def test_write_gate_covers_tools_of_the_resident_mcp_clients(monkeypatch):
+    # A resident client's tools reach the agent as MCPAgentTool, like any MCP tool, so
+    # the BeforeToolCallEvent gate stops them too.
+    monkeypatch.syspath_prepend(str(AGENT_DIR))
+    from mcp.types import Tool
+    from strands import Agent
+    from strands.hooks.events import BeforeToolCallEvent
+    from strands.models import Model
+    from strands.tools.mcp.mcp_agent_tool import MCPAgentTool
+
+    import resilience
+
+    calls = []
+
+    class Knowledge:
+        async def call_tool_async(self, **kwargs):
+            calls.append(kwargs["name"])
+            return {"status": "success", "toolUseId": kwargs["tool_use_id"], "content": [{"text": "doc"}]}
+
+    class OneToolCall(Model):
+        def update_config(self, **model_config):
+            pass
+
+        def get_config(self):
+            return {}
+
+        async def structured_output(self, output_model, prompt, system_prompt=None, **kwargs):
+            raise NotImplementedError
+            yield  # pragma: no cover
+
+        async def stream(self, messages, tool_specs=None, system_prompt=None, **kwargs):
+            yield {"messageStart": {"role": "assistant"}}
+            if any("toolResult" in block for m in messages for block in m["content"]):
+                yield {"contentBlockDelta": {"delta": {"text": "done"}}}
+                yield {"contentBlockStop": {}}
+                yield {"messageStop": {"stopReason": "end_turn"}}
+                return
+            yield {"contentBlockStart": {"start": {"toolUse": {"toolUseId": "t1", "name": "aws___search_documentation"}}}}
+            yield {"contentBlockDelta": {"delta": {"toolUse": {"input": "{}"}}}}
+            yield {"contentBlockStop": {}}
+            yield {"messageStop": {"stopReason": "tool_use"}}
+
+    tool = MCPAgentTool(Tool(name="aws___search_documentation", inputSchema={"type": "object", "properties": {}}), Knowledge())
+    agent = Agent(model=OneToolCall(), tools=[tool], callback_handler=None)
+    agent.hooks.add_callback(BeforeToolCallEvent, resilience.gate_tool_call)
+    closed = threading.Event()
+    closed.set()
+    monkeypatch.setattr(resilience, "_writes_closed", closed)
+
+    agent("Look it up.")
+
+    assert calls == []
+    results = [block["toolResult"] for m in agent.messages for block in m["content"] if "toolResult" in block]
+    assert results and results[0]["status"] == "error"
+    assert "shutting down" in json.dumps(results[0])

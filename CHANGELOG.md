@@ -63,7 +63,8 @@ Entries before v0.5.0 were written retroactively as summaries.
   on later turns (neither uses the signed-in user's token). If one is still connecting when
   the first turn is ready, that turn goes ahead without it and the chat shows it as not
   connected in time; later turns use it once it has connected. A client whose server has
-  stopped is rebuilt on the next turn, under the same rule. The role documents and each
+  stopped is rebuilt on the next turn, under the same rule. On SIGTERM the agent also closes
+  these clients (and the AWS Pricing server process) while it exits. The role documents and each
   user's style and template list are fetched through the MCP server once per agent process
   and kept in memory, so later turns make no `start_presentation` call. A style or template
   added during the session shows up in the system prompt in the next agent session; the

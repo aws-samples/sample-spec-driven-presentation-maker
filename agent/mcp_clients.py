@@ -219,8 +219,7 @@ def resident_client(name: str, make: Callable[[], MCPClient]) -> ResidentClient:
 def close_resident_clients() -> None:
     """Close every resident MCP client and forget them; the one shutdown hook for them.
 
-    Meant for the agent's SIGTERM handling (stop_guard, PR #502). The next
-    create_agent connects new ones.
+    stop_guard calls it on SIGTERM. The next create_agent connects new ones.
     """
     with _RESIDENT_LOCK:
         residents = list(_RESIDENT_CLIENTS.values())
