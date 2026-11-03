@@ -17,6 +17,8 @@ AUTH = "auth"
 BAD_INPUT = "bad_input"
 MAX_OUTPUT = "max_output"
 INTERNAL = "internal"
+# Sent only with an explicit code: the page holds a session id it has to replace.
+SESSION_RELOAD_REQUIRED = "session_reload_required"
 
 _PATTERNS: list[tuple[tuple[str, ...], str]] = [
     (("Too much media", "too long"), CONVERSATION_TOO_LONG),

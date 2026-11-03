@@ -37,9 +37,10 @@ export const resetParserState = () => {
  * @param {string} currentCompletion - The accumulated completion text
  * @param {Function} updateCallback - Callback to update the UI with new text
  * @param {Function} [toolCallback] - Callback for tool use events: (toolName, toolUseData)
+ * @param {Function} [translateError] - Optional translator for error codes: (code) => string | undefined
  * @returns {string} Updated completion text
  */
-export const parseStreamingChunk = (line, currentCompletion, updateCallback, toolCallback) => {
+export const parseStreamingChunk = (line, currentCompletion, updateCallback, toolCallback, translateError) => {
   if (!line || !line.trim()) return currentCompletion;
   if (!line.startsWith('data: ')) return currentCompletion;
 
@@ -54,7 +55,7 @@ export const parseStreamingChunk = (line, currentCompletion, updateCallback, too
 
     // Agent-level error (e.g. Bedrock ValidationException, image/token limit exceeded)
     if (json.status === 'error' && json.error) {
-      const newCompletion = currentCompletion + `⚠️ ${agentErrorMessage(json.error, json.code)}`;
+      const newCompletion = currentCompletion + `⚠️ ${agentErrorMessage(json.error, json.code, translateError)}`;
       updateCallback(newCompletion);
       return newCompletion;
     }

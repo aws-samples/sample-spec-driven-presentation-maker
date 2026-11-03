@@ -17,6 +17,7 @@ export type AgentErrorCode =
   | "bad_input"
   | "max_output"
   | "internal"
+  | "session_reload_required"
 
 const MESSAGES: Record<AgentErrorCode, string> = {
   conversation_too_long: "This conversation is too long for the model to process. Please start a new chat to continue.",
@@ -28,6 +29,7 @@ const MESSAGES: Record<AgentErrorCode, string> = {
   bad_input: "The request could not be processed. Please adjust your input and try again.",
   max_output: "The response hit the model's output limit. Ask for a smaller step and try again.",
   internal: "Sorry, something went wrong. Please try again.",
+  session_reload_required: "This page is out of date. Reload the page, then send again.",
 }
 
 const PATTERNS: [string[], AgentErrorCode][] = [
@@ -54,11 +56,16 @@ export function classifyAgentError(message: string): AgentErrorCode {
  *
  * @param message - Raw error text from the event
  * @param code - Stable code from the event, when present
+ * @param translate - Optional translator for a resolved code; English is used when it returns undefined
  */
-export function agentErrorMessage(message: string, code?: string): string {
+export function agentErrorMessage(
+  message: string,
+  code?: string,
+  translate?: (code: AgentErrorCode) => string | undefined,
+): string {
   const resolved = (code && code in MESSAGES ? code : classifyAgentError(message)) as AgentErrorCode
   // Unclassified internal errors keep the raw message — it's more actionable
   // than a generic apology when nothing matched.
   if (resolved === "internal" && !code && message) return message
-  return MESSAGES[resolved]
+  return translate?.(resolved) ?? MESSAGES[resolved]
 }

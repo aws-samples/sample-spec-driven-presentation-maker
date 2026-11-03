@@ -19,6 +19,7 @@ import os
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
+import session_guard
 import stop_guard
 from errors import BAD_INPUT, AUTH, error_event
 from factory import create_agent
@@ -78,6 +79,13 @@ async def agent_stream(payload, context):
         user_id = ""
     if not user_id:
         yield error_event("Could not extract user_id from JWT sub claim", code=AUTH)
+        return
+
+    # Only the session's owner gets in (session_guard.py); before the cancel registry,
+    # so a refused call never touches a running turn.
+    session_id, refusal = await session_guard.admit(session_id, getattr(context, "session_id", None), user_id)
+    if refusal is not None:
+        yield refusal
         return
 
     # Cancel previous request for the same session

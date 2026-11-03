@@ -32,7 +32,7 @@ User → AgentCore Runtime → Agent
 
 ### Pattern 1: AgentCore Runtime + JWT Bearer
 
-AgentCore Runtime 上の MCP サーバーに JWT を転送して接続する。あわせて呼び出し元のセッション ID を `Mcp-Session-Id` として転送し、同一セッションのリクエストが同じ microVM に routing されるようにする。
+AgentCore Runtime 上の MCP サーバーに JWT を転送して接続する。あわせて呼び出し元のセッション ID を、トークンの利用者の持ち主プレフィックス付きで `Mcp-Session-Id` として転送し、同一セッションのリクエストが同じ microVM に routing されるようにする。
 
 ```python
 def _mcp_agentcore_runtime(jwt_token: str, session_id: str = "") -> MCPClient:

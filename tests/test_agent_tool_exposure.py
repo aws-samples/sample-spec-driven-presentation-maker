@@ -21,6 +21,8 @@ from mcp.server.fastmcp import FastMCP
 from mcp.shared.memory import create_client_server_memory_streams
 
 AGENT_DIR = Path(__file__).resolve().parents[1] / "agent"
+# A session id of user-1 (owner prefix of "user-1", see shared/session_owner.py).
+OWNED = "c6c289e49e9c05b2-00000000-0000-4000-8000-000000000000"
 
 
 def _factory():
@@ -176,7 +178,7 @@ def test_string_prompt_reaches_the_agent(monkeypatch):
     monkeypatch.setattr(basic_agent, "create_agent", fake_create_agent)
     monkeypatch.setattr(basic_agent, "stream_agent", fake_stream)
 
-    events = _run(basic_agent, {"prompt": "hello", "runtimeSessionId": "s" * 33})
+    events = _run(basic_agent, {"prompt": "hello", "runtimeSessionId": OWNED})
 
     assert seen["prompt"] == "hello"
     assert events[-1] == {"done": True}

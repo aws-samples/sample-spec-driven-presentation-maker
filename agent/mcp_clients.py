@@ -13,6 +13,8 @@ from typing import Callable
 from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp import MCPClient
 
+from shared.session_owner import owned_mcp_session_id, sub_from_jwt
+
 logger = logging.getLogger("sdpm.agent")
 
 # MCP server definitions: (display_name, required)
@@ -61,7 +63,10 @@ def mcp_agentcore_runtime(
         # after is back to 0.18s. No re-initialize fallback is needed. This holds
         # for the stateless server we run (`stateless_http=True` in
         # servers/remote/server.py); stateful MCP is documented to 404 instead.
-        headers["Mcp-Session-Id"] = session_id
+        #
+        # The id always carries the owner prefix of the token's user: an id of an
+        # earlier format gets it prepended (shared/session_owner.py).
+        headers["Mcp-Session-Id"] = owned_mcp_session_id(session_id, sub_from_jwt(jwt_token))
 
     kwargs: dict = {}
     if tool_filters:

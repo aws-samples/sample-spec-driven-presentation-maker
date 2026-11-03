@@ -11,7 +11,7 @@ import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path[:0] = [str(ROOT / "agent"), str(ROOT / "tests")]
+sys.path[:0] = [str(ROOT / "agent"), str(ROOT / "tests"), str(ROOT)]
 os.environ["MEMORY_ID"] = "memory-test"
 os.environ.setdefault("AWS_REGION", "us-east-1")
 
