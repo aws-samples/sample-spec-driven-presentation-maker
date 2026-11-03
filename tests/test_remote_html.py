@@ -18,7 +18,7 @@ from sdpm import api
 from sdpm.engine.html import browser_check
 from sdpm.engine.html.browser import DISABLED_NOTE
 from sdpm.engine.html.check import CHECK_REPORT_HEADER
-from shared.html_artifacts import HTML_CONTENT_TYPE, TEMPLATE_CACHE_PREFIX
+from shared.artifact_keys import HTML_CONTENT_TYPE, TEMPLATE_CACHE_PREFIX
 from tools import html_deck, template_html_cache
 from tools import init as init_mod
 from tools import sandbox as sandbox_mod
@@ -398,7 +398,7 @@ def test_run_python_html_same_clock_writes_get_new_keys(server, storage, monkeyp
 
 
 def test_run_python_html_revision_beats_older_second_epochs(server, storage, monkeypatch):
-    from shared.html_artifacts import build_html_preview_key_map
+    from shared.artifact_keys import build_html_preview_key_map
 
     _no_pptx(monkeypatch)
     old = "html/d1/preview/cover_1793374283.html"

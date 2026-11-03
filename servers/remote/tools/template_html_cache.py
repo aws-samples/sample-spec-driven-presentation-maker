@@ -18,7 +18,7 @@ import os
 import tempfile
 from pathlib import Path
 
-from shared.html_artifacts import TEMPLATE_CACHE_PREFIX, template_cache_object_key
+from shared.artifact_keys import TEMPLATE_CACHE_PREFIX, template_cache_object_key
 from storage import Storage
 
 logger = logging.getLogger("sdpm.template_html_cache")

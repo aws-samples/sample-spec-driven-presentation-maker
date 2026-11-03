@@ -5,8 +5,7 @@
 Used by api/ and servers/remote/ to avoid duplication.
 - schema: DynamoDB key conventions
 - authz: deck access authorization
-- preview: slide preview key resolution
-- html_artifacts: S3 key layout of HTML deck artifacts
+- artifact_keys: key layout of deck artifacts (previews, compose, HTML) and the latest-epoch selector
 - review: change request contract of the Web UI comment tool
 - user_library: the user's style / template library (S3 layout, pins, template lists)
 

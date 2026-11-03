@@ -11,7 +11,7 @@ The build itself is ``sdpm.api.refresh_html`` / ``sdpm.api.generate_html`` — t
 same code as the local server. This module only materialises the S3 workspace
 into a tmpdir, uploads ``output.html``, the per-slide previews and the browser
 check's PNGs under ``html/`` (served through presigned URLs only, see
-shared/html_artifacts.py), keeps the deck record pointing at the newest artifact,
+shared/artifact_keys.py), keeps the deck record pointing at the newest artifact,
 and deletes superseded objects.
 
 Previews and PNGs of one build share one epoch: a per-build revision in
@@ -31,9 +31,10 @@ from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 from typing import Any, Callable
 
-from shared.html_artifacts import (
+from shared.artifact_keys import (
     HTML_CONTENT_TYPE,
     build_html_preview_key_map,
+    html_preview_slug_epoch,
     output_key,
     png_key,
     png_prefix,
@@ -232,17 +233,9 @@ def _publish(
     return new_key
 
 
-_PREVIEW_EPOCH_RE = re.compile(r"/([a-z0-9][a-z0-9-_]*)_(\d+)\.html$")
-
-
-def _slug_epoch(key: str) -> tuple[str, int] | None:
-    m = _PREVIEW_EPOCH_RE.search(key)
-    return (m.group(1), int(m.group(2))) if m else None
-
-
 def _revision(listed_keys: list[str]) -> int:
     """This build's epoch: now in ms, and above every listed preview / PNG epoch."""
-    epochs = [se[1] for k in listed_keys if (se := _slug_epoch(k) or png_slug_epoch(k))]
+    epochs = [se[1] for k in listed_keys if (se := html_preview_slug_epoch(k) or png_slug_epoch(k))]
     return max(time.time_ns() // 1_000_000, 1 + max(epochs, default=0))
 
 
@@ -390,7 +383,7 @@ def refresh_html_deck(
             dropped = {p.stem for p in (tmpdir / "slides").glob("*.html")} - built_slugs
             _delete(storage, [
                 k for k in listed
-                if (se := _slug_epoch(k))
+                if (se := html_preview_slug_epoch(k))
                 and ((se[0] in uploaded and se[1] < epoch) or se[0] not in built_slugs)
             ] + _stale_pngs(listed_pngs, pngs, checked, dropped, epoch))
         result["previews"] = uploaded

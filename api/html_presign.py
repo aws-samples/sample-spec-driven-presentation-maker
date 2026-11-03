@@ -23,7 +23,7 @@ from urllib.parse import quote
 import boto3
 from botocore.config import Config as BotoConfig
 
-from shared.html_artifacts import HTML_CONTENT_TYPE, HTML_PREFIX
+from shared.artifact_keys import HTML_CONTENT_TYPE, HTML_PREFIX
 
 # Purposes callers may request from GET /decks/{id}/html → URL lifetime (s).
 PURPOSES: Dict[str, int] = {"present": 14400, "download": 900}
