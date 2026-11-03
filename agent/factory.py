@@ -10,7 +10,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from botocore.config import Config as BotocoreConfig
 from strands import Agent
-from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent
+from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent, BeforeToolCallEvent
 from strands.models import BedrockModel
 
 from cost_logger import log_usage
@@ -26,7 +26,7 @@ from message_hooks import LiftToolResultImages
 from model_profiles import build_model_kwargs, MODEL_PROFILES
 from modes import MODES
 from modes.composer import make_compose_slides
-from resilience import LoopGuard
+from resilience import LoopGuard, gate_tool_call
 from session import fix_excess_tool_results
 from tools.hearing_tool import hearing
 from tools.web_tools import web_fetch
@@ -140,8 +140,8 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
     session_manager = None
     if memory_id and memory_id != "PLACEHOLDER":
         from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig
-        from bedrock_agentcore.memory.integrations.strands.session_manager import AgentCoreMemorySessionManager
-        session_manager = AgentCoreMemorySessionManager(
+        from stop_guard import GatedMemorySessionManager  # drops events once SIGTERM closed the gate
+        session_manager = GatedMemorySessionManager(
             agentcore_memory_config=AgentCoreMemoryConfig(
                 memory_id=memory_id, session_id=session_id, actor_id=user_id,
             ),
@@ -256,6 +256,9 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
     # LoopGuard
     guard = LoopGuard(max_tool_calls=int(os.environ.get("SPEC_MAX_TOOL_CALLS", "300")))
     agent.hooks.add_callback(AfterToolCallEvent, guard.after_tool)
+
+    # Write gate: no tool runs once the process is stopping (SIGTERM, stop_guard.py)
+    agent.hooks.add_callback(BeforeToolCallEvent, gate_tool_call)
 
     # Cost logger
     agent.hooks.add_callback(AfterInvocationEvent, log_usage)
