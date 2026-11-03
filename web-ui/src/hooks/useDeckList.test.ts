@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, renderHook } from "@testing-library/react"
+import { act, renderHook, waitFor } from "@testing-library/react"
 import { toast } from "sonner"
 import { intlWrapper } from "@/test/renderWithIntl"
 import en from "../../messages/en.json"
@@ -108,5 +108,16 @@ describe("useDeckList — translated action errors", () => {
     const { result } = renderHook(() => useDeckList("token", true, null), { wrapper: intlWrapper(locale) })
     await act(async () => { await result.current.handleToggleVisibility("d1", "public") })
     expect(toast.error).toHaveBeenCalledWith(expected)
+  })
+
+  it.each([
+    ["en", en.decksPage.errorLoadDecks],
+    ["ja", "デッキを読み込めませんでした"],
+  ] as const)("shows the %s banner instead of the raw error when the list cannot load", async (locale, expected) => {
+    api.listDecks.mockRejectedValueOnce(new Error("Failed to list decks: 500"))
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    const { result } = renderHook(() => useDeckList("token", true, null), { wrapper: intlWrapper(locale) })
+    await waitFor(() => expect(result.current.loading).toBe(false))
+    expect(result.current.error).toBe(expected)
   })
 })
