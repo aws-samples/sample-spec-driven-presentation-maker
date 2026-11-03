@@ -51,7 +51,8 @@ export function useDeckList(
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
   const [activeListTab, setActiveListTab] = useState<"mine" | "favorites" | "public">("mine")
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  /** The first list load failed; translated at render (the raw error goes to the console). */
+  const [loadFailed, setLoadFailed] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DeckSummary | null>(null)
   const [bulkDeleteTargets, setBulkDeleteTargets] = useState<DeckSummary[] | null>(null)
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
@@ -94,7 +95,8 @@ export function useDeckList(
         setFavoriteDecks(favDecks)
       } catch (err) {
         if (!initialLoadDone.current) {
-          setError(err instanceof Error ? err.message : "Failed to load decks")
+          console.error("Failed to load decks", err)
+          setLoadFailed(true)
         }
       } finally {
         initialLoadDone.current = true
@@ -262,6 +264,8 @@ export function useDeckList(
   const tabDecks = activeListTab === "mine" ? decks
     : activeListTab === "favorites" ? favoriteDecks
     : publicDecks
+
+  const error = loadFailed ? t("errorLoadDecks") : null
 
   return {
     decks, tabDecks, favoriteIds, activeListTab, setActiveListTab,

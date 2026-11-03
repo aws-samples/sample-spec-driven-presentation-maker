@@ -420,7 +420,8 @@
     "bulkDeleteFailed": "{count, plural, other {# 件のデッキを削除できませんでした。}}",
     "bulkDeleteDescriptionLocal": "選択したデッキのフォルダを即時に削除します。この操作は元に戻せません。",
     "errorUpdateVisibility": "公開範囲を更新できませんでした",
-    "errorDeleteDeck": "デッキを削除できませんでした"
+    "errorDeleteDeck": "デッキを削除できませんでした",
+    "errorLoadDecks": "デッキを読み込めませんでした"
   },
   "mcp": {
     "connected": "接続済み: {names}",
