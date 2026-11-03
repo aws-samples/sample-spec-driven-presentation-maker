@@ -141,20 +141,6 @@ def offloaded_tool(fn):
 # --- HTTP Request ContextVar (for extracting user_id from Runtime header) ---
 _current_request_headers: ContextVar[dict] = ContextVar("_current_request_headers", default={})
 
-# Work to start once the current HTTP response has been sent. The middleware sets a
-# fresh list per request; a tool's worker thread sees the same list, because
-# asyncio.to_thread copies the context and the list is shared, not copied.
-_after_response: ContextVar[list | None] = ContextVar("_after_response", default=None)
-
-
-def _after_this_response(fn) -> None:
-    """Run ``fn`` once the current HTTP response has been sent (at once outside the HTTP app)."""
-    pending = _after_response.get()
-    if pending is None:
-        fn()
-    else:
-        pending.append(fn)
-
 
 # --- LibreOffice warm-up, once per process ---
 #
@@ -167,21 +153,29 @@ def _after_this_response(fn) -> None:
 # conversion of a blank template touches the files a real conversion needs,
 # well before the composer reaches its first run_python.
 #
-# The warm-up starts once the first entry tool of the process has sent its
-# result: start_presentation, or start_composing, since each composer group has
-# its own MCP session (`<sid>-gN`) and so its own microVM. Requests do not mark a
-# new session by lacking an Mcp-Session-Id header: the agent always sends one,
-# while the platform's health check (a PingRequest POST about every 2 s, also
-# while the snapshot is built) sends none. Starting from those made the warm-up
-# compete with the agent's initialize, tools/list and start_presentation for the
-# lazily fetched disk and the CPU (dev, 2026-11-03: start_presentation on a new
-# session 0.5-30 s with it, 0.7 s without). One successful run per process is
-# enough, since the page cache lasts as long as the microVM; a failed run is
-# retried on the next entry tool call. Nothing runs before the snapshot, so every
-# restored microVM starts from "pending".
+# The warm-up starts once the client has gone quiet: no client request (a POST
+# carrying an Mcp-Session-Id) has been in flight for _WARMUP_QUIET_S. The agent
+# always sends that header; the platform's health check (a PingRequest POST about
+# every 2 s, also while the snapshot is built) sends none and is ignored. Starting
+# from those pings made the warm-up compete with the agent's initialize,
+# tools/list and start_presentation for the lazily fetched disk and the CPU (dev,
+# 2026-11-03: start_presentation on a new session 0.5-30 s with it, 0.7 s
+# without). On the orchestrator's session those three requests follow each other
+# within about a second, so the warm-up starts after start_presentation, while the
+# model runs. A composer group's session (`<sid>-gN`, its own microVM) gets only
+# initialize and tools/list before the composer's first tool call (11-129 s later
+# on dev, 2026-11-03), usually a run_python that renders; its start_composing goes
+# to the orchestrator's session. One successful run per process is enough,
+# since the page cache lasts as long as the microVM; after a failed run the next
+# quiet period tries again. Nothing runs before the snapshot, so every restored
+# microVM starts from "pending".
 
 _warmup_lock = threading.Lock()
 _warmup_state = "pending"  # "pending" -> "running" -> "done" (back to "pending" when a run fails)
+_WARMUP_QUIET_S = 3.0
+# Event loop only (the middleware): client requests in flight, and the pending quiet-period timer.
+_client_requests_in_flight = 0
+_warmup_timer = None
 
 
 def _soffice_warm_up() -> None:
@@ -227,11 +221,36 @@ def _start_soffice_warm_up_once() -> None:
     _run_in_background(_soffice_warm_up, name="soffice-warmup")
 
 
+def _client_request_started() -> None:
+    """(event loop) A client request arrived: the client is not quiet."""
+    global _client_requests_in_flight, _warmup_timer
+    _client_requests_in_flight += 1
+    if _warmup_timer is not None:
+        _warmup_timer.cancel()
+        _warmup_timer = None
+
+
+def _client_request_finished() -> None:
+    """(event loop) A client request has been answered: start the quiet-period timer if none is in flight."""
+    global _client_requests_in_flight, _warmup_timer
+    import asyncio
+
+    _client_requests_in_flight -= 1
+    if _client_requests_in_flight == 0 and _warmup_state == "pending":
+        _warmup_timer = asyncio.get_running_loop().call_later(_WARMUP_QUIET_S, _client_quiet)
+
+
+def _client_quiet() -> None:
+    global _warmup_timer
+    _warmup_timer = None
+    _start_soffice_warm_up_once()
+
+
 class _CaptureHeadersMiddleware:
     """Raw ASGI middleware to capture HTTP headers into a ContextVar.
 
-    Compatible with streaming responses (unlike BaseHTTPMiddleware). Work queued
-    with ``_after_this_response`` starts once the inner app has sent the response.
+    Compatible with streaming responses (unlike BaseHTTPMiddleware). It also
+    counts client requests in flight for the LibreOffice warm-up's quiet period.
     """
 
     def __init__(self, app):  # type: ignore
@@ -246,16 +265,16 @@ class _CaptureHeadersMiddleware:
         """Capture headers from HTTP requests into ContextVar."""
         if scope["type"] == "http":
             headers = {k.decode(): v.decode() for k, v in scope.get("headers", [])}
-            after: list = []
+            client = scope.get("method") == "POST" and "mcp-session-id" in headers
+            if client:
+                _client_request_started()
             token = _current_request_headers.set(headers)
-            after_token = _after_response.set(after)
             try:
                 await self.app(scope, receive, send)
             finally:
-                _after_response.reset(after_token)
                 _current_request_headers.reset(token)
-            for fn in after:
-                fn()
+                if client:
+                    _client_request_finished()
         else:
             await self.app(scope, receive, send)
 
@@ -434,7 +453,6 @@ def start_presentation() -> str:
     """
     from sdpm.entry import start_presentation as _start
 
-    _after_this_response(_start_soffice_warm_up_once)
     user_id = _get_user_id()
     styles = reference.list_styles(storage=_storage, user_id=user_id, include_all=True).get("styles", [])
     templates = template_mod.list_templates(storage=_storage, user_id=user_id).get("templates", [])
@@ -464,7 +482,6 @@ def start_composing(
     from sdpm.engine.schema import read_deck_format
     from sdpm.entry import start_composing as _start
 
-    _after_this_response(_start_soffice_warm_up_once)
     if not deck_id or not deck_id.strip():
         return json.dumps(_start(mode=mode), ensure_ascii=False)
     _check_deck_access(deck_id, action="generate_pptx")

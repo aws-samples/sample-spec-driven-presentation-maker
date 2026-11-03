@@ -4,8 +4,8 @@
 
 On AgentCore Runtime platform V2 every microVM is restored from a snapshot taken
 after startup. The LibreOffice warm-up must run after the restore but must not
-compete with the agent's first requests, so it starts once per process, after
-the first entry tool (start_presentation / start_composing) has sent its result,
+compete with the agent's first requests, so it starts once per process, after the
+client (requests carrying an Mcp-Session-Id) has been quiet for a few seconds,
 and never from the platform's health check (a PingRequest POST without an
 Mcp-Session-Id). The startup preload puts static files into the snapshot and
 must not build clients or resolve credentials, which the snapshot would freeze.
@@ -88,10 +88,11 @@ def _bearer(sub: str = "user-1") -> str:
     return f"Bearer x.{payload}.y"
 
 
-def _post(module, body: dict, *, headers: dict | None = None, events: list | None = None):
+def _post(module, body: dict, *, headers: dict | None = None, events: list | None = None, linger: float = 0.0):
     """POST /mcp through the app as server.py runs it (FastMCP + the header middleware).
 
-    ``events`` gets "response sent" once the last body chunk has gone out.
+    ``events`` gets "response sent" once the last body chunk has gone out. The event
+    loop keeps running for ``linger`` seconds after the response (timers may fire).
     """
     import httpx
 
@@ -110,24 +111,30 @@ def _post(module, body: dict, *, headers: dict | None = None, events: list | Non
         async with module.mcp.session_manager.run():
             transport = httpx.ASGITransport(app=recording)
             async with httpx.AsyncClient(transport=transport, base_url="http://testserver") as client:
-                return await client.post(
+                r = await client.post(
                     "/mcp", json=body,
                     headers={"accept": "application/json, text/event-stream", **(headers or {})},
                 )
+            await asyncio.sleep(linger)
+            return r
 
     return asyncio.run(run())
 
 
 class TestWarmUpTrigger:
+    @pytest.fixture(autouse=True)
+    def _short_quiet_period(self, server, monkeypatch):
+        monkeypatch.setattr(server[0], "_WARMUP_QUIET_S", 0.05)
+
     def test_health_check_ping_does_not_start_it(self, server):
         module, _, _, warm_ups = server
         # The platform's health check: a PingRequest without an Mcp-Session-Id.
-        r = _post(module, {"jsonrpc": "2.0", "id": 1, "method": "ping"})
+        r = _post(module, {"jsonrpc": "2.0", "id": 1, "method": "ping"}, linger=0.2)
         assert r.status_code == 200
         assert warm_ups == []
         assert module._warmup_state == "pending"
 
-    def test_first_start_presentation_starts_it_after_the_response(self, server):
+    def test_starts_once_the_client_is_quiet_after_start_presentation(self, server):
         module, _, _, warm_ups = server
         events: list[str] = []
         module._run_in_background = lambda target, *, name: events.append(f"started {name}")
@@ -136,34 +143,60 @@ class TestWarmUpTrigger:
             {"jsonrpc": "2.0", "id": 1, "method": "tools/call", "params": {"name": "start_presentation", "arguments": {}}},
             headers={"authorization": _bearer(), "mcp-session-id": "sess-1"},
             events=events,
+            linger=0.2,
         )
         assert r.status_code == 200
         assert "workflow" in r.text
         assert events == ["response sent", "started soffice-warmup"]
 
-    def test_start_composing_starts_it(self, server):
-        # A composer group's MCP session (<sid>-gN) is its own microVM.
+    def test_starts_in_a_composer_group_that_only_lists_tools(self, server):
+        # A composer group's MCP session (<sid>-gN) is its own microVM; its start_composing
+        # goes to the orchestrator's session, so it only lists tools before its first call.
         module, _, _, warm_ups = server
-        module.start_composing()
+        r = _post(
+            module, {"jsonrpc": "2.0", "id": 1, "method": "tools/list"},
+            headers={"authorization": _bearer(), "mcp-session-id": "sess-1-g1"}, linger=0.2,
+        )
+        assert r.status_code == 200
         assert warm_ups == ["soffice-warmup"]
+
+    def test_waits_while_a_client_request_is_in_flight(self, server):
+        module, _, _, warm_ups = server
+
+        async def run():
+            module._client_request_started()
+            module._client_request_finished()  # initialize answered: quiet period begins
+            await asyncio.sleep(0.02)
+            module._client_request_started()  # start_presentation arrives
+            await asyncio.sleep(0.1)
+            assert warm_ups == []
+            module._client_request_finished()
+            await asyncio.sleep(0.02)
+            assert warm_ups == []
+            await asyncio.sleep(0.1)
+            assert warm_ups == ["soffice-warmup"]
+
+        asyncio.run(run())
 
     def test_never_twice_in_one_process(self, server):
         module, _, _, warm_ups = server
-        token = module._current_request_headers.set({"authorization": _bearer()})
-        try:
-            module.start_presentation()
-            module.start_presentation()  # still running
-            module._warmup_state = "done"
-            module.start_presentation()
-            module.start_composing()
-        finally:
-            module._current_request_headers.reset(token)
+        module._client_quiet()
+        module._client_quiet()  # still running
+        module._warmup_state = "done"
+        module._client_quiet()
+
+        async def run():
+            module._client_request_started()
+            module._client_request_finished()
+            assert module._warmup_timer is None  # nothing left to wait for
+
+        asyncio.run(run())
         assert warm_ups == ["soffice-warmup"]
 
     def test_skip_switch(self, server, monkeypatch):
         module, _, _, warm_ups = server
         monkeypatch.setenv("SDPM_SKIP_SOFFICE_WARMUP", "1")
-        module.start_composing()
+        module._client_quiet()
         assert warm_ups == []
 
 
@@ -193,7 +226,7 @@ class TestWarmUpRun:
         assert len(runs) == 1
         assert module._warmup_state == "done"
 
-    def test_failure_is_retried_on_the_next_entry_call(self, server, monkeypatch):
+    def test_failure_is_retried_on_the_next_quiet_period(self, server, monkeypatch):
         module, *_ = server
         runs = self._fake_soffice(monkeypatch, 1)
         module._run_in_background = lambda target, *, name: target()
