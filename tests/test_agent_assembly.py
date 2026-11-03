@@ -15,6 +15,7 @@ series. The assembly now
 
 import json
 import threading
+import time
 
 import pytest
 
@@ -47,15 +48,28 @@ class _Optional:
 
     server_instructions = ""
 
-    def __init__(self, gate: threading.Event | None = None):
+    def __init__(self, name: str, gate: threading.Event | None = None):
+        self.name = name
         self.gate = gate
+        self.loads = 0
+        self.dead = False
         self.done = threading.Event()
         self.stopped = threading.Event()
 
+    def add_consumer(self, consumer_id, **kwargs):
+        pass
+
     async def load_tools(self, **kwargs):
+        self.loads += 1
         if self.gate is not None:
             assert self.gate.wait(5)
         self.done.set()
+        return []
+
+    def list_tools_sync(self, *args, **kwargs):
+        # A dead stdio server fails tools/list at once (ClosedResourceError).
+        if self.dead:
+            raise RuntimeError("ClosedResourceError")
         return []
 
     def stop(self, *exc):
@@ -95,6 +109,7 @@ def assembly(monkeypatch):
     """create_agent wired to in-memory MCP clients; the JWT doubles as the user."""
     factory = _factory()
     import composition
+    import mcp_clients
 
     composition.clear_process_cache()
     state = {
@@ -106,8 +121,8 @@ def assembly(monkeypatch):
         "pm": [],
     }
 
-    def optional():
-        client = _Optional(gate=state["release"] if state["gate_optional"] else None)
+    def optional(name):
+        client = _Optional(name, gate=state["release"] if state["gate_optional"] else None)
         state["optional"].append(client)
         return client
 
@@ -118,8 +133,8 @@ def assembly(monkeypatch):
 
     monkeypatch.delenv("MEMORY_ID", raising=False)
     monkeypatch.setattr(factory, "mcp_agentcore_runtime", presentation_maker)
-    monkeypatch.setattr(factory, "mcp_aws_knowledge", optional)
-    monkeypatch.setattr(factory, "mcp_aws_pricing", optional)
+    monkeypatch.setattr(factory, "mcp_aws_knowledge", lambda: optional("AWS Knowledge"))
+    monkeypatch.setattr(factory, "mcp_aws_pricing", lambda: optional("AWS Pricing"))
     monkeypatch.setattr(factory, "BedrockModel", lambda **kwargs: object())
     monkeypatch.setattr(factory, "make_compose_slides", lambda *args, **kwargs: object())
     monkeypatch.setattr(factory, "Agent", _Agent)
@@ -127,17 +142,37 @@ def assembly(monkeypatch):
     def create(user: str, session: str = "s1"):
         return factory.create_agent("spec", user_id=user, session_id=session, jwt_token=user)
 
+    mcp_clients.close_resident_clients()
     state["factory"] = factory
     state["create"] = create
     try:
         yield state
     finally:
         state["release"].set()
+        mcp_clients.close_resident_clients()
         composition.clear_process_cache()
 
 
 def _text(system_prompt) -> str:
     return system_prompt if isinstance(system_prompt, str) else json.dumps(system_prompt, ensure_ascii=False)
+
+
+def _wait_for(predicate, timeout: float = 5.0) -> bool:
+    end = time.monotonic() + timeout
+    while time.monotonic() < end:
+        if predicate():
+            return True
+        time.sleep(0.01)
+    return predicate()
+
+
+def _residents_connected(names=("AWS Knowledge", "AWS Pricing")) -> bool:
+    import mcp_clients
+
+    return all(
+        mcp_clients._RESIDENT_CLIENTS.get(n) is not None and mcp_clients._RESIDENT_CLIENTS[n].connected is not None
+        for n in names
+    )
 
 
 def test_start_presentation_and_memory_do_not_wait_for_optional_servers(assembly, monkeypatch):
@@ -170,11 +205,90 @@ def test_start_presentation_and_memory_do_not_wait_for_optional_servers(assembly
     ]
     assert all(not c.done.is_set() for c in assembly["optional"])
 
+
+def test_a_late_first_connection_serves_the_next_turn(assembly):
+    """The deadline applies to the process's first connection only; the client stays."""
+    factory = assembly["factory"]
+    assembly["gate_optional"] = True
+
+    _, first = assembly["create"]("u1")
+    assert [s["status"] for s in first] == ["ok", "error", "error"]
+
     assembly["release"].set()
-    assert all(c.stopped.wait(5) for c in assembly["optional"]), "late optional clients are closed"
+    assert _wait_for(_residents_connected)
+    _, second = assembly["create"]("u1", session="s2")
+
+    assert second == [
+        {"name": "Presentation Maker", "status": "ok"},
+        {"name": "AWS Knowledge", "status": "ok"},
+        {"name": "AWS Pricing", "status": "ok"},
+    ]
+    assert len(assembly["optional"]) == 2, "no second connection"
+    assert not any(c.stopped.is_set() for c in assembly["optional"])
+    assert factory._LATE_ERROR not in json.dumps(second)
 
 
-def test_memory_failure_closes_the_connected_clients(assembly, monkeypatch):
+def test_resident_servers_are_not_reconnected_on_the_second_turn(assembly):
+    assembly["create"]("u1")
+    assert _wait_for(_residents_connected)
+    agent, status = assembly["create"]("u1", session="s2")
+
+    assert [s["status"] for s in status] == ["ok", "ok", "ok"]
+    assert sorted(c.name for c in assembly["optional"]) == ["AWS Knowledge", "AWS Pricing"]
+    assert all(c.loads == 1 for c in assembly["optional"])
+    assert len(assembly["pm"]) == 2, "Presentation Maker is still built per turn"
+    assert all(c in agent.kwargs["tools"] for c in assembly["optional"])
+
+
+def test_a_dead_resident_server_is_rebuilt_under_the_deadline_rule(assembly, monkeypatch):
+    factory = assembly["factory"]
+    assembly["create"]("u1")
+    assert _wait_for(_residents_connected)
+    (pricing,) = [c for c in assembly["optional"] if c.name == "AWS Pricing"]
+    pricing.dead = True
+
+    # Hold the deadline (Memory) until the rebuilt Pricing client has been recorded.
+    rebuilt = threading.Event()
+    monkeypatch.setenv("MEMORY_ID", "mem-1")
+    monkeypatch.setattr(factory, "_on_recorded", lambda target: getattr(target, "name", "") == "AWS Pricing" and rebuilt.set())
+
+    def session_manager(*args):
+        assert rebuilt.wait(5)
+        return None
+
+    monkeypatch.setattr(factory, "_session_manager", session_manager)
+
+    agent, status = assembly["create"]("u1", session="s2")
+
+    assert status[2] == {"name": "AWS Pricing", "status": "ok"}
+    assert pricing.stopped.is_set(), "the dead client is closed"
+    (new,) = [c for c in assembly["optional"] if c.name == "AWS Pricing" and c is not pricing]
+    assert new in agent.kwargs["tools"] and pricing not in agent.kwargs["tools"]
+
+
+def test_a_dead_resident_server_rebuilt_too_late_is_skipped_for_the_turn(assembly, monkeypatch):
+    factory = assembly["factory"]
+    assembly["create"]("u1")
+    assert _wait_for(_residents_connected)
+    (pricing,) = [c for c in assembly["optional"] if c.name == "AWS Pricing"]
+    pricing.dead = True
+    assembly["gate_optional"] = True  # the rebuilt client connects only once released
+
+    # Hold the deadline until the dead client has been found and closed.
+    monkeypatch.setenv("MEMORY_ID", "mem-1")
+    monkeypatch.setattr(factory, "_session_manager", lambda *args: pricing.stopped.wait(5) and None)
+
+    _, status = assembly["create"]("u1", session="s2")
+
+    assert status[1] == {"name": "AWS Knowledge", "status": "ok"}
+    assert status[2] == {"name": "AWS Pricing", "status": "error", "error": factory._LATE_ERROR}
+    assembly["release"].set()
+    assert _wait_for(_residents_connected)
+    _, third = assembly["create"]("u1", session="s3")
+    assert [s["status"] for s in third] == ["ok", "ok", "ok"]
+
+
+def test_memory_failure_closes_this_turns_clients_only(assembly, monkeypatch):
     """Memory is built next to the connections, so its failure must not leak them."""
     factory = assembly["factory"]
     monkeypatch.setenv("MEMORY_ID", "mem-1")
@@ -188,8 +302,49 @@ def test_memory_failure_closes_the_connected_clients(assembly, monkeypatch):
         assembly["create"]("u1")
 
     assert assembly["pm"][0].stopped.is_set()
-    # Optional clients are closed either here (on time) or by their worker (late).
-    assert all(c.stopped.wait(5) for c in assembly["optional"])
+    assert _wait_for(_residents_connected)
+    assert not any(c.stopped.is_set() for c in assembly["optional"]), "resident clients stay"
+
+
+def test_a_connected_resident_is_used_while_its_check_is_still_running(assembly):
+    """From the second turn on a connected client is used as is; no deadline applies."""
+    factory = assembly["factory"]
+    import mcp_clients
+
+    hold = threading.Event()
+    client = _Optional("AWS Pricing")
+    resident = mcp_clients.ResidentClient("AWS Pricing", lambda: client)
+    resident.connect()
+    client.list_tools_sync = lambda *a, **k: hold.wait(5)  # a slow (but live) check
+
+    class _Required:
+        async def load_tools(self, **kwargs):
+            return []
+
+    required = _Required()
+    try:
+        usable, status = factory._prewarm_mcp_clients(
+            [required, resident], ["Presentation Maker", "AWS Pricing"], [True, False],
+        )
+    finally:
+        hold.set()
+
+    assert usable == [required, client]
+    assert status[1] == {"name": "AWS Pricing", "status": "ok"}
+
+
+def test_close_resident_clients_closes_and_forgets_them(assembly):
+    import mcp_clients
+
+    assembly["create"]("u1")
+    assert _wait_for(_residents_connected)
+
+    mcp_clients.close_resident_clients()
+
+    assert all(c.stopped.is_set() for c in assembly["optional"])
+    assembly["create"]("u1", session="s2")
+    assert _wait_for(_residents_connected)
+    assert len(assembly["optional"]) == 4, "the next turn connects new clients"
 
 
 def test_second_turn_for_the_same_user_makes_no_start_presentation_call(assembly):

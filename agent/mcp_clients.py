@@ -1,12 +1,19 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""MCP client factories and server instruction collection."""
+"""MCP client factories, process-resident clients and server instruction collection."""
 
+import asyncio
+import logging
 import os
+import threading
 import urllib.parse
+from concurrent.futures import Future
+from typing import Callable
 
 from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp import MCPClient
+
+logger = logging.getLogger("sdpm.agent")
 
 # MCP server definitions: (display_name, required)
 MCP_DEFS: list[tuple[str, bool]] = [
@@ -102,6 +109,124 @@ def mcp_aws_pricing() -> MCPClient:
             env={**os.environ, "AWS_REGION": "us-east-1", "FASTMCP_LOG_LEVEL": "ERROR"},
         )),
     )
+
+
+# Consumer id the process holds on every resident client. Strands stops an MCPClient
+# when its last consumer (an Agent's tool registry) goes away; this one never does.
+_PROCESS_CONSUMER = "sdpm-process"
+
+
+class ResidentClient:
+    """An MCP client connected once and reused across turns for the life of the process.
+
+    Only for servers that use nothing from the caller: AWS Knowledge (public endpoint)
+    and AWS Pricing (stdio subprocess under the execution role). Neither carries the
+    user's JWT, and an agent microVM serves one runtime session, so a resident client
+    is never shared across users. Presentation Maker carries the JWT and stays per turn.
+    """
+
+    def __init__(self, name: str, make: Callable[[], MCPClient]):
+        self.name = name
+        self._make = make
+        self._lock = threading.Lock()
+        self._client: MCPClient | None = None
+        self._pending: Future | None = None
+
+    @property
+    def connected(self) -> MCPClient | None:
+        """The connected client, or None while it has not connected (or was dropped)."""
+        return self._client
+
+    def connect(self) -> MCPClient:
+        """Return a connected client, connecting (or joining a connection in progress) if needed.
+
+        A connected client is checked with one tools/list call first. When the stdio
+        server has died the call fails at once with ClosedResourceError (measured
+        2026-11-03), while MCPClient still reports its session as active; the client is
+        then closed and a new one connects.
+        """
+        client = self._client
+        if client is not None:
+            try:
+                client.list_tools_sync()
+                return client
+            except Exception as e:  # noqa: BLE001 - any failure means the session is gone
+                logger.warning("MCP server %r: resident client is gone (%r); reconnecting", self.name, e)
+                self._drop(client)
+        return self._join_or_start()
+
+    def close(self) -> None:
+        """Close the connected client (best effort)."""
+        client = self._client
+        if client is not None:
+            self._drop(client)
+
+    def _drop(self, client: MCPClient) -> None:
+        with self._lock:
+            if self._client is client:
+                self._client = None
+        try:
+            client.stop(None, None, None)
+        except Exception as e:  # noqa: BLE001 - best-effort cleanup
+            logger.warning("MCP server %r: closing the client failed: %s", self.name, e)
+
+    def _join_or_start(self) -> MCPClient:
+        with self._lock:
+            if self._client is not None:  # another turn reconnected meanwhile
+                return self._client
+            pending = self._pending
+            owner = pending is None
+            if owner:
+                pending = self._pending = Future()
+        if not owner:
+            return pending.result()
+        client = None
+        try:
+            client = self._make()
+            client.add_consumer(_PROCESS_CONSUMER)
+            # load_tools() caches the tool list in the client, so Strands' own call
+            # in each turn's Agent is a cache hit.
+            asyncio.run(client.load_tools())
+        except BaseException as e:
+            with self._lock:
+                self._pending = None
+            if client is not None:
+                try:
+                    client.stop(None, None, None)
+                except Exception:  # noqa: BLE001 - best-effort cleanup after a failed connect
+                    pass
+            pending.set_exception(e)
+            raise
+        with self._lock:
+            self._client, self._pending = client, None
+        pending.set_result(client)
+        return client
+
+
+_RESIDENT_CLIENTS: dict[str, ResidentClient] = {}
+_RESIDENT_LOCK = threading.Lock()
+
+
+def resident_client(name: str, make: Callable[[], MCPClient]) -> ResidentClient:
+    """The process's resident client for *name*, created on first use with *make*."""
+    with _RESIDENT_LOCK:
+        resident = _RESIDENT_CLIENTS.get(name)
+        if resident is None:
+            resident = _RESIDENT_CLIENTS[name] = ResidentClient(name, make)
+        return resident
+
+
+def close_resident_clients() -> None:
+    """Close every resident MCP client and forget them; the one shutdown hook for them.
+
+    Meant for the agent's SIGTERM handling (stop_guard, PR #502). The next
+    create_agent connects new ones.
+    """
+    with _RESIDENT_LOCK:
+        residents = list(_RESIDENT_CLIENTS.values())
+        _RESIDENT_CLIENTS.clear()
+    for resident in residents:
+        resident.close()
 
 
 def collect_mcp_instructions(mcp_servers: list[MCPClient]) -> str:

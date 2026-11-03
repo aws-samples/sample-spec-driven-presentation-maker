@@ -58,16 +58,16 @@ Entries before v0.5.0 were written retroactively as summaries.
 - **Faster first output on every Cloud turn.** The agent no longer waits for the optional
   AWS Knowledge and AWS Pricing MCP servers, the Memory session, and `start_presentation` one
   after another before it calls the model. It fetches `start_presentation` as soon as the
-  Presentation Maker server is connected and loads the Memory session at the same time. An
-  optional server that is still connecting when that is done is skipped for the turn, and
-  the chat shows it as not connected in time. AWS Pricing starts slower than a warm
-  Presentation Maker reconnect, so it is usually skipped on every message after the first
-  one of a session (its tools are unavailable on those turns) until a later release reuses
-  MCP clients across turns. The role documents and each user's style and template list are
-  fetched through the MCP server once per agent process and kept in memory, so later turns
-  make no `start_presentation` call. A style or template added during the session shows up
-  in the system prompt in the next agent session; the agent's `list_styles` /
-  `list_templates` tools still return the current lists.
+  Presentation Maker server is connected and loads the Memory session at the same time. The
+  AWS Knowledge and AWS Pricing MCP clients are connected once per agent process and reused
+  on later turns (neither uses the signed-in user's token). If one is still connecting when
+  the first turn is ready, that turn goes ahead without it and the chat shows it as not
+  connected in time; later turns use it once it has connected. A client whose server has
+  stopped is rebuilt on the next turn, under the same rule. The role documents and each
+  user's style and template list are fetched through the MCP server once per agent process
+  and kept in memory, so later turns make no `start_presentation` call. A style or template
+  added during the session shows up in the system prompt in the next agent session; the
+  agent's `list_styles` / `list_templates` tools still return the current lists.
 - **Self sign-up is now off by default in the AWS stack.** The default Cognito user pool
   accepts only users created by an administrator (Cognito console or
   `aws cognito-idp admin-create-user`, see
