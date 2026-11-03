@@ -7,7 +7,6 @@ deck file I/O via sandbox functions. Not ACP-specific.
 """
 
 import json
-import re
 import subprocess
 import sys
 import time
@@ -225,37 +224,32 @@ def run_python(
     return json.dumps(result, ensure_ascii=False)
 
 
-_COMPOSE_FILE = re.compile(r"^(?P<slug>.+)_(?P<epoch>\d+)\.json$")
-
-
 def _write_compose(deck_dir: Path, refresh: Any, result: dict[str, Any]) -> None:
     """Write the refresh's compose payloads to compose/<slug>_<epoch>.json and
     compose/defs_<epoch>.json; older files of the written slugs and older defs go."""
+    from shared.artifact_keys import COMPOSE_DEFS, compose_key, latest_compose_keys, superseded_compose_keys
+
     compose_dir = deck_dir / "compose"
-    existing: dict[str, list[tuple[int, Path]]] = {}
-    if compose_dir.is_dir():
-        for f in compose_dir.iterdir():
-            m = _COMPOSE_FILE.match(f.name)
-            if m:
-                existing.setdefault(m["slug"], []).append((int(m["epoch"]), f))
+    names = [f.name for f in compose_dir.iterdir()] if compose_dir.is_dir() else []
+    latest = latest_compose_keys(names)
     previous: dict[str, dict] = {}
     for slug in refresh.compose_slugs:
-        if slug in existing:
+        if slug in latest:
             try:
-                previous[slug] = json.loads(max(existing[slug])[1].read_text(encoding="utf-8"))
+                previous[slug] = json.loads((compose_dir / latest[slug]).read_text(encoding="utf-8"))
             except (OSError, ValueError):
                 pass
     composed = refresh.compose(previous)
     if composed.defs is not None:
         epoch = int(time.time())
         compose_dir.mkdir(exist_ok=True)
-        (compose_dir / f"defs_{epoch}.json").write_text(json.dumps(composed.defs, ensure_ascii=False), encoding="utf-8")
+        (compose_dir / compose_key("", COMPOSE_DEFS, epoch)).write_text(
+            json.dumps(composed.defs, ensure_ascii=False), encoding="utf-8")
         for slug, payload in composed.slides.items():
-            (compose_dir / f"{slug}_{epoch}.json").write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-        for slug in ("defs", *composed.slides):
-            for ep, f in existing.get(slug, []):
-                if ep < epoch:
-                    f.unlink(missing_ok=True)
+            (compose_dir / compose_key("", slug, epoch)).write_text(
+                json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+        for name in superseded_compose_keys(names, "", (COMPOSE_DEFS, *composed.slides), epoch):
+            (compose_dir / name).unlink(missing_ok=True)
         result["compose"] = f"{len(composed.slides)} slides composed"
     if composed.error or composed.shortfall:
         result["compose_error"] = composed.error or composed.shortfall

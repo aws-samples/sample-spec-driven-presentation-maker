@@ -1,12 +1,12 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""shared.html_artifacts — S3 key layout of HTML deck artifacts."""
+"""shared.artifact_keys — S3 key layout of HTML deck artifacts."""
 
 import re
 
 import pytest
 
-from shared import html_artifacts as ha
+from shared import artifact_keys as ha
 
 
 def test_output_key_is_a_fresh_uuid_under_html_prefix():

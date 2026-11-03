@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Any, Literal
 
 from sdpm.engine.schema.lint_outline import lint_outline
+from sdpm.engine.schema.slugs import OUTLINE_LINE_RE, OUTLINE_SLUG_RE
 
 DECK_JSON_SKELETON: dict[str, Any] = {
     "template": "",
@@ -23,8 +24,6 @@ DECK_JSON_SKELETON: dict[str, Any] = {
 # HTML decks so PPTX deck.json stays unchanged (not part of DECK_JSON_SKELETON).
 OUTPUT_FORMATS: tuple[str, ...] = ("pptx", "html")
 
-_SLIDE_RE = re.compile(r"^-\s+\[([^\]]+)\]\s+.+")
-_VALID_SLUG_RE = re.compile(r"^[a-z0-9-]+$")
 _SUB_ITEM_RE = re.compile(r"^\s{2,}-\s+(body|visual|evidence)\s*:")
 _COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 _REQUIRED_SUB_ITEMS = ("body", "visual", "evidence")
@@ -133,8 +132,8 @@ def _is_positive_number(value: object) -> bool:
 def _outline_slugs(lines: list[str]) -> list[str]:
     slugs: list[str] = []
     for line in lines:
-        match = _SLIDE_RE.match(line.strip())
-        if match and _VALID_SLUG_RE.fullmatch(match.group(1)):
+        match = OUTLINE_LINE_RE.match(line.strip())
+        if match and OUTLINE_SLUG_RE.fullmatch(match.group(1)):
             slugs.append(match.group(1))
     return slugs
 
@@ -156,7 +155,7 @@ def _outline_structure_warnings(lines: list[str]) -> list[str]:
 
     for line_number, line in enumerate(lines, 1):
         stripped = line.strip()
-        slide_match = _SLIDE_RE.match(stripped)
+        slide_match = OUTLINE_LINE_RE.match(stripped)
         if slide_match:
             finish_slide()
             current = (line_number, slide_match.group(1))
