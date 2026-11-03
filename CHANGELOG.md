@@ -209,6 +209,16 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **Stopping a Cloud turn no longer leaves it running in the background.** The stop button
+  ends the runtime session, and AgentCore then sends the agent's process SIGTERM. The agent
+  used to wait for the running turn to finish, so the turn and its composers kept calling
+  tools and writing slides, MCP calls and Memory events until the platform ended the
+  process 10–60 seconds later. The agent now stops on SIGTERM: it ends the running turns,
+  drops every tool call, direct MCP call and Memory event from then on, and exits within
+  3 seconds. Composers also stop when their turn is cancelled, even after the parent turn
+  has ended (they used to miss the cancel and could keep composing for minutes), and a
+  cancelled compose returns at once with status `cancelled` instead of waiting for them.
+  A call the agent had already sent to the MCP Runtime still completes there.
 - **A slide's live preview is no longer taken from another slide's compose file.** The API
   picked a slide's latest `compose/{slug}_{epoch}.json` by the prefix `compose/{slug}_`, so slug
   `slide` also took the legacy numbered files `slide_N_*.json`, and in a deck without an outline
