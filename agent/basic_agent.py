@@ -45,6 +45,12 @@ async def agent_stream(payload, context):
     user_query = payload.get("prompt")
     session_id = payload.get("runtimeSessionId")
 
+    # Text only: the agent framework also accepts content-block lists, which
+    # this entrypoint does not take from callers.
+    if user_query is not None and not isinstance(user_query, str):
+        yield error_event("Invalid field: prompt must be a string", code=BAD_INPUT)
+        return
+
     if not all([user_query, session_id]):
         yield error_event("Missing required fields: prompt or runtimeSessionId", code=BAD_INPUT)
         return

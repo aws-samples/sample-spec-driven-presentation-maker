@@ -11,21 +11,16 @@
 
 import * as cdk from "aws-cdk-lib";
 import * as bedrockagentcore from "aws-cdk-lib/aws-bedrockagentcore";
-import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as ecr_assets from "aws-cdk-lib/aws-ecr-assets";
 import * as iam from "aws-cdk-lib/aws-iam";
-import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import * as path from "path";
 import { AUTH_SSM_PARAMS } from "./auth-stack";
 import { RuntimeResourcePolicy } from "./construct/runtime-resource-policy";
+import { agentCoreServicePrincipal } from "./construct/agentcore-principal";
 
 interface AgentStackProps extends cdk.StackProps {
-  /** Amazon DynamoDB table from DataStack. */
-  table: dynamodb.TableV2;
-  /** S3 bucket for PPTX output. */
-  pptxBucket: s3.Bucket;
   /** MCP Server Runtime ARN. */
   mcpRuntimeArn: string;
   /**
@@ -73,21 +68,23 @@ export class AgentStack extends cdk.Stack {
     });
 
     // --- IAM Role ---
+    // Execution role: only what the agent code uses. Deck storage (DynamoDB / S3)
+    // belongs to the MCP Runtime, which the agent calls with the user's JWT, so
+    // the agent role needs no storage or runtime-invoke permissions.
+    // Trust: only AgentCore resources of this account (confused-deputy guard).
     const role = new iam.Role(this, "AgentRole", {
-      assumedBy: new iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+      assumedBy: agentCoreServicePrincipal(this),
       description: "Execution role for spec-driven-presentation-maker Agent Runtime",
     });
 
-    // IAM: Least-privilege — Agent role only gets Bedrock InvokeModel and MCP Runtime invoke.
+    // Bedrock Converse / ConverseStream. Resource stays "*": the model can be
+    // switched per user among allowedModelIds (cross-region inference profiles).
     role.addToPolicy(
       new iam.PolicyStatement({
         actions: ["bedrock:InvokeModel", "bedrock:InvokeModelWithResponseStream"],
         resources: ["*"],
       })
     );
-
-    props.table.grantReadWriteData(role);
-    props.pptxBucket.grantReadWrite(role);
 
     // CloudWatch Logs (AgentCore writes stdout/stderr directly via execution role)
     role.addToPolicy(new iam.PolicyStatement({
@@ -111,51 +108,47 @@ export class AgentStack extends cdk.Stack {
       })
     );
 
-    // Amazon Bedrock AgentCore Memory
+    // Explicit denies (security best practices for AgentCore Runtime):
+    // - user-id delegation: the agent identifies users by the verified JWT only.
+    // - calls made through AWS-managed MCP servers: the agent uses the public
+    //   AWS Knowledge endpoint, which carries no AWS credentials.
     role.addToPolicy(
       new iam.PolicyStatement({
-        actions: ["bedrock-agentcore:*"],
-        resources: ["*"],
-      })
-    );
-
-    // AWS MCP service (IAM-authenticated Knowledge MCP endpoint)
-    role.addToPolicy(
-      new iam.PolicyStatement({
-        actions: ["aws-mcp:*"],
-        resources: ["*"],
-      })
-    );
-
-    // ECR pull
-    role.addToPolicy(
-      new iam.PolicyStatement({
+        sid: "DenyUserIdDelegation",
+        effect: iam.Effect.DENY,
         actions: [
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:GetAuthorizationToken",
+          "bedrock-agentcore:InvokeAgentRuntimeForUser",
+          "bedrock-agentcore:GetWorkloadAccessTokenForUserId",
         ],
         resources: ["*"],
       })
     );
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        sid: "DenyViaAwsManagedMcp",
+        effect: iam.Effect.DENY,
+        actions: ["*"],
+        resources: ["*"],
+        conditions: { Bool: { "aws:ViaAWSMCPService": "true" } },
+      })
+    );
 
-    // CloudWatch Logs / X-Ray / Metrics — required for AgentCore Runtime observability
+    // ECR pull: the image repository only (GetAuthorizationToken has no resource scope)
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["ecr:GetDownloadUrlForLayer", "ecr:BatchGetImage"],
+        resources: [image.repository.repositoryArn],
+      })
+    );
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: ["ecr:GetAuthorizationToken"],
+        resources: ["*"],
+      })
+    );
+
+    // X-Ray / Metrics — required for AgentCore Runtime observability
     // https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html
-    role.addToPolicy(
-      new iam.PolicyStatement({
-        actions: [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams",
-        ],
-        resources: [
-          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*`,
-          `arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`,
-        ],
-      })
-    );
     role.addToPolicy(
       new iam.PolicyStatement({
         actions: [
@@ -190,6 +183,20 @@ export class AgentStack extends cdk.Stack {
       eventExpiryDuration: 90,
     });
     const memoryId = memory.attrMemoryId;
+
+    // Memory: the short-term event calls of the Strands session manager
+    // (AgentCoreMemorySessionManager; no long-term retrieval is configured).
+    role.addToPolicy(
+      new iam.PolicyStatement({
+        actions: [
+          "bedrock-agentcore:CreateEvent",
+          "bedrock-agentcore:ListEvents",
+          "bedrock-agentcore:GetEvent",
+          "bedrock-agentcore:DeleteEvent",
+        ],
+        resources: [memory.attrMemoryArn],
+      })
+    );
 
     // --- Amazon Bedrock AgentCore Runtime ---
     const defaultPolicy = role.node.findChild("DefaultPolicy") as iam.Policy;
@@ -231,8 +238,6 @@ export class AgentStack extends cdk.Stack {
         CREATE_MODEL_ID: this.node.tryGetContext("createModelId") || props.createModelId || props.chatModelId || "global.anthropic.claude-sonnet-4-6",
         ALLOWED_MODEL_IDS: JSON.stringify(props.allowedModelIds ?? []),
         MEMORY_ID: memoryId,
-        DECKS_TABLE: props.table.tableName,
-        PPTX_BUCKET: props.pptxBucket.bucketName,
         AWS_DEFAULT_REGION: this.region,
         COMPOSER_MAX_CONCURRENCY: "10",
         DEPLOY_TIMESTAMP: new Date().toISOString(),

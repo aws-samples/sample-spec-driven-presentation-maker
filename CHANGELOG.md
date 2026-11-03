@@ -268,6 +268,23 @@ Entries before v0.5.0 were written retroactively as summaries.
   button, the agent's calls to the MCP runtime and external MCP clients keep working; a
   caller that ran commands in a runtime session through `InvokeAgentRuntimeCommand` now gets
   403.
+- **Narrow the agent's execution role to what it uses.** The agent role no longer has access to
+  the decks table or the PPTX bucket (deck storage is the MCP server's), and the agent runtime no
+  longer gets the `DECKS_TABLE` / `PPTX_BUCKET` variables. AgentCore access is limited to the
+  Memory events the session manager writes and reads, on the agent's own Memory; ECR pulls to the
+  image repository; and the role explicitly denies user-id delegation
+  (`InvokeAgentRuntimeForUser`, `GetWorkloadAccessTokenForUserId`) and any call made through an
+  AWS-managed MCP server. The trust policies of the agent and MCP runtime roles accept AgentCore
+  only for resources of the deploying account and Region (`aws:SourceAccount` /
+  `aws:SourceArn`). The MCP runtime role drops its unused AWS Marketplace permissions and its
+  ECR pull on `*`, and the API Lambda's `ListEvents` is limited to the agent's Memory.
+- **Limit the AWS knowledge tools to documentation tools.** The agent connects to the public AWS
+  Knowledge MCP Server endpoint (`knowledge-mcp.global.api.aws`) and offers its model only
+  `aws___search_documentation`, `aws___read_documentation`, `aws___retrieve_skill`,
+  `aws___list_regions` and `aws___get_regional_availability`. The `mcp-proxy-for-aws`
+  dependency is removed.
+- **The agent accepts `prompt` as text only.** An invocation whose `prompt` is not a string is
+  answered with a `bad_input` error.
 - **The agent no longer sees the user's id in Cloud attachments.** The upload handle the API
   returns and the Web UI puts in the `[Attached:…]` marker is now `uploads/{uuid}/{name}`
   instead of the S3 key `uploads/{userId}/{uuid}/{name}`. The MCP server builds the S3 key from

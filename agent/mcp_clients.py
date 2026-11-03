@@ -2,14 +2,11 @@
 # SPDX-License-Identifier: MIT-0
 """MCP client factories and server instruction collection."""
 
-import logging
 import os
 import urllib.parse
 
 from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp import MCPClient
-
-logger = logging.getLogger("sdpm.agent")
 
 # MCP server definitions: (display_name, required)
 MCP_DEFS: list[tuple[str, bool]] = [
@@ -70,26 +67,29 @@ def mcp_agentcore_runtime(
     )
 
 
-def mcp_aws_knowledge() -> MCPClient:
-    """Pattern 2: IAM-authenticated AWS Knowledge MCP with public fallback.
+AWS_KNOWLEDGE_URL = "https://knowledge-mcp.global.api.aws"
 
-    Note: AWS MCP Server is currently only available in us-east-1.
-    We hard-code the endpoint region regardless of the agent's region.
+# The AWS documentation tools the agent offers its model. The allowlist pins the
+# set even if the endpoint adds tools later.
+AWS_KNOWLEDGE_TOOLS: list[str] = [
+    "aws___search_documentation",
+    "aws___read_documentation",
+    "aws___retrieve_skill",
+    "aws___list_regions",
+    "aws___get_regional_availability",
+]
+
+
+def mcp_aws_knowledge() -> MCPClient:
+    """Pattern 2: AWS Knowledge MCP Server (public endpoint, no authentication).
+
+    The agent uses the AWS documentation tools only. The public endpoint serves
+    exactly those and is called without the execution role's credentials.
     """
-    try:
-        from mcp_proxy_for_aws.client import aws_iam_streamablehttp_client
-        return MCPClient(
-            lambda: aws_iam_streamablehttp_client(
-                endpoint="https://aws-mcp.us-east-1.api.aws/mcp",
-                aws_service="aws-mcp",
-                aws_region="us-east-1",
-            ),
-        )
-    except Exception:
-        logger.warning("IAM auth unavailable for AWS Knowledge MCP, using public endpoint")
-        return MCPClient(
-            lambda: streamablehttp_client(url="https://knowledge-mcp.global.api.aws"),
-        )
+    return MCPClient(
+        lambda: streamablehttp_client(url=AWS_KNOWLEDGE_URL),
+        tool_filters={"allowed": list(AWS_KNOWLEDGE_TOOLS)},
+    )
 
 
 def mcp_aws_pricing() -> MCPClient:

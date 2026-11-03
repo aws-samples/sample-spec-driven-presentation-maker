@@ -6,8 +6,8 @@
   },
   "scripts": {
     "build": "tsc",
-    "cdk": "cdk",
-    "test": "node --require ts-node/register --test test/*.test.ts"
+    "test": "TS_NODE_TRANSPILE_ONLY=1 node --require ts-node/register --test test/*.test.ts",
+    "cdk": "cdk"
   },
   "devDependencies": {
     "@types/node": "^26.6.5",

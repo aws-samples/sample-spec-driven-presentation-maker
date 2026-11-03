@@ -293,7 +293,7 @@ function handler(event) {
       apiLambda.addEnvironment("MEMORY_ID", props.memoryId);
       apiLambda.addToRolePolicy(new iam.PolicyStatement({
         actions: ["bedrock-agentcore:ListEvents"],
-        resources: ["*"],
+        resources: [`arn:aws:bedrock-agentcore:${this.region}:${this.account}:memory/${props.memoryId}`],
       }));
     }
 
