@@ -17,6 +17,7 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as ecr_assets from "aws-cdk-lib/aws-ecr-assets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
@@ -24,6 +25,7 @@ import * as path from "path";
 import { AUTH_SSM_PARAMS } from "./auth-stack";
 import { RuntimeResourcePolicy } from "./construct/runtime-resource-policy";
 import { agentCoreServicePrincipal } from "./construct/agentcore-principal";
+import { RUNTIME_OTEL_ENVIRONMENT, runtimeLogRetention } from "./construct/runtime-observability";
 
 interface RuntimeStackProps extends cdk.StackProps {
   /** Amazon DynamoDB table from DataStack. */
@@ -55,6 +57,8 @@ interface RuntimeStackProps extends cdk.StackProps {
   useAuthStack: boolean;
   /** Enable Dynamic Client Registration (RFC 7591) for external MCP clients. Default: true. */
   enableDCR?: boolean;
+  /** Retention of the runtime's log group (observability.logRetentionDays). Default: 30 days. */
+  logRetention?: logs.RetentionDays;
 }
 
 export class RuntimeStack extends cdk.Stack {
@@ -249,10 +253,14 @@ export class RuntimeStack extends cdk.Stack {
         KB_SSM_PARAM: props.kbSsmParamName ?? "",
         VECTOR_BUCKET_NAME: props.vectorBucketName ?? "",
         VECTOR_INDEX_NAME: props.vectorIndexName ?? "",
+        ...RUNTIME_OTEL_ENVIRONMENT,
       },
       description: "spec-driven-presentation-maker MCP Server — AI-powered presentation generation",
     });
     runtime.node.addDependency(defaultPolicy);
+
+    // Retention of the log group AgentCore creates for this runtime (observability.logRetentionDays).
+    runtimeLogRetention(this, "SdpmRuntimeLogRetention", runtime.attrAgentRuntimeId, props.logRetention);
 
     const endpoint = new bedrockagentcore.CfnRuntimeEndpoint(
       this,

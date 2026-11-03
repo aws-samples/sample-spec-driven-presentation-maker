@@ -297,7 +297,12 @@ export class DataStack extends cdk.Stack {
     // GenAI Observability and per-user token queries (attributes.user.id ×
     // attributes.gen_ai.usage.*). Account-level setting — independent from
     // invocation logging, which has different privacy characteristics
-    // (invocation logs contain prompt text; spans do not by default).
+    // (invocation logs contain prompt text). Spans carry conversation text too:
+    // the Strands tracer records messages as span events. The ADOT exporter moves
+    // the content it recognises out of the spans into log records in the runtime
+    // log group (`otel-rt-logs` stream), kept for observability.logRetentionDays.
+    // Bedrock request/response bodies from the botocore instrumentation are off
+    // (OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false on both runtimes).
     if (props?.enableTransactionSearch) {
       const txSearchFn = new lambda.Function(this, "TransactionSearchFn", {
         runtime: lambda.Runtime.PYTHON_3_13,
