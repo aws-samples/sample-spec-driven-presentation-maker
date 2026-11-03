@@ -156,3 +156,25 @@ def test_composers_stop_after_the_parent_invocation_ended(tmp_path, monkeypatch)
     time.sleep(2.5)
     late = [r for r in recorder.read() if r["who"] == "composer" and r["t"] > cancelled_at + SLACK_S]
     assert late == []
+
+
+def test_prompt_prefetch_does_not_call_mcp_once_writes_are_closed(monkeypatch):
+    # On dev, SIGTERM arrived while compose's check_specs was running; compose then
+    # prefetched the composer prompt (resolve_parts -> start_composing) after the signal.
+    monkeypatch.syspath_prepend(str(AGENT_DIR))
+    import resilience
+    from composition import Part, Source, resolve_parts
+
+    calls = []
+
+    class Client:
+        def call_tool_sync(self, tool_use_id, name, arguments):
+            calls.append(name)
+            return {"status": "success", "content": [{"text": "{}"}]}
+
+    closed = threading.Event()
+    closed.set()
+    monkeypatch.setattr(resilience, "_writes_closed", closed)
+    with pytest.raises(resilience.WritesClosed):
+        resolve_parts([Part(Source.mcp("start_composing", {}), target="system")], mcp_client=Client())
+    assert calls == []
