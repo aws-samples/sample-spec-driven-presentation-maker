@@ -120,8 +120,9 @@ async def agent_stream(payload, context):
     finally:
         stop_guard.end_turn(stop)
         # Stopped (cancel, a newer request, the client gone, SIGTERM): fence the turn's decks.
+        # hold: a SIGTERM that follows (StopRuntimeSession after a cancel) waits for the call.
         if stop.is_set():
-            fence.advance()
+            stop_guard.hold(fence.advance())
         else:
             fence.release()
         if _cancel_events.get(session_id) is cancel:

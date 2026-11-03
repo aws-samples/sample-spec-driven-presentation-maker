@@ -72,7 +72,8 @@ class TurnFence:
 
     def advance(self) -> threading.Thread | None:
         """The turn was stopped: fence its decks (once). The call runs on a daemon thread,
-        so this is safe from a signal handler and from the event loop; returns it."""
+        so this is safe from a signal handler and from the event loop; returns it (for
+        stop_guard.hold, so a shutting-down process waits for it)."""
         return self._finish(fence=True)
 
     def release(self) -> None:

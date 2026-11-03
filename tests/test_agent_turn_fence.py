@@ -254,3 +254,42 @@ def test_sigterm_advances_the_running_turns_fence(monkeypatch):
     finally:
         stop_guard.end_turn(stop)
     assert stop.is_set() and calls == ["advance"]
+
+
+def test_shutdown_waits_for_the_stop_call_until_the_watchdog_exit(monkeypatch):
+    # The turn can end (and uvicorn finish) before fence_turn reaches the server; the
+    # lifespan's shutdown then waits for the call (wait_held), but not past the watchdog.
+    import sys
+    import time
+
+    stop_guard = _basic_agent().stop_guard
+    resilience = sys.modules["resilience"]
+    monkeypatch.setattr(resilience, "_writes_closed", threading.Event())
+    monkeypatch.setattr(stop_guard, "_running", {})
+    monkeypatch.setattr(stop_guard, "_held", set())
+    monkeypatch.setattr(stop_guard, "_exit_at", None)
+    sent = threading.Event()
+
+    def advance():
+        thread = threading.Thread(target=lambda: (time.sleep(0.3), sent.set()), daemon=True)
+        thread.start()
+        return thread
+
+    stop = stop_guard.begin_turn(on_stop=advance)
+    try:
+        stop_guard.stop_all()
+    finally:
+        stop_guard.end_turn(stop)
+    stop_guard.wait_held()
+    assert sent.is_set()
+
+    stuck = threading.Event()
+    hung = threading.Thread(target=stuck.wait, daemon=True)
+    hung.start()
+    stop_guard.hold(hung)
+    stop_guard.hold(None)  # a turn with nothing to fence
+    monkeypatch.setattr(stop_guard, "_exit_at", time.monotonic() + 0.2)
+    started = time.monotonic()
+    stop_guard.wait_held()
+    assert time.monotonic() - started < 1.0
+    stuck.set()

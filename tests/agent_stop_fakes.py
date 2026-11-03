@@ -97,15 +97,18 @@ class FakeMCP(ToolProvider):
     so nothing else on that loop (Strands' cancel watcher) runs meanwhile.
     meta: the client-level ``_meta`` the factory gave it (the turn's write-fence
     generation); recorded at construction and with every direct call.
+    fence_seconds: fence_turn is recorded only after this long, like a request that
+    reaches a cold MCP runtime late; a process that exits sooner never records it.
     """
 
     server_instructions = ""
 
     def __init__(self, recorder: Recorder, who: str, tool_seconds: float = 0.5, hold_loop: bool = False,
-                 meta: dict | None = None):
+                 meta: dict | None = None, fence_seconds: float = 0.0):
         self.recorder = recorder
         self.who = who
         self.meta = meta
+        self.fence_seconds = fence_seconds
         recorder.log("client", "created", who, detail={"meta": meta})
 
         if hold_loop:
@@ -138,6 +141,8 @@ class FakeMCP(ToolProvider):
         pass
 
     def call_tool_sync(self, tool_use_id, name, arguments, **kwargs):
+        if name == "fence_turn":
+            time.sleep(self.fence_seconds)
         self.recorder.log("mcp", name, self.who, detail={"arguments": arguments, "meta": self.meta})
         return {"status": "success", "toolUseId": tool_use_id, "content": [{"text": json.dumps(_PAYLOAD)}]}
 

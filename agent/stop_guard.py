@@ -11,14 +11,18 @@ running and writing to S3, MCP and Memory meanwhile.
 The guard, installed through the app's lifespan so it runs before uvicorn's own handler:
   1. closes the write gate (resilience.close_writes): tool calls, compose's direct MCP
      calls and Memory events (GatedMemorySessionManager) are dropped from then on;
-  2. sets every running turn's stop event, which Strands and the composers observe;
+  2. sets every running turn's stop event, which Strands and the composers observe, and
+     runs its stop callback (the turn's fence_turn call, turn_fence.py);
   3. starts a watchdog that flushes OpenTelemetry and exits the process after
      EXIT_AFTER_S, whatever is still running (a composer thread blocked in a read);
   4. closes the process's resident MCP clients (AWS Knowledge, and AWS Pricing's stdio
      subprocess) on a side thread, best effort: the watchdog's exit bounds it.
-basic_agent passes GRACEFUL_SHUTDOWN_S to uvicorn so it stops waiting before that.
+basic_agent passes GRACEFUL_SHUTDOWN_S to uvicorn so it stops waiting before that. The
+lifespan's shutdown then waits, up to the watchdog's exit, for the stop calls still
+running (hold / wait_held), since a turn can end before its fence_turn reaches the server.
 """
 
+import asyncio
 import contextlib
 import logging
 import os
@@ -43,13 +47,19 @@ _lock = threading.RLock()
 # Running turns: stop event -> what to call when the turn is stopped (or None).
 _running: dict[threading.Event, Callable[[], object] | None] = {}
 _exiting = threading.Event()
+# Calls a stopped turn still has to send (turn_fence's fence_turn), and when the watchdog
+# exits the process. The lifespan's shutdown waits for them until then: right after it,
+# uvicorn re-raises SIGTERM under the default handler, which ends the process at once.
+_held: set[threading.Thread] = set()
+_exit_at: float | None = None
 
 
 def begin_turn(on_stop: Callable[[], object] | None = None) -> threading.Event:
     """Register a running turn and return its stop event (set on SIGTERM).
 
     ``on_stop`` runs when SIGTERM stops the turn (on the signal handler's thread, so it
-    must not block: turn_fence.TurnFence.advance hands its call to a thread).
+    must not block: turn_fence.TurnFence.advance hands its call to a thread and returns
+    it, and the process waits for a returned thread before it exits; see hold()).
     Pair with end_turn() in a finally block.
     """
     stop = threading.Event()
@@ -65,6 +75,27 @@ def end_turn(stop: threading.Event) -> None:
         _running.pop(stop, None)
 
 
+def hold(thread: object) -> None:
+    """Keep the process alive for ``thread`` (if it is one) when it shuts down, up to the
+    watchdog's exit."""
+    if not isinstance(thread, threading.Thread):
+        return
+    with _lock:
+        _held.difference_update([t for t in _held if not t.is_alive()])
+        _held.add(thread)
+
+
+def wait_held() -> None:
+    """Wait for the held threads, until the watchdog's exit (EXIT_AFTER_S without SIGTERM)."""
+    with _lock:
+        threads = list(_held)
+        deadline = _exit_at if _exit_at is not None else time.monotonic() + EXIT_AFTER_S
+    for thread in threads:
+        thread.join(max(0.0, deadline - time.monotonic()))
+    if any(t.is_alive() for t in threads):
+        logger.warning("SIGTERM guard: exiting with %d stop call(s) still running", sum(t.is_alive() for t in threads))
+
+
 def stop_all() -> int:
     """Close the write gate and set the stop event of every running turn."""
     close_writes()
@@ -74,7 +105,7 @@ def stop_all() -> int:
         stop.set()
         if on_stop is not None:
             try:
-                on_stop()
+                hold(on_stop())
             except Exception as e:  # noqa: BLE001 - the other turns still stop
                 logger.warning("SIGTERM guard: a turn's stop callback failed: %s", e)
     return len(running)
@@ -127,6 +158,10 @@ def _close_resident_clients() -> None:
 
 def _on_sigterm(previous):
     def handler(signum, frame):
+        global _exit_at
+        if not _exiting.is_set():  # before stop_all, so wait_held already sees the deadline
+            with _lock:
+                _exit_at = time.monotonic() + EXIT_AFTER_S
         stopped = stop_all()
         if not _exiting.is_set():  # signal handlers run on the main thread only: no race here
             _exiting.set()
@@ -148,6 +183,8 @@ def install() -> None:
 
 @contextlib.asynccontextmanager
 async def lifespan(app):
-    """App lifespan: uvicorn has installed its signal handlers by the time this starts."""
+    """App lifespan: uvicorn has installed its signal handlers by the time this starts.
+    Its shutdown waits for the stop calls still running (wait_held)."""
     install()
     yield
+    await asyncio.to_thread(wait_held)
