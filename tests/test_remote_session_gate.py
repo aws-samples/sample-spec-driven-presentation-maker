@@ -17,8 +17,8 @@ server = harness.server  # the fixture: servers/remote/server.py imported fresh 
 _bearer = harness._bearer
 _post = harness._post
 
-P1 = "c6c289e49e9c05b2"  # owner_prefix("user-1")
-P2 = "d92b69cfb82cecab"  # owner_prefix("user-2")
+P1 = "c6c289e49e9c05b2"  # owner_prefix("user-1")  # pragma: allowlist secret
+P2 = "d92b69cfb82cecab"  # owner_prefix("user-2")  # pragma: allowlist secret
 OWN = f"{P1}-00000000-0000-4000-8000-000000000000"
 OTHER = f"{P2}-00000000-0000-4000-8000-000000000000"
 LIST = {"jsonrpc": "2.0", "id": 1, "method": "tools/list"}

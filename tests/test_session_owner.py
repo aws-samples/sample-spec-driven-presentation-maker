@@ -18,8 +18,9 @@ from shared.session_owner import (
     sub_from_jwt,
 )
 
-P1 = "c6c289e49e9c05b2"  # owner_prefix("user-1"); web-ui/src/lib/sessionId.test.ts pins the same
-P2 = "d92b69cfb82cecab"  # owner_prefix("user-2")
+# web-ui/src/lib/sessionId.test.ts pins the same vectors.
+P1 = "c6c289e49e9c05b2"  # owner_prefix("user-1")  # pragma: allowlist secret
+P2 = "d92b69cfb82cecab"  # owner_prefix("user-2")  # pragma: allowlist secret
 UUID = "0f8c6a4e-2b1d-4c3e-9a7f-5d6e7f8a9b0c"
 PADDED_DECK = "a1b2c3d4".ljust(36, "0")
 

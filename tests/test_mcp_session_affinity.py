@@ -126,7 +126,7 @@ def test_terminate_on_close_stays_false(monkeypatch):
 
 # --- owner prefix -------------------------------------------------------------
 
-P1 = "c6c289e49e9c05b2"  # owner_prefix("user-1")
+P1 = "c6c289e49e9c05b2"  # owner_prefix("user-1")  # pragma: allowlist secret
 OWN = f"{P1}-00000000-0000-4000-8000-000000000000"
 
 

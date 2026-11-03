@@ -9,8 +9,8 @@ const MAX = 256
 
 describe("ownerPrefix", () => {
   it("matches the Python vector (tests/test_session_owner.py)", () => {
-    expect(ownerPrefix("user-1")).toBe("c6c289e49e9c05b2")
-    expect(ownerPrefix("user-2")).toBe("d92b69cfb82cecab")
+    expect(ownerPrefix("user-1")).toBe("c6c289e49e9c05b2") // pragma: allowlist secret
+    expect(ownerPrefix("user-2")).toBe("d92b69cfb82cecab") // pragma: allowlist secret
   })
 })
 

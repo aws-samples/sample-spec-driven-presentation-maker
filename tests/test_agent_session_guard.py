@@ -15,8 +15,8 @@ import pytest
 from shared.session_owner import ProcessOwner
 from test_agent_tool_exposure import _basic_agent
 
-P1 = "c6c289e49e9c05b2"  # owner_prefix("user-1")
-P2 = "d92b69cfb82cecab"  # owner_prefix("user-2")
+P1 = "c6c289e49e9c05b2"  # owner_prefix("user-1")  # pragma: allowlist secret
+P2 = "d92b69cfb82cecab"  # owner_prefix("user-2")  # pragma: allowlist secret
 OWN = f"{P1}-00000000-0000-4000-8000-000000000000"
 OTHER = f"{P2}-00000000-0000-4000-8000-000000000000"
 LEGACY = "0f8c6a4e-2b1d-4c3e-9a7f-5d6e7f8a9b0c"
