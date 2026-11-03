@@ -142,39 +142,55 @@ def offloaded_tool(fn):
 _current_request_headers: ContextVar[dict] = ContextVar("_current_request_headers", default={})
 
 
-# --- LibreOffice warm-up per MCP session ---
+# --- LibreOffice warm-up, once per process ---
 #
 # AgentCore Runtime platform V2 restores every microVM from a snapshot, and the
 # restored root filesystem is lazily fetched: the first read of each file is
 # slow (measured 2026-09-20: reading LibreOffice's 166 MB of .so took 2-16 s,
 # the first `soffice --version` 13.5 s, the first conversion 20 s more — about
 # 60 s in total; the second run 3 s). Warming before the snapshot does not help
-# because the page cache is not restored. So the warm-up runs after restore:
-# each MCP session maps to one microVM, and the session's `initialize` request
-# (the only POST /mcp without an Mcp-Session-Id header) is the earliest moment
-# we know the microVM is in use. One background conversion of a blank template
-# touches exactly the files a real conversion needs, well before the composer
-# reaches its first run_python.
+# because the page cache is not restored, so after a restore one background
+# conversion of a blank template touches the files a real conversion needs,
+# well before the composer reaches its first run_python.
+#
+# The warm-up starts once the client has gone quiet: no client request (a POST
+# carrying an Mcp-Session-Id) has been in flight for _WARMUP_QUIET_S. The agent
+# always sends that header; the platform's health check (a PingRequest POST about
+# every 2 s, also while the snapshot is built) sends none and is ignored. Starting
+# from those pings made the warm-up compete with the agent's initialize,
+# tools/list and start_presentation for the lazily fetched disk and the CPU (dev,
+# 2026-11-03: start_presentation on a new session 0.5-30 s with it, 0.7 s
+# without). On the orchestrator's session those three requests follow each other
+# within about a second, so the warm-up starts after start_presentation, while the
+# model runs. A composer group's session (`<sid>-gN`, its own microVM) gets only
+# initialize and tools/list before the composer's first tool call (11-129 s later
+# on dev, 2026-11-03), usually a run_python that renders; its start_composing goes
+# to the orchestrator's session. One successful run per process is enough,
+# since the page cache lasts as long as the microVM; after a failed run the next
+# quiet period tries again. Nothing runs before the snapshot, so every restored
+# microVM starts from "pending".
 
 _warmup_lock = threading.Lock()
-_warmup_running = False
-_warmup_last_done = 0.0
-_WARMUP_MIN_INTERVAL_S = 300.0
+_warmup_state = "pending"  # "pending" -> "running" -> "done" (back to "pending" when a run fails)
+_WARMUP_QUIET_S = 3.0
+# Event loop only (the middleware): client requests in flight, and the pending quiet-period timer.
+_client_requests_in_flight = 0
+_warmup_timer = None
 
 
 def _soffice_warm_up() -> None:
-    global _warmup_running, _warmup_last_done
+    global _warmup_state
     import shutil
     import subprocess
     import tempfile
 
+    done = False
     try:
-        if not shutil.which("soffice"):
-            return
         from sdpm.config import TEMPLATES_DIR
 
         sample = TEMPLATES_DIR / "blank-light.pptx"
-        if not sample.exists():
+        if not shutil.which("soffice") or not sample.exists():
+            done = True  # nothing to warm on this image
             return
         t0 = time.monotonic()
         with tempfile.TemporaryDirectory() as tmp:
@@ -185,30 +201,56 @@ def _soffice_warm_up() -> None:
                 capture_output=True, timeout=180, env=env, check=False,
             )
         logger.info("soffice warm-up took %.1fs rc=%s", time.monotonic() - t0, r.returncode)
-        _warmup_last_done = time.time()
+        done = r.returncode == 0
     except Exception as e:  # noqa: BLE001 - best effort, never affects requests
         logger.warning("soffice warm-up failed: %s", e)
     finally:
         with _warmup_lock:
-            _warmup_running = False
+            _warmup_state = "done" if done else "pending"
 
 
-def _maybe_start_soffice_warm_up() -> None:
-    """Start a background warm-up unless one is running or recently finished."""
-    global _warmup_running
+def _start_soffice_warm_up_once() -> None:
+    """Start the background warm-up unless it is running or already succeeded in this process."""
+    global _warmup_state
     if os.environ.get("SDPM_SKIP_SOFFICE_WARMUP"):
         return
     with _warmup_lock:
-        if _warmup_running or time.time() - _warmup_last_done < _WARMUP_MIN_INTERVAL_S:
+        if _warmup_state != "pending":
             return
-        _warmup_running = True
-    threading.Thread(target=_soffice_warm_up, name="soffice-warmup", daemon=True).start()
+        _warmup_state = "running"
+    _run_in_background(_soffice_warm_up, name="soffice-warmup")
+
+
+def _client_request_started() -> None:
+    """(event loop) A client request arrived: the client is not quiet."""
+    global _client_requests_in_flight, _warmup_timer
+    _client_requests_in_flight += 1
+    if _warmup_timer is not None:
+        _warmup_timer.cancel()
+        _warmup_timer = None
+
+
+def _client_request_finished() -> None:
+    """(event loop) A client request has been answered: start the quiet-period timer if none is in flight."""
+    global _client_requests_in_flight, _warmup_timer
+    import asyncio
+
+    _client_requests_in_flight -= 1
+    if _client_requests_in_flight == 0 and _warmup_state == "pending":
+        _warmup_timer = asyncio.get_running_loop().call_later(_WARMUP_QUIET_S, _client_quiet)
+
+
+def _client_quiet() -> None:
+    global _warmup_timer
+    _warmup_timer = None
+    _start_soffice_warm_up_once()
 
 
 class _CaptureHeadersMiddleware:
     """Raw ASGI middleware to capture HTTP headers into a ContextVar.
 
-    Compatible with streaming responses (unlike BaseHTTPMiddleware).
+    Compatible with streaming responses (unlike BaseHTTPMiddleware). It also
+    counts client requests in flight for the LibreOffice warm-up's quiet period.
     """
 
     def __init__(self, app):  # type: ignore
@@ -223,14 +265,16 @@ class _CaptureHeadersMiddleware:
         """Capture headers from HTTP requests into ContextVar."""
         if scope["type"] == "http":
             headers = {k.decode(): v.decode() for k, v in scope.get("headers", [])}
-            if scope.get("method") == "POST" and "mcp-session-id" not in headers:
-                # A new MCP session is being initialized on this microVM.
-                _maybe_start_soffice_warm_up()
+            client = scope.get("method") == "POST" and "mcp-session-id" in headers
+            if client:
+                _client_request_started()
             token = _current_request_headers.set(headers)
             try:
                 await self.app(scope, receive, send)
             finally:
                 _current_request_headers.reset(token)
+                if client:
+                    _client_request_finished()
         else:
             await self.app(scope, receive, send)
 
@@ -1430,6 +1474,57 @@ if _kb_configured:
             days=days,
         )
         return json.dumps({"results": results}, ensure_ascii=False)
+
+
+# --- Startup preload (held in the platform V2 snapshot) ---
+#
+# What the first start_presentation on a restored microVM would otherwise read
+# from the lazily fetched root filesystem is read here, before the snapshot: the
+# botocore service definitions of every AWS API this server calls, the bundled
+# style listing and the role documents (dev, 2026-11-03: start_presentation on a
+# new session 0.73 s -> 0.50 s). Only files baked into the image are read. No
+# client is built, no credentials are resolved and no connection is opened: the
+# default boto3 session only holds configuration and the parsed definitions until
+# the first request builds a client (see AwsStorage).
+
+_PRELOAD_SERVICES = (
+    "s3", "dynamodb", "ssm", "bedrock-agentcore", "bedrock-runtime", "bedrock-agent-runtime", "s3vectors",
+)
+_PRELOAD_SERVICE_FILES = ("service-2", "endpoint-rule-set-1", "paginators-1", "waiters-2", "resources-1")
+_PRELOAD_DATA_FILES = ("endpoints", "partitions", "sdk-default-configuration", "_retry")
+
+
+def _preload() -> None:
+    from botocore.exceptions import DataNotFoundError
+
+    from sdpm import entry
+
+    t0 = time.monotonic()
+    try:
+        # Every boto3.client() / boto3.resource() here goes through the default session,
+        # so its loader is the one whose cache the definitions have to be in.
+        if boto3.DEFAULT_SESSION is None:
+            boto3.setup_default_session()
+        loader = boto3.DEFAULT_SESSION._session.get_component("data_loader")
+        for service in _PRELOAD_SERVICES:
+            for type_name in _PRELOAD_SERVICE_FILES:
+                try:
+                    loader.load_service_model(service, type_name)
+                except DataNotFoundError:  # not every service ships every file
+                    pass
+        for name in _PRELOAD_DATA_FILES:
+            try:
+                loader.load_data(name)
+            except DataNotFoundError:
+                pass
+        reference.bundled_styles()
+        entry.preload_references()
+    except Exception:  # noqa: BLE001 - an optimisation only; the requests read the same files
+        logger.warning("startup preload failed", exc_info=True)
+    logger.info("startup preload took %.2fs", time.monotonic() - t0)
+
+
+_preload()
 
 
 if __name__ == "__main__":

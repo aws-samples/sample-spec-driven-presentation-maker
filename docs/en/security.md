@@ -73,19 +73,24 @@ sample cannot set safe defaults for them. Evaluate each one before production us
 9. **Bedrock model and region**: if data residency matters, avoid cross-region inference
    profiles.
 
-### Only if you switch AgentCore runtimes to platformVersion V2
+### AgentCore runtime platform versions
 
-This stack runs the AgentCore runtimes on V1. CloudFormation and the CDK cannot set the
-`platformVersion` field, so a deployment of this sample does not use V2.
+The MCP runtime runs on `platformVersion` V2 (`infra/lib/runtime-stack.ts`); the agent
+runtime runs on V1. V2 restores every instance from one snapshot taken after startup, so
+whatever the process holds at that point is the same in every instance. The MCP server
+keeps only static data there (imported modules, parsed AWS API definitions, the bundled
+styles and role documents); it builds AWS clients, resolves credentials and opens
+connections on the first request after a restore. Values this stack takes from the kernel
+are not affected: `uuid.uuid4()` and `secrets` read `getrandom(2)` on every call, and SigV4
+signing is HMAC-based and deterministic.
 
-V2 restores every instance from one snapshot. A userspace random number generator seeded
-before the snapshot is then shared across instances. Values this stack takes from the
-kernel are not affected: `uuid.uuid4()` and `secrets` read `getrandom(2)` on every call, and
-SigV4 signing is HMAC-based and deterministic. The exposure is limited to OpenSSL's own
-DRBG behind outbound TLS. If you enable V2, replace the MCP runtime's OpenSSL with a
-snapshot-safe build (`openssl-snapsafe-libs` on Amazon Linux 2023; it conflicts with
-`openssl-libs` and needs `--allowerasing`), or use an AWS-provided base image that already
-ships one.
+What remains is OpenSSL's own DRBG behind outbound TLS from the MCP runtime: seeded before
+the snapshot, it starts from the same state in every restored instance. Swapping in a
+snapshot-safe OpenSSL build does not change that, because AgentCore Runtime does not reseed
+those builds after a restore
+([Optimize for V2](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-v2-optimize.html)).
+This sample accepts the risk. If your organization does not, set `platformVersion` to `"V1"`
+in `infra/lib/runtime-stack.ts`; the MCP server runs on both.
 
 ## Local install
 
