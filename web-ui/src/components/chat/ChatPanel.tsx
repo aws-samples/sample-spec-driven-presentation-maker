@@ -15,6 +15,7 @@ import { IS_LOCAL } from "@/lib/mode"
 import { loadRuntimeConfig } from "@/lib/runtimeConfig"
 import { buildAttachedMarkers } from "@/lib/attachmentMarker"
 import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
+import { deckSessionId, isOwnerPrefixed } from "@/lib/sessionId"
 import { getChatHistory, patchDeck } from "@/services/deckService"
 import * as localService from "@/services/localService"
 import type { UploadedFile } from "@/services/uploadService"
@@ -75,12 +76,18 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const tSessionPicker = useTranslations("sessionPicker")
   const tReview = useTranslations("review")
   const locale = useLocale()
+  const auth = useAuth()
   // --- Session ---
+  // Cloud ids carry the owner prefix of the signed-in user (lib/sessionId.ts).
+  const sub = auth.user?.profile?.sub
   const [sessionId, setSessionId] = useState(() => {
     if (chatSessionId) return chatSessionId
-    if (deckId === "new") return generateSessionId()
-    return deckId.padEnd(36, "0")
+    if (deckId === "new") return generateSessionId(sub)
+    return IS_LOCAL || !sub ? deckId.padEnd(36, "0") : deckSessionId(sub, deckId)
   })
+  // A linked chat id of an earlier format whose history is empty is replaced for
+  // this page load (see loadHistory); the prop-swap effect must not bring it back.
+  const replacedLegacyIdRef = useRef<string | null>(null)
   const sessionIdRef = useRef(sessionId)
   sessionIdRef.current = sessionId
   // Mid-stream guard: when a deck is created while the agent is still
@@ -92,7 +99,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const pendingChatSessionIdRef = useRef<string | null>(null)
   const isLoadingRef = useRef(false)
   useEffect(() => {
-    if (chatSessionId && chatSessionId !== sessionId) {
+    if (chatSessionId && chatSessionId !== sessionId && chatSessionId !== replacedLegacyIdRef.current) {
       if (isLoadingRef.current) {
         pendingChatSessionIdRef.current = chatSessionId
       } else {
@@ -146,7 +153,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const currentDeckId = useRef(deckId)
   currentDeckId.current = deckId
 
-  const auth = useAuth()
   const isMobile = useIsMobile()
   const slashPickerItems = useSlashPickerItems(auth.user?.id_token)
   // Mirror of the chat input; the HTML pill derives its state from the text alone.
@@ -260,7 +266,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         return
       }
       console.error("Failed to continue from kiro session", err)
-      const freshSessionId = generateSessionId()
+      const freshSessionId = generateSessionId(sub)
       sessionIdRef.current = freshSessionId
       setSessionId(freshSessionId)
       setContinuedOrigin(undefined)
@@ -320,6 +326,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           }
           const parsed = parseCloudHistory(history)
           if (parsed.length > 0) stream.setMessages(parsed)
+        } else if (!IS_LOCAL && sub && deckId && deckId !== "new" && !isOwnerPrefixed(sessionId)) {
+          // An earlier-format id with no history: continue under this user's own id.
+          replacedLegacyIdRef.current = sessionId
+          setSessionId(deckSessionId(sub, deckId))
         }
       } finally {
         setHistoryLoading(false)

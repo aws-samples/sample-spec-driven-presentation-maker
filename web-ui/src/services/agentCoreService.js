@@ -9,6 +9,7 @@
 import * as parser from './strandsParser.js';
 import { getAllowedModels } from "@/lib/allowedModels";
 import { IS_LOCAL } from "@/lib/mode";
+import { newSessionId } from "@/lib/sessionId";
 
 // Read the user's selected chat model from localStorage, validated against the allowed list.
 function readSelectedChatModelId() {
@@ -56,7 +57,7 @@ export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
 /**
  * Invokes the AgentCore runtime with streaming support
  */
-export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId, continuedFrom) => {
+export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId, continuedFrom, translateError) => {
   // Local mode: proxy through Next.js API Route → kiro-cli acp
   if (IS_LOCAL) {
     return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom);
@@ -144,7 +145,7 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
 
           for (const line of lines) {
             if (line.trim()) {
-              completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
+              completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse, translateError);
             }
           }
         }
@@ -190,10 +191,10 @@ export const stopRuntimeSession = async (sessionId, accessToken) => {
 }
 
 /**
- * Generate a new session ID
+ * Generate a new session ID. Cloud ids carry the owner prefix of `sub` (lib/sessionId.ts).
  */
-export const generateSessionId = () => {
-  return generateId()
+export const generateSessionId = (sub) => {
+  return IS_LOCAL || !sub ? generateId() : newSessionId(sub)
 }
 
 /**

@@ -37,7 +37,7 @@ interface StyleChatPanelProps {
 export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleChatPanelProps) {
   const t = useTranslations("styleChat")
   const auth = useAuth()
-  const sessionId = useRef(generateSessionId()).current
+  const sessionId = useRef(generateSessionId(auth.user?.profile?.sub)).current
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const shouldAutoScroll = useRef(true)

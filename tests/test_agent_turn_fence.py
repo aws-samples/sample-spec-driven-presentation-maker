@@ -10,6 +10,9 @@ path end to end is in test_agent_stop_guard.
 
 import threading
 
+# A session id of user-1 (owner prefix of "user-1", see shared/session_owner.py).
+OWNED = "c6c289e49e9c05b2-00000000-0000-4000-8000-000000000000"
+
 
 # Imported lazily: test_mcp_parallel_connect puts agent/ on sys.path when it is imported,
 # and agent/tools would then shadow servers/remote's tools package for the test modules
@@ -219,7 +222,7 @@ def _entrypoint(monkeypatch, stream):
     monkeypatch.setattr(basic_agent, "TurnFence", _FenceSpy)
     monkeypatch.setattr(basic_agent, "create_agent", fake_create_agent)
     monkeypatch.setattr(basic_agent, "stream_agent", stream)
-    _run(basic_agent, {"prompt": "hello", "runtimeSessionId": "s" * 33})
+    _run(basic_agent, {"prompt": "hello", "runtimeSessionId": OWNED})
     (fence,) = _FenceSpy.instances
     assert seen["fence"] is fence
     return fence
