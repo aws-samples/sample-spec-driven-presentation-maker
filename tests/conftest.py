@@ -32,6 +32,12 @@ def _no_browser(monkeypatch):
 
 
 @pytest.fixture(autouse=True)
+def _no_soffice_warm_up(monkeypatch):
+    """No test starts the remote server's LibreOffice warm-up unless it removes the switch itself."""
+    monkeypatch.setenv("SDPM_SKIP_SOFFICE_WARMUP", "1")
+
+
+@pytest.fixture(autouse=True)
 def _isolated_template_html_cache(tmp_path_factory, monkeypatch):
     """HTML template conversions go to a per-session temp cache, not the checkout's .cache."""
     import sdpm.config

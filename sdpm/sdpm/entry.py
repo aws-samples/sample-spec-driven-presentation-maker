@@ -33,11 +33,37 @@ _DEFAULT_BASE_STYLE = "typographic"  # smallest bundled style that follows the f
 # the first (lowest number). Slugs without a ``-<n>`` suffix belong to no group.
 _GROUP_MEMBER = re.compile(r"^(.+)-(\d+)$")
 
+# Role documents and specs read once, keyed by (directory, name). None (the default)
+# reads the files on every call, so editing a checkout under a running local server
+# takes effect at once; a server whose references cannot change while it runs (the
+# cloud image) turns the cache on with preload_references().
+_reference_cache: dict[tuple[Path, str], str] | None = None
+
 
 def _read_reference(directory: Path, name: str) -> str:
     from sdpm.knowledge.reference import read_docs
 
-    return read_docs(directory, [name])[0]["content"]
+    cache = _reference_cache
+    if cache is not None and (directory, name) in cache:
+        return cache[(directory, name)]
+    content = read_docs(directory, [name])[0]["content"]
+    if cache is not None:
+        cache[(directory, name)] = content
+    return content
+
+
+def preload_references() -> None:
+    """Read every role document and spec the entry payloads use, and serve them from memory from now on.
+
+    For a server whose bundled references cannot change for the life of its process.
+    """
+    global _reference_cache
+    if _reference_cache is None:
+        _reference_cache = {}
+    for role in ("orchestrator", "composer", "composer-html", "style", "translate"):
+        _workflow(role)
+    for guide in ("slide-json-spec", "slide-html-spec", *_FORMAT_NOTES.values()):
+        _read_reference(_GUIDES_DIR, guide)
 
 
 def _workflow(role: str) -> str:
