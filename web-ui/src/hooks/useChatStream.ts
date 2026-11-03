@@ -289,6 +289,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
         mode,
         deckId,
         options?.continuedFrom,
+        (code: string) => code === "session_reload_required" ? t("errorSessionReloadRequired") : undefined,
       )
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {

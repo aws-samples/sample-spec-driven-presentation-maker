@@ -27,6 +27,8 @@ import pytest
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENT_DIR = ROOT / "agent"
+# A session id of user-1 (owner prefix of "user-1", see shared/session_owner.py).
+OWNED = "c6c289e49e9c05b2-00000000-0000-4000-8000-000000000000"
 
 from agent_stop_fakes import FakeMCP, Recorder, ScriptedModel  # noqa: E402
 
@@ -78,7 +80,7 @@ def test_sigterm_during_compose_stops_every_write_and_exits(tmp_path):
             try:
                 with httpx.stream(
                     "POST", f"http://127.0.0.1:{port}/invocations", timeout=30,
-                    json={"prompt": "Make the deck.", "runtimeSessionId": "s" * 33},
+                    json={"prompt": "Make the deck.", "runtimeSessionId": OWNED},
                     headers={"Authorization": f"Bearer h.{claims}.s"},
                 ) as response:
                     for _ in response.iter_lines():

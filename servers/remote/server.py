@@ -33,6 +33,7 @@ from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from shared.authz import authorize  # noqa: E402
 from shared import user_library  # noqa: E402
+from shared.session_owner import ProcessOwner, belongs_to, is_owner_prefixed, sub_from_jwt  # noqa: E402
 from storage.aws import AwsStorage  # noqa: E402
 from tools import assets, reference, preview, generate  # noqa: E402
 from tools import sandbox as sandbox_mod  # noqa: E402
@@ -246,6 +247,44 @@ def _client_quiet() -> None:
     _start_soffice_warm_up_once()
 
 
+# --- Session ownership ---
+#
+# A session is admitted only for its owner (shared/session_owner.py). An
+# owner-prefixed id must carry the prefix of the token's user; ids of other
+# formats are admitted under the process binding alone. Every deck operation
+# still goes through _check_deck_access.
+
+_process_owner = ProcessOwner()
+_SESSION_HEADERS = ("mcp-session-id", "x-amzn-bedrock-agentcore-runtime-session-id")
+
+
+def _session_refusal(headers: dict) -> str | None:
+    """Return the refused session id (or ``"-"``) when the request may not proceed, else None."""
+    auth = headers.get("authorization")
+    if auth is None:
+        return None  # platform health checks; every data tool requires the JWT itself
+    token = auth[7:].strip() if auth.lower().startswith("bearer ") else ""
+    sub = sub_from_jwt(token)
+    if not sub:
+        return "-"
+    for name in _SESSION_HEADERS:
+        session_id = headers.get(name)
+        if session_id and is_owner_prefixed(session_id) and not belongs_to(session_id, sub):
+            return session_id
+    if not _process_owner.claim(sub):
+        return headers.get("mcp-session-id") or "-"
+    return None
+
+
+async def _send_forbidden(send) -> None:  # type: ignore
+    await send({
+        "type": "http.response.start",
+        "status": 403,
+        "headers": [(b"content-type", b"application/json")],
+    })
+    await send({"type": "http.response.body", "body": b'{"error": "forbidden"}'})
+
+
 class _CaptureHeadersMiddleware:
     """Raw ASGI middleware to capture HTTP headers into a ContextVar.
 
@@ -265,6 +304,11 @@ class _CaptureHeadersMiddleware:
         """Capture headers from HTTP requests into ContextVar."""
         if scope["type"] == "http":
             headers = {k.decode(): v.decode() for k, v in scope.get("headers", [])}
+            refused = _session_refusal(headers)
+            if refused is not None:
+                logger.warning("Session refused for session %s", refused[:12])
+                await _send_forbidden(send)
+                return
             client = scope.get("method") == "POST" and "mcp-session-id" in headers
             if client:
                 _client_request_started()

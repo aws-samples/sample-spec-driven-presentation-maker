@@ -300,6 +300,17 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Security
 
+- **Agent and MCP runtime sessions are bound to their owner.** New session ids created by
+  the Web UI start with a prefix derived from the signed-in user (`shared/session_owner.py`,
+  mirrored in `web-ui/src/lib/sessionId.ts`), and the agent and the MCP server admit such an
+  id only for that user. Each runtime process serves one user. Existing decks keep their
+  chat: a chat id from before this change is admitted when AgentCore Memory holds that
+  user's history for it, and a deck without history continues under the user's own id. The
+  agent forwards an owner-prefixed id to the MCP runtime (also for composer groups,
+  `<id>-gN`). A refused call gets an error event with no details; a chat tab opened before
+  the update may be asked to reload the page once (new error code
+  `session_reload_required`). Deploy the Web UI first, then SdpmRuntime, then SdpmAgent.
+  Local mode is unchanged.
 - **The AgentCore runtimes allow only the operations the app uses.** The agent and MCP
   runtimes, their `DEFAULT` endpoints and the named endpoints `sdpm_agent_endpoint` and
   `sdpm_endpoint` now carry a resource-based policy (`AWS::BedrockAgentCore::ResourcePolicy`,
