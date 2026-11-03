@@ -55,6 +55,20 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **The first reply in a new Cloud deck no longer waits for the LibreOffice warm-up.** The MCP
+  server started its background LibreOffice warm-up from the platform's health checks: right
+  after each microVM was restored, and again every 5 minutes. It then competed with the
+  agent's first `start_presentation` for disk and CPU (dev: 0.5–30 s, 0.7 s without it). The
+  warm-up now starts once per process, after the first `start_presentation` or
+  `start_composing` has sent its result, and does not run again once it has succeeded. The
+  server also reads the AWS API definitions, the bundled style list and the role documents at
+  startup, so the V2 snapshot holds them (dev: 0.73 s → 0.50 s).
+  The MCP runtime's `platformVersion: "V2"` is now declared in `infra/lib/runtime-stack.ts`
+  instead of being set outside CloudFormation, and its `DEPLOY_TIMESTAMP` environment variable
+  is removed: a deploy that changes neither the image nor the configuration no longer creates
+  a runtime version (each one rebuilds the V2 snapshot).
+  **Upgrade:** a new deployment now runs the MCP runtime on V2 instead of V1; see
+  [Security](docs/en/security.md#agentcore-runtime-platform-versions).
 - **Self sign-up is now off by default in the AWS stack.** The default Cognito user pool
   accepts only users created by an administrator (Cognito console or
   `aws cognito-idp admin-create-user`, see

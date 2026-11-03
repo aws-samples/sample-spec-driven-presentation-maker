@@ -220,6 +220,12 @@ export class RuntimeStack extends cdk.Stack {
     const runtime = new bedrockagentcore.CfnRuntime(this, "SdpmRuntime", {
       agentRuntimeName: "sdpm",
       roleArn: runtimeRole.roleArn,
+      // V2 restores each microVM from a snapshot taken after startup: the server's
+      // startup preload and its once-per-process LibreOffice warm-up assume it
+      // (servers/remote/server.py). Each new version builds a new snapshot (about
+      // 4 minutes), so the environment below holds no per-deploy value: a deploy
+      // that changes neither the image nor the configuration creates no version.
+      platformVersion: "V2",
       agentRuntimeArtifact: {
         containerConfiguration: {
           containerUri: image.imageUri,
@@ -243,7 +249,6 @@ export class RuntimeStack extends cdk.Stack {
         KB_SSM_PARAM: props.kbSsmParamName ?? "",
         VECTOR_BUCKET_NAME: props.vectorBucketName ?? "",
         VECTOR_INDEX_NAME: props.vectorIndexName ?? "",
-        DEPLOY_TIMESTAMP: new Date().toISOString(),
       },
       description: "spec-driven-presentation-maker MCP Server — AI-powered presentation generation",
     });
