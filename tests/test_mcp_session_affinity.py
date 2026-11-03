@@ -122,3 +122,32 @@ def test_terminate_on_close_stays_false(monkeypatch):
     mcp_clients.mcp_agentcore_runtime(jwt_token="tok", session_id="s-3")
 
     assert seen["transport_kwargs"]["terminate_on_close"] is False
+
+
+# --- owner prefix -------------------------------------------------------------
+
+P1 = "c6c289e49e9c05b2"  # owner_prefix("user-1")  # pragma: allowlist secret
+OWN = f"{P1}-00000000-0000-4000-8000-000000000000"
+
+
+def _jwt_of(sub: str) -> str:
+    import base64
+    import json
+
+    body = base64.urlsafe_b64encode(json.dumps({"sub": sub}).encode()).decode().rstrip("=")
+    return f"h.{body}.s"
+
+
+@pytest.mark.parametrize("session_id, sent", [
+    ("sess-1234567890", f"{P1}-sess-1234567890"),
+    (OWN, OWN),
+    (f"{OWN}-g2", f"{OWN}-g2"),
+    ("sess-1234567890-g2", f"{P1}-sess-1234567890-g2"),
+])
+def test_mcp_session_id_carries_the_owner_prefix(monkeypatch, session_id, sent):
+    mcp_clients = _require_mcp_clients()
+    seen = _capture(monkeypatch, mcp_clients)
+
+    mcp_clients.mcp_agentcore_runtime(jwt_token=_jwt_of("user-1"), session_id=session_id)
+
+    assert seen["transport_kwargs"]["headers"]["Mcp-Session-Id"] == sent

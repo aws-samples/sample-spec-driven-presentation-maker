@@ -39,3 +39,20 @@ describe("agentErrorMessage", () => {
     expect(agentErrorMessage("timed out waiting", "future_code")).toMatch(/took too long/)
   })
 })
+
+describe("agentErrorMessage with session_reload_required", () => {
+  it("maps the code to the English reload message", () => {
+    expect(agentErrorMessage("Reload the page", "session_reload_required")).toBe(
+      "This page is out of date. Reload the page, then send again.",
+    )
+  })
+
+  it("uses the translator when it returns a string", () => {
+    const translate = (code: string) => (code === "session_reload_required" ? "translated" : undefined)
+    expect(agentErrorMessage("Reload the page", "session_reload_required", translate)).toBe("translated")
+  })
+
+  it("falls back to English when the translator returns undefined", () => {
+    expect(agentErrorMessage("raw", "throttled", () => undefined)).toMatch(/temporarily busy/)
+  })
+})
