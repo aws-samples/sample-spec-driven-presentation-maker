@@ -87,3 +87,37 @@ describe("AuthStack sign-up", () => {
     );
   });
 });
+
+describe("AuthStack WebClient", () => {
+  test("declares every OAuth setting the Web UI needs, including the MCP custom scope", () => {
+    const client = synth().findResources("AWS::Cognito::UserPoolClient")[WEB_CLIENT_ID].Properties;
+    // Authorization code flow (the Web UI adds PKCE; the client has no secret).
+    assert.deepEqual(client.AllowedOAuthFlows, ["code"]);
+    assert.equal(client.AllowedOAuthFlowsUserPoolClient, true);
+    assert.equal(client.GenerateSecret, false);
+    assert.deepEqual(client.SupportedIdentityProviders, ["COGNITO"]);
+    // sdpm-mcp/invoke: the MCP runtime's JWT authorizer rejects tokens without it.
+    const [openid, profile, email, mcp, ...rest] = client.AllowedOAuthScopes;
+    assert.deepEqual([openid, profile, email, rest], ["openid", "profile", "email", []]);
+    const [, [resourceServer, scopeName]] = mcp["Fn::Join"];
+    assert.match(resourceServer.Ref, /^UserPoolMcpResourceServer/);
+    assert.equal(scopeName, "/invoke");
+    // The explicit auth flows WebUiStack's custom resource used to set.
+    assert.deepEqual(
+      [...client.ExplicitAuthFlows].sort(),
+      ["ALLOW_REFRESH_TOKEN_AUTH", "ALLOW_USER_PASSWORD_AUTH", "ALLOW_USER_SRP_AUTH"],
+    );
+  });
+
+  test("the published MCP custom scope names the scope the WebClient carries", () => {
+    const t = synth();
+    t.hasResourceProperties("AWS::Cognito::UserPoolResourceServer", {
+      Identifier: "sdpm-mcp",
+      Scopes: [{ ScopeName: "invoke", ScopeDescription: Match.anyValue() }],
+    });
+    t.hasResourceProperties("AWS::SSM::Parameter", {
+      Name: "/sdpm/auth/mcp-custom-scope",
+      Value: "sdpm-mcp/invoke",
+    });
+  });
+});
