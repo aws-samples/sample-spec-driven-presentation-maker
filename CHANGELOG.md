@@ -191,6 +191,12 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **A slide's live preview is no longer taken from another slide's compose file.** The API
+  picked a slide's latest `compose/{slug}_{epoch}.json` by the prefix `compose/{slug}_`, so slug
+  `slide` also took the legacy numbered files `slide_N_*.json`, and in a deck without an outline
+  slug `intro` could take slide `intro_2`'s file. Writing a slide's compose on the AWS stack
+  deleted the older files with the same prefix, so it also removed `intro_2`'s. Both now match
+  the whole name, as the MCP Runtime, the local server and the local Web UI already did.
 - **The API Lambda no longer leaves template copies in `/tmp`.** Listing templates (when a
   builtin template had to be analysed) and registering an uploaded template downloaded the
   `.pptx` into a temporary directory that was never removed, so a warm Lambda container

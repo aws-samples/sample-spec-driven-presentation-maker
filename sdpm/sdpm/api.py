@@ -676,17 +676,11 @@ def parse_outline_slugs(outline_path: Path) -> list[str]:
     Returns:
         List of slug strings in document order.
     """
-    import re
+    from sdpm.engine.schema import parse_outline_text
 
-    pattern = re.compile(r"^-\s*\[([a-z0-9-]+)\]\s*")
-    slugs: list[str] = []
     if not outline_path.exists():
-        return slugs
-    for line in outline_path.read_text(encoding="utf-8").splitlines():
-        m = pattern.match(line)
-        if m:
-            slugs.append(m.group(1))
-    return slugs
+        return []
+    return parse_outline_text(outline_path.read_text(encoding="utf-8"))
 
 
 def _resolve_config(

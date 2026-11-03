@@ -211,6 +211,55 @@ def test_get_deck_pptx_shape_unchanged(monkeypatch, index):
     assert result["template"] == "blank-dark" and result["isOwner"] is True
 
 
+def _compose_urls(result) -> dict:
+    return {s["slug"]: s.get("composeUrl", "").removeprefix("https://app-origin.example/") for s in result["slides"]}
+
+
+def test_get_deck_compose_latest_epoch_per_slug_and_legacy_fallback(monkeypatch, index):
+    _setup(monkeypatch, index, objects={
+        "decks/d1/specs/outline.md": _OUTLINE,
+        "decks/d1/slides/cover.json": b"{}",
+        "decks/d1/slides/body.json": b"{}",
+        "decks/d1/compose/cover_100.json": b"{}",
+        "decks/d1/compose/cover_300.json": b"{}",
+        "decks/d1/compose/slide_2_50.json": b"{}",
+        "decks/d1/compose/defs_100.json": b"{}",
+        "decks/d1/compose/defs_200.json": b"{}",
+    })
+    result = index.get_deck("d1")
+    assert _compose_urls(result) == {
+        "cover": "decks/d1/compose/cover_300.json",
+        "body": "decks/d1/compose/slide_2_50.json",  # legacy numbered compose of slide 2
+    }
+    assert result["defsUrl"] == "https://app-origin.example/decks/d1/compose/defs_200.json"
+
+
+def test_get_deck_compose_slug_slide_does_not_take_legacy_numbered_files(monkeypatch, index):
+    """Was a prefix match on ``compose/slide_``: slug ``slide`` got ``slide_3_*.json``."""
+    _setup(monkeypatch, index, objects={
+        "decks/d1/specs/outline.md": b"- [cover] Cover\n- [slide] Slide\n",
+        "decks/d1/slides/cover.json": b"{}",
+        "decks/d1/slides/slide.json": b"{}",
+        "decks/d1/compose/slide_3_500.json": b"{}",
+        "decks/d1/compose/slide_100.json": b"{}",
+    })
+    assert _compose_urls(index.get_deck("d1")) == {"cover": "", "slide": "decks/d1/compose/slide_100.json"}
+
+
+def test_get_deck_compose_without_outline_does_not_take_a_longer_slug(monkeypatch, index):
+    """Was a prefix match on ``compose/intro_``: slug ``intro`` got ``intro_2_*.json``."""
+    _setup(monkeypatch, index, objects={
+        "decks/d1/slides/intro.json": b"{}",
+        "decks/d1/slides/intro_2.json": b"{}",
+        "decks/d1/compose/intro_100.json": b"{}",
+        "decks/d1/compose/intro_2_900.json": b"{}",
+    })
+    assert _compose_urls(index.get_deck("d1")) == {
+        "intro": "decks/d1/compose/intro_100.json",
+        "intro_2": "decks/d1/compose/intro_2_900.json",
+    }
+
+
 def test_get_deck_html_uses_regional_presigns_only(monkeypatch, index):
     preview = "html/d1/preview/cover_100.html"
     _setup(monkeypatch, index, role="viewer", deck={"htmlS3Key": HTML_KEY}, objects={

@@ -21,6 +21,7 @@ export const MAX_BODY_BYTES = 512 * 1024
 export const WHITESPACE = "\u0009\u000a\u000b\u000c\u000d\u001c\u001d\u001e\u001f\u0020\u0085\u00a0\u1680\u2000\u2001\u2002\u2003\u2004\u2005\u2006\u2007\u2008\u2009\u200a\u2028\u2029\u202f\u205f\u3000\ufeff"
 
 export const NAME_RE = /^[A-Z]{1,3}$/
+/** Slide slug of a comment: `SLUG_RE` in sdpm.engine.schema (tests/test_slug_parity.py). */
 export const SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/
 /** `@X` mentions. No `\b`, so `@Bと` matches. */
 export const MENTION_RE = /@([A-Z]{1,3})(?![A-Za-z0-9])/g
