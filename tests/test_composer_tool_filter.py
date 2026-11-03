@@ -41,7 +41,7 @@ def test_composer_mcp_factory_carries_the_composer_allowlist(monkeypatch):
     monkeypatch.setattr(factory, "mcp_agentcore_runtime", runtime)
     monkeypatch.setattr(factory, "mcp_aws_knowledge", lambda: object())
     monkeypatch.setattr(factory, "mcp_aws_pricing", lambda: object())
-    monkeypatch.setattr(factory, "_prewarm_mcp_clients", lambda clients, names, required: (clients, []))
+    monkeypatch.setattr(factory, "_prewarm_mcp_clients", lambda clients, names, required, then=None: (clients, []))
     monkeypatch.setattr(factory, "BedrockModel", lambda **kwargs: object())
     monkeypatch.setattr(factory, "make_compose_slides", make_compose_slides)
     monkeypatch.setattr(factory, "Agent", _Agent)

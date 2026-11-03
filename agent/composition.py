@@ -9,11 +9,17 @@ resolve_parts: turns list[Part] into (system_prompt, messages).
 When any Part has cache_point=True, the system prompt is returned as
 Bedrock content blocks (list[dict]) with a cachePoint inserted after that part.
 Otherwise it is returned as a plain string.
+
+Picking Source.mcp results are kept for the life of the process (see
+_process_cache_key): the role documents (``static.*``) once per process, the
+per-user environment once per user. They are fetched through the MCP port the
+first time and live only in this process — never in Memory or the history.
 """
 
 from __future__ import annotations
 
 import json
+import threading
 import uuid
 from dataclasses import dataclass, field
 from datetime import datetime, timedelta, timezone
@@ -47,7 +53,8 @@ class Source:
         yields that value (strings verbatim, anything else re-serialised as JSON);
         a comma-separated list of paths (``styles,templates``) yields a JSON object
         keyed by the last path segment. Identical (tool, args) calls are made once
-        per resolve_parts run, so several parts may pick from one response.
+        per resolve_parts run, so several parts may pick from one response, and
+        picked values are kept per process (see _process_cache_key).
         """
         return cls(type="mcp", value=tool_name, args=args, pick=pick)
 
@@ -116,10 +123,53 @@ def pick_from_text(text: str, pick: str) -> str:
     return json.dumps(picked, ensure_ascii=False)
 
 
-def _resolve_source(source: Source, mcp_client, context: dict, memo: dict | None = None) -> str:
+# Picked Source.mcp values for the life of the process. create_agent runs every
+# turn, and without this each turn waited on one start_presentation call before
+# its first model request (about 0.4s warm on dev, 2026-11-03).
+_PROCESS_CACHE: dict[tuple, str] = {}
+_PROCESS_CACHE_LOCK = threading.Lock()
+
+
+def _process_cache_key(source: Source, user_id: str | None) -> tuple | None:
+    """Process-cache key for a picking Source.mcp, or None when it is not cached.
+
+    - Picks under ``static`` (the role documents and specs of the entry tools) depend
+      only on the tool and its arguments, so they are shared by every user.
+    - Any other pick (the styles and templates start_presentation returns) is per
+      user, so it is cached only under that user's id.
+
+    Plain Source.mcp (no pick) is never cached: it keeps its one-call-per-part
+    semantics.
+    """
+    if source.type != "mcp" or not source.pick:
+        return None
+    base = (source.value, json.dumps(source.args, sort_keys=True), source.pick)
+    paths = [p.strip() for p in source.pick.split(",") if p.strip()]
+    if paths and all(p == "static" or p.startswith("static.") for p in paths):
+        return ("static", *base)
+    if user_id:
+        return ("user", user_id, *base)
+    return None
+
+
+def clear_process_cache() -> None:
+    """Forget every cached Source.mcp value (tests)."""
+    with _PROCESS_CACHE_LOCK:
+        _PROCESS_CACHE.clear()
+
+
+def _resolve_source(
+    source: Source, mcp_client, context: dict, memo: dict | None = None, user_id: str | None = None,
+) -> str:
     if source.type == "file":
         return _read_file(source.value)
     if source.type == "mcp":
+        cache_key = _process_cache_key(source, user_id)
+        if cache_key is not None:
+            with _PROCESS_CACHE_LOCK:
+                cached = _PROCESS_CACHE.get(cache_key)
+            if cached is not None:
+                return cached
         # Only picking sources share one call: they exist to slice a single
         # response. Plain Source.mcp keeps its one-call-per-part semantics.
         key = (source.value, json.dumps(source.args, sort_keys=True))
@@ -129,10 +179,27 @@ def _resolve_source(source: Source, mcp_client, context: dict, memo: dict | None
             text = _call_mcp(mcp_client, source.value, source.args)
             if source.pick and memo is not None:
                 memo[key] = text
-        return pick_from_text(text, source.pick) if text else text
+        content = pick_from_text(text, source.pick) if text else text
+        if cache_key is not None and content:
+            with _PROCESS_CACHE_LOCK:
+                _PROCESS_CACHE[cache_key] = content
+        return content
     if source.type == "callable":
         return source.value(context)
     raise ValueError(f"Unknown source type: {source.type}")
+
+
+def prefetch_sources(parts: list[Part], mcp_client: Any, user_id: str | None = None) -> None:
+    """Fetch the process-cached Source.mcp values of *parts* that are not cached yet.
+
+    Lets the caller start the entry-tool call as soon as the MCP client is connected;
+    a later resolve_parts with the same user_id then reads the cache. Raises what the
+    MCP call raises; nothing is cached for a failed call.
+    """
+    memo: dict = {}
+    for part in parts:
+        if _process_cache_key(part.source, user_id) is not None:
+            _resolve_source(part.source, mcp_client, {}, memo, user_id)
 
 
 def _tool_result_pair(
@@ -177,6 +244,7 @@ def resolve_parts(
     mcp_client: Any = None,
     context: dict | None = None,
     enable_cache: bool = True,
+    user_id: str | None = None,
 ) -> tuple[str | list[dict], list[dict]]:
     """Resolve parts into (system_prompt, messages).
 
@@ -184,6 +252,7 @@ def resolve_parts(
         parts: List of Part definitions.
         mcp_client: MCP client for Source.mcp (may be None if no mcp sources).
         context: Values for callable sources and placeholder substitution.
+        user_id: Owner of the per-user picks; without it they are fetched every time.
 
     Returns:
         Tuple of (system prompt, initial messages list).
@@ -197,7 +266,7 @@ def resolve_parts(
     memo: dict = {}
 
     for part in parts:
-        content = _resolve_source(part.source, mcp_client, context, memo)
+        content = _resolve_source(part.source, mcp_client, context, memo, user_id)
         if not content:
             continue
         if part.target == "system":

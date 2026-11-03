@@ -55,29 +55,55 @@ def _factory():
     return factory
 
 
-class _FakeClient:
-    """Stands in for MCPClient's ToolProvider surface."""
+# Time a worker needs between load_tools returning and recording the result.
+_RECORD_GRACE = 0.1
 
-    def __init__(self, delay: float = 0.0, error: BaseException | None = None):
+
+class _FakeClient:
+    """Stands in for MCPClient's ToolProvider surface.
+
+    ``after`` holds clients whose connection must finish before this one's does, so a
+    test can order a required client behind the optional ones without racing the
+    optional servers' deadline. ``done`` is set when load_tools returns, just before
+    the worker records the result; _RECORD_GRACE covers that gap.
+    """
+
+    def __init__(self, delay: float = 0.0, error: BaseException | None = None,
+                 after: list["_FakeClient"] | None = None, gate: threading.Event | None = None):
         self.delay = delay
         self.error = error
+        self.after = after or []
+        self.gate = gate
         self.calls = 0
+        self.stopped = threading.Event()
+        self.done = threading.Event()
         self.thread_names: list[str] = []
 
     async def load_tools(self, **kwargs):
         self.calls += 1
         self.thread_names.append(threading.current_thread().name)
         time.sleep(self.delay)
+        for other in self.after:
+            assert other.done.wait(5)
+        if self.after:
+            time.sleep(_RECORD_GRACE)
+        if self.gate is not None:
+            assert self.gate.wait(5)
+        self.done.set()
         if self.error is not None:
             raise self.error
         return []
+
+    def stop(self, *exc):
+        self.stopped.set()
 
 
 def test_clients_are_connected_concurrently():
     """Wall clock must track the slowest client, not the sum."""
     factory = _factory()
     delays = [0.30, 0.30, 0.30]
-    clients = [_FakeClient(delay=d) for d in delays]
+    optional = [_FakeClient(delay=d) for d in delays[1:]]
+    clients = [_FakeClient(delay=delays[0], after=optional), *optional]
 
     start = time.monotonic()
     usable, status = factory._prewarm_mcp_clients(
@@ -95,7 +121,8 @@ def test_clients_are_connected_concurrently():
 def test_each_client_is_loaded_exactly_once():
     """A second load_tools() from Strands must hit the client's cache, not reconnect."""
     factory = _factory()
-    clients = [_FakeClient(), _FakeClient(), _FakeClient()]
+    optional = [_FakeClient(), _FakeClient()]
+    clients = [_FakeClient(after=optional), *optional]
 
     factory._prewarm_mcp_clients(clients, ["a", "b", "c"], [True, False, False])
 
@@ -105,8 +132,8 @@ def test_each_client_is_loaded_exactly_once():
 def test_optional_server_failure_is_dropped_not_raised():
     """This is what the required flag always claimed to do."""
     factory = _factory()
-    ok = _FakeClient()
     broken = _FakeClient(error=RuntimeError("us-east-1 unreachable"))
+    ok = _FakeClient(after=[broken])
 
     usable, status = factory._prewarm_mcp_clients(
         [ok, broken], ["Presentation Maker", "AWS Knowledge"], [True, False]
@@ -130,7 +157,8 @@ def test_required_server_failure_is_raised():
 def test_status_order_matches_the_input_order():
     """mcp_status is surfaced to the UI, so the order must stay stable."""
     factory = _factory()
-    clients = [_FakeClient(delay=0.05), _FakeClient(delay=0.0), _FakeClient(delay=0.02)]
+    optional = [_FakeClient(delay=0.0), _FakeClient(delay=0.02)]
+    clients = [_FakeClient(delay=0.05, after=optional), *optional]
 
     _usable, status = factory._prewarm_mcp_clients(
         clients, ["first", "second", "third"], [True, False, False]
@@ -144,3 +172,86 @@ def test_no_clients_is_not_an_error():
     usable, status = factory._prewarm_mcp_clients([], [], [])
     assert usable == []
     assert status == []
+
+
+def test_then_runs_once_the_required_server_is_up_while_optional_ones_connect():
+    """start_presentation must not wait for AWS Knowledge / AWS Pricing."""
+    factory = _factory()
+    release = threading.Event()
+    required = _FakeClient()
+    optional = _FakeClient(gate=release)
+    seen: list = []
+
+    def then(required_clients):
+        seen.append((list(required_clients), optional.done.is_set()))
+
+    try:
+        factory._prewarm_mcp_clients([required, optional], ["pm", "opt"], [True, False], then=then)
+    finally:
+        release.set()
+
+    assert seen == [([required], False)]
+
+
+def test_optional_server_still_connecting_at_the_deadline_is_dropped_and_closed():
+    """The deadline is the end of *then*; a late optional server is skipped for the turn."""
+    factory = _factory()
+    release = threading.Event()
+    required = _FakeClient()
+    early = _FakeClient()
+    late = _FakeClient(gate=release)
+
+    def then(_required_clients):
+        assert early.done.wait(5)
+        time.sleep(_RECORD_GRACE)
+
+    start = time.monotonic()
+    usable, status = factory._prewarm_mcp_clients(
+        [required, early, late], ["Presentation Maker", "AWS Knowledge", "AWS Pricing"],
+        [True, False, False], then=then,
+    )
+    elapsed = time.monotonic() - start
+
+    assert usable == [required, early]
+    assert status[:2] == [
+        {"name": "Presentation Maker", "status": "ok"},
+        {"name": "AWS Knowledge", "status": "ok"},
+    ]
+    assert status[2] == {"name": "AWS Pricing", "status": "error", "error": factory._LATE_ERROR}
+    assert elapsed < 2, "the late optional server held up the turn"
+    assert not late.stopped.is_set()
+
+    release.set()
+    assert late.stopped.wait(5), "the late client must be closed once it connects"
+    assert not required.stopped.is_set() and not early.stopped.is_set()
+
+
+def test_optional_servers_finishing_before_the_deadline_are_kept():
+    """*then* extends the deadline: an optional server done by its end is used."""
+    factory = _factory()
+    required = _FakeClient()
+    optional = _FakeClient(delay=0.05)
+
+    def then(_required_clients):
+        assert optional.done.wait(5)
+        time.sleep(_RECORD_GRACE)
+
+    usable, status = factory._prewarm_mcp_clients(
+        [required, optional], ["pm", "opt"], [True, False], then=then,
+    )
+
+    assert usable == [required, optional]
+    assert [s["status"] for s in status] == ["ok", "ok"]
+
+
+def test_required_failure_skips_then():
+    factory = _factory()
+    called: list = []
+
+    with pytest.raises(RuntimeError, match="AgentCore unreachable"):
+        factory._prewarm_mcp_clients(
+            [_FakeClient(error=RuntimeError("AgentCore unreachable")), _FakeClient()],
+            ["Presentation Maker", "AWS Knowledge"], [True, False], then=called.append,
+        )
+
+    assert called == []

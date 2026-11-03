@@ -3,10 +3,13 @@
 """Unified agent factory: assembles MCP clients, model, tools, and prompt into a Strands Agent."""
 
 import asyncio
+import contextvars
 import json
 import logging
 import os
-from concurrent.futures import ThreadPoolExecutor
+import threading
+from concurrent.futures import ThreadPoolExecutor, wait
+from typing import Callable
 
 from botocore.config import Config as BotocoreConfig
 from strands import Agent
@@ -21,7 +24,7 @@ from mcp_clients import (
     mcp_aws_knowledge,
     mcp_aws_pricing,
 )
-from composition import resolve_parts
+from composition import prefetch_sources, resolve_parts
 from message_hooks import LiftToolResultImages
 from model_profiles import build_model_kwargs, MODEL_PROFILES
 from modes import MODES
@@ -65,8 +68,17 @@ _MCP_FACTORIES = [
 ]
 
 
-def _prewarm_mcp_clients(clients: list, names: list[str], required: list[bool]) -> tuple[list, list[dict]]:
-    """Connect the MCP clients concurrently and drop the optional ones that fail.
+# Status error for an optional server that was still connecting at the deadline.
+_LATE_ERROR = "Not connected in time; skipped for this turn"
+
+
+def _prewarm_mcp_clients(
+    clients: list,
+    names: list[str],
+    required: list[bool],
+    then: Callable[[list], None] | None = None,
+) -> tuple[list, list[dict]]:
+    """Connect the MCP clients concurrently and drop the optional ones that fail or are late.
 
     Strands connects MCP servers serially: `ToolRegistry.process_tools()` iterates
     the tools list and blocks on `await provider.load_tools()` for each
@@ -86,12 +98,23 @@ def _prewarm_mcp_clients(clients: list, names: list[str], required: list[bool]) 
     `continue_on_error=False`). Connecting here lets an optional server be dropped
     with a status entry, which is what the flag always claimed to do.
 
+    Optional servers also get a deadline: the moment the required servers are up
+    and *then* has returned. *then* runs on the calling thread with the connected
+    required clients (in input order) while the optional ones are still connecting,
+    so the caller can do its own critical-path work there. An optional server still
+    connecting at the deadline is dropped for this turn and closed once its
+    connection finishes; on dev the AWS Pricing stdio server (about 1.4s) was the
+    slowest part of a warm turn's assembly (2026-11-03).
+
     Returns:
         (clients that are usable, status entries per server)
     """
     results: dict[int, BaseException | None] = {}
+    lock = threading.Lock()
+    deadline = threading.Event()
 
     def connect(index: int) -> None:
+        error: BaseException | None = None
         try:
             # asyncio.run rather than Strands' run_async: that helper lives in the
             # private strands._async module, and each worker thread here has no
@@ -99,27 +122,69 @@ def _prewarm_mcp_clients(clients: list, names: list[str], required: list[bool]) 
             # inside (the MCP session itself runs on the client's own background
             # thread), so a throwaway loop per thread is enough.
             asyncio.run(clients[index].load_tools())
-            results[index] = None
         except BaseException as e:  # noqa: BLE001 - recorded per client below
-            results[index] = e
+            error = e
+        with lock:
+            if required[index] or not deadline.is_set():
+                results[index] = error
+                return
+        # Dropped at the deadline: no agent consumes this client, so close it here.
+        if error is None:
+            try:
+                clients[index].stop(None, None, None)
+            except Exception as e:  # noqa: BLE001 - best-effort cleanup off the request path
+                logger.warning("MCP server %r: closing the late client failed: %s", names[index], e)
 
-    if clients:
-        with ThreadPoolExecutor(max_workers=len(clients)) as pool:
-            list(pool.map(connect, range(len(clients))))
+    pool = ThreadPoolExecutor(max_workers=len(clients), thread_name_prefix="sdpm-mcp") if clients else None
+    try:
+        futures = [pool.submit(connect, i) for i in range(len(clients))] if pool else []
+        wait([f for f, req in zip(futures, required) if req])
+        for i, req in enumerate(required):
+            if req and results[i] is not None:
+                logger.warning("MCP server %r failed to connect: %s", names[i], results[i])
+                raise results[i]
+        if then is not None:
+            then([client for client, req in zip(clients, required) if req])
+    finally:
+        with lock:
+            deadline.set()
+            outcome = dict(results)
+        if pool is not None:
+            pool.shutdown(wait=False)
 
     usable: list = []
     status: list[dict] = []
     for i, client in enumerate(clients):
-        error = results.get(i)
+        if i not in outcome:
+            logger.warning("MCP server %r dropped for this turn: still connecting at the deadline", names[i])
+            status.append({"name": names[i], "status": "error", "error": _LATE_ERROR})
+            continue
+        error = outcome[i]
         if error is None:
             usable.append(client)
             status.append({"name": names[i], "status": "ok"})
             continue
         logger.warning("MCP server %r failed to connect: %s", names[i], error)
         status.append({"name": names[i], "status": "error", "error": str(error)})
-        if required[i]:
-            raise error
     return usable, status
+
+
+def _session_manager(memory_id: str, session_id: str, user_id: str, region: str):
+    """AgentCore Memory session manager, or None when Memory is not configured.
+
+    Its constructor reads (and for a new session writes) Memory, about 0.4s on dev,
+    so create_agent builds it next to the MCP connections.
+    """
+    if not memory_id or memory_id == "PLACEHOLDER":
+        return None
+    from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig
+    from bedrock_agentcore.memory.integrations.strands.session_manager import AgentCoreMemorySessionManager
+    return AgentCoreMemorySessionManager(
+        agentcore_memory_config=AgentCoreMemoryConfig(
+            memory_id=memory_id, session_id=session_id, actor_id=user_id,
+        ),
+        region_name=region,
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -136,17 +201,13 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
     memory_id = os.environ.get("MEMORY_ID", "")
     region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
 
-    # Session manager
-    session_manager = None
-    if memory_id and memory_id != "PLACEHOLDER":
-        from bedrock_agentcore.memory.integrations.strands.config import AgentCoreMemoryConfig
-        from bedrock_agentcore.memory.integrations.strands.session_manager import AgentCoreMemorySessionManager
-        session_manager = AgentCoreMemorySessionManager(
-            agentcore_memory_config=AgentCoreMemoryConfig(
-                memory_id=memory_id, session_id=session_id, actor_id=user_id,
-            ),
-            region_name=region,
-        )
+    # Session manager — built on a side thread while the MCP servers connect. The
+    # context copy keeps its Memory calls under this request's trace.
+    side = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sdpm-memory")
+    session_manager_future = side.submit(
+        contextvars.copy_context().run, _session_manager, memory_id, session_id, user_id, region,
+    )
+    side.shutdown(wait=False)
 
     # Models — agent uses chat or create model depending on mode
     if cfg.agent_model == "create":
@@ -169,7 +230,20 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         built.append(factory_fn(jwt_token, session_id=session_id, tool_filters=filters))
         names.append(name)
         required_flags.append(required)
-    mcp_servers, mcp_status = _prewarm_mcp_clients(built, names, required_flags)
+
+    def critical_path(required_clients: list) -> None:
+        # Runs as soon as the Presentation Maker client is up, while the optional
+        # servers are still connecting: start_presentation (the system-prompt
+        # sources) goes first, then the Memory session manager is awaited. The
+        # optional servers' deadline is the end of this function.
+        try:
+            prefetch_sources(cfg.parts, required_clients[0] if required_clients else None, user_id=user_id)
+        except Exception as e:
+            logger.warning("Prompt prefetch failed: %s", e)
+        wait([session_manager_future])
+
+    mcp_servers, mcp_status = _prewarm_mcp_clients(built, names, required_flags, then=critical_path)
+    session_manager = session_manager_future.result()
 
     # Tools
     tools = [*mcp_servers, web_fetch, hearing]
@@ -242,6 +316,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
             mcp_client=mcp_servers[0] if mcp_servers else None,
             context=context,
             enable_cache=enable_cache,
+            user_id=user_id,
         )
     except Exception as e:
         logger.warning("Prompt resolve failed: %s", e)

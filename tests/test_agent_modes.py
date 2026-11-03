@@ -13,12 +13,20 @@ _AGENT_DIR = _ROOT / "agent"
 
 sys.path.insert(0, str(_AGENT_DIR))
 try:
-    from composition import resolve_parts
+    from composition import clear_process_cache, resolve_parts
     from modes import MODES
 finally:
     sys.path.remove(str(_AGENT_DIR))
 
 from sdpm import tools as contract  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _fresh_process_cache():
+    """Each test counts its own entry-tool calls."""
+    clear_process_cache()
+    yield
+    clear_process_cache()
 
 _PROMPTS_DIR = _AGENT_DIR / "prompts"
 # mode -> (entry tool, first heading of the role document)
