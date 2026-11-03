@@ -60,10 +60,11 @@ def set_urls(props):
         cognito.meta.service_model.operation_model("UpdateUserPoolClient").input_shape.members
     )
     request = update_request(current, props["CallbackURLs"], props["LogoutURLs"], update_fields)
+    # Log only the resource properties: ``request`` derives from the described
+    # client, which can carry ClientSecret.
     logger.info(
-        "Updating client %s: CallbackURLs=%s LogoutURLs=%s, keeping AllowedOAuthScopes=%s",
-        props["ClientId"], request["CallbackURLs"], request["LogoutURLs"],
-        request.get("AllowedOAuthScopes"),
+        "Updating client %s: CallbackURLs=%s LogoutURLs=%s",
+        props["ClientId"], props["CallbackURLs"], props["LogoutURLs"],
     )
     cognito.update_user_pool_client(**request)
 
