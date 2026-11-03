@@ -372,6 +372,19 @@ Entries before v0.5.0 were written retroactively as summaries.
   open in the same browser can no longer drive the local agent, upload files or change styles
   and templates through `127.0.0.1`. Requests without an `Origin` header (scripts, curl) are
   unaffected. (#473)
+- **Model request and response bodies are no longer written to the runtime logs, and the
+  runtime log groups expire.** `aws-opentelemetry-distro` turns on
+  `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` when AgentCore observability is on, so
+  the botocore Bedrock instrumentation wrote every model request and response body to the
+  `otel-rt-logs` stream of the runtime log groups. Both runtimes now set it to `false`. Token
+  counts on the spans and the `bedrock_usage` / `slides_composed` / `slides_built` events of
+  [Usage measurement](docs/en/usage-measurement.md) are unchanged. The log groups AgentCore
+  creates for the runtimes (`/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`) had no
+  retention period; the stacks now set it, also on groups that already exist, from the new
+  `observability.logRetentionDays` in `infra/config.yaml` (default 30 days; an invalid value
+  fails the synth). Log data older than the period is removed by CloudWatch Logs after the
+  deploy. The stacks never delete these log groups. The Strands tracer still records
+  conversation text in the agent runtime log group, now kept for that period.
 
 ## [0.11.0] - 2026-10-31
 

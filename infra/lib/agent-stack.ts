@@ -13,12 +13,14 @@ import * as cdk from "aws-cdk-lib";
 import * as bedrockagentcore from "aws-cdk-lib/aws-bedrockagentcore";
 import * as ecr_assets from "aws-cdk-lib/aws-ecr-assets";
 import * as iam from "aws-cdk-lib/aws-iam";
+import * as logs from "aws-cdk-lib/aws-logs";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import * as path from "path";
 import { AUTH_SSM_PARAMS } from "./auth-stack";
 import { RuntimeResourcePolicy } from "./construct/runtime-resource-policy";
 import { agentCoreServicePrincipal } from "./construct/agentcore-principal";
+import { RUNTIME_OTEL_ENVIRONMENT, runtimeLogRetention } from "./construct/runtime-observability";
 
 interface AgentStackProps extends cdk.StackProps {
   /** MCP Server Runtime ARN. */
@@ -47,6 +49,8 @@ interface AgentStackProps extends cdk.StackProps {
   createModelId?: string;
   /** Allowed model IDs for per-user model switching; empty = feature disabled. */
   allowedModelIds: string[];
+  /** Retention of the runtime's log group (observability.logRetentionDays). Default: 30 days. */
+  logRetention?: logs.RetentionDays;
 }
 
 export class AgentStack extends cdk.Stack {
@@ -241,10 +245,14 @@ export class AgentStack extends cdk.Stack {
         AWS_DEFAULT_REGION: this.region,
         COMPOSER_MAX_CONCURRENCY: "10",
         DEPLOY_TIMESTAMP: new Date().toISOString(),
+        ...RUNTIME_OTEL_ENVIRONMENT,
       },
       description: "spec-driven-presentation-maker Strands Agent — connects to MCP Server for slide generation",
     });
     runtime.node.addDependency(defaultPolicy);
+
+    // Retention of the log group AgentCore creates for this runtime (observability.logRetentionDays).
+    runtimeLogRetention(this, "AgentRuntimeLogRetention", runtime.attrAgentRuntimeId, props.logRetention);
 
     const endpoint = new bedrockagentcore.CfnRuntimeEndpoint(
       this,

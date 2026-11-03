@@ -317,6 +317,13 @@ The SdpmData stack deletes its data with it. The DynamoDB table and both S3 buck
 (`autoDeleteObjects`). `cdk destroy` or deleting SdpmData removes every deck. Export what
 you want to keep first. See also [Uninstall](uninstall.md).
 
+AgentCore creates the runtime log groups (`/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`)
+itself. The SdpmRuntime and SdpmAgent stacks set their retention to
+`observability.logRetentionDays` in `config.yaml` (default 30 days), also for groups that
+already exist. The setting is applied when the custom resource is created and whenever the
+value or the runtime changes. Deleting the stacks leaves these log groups and their data in
+place.
+
 ## Troubleshooting
 
 ### Docker build fails with Finch
