@@ -12,6 +12,14 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Sign-up settings for the default Cognito user pool.** `auth.selfSignUp` in
+  `infra/config.yaml` turns self sign-up on, and `auth.allowedEmailDomains` limits it to the
+  listed email domains. A Cognito Pre sign-up Lambda trigger checks the domain of each
+  sign-up request: exact match, case-insensitive, subdomains not included (list each one).
+  Users created by an administrator are not checked. `allowedEmailDomains` without
+  `selfSignUp: true`, or an entry that is not a domain name, fails the synth. See
+  [Developer guide](docs/en/developer-guide.md#default-amazon-cognito-user-pool).
+  `infra` now has CDK assertion tests (`cd infra && npm test`), run in CI.
 - **`agent-spectrum` style.** A bundled concept style made to be watched rather than presented
   (screen recordings, animated previews, README stills): a flat near-black ground, light type,
   and the Web UI's five builder colours (blue, teal, violet, amber, pink) in a fixed order, used
@@ -47,6 +55,16 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **Self sign-up is now off by default in the AWS stack.** The default Cognito user pool
+  accepts only users created by an administrator (Cognito console or
+  `aws cognito-idp admin-create-user`, see
+  [Deploy guide](docs/en/deploy-cloudshell.md#creating-a-cognito-user-layer-4)); the sign-in
+  page no longer offers sign-up. One-Click Deploy still creates the first user for
+  NotificationEmailAddress.
+  **Upgrade:** the next deploy of `SdpmAuth` switches an existing user pool to
+  administrator-created users. The user pool is updated in place: existing users keep their
+  accounts and sign in as before. To keep self sign-up on, set `auth.selfSignUp: true` in
+  `infra/config.yaml` before you deploy.
 - **`run_python` returns the same result for PPTX decks locally and in the cloud.** The
   post-processing after a PPTX deck edit (full build, render of the affected slides,
   measurement, compose, previews) now lives in `sdpm.api.refresh_pptx`; both servers only do
