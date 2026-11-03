@@ -27,7 +27,7 @@ RUN uv export --frozen --directory /tmp/workspace --package sdpm-agent --no-dev 
 RUN useradd -m -u 1000 bedrock_agentcore
 USER bedrock_agentcore
 
-COPY agent/basic_agent.py agent/cost_logger.py agent/errors.py agent/factory.py agent/composition.py agent/mcp_clients.py agent/message_hooks.py agent/model_profiles.py agent/resilience.py agent/session.py agent/session_guard.py agent/stop_guard.py agent/streaming.py agent/turn_fence.py ./
+COPY agent/basic_agent.py agent/cost_logger.py agent/errors.py agent/factory.py agent/composition.py agent/mcp_clients.py agent/message_hooks.py agent/model_profiles.py agent/resilience.py agent/session.py agent/session_guard.py agent/stop_guard.py agent/streaming.py agent/token_holder.py agent/turn_fence.py ./
 COPY shared/__init__.py shared/session_owner.py shared/
 COPY agent/prompts/ prompts/
 COPY agent/modes/ modes/
