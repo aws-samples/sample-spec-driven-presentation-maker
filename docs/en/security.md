@@ -59,11 +59,12 @@ sample cannot set safe defaults for them. Evaluate each one before production us
    logs should be kept, and for how long, is your choice.
 6. **Cognito advanced security** (MFA, compromised-credential detection) is off by default
    to keep the demo simple.
-7. **Cognito self sign-up** is on (`selfSignUpEnabled: true` in `infra/lib/auth-stack.ts`).
-   Anyone who reaches the sign-up page can create an account with a verified email address
-   and use the Bedrock-backed agent. For a closed group of users, set `selfSignUpEnabled` to
-   `false` in `infra/lib/auth-stack.ts` (there is no `config.yaml` setting for it) and create
-   the users yourself ([Deploy guide](deploy-cloudshell.md#creating-a-cognito-user-layer-4)).
+7. **Cognito self sign-up** is off by default (`auth.selfSignUp: false`): an administrator
+   creates the users ([Deploy guide](deploy-cloudshell.md#creating-a-cognito-user-layer-4)).
+   With `auth.selfSignUp: true`, anyone who reaches the sign-in page can create an account
+   and use the Bedrock-backed agent. To accept only your organization's addresses, list its
+   email domains in `auth.allowedEmailDomains`; a Cognito Pre sign-up Lambda trigger checks
+   each sign-up request ([Developer guide](developer-guide.md#default-amazon-cognito-user-pool)).
 8. **Open Dynamic Client Registration** (`auth.enableDCR`, default `true`): the discovery
    API's `/register` creates a Cognito app client for any caller. This suits personal and
    demo use. To allow only known MCP clients, set `auth.enableDCR: false` and list their

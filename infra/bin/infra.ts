@@ -54,12 +54,30 @@ if (externalOidc && externalClients) {
   // Customer-provided IdP — no AuthStack needed
   oidcDiscoveryUrl = externalOidc;
   allowedClients = externalClients;
+  if (config.auth?.selfSignUp !== undefined || config.auth?.allowedEmailDomains !== undefined) {
+    console.warn(
+      "[config] `auth.selfSignUp` / `auth.allowedEmailDomains` apply to the default Cognito user pool only " +
+      "and are ignored with auth.oidcDiscoveryUrl. Manage sign-up in your IdP.",
+    );
+  }
 } else {
   // Default Amazon Cognito (demo/quickstart)
+  // Self sign-up is off unless auth.selfSignUp is true; users are then created
+  // by an administrator. auth.allowedEmailDomains limits self sign-up to those domains.
+  const selfSignUp = config.auth?.selfSignUp ?? false;
+  if (typeof selfSignUp !== "boolean") {
+    throw new Error("Config error: auth.selfSignUp must be true or false.");
+  }
+  const allowedEmailDomains = config.auth?.allowedEmailDomains ?? [];
+  if (!Array.isArray(allowedEmailDomains) || allowedEmailDomains.some((d: unknown) => typeof d !== "string")) {
+    throw new Error("Config error: auth.allowedEmailDomains must be a list of domain names.");
+  }
   authStack = new AuthStack(app, "SdpmAuth", {
     env,
     description: "Spec-Driven Presentation Maker - Auth (uksb-ynuz0lkrea)(tag:auth)",
     mcpCallbackUrls: config.auth?.mcpCallbackUrls,
+    selfSignUp,
+    allowedEmailDomains,
   });
   // In AuthStack mode, downstream stacks read Auth values (oidcDiscoveryUrl,
   // WebClient ID, MCP custom scope, etc.) from SSM Parameter Store published
