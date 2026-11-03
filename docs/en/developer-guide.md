@@ -216,6 +216,25 @@ hosted UI. Users sign in through the Web UI, and the JWT is passed through the s
 the authentication and authorization model, see
 [Architecture — Authentication and Authorization Model](architecture.md#authentication-and-authorization-model).
 
+Self sign-up is off by default: an administrator creates each user, in the Cognito console
+or with `aws cognito-idp admin-create-user`
+([Deploy guide — Creating a Cognito user](deploy-cloudshell.md#creating-a-cognito-user-layer-4)).
+To let people create their own account from the sign-in page, turn it on in `config.yaml`,
+optionally limited to some email domains:
+
+```yaml
+auth:
+  selfSignUp: true            # default: false
+  allowedEmailDomains:        # optional; omit for any domain
+    - example.com
+```
+
+A Cognito Pre sign-up Lambda trigger checks the domain of every sign-up request. The match
+is exact and ignores case: `example.com` does not admit `team.example.com`, so list each
+subdomain you want. Users created by an administrator are not checked.
+`allowedEmailDomains` without `selfSignUp: true` fails the synth. Switching either setting
+updates the user pool in place; existing users keep their accounts.
+
 #### External OIDC IdP
 
 To use your own IdP (Entra ID, Auth0, Okta and others):
@@ -232,7 +251,7 @@ If the deploy script's log monitoring was interrupted, or you need the endpoints
 bash scripts/show_endpoints.sh
 ```
 
-It prints the CloudFront URL and the Cognito sign-up URL from the deployed CloudFormation stacks.
+It prints the CloudFront URL and the Cognito user pool console URL from the deployed CloudFormation stacks.
 
 ### Updating the Web UI
 

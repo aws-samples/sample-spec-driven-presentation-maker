@@ -72,11 +72,22 @@ model:
 #   enableDCR: false + mcpCallbackUrls     → Static client only (enterprise lockdown)
 #   enableDCR: false + no mcpCallbackUrls  → No external MCP access (WebUI only)
 #
+# Sign-up for the default Cognito user pool (Web UI and MCP clients).
+# selfSignUp: false (default) → an administrator creates the users (Cognito console or
+#   `aws cognito-idp admin-create-user`; see docs/en/deploy-cloudshell.md).
+# selfSignUp: true → people can create their own account from the sign-in page.
+# allowedEmailDomains: with selfSignUp: true, only these email domains can sign up.
+#   Checked by a Cognito Pre sign-up Lambda trigger; exact match, case-insensitive.
+#   Subdomains are not included: list each one. Omit or leave empty for any domain.
+#
 # auth:
 #   enableDCR: true
 #   mcpCallbackUrls:
 #     - https://claude.ai/api/mcp/auth_callback
 #     - https://claude.com/api/mcp/auth_callback
+#   selfSignUp: false
+#   allowedEmailDomains:
+#     - example.com
 
 # WAF IP address restriction (optional).
 # When specified, only the listed IP ranges can access CloudFront and API Gateway.
