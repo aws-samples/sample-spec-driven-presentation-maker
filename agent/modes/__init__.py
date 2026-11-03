@@ -56,9 +56,9 @@ _ORCHESTRATOR_ENVIRONMENT = [
 #
 # Hand-edit sync (diff) is a CLI capability, not an MCP tool; the hand-edit-sync
 # guide says how to run it from a checkout.
-# start_* are deliberately absent: the role document is already in the system
-# prompt (and start_presentation's environment in the history), so exposing them
-# would only invite a redundant call.
+# start_* are deliberately absent: the role document and start_presentation's
+# environment are already in the system prompt, so exposing them would only
+# invite a redundant call.
 _DECK_TOOLS = [
     "init_deck_workspace", "analyze_template", "read_attachment",
     "list_styles", "apply_style",

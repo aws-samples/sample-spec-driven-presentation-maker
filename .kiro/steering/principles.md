@@ -72,7 +72,8 @@ Rules that follow from this:
    composer, which mode — to load in its first instruction. The agent then calls
    `start_<role>(...)` itself, passing the mode as an argument. There is no docstring heuristic to infer role from arguments, and no
    case where a role's text is embedded into a system prompt instead of fetched
-   — every consumer, including the L4 agent, fetches live.
+   — every consumer, including the L4 agent, fetches it through the port (the L4 agent
+   once per process).
 
    Writing role documents and guides: state what the agent can do (its tools and their
    range) and what it should do, in positive form rather than "X is not Y" / "do not X";
