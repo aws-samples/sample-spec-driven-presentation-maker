@@ -71,6 +71,7 @@ class _PresentationMaker:
         self.user = user
         self.calls = calls
         self.called = called
+        self.stopped = threading.Event()
 
     async def load_tools(self, **kwargs):
         return []
@@ -86,7 +87,7 @@ class _PresentationMaker:
         return {"status": "success", "content": [{"text": json.dumps(payload)}]}
 
     def stop(self, *exc):
-        pass
+        self.stopped.set()
 
 
 @pytest.fixture
@@ -102,6 +103,7 @@ def assembly(monkeypatch):
         "release": threading.Event(),
         "gate_optional": False,
         "optional": [],
+        "pm": [],
     }
 
     def optional():
@@ -109,11 +111,13 @@ def assembly(monkeypatch):
         state["optional"].append(client)
         return client
 
+    def presentation_maker(jwt_token, session_id="", tool_filters=None):
+        client = _PresentationMaker(jwt_token, state["calls"], state["called"])
+        state["pm"].append(client)
+        return client
+
     monkeypatch.delenv("MEMORY_ID", raising=False)
-    monkeypatch.setattr(
-        factory, "mcp_agentcore_runtime",
-        lambda jwt_token, session_id="", tool_filters=None: _PresentationMaker(jwt_token, state["calls"], state["called"]),
-    )
+    monkeypatch.setattr(factory, "mcp_agentcore_runtime", presentation_maker)
     monkeypatch.setattr(factory, "mcp_aws_knowledge", optional)
     monkeypatch.setattr(factory, "mcp_aws_pricing", optional)
     monkeypatch.setattr(factory, "BedrockModel", lambda **kwargs: object())
@@ -168,6 +172,24 @@ def test_start_presentation_and_memory_do_not_wait_for_optional_servers(assembly
 
     assembly["release"].set()
     assert all(c.stopped.wait(5) for c in assembly["optional"]), "late optional clients are closed"
+
+
+def test_memory_failure_closes_the_connected_clients(assembly, monkeypatch):
+    """Memory is built next to the connections, so its failure must not leak them."""
+    factory = assembly["factory"]
+    monkeypatch.setenv("MEMORY_ID", "mem-1")
+
+    def broken(*args):
+        raise RuntimeError("Memory unreachable")
+
+    monkeypatch.setattr(factory, "_session_manager", broken)
+
+    with pytest.raises(RuntimeError, match="Memory unreachable"):
+        assembly["create"]("u1")
+
+    assert assembly["pm"][0].stopped.is_set()
+    # Optional clients are closed either here (on time) or by their worker (late).
+    assert all(c.stopped.wait(5) for c in assembly["optional"])
 
 
 def test_second_turn_for_the_same_user_makes_no_start_presentation_call(assembly):

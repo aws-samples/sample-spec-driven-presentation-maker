@@ -55,17 +55,20 @@ def _factory():
     return factory
 
 
-# Time a worker needs between load_tools returning and recording the result.
-_RECORD_GRACE = 0.1
+@pytest.fixture(autouse=True)
+def _record_events(monkeypatch):
+    """Set each fake client's ``recorded`` once its worker has recorded the result."""
+    factory = _factory()
+    monkeypatch.setattr(factory, "_on_recorded", lambda client: client.recorded.set())
 
 
 class _FakeClient:
     """Stands in for MCPClient's ToolProvider surface.
 
-    ``after`` holds clients whose connection must finish before this one's does, so a
-    test can order a required client behind the optional ones without racing the
-    optional servers' deadline. ``done`` is set when load_tools returns, just before
-    the worker records the result; _RECORD_GRACE covers that gap.
+    ``after`` holds clients whose results must be recorded before this one's
+    connection finishes, so a test can order a required client behind the optional
+    ones without racing the optional servers' deadline. ``done`` is set when
+    load_tools returns; ``recorded`` once the worker has recorded the result.
     """
 
     def __init__(self, delay: float = 0.0, error: BaseException | None = None,
@@ -77,6 +80,7 @@ class _FakeClient:
         self.calls = 0
         self.stopped = threading.Event()
         self.done = threading.Event()
+        self.recorded = threading.Event()
         self.thread_names: list[str] = []
 
     async def load_tools(self, **kwargs):
@@ -84,9 +88,7 @@ class _FakeClient:
         self.thread_names.append(threading.current_thread().name)
         time.sleep(self.delay)
         for other in self.after:
-            assert other.done.wait(5)
-        if self.after:
-            time.sleep(_RECORD_GRACE)
+            assert other.recorded.wait(5)
         if self.gate is not None:
             assert self.gate.wait(5)
         self.done.set()
@@ -202,8 +204,7 @@ def test_optional_server_still_connecting_at_the_deadline_is_dropped_and_closed(
     late = _FakeClient(gate=release)
 
     def then(_required_clients):
-        assert early.done.wait(5)
-        time.sleep(_RECORD_GRACE)
+        assert early.recorded.wait(5)
 
     start = time.monotonic()
     usable, status = factory._prewarm_mcp_clients(
@@ -233,8 +234,7 @@ def test_optional_servers_finishing_before_the_deadline_are_kept():
     optional = _FakeClient(delay=0.05)
 
     def then(_required_clients):
-        assert optional.done.wait(5)
-        time.sleep(_RECORD_GRACE)
+        assert optional.recorded.wait(5)
 
     usable, status = factory._prewarm_mcp_clients(
         [required, optional], ["pm", "opt"], [True, False], then=then,

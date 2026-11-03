@@ -71,6 +71,10 @@ _MCP_FACTORIES = [
 # Status error for an optional server that was still connecting at the deadline.
 _LATE_ERROR = "Not connected in time; skipped for this turn"
 
+# Test seam: called with each client once its worker has recorded the connection
+# result (or closed the client as late). Tests use it to order clients without sleeps.
+_on_recorded: Callable[[object], None] | None = None
+
 
 def _prewarm_mcp_clients(
     clients: list,
@@ -125,15 +129,17 @@ def _prewarm_mcp_clients(
         except BaseException as e:  # noqa: BLE001 - recorded per client below
             error = e
         with lock:
-            if required[index] or not deadline.is_set():
+            on_time = required[index] or not deadline.is_set()
+            if on_time:
                 results[index] = error
-                return
         # Dropped at the deadline: no agent consumes this client, so close it here.
-        if error is None:
+        if not on_time and error is None:
             try:
                 clients[index].stop(None, None, None)
             except Exception as e:  # noqa: BLE001 - best-effort cleanup off the request path
                 logger.warning("MCP server %r: closing the late client failed: %s", names[index], e)
+        if _on_recorded is not None:
+            _on_recorded(clients[index])
 
     pool = ThreadPoolExecutor(max_workers=len(clients), thread_name_prefix="sdpm-mcp") if clients else None
     try:
@@ -243,7 +249,16 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         wait([session_manager_future])
 
     mcp_servers, mcp_status = _prewarm_mcp_clients(built, names, required_flags, then=critical_path)
-    session_manager = session_manager_future.result()
+    try:
+        session_manager = session_manager_future.result()
+    except Exception:
+        # Memory failed after the servers connected: no agent will own these clients.
+        for client in mcp_servers:
+            try:
+                client.stop(None, None, None)
+            except Exception as e:  # noqa: BLE001 - best-effort cleanup before re-raising
+                logger.warning("Closing an MCP client after the Memory failure failed: %s", e)
+        raise
 
     # Tools
     tools = [*mcp_servers, web_fetch, hearing]
