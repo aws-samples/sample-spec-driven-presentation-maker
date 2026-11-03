@@ -25,7 +25,7 @@ from api.html_presign import (
     safe_download_name,
     slide_size,
 )
-from shared.html_artifacts import build_html_preview_key_map, output_key, preview_key
+from shared.artifact_keys import build_html_preview_key_map, output_key, preview_key
 
 _REPO = Path(__file__).resolve().parent.parent
 BUCKET = "sdpm-pptx-bucket"
@@ -164,7 +164,7 @@ def test_view_url_expiry(presign_client):
     assert parse_qs(urlsplit(url).query)["X-Amz-Expires"] == ["900"]
 
 
-# --- key layout round trip with shared.html_artifacts -----------------------------
+# --- key layout round trip with shared.artifact_keys -----------------------------
 
 
 def test_output_key_is_signable():

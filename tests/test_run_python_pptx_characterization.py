@@ -255,6 +255,17 @@ def test_remote_unchanged_slide_keeps_compose_unchanged_and_drops_old_keys(remot
     assert storage.keys("pptx/d1/") == artifacts  # measure only: no artifact refresh
 
 
+def test_remote_compose_write_keeps_the_compose_of_a_longer_slug(remote):
+    """Was a prefix match on ``compose/body_``: writing ``body`` deleted ``body_2_*.json``."""
+    run, storage, office = remote
+    storage.objects["decks/d1/compose/body_2_100.json"] = b"{}"
+    storage.objects["decks/d1/compose/body_100.json"] = b"{}"
+    run({"slides/body.json": EDITED_BODY}, ["body"])
+    compose = storage.keys("decks/d1/compose/")
+    assert "decks/d1/compose/body_2_100.json" in compose
+    assert "decks/d1/compose/body_100.json" not in compose
+
+
 def test_remote_edit_without_measure(remote):
     run, storage, office = remote
     out = run({"slides/body.json": EDITED_BODY})

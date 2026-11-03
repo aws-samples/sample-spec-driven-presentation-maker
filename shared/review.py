@@ -27,6 +27,8 @@ from functools import lru_cache
 from pathlib import Path
 from typing import Any, Callable
 
+from sdpm.engine.schema import SLUG_RE
+
 MAX_COMMENTS = 100
 MAX_TEXT_CHARS = 2000
 MAX_NOTE_CHARS = 4000
@@ -45,7 +47,6 @@ WHITESPACE = (
 # accept non-ASCII digits.
 REVIEW_ID_RE = re.compile(r"[0-9]{8}-[0-9]{6}-[0-9a-f]{4}")
 NAME_RE = re.compile(r"[A-Z]{1,3}")
-SLUG_RE = re.compile(r"[a-z0-9][a-z0-9_-]*")
 _PLACEHOLDER_RE = re.compile(r"\{(\w+)\}")
 _TEMPLATE_PATH = Path(__file__).with_name("review_template.json")
 

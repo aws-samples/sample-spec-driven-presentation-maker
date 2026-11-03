@@ -64,7 +64,7 @@ def get_preview(
     Returns:
         List of str and Image objects for MCP content serialization.
     """
-    from shared.preview import build_slide_key_map
+    from shared.artifact_keys import build_slide_key_map
 
     all_keys = storage.list_files(prefix=f"previews/{deck_id}/", bucket=storage.pptx_bucket)
     key_map = build_slide_key_map(all_keys)
@@ -95,7 +95,7 @@ def get_html_preview(
     Returns:
         List of str and Image objects for MCP content serialization.
     """
-    from shared.html_artifacts import build_html_png_key_map, png_prefix
+    from shared.artifact_keys import build_html_png_key_map, png_prefix
 
     key_map = build_html_png_key_map(storage.list_files(prefix=png_prefix(deck_id), bucket=storage.pptx_bucket))
     result: list = []

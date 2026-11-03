@@ -42,7 +42,7 @@ from html_presign import (
     presigned_html_url,
     slide_size,
 )
-from shared.html_artifacts import build_html_preview_key_map, preview_prefix as html_preview_prefix
+from shared.artifact_keys import build_html_preview_key_map, preview_prefix as html_preview_prefix
 from shared.review import (
     MAX_BODY_BYTES as REVIEW_MAX_BODY_BYTES,
     build_review_file,
@@ -213,7 +213,7 @@ def _resolve_preview_url(deck_id: str, slug: str, preview_keys: set) -> Optional
     Returns:
         Presigned/signed URL or None.
     """
-    from shared.preview import build_slide_key_map
+    from shared.artifact_keys import build_slide_key_map
 
     key_map = build_slide_key_map(preview_keys)
     key = key_map.get(slug)
@@ -842,22 +842,14 @@ def _read_deck_json(deck_id: str) -> Dict[str, Any]:
 
 
 def _read_outline_slugs(deck_id: str) -> List[str]:
-    """Slugs from specs/outline.md in order ([] when missing).
+    """Slugs from specs/outline.md in order ([] when missing), as the build reads them."""
+    from sdpm.engine.schema import parse_outline_text
 
-    Canonical implementation: sdpm.api.parse_outline_slugs (not importable in Lambda).
-    """
-    slugs: List[str] = []
     try:
         outline_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/specs/outline.md")
-        outline_text = outline_resp["Body"].read().decode("utf-8")
-        slug_re = re.compile(r"^-\s*\[([a-z0-9-]+)\]\s*")
-        for line in outline_text.splitlines():
-            m = slug_re.match(line)
-            if m:
-                slugs.append(m.group(1))
+        return parse_outline_text(outline_resp["Body"].read().decode("utf-8"))
     except Exception:
-        pass
-    return slugs
+        return []
 
 
 def _read_specs(deck_id: str) -> Dict[str, Any]:
@@ -890,7 +882,6 @@ def _read_specs(deck_id: str) -> Dict[str, Any]:
     return specs
 
 
-_SCRIPT_WARNING_SLUG = re.compile(r"^[a-z0-9][a-z0-9_-]*$")
 _SCRIPT_WARNING_KINDS = frozenset({"navigation", "popup", "external-url", "webrtc"})
 _SCRIPT_WARNINGS_MAX = 200
 
@@ -898,6 +889,8 @@ _SCRIPT_WARNINGS_MAX = 200
 def _script_warnings(raw: Any) -> List[Dict[str, Any]]:
     """The record's htmlScriptExternal as ``[{slug, kinds}]``: at most 200 entries with a
     slide slug and known kinds; anything else is dropped."""
+    from sdpm.engine.schema import SLUG_RE
+
     out: List[Dict[str, Any]] = []
     for entry in raw if isinstance(raw, list) else []:
         if len(out) >= _SCRIPT_WARNINGS_MAX:
@@ -905,7 +898,7 @@ def _script_warnings(raw: Any) -> List[Dict[str, Any]]:
         if not isinstance(entry, dict):
             continue
         slug, kinds = entry.get("slug"), entry.get("kinds")
-        if not isinstance(slug, str) or not _SCRIPT_WARNING_SLUG.match(slug):
+        if not isinstance(slug, str) or not SLUG_RE.fullmatch(slug):
             continue
         if not isinstance(kinds, list) or not all(isinstance(k, str) and k in _SCRIPT_WARNING_KINDS for k in kinds):
             continue
@@ -1015,28 +1008,18 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
     # Read slides from S3 (deck.json + slides/*.json format)
     slides = []
 
-    # Collect compose keys for animation (epoch-keyed)
-    compose_keys = set()
+    # Live-preview payloads: slug → latest compose/{slug}_{epoch}.json (defs included)
+    from shared.artifact_keys import COMPOSE_DEFS, compose_prefix, latest_compose_keys
+
+    compose_keys: List[str] = []
     try:
-        for obj in s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/compose/").get("Contents", []):
-            compose_keys.add(obj["Key"])
+        listed = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=compose_prefix(deck_id))
+        compose_keys = [obj["Key"] for obj in listed.get("Contents", [])]
     except Exception:
         pass
+    latest_compose = latest_compose_keys(compose_keys, compose_prefix(deck_id))
 
-    import re as _re
-    def _latest_compose_key(prefix: str, keys: set) -> Optional[str]:
-        """Pick the key with the highest epoch from epoch-keyed compose files."""
-        best_epoch, best_key = -1, None
-        for k in keys:
-            if not k.startswith(prefix):
-                continue
-            m = _re.search(r"_(\d+)\.json$", k)
-            epoch = int(m.group(1)) if m else 0
-            if epoch > best_epoch:
-                best_epoch, best_key = epoch, k
-        return best_key
-
-    defs_key = _latest_compose_key(f"decks/{deck_id}/compose/defs_", compose_keys)
+    defs_key = latest_compose.get(COMPOSE_DEFS)
     has_defs = defs_key is not None
 
     # outline.md for slug order, then slides/*.json
@@ -1073,9 +1056,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
                 continue
         slide_preview = _resolve_preview_url(deck_id, slug, preview_keys)
         slide_entry: Dict[str, Any] = {"slug": slug, "previewUrl": slide_preview}
-        compose_key = _latest_compose_key(f"decks/{deck_id}/compose/{slug}_", compose_keys)
-        if not compose_key:
-            compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}_", compose_keys)
+        compose_key = latest_compose.get(slug) or latest_compose.get(f"slide_{i + 1}")
         if compose_key:
             slide_entry["composeUrl"] = preview_url(compose_key)
         slides.append(slide_entry)
