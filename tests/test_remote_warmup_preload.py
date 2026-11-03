@@ -225,9 +225,27 @@ class TestWarmUpRun:
 
 class TestStartupPreload:
     def test_builds_no_client_and_resolves_no_credentials(self, server):
+        import boto3
+
         _, built, credentials, _ = server
         assert built == []
         assert credentials == []
+        session = boto3.DEFAULT_SESSION._session
+        assert session._credentials is None
+        assert "credential_provider" in session._components._deferred  # never created
+
+    def test_credentials_are_resolved_when_the_first_client_is_built(self, server, monkeypatch):
+        # After a restore, each process resolves credentials itself, on its first client.
+        import boto3
+
+        monkeypatch.setenv("AWS_ACCESS_KEY_ID", "AKIDEXAMPLE")
+        monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "secret")
+        _, _, credentials, _ = server
+        session = boto3.DEFAULT_SESSION._session
+        client = session.create_client("s3", region_name="ap-northeast-1")
+        assert credentials == [session]
+        assert "credential_provider" not in session._components._deferred
+        assert client._request_signer._credentials.access_key == "AKIDEXAMPLE"
 
     def test_service_definitions_are_served_from_memory(self, server, monkeypatch):
         import os
