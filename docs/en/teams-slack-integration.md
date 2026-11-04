@@ -41,18 +41,24 @@ POST https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{ENCODED_ARN}/inv
 |---|---|
 | `Content-Type` | `application/json` |
 | `Authorization` | `Bearer {JWT_TOKEN}` |
+| `X-Amzn-Bedrock-AgentCore-Runtime-Session-Id` | the same id as `runtimeSessionId` |
 
 ### Request Body
 
 ```json
 {
   "prompt": "Create a 5-slide presentation about AWS Well-Architected",
-  "runtimeSessionId": "slack-U12345-1710000000",
+  "runtimeSessionId": "3f9a1c2b7d4e5f60-slack-U12345-1710000000",
   "userId": "user-sub-from-jwt"
 }
 ```
 
-Setting `runtimeSessionId` per user+channel enables conversation continuity.
+Setting `runtimeSessionId` per user+channel enables conversation continuity. The agent
+admits a new session only for its owner: the id must start with the owner prefix of the
+token's `sub` (the first 16 hex characters of SHA-256 over `sub`, then `-`;
+`shared/session_owner.py`), and the header must carry the same id. An id without the prefix
+is refused (`session_reload_required`) unless the agent already holds that user's history
+for it.
 
 ### Response
 
@@ -114,6 +120,8 @@ Build a Lambda-based bot using [Slack Bolt for Python](https://slack.dev/bolt-py
 #### 2. AWS Lambda Handler
 
 ```python
+import base64
+import hashlib
 import json
 import os
 import urllib.request
@@ -128,9 +136,18 @@ app = App(
 )
 
 
+def _owner_prefix(token: str) -> str:
+    """First 16 hex characters of SHA-256 over the token's sub (shared/session_owner.py)."""
+    payload = token.split(".")[1]
+    payload += "=" * (-len(payload) % 4)
+    sub = json.loads(base64.urlsafe_b64decode(payload))["sub"]
+    return hashlib.sha256(sub.encode("utf-8")).hexdigest()[:16]
+
+
 def _invoke_agent(prompt: str, session_id: str) -> str:
     """Call the Layer 4 Agent and return the final text."""
     token = _get_oauth_token()  # Cognito client_credentials
+    session_id = f"{_owner_prefix(token)}-{session_id}"
     escaped_arn = urllib.request.quote(os.environ["AGENT_RUNTIME_ARN"], safe="")
     url = (
         f"https://bedrock-agentcore.{os.environ['AWS_REGION']}.amazonaws.com"
@@ -145,6 +162,7 @@ def _invoke_agent(prompt: str, session_id: str) -> str:
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {token}",
+            "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": session_id,
         },
     )
 
@@ -268,9 +286,10 @@ The Layer 4 Agent has built-in session management via Amazon Bedrock AgentCore M
 
 | Platform | Recommended Session ID Format | Effect |
 |---|---|---|
-| Slack | `slack-{userId}-{threadTs}` | Conversation continues per thread |
-| Teams | `teams-{aadObjectId}-{conversationId}` | Conversation continues per chat |
+| Slack | `{ownerPrefix}-slack-{userId}-{threadTs}` | Conversation continues per thread |
+| Teams | `{ownerPrefix}-teams-{aadObjectId}-{conversationId}` | Conversation continues per chat |
 
+`{ownerPrefix}` is the owner prefix of the token's `sub` (see [Request Body](#request-body)).
 Calling with the same session ID causes the Agent to respond while retaining the previous conversation context.
 
 ---
