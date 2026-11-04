@@ -40,7 +40,8 @@ Entries before v0.5.0 were written retroactively as summaries.
   `localStorage`, and only a session last seen working is reconnected); a message sent while
   that reconnect connects goes out once the session's state is known. When the session's
   process is gone, the chat shows the Memory history as before. The new deck screen sends
-  `prepare` once when it opens, so the first prompt finds the session built. Local mode is
+  `prepare` once per page, when it is first shown (not on every page load), so the first
+  prompt finds the session built. Local mode is
   unchanged.
 
 - **Sign-up settings for the default Cognito user pool.** `auth.selfSignUp` in

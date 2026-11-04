@@ -216,6 +216,7 @@ export function ChatPanelShell({
             onPreviewInvalidated={onPreviewInvalidated}
             onWorkflowPhase={onWorkflowPhase}
             onLoadingChange={panelAVisible ? onLoadingChange : undefined}
+            visible={open && panelAVisible}
           />
         </div>
 

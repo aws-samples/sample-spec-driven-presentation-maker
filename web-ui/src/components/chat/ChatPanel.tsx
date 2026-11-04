@@ -52,6 +52,8 @@ interface ChatPanelProps {
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
   onLoadingChange?: (isLoading: boolean) => void
+  /** The panel is on screen. A new deck's `prepare` waits until it is (Cloud). */
+  visible?: boolean
 }
 
 /** Handle exposed to parents for input insertion and programmatic user messages. */
@@ -71,7 +73,7 @@ function formatRelativeTime(value: string, locale: string): string {
   return formatter.format(Math.round(hours / 24), "day")
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, visible = true }, ref) {
   const t = useTranslations("chat")
   const tCompose = useTranslations("compose")
   const tSessionPicker = useTranslations("sessionPicker")
@@ -359,17 +361,19 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [resumeCut, configLoaded])
 
   // --- Prepare the new deck's session (Cloud) ---
-  // Once per mount, no re-warm: the first prompt then finds its MCP connections built.
+  // Once per mount, when the new deck screen is first shown (the shell keeps this panel
+  // mounted while the chat is closed or another tab is shown), no re-warm: the first prompt
+  // then finds its MCP connections built.
   const preparedRef = useRef(false)
   useEffect(() => {
-    if (IS_LOCAL || deckId !== "new" || !configLoaded || preparedRef.current) return
+    if (IS_LOCAL || deckId !== "new" || !visible || !configLoaded || preparedRef.current) return
     const token = auth.user?.access_token
     if (!token) return
     preparedRef.current = true
     // intentional: best-effort — without it the first prompt builds the session itself
     prepareAgentCore(sessionIdRef.current, token, mode).catch((err: unknown) => console.warn("Prepare failed:", err))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deckId, configLoaded, auth.user?.access_token])
+  }, [deckId, visible, configLoaded, auth.user?.access_token])
 
   // --- Reconnect to running background session (Local mode) ---
   useEffect(() => {

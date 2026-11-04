@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * ChatPanel prepare (Cloud, first-response-latency R4): the new deck screen sends one
- * `prepare` when it opens — not again on re-renders, mode changes or later — and none for
+ * `prepare` when it is first shown (not when a page loads with it hidden) — not again on re-renders, mode changes or later — and none for
  * an existing deck or in Local mode. A send before `ready` goes over the prepare socket;
  * after `ready` that socket closes.
  */
@@ -46,6 +46,7 @@ vi.mock("@/services/localService", () => ({
 vi.mock("@/services/kiroSessionsService", () => ({ forkKiroSession: vi.fn(), listKiroSessions: vi.fn(async () => ({ recent: [] })) }))
 
 import { ChatPanel, type ChatPanelHandle } from "./ChatPanel"
+import { ChatPanelShell } from "./ChatPanelShell"
 
 const prepares = () => FakeWebSocket.instances.flatMap((ws) => ws.ofType("prepare"))
 
@@ -104,6 +105,44 @@ describe("ChatPanel prepare (Cloud)", () => {
     expect(ws.closedWith).toBeUndefined()
     await act(async () => { ws.receive({ batch: [{ seq: 1, ev: { work: { state: "busy" } } }, { seq: 2, ev: { work: { state: "idle", how: "finished" } } }] }) })
     expect(ws.closedWith).toBe(1000)
+  })
+
+  it("waits until the new deck screen is shown, then prepares once", async () => {
+    const view = renderWithIntl(<ChatPanel deckId="new" visible={false} />)
+    await waitFor(() => expect(getChatHistory).toHaveBeenCalled())
+    await act(async () => { vi.advanceTimersByTime(1000) })
+    expect(FakeWebSocket.instances).toHaveLength(0)
+
+    view.rerender(<ChatPanel deckId="new" visible />)
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1))
+    const ws = FakeWebSocket.last()
+    act(() => ws.open())
+    expect(prepares()).toHaveLength(1)
+
+    view.rerender(<ChatPanel deckId="new" visible={false} />)
+    view.rerender(<ChatPanel deckId="new" visible />)
+    await act(async () => { vi.advanceTimersByTime(1000) })
+    expect(FakeWebSocket.instances).toHaveLength(1)
+  })
+
+  it("does not prepare when a page loads with the chat closed or on a deck's own tab", async () => {
+    const shell = (open: boolean, chatTab: "new" | "deck", deckId: string | null) => (
+      <ChatPanelShell open={open} onClose={() => {}} chatTab={chatTab} onChatTabChange={() => {}} deckId={deckId} deckName="d" />
+    )
+    const view = renderWithIntl(shell(false, "new", null))
+    await waitFor(() => expect(getChatHistory).toHaveBeenCalled())
+    await act(async () => { vi.advanceTimersByTime(1000) })
+    expect(FakeWebSocket.instances).toHaveLength(0)
+
+    view.rerender(shell(true, "deck", "d1"))
+    await act(async () => { vi.advanceTimersByTime(1000) })
+    expect(FakeWebSocket.instances).toHaveLength(0)
+
+    // New Deck: the chat opens on the New tab.
+    view.rerender(shell(true, "new", "d1"))
+    await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1))
+    act(() => FakeWebSocket.last().open())
+    expect(prepares()).toEqual([{ type: "prepare", mode: "spec" }])
   })
 
   it("does not prepare an existing deck", async () => {
