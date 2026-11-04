@@ -44,7 +44,7 @@ TERMINAL = ("completed", "failed", "cancelled")
 
 _DELIVERED_AUTOMATICALLY = (
     "Not available here: background results are delivered automatically when the task "
-    "finishes. Continue without checking on them."
+    "finishes. Finish any other work and end your turn; you are woken with the result."
 )
 
 
