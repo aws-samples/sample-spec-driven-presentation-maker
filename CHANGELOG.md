@@ -239,6 +239,27 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **Deploying `SdpmAuth` no longer removes the `sdpm-mcp/invoke` scope from the Web UI's
+  Cognito app client.** The scope was added by a custom resource in `SdpmWebUi` that called
+  `UpdateUserPoolClient` with a fixed payload. The `SdpmAuth` template did not declare the
+  scope, so an update of the client there dropped it, and the agent's calls to the MCP
+  runtime failed with 401. `AuthStack` now declares the scope and the explicit auth flows
+  on the client. The `SdpmWebUi` custom resource sets only the callback/logout URLs: it
+  reads the client and writes every other field back unchanged. The client is updated in
+  place (same client ID, no user pool change).
+
+- **Stopping a Cloud turn no longer lets its in-flight tool calls change the deck
+  afterwards.** A tool call the agent had already sent kept running on the MCP runtime and
+  wrote to S3 after the stop (on dev: `run_python` saved 4 slides 1.7 s after a cancel, and
+  `generate_pptx`'s previews and thumbnail landed 1.5 s after the stop button). Each turn
+  now sends a generation number with its Presentation Maker calls (composers included), and
+  a stopped turn raises the deck's write fence (`writeFence` on the deck item) to it through
+  the new `fence_turn` tool. The MCP server checks the fence before every S3 write and skips
+  the writes of a stopped turn (the call returns a "Cancelled" error), and the deck record
+  update after a build is conditional on it. A turn that ends normally fences nothing, so
+  its last previews still land when the next message is sent quickly. Calls without a
+  generation (the local server, other MCP clients) are unchanged.
+
 - **Stopping a Cloud turn no longer leaves it running in the background.** The stop button
   ends the runtime session, and AgentCore then sends the agent's process SIGTERM. The agent
   used to wait for the running turn to finish, so the turn and its composers kept calling
@@ -300,6 +321,17 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Security
 
+- **Agent and MCP runtime sessions are bound to their owner.** New session ids created by
+  the Web UI start with a prefix derived from the signed-in user (`shared/session_owner.py`,
+  mirrored in `web-ui/src/lib/sessionId.ts`), and the agent and the MCP server admit such an
+  id only for that user. Each runtime process serves one user. Existing decks keep their
+  chat: a chat id from before this change is admitted when AgentCore Memory holds that
+  user's history for it, and a deck without history continues under the user's own id. The
+  agent forwards an owner-prefixed id to the MCP runtime (also for composer groups,
+  `<id>-gN`). A refused call gets an error event with no details; a chat tab opened before
+  the update may be asked to reload the page once (new error code
+  `session_reload_required`). Deploy the Web UI first, then SdpmRuntime, then SdpmAgent.
+  Local mode is unchanged.
 - **The AgentCore runtimes allow only the operations the app uses.** The agent and MCP
   runtimes, their `DEFAULT` endpoints and the named endpoints `sdpm_agent_endpoint` and
   `sdpm_endpoint` now carry a resource-based policy (`AWS::BedrockAgentCore::ResourcePolicy`,
@@ -349,6 +381,19 @@ Entries before v0.5.0 were written retroactively as summaries.
   open in the same browser can no longer drive the local agent, upload files or change styles
   and templates through `127.0.0.1`. Requests without an `Origin` header (scripts, curl) are
   unaffected. (#473)
+- **Model request and response bodies are no longer written to the runtime logs, and the
+  runtime log groups expire.** `aws-opentelemetry-distro` turns on
+  `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` when AgentCore observability is on, so
+  the botocore Bedrock instrumentation wrote every model request and response body to the
+  `otel-rt-logs` stream of the runtime log groups. Both runtimes now set it to `false`. Token
+  counts on the spans and the `bedrock_usage` / `slides_composed` / `slides_built` events of
+  [Usage measurement](docs/en/usage-measurement.md) are unchanged. The log groups AgentCore
+  creates for the runtimes (`/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`) had no
+  retention period; the stacks now set it, also on groups that already exist, from the new
+  `observability.logRetentionDays` in `infra/config.yaml` (default 30 days; an invalid value
+  fails the synth). Log data older than the period is removed by CloudWatch Logs after the
+  deploy. The stacks never delete these log groups. The Strands tracer still records
+  conversation text in the agent runtime log group, now kept for that period.
 
 ## [0.11.0] - 2026-10-31
 

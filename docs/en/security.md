@@ -29,7 +29,9 @@ These settings come with every deployment of the CDK stacks in `infra/`:
 - **AgentCore Runtime**: the agent and MCP runtimes validate a JWT on every call
   (`customJwtAuthorizer`). The user ID comes from the token's `sub` claim. A resource-based
   policy on each runtime and its endpoints allows only `InvokeAgentRuntime` and
-  `StopRuntimeSession`, the operations the app uses.
+  `StopRuntimeSession`, the operations the app uses. The agent and the MCP server admit a
+  session only for its owner: the session id carries a prefix derived from the token's
+  `sub`, and each runtime process serves one user (`shared/session_owner.py`).
 - **Per-deck authorization**: a user is the deck's owner, a viewer (the deck is public), or
   has no access. The rules live in one place, `shared/authz.py`, used by both the API and the
   MCP server. See [Architecture — Authorization](architecture.md#authorization-role-based-access-control).
@@ -38,8 +40,15 @@ These settings come with every deployment of the CDK stacks in `infra/`:
   these before production.
 - **Secrets**: no credentials in the code. Services get access through IAM roles and
   environment variables.
-- **Logs**: CloudWatch log groups keep logs for one week or one month. Bedrock model
-  invocation logging is optional (`features.enableInvocationLogging`).
+- **Logs**: the CloudWatch log groups the stacks define keep logs for one week or one month.
+  AgentCore creates the runtime log groups (`/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`)
+  itself; the stacks give them the retention set in `observability.logRetentionDays`
+  (default 30 days). These groups hold conversation text: the Strands tracer records
+  messages as span events, and the OpenTelemetry exporter writes them to the
+  `otel-rt-logs` stream of the agent runtime log group. Bedrock request and response
+  bodies from the botocore instrumentation are not recorded
+  (`OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` on both runtimes). Bedrock
+  model invocation logging is optional (`features.enableInvocationLogging`).
 
 ## Settings that depend on your environment
 

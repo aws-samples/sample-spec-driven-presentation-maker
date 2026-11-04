@@ -17,6 +17,15 @@ features:
   enableInvocationLogging: false  # Bedrock Model Invocation Logging (account-level, skipped if already configured)
   enableTransactionSearch: false  # CloudWatch Transaction Search — per-user token queries via aws/spans (account-level, skipped if already enabled)
 
+# Log retention of the AgentCore runtime log groups
+# (/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT). AgentCore creates these
+# groups without a retention period; the stacks set one (also on groups that
+# already exist).
+# Must be a value CloudWatch Logs accepts: 1, 3, 5, 7, 14, 30, 60, 90, 120, 150,
+# 180, 365, 400, 545, 731, 1096, 1827, 2192, 2557, 2922, 3288 or 3653. Default: 30.
+observability:
+  logRetentionDays: 30
+
 # Model configuration for the Agent (Layer 4).
 # Use inference profile IDs for cross-region routing.
 # Examples:

@@ -44,7 +44,7 @@ Three connection patterns are supported. Each returns an `MCPClient` instance ad
 
 ### Pattern 1: AgentCore Runtime + JWT Bearer
 
-For MCP servers deployed on Amazon Bedrock AgentCore Runtime. The caller's JWT is forwarded as-is for authentication and user_id propagation, and the caller's session id is forwarded as `Mcp-Session-Id` so that AgentCore routes the requests of one session to the same microVM.
+For MCP servers deployed on Amazon Bedrock AgentCore Runtime. The caller's JWT is forwarded as-is for authentication and user_id propagation, and the caller's session id is forwarded as `Mcp-Session-Id`, with the owner prefix of the token's user, so that AgentCore routes the requests of one session to the same microVM.
 
 ```python
 def _mcp_agentcore_runtime(jwt_token: str, session_id: str = "") -> MCPClient:

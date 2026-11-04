@@ -13,6 +13,8 @@ from typing import Callable
 from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp import MCPClient
 
+from shared.session_owner import owned_mcp_session_id, sub_from_jwt
+
 logger = logging.getLogger("sdpm.agent")
 
 # MCP server definitions: (display_name, required)
@@ -27,6 +29,7 @@ def mcp_agentcore_runtime(
     jwt_token: str,
     session_id: str = "",
     tool_filters: dict | None = None,
+    meta: dict | None = None,
 ) -> MCPClient:
     """Pattern 1: Amazon Bedrock AgentCore Runtime MCP Server with JWT Bearer authentication.
 
@@ -36,6 +39,9 @@ def mcp_agentcore_runtime(
             routes by that header, so omitting it makes every request land on a
             new microVM — see the note below. Empty string disables the header.
         tool_filters: Optional tool filter dict (e.g. {"allowed": ["tool1", "tool2"]}).
+        meta: Optional ``_meta`` sent with every tool call (the turn's write-fence
+            generation, turn_fence.py). It travels in the JSON-RPC body, which the
+            AgentCore proxy forwards as is; Strands merges trace context into it.
     """
     region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
     runtime_arn = os.environ["MCP_RUNTIME_ARN"]
@@ -57,11 +63,16 @@ def mcp_agentcore_runtime(
         # after is back to 0.18s. No re-initialize fallback is needed. This holds
         # for the stateless server we run (`stateless_http=True` in
         # servers/remote/server.py); stateful MCP is documented to 404 instead.
-        headers["Mcp-Session-Id"] = session_id
+        #
+        # The id always carries the owner prefix of the token's user: an id of an
+        # earlier format gets it prepended (shared/session_owner.py).
+        headers["Mcp-Session-Id"] = owned_mcp_session_id(session_id, sub_from_jwt(jwt_token))
 
     kwargs: dict = {}
     if tool_filters:
         kwargs["tool_filters"] = tool_filters
+    if meta:
+        kwargs["meta"] = meta
 
     return MCPClient(
         lambda: streamablehttp_client(

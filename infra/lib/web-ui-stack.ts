@@ -462,58 +462,36 @@ function handler(event) {
     awsExports.node.addDependency(deployment);
 
     // --- Add Amazon CloudFront URL to Amazon Cognito callback/logout URLs ---
-    // AllowedOAuthScopes always includes the MCP custom scope — AuthStack
-    // always publishes it. The SSM value is a CDK token so we construct
-    // the list inline here (Fn::Sub not needed because the SDK call accepts
-    // tokens directly).
-    const oauthScopes = ["openid", "profile", "email", mcpCustomScope];
-    new cr.AwsCustomResource(this, "UpdateCognitoCallbackUrls", {
-      onCreate: {
-        service: "CognitoIdentityServiceProvider",
-        action: "updateUserPoolClient",
-        parameters: {
-          UserPoolId: userPoolId,
-          ClientId: webClientId,
-          SupportedIdentityProviders: ["COGNITO"],
-          AllowedOAuthFlows: ["code"],
-          AllowedOAuthScopes: oauthScopes,
-          AllowedOAuthFlowsUserPoolClient: true,
-          CallbackURLs: ["http://localhost:3000", this.siteUrl],
-          LogoutURLs: ["http://localhost:3000", this.siteUrl],
-          ExplicitAuthFlows: [
-            "ALLOW_REFRESH_TOKEN_AUTH",
-            "ALLOW_USER_PASSWORD_AUTH",
-            "ALLOW_USER_SRP_AUTH",
-          ],
-        },
-        physicalResourceId: cr.PhysicalResourceId.of("cognito-callback-urls"),
+    // AuthStack owns the WebClient (OAuth flows, scopes including the MCP custom
+    // scope, auth flows). It cannot know the CloudFront URL without a circular
+    // dependency, so this custom resource sets the callback/logout URLs and
+    // nothing else. UpdateUserPoolClient resets every field the call leaves out,
+    // so the handler reads the client first and passes every other field through.
+    const callbackUrlsFn = new lambda.Function(this, "CognitoCallbackUrlsFn", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "..", "lambdas", "cognito-callback-urls")),
+      timeout: cdk.Duration.minutes(1),
+      description: "Sets the Web UI callback/logout URLs on the Cognito WebClient, keeping its other settings",
+      logGroup: new logs.LogGroup(this, "CognitoCallbackUrlsFnLogs", {
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+    callbackUrlsFn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["cognito-idp:DescribeUserPoolClient", "cognito-idp:UpdateUserPoolClient"],
+      resources: [userPoolArn],
+    }));
+    const webUiUrls = ["http://localhost:3000", this.siteUrl];
+    new cdk.CustomResource(this, "UpdateCognitoCallbackUrls", {
+      serviceToken: callbackUrlsFn.functionArn,
+      resourceType: "Custom::CognitoCallbackUrls",
+      properties: {
+        UserPoolId: userPoolId,
+        ClientId: webClientId,
+        CallbackURLs: webUiUrls,
+        LogoutURLs: webUiUrls,
       },
-      onUpdate: {
-        service: "CognitoIdentityServiceProvider",
-        action: "updateUserPoolClient",
-        parameters: {
-          UserPoolId: userPoolId,
-          ClientId: webClientId,
-          SupportedIdentityProviders: ["COGNITO"],
-          AllowedOAuthFlows: ["code"],
-          AllowedOAuthScopes: oauthScopes,
-          AllowedOAuthFlowsUserPoolClient: true,
-          CallbackURLs: ["http://localhost:3000", this.siteUrl],
-          LogoutURLs: ["http://localhost:3000", this.siteUrl],
-          ExplicitAuthFlows: [
-            "ALLOW_REFRESH_TOKEN_AUTH",
-            "ALLOW_USER_PASSWORD_AUTH",
-            "ALLOW_USER_SRP_AUTH",
-          ],
-        },
-        physicalResourceId: cr.PhysicalResourceId.of("cognito-callback-urls"),
-      },
-      policy: cr.AwsCustomResourcePolicy.fromStatements([
-        new iam.PolicyStatement({
-          actions: ["cognito-idp:UpdateUserPoolClient"],
-          resources: [userPoolArn],
-        }),
-      ]),
     });
 
     // --- WAF: CloudFront WebACL (from us-east-1 stack) ---

@@ -19,10 +19,12 @@ import os
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
+import session_guard
 import stop_guard
 from errors import BAD_INPUT, AUTH, error_event
 from factory import create_agent
 from streaming import stream_agent
+from turn_fence import TurnFence
 
 logger = logging.getLogger("sdpm.agent")
 
@@ -79,6 +81,13 @@ async def agent_stream(payload, context):
         yield error_event("Could not extract user_id from JWT sub claim", code=AUTH)
         return
 
+    # Only the session's owner gets in (session_guard.py); before the cancel registry,
+    # so a refused call never touches a running turn.
+    session_id, refusal = await session_guard.admit(session_id, getattr(context, "session_id", None), user_id)
+    if refusal is not None:
+        yield refusal
+        return
+
     # Cancel previous request for the same session
     prev_cancel = _cancel_events.get(session_id)
     if prev_cancel is not None:
@@ -87,8 +96,11 @@ async def agent_stream(payload, context):
 
     cancel = asyncio.Event()
     _cancel_events[session_id] = cancel
-    # The turn's stop event: set on SIGTERM, observed by Strands and the composers.
-    stop = stop_guard.begin_turn()
+    # The turn's write fence: its generation goes with every Presentation Maker call, and
+    # a stopped turn fences its decks so its in-flight calls no longer write (turn_fence.py).
+    fence = TurnFence()
+    # The turn's stop event: set on SIGTERM (which also fences), observed by Strands and the composers.
+    stop = stop_guard.begin_turn(on_stop=fence.advance)
 
     try:
         os.environ["_CURRENT_SESSION_ID"] = session_id
@@ -102,6 +114,7 @@ async def agent_stream(payload, context):
             jwt_token=jwt_token,
             chat_model_id=requested_chat_model_id,
             create_model_id=requested_create_model_id,
+            fence=fence,
         )
 
         yield {"mcp_status": mcp_status}
@@ -114,6 +127,12 @@ async def agent_stream(payload, context):
         yield error_event(e)
     finally:
         stop_guard.end_turn(stop)
+        # Stopped (cancel, a newer request, the client gone, SIGTERM): fence the turn's decks.
+        # hold: a SIGTERM that follows (StopRuntimeSession after a cancel) waits for the call.
+        if stop.is_set():
+            stop_guard.hold(fence.advance())
+        else:
+            fence.release()
         if _cancel_events.get(session_id) is cancel:
             del _cancel_events[session_id]
 

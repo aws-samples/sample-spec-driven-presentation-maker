@@ -26,6 +26,7 @@ INTERNAL = _errors.INTERNAL
 MAX_OUTPUT = _errors.MAX_OUTPUT
 MODEL_NOT_READY = _errors.MODEL_NOT_READY
 SERVICE_UNAVAILABLE = _errors.SERVICE_UNAVAILABLE
+SESSION_RELOAD_REQUIRED = _errors.SESSION_RELOAD_REQUIRED
 THROTTLED = _errors.THROTTLED
 TIMEOUT = _errors.TIMEOUT
 _PATTERNS = _errors._PATTERNS
@@ -66,6 +67,10 @@ class TestErrorEvent:
         ev = error_event("No JWT token", code=AUTH)
         assert ev["code"] == AUTH
 
+    def test_session_reload_required_is_sent_with_its_code(self):
+        ev = error_event("Reload the page", code=SESSION_RELOAD_REQUIRED)
+        assert ev == {"status": "error", "code": "session_reload_required", "error": "Reload the page"}
+
 
 class TestTypeScriptParity:
     """Guard against drift between agent/errors.py and lib/agentErrors.ts."""
@@ -75,6 +80,7 @@ class TestTypeScriptParity:
         py_codes = {
             CONVERSATION_TOO_LONG, THROTTLED, TIMEOUT, MODEL_NOT_READY,
             SERVICE_UNAVAILABLE, AUTH, BAD_INPUT, MAX_OUTPUT, INTERNAL,
+            SESSION_RELOAD_REQUIRED,
         }
         for code in py_codes:
             assert f'"{code}"' in ts, f"code {code!r} missing from agentErrors.ts"
@@ -88,6 +94,7 @@ class TestTypeScriptParity:
         py_codes = {
             CONVERSATION_TOO_LONG, THROTTLED, TIMEOUT, MODEL_NOT_READY,
             SERVICE_UNAVAILABLE, AUTH, BAD_INPUT, MAX_OUTPUT, INTERNAL,
+            SESSION_RELOAD_REQUIRED,
         }
         assert ts_codes == py_codes, (
             f"code sets differ — TS only: {ts_codes - py_codes}, Python only: {py_codes - ts_codes}"
