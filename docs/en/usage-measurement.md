@@ -102,6 +102,10 @@ Notes:
 - Ingested spans are billed per CloudWatch pricing — fine at PoC scale.
 - This is independent from `enableInvocationLogging` (Bedrock model invocation
   logging), which records prompt text and has different privacy implications.
+- The runtime log groups hold conversation text from the Strands tracer (the
+  `otel-rt-logs` stream), kept for `observability.logRetentionDays` (default 30
+  days). The queries on this page read only the structured events and the token
+  attributes, which do not depend on it.
 
 ## Estimating cost
 

@@ -40,8 +40,15 @@ These settings come with every deployment of the CDK stacks in `infra/`:
   these before production.
 - **Secrets**: no credentials in the code. Services get access through IAM roles and
   environment variables.
-- **Logs**: CloudWatch log groups keep logs for one week or one month. Bedrock model
-  invocation logging is optional (`features.enableInvocationLogging`).
+- **Logs**: the CloudWatch log groups the stacks define keep logs for one week or one month.
+  AgentCore creates the runtime log groups (`/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`)
+  itself; the stacks give them the retention set in `observability.logRetentionDays`
+  (default 30 days). These groups hold conversation text: the Strands tracer records
+  messages as span events, and the OpenTelemetry exporter writes them to the
+  `otel-rt-logs` stream of the agent runtime log group. Bedrock request and response
+  bodies from the botocore instrumentation are not recorded
+  (`OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false` on both runtimes). Bedrock
+  model invocation logging is optional (`features.enableInvocationLogging`).
 
 ## Settings that depend on your environment
 

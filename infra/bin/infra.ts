@@ -27,6 +27,7 @@ import { AgentStack } from "../lib/agent-stack";
 import { WebUiStack } from "../lib/web-ui-stack";
 import { CloudFrontWafStack } from "../lib/cloudfront-waf-stack";
 import { MODEL_METADATA } from "../lib/model-metadata";
+import { parseLogRetentionDays } from "../lib/construct/runtime-observability";
 
 // Load deployment configuration
 const configPath = path.join(__dirname, "../config.yaml");
@@ -111,6 +112,9 @@ if (config.features?.observability !== undefined) {
 
 const enableTransactionSearch = config.features?.enableTransactionSearch === true;
 
+// Retention of the AgentCore runtime log groups (created by the service, not by CloudFormation).
+const runtimeLogRetention = parseLogRetentionDays(config.observability?.logRetentionDays);
+
 const data = new DataStack(app, "SdpmData", { env, enableInvocationLogging, enableTransactionSearch, description: "Spec-Driven Presentation Maker - Data (uksb-ynuz0lkrea)(tag:data)" });
 
 const runtime = new RuntimeStack(app, "SdpmRuntime", {
@@ -133,6 +137,7 @@ const runtime = new RuntimeStack(app, "SdpmRuntime", {
   vectorIndexName: data.vectorIndexName || undefined,
   useAuthStack: !!authStack,
   enableDCR: config.auth?.enableDCR !== false,
+  logRetention: runtimeLogRetention,
 });
 // When AuthStack is present, explicitly declare the dependency so that SSM
 // parameters published by AuthStack exist before RuntimeStack reads them.
@@ -243,6 +248,7 @@ if (config.stacks?.agent) {
     chatModelId: defaultChatModelId,
     createModelId: defaultCreateModelId,
     allowedModelIds,
+    logRetention: runtimeLogRetention,
   });
   // AgentStack reads the WebClient ID from SSM in AuthStack mode.
   // Ensure AuthStack deploys first.

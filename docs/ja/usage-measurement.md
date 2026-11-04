@@ -102,6 +102,10 @@ filter attributes.gen_ai.operation.name = "chat" and attributes.user.id != ""
 - 取り込まれたスパンは CloudWatch の料金体系で課金されます（PoC 規模なら軽微）。
 - `enableInvocationLogging`（Bedrock モデル呼び出しログ）とは独立した設定です。
   invocation logging はプロンプト本文を記録するためプライバシー特性が異なります。
+- ランタイムのロググループには Strands トレーサーが記録した会話本文が入ります
+  （`otel-rt-logs` ストリーム）。保持期間は `observability.logRetentionDays`
+  （既定 30 日）です。このページのクエリは構造化イベントとトークン属性だけを
+  読むため、本文の有無には影響されません。
 
 ## コストの概算
 
