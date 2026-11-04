@@ -40,6 +40,14 @@ Entries before v0.5.0 were written retroactively as summaries.
   writes are fenced (`fence_turn`) from that moment. `/invocations` follows a turn that
   dispatched a compose until the session goes idle and gets `taskEnd` as the compose's
   `toolResult`.
+- **Message a running composer (agent, Cloud).** While a compose runs, the orchestrator can
+  send a composer a message with `message_composer(group, text)`; the composer reads it at
+  its next step and applies it to the slides it writes. A composer tells the orchestrator
+  something with `report_to_orchestrator(text)` (`agent/compose_messaging.py`): the session
+  publishes `composerNote {toolUseId, group, slugs, text}` and delivers the note to the
+  orchestrator as a `<composer_note>` text, in the running turn or in a turn of its own
+  (`turn {why: "report"}`). When the direction changes while composers run, the orchestrator
+  corrects the running work this way instead of cancelling and redoing it.
 - **Send any time, stop, and come back to a running session (Web UI, Cloud).** The Web UI
   talks to its session over the agent's `/ws` WebSocket (one connection per work period,
   closed when the session goes idle; a 30-second ping only while it works). The send button
