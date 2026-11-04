@@ -70,6 +70,7 @@ const HISTORY = [
 type ResumeHandlers = {
   onResumeAck: (ack: { working: boolean }) => void
   onStreamUpdate: (text: string) => void
+  onToolUse: (name: string, data: Record<string, unknown>) => void
   onSession: { onEvent: (ev: Record<string, unknown>, info: { own: boolean }) => void }
 }
 
@@ -148,6 +149,54 @@ describe("ChatPanel resume (Cloud)", () => {
     fireEvent.click(stop)
     expect(cancelAgentCore).toHaveBeenCalledWith(SESSION, "at")
     await act(async () => { live.finish!() })
+  })
+
+  it("rebuilds a background compose after a reload and follows it to its result", async () => {
+    const BACKGROUND = "Composers are working in the background. You can keep chatting."
+    const input = { slide_groups: [{ slugs: ["intro"], instruction: "a" }, { slugs: ["body"], instruction: "b" }] }
+    const stream = (data: Record<string, unknown>) => ({ toolUseId: "c1", name: "compose_slides", stream: true, data })
+    storeState(SESSION, "working")
+    const live: { handlers?: ResumeHandlers; finish?: () => void } = {}
+    resumeAgentCore.mockImplementationOnce((_sid: string, _tok: string, _from: number, h: ResumeHandlers) => {
+      live.handlers = h
+      h.onResumeAck({ working: true })
+      h.onSession.onEvent({ work: { state: "busy" } }, { own: false })
+      h.onSession.onEvent({ turn: { id: "p1", why: "prompt", text: "make it" } }, { own: false })
+      h.onStreamUpdate("Composing.")
+      h.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", input: {}, started: true })
+      h.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", input })
+      h.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", taskStarted: true, task: { id: "t", state: "running" } })
+      h.onSession.onEvent({ turnEnd: { id: "p1", how: "finished" } }, { own: false })
+      h.onToolUse("compose_slides", stream({ status: "starting", group: 1, total_groups: 2, slugs: "intro" }))
+      h.onToolUse("compose_slides", stream({ status: "starting", group: 2, total_groups: 2, slugs: "body" }))
+      return new Promise((resolve) => { live.finish = () => resolve({ working: true, completion: "" }) })
+    })
+    renderWithIntl(<ChatPanel deckId="d1" />)
+    await waitFor(() => expect(screen.getByText("2 slides in production")).toBeTruthy())
+    expect(screen.queryByText("stale partial")).toBeNull()
+    expect(screen.getByText(BACKGROUND)).toBeTruthy()
+
+    const h = live.handlers!
+    act(() => h.onToolUse("compose_slides", stream({ status: "done", group: 1, slugs: "intro" })))
+    expect(screen.getByText("1 / 2 created")).toBeTruthy()
+
+    act(() => {
+      h.onToolUse("compose_slides", stream({ status: "done", group: 2, slugs: "body" }))
+      h.onToolUse("compose_slides", {
+        toolUseId: "c1", name: "compose_slides", completed: true, status: "success",
+        result: { status: "success" }, task: { id: "t", state: "completed" },
+      })
+      h.onSession.onEvent({ turn: { id: "w1", why: "wake", text: "" } }, { own: false })
+      h.onStreamUpdate("Composing.\n\nAll slides are ready.")
+    })
+    expect(screen.getByText("Composed 2 slides")).toBeTruthy()
+    expect(screen.queryByText(BACKGROUND)).toBeNull()
+    expect(screen.getByText("All slides are ready.")).toBeTruthy()
+
+    act(() => h.onSession.onEvent({ work: { state: "idle", how: "finished" } }, { own: false }))
+    await act(async () => { live.finish!() })
+    expect(screen.getByText("Composed 2 slides")).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Stop generation" })).toBeNull()
   })
 })
 

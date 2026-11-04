@@ -54,4 +54,31 @@ describe("parseEvent", () => {
     const ev = { event: { contentBlockDelta: { delta: { text: "x" } } } }
     expect(parseStreamingChunk(`data: ${JSON.stringify(ev)}`, "", vi.fn())).toBe(parseEvent(ev, "", vi.fn()))
   })
+
+  it("passes a background dispatch as a running task", () => {
+    const tool = vi.fn()
+    parseEvent({ taskStart: { toolUseId: "c1", name: "compose_slides", taskId: "t-1" } }, "", vi.fn(), tool)
+    expect(tool).toHaveBeenCalledWith("compose_slides", {
+      toolUseId: "c1", name: "compose_slides", taskStarted: true, task: { id: "t-1", state: "running" },
+    })
+  })
+
+  it.each([
+    ["completed", "completed", JSON.stringify({ status: "success", slides: 4 }), "success", "completed"],
+    ["failed", "failed", "boom", "error", "failed"],
+    ["cancelled by the task manager", "cancelled", "", undefined, "cancelled"],
+    ["a compose that stopped itself", "completed", JSON.stringify({ status: "cancelled" }), undefined, "cancelled"],
+  ])("closes a background task: %s", (_name, status, content, cardStatus, state) => {
+    const tool = vi.fn()
+    parseEvent({ taskEnd: { toolUseId: "c1", name: "compose_slides", taskId: "t-1", status, content } }, "", vi.fn(), tool)
+    const data = tool.mock.calls[0][1]
+    expect(data).toMatchObject({ toolUseId: "c1", completed: true, rawResult: content, task: { id: "t-1", state } })
+    expect(data.status).toBe(cardStatus)
+  })
+
+  it("leaves the completion unchanged for a composer note", () => {
+    const tool = vi.fn()
+    expect(parseEvent({ composerNote: { toolUseId: "c1", group: 1, slugs: "a", text: "done" } }, "t", vi.fn(), tool)).toBe("t")
+    expect(tool).not.toHaveBeenCalled()
+  })
 })

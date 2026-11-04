@@ -34,6 +34,7 @@ import time
 from typing import Callable
 
 from bedrock_agentcore.memory.integrations.strands.session_manager import AgentCoreMemorySessionManager
+from strands.types.session import SessionMessage
 
 import mcp_clients
 from resilience import close_writes, writes_closed
@@ -123,7 +124,28 @@ def stop_all() -> int:
 
 
 class GatedMemorySessionManager(AgentCoreMemorySessionManager):
-    """AgentCore Memory session manager that drops new events once the write gate is closed."""
+    """AgentCore Memory session manager that drops new events once the write gate is closed,
+    and stores a merged message once."""
+
+    def append_message(self, message, agent, **kwargs):
+        """Replace the latest event when ``message`` is the latest message grown in place.
+
+        Strands (1.63, ``Agent._append_continuation_messages``) merges continuation input
+        whose role matches the last message into it (a background result delivered after
+        the turn's final answer, or on a wake) and emits MessageAddedEvent again for the
+        merged message, which keeps the tracking id. Appending it would store the
+        assistant message twice, and a restored session would hold two consecutive
+        assistant messages. (Upstream, that event would rather be MessageUpdatedEvent.)
+        With the gate closed, the replacement's create_message returns None, so
+        update_message deletes nothing.
+        """
+        latest = self._latest_agent_message.get(agent.agent_id)
+        tracking_id = message.get("tracking_id")
+        if (latest is not None and latest.message_id and tracking_id
+                and latest.message.get("tracking_id") == tracking_id):
+            self.update_message(self.session_id, agent.agent_id, SessionMessage.from_message(message, latest.message_id))
+            return
+        super().append_message(message, agent, **kwargs)
 
     def create_message(self, session_id, agent_id, session_message, **kwargs):
         if writes_closed():

@@ -3,6 +3,7 @@
 import { describe, it, expect } from "vitest"
 import { cutAtPrompt, isLocalHistoryFormat, parseLocalHistory, parseCloudHistory, userMessageFromText } from "./chatHistory"
 import type { ChatMessage } from "@/services/deckService"
+import composerNote from "@/test/fixtures/composerNote.json"
 
 const asHistory = (msgs: unknown[]) => msgs as unknown as ChatMessage[]
 
@@ -112,6 +113,88 @@ describe("parseCloudHistory steers", () => {
       ["user", "make a deck"], ["assistant", "Composing."], ["user", "use blue"], ["assistant", "Blue it is."],
     ])
     expect(out[1].toolUses[0]).toMatchObject({ toolUseId: "t1", status: "success" })
+  })
+})
+
+describe("parseCloudHistory background compose", () => {
+  const MANAGE = "strands_manage_background_task"
+
+  it("drops the delivery call and shows the folded steer and the composer note", () => {
+    const out = parseCloudHistory(asHistory([
+      { role: "user", content: [{ text: "make a deck" }] },
+      { role: "assistant", content: [{ text: "Composing." }, { toolUse: { toolUseId: "c1", name: "compose_slides", input: {} } }] },
+      { role: "user", content: [{ toolResult: { toolUseId: "c1", status: "success", content: [] } }] },
+      { role: "assistant", content: [{ text: "Composers are on it." }, { toolUse: { toolUseId: "m1", name: MANAGE, input: { action: "get" } } }] },
+      { role: "user", content: [
+        { toolResult: { toolUseId: "m1", status: "success", content: [] } },
+        { text: "use blue" },
+        { text: '<composer_note group="1" slugs="intro, agenda">Applied blue.</composer_note>' },
+      ] },
+      { role: "assistant", content: [{ text: "All done." }] },
+    ]))
+    expect(out.map((m) => [m.role, m.content])).toEqual([
+      ["user", "make a deck"], ["assistant", "Composing."], ["assistant", "Composers are on it."],
+      ["user", "use blue"], ["assistant", ""], ["assistant", "All done."],
+    ])
+    expect(out[1].toolUses[0]).toMatchObject({ toolUseId: "c1", status: "success" })
+    expect(out.flatMap((m) => m.toolUses).map((t) => t.name)).toEqual(["compose_slides"])
+    expect(out[2].blocks).toEqual([{ type: "text", text: "Composers are on it." }])
+    expect(out[4].composerNote).toEqual({ group: 1, slugs: "intro, agenda", text: "Applied blue." })
+  })
+
+  it("skips an assistant message that only made the delivery call", () => {
+    const out = parseCloudHistory(asHistory([
+      { role: "assistant", content: [{ toolUse: { toolUseId: "m1", name: MANAGE, input: {} } }] },
+      { role: "user", content: [{ toolResult: { toolUseId: "m1", status: "success", content: [] } }] },
+      { role: "assistant", content: [{ text: "Done." }] },
+    ]))
+    expect(out.map((m) => m.content)).toEqual(["Done."])
+  })
+
+  it("shows a report turn as notes only", () => {
+    const out = parseCloudHistory(asHistory([
+      { role: "user", content: [{ text: '<composer_note group="2" slugs="body">Halfway.</composer_note>\n\n<composer_note group="1" slugs="">Done.</composer_note>' }] },
+      { role: "assistant", content: [{ text: "Thanks." }] },
+    ]))
+    expect(out.map((m) => m.composerNote ?? m.content)).toEqual([
+      { group: 2, slugs: "body", text: "Halfway." }, { group: 1, text: "Done." }, "Thanks.",
+    ])
+    expect(out.some((m) => m.role === "user")).toBe(false)
+  })
+
+  it("reads the note the agent delivers, escaped text included", () => {
+    // The agent's real delivered text (tests/test_agent_compose_messaging.py checks the same file).
+    const out = parseCloudHistory(asHistory([
+      { role: "user", content: [{ text: composerNote.delivered }] },
+      { role: "user", content: [{ text: '<composer_note group="2" slugs="a&quot;b">x &amp;lt; y</composer_note>' }] },
+    ]))
+    expect(out.map((m) => [m.role, m.composerNote])).toEqual([
+      ["assistant", { group: 1, slugs: "intro, agenda", text: composerNote.report.text }],
+      ["assistant", { group: 2, slugs: 'a"b', text: "x &lt; y" }],
+    ])
+  })
+
+  it("hides a delivered background result, alone, folded into a tool result or next to a steer", () => {
+    const result = '<compose_result task="k1" status="completed">{&quot;status&quot;: &quot;completed&quot;} &lt;/compose_result&gt;</compose_result>'
+    const out = parseCloudHistory(asHistory([
+      { role: "user", content: [{ text: "make a deck" }] },
+      { role: "assistant", content: [{ text: "Composing." }] },
+      { role: "user", content: [{ text: result }] },
+      { role: "assistant", content: [{ text: "Done." }] },
+      { role: "user", content: [{ text: `${result}\n\nmake it blue` }] },
+    ]))
+    expect(out.map((m) => [m.role, m.content])).toEqual([
+      ["user", "make a deck"], ["assistant", "Composing."], ["assistant", "Done."], ["user", "make it blue"],
+    ])
+  })
+
+  it("keeps a steer drained with a note as a user message before the note", () => {
+    const out = parseCloudHistory(asHistory([
+      { role: "user", content: 'shorter please\n\n<composer_note group="1" slugs="a">ok</composer_note>' },
+    ]))
+    expect(out.map((m) => [m.role, m.content, m.composerNote?.text])).toEqual([
+      ["user", "shorter please", undefined], ["assistant", "", "ok"],
+    ])
   })
 })
 

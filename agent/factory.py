@@ -15,6 +15,8 @@ from strands import Agent
 from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent, BeforeToolCallEvent
 from strands.models import BedrockModel
 
+import background
+from compose_messaging import make_message_composer
 from cost_logger import log_usage
 from mcp_clients import (
     MCP_DEFS,
@@ -292,6 +294,12 @@ def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mc
     Its hooks act on the handle's current turn (write fence, LoopGuard), so the Agent
     serves every turn of the session until the mode or a model changes.
 
+    With composers, compose_slides runs as a background task (background.py): the
+    Agent's callback handler forwards the task's progress to the handle, and the handle
+    records the decks the tasks work on and the results Strands delivers. The orchestrator
+    also gets message_composer, and each composer report_to_orchestrator, both through the
+    handle's ComposeMessaging.
+
     Returns:
         (Agent, the MCP clients it uses, MCP status list)
     """
@@ -318,7 +326,8 @@ def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mc
         if cfg.use_composer:
             # The list itself goes to compose_slides, so a resident client that connects
             # later in the session (add_clients) reaches the composers too.
-            tools.append(make_compose_slides(servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create, user_id=user_id, session_id=session_id))
+            tools.append(make_compose_slides(servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create, user_id=user_id, session_id=session_id, messaging=handle.compose_messaging))
+            tools.append(make_message_composer(handle.compose_messaging))
         return tools
 
     agent_name = f"Sdpm{mode.capitalize()}Agent"
@@ -327,6 +336,12 @@ def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mc
         "model.id": resolved_agent, "purpose": cfg.agent_model,
     }
 
+    # Only with composers: other modes keep Strands' default callback handler.
+    background_kwargs = (
+        {"background_tasks": background.CONFIG, "callback_handler": handle.on_agent_callback}
+        if cfg.use_composer else {}
+    )
+
     def build(servers: list) -> Agent:
         return Agent(
             name=agent_name, system_prompt="", tools=tools_for(servers), model=model,
@@ -334,6 +349,7 @@ def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mc
             trace_attributes=agent_trace_attributes,
             hooks=[LiftToolResultImages()],
             plugins=[handle.steer_plugin()],
+            **background_kwargs,
         )
 
     mcp_servers = list(mcp_servers)
@@ -361,6 +377,14 @@ def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mc
 
     # Write fence: the decks the current turn touches (turn_fence.py)
     agent.hooks.add_callback(BeforeToolCallEvent, handle.note_tool_call)
+
+    if cfg.use_composer:
+        # Background compose: the model neither sees nor calls the management tool, the
+        # results reach the history as <compose_result> text, and the handle learns each
+        # task's deck and each delivered result.
+        background.hide_manage_tool(agent)
+        background.deliver_as_text(agent, handle.note_delivered)
+        agent.hooks.add_callback(BeforeToolCallEvent, handle.note_task_dispatch)
 
     # Cost logger
     agent.hooks.add_callback(AfterInvocationEvent, log_usage)

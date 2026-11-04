@@ -19,14 +19,43 @@ Entries before v0.5.0 were written retroactively as summaries.
   session manager is created at the first prompt. The agent serves `/ws`
   (`agent/ws_entry.py`): `prompt`, `steer`, `cancel`, `resume(from_seq)`, `prepare` and
   `ping`, with every event numbered in a per-session ring so a client that reconnects gets
-  what it missed. A session is *working* while a turn runs or a follow-on turn is queued; the
-  work period holds HealthyBusy on `/ping` and is bounded by a 60-minute watchdog. A message
+  what it missed. A session is *working* while a turn runs, a follow-on turn is queued or a
+  background compose has not been delivered; the work period holds HealthyBusy on `/ping`
+  and is bounded by a 60-minute watchdog. A message
   sent while the session works is a steer: it reaches the running turn at its next step and
   is stored in Memory there, as the user's words (`agent/steer_inbox.py`); a steer that
   arrives as the turn ends runs as the next turn in the same mode and models. A disconnect never
   cancels; only the stop button (`cancel`), the watchdog and SIGTERM stop a turn. `prepare`
-  builds the session early without writing to Memory. Known limitation: while a synchronous
-  `compose_slides` runs, a steer reaches the orchestrator only after it returns.
+  builds the session early without writing to Memory.
+- **Compose runs in the background (agent, Cloud).** `compose_slides` runs as a Strands
+  background task of the orchestrator (`agent/background.py`): the orchestrator's turn goes
+  on, or ends, while the composers work, and the session keeps working until the report is
+  delivered. After a dispatch the orchestrator tells the user what is being composed and ends
+  its turn; it looks at the slides (`get_preview`) once the report arrives. When the compose
+  settles with no turn running, the session starts a turn with no
+  input (`turn {why: "wake"}`). The report reaches the orchestrator's history as a user text
+  `<compose_result task="…" status="…">report</compose_result>` (escaped); Strands' own
+  delivery, a synthetic call of its task management tool, is rewritten before it is stored,
+  so neither the model nor Memory sees that tool. A message sent while only the compose runs starts a turn at once. New events:
+  `taskStart {toolUseId, taskId, name}` (replaces the dispatch's `toolResult`), `taskEnd
+  {toolUseId, taskId, name, status, content}`, and `toolStream` progress between turns. A stop
+  (the stop button, the watchdog, SIGTERM) sets the work period's stop event first, which the
+  composers see, then cancels the background task; with no turn running, the decks the task
+  writes are fenced (`fence_turn`) from that moment. `/invocations` follows a turn that
+  dispatched a compose until the session goes idle and gets `taskEnd` as the compose's
+  `toolResult`.
+- **Message a running composer (agent, Cloud).** While a compose runs, the orchestrator can
+  send a composer a message with `message_composer(group, text)`; the composer reads it at
+  its next step and applies it to the slides it writes. A composer tells the orchestrator
+  something with `report_to_orchestrator(text)` (`agent/compose_messaging.py`), to answer a
+  message or to raise a decision (progress and completion stay in its summary): the session
+  publishes `composerNote {toolUseId, group, slugs, text}` (`slugs` as one comma-separated
+  label) and delivers the note to the orchestrator as an escaped `<composer_note>` text, in
+  the running turn or in a turn of its own (`turn {why: "report"}`). A message sent after
+  a composer's last step makes it run once more with that message; `message_composer` to a
+  composer that is not running returns an error result. When the direction changes while
+  composers run, the orchestrator corrects the running work this way instead of cancelling
+  and redoing it.
 - **Send any time, stop, and come back to a running session (Web UI, Cloud).** The Web UI
   talks to its session over the agent's `/ws` WebSocket (one connection per work period,
   closed when the session goes idle; a 30-second ping only while it works). The send button
@@ -43,6 +72,17 @@ Entries before v0.5.0 were written retroactively as summaries.
   `prepare` once per page, when it is first shown (not on every page load), so the first
   prompt finds the session built. Local mode is
   unchanged.
+- **Background compose in the chat (Web UI, Cloud).** The compose card stays live while the
+  composers work in the background, across later messages and turns, and closes when the
+  result arrives (`taskEnd`); a stopped compose shows as stopped. While a compose runs and no
+  turn does, the chat says the composers are working in the background and that you can keep
+  chatting. A message sent
+  while the agent works is marked as sent, then as read by the agent once it reaches it.
+  Messages between the orchestrator and a composer (`message_composer`, `composerNote`) show
+  as composer notes, not as user messages, live and in the reloaded history; a message that
+  did not reach a composer is marked as not delivered. The reloaded
+  history hides the call that delivered the background result. Reloading the page during a
+  background compose brings back the card with live progress. Local mode is unchanged.
 
 - **Sign-up settings for the default Cognito user pool.** `auth.selfSignUp` in
   `infra/config.yaml` turns self sign-up on, and `auth.allowedEmailDomains` limits it to the
@@ -87,6 +127,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **`compose_slides` returns at once in the Cloud agent.** Its result is a dispatch notice;
+  the report arrives later on its own (see "Compose runs in the background"). The Strands
+  tool that manages background tasks (`strands_manage_background_task`) is hidden from the
+  orchestrator model and a call to it by name is refused: the report is delivered without
+  polling, and a compose is stopped only by a stop of the session's work. While a background
+  task is open the session keeps its Agent even if a turn asks for another mode or model.
+  A message sent while a stop finishes now runs in a new work period.
 - **`/invocations` runs on the session runtime.** HTTP clients (Local, external ones) see the
   same events and the same behaviour as before for the turns they start: a newer HTTP prompt
   takes over the running HTTP turn and a client that goes away cancels its own turn. An HTTP
@@ -277,6 +324,11 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **A message that grows in place is stored once in Memory.** Strands merges continuation
+  input into the latest message when the roles match (a background result folded into a tool
+  result mid-turn) and announces it again; the Memory session manager now replaces that
+  message's event instead of adding a second one, so a restored session no longer holds the
+  message twice.
 - **Decks with speaker notes built on a template without a notes master now open in
   Keynote and Quick Look.** python-pptx created the notes master but did not declare it
   in `presentation.xml` (`<p:notesMasterIdLst>`), so Keynote rejected the file as invalid

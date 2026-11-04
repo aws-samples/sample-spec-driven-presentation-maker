@@ -53,9 +53,10 @@ class _Model(Model):
         yield {"messageStop": {"stopReason": "end_turn"}}
 
 
-def _agent(tmp_path, model, inbox, stopped=lambda: False, tools=(), delivered=None):
+def _agent(tmp_path, model, inbox, stopped=lambda: False, tools=(), delivered=None, prefix=""):
     steer = load("steer_inbox")
-    plugin = steer.SteerInbox(inbox, stopped, (lambda items, how: delivered.append((items, how))) if delivered is not None else None)
+    plugin = steer.SteerInbox(inbox, stopped, (lambda items, how: delivered.append((items, how))) if delivered is not None else None,
+                              prefix=prefix)
     manager = FileSessionManager(session_id="s1", storage_dir=str(tmp_path))
     return Agent(model=model, tools=list(tools), session_manager=manager, plugins=[plugin], callback_handler=None)
 
@@ -118,6 +119,34 @@ def test_a_steer_during_the_final_response_resumes_the_invocation(tmp_path):
     assert str(result).strip() == "Adding a summary slide."
     assert delivered == [([("m2", "also add a summary")], "resume")]
     assert _shape(_restored(tmp_path)) == _shape(agent.messages)
+
+
+def test_a_prefix_goes_before_each_folded_and_resumed_text(tmp_path):
+    inbox = load("steer_inbox").Inbox()
+    prefix = "From the orchestrator: "
+
+    @tool
+    def build() -> str:
+        """Build the deck."""
+        inbox.put("m1", "make it blue")
+        return "built"
+
+    model = _Model(
+        [("tool", "build"), ("text", "Blue."), ("text", "Summary added.")],
+        during={1: lambda: inbox.put("m2", "add a summary")},
+    )
+    agent = _agent(tmp_path, model, inbox, tools=[build], prefix=prefix)
+
+    agent("Make a deck.")
+
+    assert _shape(agent.messages) == [
+        ("user", ["text:Make a deck."]),
+        ("assistant", ["toolUse"]),
+        ("user", ["toolResult", "text:From the orchestrator: make it blue"]),
+        ("assistant", ["text:Blue."]),
+        ("user", ["text:From the orchestrator: add a summary"]),
+        ("assistant", ["text:Summary added."]),
+    ]
 
 
 def test_several_steers_keep_their_order(tmp_path):

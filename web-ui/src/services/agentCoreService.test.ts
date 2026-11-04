@@ -107,6 +107,33 @@ describe("invokeAgentCore (Cloud)", () => {
     await expect(done).rejects.toThrow()
   })
 
+  it("routes a composer note to the session handler and task events to the parser", async () => {
+    const onToolUse = vi.fn()
+    const onSession = { onEvent: vi.fn() }
+    const sessionId = sid()
+    const done = invokeAgentCore("hi", sessionId, vi.fn(), "tok", "u1", onToolUse, undefined, "spec",
+      undefined, undefined, undefined, onSession)
+    const ws = FakeWebSocket.last()
+    ws.open()
+    const prompt = ws.ofType("prompt")[0]
+    ws.receive({ ctl: "accepted", id: prompt.id, as: "turn", head: 2 })
+    const note = { composerNote: { toolUseId: "c1", group: 1, slugs: "a", text: "done" } }
+    ws.receive({ batch: [
+      busy(1), { seq: 2, ev: { turn: { id: prompt.id, why: "prompt", text: "hi" } } },
+      { seq: 3, ev: { taskStart: { toolUseId: "c1", name: "compose_slides", taskId: "t" } } },
+      { seq: 4, ev: { turnEnd: { id: prompt.id, how: "finished" } } },
+      { seq: 5, ev: note },
+    ] })
+    expect(onSession.onEvent).toHaveBeenCalledWith(note, { own: false })
+    expect(onToolUse).toHaveBeenCalledWith("compose_slides", expect.objectContaining({ taskStarted: true }))
+    let settled = false
+    void done.then(() => { settled = true })
+    await vi.advanceTimersByTimeAsync(0)
+    expect(settled).toBe(false)
+    ws.receive(idle(6))
+    await expect(done).resolves.toBe("")
+  })
+
   it("keeps following when a steer that raced the end of the work starts a new turn", async () => {
     const sessionId = sid()
     const { done, ws } = startInvoke(sessionId)

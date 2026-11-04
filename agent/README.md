@@ -46,7 +46,7 @@ Each session's agent is assembled by `factory.py` for its session handle, which:
   `cancel`, `resume(from_seq)`, `prepare`, `ping`. The server answers with control frames
   (`accepted`, `cancelAck`, `resumeAck`, `prepareAck`, `ready`, `pong`, `keepalive`, `error`)
   and the session's events as `{"seq", "ev"}`, where `ev` has the shapes of the HTTP stream
-  plus `work` (busy / idle), `turn`, `turnEnd` and `steer`. Frames stay under 24,000 bytes
+  plus `work` (busy / idle), `turn`, `turnEnd`, `steer`, `taskStart`, `taskEnd` and `composerNote`. Frames stay under 24,000 bytes
   (`{"batch": [...]}`, or `{"chunk", ...}` for a large event) and go out at most one per
   20 ms. The client speaks first; the session is admitted from the forwarded
   `Authorization` header on the first message and its owner checked on every message.
@@ -63,7 +63,19 @@ the session's ring (`event_ring.py`), so a client that reconnects asks for what 
 
 What stops a turn: the stop button (`cancel`, which first discards the steers not yet
 delivered), the 60-minute watchdog of a work period, and SIGTERM. A disconnect never does.
-While a synchronous `compose_slides` runs, a steer reaches the orchestrator after it returns.
+
+`compose_slides` runs as a Strands background task of the orchestrator (`background.py`):
+the call returns a dispatch notice (`taskStart`) and the turn goes on or ends while the
+composers work. The session stays working until the report is delivered: its progress keeps
+coming as `toolStream`, the settled task is published as `taskEnd`, and when no turn runs the
+session starts one with no input (`turn {why: "wake"}`), in which Strands hands the report to
+the orchestrator before its model call, as a user text `<compose_result task status>` (the
+management tool's synthetic call is rewritten before it reaches the history). A steer sent meanwhile starts a turn at once. A stop
+sets the work period's stop event (the composers' too) before it cancels the task, and with no
+turn running it fences the decks the task writes. While the composers work, the orchestrator
+reaches one with `message_composer` and a composer answers with `report_to_orchestrator`
+(`compose_messaging.py`), which the session publishes as `composerNote` and delivers like a
+steer, as a `<composer_note>` text (a `turn {why: "report"}` when no turn runs).
 
 ---
 

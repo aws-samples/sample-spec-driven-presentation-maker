@@ -102,6 +102,23 @@ describe("ToolCard", () => {
     expect(container.querySelector(".ledger-marker")).toBeNull()
   })
 
+  it("dispatches message_composer to a composer note", () => {
+    const { container, getByRole } = renderWithIntl(
+      <ToolCard name="message_composer" input={{ group: 2, text: "Use blue." }} isActive />
+    )
+    expect(container.querySelector(".ledger-marker")).toBeNull()
+    expect(getByRole("note").textContent).toContain("To composer 2")
+    expect(getByRole("note").textContent).toContain("Use blue.")
+    expect(getByRole("note").textContent).not.toContain("Not delivered")
+  })
+
+  it("marks a message_composer that did not reach a composer", () => {
+    const { container } = renderWithIntl(
+      <ToolCard name="message_composer" input={{ group: 2, text: "Use blue." }} status="error" />
+    )
+    expect(container.querySelector("[role='note']")?.textContent).toContain("Not delivered")
+  })
+
   it("does not set aria-live on active (not yet complete)", () => {
     const { container } = renderWithIntl(
       <ToolCard name="get_deck" input={{ deck_id: "x" }} isActive />
@@ -127,6 +144,11 @@ describe("ToolCardCompact", () => {
     )
     const el = container.querySelector(".ledger-compact")
     expect(el!.textContent).toContain("file.md")
+  })
+
+  it("labels message_composer in English and Japanese", () => {
+    expect(renderWithIntl(<ToolCardCompact name="message_composer" />).container.textContent).toContain("Messaging a composer")
+    expect(renderWithIntl(<ToolCardCompact name="message_composer" />, { locale: "ja" }).container.textContent).toContain("コンポーザーに連絡")
   })
 
   it("renders small muted dot marker with agent color", () => {

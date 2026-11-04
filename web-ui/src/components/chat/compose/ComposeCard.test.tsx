@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest"
 import { cleanup, fireEvent, screen, within } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { ComposeCard } from "./ComposeCard"
+import { ChatMessage } from "../ChatMessage"
 import { parseComposeState } from "./parseComposeState"
 import { activityCategory } from "./activityLabel"
 
@@ -184,6 +185,29 @@ describe("ComposeCard production board", () => {
     )
     const live = container.querySelector(".sr-only[aria-live='polite']") as HTMLElement
     expect(live.textContent).toContain("1 of 2 slides created")
+  })
+})
+
+describe("background compose card in a chat message", () => {
+  const tool = {
+    toolUseId: "c1", name: "compose_slides", input: twoGroups, streamMessages: twoStarted,
+    task: { id: "t-1", state: "running" as const },
+  }
+  const message = (props: { sessionWorking: boolean; isStreaming?: boolean }) => (
+    <ChatMessage role="assistant" content="Composing." toolUses={[tool]}
+      blocks={[{ type: "text", text: "Composing." }, { type: "tool", tool }]} {...props} />
+  )
+
+  it("is active while the session works, even when its message no longer streams", () => {
+    renderWithIntl(message({ sessionWorking: true }))
+    expect(screen.getByText("2 slides in production")).toBeTruthy()
+    expect(screen.queryByText("Stopped")).toBeNull()
+  })
+
+  it("shows stopped when the session went idle without a task end", () => {
+    renderWithIntl(message({ sessionWorking: false }))
+    expect(screen.getAllByText("Stopped").length).toBeGreaterThan(0)
+    expect(screen.queryByText("2 slides in production")).toBeNull()
   })
 })
 

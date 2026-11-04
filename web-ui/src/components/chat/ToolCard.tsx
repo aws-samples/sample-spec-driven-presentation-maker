@@ -34,11 +34,12 @@ import {
   BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench,
   Check, FileText, Download, Code, Palette,
-  LayoutTemplate, Package, AlertCircle, RefreshCw,
+  LayoutTemplate, Package, AlertCircle, RefreshCw, MessageSquare,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { ComposeCard } from "./compose/ComposeCard"
+import { ComposerNoteCard } from "./ComposerNoteCard"
 import { useDeckFormat } from "./DeckFormatContext"
 import { CAT, type ToolCategory } from "./toolPalette"
 import { basename } from "@/lib/local/pathUtils"
@@ -118,6 +119,7 @@ export const TOOL_META: Record<string, ToolMeta> = {
   spec_driven_presentation_maker_grid:               { Icon: LayoutTemplate, label: "Computing layout",      category: "compute" },
   // Agent tools
   compose_slides:     { Icon: Package,         label: "Composing slides",       category: "produce" },
+  message_composer:   { Icon: MessageSquare,   label: "Messaging a composer",   category: "other" },
 }
 
 /**
@@ -201,6 +203,17 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
         status={status}
         isActive={isActive}
         streamMessages={streamMessages}
+      />
+    )
+  }
+  // A message to a running composer reads as a message, not a tool row.
+  if (name === "message_composer" || name.endsWith("_message_composer")) {
+    return (
+      <ComposerNoteCard
+        direction="to"
+        group={Number(input?.group) || 0}
+        text={typeof input?.text === "string" ? input.text : ""}
+        failed={status === "error"}
       />
     )
   }

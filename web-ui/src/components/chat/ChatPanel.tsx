@@ -23,6 +23,7 @@ import { useChatStream, type Message, type ToolUseCallbackData } from "@/hooks/u
 import { useSlashPickerItems } from "@/hooks/useSlashPickerItems"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage, ToolUse } from "./ChatMessage"
+import { ComposerNoteCard } from "./ComposerNoteCard"
 import { McpStatusBar } from "./McpStatusBar"
 import { FileDropZone } from "./FileDropZone"
 import { useIsMobile } from "@/hooks/UseMobile"
@@ -734,6 +735,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                     <McpStatusBar servers={msg.mcpStatus} />
                   </div>
                 )}
+                {msg.composerNote ? (
+                  <div className="ml-8.5">
+                    <ComposerNoteCard direction="from" {...msg.composerNote} />
+                  </div>
+                ) : (
                 <ChatMessage
                   role={msg.role}
                   content={msg.content}
@@ -741,14 +747,20 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   blocks={msg.blocks}
                   snippets={msg.snippets}
                   attachments={msg.attachments}
-                  isStreaming={stream.isLoading && i === stream.messages.length - 1}
+                  isStreaming={(IS_LOCAL ? stream.isLoading : stream.turnActive) && i === stream.messages.length - 1}
+                  sessionWorking={!IS_LOCAL && stream.isLoading}
                   idToken={auth.user?.id_token}
                   onSend={(text: string) => handleSend(text, [], [], [])}
                   hearingDisabled={i < lastUserIdx}
                   deckId={deckId}
                 />
-                {msg.steerNotDelivered && (
+                )}
+                {msg.steerNotDelivered ? (
                   <p className="mt-1 text-right text-xs text-foreground-muted">{t("steerNotDelivered")}</p>
+                ) : msg.steerState && (
+                  <p className="mt-1 text-right text-xs text-foreground-muted">
+                    {msg.steerState === "delivered" ? t("steerDelivered") : t("steerPending")}
+                  </p>
                 )}
               </div>
             ))
@@ -758,9 +770,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         )}
       </div>
 
-      {(stream.stopping || stream.reconnecting) && (
+      {(stream.stopping || stream.reconnecting) ? (
         <p role="status" className="flex-none px-4 pb-1 text-xs text-foreground-muted">
           {stream.stopping ? t("stopping") : t("reconnecting")}
+        </p>
+      ) : !IS_LOCAL && stream.isLoading && !stream.turnActive
+          && stream.messages.some((m) => m.toolUses.some((tool) => tool.task?.state === "running")) && (
+        <p role="status" className="flex-none px-4 pb-1 text-xs text-foreground-muted">
+          {t("backgroundWorking")}
         </p>
       )}
 

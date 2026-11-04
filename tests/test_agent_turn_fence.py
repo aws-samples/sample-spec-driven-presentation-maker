@@ -90,6 +90,18 @@ def test_a_stopped_turn_fences_the_decks_its_calls_named_once():
     assert len(client.calls) == 1
 
 
+def test_decks_of_background_tasks_are_fenced_with_the_turns_own():
+    fence = _fence_class()(generation=7)
+    client = _Client()
+    fence.bind(client)
+    fence.note_tool_call(_Event({"deck_id": "d2"}))
+    fence.note_decks(["d1 ", " ", None, "d2"])  # the decks the session's running composes write
+
+    fence.advance().join(5)
+
+    assert client.calls[0]["arguments"] == {"deck_ids": ["d1", "d2"]}
+
+
 def test_a_turn_that_ends_normally_fences_nothing():
     fence = _fence_class()(generation=5)
     client = _Client()
@@ -237,7 +249,7 @@ def _entrypoint(monkeypatch, stream):
 
 
 def test_a_cancelled_turn_advances_the_fence(monkeypatch):
-    async def cancelled(agent, user_query, session_id, cancel, cancel_signal):
+    async def cancelled(agent, user_query, session_id, cancel, cancel_signal, **kwargs):
         yield {"keepalive": True}
         cancel_signal.set()  # what stream_agent does when the turn is cancelled
 
@@ -245,7 +257,7 @@ def test_a_cancelled_turn_advances_the_fence(monkeypatch):
 
 
 def test_a_finished_turn_releases_the_fence(monkeypatch):
-    async def finished(agent, user_query, session_id, cancel, cancel_signal):
+    async def finished(agent, user_query, session_id, cancel, cancel_signal, **kwargs):
         yield {"done": True}
 
     assert _entrypoint(monkeypatch, finished).events == ["release"]

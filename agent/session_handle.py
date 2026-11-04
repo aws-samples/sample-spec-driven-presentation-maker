@@ -21,6 +21,13 @@ A SessionHandle builds them once per session and reuses them:
 Per turn, the Agent's hooks act on the turn's own objects (write fence, LoopGuard,
 stop event), and the system prompt is refreshed (``{now}``). A cancelled turn leaves
 the handle as it is; close() (idle sweep, SIGTERM) releases the clients.
+
+Background compose (background.py): the Agent owns its tasks, so while it has any (running,
+or settled and not delivered yet) a turn keeps it even if it asks for another mode or model.
+The handle records the decks the tasks work on (``task_decks``, fenced when the work is
+stopped) and passes the tasks' progress (``on_background_event``) and delivered results
+(``on_task_end``) to the session. Its ComposeMessaging carries messages between the
+orchestrator and the running composers (compose_messaging.py).
 """
 
 import contextvars
@@ -30,7 +37,9 @@ import threading
 import time
 from concurrent.futures import Future, ThreadPoolExecutor, wait
 
+import background
 import factory
+from compose_messaging import ComposeMessaging
 from modes import MODES
 from resilience import LoopGuard
 from steer_inbox import Inbox, SteerInbox
@@ -65,6 +74,14 @@ class SessionHandle:
         self.turn_fence: TurnFence | None = None
         self.loop_guard: LoopGuard | None = None
         self.stop: threading.Event | None = None
+        # Decks of the background tasks dispatched since the tasks last settled.
+        self.task_decks: set[str] = set()
+        # Called with each background toolStream event, and with each task snapshot
+        # Strands delivers into the history (session_runtime).
+        self.on_background_event = None
+        self.on_task_end = None
+        # The running composers' inboxes and their reports (the session sets on_report).
+        self.compose_messaging = ComposeMessaging(session_id)
         self.last_used = time.monotonic()
         self.closed = False
         self._lock = threading.RLock()
@@ -141,6 +158,44 @@ class SessionHandle:
         if guard is not None:
             guard.after_tool(event)
 
+    def note_task_dispatch(self, event) -> None:
+        """BeforeToolCallEvent hook: remember the deck a background tool call works on."""
+        if event.tool_use.get("name") not in background.BACKGROUND_TOOLS:
+            return
+        tool_input = event.tool_use.get("input")
+        deck_id = tool_input.get("deck_id") if isinstance(tool_input, dict) else None
+        if isinstance(deck_id, str) and deck_id.strip():
+            with self._lock:
+                self.task_decks.add(deck_id.strip())
+
+    def note_delivered(self, task: dict) -> None:
+        """background.deliver_as_text's callback: a task's result is in the history."""
+        callback = self.on_task_end
+        if callback is not None:
+            callback(task)
+
+    def on_agent_callback(self, **kwargs) -> None:
+        """The Agent's callback handler: a background task's progress goes to the session
+        (a foreground tool's reaches it through stream_agent)."""
+        stream_event = kwargs.get("tool_stream_event")
+        callback = self.on_background_event
+        if not isinstance(stream_event, dict) or callback is None:
+            return
+        tool_use = stream_event.get("tool_use") or {}
+        data = stream_event.get("data")
+        if tool_use.get("name") in background.BACKGROUND_TOOLS and isinstance(data, dict):
+            callback({"toolStream": {"toolUseId": tool_use.get("toolUseId", ""), "name": tool_use["name"], "data": data}})
+
+    @property
+    def agent(self):
+        """The session's current Agent (None before its first turn)."""
+        return self._agent
+
+    def fence_client(self):
+        """The orchestrator's Presentation Maker client (for a fence call), or None."""
+        with self._lock:
+            return self._agent_clients[0] if self._agent_clients else None
+
     # -- prepare ----------------------------------------------------------------
 
     def prepare(self, token: str, mode: str = "spec", chat_model_id: str | None = None,
@@ -199,6 +254,14 @@ class SessionHandle:
         with self._build_lock:
             model_ids = factory.resolve_models(cfg, chat_model_id, create_model_id)
             key = (mode, *model_ids)
+            # The Agent owns its background tasks: a rebuilt one would restore them as failed.
+            keep = self._agent is not None and bool(background.tasks(self._agent))
+            if keep and self._agent_key != key:
+                logger.info("Session %s: keeping %s while its background tasks are open (asked for %s)",
+                            self.session_id[:12], self._agent_key, key)
+                key = self._agent_key
+                mode, model_ids = key[0], tuple(key[1:])
+                cfg = MODES[mode]
             new_agent = self._agent is None or self._agent_key != key
             memory = self._start_session_manager() if new_agent else None
             try:
@@ -209,10 +272,14 @@ class SessionHandle:
                 if memory is not None:
                     memory.cancel()
                 raise
-            if not new_agent and self._stale(mcp_servers):
+            if not new_agent and not keep and self._stale(mcp_servers):
                 # A resident client was replaced (its server died): the Agent's tools
                 # point at the old one.
                 new_agent, memory = True, self._start_session_manager()
+            elif not new_agent and keep and self._stale(mcp_servers):
+                # Rebuilding would fail the open tasks; the turn runs with the old tools.
+                logger.warning("Session %s: a resident client was replaced while background tasks are open; "
+                               "keeping the Agent and its tools until they are delivered", self.session_id[:12])
             if new_agent:
                 session_manager = memory.result()
                 self._retire_agent()
@@ -228,6 +295,10 @@ class SessionHandle:
 
         if fence is not None:
             fence.bind(self._agent_clients[0] if self._agent_clients else None)
+            if background.pending(agent):
+                # A stop during this turn fences the decks the running tasks write too.
+                with self._lock:
+                    fence.note_decks(list(self.task_decks))
         return agent, mcp_status
 
     def end_turn(self) -> None:

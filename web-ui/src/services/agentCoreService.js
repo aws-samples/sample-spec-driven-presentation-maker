@@ -66,7 +66,9 @@ export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
  * Invokes the agent. Cloud: sends a prompt over the session's WebSocket and follows the
  * session until it goes idle (steers and the turns they start included); resolves the
  * accumulated text. `onSession` (Cloud) gets `onEvent(ev, {own})` for the session's
- * `work` / `turn` / `turnEnd` / `steer` events and `onReconnecting(active)`.
+ * `work` / `turn` / `turnEnd` / `steer` / `composerNote` events and `onReconnecting(active)`.
+ * A background compose (`taskStart` … `taskEnd`) keeps the session working after its turn,
+ * so the follow lasts until its result has been delivered.
  */
 export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId, continuedFrom, translateError, onSession) => {
   // Local mode: proxy through Next.js API Route → kiro-cli acp
@@ -103,7 +105,7 @@ export const CANCEL_ACK_MS = 3000
 export const STOP_SETTLE_MS = 2000
 const PREPARE_LIMIT_MS = 60_000
 
-const SESSION_EVENT_KEYS = ["work", "turn", "turnEnd", "steer"]
+const SESSION_EVENT_KEYS = ["work", "turn", "turnEnd", "steer", "composerNote"]
 
 /** sessionId → { socket, token, follower, ownIds, waiters } */
 const sessions = new Map()

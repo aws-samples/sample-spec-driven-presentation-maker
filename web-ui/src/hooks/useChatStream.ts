@@ -12,6 +12,11 @@
  * cancel (cancelAgentCore). `resume` follows a session that was working when the page
  * loaded; a send while it connects waits for its answer. Local keeps one request at a time and its own stop.
  *
+ * Cloud background compose: `taskStart` gives the compose card a running task, which stays
+ * running across later turns and messages until `taskEnd` closes it. `turnActive` is "a
+ * turn runs" (Local: `isLoading`), so the panel can tell turns from the background wait.
+ * A composer's report (`composerNote`) becomes a note message of its own.
+ *
  * Does NOT manage: chat history loading, Local reconnect, @mentions, Options, saveLocalChat.
  * Those remain in each panel's orchestrator.
  */
@@ -53,6 +58,17 @@ export interface Message {
   steerId?: string
   /** Cloud: the steer was dropped by a stop before it reached the agent. */
   steerNotDelivered?: boolean
+  /** Cloud: the steer is waiting for the agent (accepted) or the agent has read it (delivered). */
+  steerState?: "accepted" | "delivered"
+  /** Cloud: a composer's report to the orchestrator (`report_to_orchestrator`). */
+  composerNote?: ComposerNote
+}
+
+export interface ComposerNote {
+  /** 1-based group of the compose_slides call. */
+  group: number
+  slugs?: string
+  text: string
 }
 
 /** Shape of tool-use callback data from the agent streaming API. */
@@ -64,6 +80,10 @@ export interface ToolUseCallbackData {
   input?: Record<string, unknown>
   stream?: boolean
   data?: Record<string, unknown>
+  /** Cloud: the tool now runs in the background (`taskStart`). */
+  taskStarted?: boolean
+  /** Cloud: the background task of the tool (`taskStart` / `taskEnd`). */
+  task?: ToolUse["task"]
 }
 
 export interface UseChatStreamOptions {
@@ -92,6 +112,8 @@ export interface UseChatStreamReturn {
   reconnecting: boolean
   /** Cloud: a stop was sent and the session has not stopped yet. */
   stopping: boolean
+  /** A turn runs (Cloud: between `turn` and `turnEnd`; Local: `isLoading`). */
+  turnActive: boolean
   /** Ref to current messages for external reads without re-render dependency. */
   messagesRef: React.MutableRefObject<Message[]>
 }
@@ -141,10 +163,16 @@ interface SessionEventInfo { own: boolean }
 type SessionEvent = {
   work?: { state?: string }
   turn?: { id?: string; why?: string; text?: string }
+  turnEnd?: { id?: string }
   steer?: { id?: string; text?: string; state?: string }
+  composerNote?: { toolUseId?: string; group?: number; slugs?: string; text?: string }
 }
 
 const emptyAssistant = (): Message => ({ role: "assistant", content: "", toolUses: [] })
+
+/** An assistant placeholder nothing has been written into yet. */
+const isBlankAssistant = (m: Message | undefined) =>
+  m?.role === "assistant" && !m.content && m.toolUses.length === 0 && !m.composerNote
 
 function blocksFor(content: string, toolUses: ToolUse[], segment: Segment): Block[] {
   return rebuildBlocks(content, new Map(toolUses.map((t) => [t.toolUseId, t])), segment.toolOrder, segment.positions)
@@ -161,12 +189,13 @@ function indexOfTool(messages: Message[], toolUseId: string | undefined): number
  * The handlers of one run: an invoke (its assistant placeholder already shown) or a resume
  * (`replayCut` set: the first prompt of the replay replaces the history after it).
  */
-function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut }: {
+function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, setTurnActive }: {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   onToolEvent?: (toolName: string, data: ToolUseCallbackData | undefined) => void
   steers: Map<string, PendingSteer>
   segmentOpen: boolean
   replayCut?: (prompt: string) => Message[]
+  setTurnActive?: (active: boolean) => void
 }) {
   let streamed = ""
   let segment: Segment = { start: 0, toolOrder: [], positions: new Map() }
@@ -188,14 +217,14 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut }:
     setMessages((prev) => [...prev, emptyAssistant()])
   }
 
-  /** A user message the agent accepted, followed by a new assistant message. */
+  /** A user message the agent accepted (or a composer note), followed by a new assistant message. */
   const pushUser = (user: Message, base?: Message[]) => {
     newSegment()
     setMessages((prev) => {
       let list = base ?? prev
       const last = list[list.length - 1]
       let mcpStatus: McpServerStatus[] | undefined
-      if (!base && last?.role === "assistant" && !last.content && last.toolUses.length === 0) {
+      if (!base && isBlankAssistant(last)) {
         mcpStatus = last.mcpStatus
         list = list.slice(0, -1)
       }
@@ -288,6 +317,23 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut }:
       return
     }
 
+    // Tool dispatched to the background — it keeps running (in whichever message holds it)
+    if (toolUseData?.taskStarted) {
+      const s = toolSegment.get(toolUseData.toolUseId ?? "") ?? segment
+      setMessages((prev) => {
+        const at = indexOfTool(prev, toolUseData.toolUseId)
+        if (at < 0) return prev
+        const updated = [...prev]
+        const msg = updated[at]
+        const newToolUses = msg.toolUses.map((t: ToolUse) =>
+          t.toolUseId === toolUseData.toolUseId ? { ...t, task: toolUseData.task } : t)
+        updated[at] = { ...msg, toolUses: newToolUses, blocks: blocksFor(msg.content, newToolUses, s) }
+        return updated
+      })
+      onToolEvent?.(toolName, toolUseData)
+      return
+    }
+
     // Tool completed — update status/result (in whichever message holds the tool)
     if (toolUseData?.completed) {
       const s = toolSegment.get(toolUseData.toolUseId ?? "") ?? segment
@@ -297,7 +343,9 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut }:
         const updated = [...prev]
         const msg = updated[at]
         const newToolUses = msg.toolUses.map((t: ToolUse) =>
-          t.toolUseId === toolUseData.toolUseId ? { ...t, status: toolUseData.status, result: toolUseData.result } : t)
+          t.toolUseId === toolUseData.toolUseId
+            ? { ...t, status: toolUseData.status, result: toolUseData.result, ...(toolUseData.task ? { task: toolUseData.task } : {}) }
+            : t)
         updated[at] = { ...msg, toolUses: newToolUses, blocks: blocksFor(msg.content, newToolUses, s) }
         return updated
       })
@@ -343,6 +391,19 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut }:
       // A resume run shows every user message: this page's own ones went up in a run before it
       // (the deck opened again in this tab) or are steers kept in `steers`.
       const mine = own && !replayCut
+      if (ev.turn) setTurnActive?.(true)
+      else if (ev.turnEnd || ev.work?.state === "idle") setTurnActive?.(false)
+      const note = ev.composerNote
+      if (note) {
+        const key = `${note.toolUseId ?? ""}:${note.group ?? ""}:${note.text ?? ""}`
+        if (rendered.has(key)) return
+        rendered.add(key)
+        pushUser({
+          ...emptyAssistant(),
+          composerNote: { group: note.group ?? 0, ...(note.slugs ? { slugs: note.slugs } : {}), text: note.text ?? "" },
+        })
+        return
+      }
       const turn = ev.turn
       if (turn?.id && turn.why === "prompt") {
         if (rendered.has(turn.id)) return
@@ -363,7 +424,10 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut }:
         if (rendered.has(steer.id)) return
         rendered.add(steer.id)
         if (mine && !steers.has(steer.id)) return
-        pushUser(userFor(steer.id, steer.text ?? "", true))
+        pushUser({ ...userFor(steer.id, steer.text ?? "", true), steerState: "accepted" })
+      } else if (steer.state === "delivered") {
+        const id = steer.id
+        setMessages((prev) => prev.map((m) => (m.steerId === id ? { ...m, steerState: "delivered" } : m)))
       } else if (steer.state === "discarded") {
         const id = steer.id
         setMessages((prev) => prev.map((m) => (m.steerId === id ? { ...m, steerNotDelivered: true } : m)))
@@ -379,6 +443,8 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const [isLoading, setIsLoading] = useState(false)
   const [reconnecting, setReconnecting] = useState(false)
   const [stopping, setStopping] = useState(false)
+  // Cloud: a turn runs (`turn` … `turnEnd`); false while only background work goes on.
+  const [cloudTurnActive, setCloudTurnActive] = useState(false)
   // Synchronous re-entry guard: setIsLoading(true) below is React state
   // and does not flip until the next render, so two near-simultaneous
   // triggers (Enter key repeat, double click, fast tap) both pass the
@@ -471,10 +537,11 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       emptyAssistant(),
     ])
     setIsLoading(true)
+    setCloudTurnActive(true)
 
     const controller = new AbortController()
     abortControllerRef.current = controller
-    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: true })
+    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: true, setTurnActive: setCloudTurnActive })
 
     try {
       await invokeAgentCore(
@@ -523,6 +590,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       abortControllerRef.current = null
       isLoadingRef.current = false
       setIsLoading(false)
+      setCloudTurnActive(false)
       setReconnecting(false)
       onSendComplete?.()
     }
@@ -537,7 +605,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     let openGate = () => {}
     const gate = new Promise<void>((resolve) => { openGate = resolve })
     resumeGateRef.current = gate
-    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: false, replayCut: cutHistory })
+    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: false, replayCut: cutHistory, setTurnActive: setCloudTurnActive })
     let followed = false
     try {
       await resumeAgentCore(sessionId, accessToken, 0, {
@@ -564,6 +632,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       if (followed) {
         isLoadingRef.current = false
         setIsLoading(false)
+        setCloudTurnActive(false)
         onSendComplete?.()
       }
       if (resumeGateRef.current === gate) resumeGateRef.current = null
@@ -571,5 +640,6 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     }
   }, [sessionId, auth.user?.access_token, onToolEvent, onSendComplete, translateError])
 
-  return { messages, setMessages, isLoading, sendMessage, stopGeneration, resume, reconnecting, stopping, messagesRef }
+  const turnActive = IS_LOCAL ? isLoading : cloudTurnActive
+  return { messages, setMessages, isLoading, sendMessage, stopGeneration, resume, reconnecting, stopping, turnActive, messagesRef }
 }

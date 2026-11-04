@@ -158,6 +158,112 @@ describe("useChatStream (Cloud) steer", () => {
   })
 })
 
+describe("useChatStream (Cloud) background compose", () => {
+  const compose = (messages: Message[]) => messages.flatMap((m) => m.toolUses).find((t) => t.name === "compose_slides")
+
+  /** A prompt that dispatches compose in the background, then its turn ends. */
+  function dispatch() {
+    const run = captureInvoke()
+    const rendered = renderStream()
+    let sent: Promise<boolean> | undefined
+    act(() => { sent = rendered.result.current.sendMessage("make it") })
+    const h = run.handlers!
+    act(() => {
+      h.onSession.onEvent({ turn: { id: "p1", why: "prompt", text: "make it" } }, { own: true })
+      h.onStreamUpdate("Composing.")
+      h.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", input: {}, started: true })
+      h.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", taskStarted: true, task: { id: "t-1", state: "running" } })
+      h.onSession.onEvent({ turnEnd: { id: "p1", how: "finished" } }, { own: true })
+    })
+    return { ...rendered, run, h, sent: () => sent }
+  }
+
+  it("keeps the compose card running across a steer turn and closes it with the report", async () => {
+    const { result, run, h, sent } = dispatch()
+    expect(compose(result.current.messages)).toMatchObject({ task: { state: "running" } })
+    expect(compose(result.current.messages)?.status).toBeUndefined()
+    expect(result.current.isLoading).toBe(true)
+    expect(result.current.turnActive).toBe(false)
+
+    steerAgentCore.mockResolvedValueOnce({ id: "x", as: "steer" })
+    await act(async () => { await result.current.sendMessage("use blue") })
+    const steerId = steerAgentCore.mock.calls[0][3] as string
+    act(() => {
+      h.onSession.onEvent({ steer: { id: steerId, text: "use blue", state: "accepted" } }, { own: true })
+      h.onSession.onEvent({ steer: { id: steerId, state: "delivered", how: "turn" } }, { own: true })
+      h.onSession.onEvent({ turn: { id: steerId, why: "steer", text: "use blue" } }, { own: true })
+    })
+    expect(result.current.turnActive).toBe(true)
+    act(() => {
+      h.onStreamUpdate("Composing.\n\nBlue it is.")
+      h.onSession.onEvent({ turnEnd: { id: steerId, how: "finished" } }, { own: true })
+      h.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", stream: true, data: { status: "starting", group: 1 } })
+    })
+    expect(result.current.turnActive).toBe(false)
+    const [, card, steer, after] = result.current.messages
+    expect(card.toolUses[0]).toMatchObject({ task: { state: "running" }, streamMessages: [{ status: "starting", group: 1 }] })
+    expect(steer).toMatchObject({ role: "user", content: "use blue", steerState: "delivered" })
+    expect(after).toMatchObject({ role: "assistant", toolUses: [] })
+
+    act(() => {
+      h.onToolUse("compose_slides", {
+        toolUseId: "c1", name: "compose_slides", completed: true, status: "success",
+        result: { status: "success" }, task: { id: "t-1", state: "completed" },
+      })
+      h.onSession.onEvent({ turn: { id: "w1", why: "wake", text: "" } }, { own: false })
+    })
+    expect(compose(result.current.messages)).toMatchObject({ status: "success", task: { state: "completed" } })
+    expect(result.current.messages[1].blocks?.find((b) => b.type === "tool")).toMatchObject({ tool: { status: "success" } })
+    expect(result.current.turnActive).toBe(true)
+    act(() => { h.onSession.onEvent({ work: { state: "idle", how: "finished" } }, { own: false }) })
+    expect(result.current.turnActive).toBe(false)
+    await act(async () => { run.finish!(); await sent() })
+    expect(result.current.isLoading).toBe(false)
+  })
+
+  it("leaves a cancelled task without a status", async () => {
+    const { result, run, h } = dispatch()
+    act(() => {
+      h.onToolUse("compose_slides", {
+        toolUseId: "c1", name: "compose_slides", completed: true, status: undefined,
+        result: {}, task: { id: "t-1", state: "cancelled" },
+      })
+    })
+    const card = compose(result.current.messages)
+    expect(card?.status).toBeUndefined()
+    expect(card?.task?.state).toBe("cancelled")
+    await act(async () => { run.finish!() })
+  })
+
+  it("puts a composer note in a message of its own and later text after it", async () => {
+    const { result, run, h } = dispatch()
+    const note = { composerNote: { toolUseId: "c1", group: 2, slugs: "intro, agenda", text: "Applied blue." } }
+    act(() => {
+      h.onSession.onEvent(note, { own: false })
+      h.onSession.onEvent(note, { own: false })
+      h.onSession.onEvent({ turn: { id: "r1", why: "report", text: "" } }, { own: false })
+      h.onStreamUpdate("Composing.\n\nNoted.")
+    })
+    const [, , noteMsg, after, ...rest] = result.current.messages
+    expect(noteMsg).toMatchObject({ role: "assistant", content: "", composerNote: { group: 2, slugs: "intro, agenda", text: "Applied blue." } })
+    expect(after).toMatchObject({ role: "assistant", content: "\n\nNoted." })
+    expect(rest).toEqual([])
+    await act(async () => { run.finish!() })
+  })
+
+  it("marks a steer accepted until it is delivered", async () => {
+    const { result, run, h } = dispatch()
+    steerAgentCore.mockResolvedValueOnce({ id: "x", as: "steer" })
+    await act(async () => { await result.current.sendMessage("more") })
+    const steerId = steerAgentCore.mock.calls[0][3] as string
+    act(() => { h.onSession.onEvent({ steer: { id: steerId, text: "more", state: "accepted" } }, { own: true }) })
+    expect(result.current.messages.find((m) => m.steerId === steerId)?.steerState).toBe("accepted")
+    act(() => { h.onSession.onEvent({ steer: { id: steerId, state: "delivered", how: "fold" } }, { own: true }) })
+    expect(result.current.messages.find((m) => m.steerId === steerId)?.steerState).toBe("delivered")
+    await act(async () => { run.finish!() })
+  })
+})
+
 describe("useChatStream (Cloud) stop", () => {
   it("sends a cancel instead of stopping the runtime session", async () => {
     let release: (() => void) | undefined

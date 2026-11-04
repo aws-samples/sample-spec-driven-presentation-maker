@@ -160,6 +160,8 @@ export interface ToolUse {
   result?: Record<string, unknown>
   /** Streaming progress messages from tool (e.g. compose_slides sub-agent progress). */
   streamMessages?: Record<string, unknown>[]
+  /** Cloud: the tool runs as a background task (compose_slides); running until `taskEnd`. */
+  task?: { id?: string; state: "running" | "completed" | "failed" | "cancelled" }
 }
 
 export type MessageBlock = { type: "text"; text: string } | { type: "tool"; tool: ToolUse }
@@ -181,9 +183,14 @@ interface ChatMessageProps {
   hearingDisabled?: boolean
   /** Deck of this chat; a change request card numbers the slides only for the open deck. */
   deckId?: string
+  /** Cloud: the session works, so a tool with a running background task is active in any message. */
+  sessionWorking?: boolean
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, onSend, hearingDisabled = false, deckId }: ChatMessageProps) {
+/** A tool whose background task still runs while the session works (Cloud compose). */
+const runsInBackground = (tool: ToolUse, sessionWorking: boolean) => sessionWorking && tool.task?.state === "running"
+
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, onSend, hearingDisabled = false, deckId, sessionWorking = false }: ChatMessageProps) {
   const t = useTranslations("chat")
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
@@ -338,7 +345,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                   input={block.tool.input}
                   status={block.tool.status}
                   result={block.tool.result}
-                  isActive={isStreaming && !block.tool.status && (i === blocks.length - 1 || (block.tool.streamMessages?.length ?? 0) > 0)}
+                  isActive={(isStreaming && !block.tool.status && (i === blocks.length - 1 || (block.tool.streamMessages?.length ?? 0) > 0)) || runsInBackground(block.tool, sessionWorking)}
                   streamMessages={block.tool.streamMessages}
                   idToken={idToken}
                 />
@@ -387,7 +394,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                     input={latestTool.input}
                     status={latestTool.status}
                     result={latestTool.result}
-                    isActive={isStreaming && !latestTool.status}
+                    isActive={(isStreaming && !latestTool.status) || runsInBackground(latestTool, sessionWorking)}
                     streamMessages={latestTool.streamMessages}
                     idToken={idToken}
                   />

@@ -8,12 +8,14 @@
 
 import { createRef } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, waitFor } from "@testing-library/react"
+import { act, cleanup, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { deckSessionId, ownerPrefix } from "@/lib/sessionId"
+import composerNote from "@/test/fixtures/composerNote.json"
 
-const { invokeAgentCore, getChatHistory } = vi.hoisted(() => ({
+const { invokeAgentCore, steerAgentCore, getChatHistory } = vi.hoisted(() => ({
   invokeAgentCore: vi.fn(),
+  steerAgentCore: vi.fn(),
   getChatHistory: vi.fn(),
 }))
 
@@ -32,6 +34,7 @@ vi.mock("@/services/agentCoreService", async (importOriginal) => ({
   stopRuntimeSession: vi.fn(),
   prepareAgentCore: vi.fn(async () => undefined),
   invokeAgentCore,
+  steerAgentCore,
 }))
 vi.mock("@/services/deckService", () => ({
   getChatHistory,
@@ -88,5 +91,101 @@ describe("ChatPanel session ids (Cloud)", () => {
   it("replaces a linked chat of an earlier format that has no history", async () => {
     expect(await sentSessionId({ deckId: "d1", chatSessionId: LEGACY }, 2)).toBe(deckSessionId("u1", "d1"))
     expect(getChatHistory.mock.calls.map((c) => c[0])).toEqual([LEGACY, deckSessionId("u1", "d1")])
+  })
+})
+
+type Handlers = {
+  onStreamUpdate: (text: string) => void
+  onToolUse: (name: string, data: Record<string, unknown>) => void
+  onSession: { onEvent: (ev: Record<string, unknown>, info: { own: boolean }) => void }
+}
+
+describe("ChatPanel background compose (Cloud)", () => {
+  const BACKGROUND = "Composers are working in the background. You can keep chatting."
+
+  beforeEach(() => {
+    vi.clearAllMocks()
+    Element.prototype.scrollIntoView = vi.fn()
+    getChatHistory.mockResolvedValue({ messages: [], truncated: false })
+  })
+  afterEach(() => cleanup())
+
+  it("shows the background line between turns, composer notes and steer delivery", async () => {
+    let h: Handlers | undefined
+    let finish: (() => void) | undefined
+    invokeAgentCore.mockImplementationOnce((...args: unknown[]) => new Promise<string>((resolve) => {
+      h = { onStreamUpdate: args[2], onToolUse: args[5], onSession: args[11] } as Handlers
+      finish = () => resolve("")
+    }))
+    const ref = createRef<ChatPanelHandle>()
+    renderWithIntl(<ChatPanel ref={ref} deckId="d1" />)
+    await waitFor(() => expect(getChatHistory).toHaveBeenCalled())
+    await waitFor(() => expect(ref.current).toBeTruthy())
+    act(() => { void ref.current!.sendMessage("make it") })
+    await waitFor(() => expect(h).toBeDefined())
+
+    act(() => {
+      h!.onSession.onEvent({ turn: { id: "p1", why: "prompt", text: "make it" } }, { own: true })
+      h!.onStreamUpdate("Composing.")
+      h!.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", input: {}, started: true })
+    })
+    expect(screen.queryByText(BACKGROUND)).toBeNull()
+    act(() => {
+      h!.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", taskStarted: true, task: { id: "t", state: "running" } })
+      h!.onSession.onEvent({ turnEnd: { id: "p1", how: "finished" } }, { own: true })
+    })
+    expect(screen.getByText(BACKGROUND)).toBeTruthy()
+
+    // The agent's real composerNote payload (tests/test_agent_compose_messaging.py checks the same file).
+    act(() => { h!.onSession.onEvent(composerNote.event, { own: false }) })
+    const note = screen.getByRole("note", { name: "Message with composer 1" })
+    expect(note.textContent).toContain("· intro, agenda")
+    expect(note.textContent).toContain(composerNote.event.composerNote.text)
+
+    steerAgentCore.mockResolvedValueOnce({ id: "x", as: "steer" })
+    await act(async () => { await ref.current!.sendMessage("use blue") })
+    const steerId = steerAgentCore.mock.calls[0][3] as string
+    act(() => { h!.onSession.onEvent({ steer: { id: steerId, text: "use blue", state: "accepted" } }, { own: true }) })
+    expect(screen.getByText("Sent while the agent works")).toBeTruthy()
+    act(() => {
+      h!.onSession.onEvent({ steer: { id: steerId, state: "delivered", how: "turn" } }, { own: true })
+      h!.onSession.onEvent({ turn: { id: steerId, why: "steer", text: "use blue" } }, { own: true })
+    })
+    expect(screen.getByText("Read by the agent")).toBeTruthy()
+    expect(screen.queryByText(BACKGROUND)).toBeNull()
+
+    await act(async () => { finish!() })
+    expect(screen.queryByText(BACKGROUND)).toBeNull()
+  })
+
+  it("shows the background line only while a task runs", async () => {
+    let h: Handlers | undefined
+    let finish: (() => void) | undefined
+    invokeAgentCore.mockImplementationOnce((...args: unknown[]) => new Promise<string>((resolve) => {
+      h = { onStreamUpdate: args[2], onToolUse: args[5], onSession: args[11] } as Handlers
+      finish = () => resolve("")
+    }))
+    const ref = createRef<ChatPanelHandle>()
+    renderWithIntl(<ChatPanel ref={ref} deckId="d1" />)
+    await waitFor(() => expect(getChatHistory).toHaveBeenCalled())
+    await waitFor(() => expect(ref.current).toBeTruthy())
+    act(() => { void ref.current!.sendMessage("make it") })
+    await waitFor(() => expect(h).toBeDefined())
+
+    act(() => {
+      h!.onSession.onEvent({ turn: { id: "p1", why: "prompt", text: "make it" } }, { own: true })
+      h!.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", input: {}, started: true })
+      h!.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", taskStarted: true, task: { id: "t", state: "running" } })
+      h!.onSession.onEvent({ turnEnd: { id: "p1", how: "finished" } }, { own: true })
+    })
+    expect(screen.getByText(BACKGROUND)).toBeTruthy()
+    act(() => {
+      h!.onToolUse("compose_slides", {
+        toolUseId: "c1", name: "compose_slides", status: "success", completed: true, task: { id: "t", state: "completed" },
+      })
+    })
+    expect(screen.queryByText(BACKGROUND)).toBeNull()  // still working (a wake turn comes), no task runs
+
+    await act(async () => { finish!() })
   })
 })

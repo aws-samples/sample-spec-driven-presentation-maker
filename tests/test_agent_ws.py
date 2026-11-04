@@ -397,7 +397,7 @@ def real_handle(ctx, monkeypatch, tmp_path):
         lambda jwt_token, session_id="", tool_filters=None, meta=None, **kwargs: FakeMCP(recorder, "parent", meta=meta),
     ])
 
-    async def stream(agent, text, session_id, takeover, stop):
+    async def stream(agent, text, session_id, takeover, stop, **kwargs):
         recorder.log("stream", "turn", detail={"agent": id(agent)})
         yield {"event": {"contentBlockDelta": {"delta": {"text": "hi"}, "contentBlockIndex": 0}}}
 
@@ -485,3 +485,38 @@ def test_a_jwt_payload_is_never_echoed(ctx):
 
     assert token_part not in json.dumps(client.ctl) + json.dumps(client.items)
     assert base64.urlsafe_b64decode(token_part + "==")  # sanity: it is a payload
+
+
+# --- background compose ---------------------------------------------------------------
+
+
+def test_resume_during_the_background_wait_replays_the_task_and_tails_its_end(ctx, monkeypatch, tmp_path):
+    from test_agent_session_runtime import real_edges, stop_sessions
+
+    real = real_edges(monkeypatch, tmp_path, ctx.runtime)
+    real.composer_seconds = 1.5  # composers still write after the dispatching turn ended
+    try:
+        first = ctx.connect()
+        first.send(type="prompt", id="p1", prompt="Make the deck.")
+        first.until(lambda ev: "turnEnd" in ev, timeout=10)
+        opened = next(i["seq"] for i in first.items if "turn" in i["ev"])
+        first.close()
+        session = ctx.registry.get(OWNED, "user-1")
+        assert session.working and session.turn.done
+
+        second = ctx.connect()
+        second.send(type="resume", from_seq=opened - 1)
+        second.until(_idle, timeout=15)
+
+        ack = next(c for c in second.ctl if c["ctl"] == "resumeAck")
+        assert ack["working"] is True and ack["complete"] is True
+        evs = [i["ev"] for i in second.items]
+        kinds = [next(iter(ev)) for ev in evs]
+        assert kinds[0] == "turn" and "taskStart" in kinds
+        first_end = kinds.index("turnEnd")
+        assert "toolStream" in kinds[first_end:], "the composers' progress after the turn"
+        assert kinds.index("taskEnd") > first_end
+        assert [ev["turn"]["why"] for ev in evs if "turn" in ev] == ["prompt", "wake"]
+        assert evs[-1]["work"] == {"state": "idle", "how": "finished"}
+    finally:
+        stop_sessions(ctx.registry)

@@ -34,7 +34,7 @@ User → AgentCore Runtime → Agent
   `cancel`、`resume(from_seq)`、`prepare`、`ping`。サーバーは制御フレーム（`accepted`、`cancelAck`、
   `resumeAck`、`prepareAck`、`ready`、`pong`、`keepalive`、`error`）と、セッションのイベント
   `{"seq", "ev"}` を返す。`ev` は HTTP のストリームと同じ形に、`work`（busy / idle）、`turn`、
-  `turnEnd`、`steer` を足したもの。フレームは 24,000 バイト以下（`{"batch": [...]}`、大きいイベントは
+  `turnEnd`、`steer`、`taskStart`、`taskEnd`、`composerNote` を足したもの。フレームは 24,000 バイト以下（`{"batch": [...]}`、大きいイベントは
   `{"chunk", ...}`）で、20 ミリ秒に 1 つまで送る。最初に送るのはクライアント。セッションは最初の
   メッセージで、プラットフォームが転送する `Authorization` ヘッダから受け付け、以後のメッセージごとに
   持ち主を確かめる。
@@ -50,8 +50,19 @@ Memory に保存するか、終わろうとしているターンを続けるか�
 取りこぼした分を求められる。
 
 ターンを止めるのは、停止ボタン（`cancel`。まだ届けていない steer を先に捨てる）、仕事中の期間の
-60 分の番犬、SIGTERM の 3 つだけ。切断では止めない。同期の `compose_slides` の実行中は、steer は
-それが戻ってからオーケストレーターに届く。
+60 分の番犬、SIGTERM の 3 つだけ。切断では止めない。
+
+`compose_slides` はオーケストレーターの Strands バックグラウンドタスクとして動く（`background.py`）。
+呼び出しはディスパッチの通知（`taskStart`）を返してすぐ戻り、コンポーザーが作業している間もターンは
+続くか終わる。レポートが届くまでセッションは仕事中のまま。進捗は `toolStream` で届き続け、終わった
+タスクは `taskEnd` として出る。ターンが動いていなければ入力なしのターン（`turn {why: "wake"}`）を
+始め、Strands がモデル呼び出しの前にレポートをオーケストレーターに渡す。渡し方は user のテキスト
+`<compose_result task status>` で、管理ツールの合成の呼び出しは履歴に入る前に書き換える。その間に送った steer は
+すぐにターンになる。停止は仕事中の期間の停止イベント（コンポーザーも見る）を立ててからタスクを
+キャンセルし、ターンが動いていなければタスクが書くデッキをフェンスする。コンポーザーの作業中、
+オーケストレーターは `message_composer` でコンポーザーに伝え、コンポーザーは `report_to_orchestrator`
+で答える（`compose_messaging.py`）。答えはセッションが `composerNote` として出し、`<composer_note>`
+のテキストとして steer と同じように届ける（ターンが動いていなければ `turn {why: "report"}`）。
 
 ---
 
