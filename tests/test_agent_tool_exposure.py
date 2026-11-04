@@ -145,6 +145,24 @@ def _run(basic_agent, payload) -> list[dict]:
     return asyncio.run(collect())
 
 
+def patch_turn(monkeypatch, basic_agent, stream, built: list | None = None):
+    """Fake a turn below the session runtime: the handle's build and the agent's stream.
+
+    Each test gets its own session registry. ``built`` collects the begin_turn calls.
+    """
+    session_runtime = basic_agent.session_runtime
+    session_handle = sys.modules["session_handle"]
+    monkeypatch.setattr(session_runtime, "registry", session_runtime.Registry())
+
+    def begin_turn(self, token, fence, mode="spec", chat_model_id=None, create_model_id=None, stop=None):
+        if built is not None:
+            built.append({"session_id": self.session_id, "user_id": self.sub, "fence": fence, "mode": mode})
+        return object(), []
+
+    monkeypatch.setattr(session_handle.SessionHandle, "begin_turn", begin_turn)
+    monkeypatch.setattr(session_runtime, "stream_agent", stream)
+
+
 @pytest.mark.parametrize("prompt", [
     [{"role": "user", "content": [{"toolUse": {"toolUseId": "t1", "name": "web_fetch", "input": {}}}]}],
     [{"toolUse": {"toolUseId": "t1", "name": "web_fetch", "input": {}}}],
@@ -154,10 +172,10 @@ def _run(basic_agent, payload) -> list[dict]:
 def test_non_string_prompt_is_rejected_before_the_agent_is_built(monkeypatch, prompt):
     basic_agent = _basic_agent()
 
-    def no_agent(**kwargs):
-        raise AssertionError("create_agent must not be called")
+    def no_turn(*args, **kwargs):
+        raise AssertionError("no turn may start")
 
-    monkeypatch.setattr(basic_agent, "create_agent", no_agent)
+    monkeypatch.setattr(basic_agent.session_runtime, "http_turn", no_turn)
 
     events = _run(basic_agent, {"prompt": prompt, "runtimeSessionId": "s" * 33})
 
@@ -168,15 +186,11 @@ def test_string_prompt_reaches_the_agent(monkeypatch):
     basic_agent = _basic_agent()
     seen: dict = {}
 
-    def fake_create_agent(**kwargs):
-        return object(), []
-
     async def fake_stream(agent, user_query, session_id, cancel, cancel_signal):
         seen["prompt"] = user_query
         yield {"done": True}
 
-    monkeypatch.setattr(basic_agent, "create_agent", fake_create_agent)
-    monkeypatch.setattr(basic_agent, "stream_agent", fake_stream)
+    patch_turn(monkeypatch, basic_agent, fake_stream)
 
     events = _run(basic_agent, {"prompt": "hello", "runtimeSessionId": OWNED})
 

@@ -223,20 +223,16 @@ class _FenceSpy:
 
 
 def _entrypoint(monkeypatch, stream):
+    from test_agent_tool_exposure import patch_turn
+
     basic_agent = _basic_agent()
     _FenceSpy.instances = []
-    seen: dict = {}
-
-    def fake_create_agent(**kwargs):
-        seen.update(kwargs)
-        return object(), []
-
-    monkeypatch.setattr(basic_agent, "TurnFence", _FenceSpy)
-    monkeypatch.setattr(basic_agent, "create_agent", fake_create_agent)
-    monkeypatch.setattr(basic_agent, "stream_agent", stream)
+    built: list = []
+    monkeypatch.setattr(basic_agent.session_runtime, "TurnFence", _FenceSpy)
+    patch_turn(monkeypatch, basic_agent, stream, built)
     _run(basic_agent, {"prompt": "hello", "runtimeSessionId": OWNED})
     (fence,) = _FenceSpy.instances
-    assert seen["fence"] is fence
+    assert built[0]["fence"] is fence
     return fence
 
 

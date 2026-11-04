@@ -13,7 +13,7 @@ import json
 import pytest
 
 from shared.session_owner import ProcessOwner
-from test_agent_tool_exposure import _basic_agent
+from test_agent_tool_exposure import _basic_agent, patch_turn
 
 P1 = "c6c289e49e9c05b2"  # owner_prefix("user-1")  # pragma: allowlist secret
 P2 = "d92b69cfb82cecab"  # owner_prefix("user-2")  # pragma: allowlist secret
@@ -51,15 +51,10 @@ def agent(monkeypatch):
     monkeypatch.setenv("MEMORY_ID", "memory-test")
     built: list[dict] = []
 
-    def fake_create_agent(**kwargs):
-        built.append(kwargs)
-        return object(), []
-
     async def fake_stream(agent, user_query, session_id, cancel, stop):
         yield {"done": True}
 
-    monkeypatch.setattr(basic_agent, "create_agent", fake_create_agent)
-    monkeypatch.setattr(basic_agent, "stream_agent", fake_stream)
+    patch_turn(monkeypatch, basic_agent, fake_stream, built)
     basic_agent.built = built
     yield basic_agent
     del basic_agent.built
@@ -94,17 +89,12 @@ def test_own_prefixed_id_reaches_the_agent(agent, monkeypatch):
     assert memory.calls == []
 
 
-def test_other_users_prefixed_id_is_refused_before_the_cancel_registry(agent):
-    running = asyncio.Event()
-    agent._cancel_events[OTHER] = running
-    try:
-        events = _run(agent, OTHER, header=OTHER)
-    finally:
-        del agent._cancel_events[OTHER]
+def test_other_users_prefixed_id_is_refused_before_the_session_registry(agent):
+    events = _run(agent, OTHER, header=OTHER)
 
     assert events == [{"status": "error", "code": "auth", "error": "Session not available"}]
     assert agent.built == []
-    assert not running.is_set()
+    assert agent.session_runtime.registry._sessions == {}
 
 
 def test_header_and_payload_mismatch_is_bad_input(agent):
