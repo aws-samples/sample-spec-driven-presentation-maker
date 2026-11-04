@@ -13,6 +13,7 @@
  * 1. messageStart - Signals the beginning of a new assistant message
  * 2. contentBlockDelta - Contains incremental text content
  * 3. toolUse (custom) - Tool execution events from backend
+ * 4. taskStart / taskEnd (Cloud) - a background tool's dispatch and its settled result
  *
  * Tool events are passed to toolCallback as structured data,
  * NOT inserted into the completion text.
@@ -59,8 +60,8 @@ export const parseStreamingChunk = (line, currentCompletion, updateCallback, too
 
 /**
  * Apply one parsed agent event (an SSE line's JSON, or the `ev` of a WebSocket item).
- * Events this parser does not know (the session's `work`, `turn`, `turnEnd`, `steer`)
- * leave the completion unchanged.
+ * Events this parser does not know (the session's `work`, `turn`, `turnEnd`, `steer`,
+ * `composerNote`) leave the completion unchanged.
  *
  * @param {object} json - The event object
  * @param {string} currentCompletion - The accumulated completion text
@@ -135,6 +136,40 @@ export const parseEvent = (json, currentCompletion, updateCallback, toolCallback
           result: parsedContent,
           rawResult: json.toolResult.content,
           completed: true,
+        });
+      }
+      return currentCompletion;
+    }
+
+    // Background task dispatched (Cloud compose_slides): the tool keeps running after its
+    // turn, so the card gets a running task instead of a result.
+    if (json.taskStart) {
+      const { toolUseId, name, taskId } = json.taskStart;
+      if (toolCallback) {
+        toolCallback(name, { toolUseId, name, taskStarted: true, task: { id: taskId, state: 'running' } });
+      }
+      return currentCompletion;
+    }
+
+    // Background task settled: its result closes the card. A cancelled task, or a compose
+    // that stopped itself (report status "cancelled"), gets no status (the stopped look).
+    if (json.taskEnd) {
+      const { toolUseId, name, taskId, status, content } = json.taskEnd;
+      let parsedContent = {};
+      try {
+        if (content) parsedContent = JSON.parse(content);
+      } catch { /* content may not be JSON */ }
+      const cancelled = status === 'cancelled' || parsedContent?.status === 'cancelled';
+      const state = cancelled ? 'cancelled' : status === 'failed' ? 'failed' : 'completed';
+      if (toolCallback) {
+        toolCallback(name, {
+          toolUseId,
+          name,
+          status: cancelled ? undefined : state === 'failed' ? 'error' : 'success',
+          result: parsedContent,
+          rawResult: content,
+          completed: true,
+          task: { id: taskId, state },
         });
       }
       return currentCompletion;
