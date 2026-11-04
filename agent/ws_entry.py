@@ -4,7 +4,9 @@
 
 Client messages (JSON, field ``type``):
   prompt {id, prompt, mode?, chatModelId?, createModelId?}   idle: a new turn; working: a steer
-  steer {id, text}                                          routed the same way
+  steer {id, text}                                          routed the same way; becoming a
+                                                            turn, it keeps the latest turn's
+                                                            mode and models
   cancel {id}  ·  resume {from_seq}  ·  prepare {mode?, chatModelId?, createModelId?}  ·  ping
 
 Server frames: control messages ``{"ctl": ...}`` (accepted, cancelAck, resumeAck,
@@ -216,8 +218,10 @@ class Connection:
         kind = message["type"]
         if kind == "ping":
             self.send({"ctl": "pong"})
-        elif kind in ("prompt", "steer"):
-            self._on_message(message, message.get("prompt") if kind == "prompt" else message.get("text"))
+        elif kind == "prompt":
+            self._on_message(message, message.get("prompt"))
+        elif kind == "steer":
+            self._on_message(message, message.get("text"), steer=True)
         elif kind == "cancel":
             session = self._session(create=False)
             result = session.cancel() if session is not None else "idle"
@@ -247,12 +251,13 @@ class Connection:
         else:
             self.send(_error(BAD_INPUT, "Unknown message type"))
 
-    def _on_message(self, message: dict, text) -> None:
+    def _on_message(self, message: dict, text, steer: bool = False) -> None:
         if not isinstance(text, str) or not text:
             self.send(_error(BAD_INPUT, "Invalid field: prompt must be a string"))
             return
-        mode = message.get("mode") or "spec"
-        if mode not in MODES:
+        # A steer carries no mode or models: the session runs it with its latest turn's.
+        mode = message.get("mode") or (None if steer else "spec")
+        if mode is not None and mode not in MODES:
             self.send(_error(BAD_INPUT, "Invalid field: mode"))
             return
         session = self._session(create=True)
@@ -260,7 +265,7 @@ class Connection:
             self._subscribe(session, None)  # the live tail, from now on
         routed, item_id = session.submit(
             text, "ws", self.token, mode, message.get("chatModelId"), message.get("createModelId"),
-            item_id=_item_id(message.get("id")),
+            item_id=_item_id(message.get("id")), inherit=steer,
         )
         self.send({"ctl": "accepted", "id": item_id, "as": routed, "head": session.ring.head})
 

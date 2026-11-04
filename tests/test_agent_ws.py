@@ -436,6 +436,45 @@ def test_prepare_builds_the_handle_without_memory_or_healthy_busy(ctx, real_hand
     assert len(ctx.busy.started) == 1
 
 
+def test_a_steer_after_the_turn_ended_runs_in_its_mode_and_model_on_the_same_agent(ctx, real_handle, monkeypatch):
+    recorder, managers = real_handle
+    monkeypatch.setattr(load("factory"), "_ALLOWED_MODEL_IDS", {"chat-x"})
+    client = ctx.connect()
+    client.send(type="prompt", id="p1", prompt="hello", mode="vibe", chatModelId="chat-x")
+    client.until(_idle)
+    session = ctx.registry.get(OWNED, "user-1")
+    first_agent = session.handle._agent
+
+    client.send(type="steer", id="s1", text="one more thing")
+    client.until(lambda c: c.get("ctl") == "accepted" and c.get("id") == "s1")
+    assert next(c for c in client.ctl if c.get("id") == "s1")["as"] == "turn"
+    assert _wait_for(lambda: [r["kind"] for r in recorder.read()].count("stream") == 2)
+    assert _wait_for(lambda: not session.working)
+
+    streams = [r["detail"]["agent"] for r in recorder.read() if r["kind"] == "stream"]
+    assert streams[0] == streams[1] == id(first_agent), "the steer reused the vibe Agent"
+    assert session.handle._agent_key[0] == "vibe" and "chat-x" in session.handle._agent_key
+    assert len(managers) == 1, "no second Memory session manager"
+
+
+def test_a_ws_steer_sent_while_a_stop_finishes_keeps_the_turns_mode_and_models(ctx):
+    turns = ctx.fake_turns()
+    turns.linger = 0.2
+    client = ctx.connect()
+    client.send(type="prompt", id="p1", prompt="work", mode="style_creator", chatModelId="chat-x", createModelId="create-y")
+    client.until(lambda ev: "event" in ev)
+
+    client.send(type="cancel", id="c1")
+    client.until(_ctl("cancelAck"))
+    client.send(type="steer", id="s1", text="next")
+    client.until(lambda ev: "turn" in ev and ev["turn"]["text"] == "next")
+    turns.release("next")
+    client.until(lambda ev: _idle(ev) and ev["work"]["how"] == "finished")
+
+    assert next(c for c in client.ctl if c.get("id") == "s1")["as"] == "turn"
+    assert turns.settings == [("style_creator", "chat-x", "create-y")] * 2
+
+
 def test_a_jwt_payload_is_never_echoed(ctx):
     # The connection's token stays server-side: no frame carries it.
     ctx.fake_turns()

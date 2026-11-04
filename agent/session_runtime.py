@@ -142,6 +142,9 @@ class Session:
         self.lock = threading.RLock()
         self.subs: dict[str, tuple[asyncio.AbstractEventLoop, asyncio.Queue]] = {}
         self.turn: Turn | None = None
+        # (mode, chat model, create model) of the latest turn, kept after its period
+        # ends: a steer, which carries none of them, runs with these.
+        self.settings: tuple[str, str | None, str | None] = ("spec", None, None)
         self.next_prompts: list[Prompt] = []
         self.working = False
         self.period = 0
@@ -203,19 +206,31 @@ class Session:
 
     # -- input ------------------------------------------------------------------
 
-    def submit(self, text: str, origin: str, token: str, mode: str = "spec",
+    def submit(self, text: str, origin: str, token: str, mode: str | None = "spec",
                chat_model_id: str | None = None, create_model_id: str | None = None,
-               item_id: str = "") -> tuple[str, str]:
+               item_id: str = "", inherit: bool = False) -> tuple[str, str]:
         """A user message: a new turn when idle, a steer while working.
+
+        ``inherit`` (a WebSocket ``steer``): a mode or model left as None is that of the
+        latest turn, or of the message queued to run next, so a steer that becomes a turn
+        runs where the conversation was (``spec`` and the default models only before the
+        session's first turn).
 
         Returns (``"turn"`` | ``"steer"``, id). Raises PermissionError for another
         user's token and RuntimeError once the session is closed.
         """
         self.handle.update_token(token)
-        prompt = Prompt(text, origin, mode or "spec", chat_model_id, create_model_id, id=item_id)
         with self.lock:
             if self.closed:
                 raise RuntimeError("session closed")
+            if inherit:
+                last = self.next_prompts[-1] if self.next_prompts else None
+                last_mode, last_chat, last_create = (
+                    (last.mode, last.chat_model_id, last.create_model_id) if last else self.settings)
+                mode = mode or last_mode
+                chat_model_id = chat_model_id or last_chat
+                create_model_id = create_model_id or last_create
+            prompt = Prompt(text, origin, mode or "spec", chat_model_id, create_model_id, id=item_id)
             self.last_active = time.monotonic()
             if not self.working:
                 self._start_period(prompt)
@@ -281,6 +296,7 @@ class Session:
     def _new_turn_locked(self, prompt: Prompt) -> Turn:
         turn = Turn(prompt)
         self.turn = turn
+        self.settings = (prompt.mode, prompt.chat_model_id, prompt.create_model_id)
         self.publish({"turn": {"id": turn.id, "why": prompt.why, "text": prompt.text}})
         return turn
 
@@ -323,10 +339,10 @@ class Session:
         for item_id, _ in items:
             self.publish({"steer": {"id": item_id, "state": "delivered", "how": "turn"}})
         _log("session_steer", state="delivered", session_id=self.id[:12], period=self.period, how="turn", n=len(items))
-        last = self.turn.prompt if self.turn is not None else Prompt("", "steer")
+        mode, chat_model_id, create_model_id = self.settings
         return self._new_turn_locked(Prompt(
-            "\n\n".join(text for _, text in items), "steer", last.mode, last.chat_model_id,
-            last.create_model_id, why="steer",
+            "\n\n".join(text for _, text in items), "steer", mode, chat_model_id,
+            create_model_id, why="steer",
         ))
 
     def _end_period_locked(self, how: str) -> None:

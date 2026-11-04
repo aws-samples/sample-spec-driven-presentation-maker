@@ -54,6 +54,7 @@ class _Turns:
         self.gates: dict[str, threading.Event] = {}
         self.prompts: list[str] = []
         self.handles: list = []
+        self.settings: list[tuple] = []
         self.linger = 0.0
         self.fail: set[str] = set()
         handle_class = load("session_handle").SessionHandle
@@ -61,6 +62,7 @@ class _Turns:
 
         def begin_turn(handle, token, fence, mode="spec", chat_model_id=None, create_model_id=None, stop=None):
             turns.handles.append(handle)
+            turns.settings.append((mode, chat_model_id, create_model_id))
             handle.update_token(token)
             return object(), [{"name": "Presentation Maker", "status": "ok"}]
 
@@ -262,6 +264,50 @@ def test_a_message_sent_while_a_stop_finishes_runs_after_it(rt):
 
     assert [ev["turnEnd"]["how"] for ev in evs if "turnEnd" in ev] == ["cancelled", "finished"]
     assert evs[-1]["work"]["how"] == "finished"
+
+
+@pytest.mark.parametrize("mode", ["vibe", "style_creator"])
+def test_a_steer_after_the_session_went_idle_keeps_the_latest_turns_mode_and_models(rt, mode):
+    session = rt.session()
+    tail = rt.tail(session)
+    session.submit("first", "ws", _jwt(), mode, "chat-x", "create-y")
+    rt.turns.release("first")
+    tail.until(_idle)
+
+    # The steer raced the end of the turn: it carries no mode or models.
+    assert session.submit("one more thing", "ws", _jwt(), None, inherit=True)[0] == "turn"
+    rt.turns.release("one more thing")
+    assert _wait_for(lambda: not session.working and len(rt.turns.settings) == 2)
+    session.submit("a new prompt", "ws", _jwt(), "spec")
+    rt.turns.release("a new prompt")
+    assert _wait_for(lambda: not session.working and len(rt.turns.settings) == 3)
+
+    assert rt.turns.settings == [(mode, "chat-x", "create-y"), (mode, "chat-x", "create-y"), ("spec", None, None)]
+
+
+def test_a_steer_sent_while_a_stop_finishes_keeps_the_turns_mode_and_models(rt):
+    session = rt.session()
+    tail = rt.tail(session)
+    rt.turns.linger = 0.2
+    session.submit("work", "ws", _jwt(), "vibe", "chat-x")
+    tail.until(lambda ev: "event" in ev)
+
+    session.cancel()
+    assert session.submit("next", "ws", _jwt(), None, inherit=True)[0] == "turn"
+    tail.until(lambda ev: "turn" in ev and ev["turn"]["text"] == "next")
+    rt.turns.release("next")
+    tail.until(_idle)
+
+    assert rt.turns.settings == [("vibe", "chat-x", None), ("vibe", "chat-x", None)]
+
+
+def test_a_steer_before_any_turn_runs_in_spec_with_the_default_models(rt):
+    session = rt.session()
+    session.submit("hello", "ws", _jwt(), None, inherit=True)
+    rt.turns.release("hello")
+    assert _wait_for(lambda: not session.working and rt.turns.settings)
+
+    assert rt.turns.settings == [("spec", None, None)]
 
 
 def test_nobody_listening_cancels_nothing(rt):

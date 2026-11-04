@@ -22,7 +22,8 @@ Entries before v0.5.0 were written retroactively as summaries.
   what it missed. A session is *working* while a turn runs or a follow-on turn is queued; the
   work period holds HealthyBusy on `/ping` and is bounded by a 60-minute watchdog. A message
   sent while the session works is a steer: it reaches the running turn at its next step and
-  is stored in Memory there, as the user's words (`agent/steer_inbox.py`). A disconnect never
+  is stored in Memory there, as the user's words (`agent/steer_inbox.py`); a steer that
+  arrives as the turn ends runs as the next turn in the same mode and models. A disconnect never
   cancels; only the stop button (`cancel`), the watchdog and SIGTERM stop a turn. `prepare`
   builds the session early without writing to Memory. Known limitation: while a synchronous
   `compose_slides` runs, a steer reaches the orchestrator only after it returns.
