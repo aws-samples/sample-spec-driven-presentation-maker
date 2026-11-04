@@ -22,6 +22,7 @@ def _agent(policy, tools):
     background = load("background")
     agent = Agent(model=PolicyModel(policy), tools=tools, callback_handler=None, background_tasks=background.CONFIG)
     background.hide_manage_tool(agent)
+    background.deliver_as_text(agent)
     return agent
 
 

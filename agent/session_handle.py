@@ -168,12 +168,10 @@ class SessionHandle:
             with self._lock:
                 self.task_decks.add(deck_id.strip())
 
-    def note_delivery(self, event) -> None:
-        """MessageAddedEvent hook: a message that delivers background results."""
+    def note_delivered(self, task: dict) -> None:
+        """background.deliver_as_text's callback: a task's result is in the history."""
         callback = self.on_task_end
-        if callback is None:
-            return
-        for task in background.delivered(event.message):
+        if callback is not None:
             callback(task)
 
     def on_agent_callback(self, **kwargs) -> None:

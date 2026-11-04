@@ -69,7 +69,8 @@ the call returns a dispatch notice (`taskStart`) and the turn goes on or ends wh
 composers work. The session stays working until the report is delivered: its progress keeps
 coming as `toolStream`, the settled task is published as `taskEnd`, and when no turn runs the
 session starts one with no input (`turn {why: "wake"}`), in which Strands hands the report to
-the orchestrator before its model call. A steer sent meanwhile starts a turn at once. A stop
+the orchestrator before its model call, as a user text `<compose_result task status>` (the
+management tool's synthetic call is rewritten before it reaches the history). A steer sent meanwhile starts a turn at once. A stop
 sets the work period's stop event (the composers' too) before it cancels the task, and with no
 turn running it fences the decks the task writes. While the composers work, the orchestrator
 reaches one with `message_composer` and a composer answers with `report_to_orchestrator`

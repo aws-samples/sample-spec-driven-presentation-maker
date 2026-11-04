@@ -25,6 +25,9 @@ const MANAGE_TOOL = "strands_manage_background_task"
 /** A composer's report as the orchestrator received it (agent/session_runtime.py Session.report). */
 const COMPOSER_NOTE_RE = /<composer_note group="(\d+)"(?: slugs="([^"]*)")?>([\s\S]*?)<\/composer_note>/g
 
+/** A background result as the agent delivers it (agent/background.py result_block): hidden. */
+const COMPOSE_RESULT_RE = /<compose_result(?: [a-z_]+="[^"]*")*>[\s\S]*?<\/compose_result>/g
+
 /** Session.report escapes a note's text and slugs (Python's html.escape); undo it. */
 function unescapeNote(s: string): string {
   return s.replace(/&(lt|gt|quot|#x27|amp);/g, (_, name: string) =>
@@ -33,9 +36,10 @@ function unescapeNote(s: string): string {
 
 /**
  * Text the agent received as a user message: composer notes become note messages, the
- * rest user messages, in order. Text without a note gives one user message, as before.
+ * rest user messages, in order; a delivered background result is dropped. Text without a note gives one user message, as before.
  */
-function messagesFromText(text: string): Message[] {
+function messagesFromText(raw: string): Message[] {
+  const text = raw.includes("<compose_result") ? raw.replace(COMPOSE_RESULT_RE, "").trim() : raw
   const notes = [...text.matchAll(COMPOSER_NOTE_RE)]
   if (notes.length === 0) {
     const message = userMessageFromText(text)
@@ -97,9 +101,10 @@ function parseAttachments(text: string): { fileName: string; fileType: string }[
  * agent worked (steers, folded in where they reached it): each becomes a user
  * message at that position.
  *
- * Background compose (Cloud): the `strands_manage_background_task` call that delivered a
- * result and its toolResult are dropped (the history API strips result bodies, so the
- * compose card keeps its dispatch result). A `<composer_note>` becomes a note message.
+ * Background compose (Cloud): a delivered result (`<compose_result>` user text) is dropped,
+ * and so is the `strands_manage_background_task` call and toolResult that delivered one
+ * before (older sessions); the compose card keeps its dispatch result. A
+ * `<composer_note>` becomes a note message.
  */
 export function parseCloudHistory(history: ChatMessage[]): Message[] {
   const parsed: Message[] = []

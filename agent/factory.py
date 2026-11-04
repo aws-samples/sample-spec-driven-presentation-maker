@@ -12,7 +12,7 @@ from typing import Callable
 
 from botocore.config import Config as BotocoreConfig
 from strands import Agent
-from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent, BeforeToolCallEvent, MessageAddedEvent
+from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent, BeforeToolCallEvent
 from strands.models import BedrockModel
 
 import background
@@ -379,11 +379,12 @@ def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mc
     agent.hooks.add_callback(BeforeToolCallEvent, handle.note_tool_call)
 
     if cfg.use_composer:
-        # Background compose: the model neither sees nor calls the management tool; the
-        # handle learns each task's deck and each delivered result.
+        # Background compose: the model neither sees nor calls the management tool, the
+        # results reach the history as <compose_result> text, and the handle learns each
+        # task's deck and each delivered result.
         background.hide_manage_tool(agent)
+        background.deliver_as_text(agent, handle.note_delivered)
         agent.hooks.add_callback(BeforeToolCallEvent, handle.note_task_dispatch)
-        agent.hooks.add_callback(MessageAddedEvent, handle.note_delivery)
 
     # Cost logger
     agent.hooks.add_callback(AfterInvocationEvent, log_usage)

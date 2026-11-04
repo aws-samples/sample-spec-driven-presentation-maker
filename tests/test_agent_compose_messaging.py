@@ -128,6 +128,7 @@ def test_message_composer_reaches_the_running_composer_at_its_next_tool_result(c
     agent = Agent(model=PolicyModel(_dispatching_orchestrator), tools=[compose_slides, message_composer],
                   callback_handler=None, background_tasks=background.CONFIG)
     background.hide_manage_tool(agent)
+    background.deliver_as_text(agent)
     stop = threading.Event()
 
     async def run():
@@ -193,6 +194,7 @@ def test_a_message_sent_after_the_composers_last_step_still_reaches_it(composing
     agent = Agent(model=PolicyModel(_dispatching_orchestrator), tools=[compose_slides],
                   callback_handler=None, background_tasks=background.CONFIG)
     background.hide_manage_tool(agent)
+    background.deliver_as_text(agent)
 
     async def run():
         await agent.invoke_async("Make the deck.", invocation_state={stop_key: threading.Event()})

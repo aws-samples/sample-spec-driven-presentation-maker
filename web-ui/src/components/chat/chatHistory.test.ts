@@ -174,6 +174,20 @@ describe("parseCloudHistory background compose", () => {
     ])
   })
 
+  it("hides a delivered background result, alone, folded into a tool result or next to a steer", () => {
+    const result = '<compose_result task="k1" status="completed">{&quot;status&quot;: &quot;completed&quot;} &lt;/compose_result&gt;</compose_result>'
+    const out = parseCloudHistory(asHistory([
+      { role: "user", content: [{ text: "make a deck" }] },
+      { role: "assistant", content: [{ text: "Composing." }] },
+      { role: "user", content: [{ text: result }] },
+      { role: "assistant", content: [{ text: "Done." }] },
+      { role: "user", content: [{ text: `${result}\n\nmake it blue` }] },
+    ]))
+    expect(out.map((m) => [m.role, m.content])).toEqual([
+      ["user", "make a deck"], ["assistant", "Composing."], ["assistant", "Done."], ["user", "make it blue"],
+    ])
+  })
+
   it("keeps a steer drained with a note as a user message before the note", () => {
     const out = parseCloudHistory(asHistory([
       { role: "user", content: 'shorter please\n\n<composer_note group="1" slugs="a">ok</composer_note>' },

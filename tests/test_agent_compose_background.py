@@ -63,6 +63,7 @@ def env(monkeypatch, tmp_path):
         agent = Agent(model=orchestrator_model, tools=[compose_slides], callback_handler=None,
                       background_tasks=background.CONFIG)
         background.hide_manage_tool(agent)
+        background.deliver_as_text(agent)
         return agent, orchestrator_model
 
     try:

@@ -33,8 +33,10 @@ Entries before v0.5.0 were written retroactively as summaries.
   delivered. After a dispatch the orchestrator tells the user what is being composed and ends
   its turn; it looks at the slides (`get_preview`) once the report arrives. When the compose
   settles with no turn running, the session starts a turn with no
-  input (`turn {why: "wake"}`) and the orchestrator reads the report as the result of the
-  task. A message sent while only the compose runs starts a turn at once. New events:
+  input (`turn {why: "wake"}`). The report reaches the orchestrator's history as a user text
+  `<compose_result task="…" status="…">report</compose_result>` (escaped); Strands' own
+  delivery, a synthetic call of its task management tool, is rewritten before it is stored,
+  so neither the model nor Memory sees that tool. A message sent while only the compose runs starts a turn at once. New events:
   `taskStart {toolUseId, taskId, name}` (replaces the dispatch's `toolResult`), `taskEnd
   {toolUseId, taskId, name, status, content}`, and `toolStream` progress between turns. A stop
   (the stop button, the watchdog, SIGTERM) sets the work period's stop event first, which the
@@ -322,10 +324,11 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
-- **A background result delivered after the turn's answer is stored once in Memory.** Strands
-  merges such a delivery into the latest assistant message and announces it again; the Memory
-  session manager now replaces that message's event instead of adding a second one, so a
-  restored session no longer holds the assistant message twice.
+- **A message that grows in place is stored once in Memory.** Strands merges continuation
+  input into the latest message when the roles match (a background result folded into a tool
+  result mid-turn) and announces it again; the Memory session manager now replaces that
+  message's event instead of adding a second one, so a restored session no longer holds the
+  message twice.
 - **Decks with speaker notes built on a template without a notes master now open in
   Keynote and Quick Look.** python-pptx created the notes master but did not declare it
   in `presentation.xml` (`<p:notesMasterIdLst>`), so Keynote rejected the file as invalid

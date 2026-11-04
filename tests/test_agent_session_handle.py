@@ -411,7 +411,7 @@ class _Dispatch:
 
 def test_an_orchestrator_runs_compose_in_the_background_and_a_style_agent_does_not(env):
     background = load("background")
-    from strands.hooks.events import BeforeToolCallEvent, MessageAddedEvent
+    from strands.hooks.events import AfterInvocationEvent, BeforeModelCallEvent, BeforeToolCallEvent
     from strands.middleware.stages import InvokeModelStage
 
     handle = env["handle"]()
@@ -423,10 +423,10 @@ def test_an_orchestrator_runs_compose_in_the_background_and_a_style_agent_does_n
     assert spec.kwargs["background_tasks"] is background.CONFIG
     assert spec.kwargs["callback_handler"] == handle.on_agent_callback
     assert [stage for stage, _ in spec.middleware] == [InvokeModelStage.Input], "the manage tool is hidden"
-    assert [event for event, _ in spec.added_hooks] == [BeforeToolCallEvent], "and refused by name"
+    assert [event for event, _ in spec.added_hooks] == [
+        BeforeToolCallEvent, BeforeModelCallEvent, AfterInvocationEvent], "refused by name; deliveries as text"
     callbacks = [(event, getattr(cb, "__name__", "")) for event, cb in spec.hooks.callbacks]
     assert (BeforeToolCallEvent, "note_task_dispatch") in callbacks
-    assert (MessageAddedEvent, "note_delivery") in callbacks
     assert "background_tasks" not in styler.kwargs and "callback_handler" not in styler.kwargs
     assert styler.middleware == [] and styler.added_hooks == []
 
@@ -486,14 +486,9 @@ def test_a_delivered_result_reaches_the_session(env):
     handle = env["handle"]()
     ended: list = []
     handle.on_task_end = ended.append
-    meta = {"task_id": "k1", "tool_use_id": "t1", "tool_name": "compose_slides", "status": "completed"}
+    task = {"task_id": "k1", "tool_use_id": "t1", "tool_name": "compose_slides", "status": "completed",
+            "result": {"content": [{"text": "{}"}]}}
 
-    class _Added:
-        message = {"role": "user", "content": [
-            {"toolResult": {"toolUseId": "k1", "status": "success", "content": [{"json": meta}, {"text": "{}"}]}},
-            {"text": "a folded steer"},
-        ]}
+    handle.note_delivered(task)
 
-    handle.note_delivery(_Added())
-
-    assert ended == [{**meta, "result": {"content": [{"text": "{}"}]}}]
+    assert ended == [task]
