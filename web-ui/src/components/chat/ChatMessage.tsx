@@ -160,6 +160,8 @@ export interface ToolUse {
   result?: Record<string, unknown>
   /** Streaming progress messages from tool (e.g. compose_slides sub-agent progress). */
   streamMessages?: Record<string, unknown>[]
+  /** Cloud: the tool runs as a background task (compose_slides); running until `taskEnd`. */
+  task?: { id?: string; state: "running" | "completed" | "failed" | "cancelled" }
 }
 
 export type MessageBlock = { type: "text"; text: string } | { type: "tool"; tool: ToolUse }
