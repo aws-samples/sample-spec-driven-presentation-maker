@@ -277,6 +277,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **Decks with speaker notes built on a template without a notes master now open in
+  Keynote and Quick Look.** python-pptx created the notes master but did not declare it
+  in `presentation.xml` (`<p:notesMasterIdLst>`), so Keynote rejected the file as invalid
+  and Quick Look hung on it; PowerPoint repaired it silently. The builder now adds the
+  declaration on save when it is missing. Regenerate existing decks to pick up the fix.
+  (#508, thanks @takke1986)
+
 - **Deploying `SdpmAuth` no longer removes the `sdpm-mcp/invoke` scope from the Web UI's
   Cognito app client.** The scope was added by a custom resource in `SdpmWebUi` that called
   `UpdateUserPoolClient` with a fixed payload. The `SdpmAuth` template did not declare the
