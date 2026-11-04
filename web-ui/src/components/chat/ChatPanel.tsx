@@ -16,10 +16,10 @@ import { loadRuntimeConfig } from "@/lib/runtimeConfig"
 import { buildAttachedMarkers } from "@/lib/attachmentMarker"
 import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
 import { deckSessionId, isOwnerPrefixed } from "@/lib/sessionId"
-import { getChatHistory, patchDeck } from "@/services/deckService"
+import { getChatHistory, patchDeck, type ChatMessage as ChatHistoryMessage } from "@/services/deckService"
 import * as localService from "@/services/localService"
 import type { UploadedFile } from "@/services/uploadService"
-import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
+import { useChatStream, type Message, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { useSlashPickerItems } from "@/hooks/useSlashPickerItems"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage, ToolUse } from "./ChatMessage"
@@ -35,7 +35,8 @@ import { ForkProgressCard } from "./ForkProgressCard"
 import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
 import { toast } from "sonner"
-import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
+import { cutAtPrompt, isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
+import { isResumable } from "@/lib/sessionState"
 import { useLocale, useTranslations } from "next-intl"
 import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsService"
 import type { ForkSessionPhase, KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
@@ -113,6 +114,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [configLoaded, setConfigLoaded] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [reconnectLoading, setReconnectLoading] = useState(false)
+  // Cloud: set by the history load when the session was working; applied once the config is loaded.
+  const [resumeCut, setResumeCut] = useState<{ cut: (prompt: string) => Message[] } | null>(null)
 
   // --- Options ---
   const [optionsOpen, setOptionsOpen] = useState(false)
@@ -313,8 +316,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       if (!IS_LOCAL && !idToken) return
       if (!sessionId) return
       setHistoryLoading(true)
+      let raw: ChatHistoryMessage[] = []
       try {
         const { messages: history, truncated } = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
+        raw = history
         if (truncated) {
           toast.info(t("historyTruncated"))
         }
@@ -334,10 +339,24 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       } finally {
         setHistoryLoading(false)
       }
+      // Cloud: the session was working when this page last saw it (reload, wake, reopened
+      // deck) — follow it once the agent config is loaded. The replay rebuilds the work
+      // from its opening prompt on.
+      if (!IS_LOCAL && deckId && deckId !== "new" && isResumable(sessionId)) {
+        setResumeCut({ cut: (prompt: string) => parseCloudHistory(cutAtPrompt(raw, prompt)) })
+      }
     }
     if (auth.isAuthenticated) loadHistory()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, auth.isAuthenticated])
+
+  // --- Resume a working session (Cloud) ---
+  useEffect(() => {
+    if (!resumeCut || !configLoaded) return
+    setResumeCut(null)
+    void stream.resume(resumeCut.cut)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeCut, configLoaded])
 
   // --- Reconnect to running background session (Local mode) ---
   useEffect(() => {

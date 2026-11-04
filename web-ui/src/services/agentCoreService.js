@@ -124,6 +124,7 @@ function sessionWsUrl(sessionId) {
 }
 
 function sessionEntry(sessionId, accessToken) {
+  if (!AGENT_CONFIG.AGENT_RUNTIME_ARN) throw new Error("Agent Runtime ARN not configured")
   let entry = sessions.get(sessionId)
   if (!entry) {
     entry = { token: accessToken, follower: null, ownIds: new Set(), waiters: new Map(), socket: null }
@@ -289,8 +290,8 @@ function detach(entry) {
  * agent accepted it (`as`: "steer", or "turn" when the work had just ended); rejects when
  * it was not acknowledged within STEER_ACK_MS.
  */
-export const steerAgentCore = (sessionId, text, accessToken, id = generateId()) => {
-  if (IS_LOCAL) return Promise.reject(new Error("Steer is a Cloud feature"))
+export const steerAgentCore = async (sessionId, text, accessToken, id = generateId()) => {
+  if (IS_LOCAL) throw new Error("Steer is a Cloud feature")
   const entry = sessionEntry(sessionId, accessToken)
   entry.ownIds.add(id)
   return waitFor(entry, id, STEER_ACK_MS, () => entry.socket.send({ type: "steer", id, text }))
