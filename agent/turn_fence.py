@@ -99,9 +99,12 @@ class TurnFence:
         try:
             if decks:
                 # Not through call_tool_with_retry: this is the one call made after the
-                # write gate closed. The client's meta carries this turn's generation.
+                # write gate closed. The generation goes with the call itself: the
+                # client's meta is the session's (session_handle.py) and holds the next
+                # turn's generation once that turn has started.
                 result = client.call_tool_sync(
                     tool_use_id=f"fence-{uuid.uuid4().hex[:8]}", name=FENCE_TOOL, arguments={"deck_ids": decks},
+                    meta=self.meta,
                 )
                 if result.get("status") == "error":
                     logger.warning("write fence: fence_turn failed for %s: %s", decks, result.get("content"))
