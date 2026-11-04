@@ -31,7 +31,7 @@ from composition import prefetch_sources, resolve_parts
 from message_hooks import LiftToolResultImages
 from model_profiles import build_model_kwargs, MODEL_PROFILES
 from modes import MODES
-from modes.composer import make_cancelled_report, make_compose_slides
+from modes.composer import make_compose_slides
 from resilience import gate_tool_call
 from session import fix_excess_tool_results
 from tools.hearing_tool import hearing
@@ -376,10 +376,10 @@ def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mc
 
     if cfg.use_composer:
         # Background compose: the model neither sees nor calls the management tool, the
-        # results reach the history as <compose_result> text (a stopped compose's with the
-        # slides the deck holds), and the handle learns each delivered result.
+        # results reach the history as <compose_result> text, and the handle learns each
+        # delivered result.
         background.hide_manage_tool(agent)
-        background.deliver_as_text(agent, handle.note_delivered, make_cancelled_report(mcp_servers))
+        background.deliver_as_text(agent, handle.note_delivered)
 
     # Cost logger
     agent.hooks.add_callback(AfterInvocationEvent, log_usage)

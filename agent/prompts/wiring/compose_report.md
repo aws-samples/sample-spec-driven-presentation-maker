@@ -22,7 +22,6 @@ The report is JSON:
 
 - `status`: `"completed"` / `"partial"` / `"failed"`
 - `generated_slides`: slugs successfully written
-- `slides_in_deck`: with status `cancelled` (the work was stopped), the slugs whose slide files the deck holds now
 - `failed_groups`: per-group failures with `slugs`, `instruction`, and `error` —
   on retry, call `compose_slides` again with ONLY these groups (reuse their
   slugs and instruction). Successfully generated slides do NOT need regeneration.

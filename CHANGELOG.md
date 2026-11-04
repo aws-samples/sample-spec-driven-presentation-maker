@@ -348,10 +348,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   tool call, no direct MCP call from `compose_slides` and no Memory event, except the tool
   result that closes the turn. A Presentation Maker call that was already running on the MCP
   runtime when the stop came runs to its end (a few seconds; on dev, `run_python` saved its
-  slides 1.7 s after a cancel), as in Local mode. A stopped compose's report (status
-  `cancelled`) lists the slides the deck holds when it reaches the orchestrator
-  (`slides_in_deck`, read through `check_specs` and `start_composing`), so the model's
-  picture matches the deck. The remote MCP server exposes the same 20
+  slides 1.7 s after a cancel), as in Local mode. The remote MCP server exposes the same 20
   tools as before: the `fence_turn` tool and the write fence added earlier in this release
   cycle are gone, and a test now fails when the remote server registers a tool outside the
   `sdpm.tools` contract.

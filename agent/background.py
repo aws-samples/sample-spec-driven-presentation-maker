@@ -8,8 +8,7 @@ work; Strands delivers the report into the history later, before the next model 
 delivery is a synthetic ``strands_manage_background_task`` ``get`` call and its result;
 ``deliver_as_text`` rewrites it, before it reaches the history, into one user text block
 ``<compose_result task="…" status="…">report</compose_result>``, so neither the model nor
-Memory ever sees the management tool. A stopped compose's report is completed there with
-the slides the deck holds by then (Strands drops what a cancelled task returns).
+Memory ever sees the management tool.
 
 This module holds the policy and is the only code that knows Strands' background internals:
 the agent-state key of the task snapshots, the management tool's name, the continuation
@@ -17,18 +16,14 @@ input that carries a delivery and the task manager's cancel. Tests pin each name
 Strands' own (test_agent_background.py).
 """
 
-import asyncio
 import dataclasses
 import html
 import inspect
-import json
 import logging
 import re
 
 from strands.hooks import AfterInvocationEvent, BeforeModelCallEvent, BeforeToolCallEvent, HookOrder
 from strands.middleware.stages import InvokeModelStage
-
-from resilience import TURN_STOP_KEY, writes_closed
 
 logger = logging.getLogger("sdpm.agent")
 
@@ -159,28 +154,7 @@ def _synthetic_tasks(messages) -> list[dict] | None:
     return found
 
 
-def _is_cancelled(task: dict) -> bool:
-    """A task Strands cancelled, or a compose that saw the stop and reported ``cancelled``."""
-    if task.get("status") == "cancelled":
-        return True
-    try:
-        report = json.loads(result_text(task))
-    except ValueError:
-        return False
-    return isinstance(report, dict) and report.get("status") == "cancelled"
-
-
-def _call_input(agent, tool_use_id: str) -> dict:
-    """The input of the history's toolUse ``tool_use_id`` (the call a task runs); {} when absent."""
-    for message in reversed(getattr(agent, "messages", None) or []):
-        for block in message.get("content") or []:
-            use = block.get("toolUse") if isinstance(block, dict) else None
-            if isinstance(use, dict) and use.get("toolUseId") == tool_use_id:
-                return use.get("input") if isinstance(use.get("input"), dict) else {}
-    return {}
-
-
-def deliver_as_text(agent, on_delivered=None, cancelled_report=None) -> None:
+def deliver_as_text(agent, on_delivered=None) -> None:
     """Rewrite Strands' delivery of background results into one user text block.
 
     Strands (1.63, ``_BackgroundTasks._deliver_ready``) queues the synthetic ``get`` pairs
@@ -192,13 +166,6 @@ def deliver_as_text(agent, on_delivered=None, cancelled_report=None) -> None:
     for each task after it. A user message right before it (a tool result mid-turn) takes
     the text in; after an assistant message it is a message of its own. The model saw the
     management tool in its history and called it by name (dev, Sonnet 5); now it does not.
-
-    ``cancelled_report(deck_id, report_text) -> str`` (modes.composer.make_cancelled_report)
-    gives a stopped compose its report as delivered: Strands drops what a task returns once
-    it is cancelled, so the report is completed here, with the slides the deck holds by
-    then. It runs in a worker thread, after the stop has finished: not in an invocation
-    whose stop is set (Strands abandons that delivery and makes it again on the next
-    invocation) and not once the write gate is closed.
     """
     if MANAGE_TOOL not in getattr(agent, "tool_names", ()):
         return
@@ -206,27 +173,14 @@ def deliver_as_text(agent, on_delivered=None, cancelled_report=None) -> None:
     # added to the event, before they are prepared.
     from strands.agent import _continuation
 
-    async def complete(task: dict) -> dict:
-        deck_id = str(_call_input(agent, task.get("tool_use_id", "")).get("deck_id") or "")
-        try:
-            text = await asyncio.to_thread(cancelled_report, deck_id, result_text(task))
-        except Exception as e:  # noqa: BLE001 - delivered as Strands left it
-            logger.warning("Completing the report of cancelled task %s failed: %s", task.get("task_id"), e)
-            return task
-        return {**task, "result": {"content": [{"text": text}]}}
-
-    async def rewrite(event) -> None:
+    def rewrite(event) -> None:
         state = _continuation._get_state(event)
         if state is None or state.messages is not None:
             return
-        stop = (getattr(event, "invocation_state", None) or {}).get(TURN_STOP_KEY)
-        completing = cancelled_report is not None and not writes_closed() and not (stop is not None and stop.is_set())
         for i, input_ in enumerate(state.inputs):
             snapshots = _synthetic_tasks(input_.args)
             if not snapshots:
                 continue
-            if completing:
-                snapshots = [await complete(task) if _is_cancelled(task) else task for task in snapshots]
             appended = input_.on_appended
 
             async def on_appended(appended=appended, snapshots=snapshots) -> None:
