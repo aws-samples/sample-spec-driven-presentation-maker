@@ -19,6 +19,40 @@ import { parseAttachedMarkers } from "@/lib/attachmentMarker"
 /** Strip internal sdpm marker comments from persisted text. */
 const MARKER_RE = /<!--sdpm:[^>]*-->\n?/g
 
+/** Strands' background-task management tool: its synthetic get delivers a background result. */
+const MANAGE_TOOL = "strands_manage_background_task"
+
+/** A composer's report as the orchestrator received it (agent/session_runtime.py Session.report). */
+const COMPOSER_NOTE_RE = /<composer_note group="(\d+)"(?: slugs="([^"]*)")?>([\s\S]*?)<\/composer_note>/g
+
+/**
+ * Text the agent received as a user message: composer notes become note messages, the
+ * rest user messages, in order. Text without a note gives one user message, as before.
+ */
+function messagesFromText(text: string): Message[] {
+  const notes = [...text.matchAll(COMPOSER_NOTE_RE)]
+  if (notes.length === 0) {
+    const message = userMessageFromText(text)
+    return message.content.trim() ? [message] : []
+  }
+  const out: Message[] = []
+  const pushText = (part: string) => {
+    const message = userMessageFromText(part.trim())
+    if (message.content.trim()) out.push(message)
+  }
+  let at = 0
+  for (const note of notes) {
+    pushText(text.slice(at, note.index))
+    out.push({
+      role: "assistant", content: "", toolUses: [],
+      composerNote: { group: Number(note[1]), ...(note[2] ? { slugs: note[2] } : {}), text: note[3].trim() },
+    })
+    at = (note.index ?? 0) + note[0].length
+  }
+  pushText(text.slice(at))
+  return out
+}
+
 /** Detect the Local-mode format: messages already carry toolUses. */
 export function isLocalHistoryFormat(history: ChatMessage[]): boolean {
   return (history[0] as unknown as Record<string, unknown>)?.toolUses !== undefined
@@ -54,9 +88,14 @@ function parseAttachments(text: string): { fileName: string; fileType: string }[
  * standalone messages. Their text blocks are messages the user sent while the
  * agent worked (steers, folded in where they reached it): each becomes a user
  * message at that position.
+ *
+ * Background compose (Cloud): the `strands_manage_background_task` call that delivered a
+ * result and its toolResult are dropped (the history API strips result bodies, so the
+ * compose card keeps its dispatch result). A `<composer_note>` becomes a note message.
  */
 export function parseCloudHistory(history: ChatMessage[]): Message[] {
   const parsed: Message[] = []
+  const hiddenTools = new Set<string>()
   for (const m of history) {
     let text = ""
     const toolUses: ToolUse[] = []
@@ -74,6 +113,7 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
           if (b.toolResult) {
             const tr = b.toolResult as Record<string, unknown>
             const tuId = tr.toolUseId as string
+            if (hiddenTools.has(tuId)) continue
             const status = (tr.status as string) || "success"
             let resultText = ""
             for (const c of (tr.content as Record<string, unknown>[]) || []) {
@@ -99,10 +139,7 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
             }
           }
         }
-        for (const steer of steers) {
-          const message = userMessageFromText(steer)
-          if (message.content.trim()) parsed.push(message)
-        }
+        for (const steer of steers) parsed.push(...messagesFromText(steer))
         continue
       }
 
@@ -110,6 +147,10 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
         const b = block
         if (b.toolUse) {
           const tu = b.toolUse as Record<string, unknown>
+          if (tu.name === MANAGE_TOOL) {
+            hiddenTools.add((tu.toolUseId as string) || "")
+            continue
+          }
           toolUses.push({
             toolUseId: (tu.toolUseId as string) || "",
             name: (tu.name as string) || "",
@@ -122,6 +163,10 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
       }
     }
     if (!text.trim() && toolUses.length === 0) continue
+    if (m.role === "user") {
+      parsed.push(...messagesFromText(text))
+      continue
+    }
     const blocks: ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[] = []
     if (m.role === "assistant" && Array.isArray(m.content)) {
       for (const block of m.content) {
@@ -130,6 +175,7 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
           blocks.push({ type: "text", text: b.text as string })
         } else if (b.toolUse) {
           const tu = b.toolUse as Record<string, unknown>
+          if (tu.name === MANAGE_TOOL) continue
           blocks.push({ type: "tool", tool: {
             toolUseId: (tu.toolUseId as string) || "",
             name: (tu.name as string) || "",
@@ -138,14 +184,12 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
         }
       }
     }
-    const attachments = m.role === "user" ? parseAttachments(text) : []
     parsed.push({
       role: m.role as "user" | "assistant",
       content: text,
       toolUses,
       blocks: blocks.length > 0 ? blocks : undefined,
       snippets: snippets.length > 0 ? snippets : undefined,
-      ...(attachments.length > 0 ? { attachments } : {}),
     })
   }
   return parsed
