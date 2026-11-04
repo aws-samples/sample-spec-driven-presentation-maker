@@ -226,7 +226,8 @@ class ResidentClient:
     Only for servers that use nothing from the caller: AWS Knowledge (public endpoint)
     and AWS Pricing (stdio subprocess under the execution role). Neither carries the
     user's JWT, and an agent microVM serves one runtime session, so a resident client
-    is never shared across users. Presentation Maker carries the JWT and stays per turn.
+    is never shared across users. Presentation Maker carries the JWT and stays per session
+    (session_handle.py).
     """
 
     def __init__(self, name: str, make: Callable[[], MCPClient]):

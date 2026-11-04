@@ -203,7 +203,7 @@ def _session_manager(memory_id: str, session_id: str, user_id: str, region: str)
     """AgentCore Memory session manager, or None when Memory is not configured.
 
     Its constructor reads (and for a new session writes) Memory, about 0.4s on dev,
-    so create_agent builds it next to the MCP connections.
+    so the session handle builds it next to the MCP connections, at the first prompt.
     """
     if not memory_id or memory_id == "PLACEHOLDER":
         return None
