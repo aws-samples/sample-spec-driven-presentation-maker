@@ -12,8 +12,10 @@ from typing import Callable
 
 from mcp.client.streamable_http import streamablehttp_client
 from strands.tools.mcp import MCPClient
+from strands.types.exceptions import MCPClientInitializationError
 
 from shared.session_owner import owned_mcp_session_id, sub_from_jwt
+from token_holder import HolderAuth, TokenHolder
 
 logger = logging.getLogger("sdpm.agent")
 
@@ -26,15 +28,17 @@ MCP_DEFS: list[tuple[str, bool]] = [
 
 
 def mcp_agentcore_runtime(
-    jwt_token: str,
+    jwt_token: str = "",
     session_id: str = "",
     tool_filters: dict | None = None,
     meta: dict | None = None,
+    token: TokenHolder | None = None,
 ) -> MCPClient:
     """Pattern 1: Amazon Bedrock AgentCore Runtime MCP Server with JWT Bearer authentication.
 
     Args:
         jwt_token: JWT access token from the caller (without "Bearer " prefix).
+            Sent as a fixed ``Authorization`` header; unused when ``token`` is given.
         session_id: Caller's session id, sent as ``Mcp-Session-Id``. AgentCore
             routes by that header, so omitting it makes every request land on a
             new microVM — see the note below. Empty string disables the header.
@@ -42,13 +46,25 @@ def mcp_agentcore_runtime(
         meta: Optional ``_meta`` sent with every tool call (the turn's write-fence
             generation, turn_fence.py). It travels in the JSON-RPC body, which the
             AgentCore proxy forwards as is; Strands merges trace context into it.
+            Strands reads the dict at call time, so a caller may update it in place.
+        token: The session's TokenHolder (session_handle.py). Every request then reads
+            the latest JWT (HolderAuth) and the client is a ReconnectingMCPClient,
+            kept across turns.
     """
     region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
     runtime_arn = os.environ["MCP_RUNTIME_ARN"]
     encoded_arn = urllib.parse.quote(runtime_arn, safe="")
     url = f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT"
 
-    headers = {"Authorization": f"Bearer {jwt_token}"}
+    transport: dict = {"url": url, "timeout": 120, "terminate_on_close": False}
+    if token is not None:
+        headers: dict = {}
+        transport["auth"] = HolderAuth(token)
+        sub = token.sub
+    else:
+        headers = {"Authorization": f"Bearer {jwt_token}"}
+        sub = sub_from_jwt(jwt_token)
+    transport["headers"] = headers
     if session_id:
         # microVM stickiness: AgentCore routes MCP requests to a microVM by this
         # header. Without it the platform mints a fresh session id per request,
@@ -66,23 +82,100 @@ def mcp_agentcore_runtime(
         #
         # The id always carries the owner prefix of the token's user: an id of an
         # earlier format gets it prepended (shared/session_owner.py).
-        headers["Mcp-Session-Id"] = owned_mcp_session_id(session_id, sub_from_jwt(jwt_token))
+        headers["Mcp-Session-Id"] = owned_mcp_session_id(session_id, sub)
 
     kwargs: dict = {}
     if tool_filters:
         kwargs["tool_filters"] = tool_filters
-    if meta:
+    if meta is not None and (meta or token is not None):
         kwargs["meta"] = meta
 
-    return MCPClient(
-        lambda: streamablehttp_client(
-            url=url,
-            headers=headers,
-            timeout=120,
-            terminate_on_close=False,
-        ),
-        **kwargs,
-    )
+    client_class = ReconnectingMCPClient if token is not None else MCPClient
+    return client_class(lambda: streamablehttp_client(**transport), **kwargs)
+
+
+def _run_blocking(make_coro: Callable[[], object]) -> object:
+    """Run a coroutine to completion from sync code, also on a thread with a running loop.
+
+    compose_slides calls MCP synchronously from inside the agent's event loop, where
+    asyncio.run is not allowed; the coroutine then runs on a short-lived thread.
+    """
+    try:
+        asyncio.get_running_loop()
+    except RuntimeError:
+        return asyncio.run(make_coro())
+    result: list = []
+
+    def run() -> None:
+        try:
+            result.append((True, asyncio.run(make_coro())))
+        except BaseException as e:  # noqa: BLE001 - re-raised on the caller's thread
+            result.append((False, e))
+
+    thread = threading.Thread(target=run, daemon=True, name="sdpm-mcp-restart")
+    thread.start()
+    thread.join()
+    ok, value = result[0]
+    if not ok:
+        raise value
+    return value
+
+
+class ReconnectingMCPClient(MCPClient):
+    """A Presentation Maker client kept across a session's turns, restarted when its
+    MCP session has ended (a 401 with no newer token, a dropped connection).
+
+    The restart keeps the object, so the Agent's MCP tools (which hold it) keep working,
+    and keeps its consumers. A call made on an ended session is sent after the restart
+    (nothing reached the server); a call that fails in flight returns its error result
+    as before, so a write is never sent twice.
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self._restart_lock = threading.Lock()
+
+    def alive(self) -> bool:
+        """True while the MCP session runs.
+
+        The one private probe of this module: MCPClient has no public liveness check,
+        and its own calls test this same state before they send anything.
+        """
+        return self._is_session_active()
+
+    def restart(self) -> None:
+        """Start a new MCP session in place if the current one has ended."""
+        with self._restart_lock:
+            if self.alive():
+                return
+            consumers = set(self._consumers)
+            logger.warning("Presentation Maker MCP session ended; reconnecting")
+            try:
+                self.stop(None, None, None)
+            except Exception as e:  # noqa: BLE001 - the old session is gone either way
+                logger.warning("Closing the ended MCP session failed: %s", e)
+            # load_tools starts the session and lists the tools again (Strands' own
+            # bookkeeping); stop() reset both.
+            _run_blocking(self.load_tools)
+            self._consumers.update(consumers)
+
+    def call_tool_sync(self, *args, **kwargs):
+        if not self.alive():
+            self.restart()
+        try:
+            return super().call_tool_sync(*args, **kwargs)
+        except MCPClientInitializationError:  # ended between the check and the call; nothing sent
+            self.restart()
+            return super().call_tool_sync(*args, **kwargs)
+
+    async def call_tool_async(self, *args, **kwargs):
+        if not self.alive():
+            await asyncio.to_thread(self.restart)
+        try:
+            return await super().call_tool_async(*args, **kwargs)
+        except MCPClientInitializationError:
+            await asyncio.to_thread(self.restart)
+            return await super().call_tool_async(*args, **kwargs)
 
 
 AWS_KNOWLEDGE_URL = "https://knowledge-mcp.global.api.aws"
@@ -133,7 +226,8 @@ class ResidentClient:
     Only for servers that use nothing from the caller: AWS Knowledge (public endpoint)
     and AWS Pricing (stdio subprocess under the execution role). Neither carries the
     user's JWT, and an agent microVM serves one runtime session, so a resident client
-    is never shared across users. Presentation Maker carries the JWT and stays per turn.
+    is never shared across users. Presentation Maker carries the JWT and stays per session
+    (session_handle.py).
     """
 
     def __init__(self, name: str, make: Callable[[], MCPClient]):

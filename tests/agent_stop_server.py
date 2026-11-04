@@ -25,7 +25,7 @@ import factory  # noqa: E402
 
 factory.BedrockModel = lambda **_kwargs: ScriptedModel(recorder)
 factory._MCP_FACTORIES = [
-    lambda jwt_token, session_id="", tool_filters=None, meta=None: FakeMCP(
+    lambda jwt_token, session_id="", tool_filters=None, meta=None, **_kwargs: FakeMCP(
         recorder, "parent", meta=meta, fence_seconds=float(os.environ.get("FAKE_FENCE_SECONDS", "0")),
     ),
 ]

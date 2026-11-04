@@ -29,9 +29,13 @@ These settings come with every deployment of the CDK stacks in `infra/`:
 - **AgentCore Runtime**: the agent and MCP runtimes validate a JWT on every call
   (`customJwtAuthorizer`). The user ID comes from the token's `sub` claim. A resource-based
   policy on each runtime and its endpoints allows only `InvokeAgentRuntime` and
-  `StopRuntimeSession`, the operations the app uses. The agent and the MCP server admit a
+  `StopRuntimeSession`, the operations the app uses, plus
+  `InvokeAgentRuntimeWithWebSocketStream` on the agent runtime (the Web UI's `/ws`
+  connection); `InvokeAgentRuntimeCommand` is denied. The agent and the MCP server admit a
   session only for its owner: the session id carries a prefix derived from the token's
-  `sub`, and each runtime process serves one user (`shared/session_owner.py`).
+  `sub`, and each runtime process serves one user (`shared/session_owner.py`). On `/ws` the
+  agent reads the `Authorization` header the platform forwards after validating the token,
+  admits the session on the first message and checks its owner again on every message.
 - **Per-deck authorization**: a user is the deck's owner, a viewer (the deck is public), or
   has no access. The rules live in one place, `shared/authz.py`, used by both the API and the
   MCP server. See [Architecture — Authorization](architecture.md#authorization-role-based-access-control).

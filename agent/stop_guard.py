@@ -15,7 +15,8 @@ The guard, installed through the app's lifespan so it runs before uvicorn's own 
      runs its stop callback (the turn's fence_turn call, turn_fence.py);
   3. starts a watchdog that flushes OpenTelemetry and exits the process after
      EXIT_AFTER_S, whatever is still running (a composer thread blocked in a read);
-  4. closes the process's resident MCP clients (AWS Knowledge, and AWS Pricing's stdio
+  4. closes the sessions the process keeps (session_runtime.py, through add_close_hook)
+     and the process's resident MCP clients (AWS Knowledge, and AWS Pricing's stdio
      subprocess) on a side thread, best effort: the watchdog's exit bounds it.
 basic_agent passes GRACEFUL_SHUTDOWN_S to uvicorn so it stops waiting before that. The
 lifespan's shutdown then waits, up to the watchdog's exit, for the stop calls still
@@ -52,6 +53,16 @@ _exiting = threading.Event()
 # uvicorn re-raises SIGTERM under the default handler, which ends the process at once.
 _held: set[threading.Thread] = set()
 _exit_at: float | None = None
+# Run on the close thread at SIGTERM, before the resident clients close (the session
+# runtime closes its sessions' handles here).
+_close_hooks: list[Callable[[], object]] = []
+
+
+def add_close_hook(hook: Callable[[], object]) -> None:
+    """Run ``hook`` on the SIGTERM close thread (best effort, bounded by the watchdog)."""
+    with _lock:
+        if hook not in _close_hooks:
+            _close_hooks.append(hook)
 
 
 def begin_turn(on_stop: Callable[[], object] | None = None) -> threading.Event:
@@ -150,6 +161,13 @@ def _exit_after(delay: float) -> None:
 
 
 def _close_resident_clients() -> None:
+    with _lock:
+        hooks = list(_close_hooks)
+    for hook in hooks:
+        try:
+            hook()
+        except Exception as e:  # noqa: BLE001 - best effort, the process is exiting anyway
+            logger.warning("SIGTERM guard: a close hook failed: %s", e)
     try:
         mcp_clients.close_resident_clients()
     except Exception as e:  # noqa: BLE001 - best effort, the process is exiting anyway

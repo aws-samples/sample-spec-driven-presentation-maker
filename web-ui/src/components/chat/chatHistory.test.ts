@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import { describe, it, expect } from "vitest"
-import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
+import { cutAtPrompt, isLocalHistoryFormat, parseLocalHistory, parseCloudHistory, userMessageFromText } from "./chatHistory"
 import type { ChatMessage } from "@/services/deckService"
 
 const asHistory = (msgs: unknown[]) => msgs as unknown as ChatMessage[]
@@ -97,5 +97,46 @@ describe("parseCloudHistory", () => {
       { role: "user", content: '[Attached:{"v":1,"name":"report.pdf","source":"uploads/123e4567-e89b-12d3-a456-426614174000/report.pdf"}] summarize this' },
     ]))
     expect(out[0].attachments).toEqual([{ fileName: "report.pdf", fileType: "application/pdf" }])
+  })
+})
+
+describe("parseCloudHistory steers", () => {
+  it("shows a steer folded into a tool result as a user message between the tool card and the next reply", () => {
+    const out = parseCloudHistory(asHistory([
+      { role: "user", content: [{ text: "make a deck" }] },
+      { role: "assistant", content: [{ text: "Composing." }, { toolUse: { toolUseId: "t1", name: "compose_slides", input: {} } }] },
+      { role: "user", content: [{ toolResult: { toolUseId: "t1", status: "success", content: [] } }, { text: "use blue" }] },
+      { role: "assistant", content: [{ text: "Blue it is." }] },
+    ]))
+    expect(out.map((m) => [m.role, m.content])).toEqual([
+      ["user", "make a deck"], ["assistant", "Composing."], ["user", "use blue"], ["assistant", "Blue it is."],
+    ])
+    expect(out[1].toolUses[0]).toMatchObject({ toolUseId: "t1", status: "success" })
+  })
+})
+
+describe("userMessageFromText", () => {
+  it("strips markers and derives attachment chips", () => {
+    const m = userMessageFromText('<!--sdpm:include_images=true-->\n[Attached:{"v":1,"name":"a.png","source":"uploads/123e4567-e89b-12d3-a456-426614174000/a.png"}] look')
+    expect(m.role).toBe("user")
+    expect(m.content.startsWith("<!--")).toBe(false)
+    expect(m.attachments).toEqual([{ fileName: "a.png", fileType: "image/png" }])
+  })
+})
+
+describe("cutAtPrompt", () => {
+  const history = asHistory([
+    { role: "user", content: [{ text: "first" }] },
+    { role: "assistant", content: [{ text: "ok" }] },
+    { role: "user", content: [{ text: "make it" }, { text: "a folded steer" }] },
+    { role: "assistant", content: [{ text: "partial" }] },
+  ])
+
+  it("keeps the history before the last user message that opens with the prompt", () => {
+    expect(cutAtPrompt(history, "make it")).toEqual(history.slice(0, 2))
+  })
+
+  it("keeps the whole history when the prompt is not stored yet", () => {
+    expect(cutAtPrompt(history, "not there")).toEqual(history)
   })
 })

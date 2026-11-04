@@ -26,9 +26,38 @@ User → AgentCore Runtime → Agent
 
 ---
 
+## セッションランタイム
+
+`basic_agent.py` は 2 つの入口を、1 つのセッションランタイム（`session_runtime.py`）の上で受ける。
+
+- **`/ws`**（`ws_entry.py`）— Web UI の WebSocket。クライアントのメッセージは `prompt`、`steer`、
+  `cancel`、`resume(from_seq)`、`prepare`、`ping`。サーバーは制御フレーム（`accepted`、`cancelAck`、
+  `resumeAck`、`prepareAck`、`ready`、`pong`、`keepalive`、`error`）と、セッションのイベント
+  `{"seq", "ev"}` を返す。`ev` は HTTP のストリームと同じ形に、`work`（busy / idle）、`turn`、
+  `turnEnd`、`steer` を足したもの。フレームは 24,000 バイト以下（`{"batch": [...]}`、大きいイベントは
+  `{"chunk", ...}`）で、20 ミリ秒に 1 つまで送る。最初に送るのはクライアント。セッションは最初の
+  メッセージで、プラットフォームが転送する `Authorization` ヘッダから受け付け、以後のメッセージごとに
+  持ち主を確かめる。
+- **`/invocations`** — Local と外部のクライアント向けの HTTP ストリーミング。自分が始めたターンでは、
+  今までと同じイベントと振る舞いになる。
+
+セッションは MCP クライアント、Agent、Memory のセッションマネージャをターンをまたいで持つ
+（`session_handle.py`。JWT はターンごとに `token_holder.py` で差し替える）。ターンが動いているか、
+続きのターンが待っている間は「仕事中」で、その期間は `/ping` で HealthyBusy を返す。仕事中に送った
+メッセージは steer になる（`steer_inbox.py`）。動いているターンの次の user メッセージに足してから
+Memory に保存するか、終わろうとしているターンを続けるか、終わった後に届いたものは新しいターンにする。
+イベントはセッションのリング（`event_ring.py`）で番号を振るので、つなぎ直したクライアントは
+取りこぼした分を求められる。
+
+ターンを止めるのは、停止ボタン（`cancel`。まだ届けていない steer を先に捨てる）、仕事中の期間の
+60 分の番犬、SIGTERM の 3 つだけ。切断では止めない。同期の `compose_slides` の実行中は、steer は
+それが戻ってからオーケストレーターに届く。
+
+---
+
 ## MCP サーバーパターン
 
-`basic_agent.py` の `create_agent()` で 3 つの接続パターンを使用している。
+`factory.py` がセッションごとに 3 つの接続パターンを使用している。
 
 ### Pattern 1: AgentCore Runtime + JWT Bearer
 

@@ -30,6 +30,7 @@ vi.mock("@/services/agentCoreService", async (importOriginal) => ({
   ...(await importOriginal<typeof import("@/services/agentCoreService")>()),
   setAgentConfig: vi.fn(),
   stopRuntimeSession: vi.fn(),
+  prepareAgentCore: vi.fn(async () => undefined),
   invokeAgentCore,
 }))
 vi.mock("@/services/deckService", () => ({

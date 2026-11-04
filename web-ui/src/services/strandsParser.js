@@ -47,9 +47,31 @@ export const parseStreamingChunk = (line, currentCompletion, updateCallback, too
   const data = line.substring(6).trim();
   if (!data) return currentCompletion;
 
+  let json;
   try {
-    const json = JSON.parse(data);
+    json = JSON.parse(data);
+  } catch {
+    console.debug('Failed to parse streaming event:', data);
+    return currentCompletion;
+  }
+  return parseEvent(json, currentCompletion, updateCallback, toolCallback, translateError);
+};
 
+/**
+ * Apply one parsed agent event (an SSE line's JSON, or the `ev` of a WebSocket item).
+ * Events this parser does not know (the session's `work`, `turn`, `turnEnd`, `steer`)
+ * leave the completion unchanged.
+ *
+ * @param {object} json - The event object
+ * @param {string} currentCompletion - The accumulated completion text
+ * @param {Function} updateCallback - Callback to update the UI with new text
+ * @param {Function} [toolCallback] - Callback for tool use events: (toolName, toolUseData)
+ * @param {Function} [translateError] - Optional translator for error codes: (code) => string | undefined
+ * @returns {string} Updated completion text
+ */
+export const parseEvent = (json, currentCompletion, updateCallback, toolCallback, translateError) => {
+  if (!json || typeof json !== 'object') return currentCompletion;
+  try {
     // Keep-alive
     if (json.keepalive) return currentCompletion;
 
@@ -137,7 +159,7 @@ export const parseStreamingChunk = (line, currentCompletion, updateCallback, too
 
     return currentCompletion;
   } catch {
-    console.debug('Failed to parse streaming event:', data);
+    console.debug('Failed to apply streaming event:', json);
     return currentCompletion;
   }
 };

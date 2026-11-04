@@ -29,6 +29,13 @@ def _factory():
     return load()
 
 
+def _jwt_of(sub: str) -> str:
+    import base64
+
+    body = base64.urlsafe_b64encode(json.dumps({"sub": sub}).encode()).decode().rstrip("=")
+    return f"h.{body}.s"
+
+
 class _Hooks:
     def add_callback(self, *args, **kwargs):
         pass
@@ -86,9 +93,19 @@ class _PresentationMaker:
         self.calls = calls
         self.called = called
         self.stopped = threading.Event()
+        self.consumers: set = set()
 
     async def load_tools(self, **kwargs):
         return []
+
+    def add_consumer(self, consumer_id, **kwargs):
+        self.consumers.add(consumer_id)
+
+    def remove_consumer(self, consumer_id, **kwargs):
+        # Strands stops a client when its last consumer goes.
+        self.consumers.discard(consumer_id)
+        if not self.consumers:
+            self.stopped.set()
 
     def call_tool_sync(self, tool_use_id, name, arguments):
         self.calls.append((self.user, name, arguments))
@@ -126,8 +143,9 @@ def assembly(monkeypatch):
         state["optional"].append(client)
         return client
 
-    def presentation_maker(jwt_token, session_id="", tool_filters=None):
-        client = _PresentationMaker(jwt_token, state["calls"], state["called"])
+    def presentation_maker(jwt_token="", session_id="", tool_filters=None, token=None, **kwargs):
+        # The session handle's client reads the JWT from its TokenHolder.
+        client = _PresentationMaker(token.sub if token is not None else jwt_token, state["calls"], state["called"])
         state["pm"].append(client)
         return client
 
@@ -140,7 +158,7 @@ def assembly(monkeypatch):
     monkeypatch.setattr(factory, "Agent", _Agent)
 
     def create(user: str, session: str = "s1"):
-        return factory.create_agent("spec", user_id=user, session_id=session, jwt_token=user)
+        return factory.create_agent("spec", user_id=user, session_id=session, jwt_token=_jwt_of(user))
 
     mcp_clients.close_resident_clients()
     state["factory"] = factory

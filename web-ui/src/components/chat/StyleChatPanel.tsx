@@ -36,6 +36,7 @@ interface StyleChatPanelProps {
 
 export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleChatPanelProps) {
   const t = useTranslations("styleChat")
+  const tChat = useTranslations("chat")
   const auth = useAuth()
   const sessionId = useRef(generateSessionId(auth.user?.profile?.sub)).current
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -113,14 +114,17 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
       const snippetInfo = snippets.map((s) => `---snippet---\n${s.text}\n---/snippet---`).join("\n\n")
       fullMessage = `${fullMessage}\n\n${snippetInfo}`
     }
-    await stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments)
+    // Cloud, agent working: a steer. A steer that was not accepted keeps the input.
+    const steering = !IS_LOCAL && stream.isLoading
+    const ok = await stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments)
+    if (steering && !ok) return false
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stream.sendMessage, styleId])
+  }, [stream.sendMessage, stream.isLoading, styleId])
 
   const isInitial = stream.messages.length === 0
 
   return (
-    <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={stream.isLoading} className="flex flex-col h-full">
+    <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={stream.isLoading && IS_LOCAL} className="flex flex-col h-full">
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-4 py-4"
@@ -158,19 +162,23 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
             {(() => {
               const lastUserIdx = stream.messages.findLastIndex((m) => m.role === "user")
               return stream.messages.map((msg, i) => (
-              <ChatMessage
-                key={i}
-                role={msg.role}
-                content={msg.content}
-                toolUses={msg.toolUses}
-                blocks={msg.blocks}
-                snippets={msg.snippets}
-                attachments={msg.attachments}
-                isStreaming={stream.isLoading && i === stream.messages.length - 1}
-                idToken={auth.user?.id_token}
-                onSend={(text: string) => handleSend(text, [], [], [])}
-                hearingDisabled={i < lastUserIdx}
-              />
+              <div key={i}>
+                <ChatMessage
+                  role={msg.role}
+                  content={msg.content}
+                  toolUses={msg.toolUses}
+                  blocks={msg.blocks}
+                  snippets={msg.snippets}
+                  attachments={msg.attachments}
+                  isStreaming={stream.isLoading && i === stream.messages.length - 1}
+                  idToken={auth.user?.id_token}
+                  onSend={(text: string) => handleSend(text, [], [], [])}
+                  hearingDisabled={i < lastUserIdx}
+                />
+                {msg.steerNotDelivered && (
+                  <p className="mt-1 text-right text-xs text-foreground-muted">{tChat("steerNotDelivered")}</p>
+                )}
+              </div>
             ))
             })()}
             <div ref={messagesEndRef} />
@@ -178,11 +186,18 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
         )}
       </div>
 
+      {(stream.stopping || stream.reconnecting) && (
+        <p role="status" className="flex-none px-4 pb-1 text-xs text-foreground-muted">
+          {stream.stopping ? tChat("stopping") : tChat("reconnecting")}
+        </p>
+      )}
+
       <ChatInput
         ref={chatInputRef}
         onSend={handleSend}
         isLoading={stream.isLoading}
         onStop={stream.stopGeneration}
+        canSendWhileLoading={!IS_LOCAL}
         idToken={auth.user?.id_token}
         sessionId={sessionId}
         placeholder={t("placeholder")}

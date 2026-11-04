@@ -27,8 +27,9 @@ async def stream_agent(
         agent: Initialized Strands Agent.
         user_query: User's input message.
         session_id: Session ID (for logging).
-        cancel: Set when a newer request for the same session takes over; the stream
-            stops once the running tool has returned.
+        cancel: Set when a newer HTTP prompt takes over this HTTP-started turn
+            (session_runtime.py); the stream stops once the running tool has returned.
+            Nothing else sets it: a stop sets ``cancel_signal``.
         cancel_signal: The turn's stop event, owned by the caller. Strands observes it
             (its ``cancel_signal``), and tools get it through ``invocation_state``
             (TURN_STOP_KEY), so composers still see it after this invocation ended.
@@ -159,9 +160,9 @@ async def stream_agent(
         if cancel_task is not None and not cancel_task.done():
             cancel_task.cancel()
         if not finished:
-            # Left before Strands finished: a newer request took over, or the client went
-            # away. Cancel through Strands and let the turn end itself, so it stops with
-            # paired tool results instead of running on unobserved.
+            # Left before Strands finished: an HTTP prompt took over, or the consumer of
+            # this generator went away. Cancel through Strands and let the turn end itself,
+            # so it stops with paired tool results instead of running on unobserved.
             logger.info("Cancelling agent turn for session %s", session_id[:12])
             cancel_signal.set()
             try:

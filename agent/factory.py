@@ -3,7 +3,6 @@
 """Unified agent factory: assembles MCP clients, model, tools, and prompt into a Strands Agent."""
 
 import asyncio
-import contextvars
 import json
 import logging
 import os
@@ -31,7 +30,7 @@ from message_hooks import LiftToolResultImages
 from model_profiles import build_model_kwargs, MODEL_PROFILES
 from modes import MODES
 from modes.composer import make_compose_slides
-from resilience import LoopGuard, gate_tool_call
+from resilience import gate_tool_call
 from session import fix_excess_tool_results
 from turn_fence import TurnFence
 from tools.hearing_tool import hearing
@@ -204,7 +203,7 @@ def _session_manager(memory_id: str, session_id: str, user_id: str, region: str)
     """AgentCore Memory session manager, or None when Memory is not configured.
 
     Its constructor reads (and for a new session writes) Memory, about 0.4s on dev,
-    so create_agent builds it next to the MCP connections.
+    so the session handle builds it next to the MCP connections, at the first prompt.
     """
     if not memory_id or memory_id == "PLACEHOLDER":
         return None
@@ -219,121 +218,127 @@ def _session_manager(memory_id: str, session_id: str, user_id: str, region: str)
 
 
 # ---------------------------------------------------------------------------
-# Unified factory
+# Building blocks of a session (session_handle.SessionHandle calls them through
+# this module, so tests can patch them here)
 # ---------------------------------------------------------------------------
 
-def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_model_id: str | None = None, create_model_id: str | None = None, fence: TurnFence | None = None) -> tuple[Agent, list[dict]]:
-    """Create a Strands Agent for the given mode.
-
-    ``fence`` (turn_fence.py): its generation goes into the ``_meta`` of every
-    Presentation Maker call (orchestrator and composers), and it learns the decks the
-    turn's tool calls name.
-
-    Returns:
-        Tuple of (Configured Strands Agent, MCP status list).
-    """
-    cfg = MODES[mode]
-    memory_id = os.environ.get("MEMORY_ID", "")
-    region = os.environ.get("AWS_REGION", os.environ.get("AWS_DEFAULT_REGION", "us-east-1"))
-
-    # Session manager — built on a side thread while the MCP servers connect. The
-    # context copy keeps its Memory calls under this request's trace.
-    side = ThreadPoolExecutor(max_workers=1, thread_name_prefix="sdpm-memory")
-    session_manager_future = side.submit(
-        contextvars.copy_context().run, _session_manager, memory_id, session_id, user_id, region,
-    )
-    side.shutdown(wait=False)
-
-    # Models — agent uses chat or create model depending on mode
+def resolve_models(cfg, chat_model_id: str | None, create_model_id: str | None) -> tuple[str, str | None]:
+    """(the agent's model id, the composers' model id or None) for a mode."""
     if cfg.agent_model == "create":
-        requested_agent = create_model_id
-        default_agent = _DEFAULT_CREATE_MODEL_ID
+        resolved_agent = _resolve_model_id(create_model_id, _DEFAULT_CREATE_MODEL_ID)
     else:
-        requested_agent = chat_model_id
-        default_agent = _DEFAULT_CHAT_MODEL_ID
-    resolved_agent = _resolve_model_id(requested_agent, default_agent)
-    model = BedrockModel(**build_model_kwargs(resolved_agent))
-
-    # MCP servers — Presentation Maker built per turn (it carries the JWT), AWS
-    # Knowledge / AWS Pricing reused from the process; all connected concurrently below.
-    fence_kwargs = {"meta": fence.meta} if fence is not None else {}
-    built = []
-    names = []
-    required_flags = []
-    for i, ((name, required), factory_fn) in enumerate(zip(MCP_DEFS, _MCP_FACTORIES)):
-        if name in _RESIDENT_SERVERS:
-            built.append(resident_client(name, lambda make=factory_fn: make("")))
-        else:
-            # Apply tool_filters only to the Presentation Maker server (index 0)
-            filters = {"allowed": cfg.allowed_tools} if (i == 0 and cfg.allowed_tools) else None
-            built.append(factory_fn(jwt_token, session_id=session_id, tool_filters=filters, **fence_kwargs))
-        names.append(name)
-        required_flags.append(required)
-
-    def critical_path(required_clients: list) -> None:
-        # Runs as soon as the Presentation Maker client is up, while the optional
-        # servers are still connecting: start_presentation (the system-prompt
-        # sources) goes first, then the Memory session manager is awaited. The
-        # optional servers' deadline is the end of this function.
-        try:
-            prefetch_sources(cfg.parts, required_clients[0] if required_clients else None, user_id=user_id)
-        except Exception as e:
-            logger.warning("Prompt prefetch failed: %s", e)
-        wait([session_manager_future])
-
-    mcp_servers, mcp_status = _prewarm_mcp_clients(built, names, required_flags, then=critical_path)
-    try:
-        session_manager = session_manager_future.result()
-    except Exception:
-        # Memory failed after the servers connected: no agent will own this turn's
-        # clients. Resident ones stay for the next turn.
-        per_turn = [c for c in built if not isinstance(c, ResidentClient)]
-        for client in mcp_servers:
-            if not any(client is c for c in per_turn):
-                continue
-            try:
-                client.stop(None, None, None)
-            except Exception as e:  # noqa: BLE001 - best-effort cleanup before re-raising
-                logger.warning("Closing an MCP client after the Memory failure failed: %s", e)
-        raise
-
-    # Tools
-    tools = [*mcp_servers, web_fetch, hearing]
-    composer_mcp_factory = None
+        resolved_agent = _resolve_model_id(chat_model_id, _DEFAULT_CHAT_MODEL_ID)
+    resolved_create = None
     if cfg.use_composer:
         resolved_create = _resolve_model_id(create_model_id, _DEFAULT_CREATE_MODEL_ID)
         profile = MODEL_PROFILES.get(resolved_create)
         if profile and not profile.compose_capable:
             logger.warning("Model %r is not compose_capable; falling back to %r for create", resolved_create, _DEFAULT_CREATE_MODEL_ID)
             resolved_create = _DEFAULT_CREATE_MODEL_ID
-        composer_model = BedrockModel(
-            **build_model_kwargs(resolved_create),
-            boto_client_config=BotocoreConfig(
-                user_agent_extra="strands-agents",
-                read_timeout=120,
-                retries={"max_attempts": 5, "mode": "adaptive"},
-            ),
-        )
-        # Composers get their own Presentation Maker client per group; it carries the
-        # composer allowlist so a composer sees only the deck tools.
-        composer_filters = {"allowed": MODES["composer"].allowed_tools}
-        composer_mcp_factory = lambda mcp_session_id="": mcp_agentcore_runtime(jwt_token=jwt_token, session_id=mcp_session_id, tool_filters=composer_filters, **fence_kwargs)  # noqa: E731
-        compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create, user_id=user_id, session_id=session_id)
-        tools.append(compose_slides)
+    return resolved_agent, resolved_create
 
-    # Agent
+
+def connect_clients(handle, cfg, then: Callable[[], None] | None = None) -> tuple[list, list[dict]]:
+    """Connect the session's MCP clients for ``cfg`` and prefetch its system-prompt sources.
+
+    The Presentation Maker client is the handle's (kept across turns, carrying the
+    session's TokenHolder and shared ``_meta``); AWS Knowledge / AWS Pricing are the
+    process's resident clients. A connected client costs nothing here: load_tools is a
+    cache hit and a resident only runs its liveness check. ``then`` runs on the
+    critical path after the prefetch (the first prompt waits there for Memory).
+    """
+    built, names, required_flags = [], [], []
+    for i, ((name, required), factory_fn) in enumerate(zip(MCP_DEFS, _MCP_FACTORIES)):
+        if name in _RESIDENT_SERVERS:
+            built.append(resident_client(name, lambda make=factory_fn: make("")))
+        elif i == 0:
+            built.append(handle.pm_client(cfg))
+        else:
+            continue
+        names.append(name)
+        required_flags.append(required)
+
+    def critical_path(required_clients: list) -> None:
+        # Runs as soon as the Presentation Maker client is up, while the optional
+        # servers are still connecting: start_presentation (the system-prompt
+        # sources) goes first, then *then*. The optional servers' deadline is the
+        # end of this function.
+        try:
+            prefetch_sources(cfg.parts, required_clients[0] if required_clients else None, user_id=handle.sub)
+        except Exception as e:
+            logger.warning("Prompt prefetch failed: %s", e)
+        if then is not None:
+            then()
+
+    return _prewarm_mcp_clients(built, names, required_flags, then=critical_path)
+
+
+def build_model(model_id: str, composer: bool = False):
+    if not composer:
+        return BedrockModel(**build_model_kwargs(model_id))
+    return BedrockModel(
+        **build_model_kwargs(model_id),
+        boto_client_config=BotocoreConfig(
+            user_agent_extra="strands-agents",
+            read_timeout=120,
+            retries={"max_attempts": 5, "mode": "adaptive"},
+        ),
+    )
+
+
+def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mcp_servers: list, mcp_status: list[dict], session_manager) -> tuple[Agent, list, list[dict]]:
+    """Build the session's Agent for one (mode, models) from connected clients.
+
+    Its hooks act on the handle's current turn (write fence, LoopGuard), so the Agent
+    serves every turn of the session until the mode or a model changes.
+
+    Returns:
+        (Agent, the MCP clients it uses, MCP status list)
+    """
+    resolved_agent, resolved_create = model_ids
+    user_id, session_id = handle.sub, handle.session_id
+    model = handle.model(resolved_agent)
+
+    composer_model = None
+    composer_mcp_factory = None
+    if cfg.use_composer:
+        composer_model = handle.model(resolved_create, composer=True)
+        # Composers get their own Presentation Maker client per group; it carries the
+        # composer allowlist so a composer sees only the deck tools, the session's
+        # latest JWT, and the generation of the turn that started it.
+        composer_filters = {"allowed": MODES["composer"].allowed_tools}
+
+        def composer_mcp_factory(mcp_session_id: str = ""):
+            return mcp_agentcore_runtime(
+                session_id=mcp_session_id, tool_filters=composer_filters, meta=dict(handle.meta), token=handle.holder,
+            )
+
+    def tools_for(servers: list) -> list:
+        tools = [*servers, web_fetch, hearing]
+        if cfg.use_composer:
+            # The list itself goes to compose_slides, so a resident client that connects
+            # later in the session (add_clients) reaches the composers too.
+            tools.append(make_compose_slides(servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create, user_id=user_id, session_id=session_id))
+        return tools
+
     agent_name = f"Sdpm{mode.capitalize()}Agent"
     agent_trace_attributes = {
         "user.id": user_id, "session.id": session_id,
         "model.id": resolved_agent, "purpose": cfg.agent_model,
     }
-    try:
-        agent = Agent(
-            name=agent_name, system_prompt="", tools=tools, model=model,
+
+    def build(servers: list) -> Agent:
+        return Agent(
+            name=agent_name, system_prompt="", tools=tools_for(servers), model=model,
             session_manager=session_manager,
             trace_attributes=agent_trace_attributes,
             hooks=[LiftToolResultImages()],
+            plugins=[handle.steer_plugin()],
         )
+
+    mcp_servers = list(mcp_servers)
+    try:
+        agent = build(mcp_servers)
     except Exception:
         logger.warning("Agent init failed with all MCP servers, retrying with required-only")
         required_servers = []
@@ -346,51 +351,16 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
                 new_status.append({"name": name, "status": "error", "error": st.get("error", "Service unavailable")})
         mcp_servers = required_servers
         mcp_status = new_status
-        tools = [*mcp_servers, web_fetch, hearing]
-        if cfg.use_composer:
-            compose_slides = make_compose_slides(mcp_servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create, user_id=user_id, session_id=session_id)
-            tools.append(compose_slides)
-        agent = Agent(
-            name=agent_name, system_prompt="", tools=tools, model=model,
-            session_manager=session_manager,
-            trace_attributes=agent_trace_attributes,
-            hooks=[LiftToolResultImages()],
-        )
+        agent = build(mcp_servers)
 
-    # Prompts + history (parts-based)
-    context = {"mcp_instructions": collect_mcp_instructions(mcp_servers)}
-
-    try:
-        profile = MODEL_PROFILES.get(resolved_agent)
-        enable_cache = (profile.cache_strategy == "auto") if profile else True
-        system_prompt, initial_messages = resolve_parts(
-            cfg.parts,
-            mcp_client=mcp_servers[0] if mcp_servers else None,
-            context=context,
-            enable_cache=enable_cache,
-            user_id=user_id,
-        )
-    except Exception as e:
-        logger.warning("Prompt resolve failed: %s", e)
-        system_prompt, initial_messages = "", []
-
-    # Apply to agent
-    has_history = bool(initial_messages)
-    if has_history and len(agent.messages) == 0:
-        agent.messages.extend(initial_messages)
-    agent.system_prompt = system_prompt
-
-    # LoopGuard
-    guard = LoopGuard(max_tool_calls=int(os.environ.get("SPEC_MAX_TOOL_CALLS", "300")))
-    agent.hooks.add_callback(AfterToolCallEvent, guard.after_tool)
+    # LoopGuard (a new one per turn, held by the handle)
+    agent.hooks.add_callback(AfterToolCallEvent, handle.after_tool)
 
     # Write gate: no tool runs once the process is stopping (SIGTERM, stop_guard.py)
     agent.hooks.add_callback(BeforeToolCallEvent, gate_tool_call)
 
-    # Write fence: the decks this turn touches, and the client that fences them on a stop
-    if fence is not None:
-        agent.hooks.add_callback(BeforeToolCallEvent, fence.note_tool_call)
-        fence.bind(mcp_servers[0] if mcp_servers else None)
+    # Write fence: the decks the current turn touches (turn_fence.py)
+    agent.hooks.add_callback(BeforeToolCallEvent, handle.note_tool_call)
 
     # Cost logger
     agent.hooks.add_callback(AfterInvocationEvent, log_usage)
@@ -406,6 +376,60 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
         except Exception as e:
             logger.warning("tool filter validation skipped: %s", e)
 
+    return agent, mcp_servers, mcp_status
+
+
+def refresh_prompt(handle, cfg, agent: Agent, model_id: str, mcp_servers: list) -> None:
+    """Set the turn's system prompt (``{now}``); on a new Agent also its opening history.
+
+    The Source.mcp parts come from the process cache after the first turn, so this
+    makes no MCP call then.
+    """
+    context = {"mcp_instructions": collect_mcp_instructions(mcp_servers)}
+    try:
+        profile = MODEL_PROFILES.get(model_id)
+        enable_cache = (profile.cache_strategy == "auto") if profile else True
+        system_prompt, initial_messages = resolve_parts(
+            cfg.parts,
+            mcp_client=mcp_servers[0] if mcp_servers else None,
+            context=context,
+            enable_cache=enable_cache,
+            user_id=handle.sub,
+        )
+    except Exception as e:
+        logger.warning("Prompt resolve failed: %s", e)
+        system_prompt, initial_messages = "", []
+
+    if initial_messages and len(agent.messages) == 0:
+        agent.messages.extend(initial_messages)
+    agent.system_prompt = system_prompt
     fix_excess_tool_results(agent.messages)
 
+
+# ---------------------------------------------------------------------------
+# Unified factory
+# ---------------------------------------------------------------------------
+
+def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_model_id: str | None = None, create_model_id: str | None = None, fence: TurnFence | None = None) -> tuple[Agent, list[dict]]:
+    """Create a Strands Agent for one turn of the given mode (a one-shot session handle).
+
+    The agent entry keeps a SessionHandle per session instead (session_runtime.py);
+    this builds one, takes its first turn's Agent and leaves the clients to that Agent.
+
+    ``fence`` (turn_fence.py): its generation goes into the ``_meta`` of every
+    Presentation Maker call (orchestrator and composers), and it learns the decks the
+    turn's tool calls name.
+
+    Returns:
+        Tuple of (Configured Strands Agent, MCP status list).
+    """
+    from session_handle import SessionHandle
+
+    handle = SessionHandle(session_id, user_id)
+    try:
+        agent, mcp_status = handle.begin_turn(jwt_token, fence, mode, chat_model_id, create_model_id)
+    except BaseException:
+        handle.close()
+        raise
+    handle.release_clients()
     return agent, mcp_status

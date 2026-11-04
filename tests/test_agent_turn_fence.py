@@ -80,8 +80,9 @@ def test_a_stopped_turn_fences_the_decks_its_calls_named_once():
     thread = fence.advance()
     thread.join(5)
 
-    # The client's own meta carries the generation; the call names the decks.
-    assert client.calls == [{"name": "fence_turn", "arguments": {"deck_ids": ["d1", "d2"]}}]
+    # The call names the decks and carries the turn's own generation (the client's
+    # meta is shared by the session's turns).
+    assert client.calls == [{"name": "fence_turn", "arguments": {"deck_ids": ["d1", "d2"]}, "meta": {"sdpm/generation": 123}}]
     assert fence.meta == {"sdpm/generation": 123}
     # Held while the call runs, released after it.
     assert client.consumers == [("add", "sdpm-turn-fence"), ("remove", "sdpm-turn-fence")]
@@ -118,6 +119,14 @@ def test_generations_grow_from_turn_to_turn():
     assert 0 < first.generation <= second.generation
 
 
+def _jwt_of(sub: str) -> str:
+    import base64
+    import json
+
+    body = base64.urlsafe_b64encode(json.dumps({"sub": sub}).encode()).decode().rstrip("=")
+    return f"h.{body}.s"
+
+
 def test_orchestrator_and_composer_clients_carry_the_generation(monkeypatch):
     factory = _factory()
     runtime_calls: list[dict] = []
@@ -136,7 +145,7 @@ def test_orchestrator_and_composer_clients_carry_the_generation(monkeypatch):
     client = _Client()
 
     def runtime(**kwargs):
-        runtime_calls.append(kwargs)
+        runtime_calls.append({**kwargs, "meta": dict(kwargs["meta"]) if kwargs.get("meta") is not None else None})
         return client
 
     def make_compose_slides(mcp_servers, model, composer_mcp_factory, **kwargs):
@@ -155,7 +164,7 @@ def test_orchestrator_and_composer_clients_carry_the_generation(monkeypatch):
     monkeypatch.setattr(factory, "resolve_parts", lambda *a, **k: ("", []))
 
     fence = factory.TurnFence(generation=42)
-    factory.create_agent("spec", user_id="u1", session_id="s1", jwt_token="jwt", fence=fence)
+    factory.create_agent("spec", user_id="u1", session_id="s1", jwt_token=_jwt_of("u1"), fence=fence)
     (orchestrator,) = runtime_calls
     runtime_calls.clear()
     captured["factory"]("s1-g1")
@@ -164,15 +173,18 @@ def test_orchestrator_and_composer_clients_carry_the_generation(monkeypatch):
     assert orchestrator["meta"] == {"sdpm/generation": 42}
     assert composer["meta"] == {"sdpm/generation": 42}
     assert composer["session_id"] == "s1-g1"
-    # The fence learns the turn's decks from the orchestrator's tool calls and fences
-    # through the orchestrator's client (compose_slides names its deck there).
-    assert any(getattr(h, "__self__", None) is fence and h.__name__ == "note_tool_call" for h in hooks)
+    # The fence learns the turn's decks from the orchestrator's tool calls (through the
+    # session handle's hook, which acts on the current turn's fence) and fences through
+    # the orchestrator's client (compose_slides names its deck there).
+    (note,) = [h for h in hooks if getattr(h, "__name__", "") == "note_tool_call"]
+    note(_Event({"deck_id": "d9"}))
+    assert fence.decks == ["d9"]
     assert ("add", "sdpm-turn-fence") in client.consumers
 
-    # Without a fence (callers other than the entrypoint) the clients get no meta.
+    # Without a fence (callers other than the entrypoint) the clients carry no generation.
     runtime_calls.clear()
-    factory.create_agent("spec", user_id="u1", session_id="s1", jwt_token="jwt")
-    assert "meta" not in runtime_calls[0]
+    factory.create_agent("spec", user_id="u1", session_id="s1", jwt_token=_jwt_of("u1"))
+    assert not runtime_calls[0]["meta"]
 
 
 def test_mcp_client_sends_the_meta_with_every_call(monkeypatch):
@@ -211,20 +223,16 @@ class _FenceSpy:
 
 
 def _entrypoint(monkeypatch, stream):
+    from test_agent_tool_exposure import patch_turn
+
     basic_agent = _basic_agent()
     _FenceSpy.instances = []
-    seen: dict = {}
-
-    def fake_create_agent(**kwargs):
-        seen.update(kwargs)
-        return object(), []
-
-    monkeypatch.setattr(basic_agent, "TurnFence", _FenceSpy)
-    monkeypatch.setattr(basic_agent, "create_agent", fake_create_agent)
-    monkeypatch.setattr(basic_agent, "stream_agent", stream)
+    built: list = []
+    monkeypatch.setattr(basic_agent.session_runtime, "TurnFence", _FenceSpy)
+    patch_turn(monkeypatch, basic_agent, stream, built)
     _run(basic_agent, {"prompt": "hello", "runtimeSessionId": OWNED})
     (fence,) = _FenceSpy.instances
-    assert seen["fence"] is fence
+    assert built[0]["fence"] is fence
     return fence
 
 

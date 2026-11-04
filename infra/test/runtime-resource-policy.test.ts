@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * Both AgentCore runtimes and every endpoint callers use carry a resource-based
- * policy that allows only InvokeAgentRuntime + StopRuntimeSession and denies
+ * policy that allows only InvokeAgentRuntime + StopRuntimeSession (and, on the agent
+ * runtime, InvokeAgentRuntimeWithWebSocketStream for the Web UI's /ws) and denies
  * InvokeAgentRuntimeCommand.
  */
 
@@ -61,7 +62,9 @@ function logicalIdOf(template: Template, type: string): string {
   return ids[0];
 }
 
-function assertInvokeAndStopOnly(template: Template, endpointLogicalId: string) {
+const INVOKE_AND_STOP = ["bedrock-agentcore:InvokeAgentRuntime", "bedrock-agentcore:StopRuntimeSession"];
+
+function assertAllowedOnly(template: Template, endpointLogicalId: string, allowed: string[]) {
   const runtimeId = logicalIdOf(template, "AWS::BedrockAgentCore::Runtime");
   const runtimeArn = `<${runtimeId}.AgentRuntimeArn>`;
   const expectedArns = [
@@ -84,7 +87,7 @@ function assertInvokeAndStopOnly(template: Template, endpointLogicalId: string) 
           Sid: "AllowInvokeAndStop",
           Effect: "Allow",
           Principal: "*",
-          Action: ["bedrock-agentcore:InvokeAgentRuntime", "bedrock-agentcore:StopRuntimeSession"],
+          Action: allowed,
           Resource: arn,
         },
         {
@@ -102,11 +105,14 @@ function assertInvokeAndStopOnly(template: Template, endpointLogicalId: string) 
 const { runtime, agent } = synth();
 
 test("MCP runtime, its DEFAULT endpoint and sdpm_endpoint allow only invoke and stop", () => {
-  assertInvokeAndStopOnly(runtime, logicalIdOf(runtime, "AWS::BedrockAgentCore::RuntimeEndpoint"));
+  assertAllowedOnly(runtime, logicalIdOf(runtime, "AWS::BedrockAgentCore::RuntimeEndpoint"), INVOKE_AND_STOP);
 });
 
-test("agent runtime, its DEFAULT endpoint and sdpm_agent_endpoint allow only invoke and stop", () => {
-  assertInvokeAndStopOnly(agent, logicalIdOf(agent, "AWS::BedrockAgentCore::RuntimeEndpoint"));
+test("agent runtime, its DEFAULT endpoint and sdpm_agent_endpoint allow invoke, the WebSocket and stop", () => {
+  assertAllowedOnly(agent, logicalIdOf(agent, "AWS::BedrockAgentCore::RuntimeEndpoint"), [
+    ...INVOKE_AND_STOP,
+    "bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream",
+  ]);
 });
 
 test("McpHttpApi proxy targets the DEFAULT endpoint, which carries a policy", () => {

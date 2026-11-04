@@ -5,7 +5,7 @@
  *
  * Extracted from ChatPanel.tsx. Handles:
  * - Textarea that grows with its content (react-textarea-autosize, 1–5 rows) and IME-safe composition
- * - Send/Stop button toggle
+ * - Send and Stop buttons (Stop replaces Send while loading, unless `canSendWhileLoading`)
  * - PlusMenu (file attach + snippet)
  * - AttachmentPreview + SnippetInput
  * - FileDropZone wrapper
@@ -41,6 +41,11 @@ export interface ChatInputProps {
   onSend: (text: string, uploadedFiles: UploadedFile[], snippets: { label: string; text: string }[], attachments: { fileName: string; fileType: string }[]) => void | false | Promise<void | false>
   isLoading: boolean
   onStop: () => void
+  /**
+   * While loading, still offer Send next to Stop (Cloud: a message sent while the agent
+   * works is a steer). Without it, Stop replaces Send while loading.
+   */
+  canSendWhileLoading?: boolean
   disabled?: boolean
   placeholder?: string
   /** idToken for file upload. */
@@ -86,7 +91,7 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, onInputChange, slashItems, slashLoading, onSlashOpen, onTextareaFocus },
+  { onSend, isLoading, onStop, canSendWhileLoading = false, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, onInputChange, slashItems, slashLoading, onSlashOpen, onTextareaFocus },
   ref,
 ) {
   const t = useTranslations("chatInput")
@@ -227,10 +232,12 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   }, [input, updateInput])
 
   const hasContent = !!input.trim() || attachments.length > 0 || snippets.length > 0
+  // Loading blocks sending (and attaching) only when Send is not offered while loading.
+  const sendBlocked = isLoading && !canSendWhileLoading
   const canSend = sendOverride ? !sendOverride.blocked && (sendOverride.canSend?.(input) ?? true) : hasContent
 
   const handleSend = async () => {
-    if (!canSend || isLoading || disabled) return
+    if (!canSend || sendBlocked || disabled) return
 
     // Upload pending attachments
     const uploadedFiles: UploadedFile[] = []
@@ -302,7 +309,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   }
 
   return (
-    <FileDropZone onFiles={handleFiles} onLongTextPaste={handleSnippetConfirm} pasteDisabled={snippetOpen} disabled={isLoading} className="relative">
+    <FileDropZone onFiles={handleFiles} onLongTextPaste={handleSnippetConfirm} pasteDisabled={snippetOpen} disabled={sendBlocked} className="relative">
       <SnippetInput
         open={snippetOpen}
         onClose={() => { setSnippetOpen(false); setEditingSnippetId(null) }}
@@ -338,7 +345,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               onSnippetRequest={handleSnippetRequest}
               onContinueFromSession={onContinueFromSession}
               continueFromSessionDisabled={continueFromSessionDisabled}
-              disabled={isLoading}
+              disabled={sendBlocked}
             />
 
             <div className="flex-1 relative">
@@ -371,7 +378,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               />
             </div>
 
-            {isLoading ? (
+            {isLoading && (
               <button
                 type="button"
                 onClick={onStop}
@@ -381,7 +388,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               >
                 <Square className="h-3 w-3 fill-current" />
               </button>
-            ) : sendOverride ? (
+            )}
+            {sendBlocked ? null : sendOverride ? (
               <button
                 type="submit"
                 disabled={!canSend}

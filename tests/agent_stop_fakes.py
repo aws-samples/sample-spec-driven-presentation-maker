@@ -143,7 +143,8 @@ class FakeMCP(ToolProvider):
     def call_tool_sync(self, tool_use_id, name, arguments, **kwargs):
         if name == "fence_turn":
             time.sleep(self.fence_seconds)
-        self.recorder.log("mcp", name, self.who, detail={"arguments": arguments, "meta": self.meta})
+        meta = kwargs.get("meta") if kwargs.get("meta") is not None else self.meta
+        self.recorder.log("mcp", name, self.who, detail={"arguments": arguments, "meta": meta})
         return {"status": "success", "toolUseId": tool_use_id, "content": [{"text": json.dumps(_PAYLOAD)}]}
 
 

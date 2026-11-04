@@ -273,7 +273,11 @@
     "sessionBusy": "This chat is still answering in another tab or panel. Wait for it to finish, then send again.",
     "sessionLocked": "This chat is in use by another kiro-cli process, such as a terminal session. Close it there, then send again.",
     "errorStopGeneration": "Failed to stop generation",
-    "errorSessionReloadRequired": "This page is out of date. Reload the page, then send again."
+    "errorSessionReloadRequired": "This page is out of date. Reload the page, then send again.",
+    "steerNotDelivered": "Not delivered: the agent stopped before it read this message.",
+    "steerFailed": "Your message could not be sent to the agent. Send it again.",
+    "stopping": "Stopping…",
+    "reconnecting": "Reconnecting to the agent…"
   },
   "snippet": {
     "title": "Text Snippet",

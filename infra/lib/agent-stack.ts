@@ -265,10 +265,11 @@ export class AgentStack extends cdk.Stack {
     );
     endpoint.addDependency(runtime);
 
-    // Allow only invoke and stop on the runtime and its endpoints.
+    // Allow only invoke, the Web UI's WebSocket (/ws) and stop on the runtime and its endpoints.
     new RuntimeResourcePolicy(this, "AgentRuntimeResourcePolicy", {
       runtimeArn: runtime.attrAgentRuntimeArn,
       endpointArns: { AgentEndpoint: endpoint.attrAgentRuntimeEndpointArn },
+      allowWebSocket: true,
     });
 
     this.agentRuntimeArn = runtime.attrAgentRuntimeArn;

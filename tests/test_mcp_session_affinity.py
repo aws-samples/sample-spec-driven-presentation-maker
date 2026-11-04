@@ -151,3 +151,36 @@ def test_mcp_session_id_carries_the_owner_prefix(monkeypatch, session_id, sent):
     mcp_clients.mcp_agentcore_runtime(jwt_token=_jwt_of("user-1"), session_id=session_id)
 
     assert seen["transport_kwargs"]["headers"]["Mcp-Session-Id"] == sent
+
+
+# --- token holder (the session handle's clients) ------------------------------
+
+
+def test_holder_client_sends_no_fixed_authorization_header(monkeypatch):
+    mcp_clients = _require_mcp_clients()
+    seen = _capture(monkeypatch, mcp_clients)
+    monkeypatch.setattr(mcp_clients, "ReconnectingMCPClient", mcp_clients.MCPClient)  # the capturing fake
+    import token_holder
+
+    holder = token_holder.TokenHolder("user-1", _jwt_of("user-1"))
+    meta: dict = {}
+    mcp_clients.mcp_agentcore_runtime(session_id="sess-1234567890", token=holder, meta=meta)
+
+    transport = seen["transport_kwargs"]
+    assert "Authorization" not in transport["headers"]
+    assert transport["headers"]["Mcp-Session-Id"] == f"{P1}-sess-1234567890"
+    assert isinstance(transport["auth"], token_holder.HolderAuth) and transport["auth"].holder is holder
+    assert transport["terminate_on_close"] is False
+    # The shared meta dict itself, even while empty, so the handle can update it per turn.
+    assert seen["client_kwargs"]["meta"] is meta
+
+
+def test_holder_client_is_a_reconnecting_client(monkeypatch):
+    mcp_clients = _require_mcp_clients()
+    import token_holder
+
+    monkeypatch.setenv("MCP_RUNTIME_ARN", "arn:aws:bedrock-agentcore:ap-northeast-1:111122223333:runtime/x")
+    holder = token_holder.TokenHolder("user-1", _jwt_of("user-1"))
+
+    assert isinstance(mcp_clients.mcp_agentcore_runtime(token=holder), mcp_clients.ReconnectingMCPClient)
+    assert not isinstance(mcp_clients.mcp_agentcore_runtime(jwt_token="tok"), mcp_clients.ReconnectingMCPClient)

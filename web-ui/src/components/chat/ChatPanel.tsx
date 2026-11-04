@@ -14,12 +14,12 @@ import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
 import { loadRuntimeConfig } from "@/lib/runtimeConfig"
 import { buildAttachedMarkers } from "@/lib/attachmentMarker"
-import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
+import { generateSessionId, prepareAgentCore, setAgentConfig } from "@/services/agentCoreService"
 import { deckSessionId, isOwnerPrefixed } from "@/lib/sessionId"
-import { getChatHistory, patchDeck } from "@/services/deckService"
+import { getChatHistory, patchDeck, type ChatMessage as ChatHistoryMessage } from "@/services/deckService"
 import * as localService from "@/services/localService"
 import type { UploadedFile } from "@/services/uploadService"
-import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
+import { useChatStream, type Message, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { useSlashPickerItems } from "@/hooks/useSlashPickerItems"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage, ToolUse } from "./ChatMessage"
@@ -35,7 +35,8 @@ import { ForkProgressCard } from "./ForkProgressCard"
 import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
 import { toast } from "sonner"
-import { isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
+import { cutAtPrompt, isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
+import { isResumable } from "@/lib/sessionState"
 import { useLocale, useTranslations } from "next-intl"
 import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsService"
 import type { ForkSessionPhase, KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
@@ -51,6 +52,8 @@ interface ChatPanelProps {
   onPreviewInvalidated?: () => void
   onWorkflowPhase?: (phase: string) => void
   onLoadingChange?: (isLoading: boolean) => void
+  /** The panel is on screen. A new deck's `prepare` waits until it is (Cloud). */
+  visible?: boolean
 }
 
 /** Handle exposed to parents for input insertion and programmatic user messages. */
@@ -70,7 +73,7 @@ function formatRelativeTime(value: string, locale: string): string {
   return formatter.format(Math.round(hours / 24), "day")
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, visible = true }, ref) {
   const t = useTranslations("chat")
   const tCompose = useTranslations("compose")
   const tSessionPicker = useTranslations("sessionPicker")
@@ -113,6 +116,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [configLoaded, setConfigLoaded] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
   const [reconnectLoading, setReconnectLoading] = useState(false)
+  // Cloud: set by the history load when the session was working; applied once the config is loaded.
+  const [resumeCut, setResumeCut] = useState<{ cut: (prompt: string) => Message[] } | null>(null)
 
   // --- Options ---
   const [optionsOpen, setOptionsOpen] = useState(false)
@@ -313,8 +318,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       if (!IS_LOCAL && !idToken) return
       if (!sessionId) return
       setHistoryLoading(true)
+      let raw: ChatHistoryMessage[] = []
       try {
         const { messages: history, truncated } = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
+        raw = history
         if (truncated) {
           toast.info(t("historyTruncated"))
         }
@@ -334,10 +341,39 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       } finally {
         setHistoryLoading(false)
       }
+      // Cloud: the session was working when this page last saw it (reload, wake, reopened
+      // deck) — follow it once the agent config is loaded. The replay rebuilds the work
+      // from its opening prompt on.
+      if (!IS_LOCAL && deckId && deckId !== "new" && isResumable(sessionId)) {
+        setResumeCut({ cut: (prompt: string) => parseCloudHistory(cutAtPrompt(raw, prompt)) })
+      }
     }
     if (auth.isAuthenticated) loadHistory()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, auth.isAuthenticated])
+
+  // --- Resume a working session (Cloud) ---
+  useEffect(() => {
+    if (!resumeCut || !configLoaded) return
+    setResumeCut(null)
+    void stream.resume(resumeCut.cut)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resumeCut, configLoaded])
+
+  // --- Prepare the new deck's session (Cloud) ---
+  // Once per mount, when the new deck screen is first shown (the shell keeps this panel
+  // mounted while the chat is closed or another tab is shown), no re-warm: the first prompt
+  // then finds its MCP connections built.
+  const preparedRef = useRef(false)
+  useEffect(() => {
+    if (IS_LOCAL || deckId !== "new" || !visible || !configLoaded || preparedRef.current) return
+    const token = auth.user?.access_token
+    if (!token) return
+    preparedRef.current = true
+    // intentional: best-effort — without it the first prompt builds the session itself
+    prepareAgentCore(sessionIdRef.current, token, mode).catch((err: unknown) => console.warn("Prepare failed:", err))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deckId, visible, configLoaded, auth.user?.access_token])
 
   // --- Reconnect to running background session (Local mode) ---
   useEffect(() => {
@@ -538,6 +574,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (!configLoaded) return false
     const r = reviewRef.current
     if (!hasReviewDrafts || !r) {
+      // Cloud, agent working: a steer. A steer that was not accepted keeps the input.
+      if (!IS_LOCAL && stream.isLoading) return (await handleSend(text, uploadedFiles, snippets, attachments)) ? undefined : false
       handleSend(text, uploadedFiles, snippets, attachments)
       return
     }
@@ -557,7 +595,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         if (text.trim() && input && !input.textareaRef.current?.value.trim()) input.replaceText(text)
       }, 100)
     })
-  }, [configLoaded, hasReviewDrafts, handleSend, tReview])
+  }, [configLoaded, hasReviewDrafts, handleSend, tReview, stream.isLoading])
 
   const isLoading = stream.isLoading || reconnectLoading || forkingSession !== null
 
@@ -589,7 +627,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   return (
     <>
-      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading} className="flex flex-col h-full">
+      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading && IS_LOCAL} className="flex flex-col h-full">
       {continuedOrigin && (
         <div className="flex-none px-4 pt-3">
           <ContinuedFromChip origin={continuedOrigin} />
@@ -709,6 +747,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   hearingDisabled={i < lastUserIdx}
                   deckId={deckId}
                 />
+                {msg.steerNotDelivered && (
+                  <p className="mt-1 text-right text-xs text-foreground-muted">{t("steerNotDelivered")}</p>
+                )}
               </div>
             ))
             })()}
@@ -717,16 +758,23 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         )}
       </div>
 
+      {(stream.stopping || stream.reconnecting) && (
+        <p role="status" className="flex-none px-4 pb-1 text-xs text-foreground-muted">
+          {stream.stopping ? t("stopping") : t("reconnecting")}
+        </p>
+      )}
+
       {/* Input area */}
       <ChatInput
           ref={chatInputRef}
           onSend={handleInputSend}
           isLoading={isLoading}
           onStop={stream.stopGeneration}
+          canSendWhileLoading={!IS_LOCAL}
           disabled={!configLoaded || reconnectLoading}
           placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
           topSlot={reviewActive ? <ReviewDraftBar inputBlank={inputBlank} /> : undefined}
-          sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading, canSend: review.canSubmit } : undefined}
+          sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading && IS_LOCAL, canSend: review.canSubmit } : undefined}
           idToken={auth.user?.id_token}
           sessionId={sessionId}
           deckId={deckId}

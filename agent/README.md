@@ -29,12 +29,41 @@ AgentCore Runtime     Public / Local
 (spec-driven-presentation-maker MCP)      MCP Servers
 ```
 
-The agent is created via `create_agent()`, which:
+Each session's agent is assembled by `factory.py` for its session handle, which:
 
 1. Initializes MCP server connections (3 patterns)
 2. Collects `server_instructions` from each MCP server
 3. Injects instructions into the system prompt (MCP spec compliance)
 4. Registers built-in tools alongside MCP tools
+
+---
+
+## Session Runtime
+
+`basic_agent.py` serves two entries on one session runtime (`session_runtime.py`):
+
+- **`/ws`** (`ws_entry.py`) — the Web UI's WebSocket. Client messages: `prompt`, `steer`,
+  `cancel`, `resume(from_seq)`, `prepare`, `ping`. The server answers with control frames
+  (`accepted`, `cancelAck`, `resumeAck`, `prepareAck`, `ready`, `pong`, `keepalive`, `error`)
+  and the session's events as `{"seq", "ev"}`, where `ev` has the shapes of the HTTP stream
+  plus `work` (busy / idle), `turn`, `turnEnd` and `steer`. Frames stay under 24,000 bytes
+  (`{"batch": [...]}`, or `{"chunk", ...}` for a large event) and go out at most one per
+  20 ms. The client speaks first; the session is admitted from the forwarded
+  `Authorization` header on the first message and its owner checked on every message.
+- **`/invocations`** — HTTP streaming for Local and external clients, with the events and
+  the behaviour it always had for the turns it starts.
+
+A session keeps its MCP clients, Agent and Memory session manager across turns
+(`session_handle.py`; the JWT is swapped per turn through `token_holder.py`). It is
+*working* while a turn runs or a follow-on turn is queued; a work period holds HealthyBusy
+on `/ping`. A message sent while working is a steer (`steer_inbox.py`): it is added to the
+next user message of the running turn before Memory stores it, or continues the turn when it
+would end, or becomes a new turn when it arrives after the end. Every event is numbered in
+the session's ring (`event_ring.py`), so a client that reconnects asks for what it missed.
+
+What stops a turn: the stop button (`cancel`, which first discards the steers not yet
+delivered), the 60-minute watchdog of a work period, and SIGTERM. A disconnect never does.
+While a synchronous `compose_slides` runs, a steer reaches the orchestrator after it returns.
 
 ---
 
