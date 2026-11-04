@@ -276,8 +276,16 @@
     "errorSessionReloadRequired": "このページは古くなっています。ページを再読み込みしてから、もう一度送信してください。",
     "steerNotDelivered": "エージェントが読む前に停止したため、届きませんでした",
     "steerFailed": "メッセージをエージェントに送信できませんでした。もう一度送信してください。",
+    "steerPending": "作業中に送信",
+    "steerDelivered": "エージェントに届きました",
+    "backgroundWorking": "コンポーザーが裏で作業中です。チャットは続けられます。",
     "stopping": "停止中…",
     "reconnecting": "エージェントに再接続中…"
+  },
+  "composerNote": {
+    "from": "コンポーザー {group}",
+    "to": "コンポーザー {group} へ",
+    "aria": "コンポーザー {group} とのメッセージ"
   },
   "snippet": {
     "title": "テキストスニペット",
@@ -384,7 +392,8 @@
     "grid": "レイアウトを計算中",
     "code_to_slide": "コードをスライド化中",
     "hearing": "質問を作成中",
-    "compose_slides": "スライドを構成中"
+    "compose_slides": "スライドを構成中",
+    "message_composer": "コンポーザーに連絡"
   },
   "errorBoundary": {
     "problem": "{label}で問題が発生しました。",

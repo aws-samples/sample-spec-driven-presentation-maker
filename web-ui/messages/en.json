@@ -276,8 +276,16 @@
     "errorSessionReloadRequired": "This page is out of date. Reload the page, then send again.",
     "steerNotDelivered": "Not delivered: the agent stopped before it read this message.",
     "steerFailed": "Your message could not be sent to the agent. Send it again.",
+    "steerPending": "Sent while the agent works",
+    "steerDelivered": "Read by the agent",
+    "backgroundWorking": "Composers are working in the background. You can keep chatting.",
     "stopping": "Stopping…",
     "reconnecting": "Reconnecting to the agent…"
+  },
+  "composerNote": {
+    "from": "Composer {group}",
+    "to": "To composer {group}",
+    "aria": "Message with composer {group}"
   },
   "snippet": {
     "title": "Text Snippet",
@@ -384,7 +392,8 @@
     "grid": "Computing layout",
     "code_to_slide": "Code to slide",
     "hearing": "Asking questions",
-    "compose_slides": "Composing slides"
+    "compose_slides": "Composing slides",
+    "message_composer": "Messaging a composer"
   },
   "errorBoundary": {
     "problem": "{label} ran into a problem.",
