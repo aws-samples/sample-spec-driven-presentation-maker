@@ -6,6 +6,8 @@ AI model outputs should be reviewed before use in production contexts.
 
 Uses Amazon Bedrock AgentCore Runtime for deployment.
 JWT Bearer authentication — caller's JWT is forwarded to MCP Server.
+Entries: /ws (WebSocket, the Web UI) and /invocations (HTTP streaming), both on the
+session runtime (session_runtime.py).
 
 # Security: AWS manages infrastructure security. You manage access control,
 # data classification, and IAM policies. See SECURITY.md for details.
@@ -20,6 +22,7 @@ from bedrock_agentcore.runtime import BedrockAgentCoreApp
 import session_guard
 import session_runtime
 import stop_guard
+import ws_entry
 from errors import BAD_INPUT, AUTH, error_event
 
 logger = logging.getLogger("sdpm.agent")
@@ -30,6 +33,10 @@ app = BedrockAgentCoreApp(lifespan=stop_guard.lifespan)
 # Sessions and their turns (session_runtime.py): a working session holds a HealthyBusy
 # task on /ping, and SIGTERM closes the sessions' clients.
 session_runtime.configure(session_runtime.BusyTracker(app.add_async_task, app.complete_async_task))
+
+# /ws: the Web UI's connection (ws_entry.py). /invocations below stays for Local and
+# external clients; both run on the same session runtime.
+app.websocket(ws_entry.handle)
 
 
 @app.entrypoint
