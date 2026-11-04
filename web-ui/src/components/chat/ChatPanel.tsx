@@ -14,7 +14,7 @@ import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
 import { loadRuntimeConfig } from "@/lib/runtimeConfig"
 import { buildAttachedMarkers } from "@/lib/attachmentMarker"
-import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
+import { generateSessionId, prepareAgentCore, setAgentConfig } from "@/services/agentCoreService"
 import { deckSessionId, isOwnerPrefixed } from "@/lib/sessionId"
 import { getChatHistory, patchDeck, type ChatMessage as ChatHistoryMessage } from "@/services/deckService"
 import * as localService from "@/services/localService"
@@ -357,6 +357,19 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     void stream.resume(resumeCut.cut)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeCut, configLoaded])
+
+  // --- Prepare the new deck's session (Cloud) ---
+  // Once per mount, no re-warm: the first prompt then finds its MCP connections built.
+  const preparedRef = useRef(false)
+  useEffect(() => {
+    if (IS_LOCAL || deckId !== "new" || !configLoaded || preparedRef.current) return
+    const token = auth.user?.access_token
+    if (!token) return
+    preparedRef.current = true
+    // intentional: best-effort — without it the first prompt builds the session itself
+    prepareAgentCore(sessionIdRef.current, token, mode).catch((err: unknown) => console.warn("Prepare failed:", err))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [deckId, configLoaded, auth.user?.access_token])
 
   // --- Reconnect to running background session (Local mode) ---
   useEffect(() => {
