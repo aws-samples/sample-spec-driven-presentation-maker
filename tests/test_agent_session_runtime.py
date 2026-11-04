@@ -66,7 +66,7 @@ class _Turns:
             handle.update_token(token)
             return object(), [{"name": "Presentation Maker", "status": "ok"}]
 
-        async def stream(agent, text, session_id, takeover, stop):
+        async def stream(agent, text, session_id, takeover, stop, **kwargs):
             turns.prompts.append(text)
             if text in turns.fail:
                 raise RuntimeError("model unreachable")

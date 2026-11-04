@@ -237,7 +237,7 @@ def _entrypoint(monkeypatch, stream):
 
 
 def test_a_cancelled_turn_advances_the_fence(monkeypatch):
-    async def cancelled(agent, user_query, session_id, cancel, cancel_signal):
+    async def cancelled(agent, user_query, session_id, cancel, cancel_signal, **kwargs):
         yield {"keepalive": True}
         cancel_signal.set()  # what stream_agent does when the turn is cancelled
 
@@ -245,7 +245,7 @@ def test_a_cancelled_turn_advances_the_fence(monkeypatch):
 
 
 def test_a_finished_turn_releases_the_fence(monkeypatch):
-    async def finished(agent, user_query, session_id, cancel, cancel_signal):
+    async def finished(agent, user_query, session_id, cancel, cancel_signal, **kwargs):
         yield {"done": True}
 
     assert _entrypoint(monkeypatch, finished).events == ["release"]

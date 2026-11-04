@@ -11,6 +11,7 @@ from typing import AsyncGenerator
 from partial_json_parser import loads as _partial_loads
 from strands import Agent
 
+import background
 from resilience import TURN_STOP_KEY
 
 logger = logging.getLogger("sdpm.agent")
@@ -18,22 +19,38 @@ logger = logging.getLogger("sdpm.agent")
 KEEPALIVE_INTERVAL = 5
 
 
+def _task_id(ack: str) -> str:
+    """The task id in a background dispatch notice (its ``Task ID: <id>`` line)."""
+    for line in ack.splitlines():
+        if line.startswith("Task ID: "):
+            return line[len("Task ID: "):].strip()
+    return ""
+
+
 async def stream_agent(
-    agent: Agent, user_query: str, session_id: str, cancel: asyncio.Event, cancel_signal: threading.Event,
+    agent: Agent, user_query: str | None, session_id: str, cancel: asyncio.Event, cancel_signal: threading.Event,
+    tool_stop: threading.Event | None = None,
+    background_tools: frozenset[str] = frozenset(background.BACKGROUND_TOOLS),
 ) -> AsyncGenerator:
     """Stream agent responses as SSE events with keepalive and safe cancellation.
 
     Args:
         agent: Initialized Strands Agent.
-        user_query: User's input message.
+        user_query: User's input message; None continues the history with no new input
+            (a wake: Strands delivers settled background results before its model call).
         session_id: Session ID (for logging).
         cancel: Set when a newer HTTP prompt takes over this HTTP-started turn
             (session_runtime.py); the stream stops once the running tool has returned.
             Nothing else sets it: a stop sets ``cancel_signal``.
         cancel_signal: The turn's stop event, owned by the caller. Strands observes it
-            (its ``cancel_signal``), and tools get it through ``invocation_state``
-            (TURN_STOP_KEY), so composers still see it after this invocation ended.
-            Setting it ends the turn: Strands closes the running tool calls and stops.
+            (its ``cancel_signal``). Setting it ends the turn: Strands closes the running
+            tool calls and stops.
+        tool_stop: The stop event tools get through ``invocation_state`` (TURN_STOP_KEY);
+            ``cancel_signal`` when None. The session runtime passes its work period's, so a
+            background compose dispatched by this turn still sees a stop after it ended.
+        background_tools: Tools that run as background tasks: their dispatch notice is
+            yielded as ``{"taskStart": {toolUseId, name, taskId}}`` instead of a toolResult
+            (an error result stays a toolResult).
 
     Yields:
         SSE event dicts.
@@ -72,7 +89,7 @@ async def stream_agent(
         return await aiter.__anext__()
 
     stream_iter = agent.stream_async(
-        user_query, cancel_signal=cancel_signal, invocation_state={TURN_STOP_KEY: cancel_signal},
+        user_query, cancel_signal=cancel_signal, invocation_state={TURN_STOP_KEY: tool_stop or cancel_signal},
     ).__aiter__()
     pending = None
     cancel_task: asyncio.Task | None = None
@@ -133,9 +150,13 @@ async def stream_agent(
                                             content_text = c["text"]
                                             break
                                     in_tool_execution = False
+                                    name = tool_name_map.get(tu_id, "")
+                                    if name in background_tools and tr.get("status") != "error":
+                                        yield {"taskStart": {"toolUseId": tu_id, "name": name, "taskId": _task_id(content_text)}}
+                                        continue
                                     yield {"toolResult": {
                                         "toolUseId": tu_id,
-                                        "name": tool_name_map.get(tu_id, ""),
+                                        "name": name,
                                         "status": tr.get("status", "success"),
                                         "content": content_text,
                                     }}

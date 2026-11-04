@@ -51,7 +51,7 @@ def agent(monkeypatch):
     monkeypatch.setenv("MEMORY_ID", "memory-test")
     built: list[dict] = []
 
-    async def fake_stream(agent, user_query, session_id, cancel, stop):
+    async def fake_stream(agent, user_query, session_id, cancel, stop, **kwargs):
         yield {"done": True}
 
     patch_turn(monkeypatch, basic_agent, fake_stream, built)

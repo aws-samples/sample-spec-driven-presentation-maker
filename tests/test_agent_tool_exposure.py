@@ -186,7 +186,7 @@ def test_string_prompt_reaches_the_agent(monkeypatch):
     basic_agent = _basic_agent()
     seen: dict = {}
 
-    async def fake_stream(agent, user_query, session_id, cancel, cancel_signal):
+    async def fake_stream(agent, user_query, session_id, cancel, cancel_signal, **kwargs):
         seen["prompt"] = user_query
         yield {"done": True}
 

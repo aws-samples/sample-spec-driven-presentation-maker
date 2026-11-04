@@ -397,7 +397,7 @@ def real_handle(ctx, monkeypatch, tmp_path):
         lambda jwt_token, session_id="", tool_filters=None, meta=None, **kwargs: FakeMCP(recorder, "parent", meta=meta),
     ])
 
-    async def stream(agent, text, session_id, takeover, stop):
+    async def stream(agent, text, session_id, takeover, stop, **kwargs):
         recorder.log("stream", "turn", detail={"agent": id(agent)})
         yield {"event": {"contentBlockDelta": {"delta": {"text": "hi"}, "contentBlockIndex": 0}}}
 
