@@ -121,6 +121,26 @@ describe("invokeAgentCore (Cloud)", () => {
     await expect(done).resolves.toBe("ok")
   })
 
+  it.each([
+    ["the replay of the work that ended", { working: false, head: 5, period_start: 1, replay_from: 4, complete: true }, [text(4, " world"), idle(5)], "Hello world"],
+    ["no replay when the process is gone", { working: false, head: 0, period_start: 1, replay_from: 1, complete: true }, [], "Hello"],
+  ])("resolves after a reconnect that finds the work over: %s", async (_name, ack, replay, expected) => {
+    const { done, ws } = startInvoke(sid())
+    ws.receive(text(3, "Hello"))
+    ws.drop()
+    await vi.advanceTimersByTimeAsync(1000)
+    const ws2 = FakeWebSocket.last()
+    ws2.open()
+    expect(ws2.messages()[0]).toEqual({ type: "resume", from_seq: 3 })
+    ws2.receive({ ctl: "resumeAck", ...ack })
+    if (replay.length) {
+      expect(ws2.closedWith).toBeUndefined()
+      ws2.receive({ batch: replay })
+    }
+    await expect(done).resolves.toBe(expected)
+    expect(ws2.closedWith).toBe(1000)
+  })
+
   it("uses the Local API route in Local mode", async () => {
     mode.local = true
     fetchMock.mockResolvedValueOnce(new Response("data: {\"event\":{\"contentBlockDelta\":{\"delta\":{\"text\":\"x\"}}}}\n"))

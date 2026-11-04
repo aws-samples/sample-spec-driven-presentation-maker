@@ -89,6 +89,8 @@ export class SessionSocket {
   private reconnecting = false
   private refused = false
   private windowHooked = false
+  /** After a resume of work that ended: the last seq of its replay (0: none pending). */
+  private replayUntil = 0
 
   constructor({ url, sessionId, getToken, listener }: SessionSocketOptions) {
     this.url = url
@@ -143,6 +145,7 @@ export class SessionSocket {
     this.outbox = []
     this.pending = []
     this.holds = 0
+    this.replayUntil = 0
     this.chunks.clear()
     this.stopPing()
     this.unhookWindow()
@@ -216,6 +219,7 @@ export class SessionSocket {
   private handleClose(code: number): void {
     this.stopPing()
     this.chunks.clear()
+    this.replayUntil = 0
     const lost = this.pending
     this.pending = []
     this.outbox = []
@@ -311,7 +315,7 @@ export class SessionSocket {
   }
 
   private closeIfSettled(): void {
-    if (!this.working && this.pending.length === 0 && this.holds === 0 && this.ws) {
+    if (!this.working && this.pending.length === 0 && this.holds === 0 && this.lastSeq >= this.replayUntil && this.ws) {
       this.close()
       this.stateWriter.flush()
     }
@@ -379,6 +383,7 @@ export class SessionSocket {
       this.closeIfSettled()
     } else {
       this.stateWriter.update(this.working ? "working" : "idle", this.lastSeq)
+      if (this.replayUntil && this.lastSeq >= this.replayUntil) this.closeIfSettled()
     }
   }
 
@@ -403,7 +408,12 @@ export class SessionSocket {
         }
         this.setReconnecting(false)
         this.attempts = 0
-        this.setWorking(ctl.working === true)
+        const working = ctl.working === true
+        const head = typeof ctl.head === "number" ? ctl.head : 0
+        const replayFrom = typeof ctl.replay_from === "number" ? ctl.replay_from : head + 1
+        // Work that ended while away: stay open for its replay (it ends with `work idle`).
+        this.replayUntil = !working && replayFrom <= head ? head : 0
+        this.setWorking(working)
         break
       }
       case "prepareAck":

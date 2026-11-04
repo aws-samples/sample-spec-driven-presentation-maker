@@ -239,6 +239,9 @@ function sessionListener(entry) {
             follower.wasWorking = ctl.working === true
             follower.handlers.onResumeAck?.(ctl)
             if (!follower.wasWorking) follower.idleSeen = true
+          } else if (follower && ctl.working !== true && !(ctl.replay_from <= ctl.head)) {
+            // A reconnect found the work over and nothing left to replay (the process is gone).
+            follower.idleSeen = true
           }
           break
         case "cancelAck":
