@@ -64,6 +64,15 @@ Entries before v0.5.0 were written retroactively as summaries.
   `prepare` once per page, when it is first shown (not on every page load), so the first
   prompt finds the session built. Local mode is
   unchanged.
+- **Background compose in the chat (Web UI, Cloud).** The compose card stays live while the
+  composers work in the background, across later messages and turns, and closes when the
+  result arrives (`taskEnd`); a stopped compose shows as stopped. Between turns the chat says
+  the composers are working in the background and that you can keep chatting. A message sent
+  while the agent works is marked as sent, then as read by the agent once it reaches it.
+  Messages between the orchestrator and a composer (`message_composer`, `composerNote`) show
+  as composer notes, not as user messages, live and in the reloaded history; the reloaded
+  history hides the call that delivered the background result. Reloading the page during a
+  background compose brings back the card with live progress. Local mode is unchanged.
 
 - **Sign-up settings for the default Cognito user pool.** `auth.selfSignUp` in
   `infra/config.yaml` turns self sign-up on, and `auth.allowedEmailDomains` limits it to the
