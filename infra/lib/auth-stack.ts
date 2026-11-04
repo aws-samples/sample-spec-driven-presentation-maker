@@ -153,8 +153,9 @@ export class AuthStack extends cdk.Stack {
       },
     });
 
-    // Resource Server with custom scope for MCP access — isolates MCP auth
-    // from WebUI auth. Only McpClient / DCR-registered clients get this scope.
+    // Resource Server with custom scope for MCP access. Only clients that call
+    // the MCP runtime get this scope: WebClient (the agent forwards the Web UI
+    // user's token), McpClient and DCR-registered clients.
     const mcpScope = new cognito.ResourceServerScope({
       scopeName: "invoke",
       scopeDescription: "Invoke MCP server",
@@ -166,17 +167,28 @@ export class AuthStack extends cdk.Stack {
     /** Fully-qualified custom scope name (e.g. `sdpm-mcp/invoke`). */
     this.mcpCustomScope = `sdpm-mcp/${mcpScope.scopeName}`;
 
+    // This stack owns every WebClient setting. WebUiStack's
+    // UpdateCognitoCallbackUrls custom resource only adds the CloudFront URL to
+    // the callback/logout URLs (this stack cannot know that URL without a
+    // circular dependency) and passes every other field through unchanged.
+    // The MCP runtime's JWT authorizer requires sdpm-mcp/invoke on the token the
+    // agent forwards, so the scope is declared here, next to its resource server.
+    // authFlows keeps the explicit auth flows the custom resource used to set.
+    // Changing scopes or auth flows updates the client in place (same client ID).
     this.userPoolClient = this.userPool.addClient("WebClient", {
+      authFlows: { userPassword: true, userSrp: true },
       oAuth: {
         flows: { authorizationCodeGrant: true },
         scopes: [
           cognito.OAuthScope.OPENID,
           cognito.OAuthScope.PROFILE,
           cognito.OAuthScope.EMAIL,
+          cognito.OAuthScope.resourceServer(mcpResourceServer, mcpScope),
         ],
         callbackUrls: ["http://localhost:3000", ...(props?.callbackUrls ?? [])],
         logoutUrls: ["http://localhost:3000", ...(props?.callbackUrls ?? [])],
       },
+      supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
       generateSecret: false,
     });
 
