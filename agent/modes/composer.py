@@ -101,6 +101,82 @@ def _replay_start_composing(
     ]
 
 
+def _json_payload(result: dict) -> dict | None:
+    """The first JSON object in an MCP tool result's text content."""
+    for item in result.get("content") or []:
+        if isinstance(item, dict) and isinstance(item.get("text"), str):
+            try:
+                parsed = json.loads(item["text"])
+            except ValueError:
+                continue
+            if isinstance(parsed, dict):
+                return parsed
+    return None
+
+
+def deck_slides(mcp_client, deck_id: str) -> list[str] | None:
+    """The slugs whose slide files the deck holds now, or None when they cannot be read.
+
+    Read through the calls compose_slides already makes: check_specs for the deck's
+    format, then start_composing with no assigned slugs, whose ``slides_present`` lists
+    the slide files. One attempt each: this is read when a stopped compose's report is
+    delivered, and the model call waits for it.
+    """
+    try:
+        check = _json_payload(call_tool_with_retry(
+            mcp_client, tool_use_id=f"slides-{uuid.uuid4().hex[:8]}", name="check_specs",
+            arguments={"deck_id": deck_id}, max_attempts=1,
+        )) or {}
+        mode = "html" if check.get("outputFormat") == "html" else None
+        entry = _json_payload(call_tool_with_retry(
+            mcp_client, tool_use_id=f"slides-{uuid.uuid4().hex[:8]}", name="start_composing",
+            arguments=_start_composing_args(deck_id, [], mode), max_attempts=1,
+        )) or {}
+    except Exception as e:  # noqa: BLE001 - the report goes out without the list
+        logger.warning("Reading the slides of deck %s failed: %s", deck_id, e)
+        return None
+    slides = (entry.get("deck") or {}).get("slides_present")
+    return [str(slug) for slug in slides] if isinstance(slides, list) else None
+
+
+CANCELLED_NOTICE = (
+    "Stopped: the work was cancelled, and the deck was not built. slides_in_deck lists the "
+    "slides the deck holds now; a slide a composer was still writing may be incomplete. "
+    "Do not call compose_slides again unless the user asks."
+)
+CANCELLED_UNREAD_NOTICE = (
+    "Stopped: the work was cancelled, and the deck was not built. The slides the deck holds "
+    "could not be listed; read the deck before you tell the user what it holds. Do not call "
+    "compose_slides again unless the user asks."
+)
+
+
+def make_cancelled_report(mcp_servers: list):
+    """background.deliver_as_text's ``cancelled_report``: a stopped compose's report with
+    ``slides_in_deck``, the slides the deck holds when the report is delivered.
+
+    The report compose_slides built when it saw the stop gains the list; a task Strands
+    cancelled at once has no report, and gets one (status, slides_in_deck, notice).
+    ``mcp_servers`` is the orchestrator's client list (the Presentation Maker client first).
+    """
+
+    def cancelled_report(deck_id: str, report_text: str) -> str:
+        try:
+            report = json.loads(report_text) if report_text else {}
+        except ValueError:
+            report = {"error": report_text}
+        if not isinstance(report, dict):
+            report = {}
+        report["status"] = "cancelled"
+        slides = deck_slides(mcp_servers[0], deck_id) if mcp_servers and deck_id else None
+        if slides is not None:
+            report["slides_in_deck"] = slides
+        report.setdefault("notice", CANCELLED_NOTICE if slides is not None else CANCELLED_UNREAD_NOTICE)
+        return json.dumps(report)
+
+    return cancelled_report
+
+
 def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None, model_id: str = "", user_id: str = "", session_id: str = "", messaging=None):
     """Create compose_slides tool with closed-over MCP servers and model.
 

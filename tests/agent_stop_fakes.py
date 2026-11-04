@@ -85,7 +85,7 @@ class ScriptedModel(Model):
 _PAYLOAD = {
     "ok": True, "errors": [], "warnings": [], "slugs": ["a", "b"],
     "static": {"workflow": "Compose slides.", "slide_spec": "Slide spec."},
-    "styles": [], "templates": [], "deck": {"specs_ok": True}, "specs_ok": True,
+    "styles": [], "templates": [], "deck": {"specs_ok": True, "slides_present": ["a"]}, "specs_ok": True,
 }
 
 
