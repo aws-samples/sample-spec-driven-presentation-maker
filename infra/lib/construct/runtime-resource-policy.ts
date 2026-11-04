@@ -2,7 +2,9 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * Resource-based policies that allow only the data-plane operations the app
- * uses on an AgentCore Runtime: InvokeAgentRuntime and StopRuntimeSession.
+ * uses on an AgentCore Runtime: InvokeAgentRuntime and StopRuntimeSession, plus
+ * InvokeAgentRuntimeWithWebSocketStream on the agent runtime (the Web UI's /ws
+ * connection; `allowWebSocket`).
  *
  * AgentCore evaluates the resource-based policies of both the runtime and the
  * endpoint being invoked, so one policy is attached to the runtime, one to its
@@ -27,6 +29,9 @@ export const ALLOWED_RUNTIME_ACTIONS = [
   "bedrock-agentcore:StopRuntimeSession",
 ];
 
+/** The WebSocket handshake (`/ws`); allowed only where `allowWebSocket` is set. */
+export const WEBSOCKET_RUNTIME_ACTION = "bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream";
+
 /** Operations denied explicitly, so they stay blocked even if an Allow is widened later. */
 export const DENIED_RUNTIME_ACTIONS = ["bedrock-agentcore:InvokeAgentRuntimeCommand"];
 
@@ -38,6 +43,11 @@ export interface RuntimeResourcePolicyProps {
    * The DEFAULT endpoint is always covered and must not be listed here.
    */
   readonly endpointArns?: Record<string, string>;
+  /**
+   * Also allow InvokeAgentRuntimeWithWebSocketStream. Without it AgentCore refuses
+   * the WebSocket handshake with 403 once a policy is attached (measured on dev).
+   */
+  readonly allowWebSocket?: boolean;
 }
 
 export class RuntimeResourcePolicy extends Construct {
@@ -51,6 +61,10 @@ export class RuntimeResourcePolicy extends Construct {
       ...props.endpointArns,
     };
 
+    const allowed = props.allowWebSocket
+      ? [...ALLOWED_RUNTIME_ACTIONS, WEBSOCKET_RUNTIME_ACTION]
+      : ALLOWED_RUNTIME_ACTIONS;
+
     for (const [targetId, resourceArn] of Object.entries(targets)) {
       new bedrockagentcore.CfnResourcePolicy(this, targetId, {
         resourceArn,
@@ -61,7 +75,7 @@ export class RuntimeResourcePolicy extends Construct {
               Sid: "AllowInvokeAndStop",
               Effect: "Allow",
               Principal: "*",
-              Action: ALLOWED_RUNTIME_ACTIONS,
+              Action: allowed,
               Resource: resourceArn,
             },
             {
