@@ -15,6 +15,9 @@ SteerInbox plugin uses two public hooks:
 A steer that arrives after the last of these points stays in the inbox; the session
 runtime starts a new turn with it (session_runtime.py). Nothing is delivered once the
 turn's stop event is set: a cancel discards the inbox first (R2).
+
+Each composer of a running compose_slides has an inbox of its own, delivered the same way
+with a prefix that names the orchestrator as the sender (compose_messaging.py).
 """
 
 import threading
@@ -65,10 +68,12 @@ class SteerInbox(Plugin):
         inbox: Inbox,
         stopped: Callable[[], bool],
         on_delivered: Callable[[list[tuple[str, str]], str], None] | None = None,
+        prefix: str = "",
     ):
         self.inbox = inbox
         self.stopped = stopped
         self.on_delivered = on_delivered
+        self.prefix = prefix  # put before each delivered text (a composer's messages)
         super().__init__()
 
     def init_agent(self, agent) -> None:
@@ -86,7 +91,7 @@ class SteerInbox(Plugin):
         items = self.inbox.drain()
         if not items:
             return
-        message["content"].extend({"text": text} for _, text in items)
+        message["content"].extend({"text": self.prefix + text} for _, text in items)
         self._delivered(items, "fold")
 
     def _after_invocation(self, event: AfterInvocationEvent) -> None:
@@ -98,5 +103,5 @@ class SteerInbox(Plugin):
         items = self.inbox.drain()
         if not items:
             return
-        event.resume = [{"text": text} for _, text in items]
+        event.resume = [{"text": self.prefix + text} for _, text in items]
         self._delivered(items, "resume")
