@@ -22,8 +22,8 @@ from agent_modules import load
 
 
 class PolicyModel(Model):
-    """Replies per call from ``policy(messages)``: ("tool", name, input) or ("text", words).
-    Records the messages and the tool spec names of every call."""
+    """Replies per call from ``policy(messages)``: ("tool", name, input), ("text", words) or
+    ("text", words, seconds). Records the messages and the tool spec names of every call."""
 
     def __init__(self, policy):
         self.policy = policy
@@ -52,6 +52,8 @@ class PolicyModel(Model):
             yield {"contentBlockStop": {}}
             yield {"messageStop": {"stopReason": "tool_use"}}
             return
+        if len(step) > 2:
+            await asyncio.sleep(step[2])  # ("text", words, seconds): a slow answer
         yield {"contentBlockDelta": {"delta": {"text": step[1]}}}
         yield {"contentBlockStop": {}}
         yield {"messageStop": {"stopReason": "end_turn"}}
