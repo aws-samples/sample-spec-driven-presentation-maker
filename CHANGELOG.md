@@ -40,8 +40,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   `taskStart {toolUseId, taskId, name}` (replaces the dispatch's `toolResult`), `taskEnd
   {toolUseId, taskId, name, status, content}`, and `toolStream` progress between turns. A stop
   (the stop button, the watchdog, SIGTERM) sets the work period's stop event first, which the
-  composers see, then cancels the background task; with no turn running, the decks the task
-  writes are fenced (`fence_turn`) from that moment. `/invocations` follows a turn that
+  composers see, then cancels the background task. `/invocations` follows a turn that
   dispatched a compose until the session goes idle and gets `taskEnd` as the compose's
   `toolResult`.
 - **Message a running composer (agent, Cloud).** While a compose runs, the orchestrator can
@@ -345,17 +344,14 @@ Entries before v0.5.0 were written retroactively as summaries.
   reads the client and writes every other field back unchanged. The client is updated in
   place (same client ID, no user pool change).
 
-- **Stopping a Cloud turn no longer lets its in-flight tool calls change the deck
-  afterwards.** A tool call the agent had already sent kept running on the MCP runtime and
-  wrote to S3 after the stop (on dev: `run_python` saved 4 slides 1.7 s after a cancel, and
-  `generate_pptx`'s previews and thumbnail landed 1.5 s after the stop button). Each turn
-  now sends a generation number with its Presentation Maker calls (composers included), and
-  a stopped turn raises the deck's write fence (`writeFence` on the deck item) to it through
-  the new `fence_turn` tool. The MCP server checks the fence before every S3 write and skips
-  the writes of a stopped turn (the call returns a "Cancelled" error), and the deck record
-  update after a build is conditional on it. A turn that ends normally fences nothing, so
-  its last previews still land when the next message is sent quickly. Calls without a
-  generation (the local server, other MCP clients) are unchanged.
+- **What a stopped Cloud turn still writes.** After a stop the agent starts nothing new: no
+  tool call, no direct MCP call from `compose_slides` and no Memory event, except the tool
+  result that closes the turn. A Presentation Maker call that was already running on the MCP
+  runtime when the stop came runs to its end (a few seconds; on dev, `run_python` saved its
+  slides 1.7 s after a cancel), as in Local mode. The remote MCP server exposes the same 20
+  tools as before: the `fence_turn` tool and the write fence added earlier in this release
+  cycle are gone, and a test now fails when the remote server registers a tool outside the
+  `sdpm.tools` contract.
 
 - **Stopping a Cloud turn no longer leaves it running in the background.** The stop button
   ends the runtime session, and AgentCore then sends the agent's process SIGTERM. The agent

@@ -271,7 +271,7 @@ def test_a_report_during_a_turn_is_folded_into_the_next_tool_result(rt, monkeypa
 
     agents: list = []
 
-    def begin_turn(handle, token, fence, mode="spec", chat_model_id=None, create_model_id=None, stop=None):
+    def begin_turn(handle, token, mode="spec", chat_model_id=None, create_model_id=None, stop=None):
         handle.update_token(token)
         handle.stop = stop
         if not agents:

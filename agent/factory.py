@@ -34,7 +34,6 @@ from modes import MODES
 from modes.composer import make_compose_slides
 from resilience import gate_tool_call
 from session import fix_excess_tool_results
-from turn_fence import TurnFence
 from tools.hearing_tool import hearing
 from tools.web_tools import web_fetch
 
@@ -291,12 +290,12 @@ def build_model(model_id: str, composer: bool = False):
 def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mcp_servers: list, mcp_status: list[dict], session_manager) -> tuple[Agent, list, list[dict]]:
     """Build the session's Agent for one (mode, models) from connected clients.
 
-    Its hooks act on the handle's current turn (write fence, LoopGuard), so the Agent
+    Its hooks act on the handle's current turn (LoopGuard), so the Agent
     serves every turn of the session until the mode or a model changes.
 
     With composers, compose_slides runs as a background task (background.py): the
     Agent's callback handler forwards the task's progress to the handle, and the handle
-    records the decks the tasks work on and the results Strands delivers. The orchestrator
+    records the results Strands delivers. The orchestrator
     also gets message_composer, and each composer report_to_orchestrator, both through the
     handle's ComposeMessaging.
 
@@ -312,13 +311,13 @@ def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mc
     if cfg.use_composer:
         composer_model = handle.model(resolved_create, composer=True)
         # Composers get their own Presentation Maker client per group; it carries the
-        # composer allowlist so a composer sees only the deck tools, the session's
-        # latest JWT, and the generation of the turn that started it.
+        # composer allowlist so a composer sees only the deck tools, and the session's
+        # latest JWT.
         composer_filters = {"allowed": MODES["composer"].allowed_tools}
 
         def composer_mcp_factory(mcp_session_id: str = ""):
             return mcp_agentcore_runtime(
-                session_id=mcp_session_id, tool_filters=composer_filters, meta=dict(handle.meta), token=handle.holder,
+                session_id=mcp_session_id, tool_filters=composer_filters, token=handle.holder,
             )
 
     def tools_for(servers: list) -> list:
@@ -375,16 +374,12 @@ def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mc
     # Write gate: no tool runs once the process is stopping (SIGTERM, stop_guard.py)
     agent.hooks.add_callback(BeforeToolCallEvent, gate_tool_call)
 
-    # Write fence: the decks the current turn touches (turn_fence.py)
-    agent.hooks.add_callback(BeforeToolCallEvent, handle.note_tool_call)
-
     if cfg.use_composer:
         # Background compose: the model neither sees nor calls the management tool, the
         # results reach the history as <compose_result> text, and the handle learns each
-        # task's deck and each delivered result.
+        # delivered result.
         background.hide_manage_tool(agent)
         background.deliver_as_text(agent, handle.note_delivered)
-        agent.hooks.add_callback(BeforeToolCallEvent, handle.note_task_dispatch)
 
     # Cost logger
     agent.hooks.add_callback(AfterInvocationEvent, log_usage)
@@ -434,15 +429,11 @@ def refresh_prompt(handle, cfg, agent: Agent, model_id: str, mcp_servers: list) 
 # Unified factory
 # ---------------------------------------------------------------------------
 
-def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_model_id: str | None = None, create_model_id: str | None = None, fence: TurnFence | None = None) -> tuple[Agent, list[dict]]:
+def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_model_id: str | None = None, create_model_id: str | None = None) -> tuple[Agent, list[dict]]:
     """Create a Strands Agent for one turn of the given mode (a one-shot session handle).
 
     The agent entry keeps a SessionHandle per session instead (session_runtime.py);
     this builds one, takes its first turn's Agent and leaves the clients to that Agent.
-
-    ``fence`` (turn_fence.py): its generation goes into the ``_meta`` of every
-    Presentation Maker call (orchestrator and composers), and it learns the decks the
-    turn's tool calls name.
 
     Returns:
         Tuple of (Configured Strands Agent, MCP status list).
@@ -451,7 +442,7 @@ def create_agent(mode: str, user_id: str, session_id: str, jwt_token: str, chat_
 
     handle = SessionHandle(session_id, user_id)
     try:
-        agent, mcp_status = handle.begin_turn(jwt_token, fence, mode, chat_model_id, create_model_id)
+        agent, mcp_status = handle.begin_turn(jwt_token, mode, chat_model_id, create_model_id)
     except BaseException:
         handle.close()
         raise

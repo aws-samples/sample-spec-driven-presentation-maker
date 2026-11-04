@@ -154,9 +154,9 @@ def patch_turn(monkeypatch, basic_agent, stream, built: list | None = None):
     session_handle = sys.modules["session_handle"]
     monkeypatch.setattr(session_runtime, "registry", session_runtime.Registry())
 
-    def begin_turn(self, token, fence, mode="spec", chat_model_id=None, create_model_id=None, stop=None):
+    def begin_turn(self, token, mode="spec", chat_model_id=None, create_model_id=None, stop=None):
         if built is not None:
-            built.append({"session_id": self.session_id, "user_id": self.sub, "fence": fence, "mode": mode})
+            built.append({"session_id": self.session_id, "user_id": self.sub, "mode": mode})
         return object(), []
 
     monkeypatch.setattr(session_handle.SessionHandle, "begin_turn", begin_turn)

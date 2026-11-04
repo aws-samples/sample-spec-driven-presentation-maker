@@ -20,9 +20,8 @@ What reaches a session while it works:
   HTTP-started turn runs takes that turn over, as /invocations always did;
 - ``cancel`` (the stop button) discards the steers not yet delivered, sets the period's
   stop event (the one tools and background tasks see), then the running turn's, then
-  cancels the background tasks; with no turn running it fences the decks the tasks
-  write (an idle TurnFence). A message sent while the stop finishes opens a new period
-  after it;
+  cancels the background tasks. A message sent while the stop finishes opens a new
+  period after it;
 - a client going away cancels nothing, except an HTTP client's own running HTTP turn
   (as before). Besides cancel, only the work-period watchdog (WORK_LIMIT_S) and
   SIGTERM stop the work.
@@ -57,7 +56,6 @@ from event_ring import COALESCE_S, EventRing
 from resilience import writes_closed
 from session_handle import SessionHandle
 from streaming import stream_agent
-from turn_fence import TurnFence
 
 logger = logging.getLogger("sdpm.agent")
 
@@ -140,14 +138,13 @@ class Prompt:
 
 
 class Turn:
-    """One running turn: its write fence, its stop event (set on SIGTERM too) and the
-    HTTP takeover event (stream_agent's ``cancel``)."""
+    """One running turn: its stop event (set on SIGTERM too) and the HTTP takeover
+    event (stream_agent's ``cancel``)."""
 
     def __init__(self, prompt: Prompt):
         self.prompt = prompt
         self.id = prompt.id
-        self.fence = TurnFence()
-        self.stop = stop_guard.begin_turn(on_stop=self.fence.advance)
+        self.stop = stop_guard.begin_turn()
         self.takeover = asyncio.Event()
         self.how: str | None = None  # why it was stopped (cancelled, watchdog, takeover)
         self.done = False
@@ -367,35 +364,22 @@ class Session:
             current.how = current.how or how
             current.stop.set()
         if first:
-            stop_guard.hold(self._after_stop(period))
+            self._after_stop(period)
 
-    def _period_stopped(self, period: Period):
+    def _period_stopped(self, period: Period) -> None:
         """stop_guard's callback for a period's stop event (SIGTERM, on the signal
-        handler's thread): non-blocking; returns the idle fence's thread, if any."""
-        if not period.claim_stop("sigterm"):
-            return None
-        return self._after_stop(period)
+        handler's thread): non-blocking."""
+        if period.claim_stop("sigterm"):
+            self._after_stop(period)
 
-    def _after_stop(self, period: Period):
-        """After a period's stop event is set: fence the background tasks' decks when no
-        turn runs (a running turn's own fence has them), cancel the tasks, wake the work
-        loop. Returns the fence call's thread or None."""
-        current = self.turn
-        thread = self._idle_fence() if current is None or current.done else None
+    def _after_stop(self, period: Period) -> None:
+        """After a period's stop event is set: cancel the background tasks and wake the
+        work loop."""
         agent = self.handle.agent
         if background.pending(agent):
             loop = runtime_loop()
             loop.call_soon_threadsafe(lambda: loop.create_task(background.cancel_all(agent)))
         self._wake_soon(period)
-        return thread
-
-    def _idle_fence(self):
-        """A fence for the decks the session's background tasks write, minted now (its
-        generation is later than any turn's that started them)."""
-        fence = TurnFence()
-        fence.bind(self.handle.fence_client())
-        fence.note_decks(list(self.handle.task_decks))
-        return fence.advance()
 
     def _wake_soon(self, period: Period | None = None) -> None:
         """Wake the period's work loop (thread-safe)."""
@@ -549,7 +533,6 @@ class Session:
         while True:
             self._scan_tasks()
             if not background.pending(self.handle.agent):
-                self.handle.task_decks.clear()
                 return
             await asyncio.sleep(TASK_POLL_S)
 
@@ -578,7 +561,7 @@ class Session:
         try:
             # The holder's token, not the prompt's: a later steer may have brought a newer one.
             agent, mcp_status = await asyncio.to_thread(
-                self.handle.begin_turn, self.handle.holder.token, turn.fence, prompt.mode,
+                self.handle.begin_turn, self.handle.holder.token, prompt.mode,
                 prompt.chat_model_id, prompt.create_model_id, stop,
             )
             self.publish({"mcp_status": mcp_status})
@@ -599,16 +582,9 @@ class Session:
             stop_guard.end_turn(stop)
             self.handle.end_turn()
             with self.lock:
-                # Under the lock: a stop either sees this turn running (and sets its stop
-                # before this point) or done (and fences the tasks' decks itself).
-                # Stopped (cancel, watchdog, an HTTP takeover or its client gone, SIGTERM):
-                # fence the turn's decks. hold: a SIGTERM that follows (StopRuntimeSession
-                # after a cancel) waits for the call.
+                # Stopped: cancel, watchdog, an HTTP takeover or its client gone, SIGTERM.
                 if stop.is_set():
-                    stop_guard.hold(turn.fence.advance())
                     how = turn.how or ("sigterm" if writes_closed() else "cancelled")
-                else:
-                    turn.fence.release()
                 turn.done = True
                 self.publish({"turnEnd": {"id": turn.id, "how": how}})
         return how

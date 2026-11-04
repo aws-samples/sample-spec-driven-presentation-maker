@@ -26,11 +26,10 @@ class _PM:
 
     server_instructions = ""
 
-    def __init__(self, state, session_id, tool_filters, meta, token):
+    def __init__(self, state, session_id, tool_filters, token):
         self.state = state
         self.session_id = session_id
         self.tool_filters = tool_filters
-        self.meta = meta
         self.token = token
         self.started = False
         self.connects = 0
@@ -64,7 +63,7 @@ class _PM:
         self.stopped = True
 
     def call_tool_sync(self, tool_use_id, name, arguments, **kwargs):
-        self.state["calls"].append((self.token.token if self.token else "", name, dict(self.meta)))
+        self.state["calls"].append((self.token.token if self.token else "", name))
         payload = {"static": {"workflow": "# Orchestrator"}, "styles": [], "templates": []}
         return {"status": "success", "content": [{"text": json.dumps(payload)}]}
 
@@ -133,11 +132,6 @@ class _Agent:
         self.cleaned = True
 
 
-class _Event:
-    def __init__(self, deck_id):
-        self.tool_use = {"name": "run_python", "toolUseId": "t1", "input": {"deck_id": deck_id}}
-
-
 @pytest.fixture
 def env(monkeypatch):
     factory = load("factory")
@@ -149,8 +143,8 @@ def env(monkeypatch):
     mcp_clients.close_resident_clients()
     state = {"calls": [], "pm": [], "residents": [], "managers": [], "composer": None, "gate": None}
 
-    def runtime(jwt_token="", session_id="", tool_filters=None, meta=None, token=None):
-        client = _PM(state, session_id, tool_filters, meta, token)
+    def runtime(jwt_token="", session_id="", tool_filters=None, token=None):
+        client = _PM(state, session_id, tool_filters, token)
         state["pm"].append(client)
         return client
 
@@ -179,7 +173,6 @@ def env(monkeypatch):
     monkeypatch.setattr(factory, "_session_manager", session_manager)
     state["factory"] = factory
     state["handle"] = lambda sub="user-1", sid="s1": session_handle.SessionHandle(sid, sub)
-    state["fence"] = lambda generation: factory.TurnFence(generation=generation)
     try:
         yield state
     finally:
@@ -200,9 +193,9 @@ def _wait_for(predicate, timeout=5.0):
 
 def test_the_second_turn_reuses_the_clients_and_the_agent(env):
     handle = env["handle"]()
-    first, _ = handle.begin_turn(_jwt("user-1"), env["fence"](1))
+    first, _ = handle.begin_turn(_jwt("user-1"))
     handle.end_turn()
-    second, status = handle.begin_turn(_jwt("user-1", 1), env["fence"](2))
+    second, status = handle.begin_turn(_jwt("user-1", 1))
 
     assert second is first
     (pm,) = env["pm"]
@@ -212,33 +205,29 @@ def test_the_second_turn_reuses_the_clients_and_the_agent(env):
     assert status[0] == {"name": "Presentation Maker", "status": "ok"}
 
 
-def test_each_turn_swaps_the_token_and_the_generation(env):
+def test_each_turn_swaps_the_token(env):
     handle = env["handle"]()
-    handle.begin_turn(_jwt("user-1", 0), env["fence"](1))
+    handle.begin_turn(_jwt("user-1", 0))
     (pm,) = env["pm"]
-    composer_turn_1 = env["composer"]("s1-g1")
+    composer = env["composer"]("s1-g1")
     handle.end_turn()
 
-    handle.begin_turn(_jwt("user-1", 1), env["fence"](2))
+    handle.begin_turn(_jwt("user-1", 1))
     pm.call_tool_sync("t", "run_python", {})
 
     assert pm.token is handle.holder
-    assert env["calls"][-1] == (_jwt("user-1", 1), "run_python", {"sdpm/generation": 2})
-    assert pm.meta is handle.meta
-    # A composer keeps the generation of the turn that started it.
-    assert composer_turn_1.meta == {"sdpm/generation": 1}
-    assert composer_turn_1.token is handle.holder
-    assert env["composer"]("s1-g1").meta == {"sdpm/generation": 2}
+    assert env["calls"][-1] == (_jwt("user-1", 1), "run_python")
+    assert composer.token is handle.holder
 
 
 def test_a_dead_presentation_maker_client_is_restarted_at_the_turn_start(env):
     handle = env["handle"]()
-    handle.begin_turn(_jwt("user-1"), None)
+    handle.begin_turn(_jwt("user-1"))
     handle.end_turn()
     (pm,) = env["pm"]
     pm.dead = True
 
-    handle.begin_turn(_jwt("user-1"), None)
+    handle.begin_turn(_jwt("user-1"))
 
     assert pm.restarts == 1
     assert len(env["pm"]) == 1
@@ -246,9 +235,9 @@ def test_a_dead_presentation_maker_client_is_restarted_at_the_turn_start(env):
 
 def test_spec_to_vibe_rebuilds_the_agent_but_keeps_the_client(env):
     handle = env["handle"]()
-    spec, _ = handle.begin_turn(_jwt("user-1"), None, mode="spec")
+    spec, _ = handle.begin_turn(_jwt("user-1"), mode="spec")
     handle.end_turn()
-    vibe, _ = handle.begin_turn(_jwt("user-1"), None, mode="vibe")
+    vibe, _ = handle.begin_turn(_jwt("user-1"), mode="vibe")
 
     assert vibe is not spec and spec.cleaned
     assert len(env["pm"]) == 1
@@ -258,9 +247,9 @@ def test_spec_to_vibe_rebuilds_the_agent_but_keeps_the_client(env):
 
 def test_style_creator_gets_its_own_allowlisted_client(env):
     handle = env["handle"]()
-    handle.begin_turn(_jwt("user-1"), None, mode="spec")
+    handle.begin_turn(_jwt("user-1"), mode="spec")
     handle.end_turn()
-    handle.begin_turn(_jwt("user-1"), None, mode="style_creator")
+    handle.begin_turn(_jwt("user-1"), mode="style_creator")
 
     assert len(env["pm"]) == 2
     assert env["pm"][1].tool_filters == {"allowed": load("modes").MODES["style_creator"].allowed_tools}
@@ -270,11 +259,11 @@ def test_a_model_change_rebuilds_the_agent_with_a_new_session_manager(env, monke
     factory = env["factory"]
     monkeypatch.setattr(factory, "_ALLOWED_MODEL_IDS", {"m-a", "m-b"})
     handle = env["handle"]()
-    first, _ = handle.begin_turn(_jwt("user-1"), None, chat_model_id="m-a")
+    first, _ = handle.begin_turn(_jwt("user-1"), chat_model_id="m-a")
     handle.end_turn()
-    same, _ = handle.begin_turn(_jwt("user-1"), None, chat_model_id="m-a")
+    same, _ = handle.begin_turn(_jwt("user-1"), chat_model_id="m-a")
     handle.end_turn()
-    other, _ = handle.begin_turn(_jwt("user-1"), None, chat_model_id="m-b")
+    other, _ = handle.begin_turn(_jwt("user-1"), chat_model_id="m-b")
 
     assert same is first
     assert other is not first and first.cleaned
@@ -284,16 +273,16 @@ def test_a_model_change_rebuilds_the_agent_with_a_new_session_manager(env, monke
 
 def test_a_turn_of_another_user_is_refused(env):
     handle = env["handle"]()
-    agent, _ = handle.begin_turn(_jwt("user-1"), None)
+    agent, _ = handle.begin_turn(_jwt("user-1"))
     handle.end_turn()
 
     with pytest.raises(PermissionError):
-        handle.begin_turn(_jwt("user-2"), None)
+        handle.begin_turn(_jwt("user-2"))
     with pytest.raises(PermissionError):
         handle.update_token(_jwt("user-2"))
 
     assert handle.holder.token == _jwt("user-1")
-    again, _ = handle.begin_turn(_jwt("user-1"), None)
+    again, _ = handle.begin_turn(_jwt("user-1"))
     assert again is agent
 
 
@@ -309,7 +298,7 @@ def test_prepare_builds_no_session_manager_and_the_first_prompt_one(env):
     assert [c[1] for c in env["calls"]] == ["start_presentation"]
     assert handle.prepare(_jwt("user-1")).result(5) == status, "idempotent"
 
-    agent, _ = handle.begin_turn(_jwt("user-1"), env["fence"](1))
+    agent, _ = handle.begin_turn(_jwt("user-1"))
 
     assert len(env["managers"]) == 1
     assert agent.kwargs["session_manager"] is env["managers"][0][0]
@@ -320,12 +309,12 @@ def test_prepare_builds_no_session_manager_and_the_first_prompt_one(env):
 def test_a_stopped_turn_leaves_the_handle_reusable(env):
     handle = env["handle"]()
     stop = threading.Event()
-    first, _ = handle.begin_turn(_jwt("user-1"), env["fence"](1), stop=stop)
+    first, _ = handle.begin_turn(_jwt("user-1"), stop=stop)
     stop.set()
     assert handle.stopped()
     handle.end_turn()
 
-    second, _ = handle.begin_turn(_jwt("user-1"), env["fence"](2))
+    second, _ = handle.begin_turn(_jwt("user-1"))
 
     assert second is first and not handle.stopped()
     assert env["pm"][0].connects == 1 and not env["pm"][0].stopped
@@ -333,23 +322,18 @@ def test_a_stopped_turn_leaves_the_handle_reusable(env):
 
 def test_the_agents_hooks_act_on_the_current_turn(env):
     handle = env["handle"]()
-    fence_1, fence_2 = env["fence"](1), env["fence"](2)
-    handle.begin_turn(_jwt("user-1"), fence_1)
-    handle.note_tool_call(_Event("d1"))
+    handle.begin_turn(_jwt("user-1"))
     guard_1 = handle.loop_guard
     handle.end_turn()
-    handle.begin_turn(_jwt("user-1"), fence_2)
-    handle.note_tool_call(_Event("d2"))
+    handle.begin_turn(_jwt("user-1"))
 
-    assert fence_1.decks == ["d1"] and fence_2.decks == ["d2"]
-    assert handle.loop_guard is not guard_1
-    assert "sdpm-turn-fence" in env["pm"][0].consumers
+    assert handle.loop_guard is not None and handle.loop_guard is not guard_1
 
 
 def test_a_resident_that_connects_later_joins_the_agent(env):
     env["gate"] = threading.Event()  # the resident servers connect only once released
     handle = env["handle"]()
-    agent, first = handle.begin_turn(_jwt("user-1"), None)
+    agent, first = handle.begin_turn(_jwt("user-1"))
     assert [s["status"] for s in first] == ["ok", "error", "error"]
     handle.end_turn()
     env["gate"].set()
@@ -357,7 +341,7 @@ def test_a_resident_that_connects_later_joins_the_agent(env):
 
     assert _wait_for(lambda: all(r.connected is not None for r in mcp_clients._RESIDENT_CLIENTS.values()))
 
-    again, second = handle.begin_turn(_jwt("user-1"), None)
+    again, second = handle.begin_turn(_jwt("user-1"))
 
     assert again is agent
     assert [s["status"] for s in second] == ["ok", "ok", "ok"]
@@ -368,7 +352,7 @@ def test_a_resident_that_connects_later_joins_the_agent(env):
 
 def test_close_releases_the_presentation_maker_client_and_keeps_residents(env):
     handle = env["handle"]()
-    agent, _ = handle.begin_turn(_jwt("user-1"), None)
+    agent, _ = handle.begin_turn(_jwt("user-1"))
     handle.end_turn()
     import mcp_clients
 
@@ -381,19 +365,7 @@ def test_close_releases_the_presentation_maker_client_and_keeps_residents(env):
     assert env["pm"][0].stopped
     assert not any(r.stopped for r in env["residents"])
     with pytest.raises(RuntimeError):
-        handle.begin_turn(_jwt("user-1"), None)
-
-
-def test_close_keeps_a_client_whose_fence_call_still_runs(env):
-    handle = env["handle"]()
-    fence = env["fence"](1)
-    handle.begin_turn(_jwt("user-1"), fence)
-
-    handle.close()  # SIGTERM: the fence holds the client until fence_turn is sent
-
-    assert not env["pm"][0].stopped
-    fence.release()
-    assert _wait_for(lambda: env["pm"][0].stopped)
+        handle.begin_turn(_jwt("user-1"))
 
 
 # --- background compose ------------------------------------------------------------
@@ -404,29 +376,22 @@ def _open_task(agent, status="working"):
                                                  "status": status}]
 
 
-class _Dispatch:
-    def __init__(self, name, deck_id):
-        self.tool_use = {"name": name, "toolUseId": "t1", "input": {"deck_id": deck_id}}
-
-
 def test_an_orchestrator_runs_compose_in_the_background_and_a_style_agent_does_not(env):
     background = load("background")
     from strands.hooks.events import AfterInvocationEvent, BeforeModelCallEvent, BeforeToolCallEvent
     from strands.middleware.stages import InvokeModelStage
 
     handle = env["handle"]()
-    spec, _ = handle.begin_turn(_jwt("user-1"), None, mode="spec")
+    spec, _ = handle.begin_turn(_jwt("user-1"), mode="spec")
     handle.end_turn()
     style = env["handle"](sid="s2")
-    styler, _ = style.begin_turn(_jwt("user-1"), None, mode="style_creator")
+    styler, _ = style.begin_turn(_jwt("user-1"), mode="style_creator")
 
     assert spec.kwargs["background_tasks"] is background.CONFIG
     assert spec.kwargs["callback_handler"] == handle.on_agent_callback
     assert [stage for stage, _ in spec.middleware] == [InvokeModelStage.Input], "the manage tool is hidden"
     assert [event for event, _ in spec.added_hooks] == [
         BeforeToolCallEvent, BeforeModelCallEvent, AfterInvocationEvent], "refused by name; deliveries as text"
-    callbacks = [(event, getattr(cb, "__name__", "")) for event, cb in spec.hooks.callbacks]
-    assert (BeforeToolCallEvent, "note_task_dispatch") in callbacks
     assert "background_tasks" not in styler.kwargs and "callback_handler" not in styler.kwargs
     assert styler.middleware == [] and styler.added_hooks == []
 
@@ -446,40 +411,22 @@ def test_only_a_background_tools_progress_reaches_the_session(env):
 
 def test_the_agent_is_kept_while_its_tasks_are_open_and_rebuilt_once_they_are_delivered(env):
     handle = env["handle"]()
-    spec, _ = handle.begin_turn(_jwt("user-1"), None, mode="spec")
+    spec, _ = handle.begin_turn(_jwt("user-1"), mode="spec")
     handle.end_turn()
     _open_task(spec)
 
-    kept, _ = handle.begin_turn(_jwt("user-1"), None, mode="vibe")
+    kept, _ = handle.begin_turn(_jwt("user-1"), mode="vibe")
     handle.end_turn()
     _open_task(spec, status="completed")  # settled, not delivered yet
-    still, _ = handle.begin_turn(_jwt("user-1"), None, mode="vibe")
+    still, _ = handle.begin_turn(_jwt("user-1"), mode="vibe")
     handle.end_turn()
     cleaned_while_open = spec.cleaned
     spec.state.clear()  # delivered: Strands dropped the snapshot
-    vibe, _ = handle.begin_turn(_jwt("user-1"), None, mode="vibe")
+    vibe, _ = handle.begin_turn(_jwt("user-1"), mode="vibe")
 
     assert kept is spec and still is spec and not cleaned_while_open
     assert vibe is not spec and spec.cleaned
     assert handle._agent_key[0] == "vibe"
-
-
-def test_a_turn_started_while_a_task_runs_fences_the_tasks_deck(env):
-    handle = env["handle"]()
-    agent, _ = handle.begin_turn(_jwt("user-1"), env["fence"](1))
-    handle.note_task_dispatch(_Dispatch("compose_slides", "d7"))
-    handle.note_task_dispatch(_Dispatch("run_python", "d8"))
-    handle.end_turn()
-    _open_task(agent)
-
-    fence = env["fence"](2)
-    handle.begin_turn(_jwt("user-1"), fence)
-    fence.advance().join(5)
-
-    assert handle.task_decks == {"d7"}
-    assert fence.decks == ["d7"]
-    assert [c[1] for c in env["calls"]][-1] == "fence_turn"
-    assert handle.fence_client() is env["pm"][0]
 
 
 def test_a_delivered_result_reaches_the_session(env):

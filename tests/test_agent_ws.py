@@ -394,7 +394,7 @@ def real_handle(ctx, monkeypatch, tmp_path):
     monkeypatch.setattr(factory, "_session_manager", session_manager)
     monkeypatch.setattr(factory, "BedrockModel", lambda **kwargs: ScriptedModel(recorder))
     monkeypatch.setattr(factory, "_MCP_FACTORIES", [
-        lambda jwt_token, session_id="", tool_filters=None, meta=None, **kwargs: FakeMCP(recorder, "parent", meta=meta),
+        lambda jwt_token, session_id="", tool_filters=None, **kwargs: FakeMCP(recorder, "parent"),
     ])
 
     async def stream(agent, text, session_id, takeover, stop, **kwargs):

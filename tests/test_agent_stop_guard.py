@@ -14,7 +14,6 @@ invocation ends and a cancelled compose_slides returns without waiting for compo
 import asyncio
 import base64
 import json
-import os
 import signal
 import socket
 import subprocess
@@ -36,8 +35,6 @@ from agent_stop_fakes import FakeMCP, Recorder, ScriptedModel  # noqa: E402
 # The signal reaches the handler on the server's main thread within milliseconds; a call
 # recorded later than this after the test sent it came after the guard closed the gate.
 SLACK_S = 0.05
-# How long the fake fence_turn takes in the SIGTERM test (below stop_guard.EXIT_AFTER_S).
-FENCE_SECONDS = 1.0
 
 
 def _free_port() -> int:
@@ -63,13 +60,10 @@ def test_sigterm_during_compose_stops_every_write_and_exits(tmp_path):
     port = _free_port()
     recorder = Recorder(tmp_path / "calls.jsonl")
     log_path = tmp_path / "server.log"
-    # fence_turn takes longer than the turn takes to shut down (about 0.5-1.1 s on dev),
-    # like a cold MCP runtime: the process must still wait for it before it exits.
-    env = {**os.environ, "FAKE_FENCE_SECONDS": str(FENCE_SECONDS)}
     with log_path.open("w") as log:
         server = subprocess.Popen(
             [sys.executable, str(ROOT / "tests" / "agent_stop_server.py"), str(port), str(recorder.path)],
-            cwd=AGENT_DIR, stdout=log, stderr=subprocess.STDOUT, env=env,
+            cwd=AGENT_DIR, stdout=log, stderr=subprocess.STDOUT,
         )
     try:
         def up() -> bool:
@@ -112,19 +106,7 @@ def test_sigterm_during_compose_stops_every_write_and_exits(tmp_path):
     detail = log_path.read_text(errors="replace")[-4000:]
     assert lived < 4, detail
     assert {r["kind"] for r in records if r["t"] < sent} >= {"memory", "mcp", "model", "tool"}, records
-    # The only call after the signal fences the turn's deck (turn_fence.py), with the
-    # generation every Presentation Maker client of the turn carries, composers' included.
-    fences = [r for r in records if r["name"] == "fence_turn"]
-    assert [r for r in late if r["name"] != "fence_turn"] == [], (late, detail)
-    assert [(r["kind"], r["who"]) for r in fences] == [("mcp", "parent")], (fences, detail)
-    assert fences[0]["t"] >= sent + FENCE_SECONDS
-    assert fences[0]["detail"]["arguments"] == {"deck_ids": ["deck1"]}
-    generation = fences[0]["detail"]["meta"]["sdpm/generation"]
-    clients = [r for r in records if r["kind"] == "client"]
-    assert {r["who"] for r in clients} == {"parent", "composer"}
-    assert all(r["detail"]["meta"] == {"sdpm/generation": generation} for r in clients), clients
-    direct = [r for r in records if r["kind"] == "mcp" and r["name"] != "fence_turn"]
-    assert direct and all(r["detail"]["meta"] == {"sdpm/generation": generation} for r in direct), direct
+    assert late == [], (late, detail)
 
 
 def test_composers_stop_after_the_parent_invocation_ended(tmp_path, monkeypatch):
@@ -210,7 +192,6 @@ def test_sigterm_closes_the_resident_mcp_clients_without_holding_the_handler(mon
 
     monkeypatch.setattr(resilience, "_writes_closed", threading.Event())
     monkeypatch.setattr(stop_guard, "_exiting", threading.Event())
-    monkeypatch.setattr(stop_guard, "_exit_at", None)
     monkeypatch.setattr(mcp_clients, "_RESIDENT_CLIENTS", {})
     watchdog = threading.Event()
     monkeypatch.setattr(stop_guard, "_exit_after", lambda delay: watchdog.set())  # no os._exit here

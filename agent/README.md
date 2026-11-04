@@ -71,8 +71,7 @@ coming as `toolStream`, the settled task is published as `taskEnd`, and when no 
 session starts one with no input (`turn {why: "wake"}`), in which Strands hands the report to
 the orchestrator before its model call, as a user text `<compose_result task status>` (the
 management tool's synthetic call is rewritten before it reaches the history). A steer sent meanwhile starts a turn at once. A stop
-sets the work period's stop event (the composers' too) before it cancels the task, and with no
-turn running it fences the decks the task writes. While the composers work, the orchestrator
+sets the work period's stop event (the composers' too) before it cancels the task. While the composers work, the orchestrator
 reaches one with `message_composer` and a composer answers with `report_to_orchestrator`
 (`compose_messaging.py`), which the session publishes as `composerNote` and delivers like a
 steer, as a `<composer_note>` text (a `turn {why: "report"}` when no turn runs).

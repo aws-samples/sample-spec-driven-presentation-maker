@@ -45,7 +45,6 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 | `read_attachment` | Read content from an attached file with byte-offset paging |
 | `import_attachment` | Import file into deck workspace |
 | `search_slides` | Semantic slide search (optional, requires Amazon Bedrock KB) |
-| `fence_turn` | Agent plumbing: skip the writes a stopped agent turn's in-flight calls still make (`storage/write_fence.py`) |
 
 ## Deployment
 

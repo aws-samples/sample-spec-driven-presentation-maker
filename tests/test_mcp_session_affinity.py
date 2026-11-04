@@ -163,16 +163,14 @@ def test_holder_client_sends_no_fixed_authorization_header(monkeypatch):
     import token_holder
 
     holder = token_holder.TokenHolder("user-1", _jwt_of("user-1"))
-    meta: dict = {}
-    mcp_clients.mcp_agentcore_runtime(session_id="sess-1234567890", token=holder, meta=meta)
+    mcp_clients.mcp_agentcore_runtime(session_id="sess-1234567890", token=holder)
 
     transport = seen["transport_kwargs"]
     assert "Authorization" not in transport["headers"]
     assert transport["headers"]["Mcp-Session-Id"] == f"{P1}-sess-1234567890"
     assert isinstance(transport["auth"], token_holder.HolderAuth) and transport["auth"].holder is holder
     assert transport["terminate_on_close"] is False
-    # The shared meta dict itself, even while empty, so the handle can update it per turn.
-    assert seen["client_kwargs"]["meta"] is meta
+    assert "meta" not in seen["client_kwargs"]
 
 
 def test_holder_client_is_a_reconnecting_client(monkeypatch):
