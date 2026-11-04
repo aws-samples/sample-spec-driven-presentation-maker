@@ -26,7 +26,8 @@ Background compose (background.py): the Agent owns its tasks, so while it has an
 or settled and not delivered yet) a turn keeps it even if it asks for another mode or model.
 The handle records the decks the tasks work on (``task_decks``, fenced when the work is
 stopped) and passes the tasks' progress (``on_background_event``) and delivered results
-(``on_task_end``) to the session.
+(``on_task_end``) to the session. Its ComposeMessaging carries messages between the
+orchestrator and the running composers (compose_messaging.py).
 """
 
 import contextvars
@@ -38,6 +39,7 @@ from concurrent.futures import Future, ThreadPoolExecutor, wait
 
 import background
 import factory
+from compose_messaging import ComposeMessaging
 from modes import MODES
 from resilience import LoopGuard
 from steer_inbox import Inbox, SteerInbox
@@ -78,6 +80,8 @@ class SessionHandle:
         # Strands delivers into the history (session_runtime).
         self.on_background_event = None
         self.on_task_end = None
+        # The running composers' inboxes and their reports (the session sets on_report).
+        self.compose_messaging = ComposeMessaging(session_id)
         self.last_used = time.monotonic()
         self.closed = False
         self._lock = threading.RLock()

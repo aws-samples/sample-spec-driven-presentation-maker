@@ -16,6 +16,7 @@ from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent, Befor
 from strands.models import BedrockModel
 
 import background
+from compose_messaging import make_message_composer
 from cost_logger import log_usage
 from mcp_clients import (
     MCP_DEFS,
@@ -295,7 +296,9 @@ def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mc
 
     With composers, compose_slides runs as a background task (background.py): the
     Agent's callback handler forwards the task's progress to the handle, and the handle
-    records the decks the tasks work on and the results Strands delivers.
+    records the decks the tasks work on and the results Strands delivers. The orchestrator
+    also gets message_composer, and each composer report_to_orchestrator, both through the
+    handle's ComposeMessaging.
 
     Returns:
         (Agent, the MCP clients it uses, MCP status list)
@@ -323,7 +326,8 @@ def assemble_agent(handle, cfg, mode: str, model_ids: tuple[str, str | None], mc
         if cfg.use_composer:
             # The list itself goes to compose_slides, so a resident client that connects
             # later in the session (add_clients) reaches the composers too.
-            tools.append(make_compose_slides(servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create, user_id=user_id, session_id=session_id))
+            tools.append(make_compose_slides(servers, composer_model, composer_mcp_factory, extra_tools=[web_fetch], model_id=resolved_create, user_id=user_id, session_id=session_id, messaging=handle.compose_messaging))
+            tools.append(make_message_composer(handle.compose_messaging))
         return tools
 
     agent_name = f"Sdpm{mode.capitalize()}Agent"

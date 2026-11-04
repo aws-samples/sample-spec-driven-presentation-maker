@@ -3,8 +3,11 @@
 """Composers get a Presentation Maker client restricted to the composer's deck tools.
 
 compose_slides replaces the orchestrator's client with a fresh one per group, so the
-filter has to be on the client the composer factory builds.
+filter has to be on the client the composer factory builds. The orchestrator of a mode
+with composers also gets message_composer, wired to the same messaging as compose_slides.
 """
+
+import pytest
 
 from test_mcp_parallel_connect import _factory
 
@@ -33,17 +36,19 @@ def _jwt_of(sub: str) -> str:
 
 
 class _Agent:
+    built: list[dict] = []
+
     def __init__(self, **kwargs):
         self.messages = []
         self.hooks = _Hooks()
         self.tool_names = []
         self.system_prompt = ""
+        _Agent.built.append(kwargs)
 
 
-def test_composer_mcp_factory_carries_the_composer_allowlist(monkeypatch):
+def _patched(monkeypatch):
+    """factory with fakes at its edges; returns (factory, runtime calls, captured)."""
     factory = _factory()
-    MODES = factory.MODES
-
     runtime_calls: list[dict] = []
     captured: dict = {}
 
@@ -53,6 +58,7 @@ def test_composer_mcp_factory_carries_the_composer_allowlist(monkeypatch):
 
     def make_compose_slides(mcp_servers, model, composer_mcp_factory, **kwargs):
         captured["factory"] = composer_mcp_factory
+        captured["messaging"] = kwargs.get("messaging")
         return object()
 
     monkeypatch.delenv("MEMORY_ID", raising=False)
@@ -65,6 +71,13 @@ def test_composer_mcp_factory_carries_the_composer_allowlist(monkeypatch):
     monkeypatch.setattr(factory, "Agent", _Agent)
     monkeypatch.setattr(factory, "collect_mcp_instructions", lambda servers: "")
     monkeypatch.setattr(factory, "resolve_parts", lambda *a, **k: ("", []))
+    monkeypatch.setattr(_Agent, "built", [])
+    return factory, runtime_calls, captured
+
+
+def test_composer_mcp_factory_carries_the_composer_allowlist(monkeypatch):
+    factory, runtime_calls, captured = _patched(monkeypatch)
+    MODES = factory.MODES
 
     factory.create_agent("orchestrator", user_id="u1", session_id="s1", jwt_token=_jwt_of("u1"))
     runtime_calls.clear()
@@ -74,3 +87,16 @@ def test_composer_mcp_factory_carries_the_composer_allowlist(monkeypatch):
     assert call["session_id"] == "s1-g1"
     assert call["tool_filters"] == {"allowed": MODES["composer"].allowed_tools}
     assert "run_style_python" not in call["tool_filters"]["allowed"]
+
+
+@pytest.mark.parametrize("mode, with_composers", [("spec", True), ("vibe", True), ("style_creator", False)])
+def test_only_an_orchestrator_with_composers_gets_message_composer(monkeypatch, mode, with_composers):
+    factory, _, captured = _patched(monkeypatch)
+
+    factory.create_agent(mode, user_id="u1", session_id="s1", jwt_token=_jwt_of("u1"))
+
+    (built,) = _Agent.built
+    names = [getattr(t, "tool_name", None) for t in built["tools"]]
+    assert ("message_composer" in names) is with_composers
+    if with_composers:
+        assert captured["messaging"] is not None, "compose_slides and message_composer share the messaging"

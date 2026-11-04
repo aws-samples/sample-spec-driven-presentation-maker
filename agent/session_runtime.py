@@ -26,6 +26,9 @@ What reaches a session while it works:
 - a client going away cancels nothing, except an HTTP client's own running HTTP turn
   (as before). Besides cancel, only the work-period watchdog (WORK_LIMIT_S) and
   SIGTERM stop the work.
+- a composer's report_to_orchestrator (compose_messaging.py) publishes ``composerNote``
+  and is delivered like a steer, as a ``<composer_note>`` text: folded into the running
+  turn, or a turn of its own (``turn {why: "report"}``); it never makes a ``steer`` event.
 
 Every turn of every session runs on one event-loop thread (``sdpm-session-runtime``),
 so a turn never depends on the connection that started it. Events go into the
@@ -67,6 +70,13 @@ STOP_SETTLE_S = 5.0  # a stopped period waits this long at most for its tasks to
 # Events of the session runtime itself; HTTP responses keep today's shapes without them
 # (``taskEnd`` reaches them as the toolResult the dispatch used to be).
 RUNTIME_EVENTS = ("work", "turn", "turnEnd", "steer", "taskStart", "composerNote")
+
+# Inbox ids of composer notes (Session.report): delivered like steers, never a steer event.
+NOTE_PREFIX = "note-"
+
+
+def _is_note(item_id: str) -> bool:
+    return item_id.startswith(NOTE_PREFIX)
 
 
 # -- the runtime loop ---------------------------------------------------------
@@ -181,6 +191,7 @@ class Session:
         self.handle.on_steer_delivered = self._steer_delivered
         self.handle.on_background_event = self.publish
         self.handle.on_task_end = self._task_ended
+        self.handle.compose_messaging.on_report = self.report
         self.inbox = self.handle.inbox
         self.ring = EventRing()
         self.lock = threading.RLock()
@@ -320,8 +331,25 @@ class Session:
 
     def _discard_steers_locked(self, how: str) -> None:
         for item_id, _ in self.inbox.discard():
+            if _is_note(item_id):
+                continue
             self.publish({"steer": {"id": item_id, "state": "discarded", "how": how}})
             _log("session_steer", state="discarded", session_id=self.id[:12], period=self.period, how=how)
+
+    def report(self, tool_use_id: str, group: int, slugs: list[str], text: str) -> bool:
+        """A composer's report_to_orchestrator (compose_messaging.py, on a composer's thread):
+        publish ``composerNote`` and put the note into the inbox, where it is folded into
+        the running turn or starts one (``why: "report"``). False once the work is stopped."""
+        with self.lock:
+            period = self._period
+            if self.closed or period is None or period.stop.is_set() or writes_closed():
+                return False
+            self.publish({"composerNote": {"toolUseId": tool_use_id, "group": group, "slugs": list(slugs),
+                                           "text": text}})
+            self.inbox.put(f"{NOTE_PREFIX}{secrets.token_hex(6)}",
+                           f'<composer_note group="{group}" slugs="{", ".join(slugs)}">{text}</composer_note>')
+        self._wake_soon(period)
+        return True
 
     def _stop_locked(self, how: str) -> None:
         # Steers first, so none is folded into the closing tool result (R2).
@@ -433,13 +461,15 @@ class Session:
         mode, chat_model_id, create_model_id = self.settings
         items = self.inbox.drain()
         if items:
-            for item_id, _ in items:
+            steers = [item_id for item_id, _ in items if not _is_note(item_id)]
+            for item_id in steers:
                 self.publish({"steer": {"id": item_id, "state": "delivered", "how": "turn"}})
-            _log("session_steer", state="delivered", session_id=self.id[:12], period=self.period, how="turn",
-                 n=len(items))
+            if steers:
+                _log("session_steer", state="delivered", session_id=self.id[:12], period=self.period, how="turn",
+                     n=len(steers))
             return self._new_turn_locked(Prompt(
                 "\n\n".join(text for _, text in items), "steer", mode, chat_model_id,
-                create_model_id, why="steer",
+                create_model_id, why="steer" if steers else "report",
             ))
         settled = {task["task_id"] for task in background.undelivered(self.handle.agent)}
         if settled - period.undelivered_seen:
@@ -581,9 +611,12 @@ class Session:
         return how
 
     def _steer_delivered(self, items, how: str) -> None:
-        for item_id, _ in items:
+        steers = [item_id for item_id, _ in items if not _is_note(item_id)]
+        if not steers:
+            return
+        for item_id in steers:
             self.publish({"steer": {"id": item_id, "state": "delivered", "how": how}})
-        _log("session_steer", state="delivered", session_id=self.id[:12], period=self.period, how=how, n=len(items))
+        _log("session_steer", state="delivered", session_id=self.id[:12], period=self.period, how=how, n=len(steers))
 
     # -- lifetime ---------------------------------------------------------------
 

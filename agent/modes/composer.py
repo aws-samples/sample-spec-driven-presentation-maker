@@ -16,11 +16,13 @@ from strands import Agent, tool as strands_tool
 from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent, BeforeToolCallEvent
 from strands.types.tools import ToolContext
 
+from compose_messaging import COMPOSER_MESSAGE_PREFIX, make_report_tool
 from composition import resolve_parts
 from cost_logger import log_slides_composed, log_usage
 from message_hooks import LiftToolResultImages
 from modes import MODES  # imported lazily in compose_slides if needed
 from resilience import TURN_STOP_KEY, call_tool_with_retry, gate_tool_call
+from steer_inbox import SteerInbox
 
 logger = logging.getLogger("sdpm.agent")
 
@@ -99,7 +101,7 @@ def _replay_start_composing(
     ]
 
 
-def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None, model_id: str = "", user_id: str = "", session_id: str = ""):
+def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None, model_id: str = "", user_id: str = "", session_id: str = "", messaging=None):
     """Create compose_slides tool with closed-over MCP servers and model.
 
     Args:
@@ -114,6 +116,9 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         user_id: Cognito user ID, propagated to composer trace attributes and
             usage logs for per-user measurement.
         session_id: Runtime session ID, propagated alongside user_id.
+        messaging: Optional compose_messaging.ComposeMessaging. Each composer then gets an
+            inbox the orchestrator's message_composer reaches, and a
+            report_to_orchestrator tool.
     """
     _extra_tools = extra_tools or []
     mcp_client = mcp_servers[0] if mcp_servers else None
@@ -202,7 +207,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         # when the parent invocation ends, and a cancelled compose returns without waiting
         # for its composers, so they would miss the cancel and run on (and write) alone.
         stop: threading.Event = tool_context.invocation_state.get(TURN_STOP_KEY, tool_context.cancel_signal)
-        async with contextlib.aclosing(_compose(deck_id, slide_groups, stop)) as items:
+        tool_use_id = tool_context.tool_use.get("toolUseId", "")
+        async with contextlib.aclosing(_compose(deck_id, slide_groups, stop, tool_use_id)) as items:
             try:
                 async for item in items:
                     yield item
@@ -210,7 +216,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 stop.set()
                 raise
 
-    async def _compose(deck_id: str, slide_groups: list, stop: threading.Event):
+    async def _compose(deck_id: str, slide_groups: list, stop: threading.Event, tool_use_id: str = ""):
         """compose_slides' work: loads the canonical composer workflow, injects deck-specific
         context and runs the groups in parallel."""
         # LLM sometimes passes slide_groups as a JSON string instead of a list
@@ -283,8 +289,9 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
 
             progress_q: queue.Queue = queue.Queue()
 
-            def run_group(gi: int, group: dict) -> dict:
-                """Run a single composer group in a thread."""
+            def run_group(gi: int, group: dict, inbox=None) -> dict:
+                """Run a single composer group in a thread (``inbox``: its messages from
+                the orchestrator)."""
                 slugs_label = ", ".join(group["slugs"])
                 if stop.is_set():
                     return {"slugs": [], "response": "cancelled"}
@@ -354,6 +361,11 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 if _group_mcp is not None:
                     _group_tools[0] = _group_mcp  # replace Presentation Maker MCP
                 _group_tools.extend(_extra_tools)
+                if inbox is not None:
+                    _group_tools.append(make_report_tool(messaging, tool_use_id, gi + 1, group["slugs"]))
+                    inbox_kwargs = {"plugins": [SteerInbox(inbox, stopped=stop.is_set, prefix=COMPOSER_MESSAGE_PREFIX)]}
+                else:
+                    inbox_kwargs = {}
 
                 composer = Agent(
                     system_prompt=[
@@ -374,6 +386,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                         "model.id": model_id,
                         "purpose": "compose",
                     },
+                    **inbox_kwargs,
                 )
                 composer.hooks.add_callback(AfterInvocationEvent, log_usage)
 
@@ -454,10 +467,20 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                         except Exception:
                             logger.warning("group MCP stop failed", exc_info=True)
 
+            def run_messaged_group(gi: int, group: dict) -> dict:
+                """run_group with the group's inbox registered while it runs."""
+                if messaging is None:
+                    return run_group(gi, group)
+                inbox = messaging.register(tool_use_id, gi + 1, group["slugs"], stopped=stop.is_set)
+                try:
+                    return run_group(gi, group, inbox)
+                finally:
+                    messaging.unregister(tool_use_id, gi + 1)
+
             # Launch all groups in thread pool
             pool = ThreadPoolExecutor(max_workers=max_concurrency)
             try:
-                futures = {pool.submit(run_group, gi, g): gi for gi, g in enumerate(slide_groups)}
+                futures = {pool.submit(run_messaged_group, gi, g): gi for gi, g in enumerate(slide_groups)}
 
                 while futures and not stop.is_set():
                     while not progress_q.empty():
