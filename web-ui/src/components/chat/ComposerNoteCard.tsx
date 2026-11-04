@@ -6,6 +6,7 @@
  * `direction="to"`: the orchestrator's `message_composer` call. `direction="from"`: a
  * composer's `report_to_orchestrator` (the `composerNote` event, or a `<composer_note>`
  * in the history). Left-aligned on a muted surface, so it does not read as a user bubble.
+ * `failed`: the message did not reach a composer (the tool returned an error).
  */
 
 "use client"
@@ -19,9 +20,10 @@ interface ComposerNoteCardProps {
   group: number
   slugs?: string
   text: string
+  failed?: boolean
 }
 
-export function ComposerNoteCard({ direction, group, slugs, text }: ComposerNoteCardProps) {
+export function ComposerNoteCard({ direction, group, slugs, text, failed = false }: ComposerNoteCardProps) {
   const t = useTranslations("composerNote")
   const Icon = direction === "to" ? ArrowRight : MessageSquare
   return (
@@ -34,6 +36,7 @@ export function ComposerNoteCard({ direction, group, slugs, text }: ComposerNote
         <Icon className="h-3 w-3 flex-none" aria-hidden="true" />
         <span className="font-medium text-foreground-secondary">{t(direction, { group })}</span>
         {slugs && <span className="truncate">· {slugs}</span>}
+        {failed && <span className="ml-auto flex-none text-destructive">{t("notSent")}</span>}
       </div>
       <p className="mt-1 whitespace-pre-wrap break-words text-sm leading-relaxed text-foreground/85">{text}</p>
     </div>

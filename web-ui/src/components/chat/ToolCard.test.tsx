@@ -109,6 +109,14 @@ describe("ToolCard", () => {
     expect(container.querySelector(".ledger-marker")).toBeNull()
     expect(getByRole("note").textContent).toContain("To composer 2")
     expect(getByRole("note").textContent).toContain("Use blue.")
+    expect(getByRole("note").textContent).not.toContain("Not delivered")
+  })
+
+  it("marks a message_composer that did not reach a composer", () => {
+    const { container } = renderWithIntl(
+      <ToolCard name="message_composer" input={{ group: 2, text: "Use blue." }} status="error" />
+    )
+    expect(container.querySelector("[role='note']")?.textContent).toContain("Not delivered")
   })
 
   it("does not set aria-live on active (not yet complete)", () => {

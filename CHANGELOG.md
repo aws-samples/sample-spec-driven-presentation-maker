@@ -44,10 +44,13 @@ Entries before v0.5.0 were written retroactively as summaries.
   send a composer a message with `message_composer(group, text)`; the composer reads it at
   its next step and applies it to the slides it writes. A composer tells the orchestrator
   something with `report_to_orchestrator(text)` (`agent/compose_messaging.py`): the session
-  publishes `composerNote {toolUseId, group, slugs, text}` and delivers the note to the
-  orchestrator as a `<composer_note>` text, in the running turn or in a turn of its own
-  (`turn {why: "report"}`). When the direction changes while composers run, the orchestrator
-  corrects the running work this way instead of cancelling and redoing it.
+  publishes `composerNote {toolUseId, group, slugs, text}` (`slugs` as one comma-separated
+  label) and delivers the note to the orchestrator as an escaped `<composer_note>` text, in
+  the running turn or in a turn of its own (`turn {why: "report"}`). A message sent after
+  a composer's last step makes it run once more with that message; `message_composer` to a
+  composer that is not running returns an error result. When the direction changes while
+  composers run, the orchestrator corrects the running work this way instead of cancelling
+  and redoing it.
 - **Send any time, stop, and come back to a running session (Web UI, Cloud).** The Web UI
   talks to its session over the agent's `/ws` WebSocket (one connection per work period,
   closed when the session goes idle; a 30-second ping only while it works). The send button
@@ -66,11 +69,13 @@ Entries before v0.5.0 were written retroactively as summaries.
   unchanged.
 - **Background compose in the chat (Web UI, Cloud).** The compose card stays live while the
   composers work in the background, across later messages and turns, and closes when the
-  result arrives (`taskEnd`); a stopped compose shows as stopped. Between turns the chat says
-  the composers are working in the background and that you can keep chatting. A message sent
+  result arrives (`taskEnd`); a stopped compose shows as stopped. While a compose runs and no
+  turn does, the chat says the composers are working in the background and that you can keep
+  chatting. A message sent
   while the agent works is marked as sent, then as read by the agent once it reaches it.
   Messages between the orchestrator and a composer (`message_composer`, `composerNote`) show
-  as composer notes, not as user messages, live and in the reloaded history; the reloaded
+  as composer notes, not as user messages, live and in the reloaded history; a message that
+  did not reach a composer is marked as not delivered. The reloaded
   history hides the call that delivered the background result. Reloading the page during a
   background compose brings back the card with live progress. Local mode is unchanged.
 

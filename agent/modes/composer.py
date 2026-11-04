@@ -441,6 +441,12 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                         try:
                             # continue from the opening history; the turn's stop event cancels it
                             response = composer(None, cancel_signal=stop)
+                            # Nothing is sent to the composer from here on; a message that
+                            # came after its last step still reaches it.
+                            late = messaging.close(tool_use_id, gi + 1) if inbox is not None else []
+                            if late and not stop.is_set():
+                                response = composer([{"text": COMPOSER_MESSAGE_PREFIX + text} for _, text in late],
+                                                    cancel_signal=stop)
                             if stop.is_set():
                                 return {"slugs": [], "response": "cancelled"}
                             if guard.cancelled:

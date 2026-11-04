@@ -46,7 +46,7 @@ Each session's agent is assembled by `factory.py` for its session handle, which:
   `cancel`, `resume(from_seq)`, `prepare`, `ping`. The server answers with control frames
   (`accepted`, `cancelAck`, `resumeAck`, `prepareAck`, `ready`, `pong`, `keepalive`, `error`)
   and the session's events as `{"seq", "ev"}`, where `ev` has the shapes of the HTTP stream
-  plus `work` (busy / idle), `turn`, `turnEnd`, `steer`, `taskStart` and `taskEnd`. Frames stay under 24,000 bytes
+  plus `work` (busy / idle), `turn`, `turnEnd`, `steer`, `taskStart`, `taskEnd` and `composerNote`. Frames stay under 24,000 bytes
   (`{"batch": [...]}`, or `{"chunk", ...}` for a large event) and go out at most one per
   20 ms. The client speaks first; the session is admitted from the forwarded
   `Authorization` header on the first message and its owner checked on every message.

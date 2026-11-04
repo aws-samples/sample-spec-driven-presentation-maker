@@ -278,6 +278,10 @@ class SessionHandle:
                 # A resident client was replaced (its server died): the Agent's tools
                 # point at the old one.
                 new_agent, memory = True, self._start_session_manager()
+            elif not new_agent and keep and self._stale(mcp_servers):
+                # Rebuilding would fail the open tasks; the turn runs with the old tools.
+                logger.warning("Session %s: a resident client was replaced while background tasks are open; "
+                               "keeping the Agent and its tools until they are delivered", self.session_id[:12])
             if new_agent:
                 session_manager = memory.result()
                 self._retire_agent()

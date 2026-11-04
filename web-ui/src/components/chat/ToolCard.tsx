@@ -213,6 +213,7 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
         direction="to"
         group={Number(input?.group) || 0}
         text={typeof input?.text === "string" ? input.text : ""}
+        failed={status === "error"}
       />
     )
   }

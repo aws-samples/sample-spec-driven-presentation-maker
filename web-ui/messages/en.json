@@ -285,7 +285,8 @@
   "composerNote": {
     "from": "Composer {group}",
     "to": "To composer {group}",
-    "aria": "Message with composer {group}"
+    "aria": "Message with composer {group}",
+    "notSent": "Not delivered"
   },
   "snippet": {
     "title": "Text Snippet",

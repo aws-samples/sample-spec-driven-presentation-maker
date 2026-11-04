@@ -774,7 +774,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         <p role="status" className="flex-none px-4 pb-1 text-xs text-foreground-muted">
           {stream.stopping ? t("stopping") : t("reconnecting")}
         </p>
-      ) : !IS_LOCAL && stream.isLoading && !stream.turnActive && (
+      ) : !IS_LOCAL && stream.isLoading && !stream.turnActive
+          && stream.messages.some((m) => m.toolUses.some((tool) => tool.task?.state === "running")) && (
         <p role="status" className="flex-none px-4 pb-1 text-xs text-foreground-muted">
           {t("backgroundWorking")}
         </p>

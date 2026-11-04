@@ -12,6 +12,7 @@ import asyncio
 import json
 import threading
 import time
+from pathlib import Path
 
 import pytest
 from strands import Agent
@@ -142,7 +143,7 @@ def test_message_composer_reaches_the_running_composer_at_its_next_tool_result(c
     running, wrong, sent = asyncio.run(run())
 
     assert running == {1: ["a"]}
-    assert wrong == "No composer of group 2 is running. Running groups: 1 (a)."
+    assert wrong == {"status": "error", "content": [{"text": "No composer of group 2 is running. Running groups: 1 (a)."}]}
     assert sent.startswith("Sent to composer 1")
     seen = [call["messages"][-1] for call in composer_model.calls]
     (told,) = [m for m in seen if {"text": PREFIX + "make it blue"} in m["content"]]
@@ -151,6 +152,58 @@ def test_message_composer_reaches_the_running_composer_at_its_next_tool_result(c
     report = json.loads(background.result_text(task))
     assert report["status"] == "completed" and report["summaries"]["a"].strip() == "Applied."
     assert messaging.running() == {}, "the group unregistered when it ended"
+
+
+def test_close_takes_what_came_after_the_last_step_and_refuses_more():
+    messaging = load("compose_messaging").ComposeMessaging("s1")
+    messaging.register("t1", 1, ["a"])
+    assert messaging.send(1, "late") is None
+
+    assert messaging.close("t1", 1) == [("to-1", "late")]
+    assert messaging.send(1, "later").startswith("No composer is running now")
+    assert messaging.close("t1", 1) == []
+
+
+def test_a_message_sent_after_the_composers_last_step_still_reaches_it(composing, monkeypatch):
+    recorder, stop_key = composing
+    background = load("background")
+    compose_messaging = load("compose_messaging")
+    steer_inbox = load("steer_inbox")
+    messaging = compose_messaging.ComposeMessaging("s1")
+    sent: list = []
+    original = steer_inbox.SteerInbox._after_invocation
+
+    def after_invocation(self, event):
+        original(self, event)
+        if self.prefix and not sent:  # the composer's last check is done: a message comes now
+            sent.append(messaging.send(1, "make it blue"))
+
+    monkeypatch.setattr(steer_inbox.SteerInbox, "_after_invocation", after_invocation)
+
+    def composer_policy(messages):
+        if any(text.startswith(PREFIX) for text in _user_texts(messages)):
+            return ("text", "Applied.")
+        return ("text", "Done.")
+
+    composer_model = PolicyModel(composer_policy)
+    compose_slides = load("modes.composer").make_compose_slides(
+        [FakeMCP(recorder, "parent")], composer_model,
+        composer_mcp_factory=lambda _sid: FakeMCP(recorder, "composer"), messaging=messaging,
+    )
+    agent = Agent(model=PolicyModel(_dispatching_orchestrator), tools=[compose_slides],
+                  callback_handler=None, background_tasks=background.CONFIG)
+    background.hide_manage_tool(agent)
+
+    async def run():
+        await agent.invoke_async("Make the deck.", invocation_state={stop_key: threading.Event()})
+        await _until(lambda: background.undelivered(agent), timeout=10)
+
+    asyncio.run(run())
+
+    assert sent == [None], "accepted: the composer had not been closed yet"
+    assert composer_model.calls[-1]["messages"][-1] == {"role": "user", "content": [{"text": PREFIX + "make it blue"}]}
+    (task,) = background.undelivered(agent)
+    assert json.loads(background.result_text(task))["summaries"]["a"].strip() == "Applied."
 
 
 def test_a_composer_has_the_report_tool():
@@ -190,7 +243,7 @@ def test_a_report_while_the_orchestrator_is_idle_starts_a_report_turn(rt, real, 
     assert [t["text"] for t in turns if t["why"] == "report"] == [note]
     (start,) = _kinds(evs, "taskStart")
     assert _kinds(evs, "composerNote") == [
-        {"toolUseId": start["toolUseId"], "group": 1, "slugs": ["a"], "text": "Slide a is half done."}]
+        {"toolUseId": start["toolUseId"], "group": 1, "slugs": "a", "text": "Slide a is half done."}]
     assert _kinds(evs, "steer") == [], "a note is not a steer"
     assert any(call["messages"][-1]["content"] == [{"text": note}] for call in real.orchestrator.calls), \
         "the orchestrator's model read the note as the turn's input"
@@ -236,8 +289,29 @@ def test_a_report_during_a_turn_is_folded_into_the_next_tool_result(rt, monkeypa
     assert taken == [True]
     assert ("user", ["toolResult", f"text:{note}"]) in _shape(agents[0].messages)
     assert [t["why"] for t in _kinds(evs, "turn")] == ["prompt"], "no extra turn"
-    assert _kinds(evs, "composerNote") == [{"toolUseId": "t9", "group": 2, "slugs": ["c", "d"], "text": "Applied blue."}]
+    assert _kinds(evs, "composerNote") == [{"toolUseId": "t9", "group": 2, "slugs": "c, d", "text": "Applied blue."}]
     assert _kinds(evs, "steer") == []
+
+
+def test_a_report_is_published_and_delivered_as_the_web_ui_reads_it(rt):  # noqa: F811
+    # The shared fixture: the Web UI tests feed the same event and delivered text.
+    fixture = json.loads((Path(__file__).resolve().parent.parent / "web-ui" / "src" / "test" / "fixtures"
+                          / "composerNote.json").read_text())
+    session = rt.session()
+    tail = rt.tail(session)
+    session.submit("hello", "ws", _jwt())
+    tail.until(lambda ev: "event" in ev)
+
+    assert session.report(fixture["report"]["toolUseId"], fixture["report"]["group"], fixture["report"]["slugs"],
+                          fixture["report"]["text"]) is True
+    assert session.report("t2", 2, ['a"b'], "ok") is True
+    (first, second) = [text for _, text in session.inbox.drain()]
+    evs = tail.until(lambda ev: "composerNote" in ev)
+    rt.turns.release("hello")
+
+    assert first == fixture["delivered"], "the composer's text cannot close the note"
+    assert second == '<composer_note group="2" slugs="a&quot;b">ok</composer_note>'
+    assert [ev for ev in evs if "composerNote" in ev][0] == fixture["event"]
 
 
 def test_nothing_is_put_after_a_stop(rt):  # noqa: F811

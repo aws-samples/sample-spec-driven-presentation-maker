@@ -3,6 +3,7 @@
 import { describe, it, expect } from "vitest"
 import { cutAtPrompt, isLocalHistoryFormat, parseLocalHistory, parseCloudHistory, userMessageFromText } from "./chatHistory"
 import type { ChatMessage } from "@/services/deckService"
+import composerNote from "@/test/fixtures/composerNote.json"
 
 const asHistory = (msgs: unknown[]) => msgs as unknown as ChatMessage[]
 
@@ -159,6 +160,18 @@ describe("parseCloudHistory background compose", () => {
       { group: 2, slugs: "body", text: "Halfway." }, { group: 1, text: "Done." }, "Thanks.",
     ])
     expect(out.some((m) => m.role === "user")).toBe(false)
+  })
+
+  it("reads the note the agent delivers, escaped text included", () => {
+    // The agent's real delivered text (tests/test_agent_compose_messaging.py checks the same file).
+    const out = parseCloudHistory(asHistory([
+      { role: "user", content: [{ text: composerNote.delivered }] },
+      { role: "user", content: [{ text: '<composer_note group="2" slugs="a&quot;b">x &amp;lt; y</composer_note>' }] },
+    ]))
+    expect(out.map((m) => [m.role, m.composerNote])).toEqual([
+      ["assistant", { group: 1, slugs: "intro, agenda", text: composerNote.report.text }],
+      ["assistant", { group: 2, slugs: 'a"b', text: "x &lt; y" }],
+    ])
   })
 
   it("keeps a steer drained with a note as a user message before the note", () => {

@@ -498,6 +498,25 @@ def test_an_http_client_that_goes_away_cancels_its_own_turn(rt):
     assert [ev["turnEnd"]["how"] for ev in evs if "turnEnd" in ev] == ["cancelled"]
 
 
+def test_an_http_prompt_sent_while_a_stop_finishes_streams_its_turn_in_the_new_period(rt):
+    session = rt.session()
+    tail = rt.tail(session)
+    rt.turns.linger = 0.2
+    session.submit("ws work", "ws", _jwt())
+    tail.until(lambda ev: "event" in ev)
+
+    session.cancel()
+    thread, events = _http(rt, "next")
+    tail.until(lambda ev: "turn" in ev and ev["turn"]["text"] == "next")
+    rt.turns.release("next")
+    thread.join(5)
+
+    assert not thread.is_alive()
+    assert any("re:next" in json.dumps(ev) for ev in events)
+    evs = tail.until(_finished)
+    assert [ev["turnEnd"]["how"] for ev in evs if "turnEnd" in ev] == ["cancelled", "finished"]
+
+
 def test_an_http_prompt_during_websocket_work_is_a_steer(rt):
     session = rt.session()
     tail = rt.tail(session)

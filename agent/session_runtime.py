@@ -42,6 +42,7 @@ in publication order.
 import asyncio
 import contextvars
 import hmac
+import html
 import json
 import logging
 import secrets
@@ -344,10 +345,12 @@ class Session:
             period = self._period
             if self.closed or period is None or period.stop.is_set() or writes_closed():
                 return False
-            self.publish({"composerNote": {"toolUseId": tool_use_id, "group": group, "slugs": list(slugs),
-                                           "text": text}})
+            label = ", ".join(slugs)
+            self.publish({"composerNote": {"toolUseId": tool_use_id, "group": group, "slugs": label, "text": text}})
+            # Escaped, so the composer's text cannot close the note (chatHistory.ts unescapes).
             self.inbox.put(f"{NOTE_PREFIX}{secrets.token_hex(6)}",
-                           f'<composer_note group="{group}" slugs="{", ".join(slugs)}">{text}</composer_note>')
+                           f'<composer_note group="{group}" slugs="{html.escape(label)}">'
+                           f'{html.escape(text, quote=False)}</composer_note>')
         self._wake_soon(period)
         return True
 
@@ -708,6 +711,13 @@ def _task_result(end: dict) -> dict:
     }}
 
 
+def _still_queued(session: Session, turn_id: str) -> bool:
+    """Whether a prompt is queued to run, or runs now (not dropped by a stop)."""
+    with session.lock:
+        return any(p.id == turn_id for p in session.next_prompts) or (
+            session.turn is not None and session.turn.id == turn_id)
+
+
 async def http_turn(session_id: str, sub: str, token: str, prompt: str, mode: str = "spec",
                     chat_model_id: str | None = None, create_model_id: str | None = None,
                     sessions: Registry | None = None):
@@ -743,7 +753,7 @@ async def http_turn(session_id: str, sub: str, token: str, prompt: str, mode: st
         except RuntimeError as e:
             yield error_event(str(e), code=SERVICE_UNAVAILABLE)
             return
-        mine = follow = False
+        mine = follow = started = False
         while True:
             try:
                 kind, payload = await asyncio.wait_for(queue.get(), KEEPALIVE_S)
@@ -755,10 +765,13 @@ async def http_turn(session_id: str, sub: str, token: str, prompt: str, mode: st
             for item in payload:
                 ev = item["ev"]
                 if "work" in ev and ev["work"].get("state") == "idle":
+                    if routed == "turn" and not started and _still_queued(session, turn_id):
+                        continue  # a stopped period's end: this prompt runs in the next one
                     return
                 if routed == "turn":
                     if "turn" in ev:
                         mine = ev["turn"].get("id") == turn_id
+                        started = started or mine
                         continue
                     if "taskStart" in ev:
                         follow = follow or mine

@@ -62,10 +62,17 @@ class ComposeMessaging:
 
     def unregister(self, tool_use_id: str, group: int) -> None:
         """The composer ended (a later call's group of the same number stays)."""
+        self.close(tool_use_id, group)
+
+    def close(self, tool_use_id: str, group: int) -> list[tuple[str, str]]:
+        """The composer's invocation ended: nothing more is sent to it. Returns what was
+        sent after its last step (the composer runs once more with it)."""
         with self._lock:
             entry = self._groups.get(group)
-            if entry is not None and entry.tool_use_id == tool_use_id:
-                del self._groups[group]
+            if entry is None or entry.tool_use_id != tool_use_id:
+                return []
+            del self._groups[group]
+            return entry.inbox.drain()
 
     def running(self) -> dict[int, list[str]]:
         """Group number -> slugs of the composers that can be messaged now."""
@@ -109,7 +116,7 @@ def make_message_composer(messaging: ComposeMessaging):
     """The orchestrator's tool for reaching a running composer."""
 
     @strands_tool(name="message_composer")
-    def message_composer(group: int, text: str) -> str:
+    def message_composer(group: int, text: str) -> str | dict:
         """Send a message to a composer of the compose_slides call running now.
 
         It reaches the composer at its next step, and the composer applies it to the slides
@@ -122,7 +129,9 @@ def make_message_composer(messaging: ComposeMessaging):
             text: The message, e.g. the user's new request in the user's words.
         """
         error = messaging.send(group, text)
-        return error or f"Sent to composer {group}; it reads the message at its next step."
+        if error:
+            return {"status": "error", "content": [{"text": error}]}  # the Web UI card shows it was not sent
+        return f"Sent to composer {group}; it reads the message at its next step."
 
     return message_composer
 

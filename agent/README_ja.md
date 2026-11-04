@@ -34,7 +34,7 @@ User → AgentCore Runtime → Agent
   `cancel`、`resume(from_seq)`、`prepare`、`ping`。サーバーは制御フレーム（`accepted`、`cancelAck`、
   `resumeAck`、`prepareAck`、`ready`、`pong`、`keepalive`、`error`）と、セッションのイベント
   `{"seq", "ev"}` を返す。`ev` は HTTP のストリームと同じ形に、`work`（busy / idle）、`turn`、
-  `turnEnd`、`steer`、`taskStart`、`taskEnd` を足したもの。フレームは 24,000 バイト以下（`{"batch": [...]}`、大きいイベントは
+  `turnEnd`、`steer`、`taskStart`、`taskEnd`、`composerNote` を足したもの。フレームは 24,000 バイト以下（`{"batch": [...]}`、大きいイベントは
   `{"chunk", ...}`）で、20 ミリ秒に 1 つまで送る。最初に送るのはクライアント。セッションは最初の
   メッセージで、プラットフォームが転送する `Authorization` ヘッダから受け付け、以後のメッセージごとに
   持ち主を確かめる。

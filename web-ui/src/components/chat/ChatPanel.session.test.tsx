@@ -11,6 +11,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import { act, cleanup, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { deckSessionId, ownerPrefix } from "@/lib/sessionId"
+import composerNote from "@/test/fixtures/composerNote.json"
 
 const { invokeAgentCore, steerAgentCore, getChatHistory } = vi.hoisted(() => ({
   invokeAgentCore: vi.fn(),
@@ -135,8 +136,11 @@ describe("ChatPanel background compose (Cloud)", () => {
     })
     expect(screen.getByText(BACKGROUND)).toBeTruthy()
 
-    act(() => { h!.onSession.onEvent({ composerNote: { toolUseId: "c1", group: 1, slugs: "intro", text: "Done with intro." } }, { own: false }) })
-    expect(screen.getByRole("note", { name: "Message with composer 1" }).textContent).toContain("Done with intro.")
+    // The agent's real composerNote payload (tests/test_agent_compose_messaging.py checks the same file).
+    act(() => { h!.onSession.onEvent(composerNote.event, { own: false }) })
+    const note = screen.getByRole("note", { name: "Message with composer 1" })
+    expect(note.textContent).toContain("· intro, agenda")
+    expect(note.textContent).toContain(composerNote.event.composerNote.text)
 
     steerAgentCore.mockResolvedValueOnce({ id: "x", as: "steer" })
     await act(async () => { await ref.current!.sendMessage("use blue") })
@@ -152,5 +156,36 @@ describe("ChatPanel background compose (Cloud)", () => {
 
     await act(async () => { finish!() })
     expect(screen.queryByText(BACKGROUND)).toBeNull()
+  })
+
+  it("shows the background line only while a task runs", async () => {
+    let h: Handlers | undefined
+    let finish: (() => void) | undefined
+    invokeAgentCore.mockImplementationOnce((...args: unknown[]) => new Promise<string>((resolve) => {
+      h = { onStreamUpdate: args[2], onToolUse: args[5], onSession: args[11] } as Handlers
+      finish = () => resolve("")
+    }))
+    const ref = createRef<ChatPanelHandle>()
+    renderWithIntl(<ChatPanel ref={ref} deckId="d1" />)
+    await waitFor(() => expect(getChatHistory).toHaveBeenCalled())
+    await waitFor(() => expect(ref.current).toBeTruthy())
+    act(() => { void ref.current!.sendMessage("make it") })
+    await waitFor(() => expect(h).toBeDefined())
+
+    act(() => {
+      h!.onSession.onEvent({ turn: { id: "p1", why: "prompt", text: "make it" } }, { own: true })
+      h!.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", input: {}, started: true })
+      h!.onToolUse("compose_slides", { toolUseId: "c1", name: "compose_slides", taskStarted: true, task: { id: "t", state: "running" } })
+      h!.onSession.onEvent({ turnEnd: { id: "p1", how: "finished" } }, { own: true })
+    })
+    expect(screen.getByText(BACKGROUND)).toBeTruthy()
+    act(() => {
+      h!.onToolUse("compose_slides", {
+        toolUseId: "c1", name: "compose_slides", status: "success", completed: true, task: { id: "t", state: "completed" },
+      })
+    })
+    expect(screen.queryByText(BACKGROUND)).toBeNull()  // still working (a wake turn comes), no task runs
+
+    await act(async () => { finish!() })
   })
 })

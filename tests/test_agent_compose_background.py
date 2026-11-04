@@ -88,6 +88,7 @@ def test_the_dispatch_returns_while_composers_run_and_the_report_arrives_on_the_
     agent, model, returned, running = asyncio.run(run())
 
     assert running == 1 and returned < 1.0
+    assert not stop.is_set(), "a completed compose leaves the period's stop unset (no GeneratorExit)"
     assert agent.messages[-1]["content"] == [{"text": "Report seen."}]
     (delivered,) = background.delivered(model.calls[-1]["messages"][-1])
     report = json.loads(background.result_text(delivered))

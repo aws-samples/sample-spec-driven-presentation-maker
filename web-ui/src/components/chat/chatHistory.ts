@@ -25,6 +25,12 @@ const MANAGE_TOOL = "strands_manage_background_task"
 /** A composer's report as the orchestrator received it (agent/session_runtime.py Session.report). */
 const COMPOSER_NOTE_RE = /<composer_note group="(\d+)"(?: slugs="([^"]*)")?>([\s\S]*?)<\/composer_note>/g
 
+/** Session.report escapes a note's text and slugs (Python's html.escape); undo it. */
+function unescapeNote(s: string): string {
+  return s.replace(/&(lt|gt|quot|#x27|amp);/g, (_, name: string) =>
+    ({ lt: "<", gt: ">", quot: '"', "#x27": "'", amp: "&" })[name] ?? "")
+}
+
 /**
  * Text the agent received as a user message: composer notes become note messages, the
  * rest user messages, in order. Text without a note gives one user message, as before.
@@ -45,7 +51,9 @@ function messagesFromText(text: string): Message[] {
     pushText(text.slice(at, note.index))
     out.push({
       role: "assistant", content: "", toolUses: [],
-      composerNote: { group: Number(note[1]), ...(note[2] ? { slugs: note[2] } : {}), text: note[3].trim() },
+      composerNote: {
+        group: Number(note[1]), ...(note[2] ? { slugs: unescapeNote(note[2]) } : {}), text: unescapeNote(note[3].trim()),
+      },
     })
     at = (note.index ?? 0) + note[0].length
   }
