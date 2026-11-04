@@ -49,11 +49,14 @@ cp "$ROOT/scripts/mcpb/manifest.json" "$STAGE/manifest.json"
 cp "$ROOT/scripts/mcpb/.mcpbignore" "$STAGE/.mcpbignore"
 
 # The UV MCPB runtime requires a pyproject.toml at bundle root. Reuse the local
-# server's dependency declaration, point its sdpm-skill source into the bundle,
-# and avoid packaging the staging root itself (the entry point is explicit).
-sed 's#path = "../../sdpm"#path = "sdpm"#' "$ROOT/servers/local/pyproject.toml" |
-  awk '/^\[tool\.uv\.sources\]$/ { print "[tool.uv]"; print "package = false"; print "" } { print }' \
-  > "$STAGE/pyproject.toml"
+# server's dependency declaration (already `package = false`, so the staging root
+# itself is not packaged) and point its workspace sdpm-skill source into the bundle.
+sed 's#^sdpm-skill = { workspace = true }$#sdpm-skill = { path = "sdpm" }#' \
+  "$ROOT/servers/local/pyproject.toml" > "$STAGE/pyproject.toml"
+grep -qx 'sdpm-skill = { path = "sdpm" }' "$STAGE/pyproject.toml" || {
+  echo "build_mcpb.sh: could not point sdpm-skill at the bundled sdpm/ (servers/local/pyproject.toml changed?)" >&2
+  exit 1
+}
 
 if [[ "$SKIP_ASSETS" == false ]]; then
   (
