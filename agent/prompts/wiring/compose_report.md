@@ -13,6 +13,13 @@ Before dispatch, `compose_slides` validates deck.json and outline.md and returns
 
 It returns a JSON report:
 
+In this environment the call itself returns at once with a dispatch notice. The report
+arrives later on its own, as the result of a `strands_manage_background_task` `get`: the
+task's metadata JSON, then the report with the fields below. A `<composer_note group="N">`
+in a message is a report from the composer of group N while it works.
+When the direction changes while composers run, first correct the running work with
+`message_composer` instead of cancelling and redoing it.
+
 - `status`: `"completed"` / `"partial"` / `"failed"`
 - `generated_slides`: slugs successfully written
 - `failed_groups`: per-group failures with `slugs`, `instruction`, and `error` —
