@@ -3,6 +3,7 @@
 """Composer agent: compose_slides tool with parallel execution, prefetch, and post-build."""
 
 import asyncio
+import contextlib
 import json
 import logging
 import os
@@ -128,6 +129,10 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
             "pass and the content pass are separate calls. "
             f"Up to {max_concurrency} groups run concurrently. "
             "Use this once outline.md is finalized.\n\n"
+            "It runs in the background: the call returns at once, and its report is "
+            "delivered to you automatically when the composers finish, so do not wait "
+            "for it or check on it. While it runs, message_composer reaches a running "
+            "composer.\n\n"
             "The composer reads specs/ (brief, outline, art-direction) for all content "
             "and design decisions. The instruction only needs to specify which slides "
             "to compose. Add user requests or review feedback if applicable, but do NOT "
@@ -186,14 +191,28 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
     async def compose_slides(deck_id: str, slide_groups: list, tool_context: ToolContext):
         """Compose slides by delegating to composer agents.
 
-        Loads the canonical composer workflow, then injects deck-specific context.
-        Runs groups in parallel. Async generator: yields progress dicts, then returns final result str.
+        Runs as a background task of the orchestrator (background.py): the call returns a
+        dispatch notice at once, and Strands delivers the report into the history when
+        this generator ends. Async generator: yields progress dicts, then the report str.
+
+        Cancelled (a stop of the session's work, the task timeout, shutdown): sets the stop
+        event first, so the composers and the pool below stop without being waited for.
         """
-        # The turn's stop event. Not tool_context.cancel_signal: Strands clears that one
+        # The session's stop event. Not tool_context.cancel_signal: Strands clears that one
         # when the parent invocation ends, and a cancelled compose returns without waiting
         # for its composers, so they would miss the cancel and run on (and write) alone.
         stop: threading.Event = tool_context.invocation_state.get(TURN_STOP_KEY, tool_context.cancel_signal)
+        async with contextlib.aclosing(_compose(deck_id, slide_groups, stop)) as items:
+            try:
+                async for item in items:
+                    yield item
+            except (asyncio.CancelledError, GeneratorExit):
+                stop.set()
+                raise
 
+    async def _compose(deck_id: str, slide_groups: list, stop: threading.Event):
+        """compose_slides' work: loads the canonical composer workflow, injects deck-specific
+        context and runs the groups in parallel."""
         # LLM sometimes passes slide_groups as a JSON string instead of a list
         if isinstance(slide_groups, str):
             slide_groups = json.loads(slide_groups)
@@ -471,6 +490,9 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                         # await, not time.sleep: the turn's event loop keeps running
                         # (Strands' cancel watcher, keepalives) while composers work.
                         await asyncio.sleep(0.2)
+            except (asyncio.CancelledError, GeneratorExit):
+                stop.set()  # before the finally: shut the pool down without waiting
+                raise
             finally:
                 # Cancelled: leave without waiting. A composer thread can be blocked in a
                 # model stream read or a tool call; it stops on its own at the next check
