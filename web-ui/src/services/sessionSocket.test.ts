@@ -140,6 +140,32 @@ describe("SessionSocket", () => {
     expect(s.items.map((i) => i.seq)).toEqual([1, 2, 3, 4])
   })
 
+  it("delivers the replay of a resume from 0 on an open connection that already saw it", () => {
+    const s = setup()
+    const ws = startWork(s)
+    ws.receive(text(3, "a"))
+    s.socket.send({ type: "resume", from_seq: 0 })
+    ws.receive({ ctl: "resumeAck", working: true, head: 3, period_start: 1, replay_from: 1, complete: true })
+    ws.receive({ batch: [busy(1), { seq: 2, ev: { turn: { id: "p1", why: "prompt", text: "hi" } } }, text(3, "a")] })
+    expect(s.items.map((i) => i.seq)).toEqual([1, 2, 3, 1, 2, 3])
+    expect(s.socket.lastSeq).toBe(3)
+  })
+
+  it("sends only the page's resume when one is queued during a reconnect, and pings again after it", () => {
+    const s = setup()
+    const ws = startWork(s)
+    ws.receive(text(3, "a"))
+    ws.drop()
+    s.socket.send({ type: "resume", from_seq: 0 })
+    vi.advanceTimersByTime(1000)
+    const ws2 = FakeWebSocket.last()
+    ws2.open()
+    expect(ws2.ofType("resume")).toEqual([{ type: "resume", from_seq: 0 }])
+    ws2.receive({ ctl: "resumeAck", working: true, head: 3, period_start: 1, replay_from: 1, complete: true })
+    vi.advanceTimersByTime(PING_INTERVAL_MS)
+    expect(ws2.ofType("ping")).toHaveLength(1)
+  })
+
   it("backs off and gives up after five attempts", () => {
     const s = setup()
     startWork(s).drop()

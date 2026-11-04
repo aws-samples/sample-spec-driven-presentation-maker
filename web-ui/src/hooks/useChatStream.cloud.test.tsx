@@ -196,4 +196,54 @@ describe("useChatStream (Cloud) resume", () => {
     await act(async () => { finish!(); await done })
     expect(result.current.isLoading).toBe(false)
   })
+
+  it("shows the prompt this tab sent in an earlier run when the deck opens again", async () => {
+    let finish: (() => void) | undefined
+    resumeAgentCore.mockImplementationOnce((_sid: string, _tok: string, _from: number, h: Record<string, (...a: unknown[]) => void> & { onSession: Handlers["onSession"] }) => {
+      h.onResumeAck({ working: true })
+      h.onSession.onEvent({ turn: { id: "p1", why: "prompt", text: "make it" } }, { own: true })
+      h.onStreamUpdate("On it")
+      return new Promise((resolve) => { finish = () => resolve({ working: true, completion: "On it" }) })
+    })
+    const { result } = renderStream()
+    let done: Promise<void> | undefined
+    act(() => { done = result.current.resume(() => []) })
+    expect(roles(result.current.messages)).toEqual(["user:make it", "assistant:On it"])
+    await act(async () => { finish!(); await done })
+  })
+
+  it("sends a message typed while the resume connects as a steer once the session is known to work", async () => {
+    let ack: (() => void) | undefined
+    resumeAgentCore.mockImplementationOnce((_sid: string, _tok: string, _from: number, h: Record<string, (...a: unknown[]) => void>) =>
+      new Promise((resolve) => { ack = () => h.onResumeAck({ working: true }); void resolve }))
+    steerAgentCore.mockResolvedValueOnce({ id: "x", as: "steer" })
+    const { result } = renderStream()
+    act(() => { void result.current.resume(() => []) })
+    let sent: Promise<boolean> | undefined
+    act(() => { sent = result.current.sendMessage("use blue") })
+    expect(steerAgentCore).not.toHaveBeenCalled()
+    expect(invokeAgentCore).not.toHaveBeenCalled()
+    await act(async () => { ack!() })
+    await act(async () => { await sent })
+    expect(steerAgentCore).toHaveBeenCalledWith("S1", "use blue", "at", expect.any(String))
+    expect(invokeAgentCore).not.toHaveBeenCalled()
+  })
+
+  it("sends a message typed while the resume connects as a prompt when the session is idle", async () => {
+    let end: (() => void) | undefined
+    resumeAgentCore.mockImplementationOnce((_sid: string, _tok: string, _from: number, h: Record<string, (...a: unknown[]) => void>) =>
+      new Promise((resolve) => { end = () => { h.onResumeAck({ working: false }); resolve({ working: false, completion: "" }) } }))
+    const run = captureInvoke()
+    const { result } = renderStream()
+    act(() => { void result.current.resume(() => []) })
+    let sent: Promise<boolean> | undefined
+    act(() => { sent = result.current.sendMessage("hello") })
+    expect(invokeAgentCore).not.toHaveBeenCalled()
+    await act(async () => { end!() })
+    expect(invokeAgentCore).toHaveBeenCalledTimes(1)
+    expect(invokeAgentCore.mock.calls[0][0]).toBe("hello")
+    expect(roles(result.current.messages)).toEqual(["user:hello", "assistant:"])
+    await act(async () => { run.finish!(); await sent })
+    expect(steerAgentCore).not.toHaveBeenCalled()
+  })
 })

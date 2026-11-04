@@ -243,9 +243,14 @@ export class SessionSocket {
     if (this.ws || !this.working) return
     const queued = this.outbox
     this.outbox = []
-    this.pending = this.pending.filter((key) => key !== "resume")
-    this.pending.unshift("resume")
-    this.outbox.push(JSON.stringify({ type: "resume", from_seq: this.lastSeq }), ...queued)
+    // A resume the page queued meanwhile (a deck opened again) replaces the reconnect's own.
+    const pageResume = queued.some((text) => (JSON.parse(text) as Outgoing).type === "resume")
+    if (!pageResume) {
+      this.pending = this.pending.filter((key) => key !== "resume")
+      this.pending.unshift("resume")
+      this.outbox.push(JSON.stringify({ type: "resume", from_seq: this.lastSeq }))
+    }
+    this.outbox.push(...queued)
     this.open()
   }
 
@@ -292,12 +297,13 @@ export class SessionSocket {
       this.working = working
       if (working) {
         this.hookWindow()
-        this.startPing()
       } else {
         this.stopPing()
         this.attempts = 0
       }
     }
+    // Also after a reconnect, whose close stopped the ping while the session kept working.
+    if (working) this.startPing()
     this.stateWriter.update(working ? "working" : "idle", this.lastSeq)
   }
 
@@ -403,8 +409,13 @@ export class SessionSocket {
       }
       case "resumeAck": {
         answered = this.answered("resume")
-        if (typeof ctl.head === "number" && ctl.head < this.lastSeq) {
-          this.lastSeq = typeof ctl.replay_from === "number" ? Math.max(0, ctl.replay_from - 1) : 0
+        // The server sends everything from `replay_from` again: a resume from 0 on an open
+        // connection (a deck opened again) gets its replay, and a process that started over
+        // numbers from 1 again.
+        if (typeof ctl.replay_from === "number") {
+          this.lastSeq = Math.max(0, ctl.replay_from - 1)
+        } else if (typeof ctl.head === "number" && ctl.head < this.lastSeq) {
+          this.lastSeq = 0
         }
         this.setReconnecting(false)
         this.attempts = 0

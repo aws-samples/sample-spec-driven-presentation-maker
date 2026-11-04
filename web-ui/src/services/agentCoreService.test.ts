@@ -225,6 +225,29 @@ describe("resumeAgentCore", () => {
     expect(onResumeAck).toHaveBeenCalledWith(expect.objectContaining({ working: true }))
   })
 
+  it("replays from the start when the deck opens again while the first follower still follows", async () => {
+    const sessionId = sid()
+    const first = startInvoke(sessionId)
+    first.ws.receive(text(3, "Hel"))
+    const firstDone = first.done.catch((err: unknown) => err)
+    const onStreamUpdate = vi.fn()
+    const onSession = { onEvent: vi.fn() }
+    const done = resumeAgentCore(sessionId, "tok", 0, { onResumeAck: vi.fn(), onStreamUpdate, onToolUse: vi.fn(), onSession })
+    // The superseded follower detaches without an error the chat would show.
+    expect(await firstDone).toMatchObject({ name: "AbortError" })
+    expect(FakeWebSocket.instances).toHaveLength(1)
+    expect(first.ws.ofType("resume")).toEqual([{ type: "resume", from_seq: 0 }])
+    // Live output before the ack comes again in the replay.
+    first.ws.receive(text(4, "lo"))
+    expect(onStreamUpdate).not.toHaveBeenCalled()
+    first.ws.receive({ ctl: "resumeAck", working: true, head: 4, period_start: 1, replay_from: 1, complete: true })
+    first.ws.receive({ batch: [busy(1), { seq: 2, ev: { turn: { id: first.promptId, why: "prompt", text: "hi" } } }, text(3, "Hel"), text(4, "lo")] })
+    expect(onSession.onEvent).toHaveBeenCalledWith({ turn: { id: first.promptId, why: "prompt", text: "hi" } }, { own: true })
+    expect(onStreamUpdate).toHaveBeenLastCalledWith("Hello")
+    first.ws.receive(idle(5))
+    await expect(done).resolves.toEqual({ working: true, completion: "Hello" })
+  })
+
   it("closes at once when the session is not working", async () => {
     const done = resumeAgentCore(sid(), "tok", 0, { onStreamUpdate: vi.fn() })
     const ws = FakeWebSocket.last()

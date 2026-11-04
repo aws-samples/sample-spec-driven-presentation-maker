@@ -10,7 +10,7 @@
  * A message sent while it works is a steer (steerAgentCore): its bubble appears where the
  * agent accepted it, and the reply after it goes into a new assistant message. Stop sends a
  * cancel (cancelAgentCore). `resume` follows a session that was working when the page
- * loaded. Local keeps one request at a time and its own stop.
+ * loaded; a send while it connects waits for its answer. Local keeps one request at a time and its own stop.
  *
  * Does NOT manage: chat history loading, Local reconnect, @mentions, Options, saveLocalChat.
  * Those remain in each panel's orchestrator.
@@ -340,12 +340,15 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut }:
 
   const onSession = {
     onEvent(ev: SessionEvent, { own }: SessionEventInfo) {
+      // A resume run shows every user message: this page's own ones went up in a run before it
+      // (the deck opened again in this tab) or are steers kept in `steers`.
+      const mine = own && !replayCut
       const turn = ev.turn
       if (turn?.id && turn.why === "prompt") {
         if (rendered.has(turn.id)) return
         rendered.add(turn.id)
         // This page's own prompt: its bubble went up when it was sent.
-        if (own && !steers.has(turn.id)) return
+        if (mine && !steers.has(turn.id)) return
         const user = userFor(turn.id, turn.text ?? "", false)
         if (cutPending && replayCut) {
           pushUser(user, replayCut(turn.text ?? ""))
@@ -359,7 +362,7 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut }:
       if (steer.state === "accepted") {
         if (rendered.has(steer.id)) return
         rendered.add(steer.id)
-        if (own && !steers.has(steer.id)) return
+        if (mine && !steers.has(steer.id)) return
         pushUser(userFor(steer.id, steer.text ?? "", true))
       } else if (steer.state === "discarded") {
         const id = steer.id
@@ -386,6 +389,9 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const isLoadingRef = useRef(false)
   // Cloud: a resume is waiting for its answer (working or not).
   const resumingRef = useRef(false)
+  // Cloud: settles when a send can be routed after a resume — at its ack when the session
+  // works (a steer), or when the resume is over (a prompt). Null when no resume runs.
+  const resumeGateRef = useRef<Promise<void> | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const steersRef = useRef(new Map<string, PendingSteer>())
   const messagesRef = useRef(messages)
@@ -425,6 +431,10 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     const hasContent = userMessage.trim() || uploadedFiles?.length || snippets?.length
     if (!hasContent && !options?.continuedFrom) return false
     const display = options?.displayContent ?? userMessage
+
+    // Cloud, resume connecting (reload, wake, deck opened again): wait until the session's
+    // state is known, then send as a steer or a prompt.
+    if (!IS_LOCAL && resumeGateRef.current) await resumeGateRef.current
 
     // Cloud, session working: a steer into the running work.
     if (!IS_LOCAL && isLoadingRef.current) {
@@ -524,6 +534,9 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     const accessToken = auth.user?.access_token
     if (!accessToken) return
     resumingRef.current = true
+    let openGate = () => {}
+    const gate = new Promise<void>((resolve) => { openGate = resolve })
+    resumeGateRef.current = gate
     const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: false, replayCut: cutHistory })
     let followed = false
     try {
@@ -534,6 +547,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
             followed = true
             isLoadingRef.current = true
             setIsLoading(true)
+            openGate()
           }
         },
         onStreamUpdate: run.onStreamUpdate,
@@ -542,7 +556,8 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
         translateError,
       })
     } catch (err) {
-      console.error("Resume failed:", err)
+      // A newer invoke or resume on the session took over (AbortError): nothing failed.
+      if (!(err instanceof DOMException && err.name === "AbortError")) console.error("Resume failed:", err)
     } finally {
       resumingRef.current = false
       setReconnecting(false)
@@ -551,6 +566,8 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
         setIsLoading(false)
         onSendComplete?.()
       }
+      if (resumeGateRef.current === gate) resumeGateRef.current = null
+      openGate()
     }
   }, [sessionId, auth.user?.access_token, onToolEvent, onSendComplete, translateError])
 

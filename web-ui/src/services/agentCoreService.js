@@ -85,7 +85,7 @@ export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessTo
   }
 
   const entry = sessionEntry(sessionId, accessToken)
-  if (entry.follower) finish(entry, new Error("Superseded by a newer request"))
+  if (entry.follower) finish(entry, superseded())
   if (parser.resetParserState) parser.resetParserState();
   const id = generateId()
   entry.ownIds.add(id)
@@ -163,6 +163,11 @@ function follow(entry, handlers, signal, extra) {
   return promise
 }
 
+/** A newer invoke or resume on this session takes over: the old follower detaches (keeps its partial output). */
+function superseded() {
+  return new DOMException("Superseded", "AbortError")
+}
+
 function finish(entry, error) {
   const follower = entry.follower
   if (!follower) return
@@ -208,7 +213,8 @@ function sessionListener(entry) {
   return {
     onItem({ ev }) {
       const follower = entry.follower
-      if (!follower) return
+      // A resume on an open connection: the live items before its ack come again in its replay.
+      if (!follower || follower.resuming) return
       if (SESSION_EVENT_KEYS.some((k) => k in ev)) {
         const id = ev.turn?.id ?? ev.steer?.id
         follower.handlers.onSession?.onEvent?.(ev, { own: !!id && entry.ownIds.has(id) })
@@ -337,7 +343,7 @@ export const cancelAgentCore = async (sessionId, accessToken) => {
 export const resumeAgentCore = async (sessionId, accessToken, fromSeq, handlers) => {
   if (IS_LOCAL) return { working: false, completion: "" }
   const entry = sessionEntry(sessionId, accessToken)
-  if (entry.follower) finish(entry, new Error("Superseded by a resume"))
+  if (entry.follower) finish(entry, superseded())
   if (parser.resetParserState) parser.resetParserState();
   const done = follow(entry, handlers || {}, undefined, { resuming: true })
   const follower = entry.follower
