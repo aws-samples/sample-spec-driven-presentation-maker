@@ -30,7 +30,9 @@ Entries before v0.5.0 were written retroactively as summaries.
 - **Compose runs in the background (agent, Cloud).** `compose_slides` runs as a Strands
   background task of the orchestrator (`agent/background.py`): the orchestrator's turn goes
   on, or ends, while the composers work, and the session keeps working until the report is
-  delivered. When the compose settles with no turn running, the session starts a turn with no
+  delivered. After a dispatch the orchestrator tells the user what is being composed and ends
+  its turn; it looks at the slides (`get_preview`) once the report arrives. When the compose
+  settles with no turn running, the session starts a turn with no
   input (`turn {why: "wake"}`) and the orchestrator reads the report as the result of the
   task. A message sent while only the compose runs starts a turn at once. New events:
   `taskStart {toolUseId, taskId, name}` (replaces the dispatch's `toolResult`), `taskEnd
@@ -43,7 +45,8 @@ Entries before v0.5.0 were written retroactively as summaries.
 - **Message a running composer (agent, Cloud).** While a compose runs, the orchestrator can
   send a composer a message with `message_composer(group, text)`; the composer reads it at
   its next step and applies it to the slides it writes. A composer tells the orchestrator
-  something with `report_to_orchestrator(text)` (`agent/compose_messaging.py`): the session
+  something with `report_to_orchestrator(text)` (`agent/compose_messaging.py`), to answer a
+  message or to raise a decision (progress and completion stay in its summary): the session
   publishes `composerNote {toolUseId, group, slugs, text}` (`slugs` as one comma-separated
   label) and delivers the note to the orchestrator as an escaped `<composer_note>` text, in
   the running turn or in a turn of its own (`turn {why: "report"}`). A message sent after

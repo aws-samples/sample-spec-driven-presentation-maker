@@ -141,8 +141,10 @@ def make_report_tool(messaging: ComposeMessaging, tool_use_id: str, group: int, 
 
     @strands_tool(name="report_to_orchestrator")
     def report_to_orchestrator(text: str) -> str:
-        """Tell the orchestrator something while you keep working, e.g. that you applied a
-        message it sent. You get no answer here.
+        """Answer a message the orchestrator sent you while you work (e.g. that you applied
+        it), or tell it something it has to decide before you can finish. Your final
+        summary reaches the orchestrator in the compose report, so progress and completion
+        belong in that summary. You get no answer here.
 
         Args:
             text: What to tell, in a sentence or two.
