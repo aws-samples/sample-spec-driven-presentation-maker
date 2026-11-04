@@ -2,20 +2,30 @@
 # SPDX-License-Identifier: MIT-0
 """Session runtime: each session's turns, one at a time, and what a client sees of them.
 
-A session is *working* while a turn runs or a follow-on turn is queued (a steer that
-raced the end of a turn, a message sent while a stop finished). One work period is a
-chain of turns; it publishes ``work busy`` at its start and ``work idle`` at its end,
+A session is *working* while a turn runs, a follow-on turn is queued (a steer that
+raced the end of a turn), a background task (compose_slides, background.py) has not
+settled, or a settled one's result has not been delivered. One work period is that
+whole stretch; it publishes ``work busy`` at its start and ``work idle`` at its end,
 and holds a HealthyBusy task (``/ping``) the whole time, so the platform does not
 reclaim the microVM while nobody is connected (R8).
 
+Between turns, while a background task works, the period waits. A task that settles
+publishes ``taskEnd``; when no turn runs, the runtime then starts one with no input
+(``turn {why: "wake"}``), and Strands delivers the result before its model call. A wake
+that leaves the same tasks undelivered does not start another.
+
 What reaches a session while it works:
-- a message is a steer (steer_inbox.py), never a cancel. An HTTP prompt that arrives
-  while an HTTP-started turn runs takes that turn over, as /invocations always did;
-- ``cancel`` (the stop button) discards the steers not yet delivered, then sets the
-  turn's stop event. A message sent while the stop finishes runs after it;
-- a client going away cancels nothing, except an HTTP client's own HTTP turn (as
-  before). Besides cancel, only the work-period watchdog (WORK_LIMIT_S) and SIGTERM
-  stop a turn.
+- a message is a steer (steer_inbox.py), never a cancel: folded into the running turn,
+  or a turn of its own at once when none runs. An HTTP prompt that arrives while an
+  HTTP-started turn runs takes that turn over, as /invocations always did;
+- ``cancel`` (the stop button) discards the steers not yet delivered, sets the period's
+  stop event (the one tools and background tasks see), then the running turn's, then
+  cancels the background tasks; with no turn running it fences the decks the tasks
+  write (an idle TurnFence). A message sent while the stop finishes opens a new period
+  after it;
+- a client going away cancels nothing, except an HTTP client's own running HTTP turn
+  (as before). Besides cancel, only the work-period watchdog (WORK_LIMIT_S) and
+  SIGTERM stop the work.
 
 Every turn of every session runs on one event-loop thread (``sdpm-session-runtime``),
 so a turn never depends on the connection that started it. Events go into the
@@ -36,6 +46,7 @@ import threading
 import time
 from dataclasses import dataclass
 
+import background
 import stop_guard
 from errors import AUTH, SERVICE_UNAVAILABLE, error_event
 from event_ring import COALESCE_S, EventRing
@@ -50,9 +61,12 @@ WORK_LIMIT_S = 3600.0  # the watchdog: one work period at most (the longest seen
 IDLE_CLOSE_S = 30 * 60.0  # a session not working and unused this long is closed (lazily)
 MAX_SESSIONS = 16
 KEEPALIVE_S = 5.0
+TASK_POLL_S = 0.25  # how often a period looks at its background tasks
+STOP_SETTLE_S = 5.0  # a stopped period waits this long at most for its tasks to settle
 
-# Events of the session runtime itself; HTTP responses keep today's shapes without them.
-RUNTIME_EVENTS = ("work", "turn", "turnEnd", "steer")
+# Events of the session runtime itself; HTTP responses keep today's shapes without them
+# (``taskEnd`` reaches them as the toolResult the dispatch used to be).
+RUNTIME_EVENTS = ("work", "turn", "turnEnd", "steer", "taskStart", "composerNote")
 
 
 # -- the runtime loop ---------------------------------------------------------
@@ -128,6 +142,34 @@ class Turn:
         self.done = False
 
 
+class Period:
+    """One work period: its stop event (registered with stop_guard for the whole period,
+    so SIGTERM sets it; tools and background tasks see it as TURN_STOP_KEY), why it was
+    stopped, and the work loop's wake-up."""
+
+    def __init__(self, number: int, on_stop):
+        self.number = number
+        self.stop = stop_guard.begin_turn(on_stop=lambda: on_stop(self))
+        self.stopped_how: str | None = None
+        self.stopped_at: float | None = None
+        self.wake = asyncio.Event()
+        self.undelivered_seen: set[str] = set()  # task ids a wake turn was started for
+        self.monitor: asyncio.Task | None = None
+        self._claim = threading.RLock()  # re-entrant: SIGTERM's handler may interrupt a holder
+        self._claimed = False
+
+    def claim_stop(self, how: str) -> bool:
+        """Stop the period; True for the first caller only."""
+        with self._claim:
+            first = not self._claimed
+            self._claimed = True
+            if first:
+                self.stopped_how = how
+                self.stopped_at = time.monotonic()
+        self.stop.set()
+        return first
+
+
 class Session:
     """One session's runtime state (see the module docstring). Thread-safe."""
 
@@ -137,6 +179,8 @@ class Session:
         self.busy = busy
         self.handle = SessionHandle(session_id, sub)
         self.handle.on_steer_delivered = self._steer_delivered
+        self.handle.on_background_event = self.publish
+        self.handle.on_task_end = self._task_ended
         self.inbox = self.handle.inbox
         self.ring = EventRing()
         self.lock = threading.RLock()
@@ -151,7 +195,8 @@ class Session:
         self.closed = False
         self.last_active = time.monotonic()
         self._period_started = 0.0
-        self._period_how: str | None = None  # set by the watchdog / SIGTERM
+        self._period: Period | None = None
+        self._ended_tasks: set[str] = set()  # task ids whose taskEnd was published
         self._flush_armed = False
         self._task = None
 
@@ -236,8 +281,10 @@ class Session:
                 self._start_period(prompt)
                 return "turn", prompt.id
             current = self.turn
-            if current is not None and current.stop.is_set():
-                # A stop is finishing: this runs as the next turn once it has.
+            idle_turn = current is None or current.done
+            if self._period.stop.is_set() or (not idle_turn and current.stop.is_set()):
+                # A stop is finishing: this runs once it has (after a stopped period, in a
+                # new one).
                 self.next_prompts.append(prompt)
                 return "turn", prompt.id
             if origin == "http" and current is not None and current.prompt.origin == "http":
@@ -247,10 +294,13 @@ class Session:
                     current.how = "takeover"
                     runtime_loop().call_soon_threadsafe(current.takeover.set)
                 self.next_prompts.append(prompt)
+                self._wake_soon()
                 return "turn", prompt.id
             self.inbox.put(prompt.id, text)
             self.publish({"steer": {"id": prompt.id, "text": text, "state": "accepted"}})
             _log("session_steer", state="accepted", session_id=self.id[:12], period=self.period)
+            if idle_turn:
+                self._wake_soon()  # working with no turn running (a background task): a turn now
             return "steer", prompt.id
 
     def cancel(self) -> str:
@@ -276,10 +326,55 @@ class Session:
     def _stop_locked(self, how: str) -> None:
         # Steers first, so none is folded into the closing tool result (R2).
         self._discard_steers_locked(how)
+        period = self._period
+        if period is None:
+            return
+        # The period's stop first: what tools and background tasks see.
+        first = period.claim_stop(how)
         current = self.turn
         if current is not None and not current.done and not current.stop.is_set():
             current.how = current.how or how
             current.stop.set()
+        if first:
+            stop_guard.hold(self._after_stop(period))
+
+    def _period_stopped(self, period: Period):
+        """stop_guard's callback for a period's stop event (SIGTERM, on the signal
+        handler's thread): non-blocking; returns the idle fence's thread, if any."""
+        if not period.claim_stop("sigterm"):
+            return None
+        return self._after_stop(period)
+
+    def _after_stop(self, period: Period):
+        """After a period's stop event is set: fence the background tasks' decks when no
+        turn runs (a running turn's own fence has them), cancel the tasks, wake the work
+        loop. Returns the fence call's thread or None."""
+        current = self.turn
+        thread = self._idle_fence() if current is None or current.done else None
+        agent = self.handle.agent
+        if background.pending(agent):
+            loop = runtime_loop()
+            loop.call_soon_threadsafe(lambda: loop.create_task(background.cancel_all(agent)))
+        self._wake_soon(period)
+        return thread
+
+    def _idle_fence(self):
+        """A fence for the decks the session's background tasks write, minted now (its
+        generation is later than any turn's that started them)."""
+        fence = TurnFence()
+        fence.bind(self.handle.fence_client())
+        fence.note_decks(list(self.handle.task_decks))
+        return fence.advance()
+
+    def _wake_soon(self, period: Period | None = None) -> None:
+        """Wake the period's work loop (thread-safe)."""
+        period = period or self._period
+        if period is None:
+            return
+        try:
+            runtime_loop().call_soon_threadsafe(period.wake.set)
+        except RuntimeError:  # the loop is closed (process exit)
+            pass
 
     def prepare(self, token: str, mode: str = "spec", chat_model_id: str | None = None,
                 create_model_id: str | None = None):
@@ -303,7 +398,7 @@ class Session:
     def _start_period(self, prompt: Prompt) -> None:
         self.working = True
         self.period += 1
-        self._period_how = None
+        period = self._period = Period(self.period, self._period_stopped)
         self._period_started = time.monotonic()
         self.ring.start_period()
         self.publish({"work": {"state": "busy"}})
@@ -313,7 +408,7 @@ class Session:
         loop = runtime_loop()
 
         def start() -> None:
-            self._task = loop.create_task(self._work(turn), context=context)
+            self._task = loop.create_task(self._work(period, turn), context=context)
 
         loop.call_soon_threadsafe(start)
 
@@ -322,57 +417,129 @@ class Session:
             if not self.working:
                 return
             logger.warning("Session %s: work period over %.0fs; stopping it", self.id[:12], WORK_LIMIT_S)
-            self._period_how = "watchdog"
             self.next_prompts.clear()
             self._stop_locked("watchdog")
 
-    def _next_turn_locked(self) -> Turn | None:
-        if self._period_how is not None or writes_closed():
-            self.next_prompts.clear()
-            self._discard_steers_locked(self._period_how or "sigterm")
+    def _next_turn_locked(self, period: Period) -> Turn | None:
+        """The period's next turn: a queued prompt, the pending steers, or a wake for
+        settled background results; none once the period is stopped."""
+        if period.stop.is_set() or writes_closed():
+            if period.stopped_how == "watchdog" or writes_closed():
+                self.next_prompts.clear()
+            self._discard_steers_locked(period.stopped_how or "sigterm")
             return None
         if self.next_prompts:
             return self._new_turn_locked(self.next_prompts.pop(0))
-        items = self.inbox.drain()
-        if not items:
-            return None
-        for item_id, _ in items:
-            self.publish({"steer": {"id": item_id, "state": "delivered", "how": "turn"}})
-        _log("session_steer", state="delivered", session_id=self.id[:12], period=self.period, how="turn", n=len(items))
         mode, chat_model_id, create_model_id = self.settings
-        return self._new_turn_locked(Prompt(
-            "\n\n".join(text for _, text in items), "steer", mode, chat_model_id,
-            create_model_id, why="steer",
-        ))
+        items = self.inbox.drain()
+        if items:
+            for item_id, _ in items:
+                self.publish({"steer": {"id": item_id, "state": "delivered", "how": "turn"}})
+            _log("session_steer", state="delivered", session_id=self.id[:12], period=self.period, how="turn",
+                 n=len(items))
+            return self._new_turn_locked(Prompt(
+                "\n\n".join(text for _, text in items), "steer", mode, chat_model_id,
+                create_model_id, why="steer",
+            ))
+        settled = {task["task_id"] for task in background.undelivered(self.handle.agent)}
+        if settled - period.undelivered_seen:
+            # A wake that leaves the same tasks undelivered does not start another.
+            period.undelivered_seen |= settled
+            _log("session_wake", session_id=self.id[:12], period=self.period, tasks=len(settled))
+            return self._new_turn_locked(Prompt("", "wake", mode, chat_model_id, create_model_id, why="wake"))
+        return None
 
-    def _end_period_locked(self, how: str) -> None:
-        how = self._period_how or how
+    def _waiting_locked(self, period: Period) -> bool:
+        """Whether the period waits for background tasks (a stopped one, briefly)."""
+        if not background.pending(self.handle.agent):
+            return False
+        if not period.stop.is_set():
+            return True
+        if period.stopped_at is None:
+            period.stopped_at = time.monotonic()
+        return time.monotonic() - period.stopped_at < STOP_SETTLE_S
+
+    def _end_period_locked(self, period: Period, how: str) -> None:
+        how = period.stopped_how or how
         self.publish({"work": {"state": "idle", "how": how}})
         _log("session_work", state="idle", session_id=self.id[:12], period=self.period, how=how,
              ms=int((time.monotonic() - self._period_started) * 1000))
         self.working = False
         self.turn = None
+        self._period = None
         self.last_active = time.monotonic()
+        if self.next_prompts and not self.closed and not writes_closed():
+            # Sent while a stop finished: a new period, with a fresh stop event.
+            self._start_period(self.next_prompts.pop(0))
 
-    async def _work(self, turn: Turn) -> None:
-        busy = self.busy.start("sdpm-session-work", {"session": self.id[:12], "period": self.period})
+    async def _work(self, period: Period, turn: Turn | None) -> None:
+        busy = self.busy.start("sdpm-session-work", {"session": self.id[:12], "period": period.number})
         watchdog = asyncio.get_running_loop().call_later(WORK_LIMIT_S, self._watchdog)
         how = "error"
         try:
-            while turn is not None:
-                how = await self._run_turn(turn)
+            while True:
+                if turn is not None:
+                    how = await self._run_turn(period, turn)
+                self._scan_tasks()
+                if background.pending(self.handle.agent):
+                    self._ensure_monitor(period)
                 with self.lock:
-                    turn = self._next_turn_locked()
-                    if turn is None:
-                        self._end_period_locked(how)
+                    turn = self._next_turn_locked(period)
+                    if turn is not None:
+                        continue
+                    if not self._waiting_locked(period):
+                        self._end_period_locked(period, how)
+                        break
+                    period.wake.clear()
+                try:
+                    await asyncio.wait_for(period.wake.wait(), TASK_POLL_S)
+                except asyncio.TimeoutError:
+                    pass
         finally:
             watchdog.cancel()
+            stop_guard.end_turn(period.stop)
+            if period.monitor is not None:
+                period.monitor.cancel()
             with self.lock:
-                if self.working and (self.turn is None or self.turn.done):
-                    self._end_period_locked(how)
+                if self._period is period and (self.turn is None or self.turn.done):
+                    self._end_period_locked(period, how)
             self.busy.complete(busy)
 
-    async def _run_turn(self, turn: Turn) -> str:
+    # -- background tasks ------------------------------------------------------------
+
+    def _ensure_monitor(self, period: Period) -> None:
+        if period.monitor is None or period.monitor.done():
+            period.monitor = asyncio.get_running_loop().create_task(self._monitor())
+
+    async def _monitor(self) -> None:
+        """While a background task is pending: publish each one that settles."""
+        while True:
+            self._scan_tasks()
+            if not background.pending(self.handle.agent):
+                self.handle.task_decks.clear()
+                return
+            await asyncio.sleep(TASK_POLL_S)
+
+    def _scan_tasks(self) -> None:
+        for task in background.undelivered(self.handle.agent):
+            self._task_ended(task)
+
+    def _task_ended(self, task: dict) -> None:
+        """A task settled (seen in the Agent's snapshots, or in the message that delivers
+        it): publish ``taskEnd`` once, and wake the work loop."""
+        task_id = task.get("task_id")
+        with self.lock:
+            if not task_id or task_id in self._ended_tasks:
+                return
+            self._ended_tasks.add(task_id)
+            self.publish({"taskEnd": {
+                "toolUseId": task.get("tool_use_id", ""), "taskId": task_id, "name": task.get("tool_name", ""),
+                "status": task.get("status", ""), "content": background.result_text(task),
+            }})
+            _log("session_task", state="end", status=task.get("status"), session_id=self.id[:12], period=self.period)
+        self._wake_soon()
+
+    async def _run_turn(self, period: Period, turn: Turn) -> str:
         prompt, stop = turn.prompt, turn.stop
         how = "finished"
         try:
@@ -382,26 +549,33 @@ class Session:
                 prompt.chat_model_id, prompt.create_model_id, stop,
             )
             self.publish({"mcp_status": mcp_status})
-            async for event in stream_agent(agent, prompt.text, self.id, turn.takeover, stop):
+            text = None if prompt.why == "wake" else prompt.text
+            async for event in stream_agent(agent, text, self.id, turn.takeover, stop, tool_stop=period.stop):
                 if isinstance(event, dict) and "keepalive" in event:
                     continue
                 self.publish(event)
+                if isinstance(event, dict) and "taskStart" in event:
+                    _log("session_task", state="start", name=event["taskStart"].get("name"),
+                         session_id=self.id[:12], period=self.period)
+                    self._ensure_monitor(period)
         except Exception as e:
             logger.exception("Agent stream error for session %s", self.id[:12])
             self.publish(error_event(e))
             how = "error"
         finally:
             stop_guard.end_turn(stop)
-            # Stopped (cancel, watchdog, an HTTP takeover or its client gone, SIGTERM):
-            # fence the turn's decks. hold: a SIGTERM that follows (StopRuntimeSession
-            # after a cancel) waits for the call.
-            if stop.is_set():
-                stop_guard.hold(turn.fence.advance())
-                how = turn.how or ("sigterm" if writes_closed() else "cancelled")
-            else:
-                turn.fence.release()
             self.handle.end_turn()
             with self.lock:
+                # Under the lock: a stop either sees this turn running (and sets its stop
+                # before this point) or done (and fences the tasks' decks itself).
+                # Stopped (cancel, watchdog, an HTTP takeover or its client gone, SIGTERM):
+                # fence the turn's decks. hold: a SIGTERM that follows (StopRuntimeSession
+                # after a cancel) waits for the call.
+                if stop.is_set():
+                    stop_guard.hold(turn.fence.advance())
+                    how = turn.how or ("sigterm" if writes_closed() else "cancelled")
+                else:
+                    turn.fence.release()
                 turn.done = True
                 self.publish({"turnEnd": {"id": turn.id, "how": how}})
         return how
@@ -493,15 +667,25 @@ def _http_visible(ev: dict) -> bool:
     return not any(key in ev for key in RUNTIME_EVENTS)
 
 
+def _task_result(end: dict) -> dict:
+    """A ``taskEnd`` as the toolResult /invocations clients know."""
+    return {"toolResult": {
+        "toolUseId": end.get("toolUseId", ""), "name": end.get("name", ""),
+        "status": "error" if end.get("status") == "failed" else "success", "content": end.get("content", ""),
+    }}
+
+
 async def http_turn(session_id: str, sub: str, token: str, prompt: str, mode: str = "spec",
                     chat_model_id: str | None = None, create_model_id: str | None = None,
                     sessions: Registry | None = None):
     """/invocations on the session runtime, with today's event shapes.
 
     A prompt while idle (or one that takes over an HTTP turn) streams its own turn and
-    ends with it; a prompt during WebSocket-started work is a steer, and the response
-    follows the session until it goes idle. A client that goes away cancels its own
-    HTTP turn only.
+    ends with it; a turn that dispatched a background task follows the session until it
+    goes idle instead (the wake turn's answer included). A prompt during
+    WebSocket-started work is a steer, and the response follows the session until it
+    goes idle. A task's ``taskEnd`` arrives as the toolResult its dispatch used to be.
+    A client that goes away cancels its own running HTTP turn only.
     """
     sessions = sessions or registry
     try:
@@ -526,7 +710,7 @@ async def http_turn(session_id: str, sub: str, token: str, prompt: str, mode: st
         except RuntimeError as e:
             yield error_event(str(e), code=SERVICE_UNAVAILABLE)
             return
-        mine = False
+        mine = follow = False
         while True:
             try:
                 kind, payload = await asyncio.wait_for(queue.get(), KEEPALIVE_S)
@@ -543,10 +727,18 @@ async def http_turn(session_id: str, sub: str, token: str, prompt: str, mode: st
                     if "turn" in ev:
                         mine = ev["turn"].get("id") == turn_id
                         continue
-                    if "turnEnd" in ev and ev["turnEnd"].get("id") == turn_id:
-                        return
-                    if mine and _http_visible(ev):
-                        yield ev
+                    if "taskStart" in ev:
+                        follow = follow or mine
+                        continue
+                    if "turnEnd" in ev:
+                        if ev["turnEnd"].get("id") == turn_id and not follow:
+                            return
+                        mine = False
+                        continue
+                    if not (mine or follow):
+                        continue
+                if "taskEnd" in ev:
+                    yield _task_result(ev["taskEnd"])
                 elif _http_visible(ev):
                     yield ev
     finally:

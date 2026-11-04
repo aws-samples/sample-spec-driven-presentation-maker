@@ -46,6 +46,10 @@ class _Busy:
             return len(self.started) - len(self.completed)
 
 
+# SessionHandle.begin_turn before any fake replaced it (real_edges puts it back).
+_ORIGINAL_BEGIN_TURN: list = []
+
+
 class _Turns:
     """Fake turns. A turn streams one text event, then waits until its gate opens (or it
     is stopped / taken over). ``linger`` keeps a stopped turn finishing a while."""
@@ -58,6 +62,8 @@ class _Turns:
         self.linger = 0.0
         self.fail: set[str] = set()
         handle_class = load("session_handle").SessionHandle
+        if not _ORIGINAL_BEGIN_TURN:
+            _ORIGINAL_BEGIN_TURN.append(handle_class.begin_turn)
         turns = self
 
         def begin_turn(handle, token, fence, mode="spec", chat_model_id=None, create_model_id=None, stop=None):
@@ -129,6 +135,10 @@ class _Tail:
 
 def _idle(ev) -> bool:
     return ev.get("work", {}).get("state") == "idle"
+
+
+def _finished(ev) -> bool:
+    return _idle(ev) and ev["work"]["how"] == "finished"
 
 
 @pytest.fixture
@@ -249,21 +259,26 @@ def test_a_steer_after_the_last_boundary_becomes_a_new_turn_in_the_same_period(r
     assert len(rt.busy.started) == 1
 
 
-def test_a_message_sent_while_a_stop_finishes_runs_after_it(rt):
+def test_a_message_sent_while_a_stop_finishes_runs_after_it_in_a_new_period(rt):
     session = rt.session()
     tail = rt.tail(session)
     rt.turns.linger = 0.2
     session.submit("work", "ws", _jwt())
     tail.until(lambda ev: "event" in ev)
+    stopped_period = session._period
 
     session.cancel()
     assert session.submit("next", "ws", _jwt())[0] == "turn"
     tail.until(lambda ev: "turn" in ev and ev["turn"]["text"] == "next")
+    assert session._period is not stopped_period and not session._period.stop.is_set()
     rt.turns.release("next")
-    evs = tail.until(_idle)
+    evs = tail.until(_finished)
 
     assert [ev["turnEnd"]["how"] for ev in evs if "turnEnd" in ev] == ["cancelled", "finished"]
-    assert evs[-1]["work"]["how"] == "finished"
+    assert [ev["work"] for ev in evs if "work" in ev] == [
+        {"state": "busy"}, {"state": "idle", "how": "cancelled"}, {"state": "busy"}, {"state": "idle", "how": "finished"},
+    ]
+    assert _wait_for(lambda: rt.busy.active == 0) and len(rt.busy.started) == 2
 
 
 @pytest.mark.parametrize("mode", ["vibe", "style_creator"])
@@ -296,7 +311,7 @@ def test_a_steer_sent_while_a_stop_finishes_keeps_the_turns_mode_and_models(rt):
     assert session.submit("next", "ws", _jwt(), None, inherit=True)[0] == "turn"
     tail.until(lambda ev: "turn" in ev and ev["turn"]["text"] == "next")
     rt.turns.release("next")
-    tail.until(_idle)
+    tail.until(_finished)
 
     assert rt.turns.settings == [("vibe", "chat-x", None), ("vibe", "chat-x", None)]
 
@@ -399,7 +414,7 @@ def test_sigterm_stops_the_turn_and_closes_the_sessions(rt, monkeypatch):
     session.submit("work", "ws", _jwt())
     tail.until(lambda ev: "event" in ev)
 
-    assert rt.stop_guard.stop_all() == 1
+    assert rt.stop_guard.stop_all() == 2, "the work period and its turn"
     evs = tail.until(_idle)
     rt.stop_guard._close_resident_clients()
 
@@ -559,3 +574,327 @@ def test_a_steer_reaches_a_real_agent_and_is_reported_delivered(rt, monkeypatch,
     assert {"steer": {"id": steer_id, "state": "delivered", "how": "fold"}} in evs
     assert ("user", ["toolResult", "text:make it blue"]) in _shape(agents[0].messages)
     assert [ev["turn"]["text"] for ev in evs if "turn" in ev] == ["Make a deck."], "no extra turn"
+
+
+# --- background compose ---------------------------------------------------------------
+
+
+class _FakeAgent:
+    """Stands in for the handle's Agent where only its task snapshots matter."""
+
+    tool_names: list = []
+
+    def __init__(self, tasks):
+        self.state = {load("background").STATE_KEY: tasks}
+
+
+def test_a_settled_task_wakes_the_session_once_even_if_the_wake_does_not_deliver_it(rt):
+    session = rt.session()
+    tail = rt.tail(session)
+    task = {"task_id": "k1", "tool_use_id": "t1", "tool_name": "compose_slides", "status": "completed",
+            "result": {"content": [{"text": '{"status": "completed"}'}]}}
+    session.handle._agent = _FakeAgent([task])  # settled; the fake turns never deliver it
+
+    session.submit("hello", "ws", _jwt())
+    rt.turns.release("hello")
+    tail.until(lambda ev: ev.get("turn", {}).get("why") == "wake")
+    rt.turns.release(None)
+    evs = tail.until(_idle)
+
+    assert [ev["turn"]["why"] for ev in evs if "turn" in ev] == ["prompt", "wake"]
+    assert rt.turns.prompts == ["hello", None], "a wake turn has no input"
+    assert [ev["taskEnd"] for ev in evs if "taskEnd" in ev] == [
+        {"toolUseId": "t1", "taskId": "k1", "name": "compose_slides", "status": "completed",
+         "content": '{"status": "completed"}'}]
+    assert evs[-1]["work"] == {"state": "idle", "how": "finished"}
+
+
+def test_a_pending_task_keeps_the_session_working_with_no_turn(rt):
+    session = rt.session()
+    tail = rt.tail(session)
+    task = {"task_id": "k1", "tool_use_id": "t1", "tool_name": "compose_slides", "status": "working"}
+    session.handle._agent = _FakeAgent([task])
+
+    session.submit("hello", "ws", _jwt())
+    rt.turns.release("hello")
+    tail.until(lambda ev: "turnEnd" in ev)
+    time.sleep(0.4)
+    assert session.working and session.turn.done and rt.busy.active == 1
+    assert session.cancel() == "cancelling", "a session working in the background can be stopped"
+    evs = tail.until(_idle, timeout=STOP_SETTLE_WAIT)
+
+    assert evs[-1]["work"] == {"state": "idle", "how": "cancelled"}
+    assert _wait_for(lambda: rt.busy.active == 0)
+
+
+STOP_SETTLE_WAIT = 8.0  # the fake task never settles: the stopped period gives up after STOP_SETTLE_S
+
+
+# A real orchestrator on the real session handle and factory, with fakes at the edges:
+# the model (scripted per role), the Presentation Maker clients (FakeMCP, recording) and
+# no Memory.
+
+
+def _orchestrator(messages):
+    from test_agent_background import result_text, tool_results
+
+    background = load("background")
+    last = messages[-1]
+    delivered = background.delivered(last)
+    if delivered:
+        return ("text", "Report seen: " + json.loads(background.result_text(delivered[0]))["status"])
+    texts = " ".join(b.get("text", "") for b in last["content"] if "text" in b) if last["role"] == "user" else ""
+    if "Make" in texts:
+        return ("tool", "compose_slides", {"deck_id": "deck1", "slide_groups": [
+            {"slugs": ["a"], "instruction": "Compose."}, {"slugs": ["b"], "instruction": "Compose."}]})
+    if "STEER" in texts:
+        return ("text", "Noted.", _orchestrator.steer_seconds)
+    results = tool_results(last)
+    if results and "Background task dispatched" in result_text(results[0]):
+        return ("text", "Composers started.")
+    return ("text", "ok")
+
+
+_orchestrator.steer_seconds = 0.0
+
+
+def _finishing_composer(messages):
+    from test_agent_background import result_text, tool_results
+
+    results = tool_results(messages[-1])
+    if results and "wrote" in result_text(results[0]):
+        return ("text", "Done.")
+    return ("tool", "write_slide", {"slug": "x"})
+
+
+def real_edges(monkeypatch, tmp_path, runtime):
+    """Lets the real session handle build its Agent on fakes. ``composers``: "finish" (one
+    write each, then done) or "forever" (write until stopped)."""
+    from strands.models import Model
+
+    from agent_stop_fakes import FakeMCP, Recorder, ScriptedModel
+    from test_agent_background import PolicyModel
+
+    factory = load("factory")
+    import composition
+
+    composition.clear_process_cache()
+    monkeypatch.delenv("MEMORY_ID", raising=False)
+    monkeypatch.setenv("COMPOSER_MAX_TOOL_CALLS", "40")
+    monkeypatch.setattr(_orchestrator, "steer_seconds", 0.0)
+    recorder = Recorder(tmp_path / "calls.jsonl")
+    orchestrator = PolicyModel(_orchestrator)
+
+    class Real:
+        composers = "finish"
+        composer_seconds = 0.3
+
+    r = Real()
+    r.recorder, r.orchestrator = recorder, orchestrator
+
+    class _ByRole(Model):
+        def update_config(self, **model_config):
+            pass
+
+        def get_config(self):
+            return {}
+
+        async def structured_output(self, output_model, prompt, system_prompt=None, **kwargs):
+            raise NotImplementedError
+            yield  # pragma: no cover
+
+        async def stream(self, messages, tool_specs=None, system_prompt=None, **kwargs):
+            if "compose_slides" in {spec["name"] for spec in tool_specs or []}:
+                target = orchestrator
+            elif r.composers == "finish":
+                target = PolicyModel(_finishing_composer)
+            else:
+                target = ScriptedModel(recorder)
+            async for event in target.stream(messages, tool_specs, system_prompt, **kwargs):
+                yield event
+
+    monkeypatch.setattr(factory, "BedrockModel", lambda **kwargs: _ByRole())
+    monkeypatch.setattr(factory, "_MCP_FACTORIES", [
+        lambda jwt_token, session_id="", tool_filters=None, meta=None, **kwargs: FakeMCP(recorder, "parent", meta=meta),
+    ])
+    monkeypatch.setattr(factory, "mcp_agentcore_runtime", lambda meta=None, **kwargs: FakeMCP(
+        recorder, "composer", tool_seconds=r.composer_seconds, meta=meta))
+    handle_class = load("session_handle").SessionHandle
+    monkeypatch.setattr(handle_class, "begin_turn",
+                        _ORIGINAL_BEGIN_TURN[0] if _ORIGINAL_BEGIN_TURN else handle_class.begin_turn)
+    monkeypatch.setattr(runtime, "stream_agent", load("streaming").stream_agent)
+    r.composer_writes = lambda: [x for x in recorder.read() if x["kind"] == "tool" and x["who"] == "composer"]
+    r.fences = lambda: [x for x in recorder.read() if x["name"] == "fence_turn"]
+    return r
+
+
+def stop_sessions(registry) -> None:
+    """Stop and close every session (what the real edges' tests leave running)."""
+    import composition
+
+    for session in list(registry._sessions.values()):
+        session.cancel()
+        _wait_for(lambda: not session.working, timeout=STOP_SETTLE_WAIT)
+    registry.close_all()
+    composition.clear_process_cache()
+
+
+@pytest.fixture
+def real(rt, monkeypatch, tmp_path):
+    try:
+        yield real_edges(monkeypatch, tmp_path, rt.runtime)
+    finally:
+        stop_sessions(rt.registry)
+
+
+def _kinds(evs, key):
+    return [ev[key] for ev in evs if key in ev]
+
+
+def test_compose_runs_between_turns_and_a_wake_delivers_its_report(rt, real):
+    real.composer_seconds = 1.0  # the compose outlasts the dispatching turn
+    session = rt.session()
+    tail = rt.tail(session)
+
+    session.submit("Make the deck.", "ws", _jwt())
+    tail.until(lambda ev: "turnEnd" in ev)
+    assert session.working and session.turn.done, "busy with no turn running"
+    assert rt.busy.active == 1
+    evs = tail.until(_idle, timeout=15)
+
+    order = [next(iter(ev)) for ev in evs if next(iter(ev)) in ("turn", "taskStart", "turnEnd", "taskEnd", "work")]
+    assert order == ["work", "turn", "taskStart", "turnEnd", "taskEnd", "turn", "turnEnd", "work"]
+    assert [t["why"] for t in _kinds(evs, "turn")] == ["prompt", "wake"]
+    (start,) = _kinds(evs, "taskStart")
+    (end,) = _kinds(evs, "taskEnd")
+    assert end["toolUseId"] == start["toolUseId"] and end["taskId"] == start["taskId"] and end["status"] == "completed"
+    assert json.loads(end["content"])["status"] == "completed"
+    first_end = evs.index(next(ev for ev in evs if "turnEnd" in ev))
+    assert any(ev.get("toolStream", {}).get("name") == "compose_slides" for ev in evs[first_end:]), \
+        "progress keeps coming between turns"
+    assert "Report seen: completed" in json.dumps(evs)
+    assert evs[-1]["work"] == {"state": "idle", "how": "finished"}
+    assert _wait_for(lambda: rt.busy.active == 0) and len(rt.busy.started) == len(rt.busy.completed) == 1
+    assert load("background").tasks(session.handle.agent) == []
+
+
+def test_a_steer_between_turns_starts_a_turn_at_once(rt, real):
+    real.composers = "forever"
+    session = rt.session()
+    tail = rt.tail(session)
+    session.submit("Make the deck.", "ws", _jwt())
+    tail.until(lambda ev: "turnEnd" in ev)
+
+    sent = time.monotonic()
+    _, steer_id = session.submit("STEER: make it blue", "ws", _jwt())
+    evs = tail.until(lambda ev: ev.get("turn", {}).get("why") == "steer")
+    started = time.monotonic() - sent
+    (steer_turn,) = [t["id"] for t in _kinds(evs, "turn") if t["why"] == "steer"]
+    evs = tail.until(lambda ev: ev.get("turnEnd", {}).get("id") == steer_turn)
+
+    assert started < 0.5
+    assert {"steer": {"id": steer_id, "state": "delivered", "how": "turn"}} in evs
+    assert session.working, "the compose still runs"
+
+
+def test_cancel_between_turns_stops_the_period_then_the_tasks_and_fences_the_deck(rt, real, monkeypatch):
+    real.composers = "forever"
+    background = load("background")
+    order: list = []
+    cancel_all = background.cancel_all
+
+    async def recording_cancel_all(agent):
+        order.append(("cancel_all", period.stop.is_set()))
+        await cancel_all(agent)
+
+    monkeypatch.setattr(background, "cancel_all", recording_cancel_all)
+    session = rt.session()
+    tail = rt.tail(session)
+    session.submit("Make the deck.", "ws", _jwt())
+    tail.until(lambda ev: "turnEnd" in ev)
+    assert _wait_for(lambda: len(real.composer_writes()) >= 2, timeout=10)
+    period = session._period
+
+    cancelled_at = time.time()
+    assert session.cancel() == "cancelling"
+    evs = tail.until(_idle, timeout=STOP_SETTLE_WAIT)
+    time.sleep(1.5)  # a running composer write ends; nothing new starts
+
+    assert order == [("cancel_all", True)]
+    assert [e["status"] for e in _kinds(evs, "taskEnd")] == ["cancelled"]
+    assert evs[-1]["work"] == {"state": "idle", "how": "cancelled"}
+    assert [t["why"] for t in _kinds(evs, "turn")] == ["prompt"], "no wake after a stop"
+    (fence,) = real.fences()
+    assert fence["who"] == "parent" and fence["detail"]["arguments"] == {"deck_ids": ["deck1"]}
+    assert [w for w in real.composer_writes() if w["t"] > cancelled_at + 1.0] == []
+
+
+def test_cancel_during_a_steer_turn_fences_the_compose_deck_through_the_turn(rt, real):
+    real.composers = "forever"
+    _orchestrator.steer_seconds = 3.0  # the steer turn is still answering when the stop comes
+    session = rt.session()
+    tail = rt.tail(session)
+    session.submit("Make the deck.", "ws", _jwt())
+    tail.until(lambda ev: "turnEnd" in ev)
+    session.submit("STEER: hold on", "ws", _jwt())
+    tail.until(lambda ev: ev.get("turn", {}).get("why") == "steer")
+    time.sleep(0.3)
+
+    session.cancel()
+    evs = tail.until(_idle, timeout=STOP_SETTLE_WAIT)
+
+    assert [e["how"] for e in _kinds(evs, "turnEnd")] == ["finished", "cancelled"]
+    (fence,) = real.fences()
+    assert fence["detail"]["arguments"] == {"deck_ids": ["deck1"]}
+    generations = {x["detail"]["meta"]["sdpm/generation"] for x in real.recorder.read() if x["kind"] == "client"}
+    assert fence["detail"]["meta"]["sdpm/generation"] > max(generations), "the steer turn's generation"
+
+
+def test_the_watchdog_stops_a_period_waiting_on_a_task(rt, real, monkeypatch):
+    real.composers = "forever"
+    monkeypatch.setattr(rt.runtime, "WORK_LIMIT_S", 1.5)
+    session = rt.session()
+    tail = rt.tail(session)
+
+    session.submit("Make the deck.", "ws", _jwt())
+    evs = tail.until(_idle, timeout=STOP_SETTLE_WAIT)
+
+    assert evs[-1]["work"] == {"state": "idle", "how": "watchdog"}
+    assert [e["status"] for e in _kinds(evs, "taskEnd")] == ["cancelled"]
+
+
+def test_sigterm_with_only_a_background_compose_stops_it_and_holds_the_idle_fence(rt, real, monkeypatch):
+    real.composers = "forever"
+    monkeypatch.setattr(rt.stop_guard, "_held", set())
+    monkeypatch.setattr(rt.stop_guard, "_close_hooks", [])
+    session = rt.session()
+    tail = rt.tail(session)
+    session.submit("Make the deck.", "ws", _jwt())
+    tail.until(lambda ev: "turnEnd" in ev)
+    assert _wait_for(lambda: len(real.composer_writes()) >= 2, timeout=10)
+
+    signalled = time.time()
+    assert rt.stop_guard.stop_all() == 1, "only the work period runs"
+    held = [t for t in rt.stop_guard._held if t.name == "sdpm-turn-fence"]
+    evs = tail.until(_idle, timeout=STOP_SETTLE_WAIT)
+    time.sleep(1.0)
+
+    assert len(held) == 1
+    held[0].join(5)
+    (fence,) = real.fences()
+    assert fence["detail"]["arguments"] == {"deck_ids": ["deck1"]}
+    assert evs[-1]["work"] == {"state": "idle", "how": "sigterm"}
+    assert [w for w in real.composer_writes() if w["t"] > signalled + 0.6] == []
+
+
+def test_an_http_prompt_that_dispatches_compose_streams_through_the_wake(rt, real):
+    thread, events = _http(rt, "Make the deck.")
+    thread.join(15)
+
+    assert not thread.is_alive()
+    keys = {next(iter(ev)) for ev in events}
+    assert not keys & {"work", "turn", "turnEnd", "steer", "taskStart", "taskEnd", "composerNote"}
+    (result,) = [ev["toolResult"] for ev in events if "toolResult" in ev and ev["toolResult"]["name"] == "compose_slides"]
+    assert result["status"] == "success" and json.loads(result["content"])["status"] == "completed"
+    assert "Report seen: completed" in json.dumps(events)
+    assert any("toolStream" in ev for ev in events)
