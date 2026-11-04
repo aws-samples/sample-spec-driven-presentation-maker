@@ -90,6 +90,18 @@ def test_a_stopped_turn_fences_the_decks_its_calls_named_once():
     assert len(client.calls) == 1
 
 
+def test_decks_of_background_tasks_are_fenced_with_the_turns_own():
+    fence = _fence_class()(generation=7)
+    client = _Client()
+    fence.bind(client)
+    fence.note_tool_call(_Event({"deck_id": "d2"}))
+    fence.note_decks(["d1 ", " ", None, "d2"])  # the decks the session's running composes write
+
+    fence.advance().join(5)
+
+    assert client.calls[0]["arguments"] == {"deck_ids": ["d1", "d2"]}
+
+
 def test_a_turn_that_ends_normally_fences_nothing():
     fence = _fence_class()(generation=5)
     client = _Client()

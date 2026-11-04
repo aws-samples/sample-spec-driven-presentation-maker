@@ -70,6 +70,12 @@ class TurnFence:
             with self._lock:
                 self._decks.add(deck_id.strip())
 
+    def note_decks(self, decks) -> None:
+        """Remember decks the turn did not name itself (those of the session's running
+        background tasks), so a stop fences them too."""
+        with self._lock:
+            self._decks.update(d.strip() for d in decks if isinstance(d, str) and d.strip())
+
     def advance(self) -> threading.Thread | None:
         """The turn was stopped: fence its decks (once). The call runs on a daemon thread,
         so this is safe from a signal handler and from the event loop; returns it (for

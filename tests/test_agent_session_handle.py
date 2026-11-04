@@ -114,10 +114,20 @@ class _Agent:
         self.kwargs = kwargs
         self.messages = []
         self.hooks = _Hooks()
-        self.tool_names = []
+        # Strands registers the management tool with the background plugin.
+        self.tool_names = [load("background").MANAGE_TOOL] if "background_tasks" in kwargs else []
         self.system_prompt = ""
         self.tool_registry = _Registry()
         self.cleaned = False
+        self.state: dict = {}  # agent.state.get(key), where Strands keeps the task snapshots
+        self.middleware: list = []
+        self.added_hooks: list = []
+
+    def add_middleware(self, stage, handler):
+        self.middleware.append((stage, handler))
+
+    def add_hook(self, callback, event_type=None, **kwargs):
+        self.added_hooks.append((event_type, callback))
 
     def cleanup(self):
         self.cleaned = True
@@ -384,3 +394,106 @@ def test_close_keeps_a_client_whose_fence_call_still_runs(env):
     assert not env["pm"][0].stopped
     fence.release()
     assert _wait_for(lambda: env["pm"][0].stopped)
+
+
+# --- background compose ------------------------------------------------------------
+
+
+def _open_task(agent, status="working"):
+    agent.state[load("background").STATE_KEY] = [{"task_id": "k1", "tool_use_id": "t1", "tool_name": "compose_slides",
+                                                 "status": status}]
+
+
+class _Dispatch:
+    def __init__(self, name, deck_id):
+        self.tool_use = {"name": name, "toolUseId": "t1", "input": {"deck_id": deck_id}}
+
+
+def test_an_orchestrator_runs_compose_in_the_background_and_a_style_agent_does_not(env):
+    background = load("background")
+    from strands.hooks.events import BeforeToolCallEvent, MessageAddedEvent
+    from strands.middleware.stages import InvokeModelStage
+
+    handle = env["handle"]()
+    spec, _ = handle.begin_turn(_jwt("user-1"), None, mode="spec")
+    handle.end_turn()
+    style = env["handle"](sid="s2")
+    styler, _ = style.begin_turn(_jwt("user-1"), None, mode="style_creator")
+
+    assert spec.kwargs["background_tasks"] is background.CONFIG
+    assert spec.kwargs["callback_handler"] == handle.on_agent_callback
+    assert [stage for stage, _ in spec.middleware] == [InvokeModelStage.Input], "the manage tool is hidden"
+    assert [event for event, _ in spec.added_hooks] == [BeforeToolCallEvent], "and refused by name"
+    callbacks = [(event, getattr(cb, "__name__", "")) for event, cb in spec.hooks.callbacks]
+    assert (BeforeToolCallEvent, "note_task_dispatch") in callbacks
+    assert (MessageAddedEvent, "note_delivery") in callbacks
+    assert "background_tasks" not in styler.kwargs and "callback_handler" not in styler.kwargs
+    assert styler.middleware == [] and styler.added_hooks == []
+
+
+def test_only_a_background_tools_progress_reaches_the_session(env):
+    handle = env["handle"]()
+    events: list = []
+    handle.on_background_event = events.append
+
+    handle.on_agent_callback(tool_stream_event={"tool_use": {"name": "compose_slides", "toolUseId": "t1"}, "data": {"n": 1}})
+    handle.on_agent_callback(tool_stream_event={"tool_use": {"name": "run_python", "toolUseId": "t2"}, "data": {"n": 2}})
+    handle.on_agent_callback(tool_stream_event={"tool_use": {"name": "compose_slides", "toolUseId": "t1"}, "data": "text"})
+    handle.on_agent_callback(data="a model text delta")
+
+    assert events == [{"toolStream": {"toolUseId": "t1", "name": "compose_slides", "data": {"n": 1}}}]
+
+
+def test_the_agent_is_kept_while_its_tasks_are_open_and_rebuilt_once_they_are_delivered(env):
+    handle = env["handle"]()
+    spec, _ = handle.begin_turn(_jwt("user-1"), None, mode="spec")
+    handle.end_turn()
+    _open_task(spec)
+
+    kept, _ = handle.begin_turn(_jwt("user-1"), None, mode="vibe")
+    handle.end_turn()
+    _open_task(spec, status="completed")  # settled, not delivered yet
+    still, _ = handle.begin_turn(_jwt("user-1"), None, mode="vibe")
+    handle.end_turn()
+    cleaned_while_open = spec.cleaned
+    spec.state.clear()  # delivered: Strands dropped the snapshot
+    vibe, _ = handle.begin_turn(_jwt("user-1"), None, mode="vibe")
+
+    assert kept is spec and still is spec and not cleaned_while_open
+    assert vibe is not spec and spec.cleaned
+    assert handle._agent_key[0] == "vibe"
+
+
+def test_a_turn_started_while_a_task_runs_fences_the_tasks_deck(env):
+    handle = env["handle"]()
+    agent, _ = handle.begin_turn(_jwt("user-1"), env["fence"](1))
+    handle.note_task_dispatch(_Dispatch("compose_slides", "d7"))
+    handle.note_task_dispatch(_Dispatch("run_python", "d8"))
+    handle.end_turn()
+    _open_task(agent)
+
+    fence = env["fence"](2)
+    handle.begin_turn(_jwt("user-1"), fence)
+    fence.advance().join(5)
+
+    assert handle.task_decks == {"d7"}
+    assert fence.decks == ["d7"]
+    assert [c[1] for c in env["calls"]][-1] == "fence_turn"
+    assert handle.fence_client() is env["pm"][0]
+
+
+def test_a_delivered_result_reaches_the_session(env):
+    handle = env["handle"]()
+    ended: list = []
+    handle.on_task_end = ended.append
+    meta = {"task_id": "k1", "tool_use_id": "t1", "tool_name": "compose_slides", "status": "completed"}
+
+    class _Added:
+        message = {"role": "user", "content": [
+            {"toolResult": {"toolUseId": "k1", "status": "success", "content": [{"json": meta}, {"text": "{}"}]}},
+            {"text": "a folded steer"},
+        ]}
+
+    handle.note_delivery(_Added())
+
+    assert ended == [{**meta, "result": {"content": [{"text": "{}"}]}}]
