@@ -129,6 +129,29 @@ def test_cancel_all_sets_the_stop_and_the_composers_stop_without_blocking_the_lo
     assert [r for r in _composer_writes(recorder) if r["t"] > cancelled_at + 1.0] == []
 
 
+def test_a_cancelled_compose_reaches_the_model_as_an_empty_cancelled_result(env):
+    """Pins today's delivery after the stop button: cancel_all marks the task cancelled at
+    once and Strands drops what compose returns later, so the model gets the status with no
+    report; it reads the deck itself when it needs to know what the deck holds."""
+    recorder, build, stop_key, background = env
+    stop = threading.Event()
+
+    async def run():
+        agent, model = build(ScriptedModel(recorder))
+        await agent.invoke_async("Make the deck.", invocation_state={stop_key: stop})
+        await _until(lambda: len(_composer_writes(recorder)) >= 2, timeout=10)
+        await background.cancel_all(agent)
+        await _until(lambda: background.undelivered(agent), timeout=2)
+        await agent.invoke_async(None, invocation_state={stop_key: stop})
+        return model
+
+    model = asyncio.run(run())
+
+    (delivered,) = background.delivered(model.calls[-1]["messages"][-1])
+    assert delivered["status"] == "cancelled"
+    assert background.result_text(delivered) == ""
+
+
 def test_the_stop_alone_ends_the_task_with_a_cancelled_report(env):
     recorder, build, stop_key, background = env
     stop = threading.Event()

@@ -396,7 +396,6 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | `run_python` | Runs in an Amazon Bedrock AgentCore Code Interpreter sandbox |
 | `search_slides` | Semantic slide search; registered only when an Amazon Bedrock Knowledge Base is configured |
 | `start_translation` | Not bound: the translate workflow needs a checkout |
-| `fence_turn` | Agent plumbing (remote only, in no mode's allowlist): the L4 agent calls it when a turn is stopped, and the stopped turn's in-flight calls then write nothing to those decks. Every call carries the turn's generation in `_meta["sdpm/generation"]`; see `servers/remote/storage/write_fence.py` |
 
 ### Agent-Level Tools (Layer 4)
 

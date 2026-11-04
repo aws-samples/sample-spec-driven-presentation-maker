@@ -31,7 +31,6 @@ def mcp_agentcore_runtime(
     jwt_token: str = "",
     session_id: str = "",
     tool_filters: dict | None = None,
-    meta: dict | None = None,
     token: TokenHolder | None = None,
 ) -> MCPClient:
     """Pattern 1: Amazon Bedrock AgentCore Runtime MCP Server with JWT Bearer authentication.
@@ -43,10 +42,6 @@ def mcp_agentcore_runtime(
             routes by that header, so omitting it makes every request land on a
             new microVM — see the note below. Empty string disables the header.
         tool_filters: Optional tool filter dict (e.g. {"allowed": ["tool1", "tool2"]}).
-        meta: Optional ``_meta`` sent with every tool call (the turn's write-fence
-            generation, turn_fence.py). It travels in the JSON-RPC body, which the
-            AgentCore proxy forwards as is; Strands merges trace context into it.
-            Strands reads the dict at call time, so a caller may update it in place.
         token: The session's TokenHolder (session_handle.py). Every request then reads
             the latest JWT (HolderAuth) and the client is a ReconnectingMCPClient,
             kept across turns.
@@ -87,8 +82,6 @@ def mcp_agentcore_runtime(
     kwargs: dict = {}
     if tool_filters:
         kwargs["tool_filters"] = tool_filters
-    if meta is not None and (meta or token is not None):
-        kwargs["meta"] = meta
 
     client_class = ReconnectingMCPClient if token is not None else MCPClient
     return client_class(lambda: streamablehttp_client(**transport), **kwargs)

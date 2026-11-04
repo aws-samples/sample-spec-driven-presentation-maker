@@ -66,7 +66,7 @@ class _Turns:
             _ORIGINAL_BEGIN_TURN.append(handle_class.begin_turn)
         turns = self
 
-        def begin_turn(handle, token, fence, mode="spec", chat_model_id=None, create_model_id=None, stop=None):
+        def begin_turn(handle, token, mode="spec", chat_model_id=None, create_model_id=None, stop=None):
             turns.handles.append(handle)
             turns.settings.append((mode, chat_model_id, create_model_id))
             handle.update_token(token)
@@ -569,7 +569,7 @@ def test_a_steer_reaches_a_real_agent_and_is_reported_delivered(rt, monkeypatch,
 
     agents: list = []
 
-    def begin_turn(handle, token, fence, mode="spec", chat_model_id=None, create_model_id=None, stop=None):
+    def begin_turn(handle, token, mode="spec", chat_model_id=None, create_model_id=None, stop=None):
         handle.update_token(token)
         handle.stop = stop
         if not agents:
@@ -734,16 +734,15 @@ def real_edges(monkeypatch, tmp_path, runtime):
 
     monkeypatch.setattr(factory, "BedrockModel", lambda **kwargs: _ByRole())
     monkeypatch.setattr(factory, "_MCP_FACTORIES", [
-        lambda jwt_token, session_id="", tool_filters=None, meta=None, **kwargs: FakeMCP(recorder, "parent", meta=meta),
+        lambda jwt_token, session_id="", tool_filters=None, **kwargs: FakeMCP(recorder, "parent"),
     ])
-    monkeypatch.setattr(factory, "mcp_agentcore_runtime", lambda meta=None, **kwargs: FakeMCP(
-        recorder, "composer", tool_seconds=r.composer_seconds, meta=meta))
+    monkeypatch.setattr(factory, "mcp_agentcore_runtime", lambda **kwargs: FakeMCP(
+        recorder, "composer", tool_seconds=r.composer_seconds))
     handle_class = load("session_handle").SessionHandle
     monkeypatch.setattr(handle_class, "begin_turn",
                         _ORIGINAL_BEGIN_TURN[0] if _ORIGINAL_BEGIN_TURN else handle_class.begin_turn)
     monkeypatch.setattr(runtime, "stream_agent", load("streaming").stream_agent)
     r.composer_writes = lambda: [x for x in recorder.read() if x["kind"] == "tool" and x["who"] == "composer"]
-    r.fences = lambda: [x for x in recorder.read() if x["name"] == "fence_turn"]
     return r
 
 
@@ -816,7 +815,7 @@ def test_a_steer_between_turns_starts_a_turn_at_once(rt, real):
     assert session.working, "the compose still runs"
 
 
-def test_cancel_between_turns_stops_the_period_then_the_tasks_and_fences_the_deck(rt, real, monkeypatch):
+def test_cancel_between_turns_stops_the_period_then_the_tasks(rt, real, monkeypatch):
     real.composers = "forever"
     background = load("background")
     order: list = []
@@ -843,12 +842,10 @@ def test_cancel_between_turns_stops_the_period_then_the_tasks_and_fences_the_dec
     assert [e["status"] for e in _kinds(evs, "taskEnd")] == ["cancelled"]
     assert evs[-1]["work"] == {"state": "idle", "how": "cancelled"}
     assert [t["why"] for t in _kinds(evs, "turn")] == ["prompt"], "no wake after a stop"
-    (fence,) = real.fences()
-    assert fence["who"] == "parent" and fence["detail"]["arguments"] == {"deck_ids": ["deck1"]}
     assert [w for w in real.composer_writes() if w["t"] > cancelled_at + 1.0] == []
 
 
-def test_cancel_during_a_steer_turn_fences_the_compose_deck_through_the_turn(rt, real):
+def test_cancel_during_a_steer_turn_stops_the_turn_and_the_compose(rt, real):
     real.composers = "forever"
     _orchestrator.steer_seconds = 3.0  # the steer turn is still answering when the stop comes
     session = rt.session()
@@ -863,10 +860,8 @@ def test_cancel_during_a_steer_turn_fences_the_compose_deck_through_the_turn(rt,
     evs = tail.until(_idle, timeout=STOP_SETTLE_WAIT)
 
     assert [e["how"] for e in _kinds(evs, "turnEnd")] == ["finished", "cancelled"]
-    (fence,) = real.fences()
-    assert fence["detail"]["arguments"] == {"deck_ids": ["deck1"]}
-    generations = {x["detail"]["meta"]["sdpm/generation"] for x in real.recorder.read() if x["kind"] == "client"}
-    assert fence["detail"]["meta"]["sdpm/generation"] > max(generations), "the steer turn's generation"
+    assert len(_kinds(evs, "taskEnd")) == 1
+    assert evs[-1]["work"] == {"state": "idle", "how": "cancelled"}
 
 
 def test_the_watchdog_stops_a_period_waiting_on_a_task(rt, real, monkeypatch):
@@ -882,9 +877,8 @@ def test_the_watchdog_stops_a_period_waiting_on_a_task(rt, real, monkeypatch):
     assert [e["status"] for e in _kinds(evs, "taskEnd")] == ["cancelled"]
 
 
-def test_sigterm_with_only_a_background_compose_stops_it_and_holds_the_idle_fence(rt, real, monkeypatch):
+def test_sigterm_with_only_a_background_compose_stops_it(rt, real, monkeypatch):
     real.composers = "forever"
-    monkeypatch.setattr(rt.stop_guard, "_held", set())
     monkeypatch.setattr(rt.stop_guard, "_close_hooks", [])
     session = rt.session()
     tail = rt.tail(session)
@@ -894,14 +888,9 @@ def test_sigterm_with_only_a_background_compose_stops_it_and_holds_the_idle_fenc
 
     signalled = time.time()
     assert rt.stop_guard.stop_all() == 1, "only the work period runs"
-    held = [t for t in rt.stop_guard._held if t.name == "sdpm-turn-fence"]
     evs = tail.until(_idle, timeout=STOP_SETTLE_WAIT)
     time.sleep(1.0)
 
-    assert len(held) == 1
-    held[0].join(5)
-    (fence,) = real.fences()
-    assert fence["detail"]["arguments"] == {"deck_ids": ["deck1"]}
     assert evs[-1]["work"] == {"state": "idle", "how": "sigterm"}
     assert [w for w in real.composer_writes() if w["t"] > signalled + 0.6] == []
 

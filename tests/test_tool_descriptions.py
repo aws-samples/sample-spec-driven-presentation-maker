@@ -139,3 +139,29 @@ def test_contract_functions_are_annotated_not_docstring_args():
             continue
         for p in inspect.signature(fn).parameters.values():
             assert "Field(" in str(p.annotation) or "Annotated" in str(p.annotation), f"{name}.{p.name}"
+
+
+def _public_functions(module) -> set[str]:
+    return {n for n, f in inspect.getmembers(module, inspect.isfunction)
+            if f.__module__ == module.__name__ and not n.startswith("_")}
+
+
+# The tools each server implements for its own transport (a local process or the
+# AgentCore Code Interpreter), and the documented Layer 3 differences
+# (docs/en/architecture.md): the remote's preview and optional KB search, and the one
+# contract tool it does not bind.
+_SANDBOX_TOOLS = {"run_python", "run_style_python"}
+_REMOTE_ONLY = {"get_preview", "search_slides"}
+_REMOTE_UNBOUND = {"start_translation"}
+
+
+def test_both_servers_expose_the_tool_contract_and_nothing_else(local_tools, remote_tools):
+    """Every tool is defined once in sdpm.tools; a server-only tool (as fence_turn was)
+    cannot appear on either server without being added to the lists above."""
+    from sdpm import tools
+    from sdpm.tools.attachment import contracts
+
+    contract = _public_functions(tools) | _public_functions(contracts)
+
+    assert set(local_tools) == contract | _SANDBOX_TOOLS
+    assert set(remote_tools) == (contract - _REMOTE_UNBOUND) | _SANDBOX_TOOLS | _REMOTE_ONLY

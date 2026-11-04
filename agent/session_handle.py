@@ -7,9 +7,8 @@ three MCP connections, the Memory session manager and one start_presentation cal
 A SessionHandle builds them once per session and reuses them:
 
 - The Presentation Maker client(s), one per tool allowlist, carry the session's
-  TokenHolder (the JWT is swapped per turn, token_holder.py) and one shared ``_meta``
-  dict that holds the current turn's write-fence generation (turn_fence.py). A client
-  whose MCP session ended is restarted in place (mcp_clients.ReconnectingMCPClient).
+  TokenHolder (the JWT is swapped per turn, token_holder.py). A client whose MCP
+  session ended is restarted in place (mcp_clients.ReconnectingMCPClient).
 - One Agent for the current (mode, chat model, create model). A change rebuilds the
   Agent with a new Memory session manager (Strands binds a session manager to one
   Agent); spec and vibe share the Presentation Maker client (same allowlist).
@@ -18,14 +17,12 @@ A SessionHandle builds them once per session and reuses them:
 - The handle is bound to its owner's ``sub``: a turn with another user's token is
   refused (TokenHolder).
 
-Per turn, the Agent's hooks act on the turn's own objects (write fence, LoopGuard,
-stop event), and the system prompt is refreshed (``{now}``). A cancelled turn leaves
+Per turn, the Agent's hooks act on the turn's own objects (LoopGuard, stop event), and the system prompt is refreshed (``{now}``). A cancelled turn leaves
 the handle as it is; close() (idle sweep, SIGTERM) releases the clients.
 
 Background compose (background.py): the Agent owns its tasks, so while it has any (running,
 or settled and not delivered yet) a turn keeps it even if it asks for another mode or model.
-The handle records the decks the tasks work on (``task_decks``, fenced when the work is
-stopped) and passes the tasks' progress (``on_background_event``) and delivered results
+The handle passes the tasks' progress (``on_background_event``) and delivered results
 (``on_task_end``) to the session. Its ComposeMessaging carries messages between the
 orchestrator and the running composers (compose_messaging.py).
 """
@@ -44,7 +41,6 @@ from modes import MODES
 from resilience import LoopGuard
 from steer_inbox import Inbox, SteerInbox
 from token_holder import TokenHolder
-from turn_fence import GENERATION_META_KEY, TurnFence
 
 logger = logging.getLogger("sdpm.agent")
 
@@ -65,17 +61,11 @@ class SessionHandle:
         self.session_id = session_id
         self.sub = sub
         self.holder: TokenHolder | None = None
-        # _meta of every Presentation Maker client of the session; the turn's
-        # generation is written here at its start.
-        self.meta: dict = {}
         self.inbox = Inbox()
         # Called with (items, how) when SteerInbox delivers steers (session_runtime).
         self.on_steer_delivered = None
-        self.turn_fence: TurnFence | None = None
         self.loop_guard: LoopGuard | None = None
         self.stop: threading.Event | None = None
-        # Decks of the background tasks dispatched since the tasks last settled.
-        self.task_decks: set[str] = set()
         # Called with each background toolStream event, and with each task snapshot
         # Strands delivers into the history (session_runtime).
         self.on_background_event = None
@@ -117,7 +107,7 @@ class SessionHandle:
             if client is None:
                 filters = {"allowed": cfg.allowed_tools} if cfg.allowed_tools else None
                 client = factory._MCP_FACTORIES[0](
-                    "", session_id=self.session_id, tool_filters=filters, meta=self.meta, token=self.holder,
+                    "", session_id=self.session_id, tool_filters=filters, token=self.holder,
                 )
                 client.add_consumer(_HANDLE_CONSUMER)
                 self._pm[key] = client
@@ -148,25 +138,10 @@ class SessionHandle:
 
     # Hooks of the Agent: they act on the current turn's objects.
 
-    def note_tool_call(self, event) -> None:
-        fence = self.turn_fence
-        if fence is not None:
-            fence.note_tool_call(event)
-
     def after_tool(self, event) -> None:
         guard = self.loop_guard
         if guard is not None:
             guard.after_tool(event)
-
-    def note_task_dispatch(self, event) -> None:
-        """BeforeToolCallEvent hook: remember the deck a background tool call works on."""
-        if event.tool_use.get("name") not in background.BACKGROUND_TOOLS:
-            return
-        tool_input = event.tool_use.get("input")
-        deck_id = tool_input.get("deck_id") if isinstance(tool_input, dict) else None
-        if isinstance(deck_id, str) and deck_id.strip():
-            with self._lock:
-                self.task_decks.add(deck_id.strip())
 
     def note_delivered(self, task: dict) -> None:
         """background.deliver_as_text's callback: a task's result is in the history."""
@@ -190,11 +165,6 @@ class SessionHandle:
     def agent(self):
         """The session's current Agent (None before its first turn)."""
         return self._agent
-
-    def fence_client(self):
-        """The orchestrator's Presentation Maker client (for a fence call), or None."""
-        with self._lock:
-            return self._agent_clients[0] if self._agent_clients else None
 
     # -- prepare ----------------------------------------------------------------
 
@@ -231,7 +201,7 @@ class SessionHandle:
 
     # -- turns ------------------------------------------------------------------
 
-    def begin_turn(self, token: str, fence: TurnFence | None, mode: str = "spec",
+    def begin_turn(self, token: str, mode: str = "spec",
                    chat_model_id: str | None = None, create_model_id: str | None = None,
                    stop: threading.Event | None = None) -> tuple:
         """Make the session ready for a turn and return (Agent, MCP status). Blocking.
@@ -243,10 +213,6 @@ class SessionHandle:
         self.update_token(token)
         cfg = MODES[mode]
         with self._lock:
-            self.meta.pop(GENERATION_META_KEY, None)
-            if fence is not None:
-                self.meta.update(fence.meta)
-            self.turn_fence = fence
             self.stop = stop
             self.loop_guard = LoopGuard(max_tool_calls=int(os.environ.get("SPEC_MAX_TOOL_CALLS", "300")))
             self.last_used = time.monotonic()
@@ -292,18 +258,10 @@ class SessionHandle:
                 agent = self._agent
                 self._add_clients(agent, mcp_servers)
             factory.refresh_prompt(self, cfg, agent, model_ids[0], self._agent_clients)
-
-        if fence is not None:
-            fence.bind(self._agent_clients[0] if self._agent_clients else None)
-            if background.pending(agent):
-                # A stop during this turn fences the decks the running tasks write too.
-                with self._lock:
-                    fence.note_decks(list(self.task_decks))
         return agent, mcp_status
 
     def end_turn(self) -> None:
         with self._lock:
-            self.turn_fence = None
             self.loop_guard = None
             self.stop = None
             self.last_used = time.monotonic()
@@ -349,7 +307,7 @@ class SessionHandle:
 
     def release_clients(self) -> None:
         """Drop the handle's hold on its Presentation Maker clients (they stop once no
-        Agent or fence call uses them)."""
+        Agent uses them)."""
         with self._lock:
             clients = list(self._pm.values())
             self._pm.clear()
@@ -361,7 +319,7 @@ class SessionHandle:
 
     def close(self) -> None:
         """Release the Agent and the Presentation Maker clients (resident clients are the
-        process's). A fence call still running keeps its client until it is sent."""
+        process's)."""
         with self._lock:
             if self.closed:
                 return

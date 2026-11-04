@@ -24,11 +24,7 @@ import basic_agent  # noqa: E402
 import factory  # noqa: E402
 
 factory.BedrockModel = lambda **_kwargs: ScriptedModel(recorder)
-factory._MCP_FACTORIES = [
-    lambda jwt_token, session_id="", tool_filters=None, meta=None, **_kwargs: FakeMCP(
-        recorder, "parent", meta=meta, fence_seconds=float(os.environ.get("FAKE_FENCE_SECONDS", "0")),
-    ),
-]
-factory.mcp_agentcore_runtime = lambda meta=None, **_kwargs: FakeMCP(recorder, "composer", meta=meta)
+factory._MCP_FACTORIES = [lambda jwt_token, session_id="", tool_filters=None, **_kwargs: FakeMCP(recorder, "parent")]
+factory.mcp_agentcore_runtime = lambda **_kwargs: FakeMCP(recorder, "composer")
 
 basic_agent.main(port=int(sys.argv[1]))
