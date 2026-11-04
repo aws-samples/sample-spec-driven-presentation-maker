@@ -273,7 +273,11 @@
     "sessionBusy": "このチャットは別のタブまたはパネルで応答中です。応答が終わってから、もう一度送信してください。",
     "sessionLocked": "このチャットは別の kiro-cli プロセス（ターミナルなど）で使用中です。そちらを終了してから、もう一度送信してください。",
     "errorStopGeneration": "生成を停止できませんでした",
-    "errorSessionReloadRequired": "このページは古くなっています。ページを再読み込みしてから、もう一度送信してください。"
+    "errorSessionReloadRequired": "このページは古くなっています。ページを再読み込みしてから、もう一度送信してください。",
+    "steerNotDelivered": "エージェントが読む前に停止したため、届きませんでした",
+    "steerFailed": "メッセージをエージェントに送信できませんでした。もう一度送信してください。",
+    "stopping": "停止中…",
+    "reconnecting": "エージェントに再接続中…"
   },
   "snippet": {
     "title": "テキストスニペット",

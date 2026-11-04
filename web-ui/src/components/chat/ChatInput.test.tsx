@@ -216,3 +216,24 @@ describe("ChatInput send override and keep-on-failure", () => {
     expect(textarea.closest("form")?.querySelector("[data-testid='top-slot']")).toBeTruthy()
   })
 })
+
+describe("ChatInput while loading", () => {
+  it("offers Send next to Stop and sends with canSendWhileLoading (Cloud)", () => {
+    const { onSend, textarea } = renderInput({ isLoading: true, canSendWhileLoading: true })
+    expect(screen.getByRole("button", { name: "Stop generation" })).toBeTruthy()
+    changeValue(textarea, "use blue")
+    const send = screen.getByRole("button", { name: "Send message" }) as HTMLButtonElement
+    expect(send.disabled).toBe(false)
+    fireEvent.click(send)
+    expect(onSend).toHaveBeenCalledWith("use blue", [], [], [])
+  })
+
+  it("shows only Stop without it (Local)", () => {
+    const { onSend, textarea } = renderInput({ isLoading: true })
+    expect(screen.getByRole("button", { name: "Stop generation" })).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Send message" })).toBeNull()
+    changeValue(textarea, "more")
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true })
+    expect(onSend).not.toHaveBeenCalled()
+  })
+})

@@ -51,7 +51,9 @@ function parseAttachments(text: string): { fileName: string; fileType: string }[
  *
  * User messages containing toolResult blocks are folded into the preceding
  * assistant message's matching toolUse (status + result), not emitted as
- * standalone messages.
+ * standalone messages. Their text blocks are messages the user sent while the
+ * agent worked (steers, folded in where they reached it): each becomes a user
+ * message at that position.
  */
 export function parseCloudHistory(history: ChatMessage[]): Message[] {
   const parsed: Message[] = []
@@ -65,8 +67,10 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
     } else if (Array.isArray(m.content)) {
       const contentBlocks = m.content as unknown as Record<string, unknown>[]
       if (m.role === "user" && contentBlocks.some((b) => b.toolResult)) {
+        const steers: string[] = []
         for (const block of contentBlocks) {
           const b = block
+          if (typeof b.text === "string") steers.push(b.text)
           if (b.toolResult) {
             const tr = b.toolResult as Record<string, unknown>
             const tuId = tr.toolUseId as string
@@ -94,6 +98,10 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
               }
             }
           }
+        }
+        for (const steer of steers) {
+          const message = userMessageFromText(steer)
+          if (message.content.trim()) parsed.push(message)
         }
         continue
       }
@@ -141,4 +149,33 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
     })
   }
   return parsed
+}
+
+/** A user message for raw text the agent received (markers stripped, attachment chips derived). */
+export function userMessageFromText(text: string): Message {
+  const content = text.replace(MARKER_RE, "")
+  const attachments = parseAttachments(content)
+  return { role: "user", content, toolUses: [], ...(attachments.length > 0 ? { attachments } : {}) }
+}
+
+/** The text a raw user message opens with (its string content or its first text block). */
+function openingText(m: ChatMessage): string | undefined {
+  if (typeof m.content === "string") return m.content
+  if (!Array.isArray(m.content)) return undefined
+  const blocks = m.content as unknown as Record<string, unknown>[]
+  if (blocks.some((b) => b.toolResult)) return undefined
+  const first = blocks.find((b) => typeof b.text === "string")
+  return first ? (first.text as string) : undefined
+}
+
+/**
+ * The history before the user message that opened a work period (`prompt`, exactly as
+ * the agent received it): the last user message that opens with that text. The whole
+ * history when there is none (the prompt is not stored yet).
+ */
+export function cutAtPrompt(history: ChatMessage[], prompt: string): ChatMessage[] {
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].role === "user" && openingText(history[i]) === prompt) return history.slice(0, i)
+  }
+  return history
 }

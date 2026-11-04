@@ -538,6 +538,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (!configLoaded) return false
     const r = reviewRef.current
     if (!hasReviewDrafts || !r) {
+      // Cloud, agent working: a steer. A steer that was not accepted keeps the input.
+      if (!IS_LOCAL && stream.isLoading) return (await handleSend(text, uploadedFiles, snippets, attachments)) ? undefined : false
       handleSend(text, uploadedFiles, snippets, attachments)
       return
     }
@@ -557,7 +559,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         if (text.trim() && input && !input.textareaRef.current?.value.trim()) input.replaceText(text)
       }, 100)
     })
-  }, [configLoaded, hasReviewDrafts, handleSend, tReview])
+  }, [configLoaded, hasReviewDrafts, handleSend, tReview, stream.isLoading])
 
   const isLoading = stream.isLoading || reconnectLoading || forkingSession !== null
 
@@ -589,7 +591,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   return (
     <>
-      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading} className="flex flex-col h-full">
+      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading && IS_LOCAL} className="flex flex-col h-full">
       {continuedOrigin && (
         <div className="flex-none px-4 pt-3">
           <ContinuedFromChip origin={continuedOrigin} />
@@ -709,6 +711,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   hearingDisabled={i < lastUserIdx}
                   deckId={deckId}
                 />
+                {msg.steerNotDelivered && (
+                  <p className="mt-1 text-right text-xs text-foreground-muted">{t("steerNotDelivered")}</p>
+                )}
               </div>
             ))
             })()}
@@ -717,16 +722,23 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         )}
       </div>
 
+      {(stream.stopping || stream.reconnecting) && (
+        <p role="status" className="flex-none px-4 pb-1 text-xs text-foreground-muted">
+          {stream.stopping ? t("stopping") : t("reconnecting")}
+        </p>
+      )}
+
       {/* Input area */}
       <ChatInput
           ref={chatInputRef}
           onSend={handleInputSend}
           isLoading={isLoading}
           onStop={stream.stopGeneration}
+          canSendWhileLoading={!IS_LOCAL}
           disabled={!configLoaded || reconnectLoading}
           placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
           topSlot={reviewActive ? <ReviewDraftBar inputBlank={inputBlank} /> : undefined}
-          sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading, canSend: review.canSubmit } : undefined}
+          sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading && IS_LOCAL, canSend: review.canSubmit } : undefined}
           idToken={auth.user?.id_token}
           sessionId={sessionId}
           deckId={deckId}
