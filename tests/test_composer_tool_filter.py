@@ -14,6 +14,24 @@ class _Hooks:
         pass
 
 
+class _Client:
+    """The session handle holds a consumer on its Presentation Maker client."""
+
+    def add_consumer(self, consumer_id, **kwargs):
+        pass
+
+    def remove_consumer(self, consumer_id, **kwargs):
+        pass
+
+
+def _jwt_of(sub: str) -> str:
+    import base64
+    import json
+
+    body = base64.urlsafe_b64encode(json.dumps({"sub": sub}).encode()).decode().rstrip("=")
+    return f"h.{body}.s"
+
+
 class _Agent:
     def __init__(self, **kwargs):
         self.messages = []
@@ -31,7 +49,7 @@ def test_composer_mcp_factory_carries_the_composer_allowlist(monkeypatch):
 
     def runtime(**kwargs):
         runtime_calls.append(kwargs)
-        return object()
+        return _Client()
 
     def make_compose_slides(mcp_servers, model, composer_mcp_factory, **kwargs):
         captured["factory"] = composer_mcp_factory
@@ -48,7 +66,7 @@ def test_composer_mcp_factory_carries_the_composer_allowlist(monkeypatch):
     monkeypatch.setattr(factory, "collect_mcp_instructions", lambda servers: "")
     monkeypatch.setattr(factory, "resolve_parts", lambda *a, **k: ("", []))
 
-    factory.create_agent("orchestrator", user_id="u1", session_id="s1", jwt_token="jwt")
+    factory.create_agent("orchestrator", user_id="u1", session_id="s1", jwt_token=_jwt_of("u1"))
     runtime_calls.clear()
     captured["factory"]("s1-g1")
 
