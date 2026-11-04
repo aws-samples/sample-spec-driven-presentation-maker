@@ -19,14 +19,27 @@ Entries before v0.5.0 were written retroactively as summaries.
   session manager is created at the first prompt. The agent serves `/ws`
   (`agent/ws_entry.py`): `prompt`, `steer`, `cancel`, `resume(from_seq)`, `prepare` and
   `ping`, with every event numbered in a per-session ring so a client that reconnects gets
-  what it missed. A session is *working* while a turn runs or a follow-on turn is queued; the
-  work period holds HealthyBusy on `/ping` and is bounded by a 60-minute watchdog. A message
+  what it missed. A session is *working* while a turn runs, a follow-on turn is queued or a
+  background compose has not been delivered; the work period holds HealthyBusy on `/ping`
+  and is bounded by a 60-minute watchdog. A message
   sent while the session works is a steer: it reaches the running turn at its next step and
   is stored in Memory there, as the user's words (`agent/steer_inbox.py`); a steer that
   arrives as the turn ends runs as the next turn in the same mode and models. A disconnect never
   cancels; only the stop button (`cancel`), the watchdog and SIGTERM stop a turn. `prepare`
-  builds the session early without writing to Memory. Known limitation: while a synchronous
-  `compose_slides` runs, a steer reaches the orchestrator only after it returns.
+  builds the session early without writing to Memory.
+- **Compose runs in the background (agent, Cloud).** `compose_slides` runs as a Strands
+  background task of the orchestrator (`agent/background.py`): the orchestrator's turn goes
+  on, or ends, while the composers work, and the session keeps working until the report is
+  delivered. When the compose settles with no turn running, the session starts a turn with no
+  input (`turn {why: "wake"}`) and the orchestrator reads the report as the result of the
+  task. A message sent while only the compose runs starts a turn at once. New events:
+  `taskStart {toolUseId, taskId, name}` (replaces the dispatch's `toolResult`), `taskEnd
+  {toolUseId, taskId, name, status, content}`, and `toolStream` progress between turns. A stop
+  (the stop button, the watchdog, SIGTERM) sets the work period's stop event first, which the
+  composers see, then cancels the background task; with no turn running, the decks the task
+  writes are fenced (`fence_turn`) from that moment. `/invocations` follows a turn that
+  dispatched a compose until the session goes idle and gets `taskEnd` as the compose's
+  `toolResult`.
 - **Send any time, stop, and come back to a running session (Web UI, Cloud).** The Web UI
   talks to its session over the agent's `/ws` WebSocket (one connection per work period,
   closed when the session goes idle; a 30-second ping only while it works). The send button
@@ -87,6 +100,13 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **`compose_slides` returns at once in the Cloud agent.** Its result is a dispatch notice;
+  the report arrives later on its own (see "Compose runs in the background"). The Strands
+  tool that manages background tasks (`strands_manage_background_task`) is hidden from the
+  orchestrator model and a call to it by name is refused: the report is delivered without
+  polling, and a compose is stopped only by a stop of the session's work. While a background
+  task is open the session keeps its Agent even if a turn asks for another mode or model.
+  A message sent while a stop finishes now runs in a new work period.
 - **`/invocations` runs on the session runtime.** HTTP clients (Local, external ones) see the
   same events and the same behaviour as before for the turns they start: a newer HTTP prompt
   takes over the running HTTP turn and a client that goes away cancels its own turn. An HTTP
@@ -277,6 +297,10 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **A background result delivered after the turn's answer is stored once in Memory.** Strands
+  merges such a delivery into the latest assistant message and announces it again; the Memory
+  session manager now replaces that message's event instead of adding a second one, so a
+  restored session no longer holds the assistant message twice.
 - **Decks with speaker notes built on a template without a notes master now open in
   Keynote and Quick Look.** python-pptx created the notes master but did not declare it
   in `presentation.xml` (`<p:notesMasterIdLst>`), so Keynote rejected the file as invalid
