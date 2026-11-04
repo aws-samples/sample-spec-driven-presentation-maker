@@ -12,6 +12,21 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Added
 
+- **Cloud session runtime and the `/ws` WebSocket entry (agent).** Each session keeps its
+  Presentation Maker MCP client, Agent and Memory session manager across turns
+  (`agent/session_handle.py`): the JWT is swapped per turn, an MCP session that ended is
+  reconnected, the Agent is rebuilt only when the mode or a model changes, and the Memory
+  session manager is created at the first prompt. The agent serves `/ws`
+  (`agent/ws_entry.py`): `prompt`, `steer`, `cancel`, `resume(from_seq)`, `prepare` and
+  `ping`, with every event numbered in a per-session ring so a client that reconnects gets
+  what it missed. A session is *working* while a turn runs or a follow-on turn is queued; the
+  work period holds HealthyBusy on `/ping` and is bounded by a 60-minute watchdog. A message
+  sent while the session works is a steer: it reaches the running turn at its next step and
+  is stored in Memory there, as the user's words (`agent/steer_inbox.py`). A disconnect never
+  cancels; only the stop button (`cancel`), the watchdog and SIGTERM stop a turn. `prepare`
+  builds the session early without writing to Memory. Known limitation: while a synchronous
+  `compose_slides` runs, a steer reaches the orchestrator only after it returns.
+
 - **Sign-up settings for the default Cognito user pool.** `auth.selfSignUp` in
   `infra/config.yaml` turns self sign-up on, and `auth.allowedEmailDomains` limits it to the
   listed email domains. A Cognito Pre sign-up Lambda trigger checks the domain of each
@@ -54,6 +69,12 @@ Entries before v0.5.0 were written retroactively as summaries.
   decks too, and the cloud sandbox syncs `reviews/`. (#473)
 
 ### Changed
+
+- **`/invocations` runs on the session runtime.** HTTP clients (Local, external ones) see the
+  same events and the same behaviour as before for the turns they start: a newer HTTP prompt
+  takes over the running HTTP turn and a client that goes away cancels its own turn. An HTTP
+  prompt that arrives while WebSocket-started work runs no longer cancels it: it becomes a
+  steer, and the response follows the session until it goes idle.
 
 - **Faster first output on every Cloud turn.** The agent no longer waits for the optional
   AWS Knowledge and AWS Pricing MCP servers, the Memory session, and `start_presentation` one
@@ -311,6 +332,12 @@ Entries before v0.5.0 were written retroactively as summaries.
   when its JSON asks for one, as the slide JSON spec says.
 
 ### Security
+
+- **The agent runtime's resource policy allows the WebSocket invoke.** The policy on the agent
+  runtime and its endpoints now also allows `bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream`
+  (the Web UI's `/ws`); the MCP runtime is unchanged and `InvokeAgentRuntimeCommand` stays
+  denied on both. On `/ws` the agent admits the session on the first message and checks its
+  owner on every message.
 
 - **Agent and MCP runtime sessions are bound to their owner.** New session ids created by
   the Web UI start with a prefix derived from the signed-in user (`shared/session_owner.py`,

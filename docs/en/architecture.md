@@ -303,6 +303,8 @@ A reference implementation of a full-stack application.
 
 The agent fetches its role documents through the entry tools (`start_presentation`, `start_composing`, `start_style`) and places them in its system prompt, so the MCP server stays the single source of truth for workflow text. The agent itself has no `start_*` tools. Its `compose_slides` tool runs `check_specs` and then dispatches one composer agent per group it is given, up to 10 at a time. The agent calls it twice: once for the layout pass over all slides, then once for the content groups, which run in parallel.
 
+The agent runs every session on a session runtime (`agent/session_runtime.py`) behind two entries: `/ws`, the Web UI's WebSocket (`prompt`, `steer`, `cancel`, `resume`, `prepare`, `ping`), and `/invocations`, HTTP streaming for Local and external clients. A session keeps its MCP clients, Agent and Memory session manager across turns, with the JWT swapped per turn. While a turn runs the session is working: it holds HealthyBusy on `/ping`, a message sent then is a steer that reaches the running turn and is stored in Memory where it arrived, and every event is numbered so a client that reconnects gets what it missed. Only the stop button, a 60-minute watchdog and SIGTERM stop a turn; a disconnect does not.
+
 ---
 
 ## Data Flow
