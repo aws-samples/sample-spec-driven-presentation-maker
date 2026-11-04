@@ -10,489 +10,253 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-11-05
+
+The Cloud Web UI now lets you send a message while the agent works, stop it for good,
+come back to a running session, and keep chatting while composers write in the
+background. It also adds comments on the preview, faster first replies and tighter
+defaults for the AWS stack.
+
+### Upgrading from 0.11
+
+**AWS stack.** This release changes SdpmAuth, SdpmData, SdpmRuntime, SdpmAgent and
+SdpmWebUi. Update them in one run: `git pull && ./scripts/deploy.sh`, or
+`npx cdk deploy --all` in `infra/`. The new Web UI needs the new agent, and CDK updates
+SdpmAgent before SdpmWebUi. Each item below is "what changes / what to do".
+
+- **Self sign-up is off by default.** The SdpmAuth deploy switches an existing user pool
+  to administrator-created users and removes sign-up from the sign-in page; existing users
+  keep their accounts. / To keep self sign-up, set `auth.selfSignUp: true` in
+  `infra/config.yaml` before you deploy, and optionally list `auth.allowedEmailDomains`.
+  Otherwise create users as in the
+  [Deploy guide](docs/en/deploy-cloudshell.md#creating-a-cognito-user-layer-4).
+- **The runtimes carry resource policies.** The agent and MCP runtimes and their endpoints
+  allow `InvokeAgentRuntime` and `StopRuntimeSession` (plus
+  `InvokeAgentRuntimeWithWebSocketStream` on the agent runtime, for the Web UI's `/ws`) and
+  deny `InvokeAgentRuntimeCommand`; the policies arrive with the SdpmRuntime and SdpmAgent
+  deploys. / Nothing for the Web UI, the agent or MCP clients. A caller that used
+  `InvokeAgentRuntimeCommand` gets 403.
+- **Session ids carry their owner.** New session ids start with a prefix derived from the
+  user's `sub`, and the agent and MCP runtimes admit such an id only for that user. Ids of
+  the earlier format keep working when AgentCore Memory holds that user's history for them,
+  so existing decks keep their chat. / Reload a chat tab that asks for it (once). A program
+  that calls the agent's `/invocations` itself (a Slack or Teams bot) must start new session
+  ids with the owner prefix and send the same id in the
+  `X-Amzn-Bedrock-AgentCore-Runtime-Session-Id` header; see
+  [Teams & Slack](docs/en/teams-slack-integration.md#request-body). MCP clients need no
+  change.
+- **The MCP runtime runs on AgentCore platform V2.** `platformVersion: "V2"` is now
+  declared in `infra/lib/runtime-stack.ts`, so the SdpmRuntime deploy moves the MCP runtime
+  to V2, and a deploy that changes neither the image nor the configuration no longer creates
+  a runtime version. / Nothing. To stay on V1, see
+  [Security](docs/en/security.md#agentcore-runtime-platform-versions).
+- **Runtime log groups expire.** The deploy gives the AgentCore runtime log groups,
+  existing ones included, the retention in `observability.logRetentionDays` (default 30
+  days), so CloudWatch Logs removes older log data after the deploy. Model request and
+  response bodies are no longer written to `otel-rt-logs`. / To keep logs longer, set
+  `observability.logRetentionDays` before you deploy; export anything older that you need
+  first.
+- **The agent's AWS knowledge tools are documentation tools only.** The agent connects to
+  the public AWS Knowledge MCP Server and offers five documentation tools; the agent role
+  no longer has `aws-mcp:*`. / Nothing, unless your agent relied on other AWS MCP Server
+  tools.
+- **Narrower execution roles.** The agent runtime no longer has the decks table, the PPTX
+  bucket or the `DECKS_TABLE` / `PPTX_BUCKET` variables. / Only forks whose agent code
+  reads them need a change.
+- **REST API.** Deck sharing is gone (`GET /decks/shared` and the `collaborator` role);
+  deck lists no longer return `createdBy`; `GET /decks/{id}` returns `chatSessionId` to the
+  owner only and ignores `include=slideJson`; upload handles are `uploads/{uuid}/{name}`
+  (the earlier `uploads/{userId}/…` form is still accepted for the caller's own uploads
+  during a transition). / Only clients that call the API directly need to adapt. To show a
+  deck to others, make it public or send the PPTX / HTML.
+- **Python dependencies (forks).** One uv workspace and one root `uv.lock` replace the
+  per-package locks and the `requirements*.txt` / `constraints.txt` files; the Agent image
+  builds from the repository root. / To change a dependency, edit the member's
+  `pyproject.toml` and run `make lock`.
+
+**MCP clients and CLI.** No tool was added, removed or renamed (still 20), no tool argument
+changed, and the CLI commands are unchanged. These results changed:
+
+- `run_python` on PPTX decks returns the same result locally and in the cloud. Read build
+  warnings from `warnings["build"]` (`warnings` is now an object with `outline`,
+  `layoutBias` and `build`), lint results from `errors.lintDiagnostics` (the top-level
+  `lint_diagnostics` is gone), and parse `measure` as JSON (`{"error": …}`) when it does not
+  start with `📐`.
+- Cloud `run_style_python` returns `saved` as `{filename, name}`, without the S3 key.
+- Cloud `read_attachment` / `import_attachment` take and return upload handles
+  `uploads/{uuid}/{name}`.
+- Local installs: `sdpm update` works as before. The MCP server's environment moves from
+  `~/.sdpm/checkout/servers/local/.venv` to `~/.sdpm/checkout/.venv`; you can delete the
+  old `servers/local/.venv` and `sdpm/.venv`.
+
 ### Added
 
-- **Cloud session runtime and the `/ws` WebSocket entry (agent).** Each session keeps its
-  Presentation Maker MCP client, Agent and Memory session manager across turns
-  (`agent/session_handle.py`): the JWT is swapped per turn, an MCP session that ended is
-  reconnected, the Agent is rebuilt only when the mode or a model changes, and the Memory
-  session manager is created at the first prompt. The agent serves `/ws`
-  (`agent/ws_entry.py`): `prompt`, `steer`, `cancel`, `resume(from_seq)`, `prepare` and
-  `ping`, with every event numbered in a per-session ring so a client that reconnects gets
-  what it missed. A session is *working* while a turn runs, a follow-on turn is queued or a
-  background compose has not been delivered; the work period holds HealthyBusy on `/ping`
-  and is bounded by a 60-minute watchdog. A message
-  sent while the session works is a steer: it reaches the running turn at its next step and
-  is stored in Memory there, as the user's words (`agent/steer_inbox.py`); a steer that
-  arrives as the turn ends runs as the next turn in the same mode and models. A disconnect never
-  cancels; only the stop button (`cancel`), the watchdog and SIGTERM stop a turn. `prepare`
-  builds the session early without writing to Memory.
-- **Compose runs in the background (agent, Cloud).** `compose_slides` runs as a Strands
-  background task of the orchestrator (`agent/background.py`): the orchestrator's turn goes
-  on, or ends, while the composers work, and the session keeps working until the report is
-  delivered. After a dispatch the orchestrator tells the user what is being composed and ends
-  its turn; it looks at the slides (`get_preview`) once the report arrives. When the compose
-  settles with no turn running, the session starts a turn with no
-  input (`turn {why: "wake"}`). The report reaches the orchestrator's history as a user text
-  `<compose_result task="…" status="…">report</compose_result>` (escaped); Strands' own
-  delivery, a synthetic call of its task management tool, is rewritten before it is stored,
-  so neither the model nor Memory sees that tool. A message sent while only the compose runs starts a turn at once. New events:
-  `taskStart {toolUseId, taskId, name}` (replaces the dispatch's `toolResult`), `taskEnd
-  {toolUseId, taskId, name, status, content}`, and `toolStream` progress between turns. A stop
-  (the stop button, the watchdog, SIGTERM) sets the work period's stop event first, which the
-  composers see, then cancels the background task. `/invocations` follows a turn that
-  dispatched a compose until the session goes idle and gets `taskEnd` as the compose's
-  `toolResult`.
-- **Message a running composer (agent, Cloud).** While a compose runs, the orchestrator can
-  send a composer a message with `message_composer(group, text)`; the composer reads it at
-  its next step and applies it to the slides it writes. A composer tells the orchestrator
-  something with `report_to_orchestrator(text)` (`agent/compose_messaging.py`), to answer a
-  message or to raise a decision (progress and completion stay in its summary): the session
-  publishes `composerNote {toolUseId, group, slugs, text}` (`slugs` as one comma-separated
-  label) and delivers the note to the orchestrator as an escaped `<composer_note>` text, in
-  the running turn or in a turn of its own (`turn {why: "report"}`). A message sent after
-  a composer's last step makes it run once more with that message; `message_composer` to a
-  composer that is not running returns an error result. When the direction changes while
-  composers run, the orchestrator corrects the running work this way instead of cancelling
-  and redoing it.
-- **Send any time, stop, and come back to a running session (Web UI, Cloud).** The Web UI
-  talks to its session over the agent's `/ws` WebSocket (one connection per work period,
-  closed when the session goes idle; a 30-second ping only while it works). The send button
-  stays enabled while the agent works: a message sent then is a steer, shown in the chat
-  where the agent accepted it, with the reply continuing below it; a steer a stop discarded
-  is marked as not delivered, and a reloaded chat shows steers where they reached the agent.
-  Stop sends `cancel` and shows the session stopped within 2 seconds of the acknowledgement;
-  without an acknowledgement in 3 seconds it falls back to StopRuntimeSession. Opening the
-  deck again, reloading the page or waking the computer while the session works reconnects
-  and replays what was missed, then follows the work live (the last known state is kept in
-  `localStorage`, and only a session last seen working is reconnected); a message sent while
-  that reconnect connects goes out once the session's state is known. When the session's
-  process is gone, the chat shows the Memory history as before. The new deck screen sends
-  `prepare` once per page, when it is first shown (not on every page load), so the first
-  prompt finds the session built. Local mode is
-  unchanged.
-- **Background compose in the chat (Web UI, Cloud).** The compose card stays live while the
-  composers work in the background, across later messages and turns, and closes when the
-  result arrives (`taskEnd`); a stopped compose shows as stopped. While a compose runs and no
-  turn does, the chat says the composers are working in the background and that you can keep
-  chatting. A message sent
-  while the agent works is marked as sent, then as read by the agent once it reaches it.
-  Messages between the orchestrator and a composer (`message_composer`, `composerNote`) show
-  as composer notes, not as user messages, live and in the reloaded history; a message that
-  did not reach a composer is marked as not delivered. The reloaded
-  history hides the call that delivered the background result. Reloading the page during a
-  background compose brings back the card with live progress. Local mode is unchanged.
+- **Cloud chat: send any time, stop, reconnect and compose in the background.** In the
+  Cloud Web UI (#502, #506, #510, #512, #513):
+  - The send button stays enabled while the agent works. A message sent then is a steer: it
+    reaches the running turn at its next step and shows in the chat, and in Memory, where
+    the agent accepted it. A steer that a stop discarded is marked as not delivered.
+  - The stop button stops the session's work, composers included. After a stop the agent
+    starts no new tool call, MCP call or Memory event; a Presentation Maker call already
+    running on the MCP runtime finishes there (a few seconds), as in Local mode. Without an
+    acknowledgement in 3 seconds the Web UI falls back to StopRuntimeSession, and the agent
+    process exits within 3 seconds of SIGTERM. Closing the tab never stops a turn; a
+    60-minute watchdog bounds the work.
+  - Opening the deck again, reloading the page or waking the computer while the session
+    works reconnects and replays what was missed. When the session's process is gone, the
+    chat shows the Memory history.
+  - `compose_slides` runs in the background. The orchestrator says what is being composed
+    and ends its turn, and you can keep chatting. The compose card stays live across turns
+    and reloads and closes when the report arrives; the orchestrator then reviews the
+    slides in a turn of its own. While composers run, the orchestrator can correct one with
+    `message_composer`, and a composer can answer or raise a decision with
+    `report_to_orchestrator`; both show in the chat as composer notes.
 
-- **Sign-up settings for the default Cognito user pool.** `auth.selfSignUp` in
-  `infra/config.yaml` turns self sign-up on, and `auth.allowedEmailDomains` limits it to the
-  listed email domains. A Cognito Pre sign-up Lambda trigger checks the domain of each
-  sign-up request: exact match, case-insensitive, subdomains not included (list each one).
-  Users created by an administrator are not checked. `allowedEmailDomains` without
-  `selfSignUp: true`, or an entry that is not a domain name, fails the synth. See
-  [Developer guide](docs/en/developer-guide.md#default-amazon-cognito-user-pool).
-  `infra` now has CDK assertion tests (`cd infra && npm test`), run in CI.
-- **`agent-spectrum` style.** A bundled concept style made to be watched rather than presented
-  (screen recordings, animated previews, README stills): a flat near-black ground, light type,
-  and the Web UI's five builder colours (blue, teal, violet, amber, pink) in a fixed order, used
-  only to tell the parts of a figure apart. Every slide carries a five-segment stripe; labels and
-  tags are monospaced at 16pt so they stay legible when a slide is shown at README width. The
-  README key visual is built in it.
-- **Comments on the preview.** Mark what to change directly on the slides and send it as one
-  change request (修正依頼). Turn on the **Comment** tool from the preview header, with `C`,
-  or from the button that appears when hovering a slide. Drag to outline an area, or click
-  to place a frame when nothing is being edited (a click while a frame is selected only
-  confirms it). Each frame gets a letter name (A, B, …, AA) that comments can reference with
-  `@A`; a frame may stay without a comment (a place another comment points to), and only an
-  explicit delete (with undo) removes it, or Esc on a frame just drawn. Frames can be moved
-  and resized, hovering a frame shows its comment, and unsent frames survive a reload. They
-  collect above the chat input, where **Request changes** (「修正を依頼」) sends them with
-  whatever is typed in the input as the message, once a frame has a comment or the message is
-  set (until then the frames list says what is missing). The server writes `reviews/<id>.json` in the
-  deck — only what was sent (note, slide size, comments with frames in slide pixels) plus a
-  short guide for the composers — and returns the chat message the Web UI sends: the note and
-  the comments grouped by slide, the file path, how to dispatch them (one composer per slide,
-  given the file path and that slide's comment names) and a `[review:<id>]` marker. The
-  orchestrator works from the message alone; the composers read the file. Nobody rewrites the
-  file, each new request replaces the deck's previous one, and the role documents are
-  unchanged (the feature is the Web UI's). The chat shows the request as a card with its
-  frames, built from the message so it restores from chat history on both the AWS stack and
-  locally; it shows no progress (the agent's reply tells the result), and the sent frames leave
-  the slides once the request is created. When the chat send fails, the frames and the note go
-  back to the drafts and the input to be sent again. HTML decks show stacked static slide previews while the tool is on, so frames and the
-  agent see the same layout. New API route `POST /decks/{id}/reviews` (edit permission,
-  validated frames, slugs and sizes) with a matching local route; the message and guide texts
-  live once in `shared/review_template.json`. `get_deck` now returns `slideSize` for PPTX
-  decks too, and the cloud sandbox syncs `reviews/`. (#473)
+  The Web UI talks to the agent over a `/ws` WebSocket, and a session keeps its MCP
+  clients, Agent and Memory session manager across turns. `/invocations` (Local and
+  external clients) runs on the same session runtime: a turn that dispatched a compose
+  streams until the session is idle and gets the report as the compose's `toolResult`, and
+  a prompt that arrives while WebSocket-started work runs becomes a steer. Local mode is
+  unchanged.
+- **Comments on the preview.** Turn on the **Comment** tool (preview header, `C`, or the
+  button on a hovered slide), draw or click frames on the slides, name them in comments
+  with `@A`, and send them with **Request changes** (「修正を依頼」) as one change request.
+  Unsent frames survive a reload. The server writes `reviews/<id>.json` in the deck and
+  returns the chat message; the orchestrator dispatches one composer per slide, and the
+  chat shows the request as a card. HTML decks show static slide previews while the tool is
+  on. New API route `POST /decks/{id}/reviews`, with a matching local route; `get_deck` now
+  returns `slideSize` for PPTX decks too. Desktop only, Local and AWS. (#473)
+- **`agent-spectrum` style.** A bundled concept style for slides that are watched rather
+  than presented (screen recordings, README stills): near-black ground, light type, the Web
+  UI's five builder colours and a five-segment stripe on every slide. (#489)
 
 ### Changed
 
-- **`compose_slides` returns at once in the Cloud agent.** Its result is a dispatch notice;
-  the report arrives later on its own (see "Compose runs in the background"). The Strands
-  tool that manages background tasks (`strands_manage_background_task`) is hidden from the
-  orchestrator model and a call to it by name is refused: the report is delivered without
-  polling, and a compose is stopped only by a stop of the session's work. While a background
-  task is open the session keeps its Agent even if a turn asks for another mode or model.
-  A message sent while a stop finishes now runs in a new work period.
-- **`/invocations` runs on the session runtime.** HTTP clients (Local, external ones) see the
-  same events and the same behaviour as before for the turns they start: a newer HTTP prompt
-  takes over the running HTTP turn and a client that goes away cancels its own turn. An HTTP
-  prompt that arrives while WebSocket-started work runs no longer cancels it: it becomes a
-  steer, and the response follows the session until it goes idle.
-
-- **Faster first output on every Cloud turn.** The agent no longer waits for the optional
-  AWS Knowledge and AWS Pricing MCP servers, the Memory session, and `start_presentation` one
-  after another before it calls the model. It fetches `start_presentation` as soon as the
-  Presentation Maker server is connected and loads the Memory session at the same time. The
-  AWS Knowledge and AWS Pricing MCP clients are connected once per agent process and reused
-  on later turns (neither uses the signed-in user's token). If one is still connecting when
-  the first turn is ready, that turn goes ahead without it and the chat shows it as not
-  connected in time; later turns use it once it has connected. A client whose server has
-  stopped is rebuilt on the next turn, under the same rule. On SIGTERM the agent also closes
-  these clients (and the AWS Pricing server process) while it exits. The role documents and each
-  user's style and template list are fetched through the MCP server once per agent process
-  and kept in memory, so later turns make no `start_presentation` call. A style or template
-  added during the session shows up in the system prompt in the next agent session; the
-  agent's `list_styles` / `list_templates` tools still return the current lists.
-- **The first reply in a new Cloud deck no longer waits for the LibreOffice warm-up.** The MCP
-  server started its background LibreOffice warm-up from the platform's health checks: right
-  after each microVM was restored, and again every 5 minutes. It then competed with the
-  agent's first `start_presentation` for disk and CPU (dev: 0.5–30 s, 0.7 s without it). The
-  warm-up now starts once per process, after the client has sent no request for 3 seconds
-  (on a new deck, right after `start_presentation`; in each composer's own microVM, after
-  it has connected and before its first tool call), and does not run again once it has
-  succeeded. The
-  server also reads the AWS API definitions, the bundled style list and the role documents at
-  startup, so the V2 snapshot holds them (dev: 0.73 s → 0.50 s).
-  The MCP runtime's `platformVersion: "V2"` is now declared in `infra/lib/runtime-stack.ts`
-  instead of being set outside CloudFormation, and its `DEPLOY_TIMESTAMP` environment variable
-  is removed: a deploy that changes neither the image nor the configuration no longer creates
-  a runtime version (each one rebuilds the V2 snapshot).
-  **Upgrade:** a new deployment now runs the MCP runtime on V2 instead of V1; see
-  [Security](docs/en/security.md#agentcore-runtime-platform-versions).
-- **Self sign-up is now off by default in the AWS stack.** The default Cognito user pool
-  accepts only users created by an administrator (Cognito console or
-  `aws cognito-idp admin-create-user`, see
-  [Deploy guide](docs/en/deploy-cloudshell.md#creating-a-cognito-user-layer-4)); the sign-in
-  page no longer offers sign-up. One-Click Deploy still creates the first user for
-  NotificationEmailAddress.
-  **Upgrade:** the next deploy of `SdpmAuth` switches an existing user pool to
-  administrator-created users. The user pool is updated in place: existing users keep their
-  accounts and sign in as before. To keep self sign-up on, set `auth.selfSignUp: true` in
-  `infra/config.yaml` before you deploy.
+- **Faster first reply on the AWS stack.** The agent connects its MCP clients, loads the
+  Memory session and fetches `start_presentation` at the same time, and fetches the role
+  documents and the user's style and template lists once per agent process. The optional
+  AWS Knowledge and AWS Pricing clients connect once per process; a turn does not wait for
+  one that is still connecting (the chat shows it as not connected in time). The new deck
+  screen builds the session before the first prompt. The MCP server warms LibreOffice once
+  per process after the client has been quiet for 3 seconds, instead of on health checks,
+  and loads its static data into the V2 snapshot. A style or template added during a
+  session reaches the system prompt in the next agent session; `list_styles` /
+  `list_templates` always return the current lists. (#503, #504, #510)
+- **Self sign-up is off by default in the AWS stack.** The default Cognito user pool
+  accepts only users created by an administrator. `auth.selfSignUp: true` turns sign-up on,
+  and `auth.allowedEmailDomains` limits it to the listed domains (exact, case-insensitive,
+  checked by a Pre sign-up Lambda trigger; administrator-created users are not checked).
+  One-Click Deploy still creates the first user. See
+  [Developer guide](docs/en/developer-guide.md#default-amazon-cognito-user-pool). (#498)
 - **`run_python` returns the same result for PPTX decks locally and in the cloud.** The
-  post-processing after a PPTX deck edit (full build, render of the affected slides,
-  measurement, compose, previews) now lives in `sdpm.api.refresh_pptx`; both servers only do
-  the I/O around it. The measurement and warnings part of the result follows the cloud format.
-  Before:
-
-  ```
-  Local  warnings          ["fonts auto-detected from template", "page02 (Title Only) offset: -35.2% (top-heavy)", "  page02(body) …"]
-                           (every build warning without measure_slides, the measured pages' lines with it;
-                           the list replaced {"outline": …})
-         lint_diagnostics  [{slide, element, rule, message}]   (copy of errors.lintDiagnostics)
-         measure           "📐 Text measurement …" (with "⚠ Layout issues") | "No matching slides found for given slugs"
-                           | "Measure error: …"
-         invalid layouts   not reported
-  Cloud  warnings          {"layoutBias": [{slide, layout, bbox, offset, direction}]}   (replaced {"outline": …})
-         measure           "📐 Text measurement …" (no "⚠ Layout issues") | '{"error": "…"}'
-         errors.<slug>     {"invalidLayout": "…", "available": […]}   (measured slugs)
-         build warnings    not reported
-  ```
-
-  After, on both servers:
-
-  ```
-  warnings   {"outline": "…",                                  (outline lint; always kept)
-              "layoutBias": [{slide, layout, bbox, offset, direction}],
-              "build": ["  page02(body) element[4]: include src …"]}
-             layoutBias and build come with measure_slides only, for the measured pages
-             (full-deck page numbers); build holds the "pageNN" lines, not the layout-bias lines
-  measure    "📐 Text measurement …" plus the "⚠ Layout issues" section when the judge finds any
-             | '{"error": "No matching slides found for given slugs"}'
-             | '{"error": "LibreOffice SVG export failed"}' | '{"error": "…"}'
-  errors     {"lintDiagnostics": […], "<slug>": {"invalidLayout": "…", "available": […]}}
-  ```
-
-  Migration: read build warnings from `warnings["build"]` (a dict now, not a list) and lint
-  results from `errors.lintDiagnostics` (`lint_diagnostics` is gone); parse `measure` as JSON
-  when it does not start with `📐`. Transport keys stay as they were: locally `pptx`,
-  `compose`, `compose_error`, `preview_files`, `preview_error`, `render_error`, `preview`
-  (`unavailable`, with measure_slides); in the cloud `previewHint`, `readOnly`, and the
-  `pptx_error` texts. The role documents are unchanged (none of them names these fields).
-  Side effects: the local live preview's compose files now carry `sourceHash` and are not
-  written for a slide whose layout name is invalid (it showed the fallback layout), and a
-  written slide's older compose files are removed. In the cloud, the rebuilt PPTX goes through
-  the same build as `generate_pptx` (icon check, `autoSpacing`, `defaultBackground`, an
-  auto-set `defaultTextColor` instead of a failure), and previews are rendered from the changed
-  slides instead of the whole deck, as locally (a template whose master shows the slide number
-  as a plain text field then shows the partial render's number in those previews and compose
-  files, as the local ones always did). In the cloud, `previewHint` is left out when the
-  render of the changed slides failed (the same result's `pptx_error` / `measure` says why).
-  `sdpm.engine.schema.read_deck_format` replaces five
-  separate deck.json format readers; the CLI no longer crashes on a deck.json that is not an
-  object.
-- **The README opens with the key visual.** An animation of the Web UI composing a seven-slide
-  deck about SDPM (in `agent-spectrum`), the install commands right under it, then the same
-  slide in seven bundled styles. The deck page, comment and Styles screenshots are retaken on
-  that deck, and its slides replace the old six-slide sample. The deck (with the layout-pass
-  version of each slide) and the scripts that build it through the Local server, replay the
-  builds in the Local Web UI and record the GIF are in `docs/assets/src/hero/`; the gallery is
-  built from `docs/assets/src/style-gallery/`. Both read the bundled styles at build time.
-  `README_ja.md` shows the Japanese deck.
-- **Documentation reorganized for first-time readers.** The README now shows example output
-  and the three ways to use SDPM (your AI agent, the Web UI on your computer, a team server
-  on AWS). `docs/en/getting-started.md` is the user guide; checkout setup and CDK deployment
-  moved to `docs/en/developer-guide.md`, security notes to `docs/en/security.md`, and the
-  migration guides to `docs/en/migration/`. The workflow and architecture diagrams are redrawn
-  from the current code. New Japanese translations: custom templates and uninstall.
-- **One Python lock for everything.** The repository root is now a uv workspace (`sdpm`,
-  `servers/local`, `servers/remote`, `agent`, `api`) with a single `uv.lock`. The MCP Runtime
-  and Agent Runtime images and the API Lambda bundle install exactly the locked versions,
-  hash-checked, and never resolve dependencies at build time. The tests run against the same
-  lock. Removed: `sdpm/uv.lock`, `servers/local/uv.lock`, `servers/remote/constraints.txt`,
-  `agent/requirements.txt`, `agent/requirements.lock`, `api/requirements.txt`. To change a
-  dependency, edit the member's `pyproject.toml` and run `make lock` (`uv lock`). (#475)
-  - **Local installs:** `sdpm update` keeps working unchanged. The MCP server's environment
-    moves from `~/.sdpm/checkout/servers/local/.venv` to `~/.sdpm/checkout/.venv`. You can
-    delete the old `servers/local/.venv` and `sdpm/.venv` directories in the checkout.
-  - **AWS deploys:** the Agent Runtime image now builds from the repository root (both images
-    share the root `.dockerignore`, now an allowlist). The API Lambda bundle targets
-    `manylinux_2_34` (the python3.13 runtime's Amazon Linux 2023) and is built by
-    `scripts/bundle_api_lambda.sh`.
-- **CI builds and starts what a deploy ships.** Both runtime images are built on linux/arm64
-  and started (MCP `initialize` + `tools/list`, Agent `/ping`), and the API Lambda bundle is
-  imported in the Lambda runtime image. This replaces the `container-deps` dry runs. The
-  Python tests run on 3.13, the version the images ship, and the local smoke test runs on
-  3.11, the oldest supported version, with only the local server's dependencies. (#474)
-- **Dependabot's minor and patch updates for uv and GitHub Actions merge on their own** once
-  the required CI checks pass (`.github/workflows/dependabot-auto-merge.yml`). Major updates
-  and npm updates (`web-ui`, `infra`) are still merged by hand. (#476)
-- **Upload conversion moved into the core.** The PDF / DOCX / XLSX / PPTX conversion of
-  attachments now lives in `sdpm.tools.attachment.ingest` (formerly `shared.ingest`), so
-  `sdpm-skill` now depends on `pypdf>=6.15.0`, `pdfplumber`, `python-docx` and `openpyxl`.
-  Conversion results are unchanged. (#477)
-- **One style per name in the AWS style lists.** When a user saves a style under the name of
-  a bundled style (for example `report`), the Web UI style gallery (`GET /styles`) and the MCP
-  Runtime's `list_styles` and `start_style` catalogue now list it once, as the user's style,
-  instead of listing both. This is the rule Local already followed, and the style that
-  `apply_style` and the gallery preview load was already the user's, so applied styles do not
-  change. Agents on the AWS stack see one `report` entry (`"source": "user"`) where they used
-  to see two. The Web UI gallery lists the user's styles before the bundled ones. The style,
-  pin and template code of the API Lambda and the MCP Runtime now shares
-  `shared/user_library.py`; DynamoDB keys and S3 paths are unchanged.
-- **One set of attachment rules for every client.** How the orchestrator reads attachments
-  and cites them in the brief and outline now lives only in `orchestrator.md` and the
-  `attachments` guide, which every client reads: read with `read_attachment` first, list
-  each source under the brief's **Sources** with the part the slides need (section, page or
-  `read_attachment` line range), naming an attached file by its file name and `attachments/`
-  path, point each slide's `evidence` at that part, and refer to imported material by the
-  returned `bundlePath` plus the listed path. The AWS stack's agent prompt keeps only the
-  `[Attached:…]` marker format (`agent/prompts/common/attachments.md`); its extra rules
-  (content summaries in the brief, citation examples, importing only when composers need the
-  file) are gone, so Cloud briefs follow the same rules as Local clients and every attached
-  file is imported. Line references stay, now as the `read_attachment` line range in Sources
-  and `evidence`.
+  post-processing after a PPTX edit (build, render of the changed slides, measurement,
+  compose, previews) lives in `sdpm.api.refresh_pptx`. In the cloud the rebuilt PPTX now
+  goes through the same build as `generate_pptx`, and previews are rendered from the
+  changed slides only. See Upgrading for the result fields. (#494)
+- **README and documentation.** The README opens with an animation of the Web UI building a
+  deck, the install commands and a gallery of seven styles, and shows the three ways to use
+  SDPM. `docs/en/getting-started.md` is the user guide; setup and CDK deployment moved to
+  `docs/en/developer-guide.md`, security notes to `docs/en/security.md`, migration guides to
+  `docs/en/migration/`. Diagrams are redrawn from the current code; new Japanese pages for
+  custom templates and uninstall. (#484, #489)
+- **One Python lock.** The repository root is a uv workspace (`sdpm`, `servers/local`,
+  `servers/remote`, `agent`, `api`) with one `uv.lock`; the runtime images and the API
+  Lambda bundle install exactly the locked versions, hash-checked. (#475)
+- **CI and Dependabot.** CI builds and starts both runtime images and imports the API Lambda
+  bundle in the Lambda runtime image. Dependabot minor and patch updates for uv and GitHub
+  Actions merge on their own once the required checks pass. (#474, #476)
+- **Upload conversion moved into the core.** PDF / DOCX / XLSX / PPTX conversion lives in
+  `sdpm.tools.attachment.ingest`, so `sdpm-skill` now depends on `pypdf>=6.15.0`,
+  `pdfplumber`, `python-docx` and `openpyxl`. Results are unchanged. (#477)
+- **One style per name in the AWS style lists.** A user style saved under a bundled style's
+  name is listed once, as the user's, in the Web UI gallery and in `list_styles` /
+  `start_style`, as Local already did. (#491)
+- **One set of attachment rules for every client.** How the orchestrator reads and cites
+  attachments lives only in `orchestrator.md` and the `attachments` guide; the AWS agent
+  prompt keeps only the `[Attached:…]` marker format, so Cloud briefs follow the Local
+  rules and every attached file is imported. (#492)
 
 ### Removed
 
-- **Deck sharing with specific users and the `collaborator` role (breaking).** The Share dialog (user
-  search, collaborator list), the deck card's Share menu item and collaborator badge, and the
-  **Shared** tab of the deck list are gone, together with `GET /decks/shared` and the
-  `SHARED#` lookup in `shared/authz.py`. The feature never worked: nothing wrote `SHARED#`
-  records, and the `/decks/{id}/share` and `/users/search` routes the dialog called did not
-  exist. Deck roles are now owner / viewer / none with the permission matrix otherwise
-  unchanged. Public / private visibility stays as it is: to show a deck to others, make it
-  public (**Internal**) or download the PPTX / HTML. (#479)
-  **Migration:** use public / private visibility, or download the PPTX / HTML and send the file.
-- **Unused code.** Web UI components, helpers and dependencies that nothing called are gone,
-  together with the `include=slideJson` option of `GET /decks/{id}` (now ignored), the local
-  Web UI's `/api/agent/config` route and the API Lambda's direct document-parser
-  dependencies. The Web UI used none of them. (#478)
-- **The compose card's own stop button.** The **Cancel** button on the compose card (Cloud
-  only), its "Stopping…" state and the summary of what each composer did before stopping are
-  gone. To stop, use the main stop button next to the chat input: it stops the whole turn,
-  compose included (Cloud ends the runtime session, Local sends ACP `session/cancel`). Its
-  tooltip no longer changes to "Force stop" while slides are being composed. The cancel used a
-  marker file written into the agent's microVM through the runtime's `/commands` API, and the
-  agent told the composers to stop through a special tool result; both side channels are
-  removed, and the `compose_slides` report no longer has a `cancelled` status.
-- **The composers' per-slide time budget.** Composers no longer get a deadline (90 s per slide,
-  `COMPOSER_SECONDS_PER_SLIDE`) or the "Time budget reached" notice that told them to stop
-  polishing, and the compose card no longer shows composers as "rushed". The runaway guards
-  stay: a composer is still stopped after 5 consecutive tool errors or a tool-call loop / cap.
+- **Deck sharing with specific users and the `collaborator` role (breaking).** The Share
+  dialog, the **Shared** tab and `GET /decks/shared` are gone. The feature never worked:
+  nothing wrote the sharing records. Deck roles are owner / viewer / none. To show a deck to
+  others, make it public (**Internal**) or send the PPTX / HTML. (#479)
+- **Unused code.** Unused Web UI components and dependencies, the `include=slideJson`
+  option of `GET /decks/{id}` (now ignored), the local `/api/agent/config` route and the API
+  Lambda's direct document-parser dependencies. (#478)
+- **The compose card's own stop button and the composers' time budget.** The compose card's
+  **Cancel** button and its "Stopping…" state are gone; the main stop button next to the
+  chat input stops compose too. Composers no longer get a per-slide deadline or the "Time
+  budget reached" notice, and the card no longer shows "rushed". A composer is still
+  stopped after 5 consecutive tool errors or a tool-call loop. (#500)
 
 ### Fixed
 
-- **A message that grows in place is stored once in Memory.** Strands merges continuation
-  input into the latest message when the roles match (a background result folded into a tool
-  result mid-turn) and announces it again; the Memory session manager now replaces that
-  message's event instead of adding a second one, so a restored session no longer holds the
-  message twice.
 - **Decks with speaker notes built on a template without a notes master now open in
-  Keynote and Quick Look.** python-pptx created the notes master but did not declare it
-  in `presentation.xml` (`<p:notesMasterIdLst>`), so Keynote rejected the file as invalid
-  and Quick Look hung on it; PowerPoint repaired it silently. The builder now adds the
-  declaration on save when it is missing. Regenerate existing decks to pick up the fix.
-  (#508, thanks @takke1986)
-
+  Keynote and Quick Look.** The builder declares the notes master in `presentation.xml`.
+  Regenerate existing decks to pick up the fix. (#508, thanks @takke1986)
 - **Deploying `SdpmAuth` no longer removes the `sdpm-mcp/invoke` scope from the Web UI's
-  Cognito app client.** The scope was added by a custom resource in `SdpmWebUi` that called
-  `UpdateUserPoolClient` with a fixed payload. The `SdpmAuth` template did not declare the
-  scope, so an update of the client there dropped it, and the agent's calls to the MCP
-  runtime failed with 401. `AuthStack` now declares the scope and the explicit auth flows
-  on the client. The `SdpmWebUi` custom resource sets only the callback/logout URLs: it
-  reads the client and writes every other field back unchanged. The client is updated in
-  place (same client ID, no user pool change).
-
-- **What a stopped Cloud turn still writes.** After a stop the agent starts nothing new: no
-  tool call, no direct MCP call from `compose_slides` and no Memory event, except the tool
-  result that closes the turn. A Presentation Maker call that was already running on the MCP
-  runtime when the stop came runs to its end (a few seconds; on dev, `run_python` saved its
-  slides 1.7 s after a cancel), as in Local mode. The remote MCP server exposes the same 20
-  tools as before: the `fence_turn` tool and the write fence added earlier in this release
-  cycle are gone, and a test now fails when the remote server registers a tool outside the
-  `sdpm.tools` contract.
-
-- **Stopping a Cloud turn no longer leaves it running in the background.** The stop button
-  ends the runtime session, and AgentCore then sends the agent's process SIGTERM. The agent
-  used to wait for the running turn to finish, so the turn and its composers kept calling
-  tools and writing slides, MCP calls and Memory events until the platform ended the
-  process 10–60 seconds later. The agent now stops on SIGTERM: it ends the running turns,
-  drops every tool call, direct MCP call and Memory event from then on, and exits within
-  3 seconds. Composers also stop when their turn is cancelled, even after the parent turn
-  has ended (they used to miss the cancel and could keep composing for minutes), and a
-  cancelled compose returns at once with status `cancelled` instead of waiting for them.
-  A call the agent had already sent to the MCP Runtime still completes there.
-- **A slide's live preview is no longer taken from another slide's compose file.** The API
-  picked a slide's latest `compose/{slug}_{epoch}.json` by the prefix `compose/{slug}_`, so slug
-  `slide` also took the legacy numbered files `slide_N_*.json`, and in a deck without an outline
-  slug `intro` could take slide `intro_2`'s file. Writing a slide's compose on the AWS stack
-  deleted the older files with the same prefix, so it also removed `intro_2`'s. Both now match
-  the whole name, as the MCP Runtime, the local server and the local Web UI already did.
-- **The API Lambda no longer leaves template copies in `/tmp`.** Listing templates (when a
-  builtin template had to be analysed) and registering an uploaded template downloaded the
-  `.pptx` into a temporary directory that was never removed, so a warm Lambda container
-  collected them. The download now goes to a directory that is removed after the analysis.
-- **Local Web UI no longer opens the deck folder as a deck.** Starting a new chat briefly
-  switched the view to a deck named after the deck folder (`SDPM-Presentations`), which the
-  local server answered with 404, and every new deck sent a `PATCH` the local server does not
-  have (405). The deck folder is no longer taken for a deck, and Local mode skips the `PATCH`
-  (it already links the chat session to the deck on its own). (#480)
-- **Local Web UI frees a deck's agent process when its turn ends.** After a turn that used
-  composer sub-agents, or the first turn on a reopened deck whose process had been stopped,
-  the local server kept marking the kiro-cli process as busy: kiro-cli sends no end-of-turn
-  notice for sub-agent sessions, and reopening a session replays its history under its own
-  id, which the server took for a sub-agent that never finished. Busy processes are never
-  stopped to make room, so the limit of three processes stopped the most recently used idle
-  one instead of the oldest, or was not enforced at all once every process looked busy. The
-  turn now ends when kiro-cli answers the chat's prompt, and sub-agent sessions are tracked
-  only within the turn (the stop button still cancels them).
-- **Cloud `import_attachment` reports conversion errors.** A failed conversion (for example a
-  limit hit while extracting) came back as `IMPORT_ERROR` with the message `'importKey'`; the
-  tool now returns the actual error code and message.
-- **Cloud `read_attachment` works again.** Since 2026-10-08 every call failed with
-  `validation error for read_attachmentOutput — Input should be a valid string`: the remote
-  server declared the tool as returning a string while it returns the result object, and the
-  MCP output check rejected it. Agents fell back to `import_attachment`, so attachments still
-  arrived, but without the paged read first. The tool now returns the same object as the
-  local server, and a test checks every remote tool's declared return type against what it
-  returns.
-- **Local live preview keeps cut-outs in icons and shapes.** LibreOffice sets `fill-rule="evenodd"`
-  (and the default stroke width and join) once on the root `<svg>`; the local server dropped
-  it when splitting the slide into fragments, so shapes with holes rendered filled in the
-  Web UI's live preview. The local and remote servers now share one compose module
-  (`sdpm.engine.preview.compose`), which carries the remote fix for this and the local
-  removal of `textLength` / `lengthAdjust` (WebKit squashed glyphs to fit them), so the
-  cloud live preview strips those too.
-- **Previews no longer add a shadow to shapes and lines on light templates.** Shapes and
-  connectors built from slide JSON kept python-pptx's default `<p:style>`, whose effect
-  reference points at the template theme's shadow. The builder wrote an empty `<a:effectLst/>`
-  to cancel it, which PowerPoint honours but LibreOffice ignores, so preview PNGs and the
-  Web UI live preview drew a shadow under every rectangle (visible on `blank-light`). The
-  effect reference now points at no theme effect (`idx="0"`), so an element has a shadow only
-  when its JSON asks for one, as the slide JSON spec says.
+  Cognito app client**, which made the agent's calls to the MCP runtime fail with 401. The
+  client is updated in place. (#509)
+- **A slide's live preview is no longer taken from another slide's compose file** (slug
+  `intro` took `intro_2`'s), and writing one slide's compose on the AWS stack no longer
+  deletes another's. (#494)
+- **The API Lambda no longer leaves template copies in `/tmp`.** (#491)
+- **Local Web UI no longer opens the deck folder as a deck** when a new chat starts, and no
+  longer sends a `PATCH` the local server does not have. (#480)
+- **Local Web UI reopens a deck without "Sorry, something went wrong".** A reopened deck
+  reuses its live agent process; a second prompt to a busy chat or a session held by
+  another kiro-cli gets a translated message. (#487)
+- **Local Web UI frees a deck's agent process when its turn ends**, so the limit of three
+  processes stops the oldest idle one. (#490)
+- **Cloud `read_attachment` works again** (it failed on every call since 2026-10-08), and
+  Cloud `import_attachment` reports the actual conversion error. (#483, #495)
+- **Live previews keep cut-outs in icons and shapes.** Local and remote share one compose
+  module (`sdpm.engine.preview.compose`). (#485)
+- **Previews no longer add a shadow to shapes and lines on light templates.** An element
+  has a shadow only when its JSON asks for one. (#486)
+- **Untranslated Web UI strings** (deck page slide count, Folder button, deck list load
+  error) are translated. (#488, #496)
 
 ### Security
 
-- **The agent runtime's resource policy allows the WebSocket invoke.** The policy on the agent
-  runtime and its endpoints now also allows `bedrock-agentcore:InvokeAgentRuntimeWithWebSocketStream`
-  (the Web UI's `/ws`); the MCP runtime is unchanged and `InvokeAgentRuntimeCommand` stays
-  denied on both. On `/ws` the agent admits the session on the first message and checks its
-  owner on every message.
-
-- **Agent and MCP runtime sessions are bound to their owner.** New session ids created by
-  the Web UI start with a prefix derived from the signed-in user (`shared/session_owner.py`,
-  mirrored in `web-ui/src/lib/sessionId.ts`), and the agent and the MCP server admit such an
-  id only for that user. Each runtime process serves one user. Existing decks keep their
-  chat: a chat id from before this change is admitted when AgentCore Memory holds that
-  user's history for it, and a deck without history continues under the user's own id. The
-  agent forwards an owner-prefixed id to the MCP runtime (also for composer groups,
-  `<id>-gN`). A refused call gets an error event with no details; a chat tab opened before
-  the update may be asked to reload the page once (new error code
-  `session_reload_required`). Deploy the Web UI first, then SdpmRuntime, then SdpmAgent.
-  Local mode is unchanged.
-- **The AgentCore runtimes allow only the operations the app uses.** The agent and MCP
-  runtimes, their `DEFAULT` endpoints and the named endpoints `sdpm_agent_endpoint` and
-  `sdpm_endpoint` now carry a resource-based policy (`AWS::BedrockAgentCore::ResourcePolicy`,
-  managed in `infra/`) that allows `InvokeAgentRuntime` and `StopRuntimeSession` and denies
-  `InvokeAgentRuntimeCommand`. Any other runtime operation is refused. Chat, the stop
-  button, the agent's calls to the MCP runtime and external MCP clients keep working; a
-  caller that ran commands in a runtime session through `InvokeAgentRuntimeCommand` now gets
-  403.
-- **Narrow the agent's execution role to what it uses.** The agent role no longer has access to
-  the decks table or the PPTX bucket (deck storage is the MCP server's), and the agent runtime no
-  longer gets the `DECKS_TABLE` / `PPTX_BUCKET` variables. AgentCore access is limited to the
-  Memory events the session manager writes and reads, on the agent's own Memory; ECR pulls to the
-  image repository; and the role explicitly denies user-id delegation
-  (`InvokeAgentRuntimeForUser`, `GetWorkloadAccessTokenForUserId`) and any call made through an
-  AWS-managed MCP server. The trust policies of the agent and MCP runtime roles accept AgentCore
-  only for resources of the deploying account and Region (`aws:SourceAccount` /
-  `aws:SourceArn`). The MCP runtime role drops its unused AWS Marketplace permissions and its
-  ECR pull on `*`, and the API Lambda's `ListEvents` is limited to the agent's Memory.
-- **Limit the AWS knowledge tools to documentation tools.** The agent connects to the public AWS
-  Knowledge MCP Server endpoint (`knowledge-mcp.global.api.aws`) and offers its model only
-  `aws___search_documentation`, `aws___read_documentation`, `aws___retrieve_skill`,
-  `aws___list_regions` and `aws___get_regional_availability`. The `mcp-proxy-for-aws`
-  dependency is removed.
-- **The agent accepts `prompt` as text only.** An invocation whose `prompt` is not a string is
-  answered with a `bad_input` error.
-- **The agent no longer sees the user's id in Cloud attachments.** The upload handle the API
-  returns and the Web UI puts in the `[Attached:…]` marker is now `uploads/{uuid}/{name}`
-  instead of the S3 key `uploads/{userId}/{uuid}/{name}`. The MCP server builds the S3 key from
-  the signed-in caller, so a handle can only name the caller's own uploads; `read_attachment`
-  and `import_attachment` return the handle in their results and errors, and errors that
-  name an S3 key under the user's prefix have the id removed. The S3 layout, the per-user
-  quota and the 90-day expiry are unchanged, so nothing is migrated. During a transition the
-  previous form is still accepted for the caller's own uploads (and answered with the new
-  handle); another user's id in it is refused without repeating the id. The previous form
-  will be removed in the first minor release after 90 days from this release, when every
-  upload it can name has expired.
-- **Public decks no longer reveal their owner.** `GET /decks/public` and the other deck lists
-  no longer return `createdBy` (the owner's user id); nothing in the Web UI used it.
-- **`GET /decks/{id}` returns `chatSessionId` to the owner only.** Viewers of a public deck get
-  `null`.
-- **`run_style_python` no longer returns the style's S3 key.** `saved` is now
-  `{filename, name}`.
-- **Composers see only their deck tools.** The Presentation Maker client each composer group
-  gets now carries the composer's tool allowlist, as the orchestrator's already did.
-- **Local Web UI refuses cross-site POSTs.** Every POST route of the local server (`sdpm webui`,
-  `npm run dev:local`) now answers 403 when the browser's `Origin` is another site, so a page
-  open in the same browser can no longer drive the local agent, upload files or change styles
-  and templates through `127.0.0.1`. Requests without an `Origin` header (scripts, curl) are
-  unaffected. (#473)
+- **The AgentCore runtimes allow only the operations the app uses.** A resource-based policy
+  on the agent and MCP runtimes and their endpoints allows `InvokeAgentRuntime` and
+  `StopRuntimeSession`, plus `InvokeAgentRuntimeWithWebSocketStream` on the agent runtime,
+  and denies `InvokeAgentRuntimeCommand`. (#501, #510)
+- **Agent and MCP runtime sessions are bound to their owner.** New session ids carry a
+  prefix derived from the signed-in user (`shared/session_owner.py`), the agent and the MCP
+  server admit such an id only for that user, and each runtime process serves one user. On
+  `/ws` the agent checks the owner on every message. Earlier ids are admitted when Memory
+  holds the user's history for them. Local mode is unchanged. (#506, #510)
+- **Narrower execution roles.** The agent role loses deck storage access, is limited to its
+  own Memory and image repository, and denies user-id delegation and calls through
+  AWS-managed MCP servers. Both runtime roles trust AgentCore only for the deploying
+  account and Region; the MCP role drops unused permissions; the API Lambda's `ListEvents`
+  is limited to the agent's Memory. (#499)
+- **The agent's AWS knowledge tools are limited to documentation tools**
+  (`aws___search_documentation`, `aws___read_documentation`, `aws___retrieve_skill`,
+  `aws___list_regions`, `aws___get_regional_availability`) on the public AWS Knowledge MCP
+  Server. The `mcp-proxy-for-aws` dependency is removed. (#499)
+- **The agent accepts `prompt` as text only**; anything else gets a `bad_input` error.
+  (#499)
+- **User ids stay out of agent context and other users' responses.** Cloud upload handles
+  are `uploads/{uuid}/{name}`, and the MCP server builds the S3 key from the signed-in
+  caller. The earlier form is accepted for the caller's own uploads until the first minor
+  release 90 days after this one. Deck lists no longer return `createdBy`, `GET /decks/{id}`
+  returns `chatSessionId` to the owner only, and `run_style_python` no longer returns the
+  S3 key. (#495)
+- **Composers see only their deck tools**, as the orchestrator already did. (#495)
+- **Local Web UI refuses cross-site POSTs.** Every POST route of the local server answers
+  403 when the browser's `Origin` is another site; requests without `Origin` (scripts,
+  curl) are unaffected. (#473)
 - **Model request and response bodies are no longer written to the runtime logs, and the
-  runtime log groups expire.** `aws-opentelemetry-distro` turns on
-  `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT` when AgentCore observability is on, so
-  the botocore Bedrock instrumentation wrote every model request and response body to the
-  `otel-rt-logs` stream of the runtime log groups. Both runtimes now set it to `false`. Token
-  counts on the spans and the `bedrock_usage` / `slides_composed` / `slides_built` events of
-  [Usage measurement](docs/en/usage-measurement.md) are unchanged. The log groups AgentCore
-  creates for the runtimes (`/aws/bedrock-agentcore/runtimes/<runtime-id>-DEFAULT`) had no
-  retention period; the stacks now set it, also on groups that already exist, from the new
-  `observability.logRetentionDays` in `infra/config.yaml` (default 30 days; an invalid value
-  fails the synth). Log data older than the period is removed by CloudWatch Logs after the
-  deploy. The stacks never delete these log groups. The Strands tracer still records
-  conversation text in the agent runtime log group, now kept for that period.
+  runtime log groups expire.** Both runtimes set
+  `OTEL_INSTRUMENTATION_GENAI_CAPTURE_MESSAGE_CONTENT=false`; token counts and the
+  [usage measurement](docs/en/usage-measurement.md) events are unchanged. The runtime log
+  groups get the retention in `observability.logRetentionDays` (default 30 days). The
+  Strands tracer still records conversation text in the agent runtime log group. (#507)
 
 ## [0.11.0] - 2026-10-31
 
@@ -1733,7 +1497,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.4...v0.11.0
 [0.10.4]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.3...v0.10.4
 [0.10.3]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.2...v0.10.3
