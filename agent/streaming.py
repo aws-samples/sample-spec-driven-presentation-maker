@@ -30,7 +30,7 @@ def _task_id(ack: str) -> str:
 async def stream_agent(
     agent: Agent, user_query: str | None, session_id: str, cancel: asyncio.Event, cancel_signal: threading.Event,
     tool_stop: threading.Event | None = None,
-    background_tools: frozenset[str] = frozenset(background.BACKGROUND_TOOLS),
+    background_tools: frozenset[str] | None = None,
 ) -> AsyncGenerator:
     """Stream agent responses as SSE events with keepalive and safe cancellation.
 
@@ -50,11 +50,15 @@ async def stream_agent(
             background compose dispatched by this turn still sees a stop after it ended.
         background_tools: Tools that run as background tasks: their dispatch notice is
             yielded as ``{"taskStart": {toolUseId, name, taskId}}`` instead of a toolResult
-            (an error result stays a toolResult).
+            (an error result stays a toolResult). By default background.BACKGROUND_TOOLS
+            when the Agent runs background tasks, else none.
 
     Yields:
         SSE event dicts.
     """
+    if background_tools is None:
+        background_tools = (frozenset(background.BACKGROUND_TOOLS)
+                            if background.MANAGE_TOOL in agent.tool_names else frozenset())
     last_tool_use = None
     last_tool_use_id = ""
     last_yielded_input: dict = {}  # track fully-parsed input we've already sent
