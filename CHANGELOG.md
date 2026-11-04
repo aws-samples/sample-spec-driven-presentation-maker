@@ -27,6 +27,20 @@ Entries before v0.5.0 were written retroactively as summaries.
   cancels; only the stop button (`cancel`), the watchdog and SIGTERM stop a turn. `prepare`
   builds the session early without writing to Memory. Known limitation: while a synchronous
   `compose_slides` runs, a steer reaches the orchestrator only after it returns.
+- **Send any time, stop, and come back to a running session (Web UI, Cloud).** The Web UI
+  talks to its session over the agent's `/ws` WebSocket (one connection per work period,
+  closed when the session goes idle; a 30-second ping only while it works). The send button
+  stays enabled while the agent works: a message sent then is a steer, shown in the chat
+  where the agent accepted it, with the reply continuing below it; a steer a stop discarded
+  is marked as not delivered, and a reloaded chat shows steers where they reached the agent.
+  Stop sends `cancel` and shows the session stopped within 2 seconds of the acknowledgement;
+  without an acknowledgement in 3 seconds it falls back to StopRuntimeSession. Opening the
+  deck again, reloading the page or waking the computer while the session works reconnects
+  and replays what was missed, then follows the work live (the last known state is kept in
+  `localStorage`, and only a session last seen working is reconnected); when the session's
+  process is gone, the chat shows the Memory history as before. The new deck screen sends
+  `prepare` once when it opens, so the first prompt finds the session built. Local mode is
+  unchanged.
 
 - **Sign-up settings for the default Cognito user pool.** `auth.selfSignUp` in
   `infra/config.yaml` turns self sign-up on, and `auth.allowedEmailDomains` limits it to the
