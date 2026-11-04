@@ -404,6 +404,7 @@ class PPTXBuilder(
         return slide
 
     def save(self, output_path: Path):
+        _declare_notes_master(self.prs)
         self.prs.save(str(output_path))
 
 
@@ -457,3 +458,27 @@ def validate_icons_in_json(data: dict) -> list:
         check_elements(slide.get("elements", []))
 
     return list(set(missing))
+
+
+def _declare_notes_master(prs) -> None:
+    """List the notes master in presentation.xml when python-pptx left it out.
+
+    The first ``slide.notes_slide`` makes python-pptx create a notes master and
+    relate it to the presentation part, but it does not add
+    ``<p:notesMasterIdLst>`` to presentation.xml. PowerPoint repairs that silently;
+    Keynote rejects the file ("the file format is invalid") and Quick Look hangs on
+    it. The element goes right after ``<p:sldMasterIdLst>``, as the schema orders it.
+    """
+    from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+    from pptx.oxml.ns import qn
+
+    pres = prs.part._element
+    if pres.find(qn("p:notesMasterIdLst")) is not None:
+        return
+    rId = next((rel.rId for rel in prs.part.rels.values() if rel.reltype == RT.NOTES_MASTER), None)
+    if rId is None:
+        return
+    lst = pres.makeelement(qn("p:notesMasterIdLst"), {})
+    entry = lst.makeelement(qn("p:notesMasterId"), {qn("r:id"): rId})
+    lst.append(entry)
+    pres.find(qn("p:sldMasterIdLst")).addnext(lst)

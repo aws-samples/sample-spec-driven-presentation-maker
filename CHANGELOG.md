@@ -276,6 +276,15 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Fixed
 
+- **Deploying `SdpmAuth` no longer removes the `sdpm-mcp/invoke` scope from the Web UI's
+  Cognito app client.** The scope was added by a custom resource in `SdpmWebUi` that called
+  `UpdateUserPoolClient` with a fixed payload. The `SdpmAuth` template did not declare the
+  scope, so an update of the client there dropped it, and the agent's calls to the MCP
+  runtime failed with 401. `AuthStack` now declares the scope and the explicit auth flows
+  on the client. The `SdpmWebUi` custom resource sets only the callback/logout URLs: it
+  reads the client and writes every other field back unchanged. The client is updated in
+  place (same client ID, no user pool change).
+
 - **Stopping a Cloud turn no longer lets its in-flight tool calls change the deck
   afterwards.** A tool call the agent had already sent kept running on the MCP runtime and
   wrote to S3 after the stop (on dev: `run_python` saved 4 slides 1.7 s after a cancel, and
