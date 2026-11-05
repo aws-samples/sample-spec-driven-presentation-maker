@@ -6,22 +6,6 @@ description: "AWS-specific design conventions — read when building AWS service
 
 Design guide for AWS architecture diagrams and AWS service introduction slides.
 
-## Color Palette (AWS default template)
-
-| Name | Color | Usage |
-|------|-------|-------|
-| - | #232F3E | AWS Dark Blue |
-| - | #FF9900 | AWS Orange |
-| - | #00A1C9 | Cyan |
-| - | #3F8624 | Green |
-| - | #D13212 | Red |
-| accent1 | #41B3FF | Light blue |
-| accent2 | #AD5CFF | Purple |
-| accent3 | #00E500 | Green |
-| accent4 | #FF5C85 | Pink |
-| accent5 | #FF693C | Orange |
-| accent6 | #FBD332 | Yellow |
-
 ## Icon selection
 
 - General concepts → `search-assets --type general`
