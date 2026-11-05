@@ -68,6 +68,8 @@ export interface Message {
   steerState?: "accepted" | "delivered"
   /** Cloud: a composer's report to the orchestrator (`report_to_orchestrator`). */
   composerNote?: ComposerNote
+  /** Local: a notice about the session this reply ran in (lib/local/sessionNotices.ts code). */
+  localNotice?: string
 }
 
 export interface ComposerNote {
@@ -174,6 +176,8 @@ type SessionEvent = {
   turnEnd?: { id?: string }
   steer?: { id?: string; text?: string; state?: string }
   composerNote?: { toolUseId?: string; group?: number; slugs?: string; text?: string }
+  /** Local: the invoke stream's `notice` code. */
+  localNotice?: string
 }
 
 const emptyAssistant = (): Message => ({ role: "assistant", content: "", toolUses: [] })
@@ -399,6 +403,16 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, s
       // A resume run shows every user message: this page's own ones went up in a run before it
       // (the deck opened again in this tab) or are steers kept in `steers`.
       const mine = own && !replayCut
+      // Local: a notice about the session this reply runs in (it comes before any output).
+      if (IS_LOCAL && ev.localNotice) {
+        const code = ev.localNotice
+        setMessages((prev) => {
+          const last = prev[prev.length - 1]
+          if (last?.role !== "assistant") return prev
+          return [...prev.slice(0, -1), { ...last, localNotice: code }]
+        })
+        return
+      }
       if (ev.turn) setTurnActive?.(true)
       else if (ev.turnEnd || ev.work?.state === "idle") setTurnActive?.(false)
       const note = ev.composerNote

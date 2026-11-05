@@ -464,6 +464,8 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
                 onSession?.onEvent?.(event, { own: true });
                 continue;
               }
+              // A notice about this turn's session (lib/local/sessionNotices.ts) goes to the chat as a session event.
+              if (event?.notice?.code) onSession?.onEvent?.({ localNotice: event.notice.code }, { own: true });
             }
             completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
           }

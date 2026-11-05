@@ -2,8 +2,9 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * A Local 409 session conflict is shown as its own translated message instead of the
- * generic "Sorry, something went wrong". A send while the invoke runs is a steer into it,
- * shown where the turn's stream reports it accepted; Stop marks an unread one not delivered.
+ * generic "Sorry, something went wrong". A Local stream's session notice lands on the reply.
+ * A send while the invoke runs is a steer into it, shown where the turn's stream reports it
+ * accepted; Stop marks an unread one not delivered.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -54,6 +55,22 @@ describe("useChatStream session conflicts", () => {
 
   it("keeps the generic message for other failures", async () => {
     expect(await lastReplyAfter(new Error("Local agent error: 500: "))).toBe("Sorry, something went wrong. Please try again.")
+  })
+})
+
+describe("useChatStream local notice", () => {
+  it("puts the stream's notice on the reply it opens", async () => {
+    invokeAgentCore.mockImplementationOnce(async (...args: unknown[]) => {
+      const onStreamUpdate = args[2] as (text: string) => void
+      const onSession = args[11] as { onEvent: (ev: unknown, info: { own: boolean }) => void }
+      onSession.onEvent({ localNotice: "context_not_carried_over" }, { own: true })
+      onStreamUpdate("OK")
+      return "OK"
+    })
+    const { result } = renderHook(() => useChatStream({ sessionId: "K1", mode: "vibe", deckId: "d1" }), { wrapper })
+    await act(async () => { await result.current.sendMessage("hi") })
+    expect(result.current.messages.map((m) => m.role)).toEqual(["user", "assistant"])
+    expect(result.current.messages[1]).toMatchObject({ content: "OK", localNotice: "context_not_carried_over" })
   })
 })
 

@@ -534,21 +534,28 @@ export function terminateProcess(sessionId: string): void {
   ps.child.kill()
 }
 
-/** Get or create a process for a sessionId. Restores context if existingSessionId provided. */
+/**
+ * Get or create a process for a sessionId (the map key). With no live process, spawns one and
+ * restores `kiroSessionId` (default: the key) with session/load; a live process already under
+ * `kiroSessionId` is reused. Either way the process is then registered under both ids.
+ */
 export async function getOrCreateProcess(
   sessionId: string,
   agentName: string = "sdpm-orchestrator",
-  opts: SpawnProcessOptions = {},
+  opts: SpawnProcessOptions & { kiroSessionId?: string } = {},
 ): Promise<ProcessState> {
-  let ps = processes.get(sessionId)
+  const kiroSessionId = opts.kiroSessionId ?? sessionId
+  let ps = processes.get(sessionId) ?? processes.get(kiroSessionId)
   if (ps) {
+    processes.set(sessionId, ps)
     ps.lastActivity = Date.now()
     return ps
   }
   // No live process — spawn new one and restore session context
   await evictIfNeeded()
-  ps = await spawnProcess(agentName, sessionId, opts)
+  ps = await spawnProcess(agentName, kiroSessionId, opts)
   processes.set(sessionId, ps)
+  processes.set(kiroSessionId, ps)
   return ps
 }
 
@@ -698,6 +705,14 @@ export function saveSessionToDeck(deckId: string, sessionId: string): void {
   const dir = resolveDeckDir(deckId)
   if (!dir || !fs.existsSync(dir)) return
   fs.writeFileSync(path.join(dir, ".session"), sessionId, "utf-8")
+}
+
+/** The kiro session id saved in a deck's .session file, or null when the deck has none. */
+export function readSessionFromDeck(deckId: string): string | null {
+  const fs = require("fs") as typeof import("fs")
+  const dir = resolveDeckDir(deckId)
+  if (!dir) return null
+  try { return fs.readFileSync(path.join(dir, ".session"), "utf-8").trim() || null } catch { return null }
 }
 
 /** Save a fork's source metadata to the deck. */
