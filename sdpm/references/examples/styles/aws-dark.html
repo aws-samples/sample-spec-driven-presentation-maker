@@ -82,12 +82,8 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 .c-compute{color:var(--cat-compute);}
 .c-security{color:var(--cat-security);}
 .icon{display:block;width:96px;height:96px;flex:0 0 96px;}
-.icon-frame{width:116px;height:116px;flex:0 0 116px;display:flex;align-items:center;justify-content:center;border:2px solid var(--color-border);border-radius:50%;background:var(--color-bg);}
+.icon-frame{width:116px;height:116px;flex:0 0 116px;display:flex;align-items:center;justify-content:center;}
 .icon-frame .icon{width:78px;height:78px;flex-basis:78px;}
-.frame-analytics{background:var(--cat-analytics-tint);border-color:var(--cat-analytics);}
-.frame-integration{background:var(--cat-integration-tint);border-color:var(--cat-integration);}
-.frame-storage{background:var(--cat-storage-tint);border-color:var(--cat-storage);}
-.frame-compute{background:var(--cat-compute-tint);border-color:var(--cat-compute);}
 .hero-icon{display:flex;align-items:center;justify-content:center;}
 .hero-icon .icon{width:160px;height:160px;flex-basis:160px;}
 .icon-label{display:flex;align-items:center;gap:24px;}
@@ -113,8 +109,8 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 
 <!-- Part: Cover -->
 <div class="slide">
-<!-- Component: icon (.icon-frame .icon) — official AWS asset on a category-tint circle with matching border so the backing encodes service family; may vary: asset/category/78–160px; may not: recolour, detach identity, mix families, or flank prose. -->
-<div class="el icon-frame frame-analytics hero-icon" style="left:1400px;top:360px;width:320px;height:320px"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div>
+<!-- Component: icon (.icon-frame .icon) — official AWS asset standing alone on the slide ground or the node surface; its own category-colour square encodes service family, so nothing sits behind it; may vary: asset/category/78–160px; may not: recolour, add a backing shape, detach identity, mix families, or flank prose. -->
+<div class="el icon-frame hero-icon" style="left:1400px;top:360px;width:320px;height:320px"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div>
 <!-- Component: tag (.t-label) — metadata; may vary: wording/colour; may not: encode status or detach from its service. -->
 <div class="el t-label muted" style="left:112px;top:300px;width:900px;height:34px">Bundled presentation style</div>
 <div class="el t-cover" style="left:112px;top:360px;width:1080px;height:240px">AWS architecture,<br>made legible</div>
@@ -126,12 +122,12 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <!-- Frame: content — x112–1808. Title y56–144: --fs-slide-title, white, bold, ONE line, a topic noun phrase (section or subject, e.g. "Pattern — comparison"). Lead y152–300: --fs-lead (title − 6pt), --color-lead amber, bold, the slide's finding as one sentence, TWO lines max; a one-line lead leaves the second line empty, content never moves up. Content y340–930; source y970. The lead is frame, not emphasis: it does not count toward the one orange selection. may vary: wording; may not: move the claim into the title, drop the lead, exceed 1 / 2 lines, or recolour the lead. -->
 <div class="slide">
 <div class="el t-title" style="left:112px;top:56px;width:1696px;height:88px">Rules — Identity</div>
-<div class="el t-lead" style="left:112px;top:152px;width:1696px;height:148px">Category colour frames the service it identifies</div>
-<!-- Component: container (.surface-text) — compact proof; may vary: size/content; may not: repeat as chrome or hold unframed service icons. -->
-<div class="el surface-text" style="left:112px;top:340px;width:760px;height:250px"><div class="t-heading c-analytics">Use colour on identity frames</div><div class="t-caption">Border, header, legend, or category label.</div></div>
-<div class="el surface-text" style="left:1048px;top:340px;width:760px;height:250px"><div class="t-heading">Use tint inside the frame</div><div class="t-caption muted">Pair tint with the matching category border.</div></div>
+<div class="el t-lead" style="left:112px;top:152px;width:1696px;height:148px">Category colour marks the service it identifies</div>
+<!-- Component: container (.surface-text) — compact proof; may vary: size/content; may not: repeat as chrome or hold service icons. -->
+<div class="el surface-text" style="left:112px;top:340px;width:760px;height:250px"><div class="t-heading c-analytics">Use full colour for identity</div><div class="t-caption">Border, header, legend, or category label.</div></div>
+<div class="el surface-text" style="left:1048px;top:340px;width:760px;height:250px"><div class="t-heading">Use tint for groups</div><div class="t-caption muted">Pair tint with the matching category border.</div></div>
 <div class="el t-heading" style="left:112px;top:690px;width:760px;height:90px">Keep category colour attached to identity</div>
-<div class="el t-body muted" style="left:112px;top:810px;width:1480px;height:100px">A category frame stays with its label.</div>
+<div class="el t-body muted" style="left:112px;top:810px;width:1480px;height:100px">A category label sits beside its icon.</div>
 </div>
 
 <div class="slide">
@@ -186,9 +182,9 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 </div>
 
 <!-- Part: Patterns -->
-<!-- Frame: divider — label y300, title question, and category-framed service icon; may vary: wording/category; may not: add evidence, tracker, or page number. -->
+<!-- Frame: divider — label y300, title question, and one 160px service icon; may vary: wording/category; may not: add evidence, tracker, or page number. -->
 <div class="slide">
-<div class="el icon-frame frame-integration hero-icon" style="left:1400px;top:360px;width:320px;height:320px"><svg class="icon"><use href="#aws/Arch_Amazon-EventBridge_48"/></svg></div>
+<div class="el icon-frame hero-icon" style="left:1400px;top:360px;width:320px;height:320px"><svg class="icon"><use href="#aws/Arch_Amazon-EventBridge_48"/></svg></div>
 <div class="el t-label muted" style="left:112px;top:300px;width:700px;height:34px">Patterns / technical evidence</div>
 <div class="el t-cover" style="left:112px;top:370px;width:1080px;height:220px">How does the claim<br>choose the layout?</div>
 <div class="el t-body muted" style="left:112px;top:680px;width:1050px;height:120px">Every following slide demonstrates the pattern it explains.</div>
@@ -215,7 +211,7 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <div class="slide">
 <div class="el t-title" style="left:112px;top:56px;width:1696px;height:88px">Pattern — Columns</div>
 <div class="el t-lead" style="left:112px;top:152px;width:1696px;height:148px">Equal icon-led columns make service roles scannable</div>
-<div class="el columns" style="left:112px;top:350px;width:1696px;height:430px"><div class="column"><div class="icon-label"><div class="icon-frame frame-analytics"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div><div><div class="t-label c-analytics">Networking</div><div class="t-heading">API gateway</div></div></div><div class="t-caption muted">Receives governed requests</div></div><div class="column"><div class="icon-label"><div class="icon-frame frame-compute"><svg class="icon"><use href="#aws/Arch_AWS-Lambda_48"/></svg></div><div><div class="t-label c-compute">Compute</div><div class="t-heading">Function</div></div></div><div class="t-caption muted">Runs one bounded task</div></div><div class="column"><div class="icon-label"><div class="icon-frame frame-storage"><svg class="icon"><use href="#aws/Arch_Amazon-Simple-Storage-Service_48"/></svg></div><div><div class="t-label c-storage">Storage</div><div class="t-heading">Object store</div></div></div><div class="t-caption muted">Retains durable output</div></div></div>
+<div class="el columns" style="left:112px;top:350px;width:1696px;height:430px"><div class="column"><div class="icon-label"><div class="icon-frame"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div><div><div class="t-label c-analytics">Networking</div><div class="t-heading">API gateway</div></div></div><div class="t-caption muted">Receives governed requests</div></div><div class="column"><div class="icon-label"><div class="icon-frame"><svg class="icon"><use href="#aws/Arch_AWS-Lambda_48"/></svg></div><div><div class="t-label c-compute">Compute</div><div class="t-heading">Function</div></div></div><div class="t-caption muted">Runs one bounded task</div></div><div class="column"><div class="icon-label"><div class="icon-frame"><svg class="icon"><use href="#aws/Arch_Amazon-Simple-Storage-Service_48"/></svg></div><div><div class="t-label c-storage">Storage</div><div class="t-heading">Object store</div></div></div><div class="t-caption muted">Retains durable output</div></div></div>
 <div class="el takeaway t-heading" style="left:112px;top:870px;width:1696px;height:100px">One icon and one short label define each role.</div>
 </div>
 
@@ -223,15 +219,15 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <div class="slide">
 <div class="el t-title" style="left:112px;top:56px;width:1696px;height:88px">Pattern — Process</div>
 <div class="el t-lead" style="left:112px;top:152px;width:1696px;height:148px">One orange step locates the current handoff</div>
-<!-- Component: step (.step) — category-framed icon, verb, and category; may vary: 3–6 stages; may not: vary peer size or category-code status. -->
-<div class="el step accent-outline" style="left:112px;top:345px;width:340px;height:445px"><div class="icon-frame frame-analytics"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div><div class="t-heading">1 · Receive</div><div class="t-label c-analytics">Networking</div></div>
+<!-- Component: step (.step) — service icon, verb, and category label; may vary: 3–6 stages; may not: vary peer size or category-code status. -->
+<div class="el step accent-outline" style="left:112px;top:345px;width:340px;height:445px"><div class="icon-frame"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div><div class="t-heading">1 · Receive</div><div class="t-label c-analytics">Networking</div></div>
 <!-- Component: connector (.connector) — neutral handoff; may vary: route; may not: use category colour/cross nodes. -->
 <div class="el connector" style="left:452px;top:560px;width:112px;height:4px"></div>
-<div class="el step" style="left:564px;top:345px;width:340px;height:445px"><div class="icon-frame frame-integration"><svg class="icon"><use href="#aws/Arch_Amazon-EventBridge_48"/></svg></div><div class="t-heading">2 · Route</div><div class="t-label c-integration">Integration</div></div>
+<div class="el step" style="left:564px;top:345px;width:340px;height:445px"><div class="icon-frame"><svg class="icon"><use href="#aws/Arch_Amazon-EventBridge_48"/></svg></div><div class="t-heading">2 · Route</div><div class="t-label c-integration">Integration</div></div>
 <div class="el connector" style="left:904px;top:560px;width:112px;height:4px"></div>
-<div class="el step" style="left:1016px;top:345px;width:340px;height:445px"><div class="icon-frame frame-compute"><svg class="icon"><use href="#aws/Arch_AWS-Lambda_48"/></svg></div><div class="t-heading">3 · Process</div><div class="t-label c-compute">Compute</div></div>
+<div class="el step" style="left:1016px;top:345px;width:340px;height:445px"><div class="icon-frame"><svg class="icon"><use href="#aws/Arch_AWS-Lambda_48"/></svg></div><div class="t-heading">3 · Process</div><div class="t-label c-compute">Compute</div></div>
 <div class="el connector" style="left:1356px;top:560px;width:112px;height:4px"></div>
-<div class="el step" style="left:1468px;top:345px;width:340px;height:445px"><div class="icon-frame frame-storage"><svg class="icon"><use href="#aws/Arch_Amazon-Simple-Storage-Service_48"/></svg></div><div class="t-heading">4 · Retain</div><div class="t-label c-storage">Storage</div></div>
+<div class="el step" style="left:1468px;top:345px;width:340px;height:445px"><div class="icon-frame"><svg class="icon"><use href="#aws/Arch_Amazon-Simple-Storage-Service_48"/></svg></div><div class="t-heading">4 · Retain</div><div class="t-label c-storage">Storage</div></div>
 <div class="el takeaway t-heading" style="left:112px;top:875px;width:1696px;height:95px">Write stages as verbs and keep icons on one baseline.</div>
 </div>
 
@@ -266,11 +262,11 @@ body{margin:0;padding:40px;background:var(--gallery-bg);font-family:var(--font-f
 <div class="el t-title" style="left:112px;top:56px;width:1696px;height:88px">Pattern — Diagram / Hub</div>
 <div class="el t-lead" style="left:112px;top:152px;width:1696px;height:148px">A central event bus decouples intake, compute, and archive</div>
 <div class="el" style="left:112px;top:340px;width:1696px;height:580px"><svg class="hub-lines" viewBox="0 0 1696 580" width="1696" height="580" aria-label="Three visible orthogonal routes into and out of an event bus"><defs><marker markerWidth="12" markerHeight="12" refX="10" refY="5" orient="auto" markerUnits="strokeWidth"><path d="M0,0 L10,5 L0,10 z" fill="#8FADD0"/></marker></defs><path d="M340 120 H500 V250 H632" marker-end="url(#route-arrow)"/><path d="M632 330 H500 V480 H340" marker-end="url(#route-arrow)"/><path d="M1064 300 H1356" marker-end="url(#route-arrow)"/></svg></div>
-<div class="el icon-node group cat-analytics" style="left:112px;top:360px;width:340px;height:200px"><div class="icon-frame frame-analytics"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div><div><div class="t-heading">API gateway</div><div class="t-label c-analytics">Intake</div></div></div>
-<div class="el icon-node group cat-storage" style="left:112px;top:720px;width:340px;height:200px"><div class="icon-frame frame-storage"><svg class="icon"><use href="#aws/Arch_Amazon-Simple-Storage-Service_48"/></svg></div><div><div class="t-heading">Object store</div><div class="t-label c-storage">Archive</div></div></div>
-<!-- Component: hub (.icon-node) — category-framed coordinator with visible spokes; may vary: satellites/labels; may not: hide routes, mix direction, or lose the selected outline. -->
-<div class="el icon-node accent-outline" style="left:744px;top:525px;width:432px;height:230px"><div class="icon-frame frame-integration"><svg class="icon"><use href="#aws/Arch_Amazon-EventBridge_48"/></svg></div><div><div class="t-heading">Event bus</div><div class="t-label c-integration">Route once</div></div></div>
-<div class="el icon-node group cat-compute" style="left:1468px;top:540px;width:340px;height:200px"><div class="icon-frame frame-compute"><svg class="icon"><use href="#aws/Arch_AWS-Lambda_48"/></svg></div><div><div class="t-heading">Function</div><div class="t-label c-compute">Process</div></div></div>
+<div class="el icon-node group cat-analytics" style="left:112px;top:360px;width:340px;height:200px"><div class="icon-frame"><svg class="icon"><use href="#aws/Arch_Amazon-API-Gateway_48"/></svg></div><div><div class="t-heading">API gateway</div><div class="t-label c-analytics">Intake</div></div></div>
+<div class="el icon-node group cat-storage" style="left:112px;top:720px;width:340px;height:200px"><div class="icon-frame"><svg class="icon"><use href="#aws/Arch_Amazon-Simple-Storage-Service_48"/></svg></div><div><div class="t-heading">Object store</div><div class="t-label c-storage">Archive</div></div></div>
+<!-- Component: hub (.icon-node) — selected coordinator with its service icon and visible spokes; may vary: satellites/labels; may not: hide routes, mix direction, or lose the selected outline. -->
+<div class="el icon-node accent-outline" style="left:744px;top:525px;width:432px;height:230px"><div class="icon-frame"><svg class="icon"><use href="#aws/Arch_Amazon-EventBridge_48"/></svg></div><div><div class="t-heading">Event bus</div><div class="t-label c-integration">Route once</div></div></div>
+<div class="el icon-node group cat-compute" style="left:1468px;top:540px;width:340px;height:200px"><div class="icon-frame"><svg class="icon"><use href="#aws/Arch_AWS-Lambda_48"/></svg></div><div><div class="t-heading">Function</div><div class="t-label c-compute">Process</div></div></div>
 <div class="el route-label t-label muted" style="left:475px;top:425px;width:150px;height:34px">Requests</div>
 <div class="el route-label t-label muted" style="left:475px;top:785px;width:150px;height:34px">Events</div>
 <div class="el route-label t-label muted" style="left:1250px;top:610px;width:150px;height:34px">Fan out</div>
