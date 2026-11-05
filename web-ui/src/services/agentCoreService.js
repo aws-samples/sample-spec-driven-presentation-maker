@@ -73,7 +73,7 @@ export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
 export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId, continuedFrom, translateError, onSession) => {
   // Local mode: proxy through Next.js API Route → kiro-cli acp
   if (IS_LOCAL) {
-    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom);
+    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom, onSession);
   }
 
   if (!userId) {
@@ -408,7 +408,7 @@ export const generateSessionId = (sub) => {
  * Reads SSE stream from /api/agent/invoke and feeds events through the same
  * strandsParser used by the cloud path, so ChatPanel works unchanged.
  */
-const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom) => {
+const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom, onSession) => {
   const response = await fetch('/api/agent/invoke', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -458,6 +458,8 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
                 if (event.code) error.code = event.code;
                 throw error;
               }
+              // A notice about this turn's session (lib/local/sessionNotices.ts) goes to the chat as a session event.
+              if (event?.notice?.code) onSession?.onEvent?.({ localNotice: event.notice.code }, { own: true });
             }
             completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
           }

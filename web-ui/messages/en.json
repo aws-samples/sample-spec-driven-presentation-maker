@@ -277,6 +277,7 @@
     "localRefusal": "The model declined to answer this request. Rephrase it and send again.",
     "localMaxTokens": "The response hit the model's output limit. Ask for a smaller step and send again.",
     "localMaxTurnRequests": "The agent reached its step limit for one turn. Send a message to let it continue.",
+    "localContextNotCarriedOver": "This deck has no Kiro session to continue, so a new one started. The agent does not have the earlier conversation.",
     "errorStopGeneration": "Failed to stop generation",
     "errorSessionReloadRequired": "This page is out of date. Reload the page, then send again.",
     "steerNotDelivered": "Not delivered: the agent stopped before it read this message.",

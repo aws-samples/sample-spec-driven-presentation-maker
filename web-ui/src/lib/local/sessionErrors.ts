@@ -27,6 +27,16 @@ export class SessionBusyError extends Error {
 /** kiro-cli's session/load error while another live process holds the session lock. */
 const SESSION_LOCKED_MARKER = "Session is active in another process"
 
+/**
+ * kiro-cli's session/load error for a session it does not have (V2). V3 answers such a load by
+ * creating an empty session under that id, so for V3 only a missing `.session` is detectable.
+ */
+const SESSION_NOT_FOUND_MARKER = "Session not found"
+
+export function isSessionNotFound(error: unknown): boolean {
+  return error instanceof Error && error.message.includes(SESSION_NOT_FOUND_MARKER)
+}
+
 /** Map a spawn/load/prompt failure to a 409 body, or null when it is not a session conflict. */
 export function sessionConflict(error: unknown): SessionConflict | null {
   if (error instanceof SessionBusyError) {

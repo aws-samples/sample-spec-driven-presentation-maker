@@ -5,6 +5,7 @@
  * A session conflict (turn still running, or the session locked by another
  * kiro-cli process) is answered with 409 and a SessionConflict body; a kiro-cli
  * that does not answer its setup requests in time with 504 and code `agent_timeout`.
+ * A reopened deck without a kiro session to load gets a new one (lib/local/sessionNotices.ts).
  */
 import {
   sendPrompt,
@@ -12,6 +13,7 @@ import {
   hasProcess,
   getOrCreateProcess,
   pendingOrigins,
+  readSessionFromDeck,
   saveOriginToDeck,
   saveSessionToDeck,
 } from "@/lib/local/acp-process"
@@ -19,7 +21,8 @@ import { createSSEStream } from "@/lib/local/sse-bridge"
 import { withContinuedFrom, withInteractionMode } from "@/lib/local/interaction-mode"
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
-import { sessionConflict } from "@/lib/local/sessionErrors"
+import { isSessionNotFound, sessionConflict } from "@/lib/local/sessionErrors"
+import type { LocalSessionNoticeCode } from "@/lib/local/sessionNotices"
 import { AgentTimeoutError, localTurnError } from "@/lib/local/turnErrors"
 
 const MODE_TO_AGENT: Record<string, string> = {
@@ -58,6 +61,7 @@ export async function POST(req: Request) {
   }
   const agentName = MODE_TO_AGENT[mode || "spec"] || "sdpm-orchestrator"
   let isFirstPrompt = Boolean(continuedFrom)
+  let notice: LocalSessionNoticeCode | undefined
   if (clientSessionId && continuedFrom) pendingOrigins.set(clientSessionId, continuedFrom)
 
   let prompted: Awaited<ReturnType<typeof sendPrompt>>
@@ -70,8 +74,28 @@ export async function POST(req: Request) {
         // A fork must restore the copied history even if its preloaded process was evicted.
         await getOrCreateProcess(clientSessionId, agentName, { setMode: true, signal })
       } else if (deckId && deckId !== "new") {
-        // Existing deck reopened after evict — restore via session/load
-        await getOrCreateProcess(clientSessionId, agentName, { signal })
+        // Existing deck reopened after evict — restore the kiro session its .session names
+        // (the client may still hold an earlier id for this page, e.g. the deck fallback id).
+        // A deck with no session to load (made by an MCP client or Kiro CLI, or its kiro session
+        // is gone) starts a new one, saved to .session, and the chat says the earlier
+        // conversation is not carried over.
+        const savedSessionId = readSessionFromDeck(deckId)
+        let restored = false
+        if (savedSessionId) {
+          try {
+            await getOrCreateProcess(clientSessionId, agentName, { signal, kiroSessionId: savedSessionId })
+            restored = true
+          } catch (error) {
+            if (!isSessionNotFound(error)) throw error
+            console.warn("[invoke] deck %s: kiro session %s not found, starting a new one", deckId, savedSessionId)
+          }
+        }
+        if (!restored) {
+          const ps = await createNewProcessFor(clientSessionId, agentName, { signal })
+          saveSessionToDeck(deckId, ps.sessionId!)
+          isFirstPrompt = true
+          notice = "context_not_carried_over"
+        }
       } else {
         // Fresh session — spawn new process, register under client's sessionId
         await createNewProcessFor(clientSessionId, agentName, { signal })
@@ -99,6 +123,7 @@ export async function POST(req: Request) {
   const stream = createSSEStream({
     sessionId,
     subscribe,
+    notice,
     onDeckId: (createdDeckId) => {
       saveSessionToDeck(createdDeckId, sessionId)
       const origin = pendingOrigins.get(sessionId)
