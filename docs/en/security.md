@@ -88,22 +88,28 @@ sample cannot set safe defaults for them. Evaluate each one before production us
 
 ### AgentCore runtime platform versions
 
-The MCP runtime runs on `platformVersion` V2 (`infra/lib/runtime-stack.ts`); the agent
-runtime runs on V1. V2 restores every instance from one snapshot taken after startup, so
-whatever the process holds at that point is the same in every instance. The MCP server
-keeps only static data there (imported modules, parsed AWS API definitions, the bundled
-styles and role documents); it builds AWS clients, resolves credentials and opens
-connections on the first request after a restore. Values this stack takes from the kernel
-are not affected: `uuid.uuid4()` and `secrets` read `getrandom(2)` on every call, and SigV4
-signing is HMAC-based and deterministic.
+Both runtimes run on `platformVersion` V2 (`infra/lib/runtime-stack.ts` for the MCP
+runtime, `infra/lib/agent-stack.ts` for the agent runtime). V2 restores every instance from
+one snapshot taken after startup, so whatever the process holds at that point is the same
+in every instance. The MCP server keeps only static data there (imported modules, parsed
+AWS API definitions, the bundled styles and role documents); it builds AWS clients,
+resolves credentials and opens connections on the first request after a restore. The agent
+does the same: its Memory client, MCP connections, Bedrock models and session state are
+built on the first request, and its process owner is bound by that request. Values this
+stack takes from the kernel are not affected: `uuid.uuid4()` and `secrets` read
+`getrandom(2)` on every call, and SigV4 signing is HMAC-based and deterministic. The agent
+also rebinds the `random` module's functions to `random.SystemRandom`
+(`agent/snapshot_random.py`), so OpenTelemetry trace and span ids and retry jitter do not
+repeat across restored instances.
 
-What remains is OpenSSL's own DRBG behind outbound TLS from the MCP runtime: seeded before
+What remains is OpenSSL's own DRBG behind outbound TLS from both runtimes: seeded before
 the snapshot, it starts from the same state in every restored instance. Swapping in a
 snapshot-safe OpenSSL build does not change that, because AgentCore Runtime does not reseed
 those builds after a restore
 ([Optimize for V2](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-v2-optimize.html)).
 This sample accepts the risk. If your organization does not, set `platformVersion` to `"V1"`
-in `infra/lib/runtime-stack.ts`; the MCP server runs on both.
+in `infra/lib/runtime-stack.ts` and `infra/lib/agent-stack.ts`; the MCP server and the agent
+run on both.
 
 ## Local install
 
