@@ -426,7 +426,7 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
     const errorText = await response.text();
     console.error('[invokeLocal] error:', errorText);
     const error = new Error(`Local agent error: ${response.status}: ${errorText}`);
-    // 409 session conflicts carry a stable `code` (lib/local/sessionErrors.ts) the chat UI translates.
+    // 409 session conflicts and the 504 agent_timeout carry a stable `code` (lib/local/sessionErrors.ts, turnErrors.ts) the chat UI translates.
     try { error.code = JSON.parse(errorText).code; } catch { /* non-JSON body */ }
     throw error;
   }
@@ -452,7 +452,12 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
             if (line.startsWith('data: ')) {
               let event;
               try { event = JSON.parse(line.substring(6).trim()); } catch { /* parser handles malformed lines */ }
-              if (event?.status === 'error' && event.error) throw new Error(event.error);
+              if (event?.status === 'error' && event.error) {
+                const error = new Error(event.error);
+                // A turn that ended without an answer carries a stable `code` (lib/local/turnErrors.ts).
+                if (event.code) error.code = event.code;
+                throw error;
+              }
             }
             completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
           }

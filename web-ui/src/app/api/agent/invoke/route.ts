@@ -3,7 +3,8 @@
 /**
  * Local ACP Agent Invoke — sends prompt to sessionId-keyed kiro-cli process.
  * A session conflict (turn still running, or the session locked by another
- * kiro-cli process) is answered with 409 and a SessionConflict body.
+ * kiro-cli process) is answered with 409 and a SessionConflict body; a kiro-cli
+ * that does not answer its setup requests in time with 504 and code `agent_timeout`.
  */
 import {
   sendPrompt,
@@ -19,6 +20,7 @@ import { withContinuedFrom, withInteractionMode } from "@/lib/local/interaction-
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
 import { sessionConflict } from "@/lib/local/sessionErrors"
+import { AgentTimeoutError, localTurnError } from "@/lib/local/turnErrors"
 
 const MODE_TO_AGENT: Record<string, string> = {
   vibe: "sdpm-orchestrator",
@@ -60,17 +62,19 @@ export async function POST(req: Request) {
 
   let prompted: Awaited<ReturnType<typeof sendPrompt>>
   try {
-    // Ensure a process exists for this clientSessionId
+    // Ensure a process exists for this clientSessionId. A client that goes away while
+    // kiro-cli starts (or a kiro-cli that never answers) stops the spawn.
+    const signal = req.signal
     if (clientSessionId && !hasProcess(clientSessionId)) {
       if (continuedFrom) {
         // A fork must restore the copied history even if its preloaded process was evicted.
-        await getOrCreateProcess(clientSessionId, agentName, { setMode: true })
+        await getOrCreateProcess(clientSessionId, agentName, { setMode: true, signal })
       } else if (deckId && deckId !== "new") {
         // Existing deck reopened after evict — restore via session/load
-        await getOrCreateProcess(clientSessionId, agentName)
+        await getOrCreateProcess(clientSessionId, agentName, { signal })
       } else {
         // Fresh session — spawn new process, register under client's sessionId
-        await createNewProcessFor(clientSessionId, agentName)
+        await createNewProcessFor(clientSessionId, agentName, { signal })
         isFirstPrompt = true
       }
     }
@@ -82,6 +86,12 @@ export async function POST(req: Request) {
   } catch (error) {
     const conflict = sessionConflict(error)
     if (conflict) return Response.json(conflict, { status: 409 })
+    if (error instanceof AgentTimeoutError) {
+      console.warn("[invoke] %s", error.message)
+      return Response.json(localTurnError(error.code), { status: 504 })
+    }
+    // The client is gone; nobody reads this answer.
+    if (req.signal.aborted) return new Response(null, { status: 499 })
     throw error
   }
   const { sessionId, subscribe, send } = prompted
