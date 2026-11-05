@@ -31,6 +31,14 @@ global_settings:
         A digest of public code, not a credential.
       expiration: "2027-10-31"
 
+    - rule_id: "SECRET-BASE64-HIGH-ENTROPY-STRING"
+      path: "web-ui/src/test/fixtures/acp/*.jsonl"
+      reason: >
+        Captured kiro-cli ACP output replayed by acp-contract.test.ts. The flagged values
+        are opaque tool-call ids (toolu_bdrk_…) and session UUIDs from a local test run,
+        not credentials.
+      expiration: "2027-11-05"
+
     # --- CFn Custom Resource: urlopen to pre-signed ResponseURL ---
     # Standard pattern for CloudFormation custom resources.
     # The URL is the CFn-provided ResponseURL, not user-controlled.

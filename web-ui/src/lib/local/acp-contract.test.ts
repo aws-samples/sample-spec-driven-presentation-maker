@@ -24,12 +24,12 @@ type Line = Record<string, unknown>
 
 const FIXTURES = path.resolve(__dirname, "../../test/fixtures/acp")
 const ENGINES = {
-  v2: "kiro-3.0.0-v2-turn.jsonl",
-  v3: "kiro-3.0.0-v3-turn.jsonl",
+  v2: path.join(FIXTURES, "kiro-3.0.0-v2-turn.jsonl"),
+  v3: path.join(FIXTURES, "kiro-3.0.0-v3-turn.jsonl"),
 } as const
 
-function readFixture(file: string): Line[] {
-  return fs.readFileSync(path.join(FIXTURES, file), "utf-8").split("\n").filter(Boolean).map((l) => JSON.parse(l))
+function readFixture(fixturePath: string): Line[] {
+  return fs.readFileSync(fixturePath, "utf-8").split("\n").filter(Boolean).map((l) => JSON.parse(l))
 }
 
 const isResponse = (m: Line) => m.id != null && m.method === undefined
