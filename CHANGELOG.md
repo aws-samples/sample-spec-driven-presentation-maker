@@ -10,6 +10,22 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+## [0.12.1] - 2026-11-05
+
+### Changed
+
+- **The bundled `aws-light` and `aws-dark` styles have a new content-slide frame.** Every
+  content slide now pairs a one-line topic title (a noun phrase) with a lead of up to two
+  lines that states the slide's finding, in dark orange (`aws-light`) or amber (`aws-dark`).
+  The section label above the title is gone and content starts lower, at y 350 in
+  `aws-light` and y 340 in `aws-dark`. The lead colour is part of the frame, so each slide
+  still has one orange emphasis. Style names and descriptions are unchanged; decks that
+  already use either style keep their copy in `specs/art-direction.html` until
+  `apply_style` is run again.
+- **The AWS design guide (`guides/aws-design.md`) no longer lists the "AWS default
+  template" colour palette.** No bundled template matches it. Icon selection and the AWS
+  service category colours stay.
+
 ## [0.12.0] - 2026-11-05
 
 The Cloud Web UI now lets you send a message while the agent works, stop it for good,
@@ -1497,7 +1513,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.1...HEAD
+[0.12.1]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.0...v0.12.1
 [0.12.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.4...v0.11.0
 [0.10.4]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.3...v0.10.4
