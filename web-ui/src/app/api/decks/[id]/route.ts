@@ -11,6 +11,7 @@ import fs from "fs"
 import path from "path"
 import { resolveDeckDir, readSlideSize, DECK_ROOT } from "@/lib/local/deck-paths"
 import { readOriginFromDeck } from "@/lib/local/acp-process"
+import { inlineStyleIcons } from "@/lib/local/styleIcons"
 
 function safeRead(p: string): string | null {
   try { return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : null } catch { return null }
@@ -123,7 +124,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   let specs = null
   const brief = safeRead(path.join(specsDir, "brief.md"))
   const outline = safeRead(path.join(specsDir, "outline.md"))
-  const artDirection = safeRead(path.join(specsDir, "art-direction.html")) || safeRead(path.join(specsDir, "art-direction.md"))
+  // The deck's style copy is shown in the Web UI: draw the catalog icons it references
+  const artHtml = safeRead(path.join(specsDir, "art-direction.html"))
+  const artDirection = artHtml ? (await inlineStyleIcons([artHtml]))[0] : safeRead(path.join(specsDir, "art-direction.md"))
   if (brief || outline || artDirection) specs = { brief, outline, artDirection }
 
   const pptxPath = path.join(dp, "output.pptx")

@@ -18,10 +18,12 @@ S3 layout:
                    user-templates/{user_id}/{name}.pptx
   resource bucket  references/examples/styles/{name}.html  (bundled styles)
                    templates/{name}.pptx                    (builtin templates)
+                   assets/{source}/{file}                   (icon catalog)
 """
 
 import json
 import re
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any
 
 from shared.schema import (
@@ -34,6 +36,7 @@ from shared.schema import (
 
 BUILTIN_STYLES_PREFIX = "references/examples/styles/"
 BUILTIN_TEMPLATES_PREFIX = "templates/"
+ASSETS_PREFIX = "assets/"
 
 _STYLE_NAME_RE = re.compile(r"[a-zA-Z0-9_-]+")
 
@@ -136,6 +139,57 @@ def merge_styles(user_styles: list[dict], builtin_styles: list[dict]) -> list[di
     from sdpm.knowledge.reference import merge_style_lists
 
     return merge_style_lists(user_styles, builtin_styles)
+
+
+# ---------------------------------------------------------------------------
+# Icon catalog
+# ---------------------------------------------------------------------------
+
+# (resource bucket, icon id) -> SVG bytes, or None when the catalog has no such icon.
+# The catalog is static between deploys, so hits and misses live for the container.
+_icon_cache: dict[tuple[str, str], bytes | None] = {}
+_ICON_CACHE_MAX = 1024
+_MISSING_CODES = {"NoSuchKey", "404", "NotFound"}
+
+
+def _is_missing(exc: Exception) -> bool:
+    if isinstance(exc, KeyError):
+        return True
+    code = getattr(exc, "response", {}).get("Error", {}).get("Code")
+    return code in _MISSING_CODES
+
+
+def load_catalog_icons(s3: Any, resource_bucket: str, ids: Any) -> dict[str, bytes]:
+    """Read catalog icons ``assets/<source>/<name>.svg`` from the resource bucket.
+
+    The loader for :func:`sdpm.knowledge.assets.style_icons.inline_style_icons_many`.
+    Malformed ids are never queried. Missing icons are left out of the result.
+    """
+    from sdpm.knowledge.assets.style_icons import is_icon_id
+
+    wanted = sorted({i for i in ids if isinstance(i, str) and is_icon_id(i)})
+    pending = [i for i in wanted if (resource_bucket, i) not in _icon_cache]
+    if pending:
+        if len(_icon_cache) + len(pending) > _ICON_CACHE_MAX:
+            _icon_cache.clear()
+
+        def fetch(icon_id: str) -> None:
+            try:
+                body = s3.get_object(Bucket=resource_bucket, Key=f"{ASSETS_PREFIX}{icon_id}.svg")["Body"].read()
+            except Exception as exc:  # noqa: BLE001 — a failed icon is drawn as missing
+                if _is_missing(exc):
+                    _icon_cache[(resource_bucket, icon_id)] = None
+                return
+            _icon_cache[(resource_bucket, icon_id)] = body
+
+        with ThreadPoolExecutor(max_workers=8) as pool:
+            list(pool.map(fetch, pending))
+    found: dict[str, bytes] = {}
+    for icon_id in wanted:
+        body = _icon_cache.get((resource_bucket, icon_id))
+        if body is not None:
+            found[icon_id] = body
+    return found
 
 
 # ---------------------------------------------------------------------------

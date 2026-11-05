@@ -484,21 +484,37 @@ export async function fetchStyles(idToken: string): Promise<StyleEntry[]> {
   })) as StyleEntry[]
 }
 
+async function fetchStyleDetail(name: string, idToken: string): Promise<{ fullHtml?: string; html?: string } | null> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}styles/${encodeURIComponent(name)}`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  if (!res.ok) return null
+  return res.json()
+}
+
 /**
- * Fetch full HTML for a single style.
+ * Fetch the stored HTML of a single style (Export / Copy): icons stay references.
  *
  * @param name - Style name
  * @param idToken - Cognito ID token for API Gateway authorization
  * @returns Full HTML string, or empty string on error
  */
 export async function fetchStyleHtml(name: string, idToken: string): Promise<string> {
-  const base = await getApiBaseUrl()
-  const res = await fetch(`${base}styles/${encodeURIComponent(name)}`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  })
-  if (!res.ok) return ""
-  const data = await res.json()
-  return data.fullHtml || ""
+  const data = await fetchStyleDetail(name, idToken)
+  return data?.fullHtml || ""
+}
+
+/**
+ * Fetch the display HTML of a single style: the catalog icons it references, drawn in.
+ *
+ * @param name - Style name
+ * @param idToken - Cognito ID token for API Gateway authorization
+ * @returns Display HTML (the stored HTML from an API without `html`), or empty string on error
+ */
+export async function fetchStylePreviewHtml(name: string, idToken: string): Promise<string> {
+  const data = await fetchStyleDetail(name, idToken)
+  return data?.html || data?.fullHtml || ""
 }
 
 

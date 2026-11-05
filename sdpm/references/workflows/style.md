@@ -168,13 +168,11 @@ The demo slides are read as coordinates, so the format is constrained:
   `--fs-slide-title` (40pt → 192 px), and `--content-top` sits below it. One-line titles leave
   the second line empty; content never moves up to fill it.
 - No emoji anywhere — the PPTX renderer has no emoji fonts. Icons come from `search_assets`.
-- Icons are inline SVG, because the gallery renders the file on its own (relative asset paths do
-  not resolve there). One line directly after `<body>` holds the symbols the file uses —
-  `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/hub" viewBox="0 -960 960 960"><path d="…"/></symbol>…</svg>` —
-  with each `id` the `search_assets` name, `<source>/<name>`, and the path copied from that
-  asset, so the JSON `src` is `assets:` + the id. Draw one with
-  `<svg class="icon"><use href="#material/hub"/></svg>`; its colour is `fill` from a token (the
-  JSON `iconColor`). Multi-colour service icons (`aws/…`) keep their own colours.
+- Icons are references to the asset catalog. Draw one with
+  `<svg class="icon"><use href="#<source>/<name>"/></svg>`, the id being the `search_assets`
+  name, so the JSON `src` is `assets:` + the id. The file holds only these references; the
+  gallery and the Web UI draw each shape from the catalog. Its colour is `fill` from a token
+  (the JSON `iconColor`). Multi-colour service icons (`aws/…`) keep their own colours.
 
 ## Writing the rules
 

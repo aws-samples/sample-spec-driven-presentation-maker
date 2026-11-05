@@ -74,6 +74,29 @@ def _get_description(path: Path) -> str:
     return ""
 
 
+def _gallery_display_copies(
+    styles: list[tuple[str, str, Path]], copies_dir: Path,
+) -> list[tuple[str, str, Path]]:
+    """Point styles that reference catalog icons at display copies with the icons drawn in.
+
+    A style with nothing to draw keeps its own file, so its relative resources resolve.
+    """
+    from sdpm.knowledge.assets.style_icons import inline_style_icons_many
+
+    sources = [path.read_text(encoding="utf-8") for _, _, path in styles]
+    shown = inline_style_icons_many(sources)
+    copies_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for stale in copies_dir.glob("*.html"):
+        stale.unlink()
+    out = []
+    for (name, subtitle, path), source, html in zip(styles, sources, shown):
+        if html != source:
+            path = copies_dir / f"{name}.html"
+            path.write_text(html, encoding="utf-8")
+        out.append((name, subtitle, path.resolve()))
+    return out
+
+
 def generate_styles_index(styles_dirs: list[Path]) -> Path:
     """Generate an index HTML with sidebar + iframe preview for style HTMLs.
 
@@ -106,6 +129,7 @@ def generate_styles_index(styles_dirs: list[Path]) -> Path:
     if not styles:
         return Path()
 
+    styles = _gallery_display_copies(styles, Path(tempfile.gettempdir()) / "sdpm-styles-gallery")
     first_src = styles[0][2].as_uri()
 
     items_html = ""

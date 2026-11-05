@@ -9,6 +9,9 @@
  *
  * The split algorithm matches sdpmPaths.ts listStylesFromDir:
  * cut at each `<div class="slide` occurrence; last slide extends to `</body>` or EOF.
+ * Icon sprites before the first slide (`<svg>` with `<symbol>`s — drawn in by the API
+ * from the asset catalog, or embedded by older styles) are the `prelude`, carried into
+ * every per-slide document and the cover so `<use href="#…">` resolves there.
  */
 
 "use client"
@@ -23,7 +26,7 @@ const SLIDE_HEIGHT = 1080
  * Split style HTML into head + individual slide bodies.
  * Returns null if no `.slide` divs are found (fallback path).
  */
-export function splitStyleSlides(html: string): { head: string; slides: string[] } | null {
+export function splitStyleSlides(html: string): { head: string; prelude: string; slides: string[] } | null {
   // Extract <head> content
   const headMatch = html.match(/<head[^>]*>([\s\S]*?)<\/head>/i)
   const head = headMatch ? headMatch[1] : ""
@@ -52,16 +55,23 @@ export function splitStyleSlides(html: string): { head: string; slides: string[]
     slides.push(slice)
   }
 
-  return { head, slides }
+  // Icon sprites between <body> and the first slide
+  const bodyOpen = /<body\b[^>]*>/i.exec(html)
+  const beforeSlides = html.slice(bodyOpen ? bodyOpen.index + bodyOpen[0].length : 0, positions[0])
+  const prelude = (beforeSlides.match(/<svg\b[^>]*>[\s\S]*?<\/svg>/gi) || [])
+    .filter(svg => /<symbol\b/i.test(svg))
+    .join("")
+
+  return { head, prelude, slides }
 }
 
 /** Inject minimal reset into a single-slide HTML document. */
-function prepareSlideDoc(head: string, slideBody: string): string {
+function prepareSlideDoc(head: string, slideBody: string, prelude = ""): string {
   const reset = `<style data-preview-reset>
 html,body{margin:0!important;padding:0!important;zoom:1!important;overflow:hidden!important}
 .slide{margin:0 auto!important}
 </style>`
-  return `<!DOCTYPE html><html><head>${head}${reset}</head><body>${slideBody}</body></html>`
+  return `<!DOCTYPE html><html><head>${head}${reset}</head><body>${prelude}${slideBody}</body></html>`
 }
 
 /**
@@ -72,7 +82,7 @@ html,body{margin:0!important;padding:0!important;zoom:1!important;overflow:hidde
 export function buildCoverDoc(html: string): string {
   const split = splitStyleSlides(html)
   if (split) {
-    return prepareSlideDoc(split.head, split.slides[0])
+    return prepareSlideDoc(split.head, split.slides[0], split.prelude)
   }
   return html
 }
@@ -124,7 +134,7 @@ function FallbackPreview({ html, containerWidth }: { html: string; containerWidt
 }
 
 /** Per-slide card with iframe scaled to the face column width. */
-function SlideCard({ head, slideBody, index, faceWidth }: { head: string; slideBody: string; index: number; faceWidth: number }) {
+function SlideCard({ head, prelude, slideBody, index, faceWidth }: { head: string; prelude: string; slideBody: string; index: number; faceWidth: number }) {
   const scale = faceWidth / SLIDE_WIDTH
   const cardHeight = SLIDE_HEIGHT * scale
 
@@ -141,7 +151,7 @@ function SlideCard({ head, slideBody, index, faceWidth }: { head: string; slideB
       <div className="rounded-[10px] border border-border-hover overflow-hidden shadow-[0_10px_32px_rgba(0,0,0,0.2)] transition-[transform,box-shadow] duration-[250ms] ease-out hover:-translate-y-[2px] hover:shadow-[0_16px_44px_rgba(0,0,0,0.26)] motion-reduce:hover:translate-y-0">
         <div style={{ width: "100%", height: cardHeight, overflow: "hidden" }}>
           <iframe
-            srcDoc={prepareSlideDoc(head, slideBody)}
+            srcDoc={prepareSlideDoc(head, slideBody, prelude)}
             className="pointer-events-none"
             style={{
               width: SLIDE_WIDTH,
@@ -195,6 +205,7 @@ export function StyleSlidePreview({ html, loading }: { html: string; loading: bo
               <SlideCard
                 key={i}
                 head={split.head}
+                prelude={split.prelude}
                 slideBody={slide}
                 index={i}
                 faceWidth={faceWidth}
