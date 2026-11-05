@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 /** Local Styles API — lists styles from bundled + user-local directories with pin/source metadata. */
 import { BUNDLED_STYLES_DIR, getUserStylesDir, getState, listStylesFromDir } from "@/lib/local/sdpmPaths"
+import { inlineStyleIcons } from "@/lib/local/styleIcons"
 
 export async function GET() {
   const userDir = getUserStylesDir()
@@ -21,5 +22,7 @@ export async function GET() {
     merged.push({ ...s, pinned: pinSet.has(s.name), source: "builtin" })
   }
 
-  return Response.json({ styles: merged })
+  // Display copies: the catalog icons each style references, drawn in
+  const shown = await inlineStyleIcons(merged.map(s => s.html))
+  return Response.json({ styles: merged.map((s, i) => ({ ...s, html: shown[i] })) })
 }

@@ -272,6 +272,30 @@ def _deck_summary(item: Dict, extras: Dict[str, Dict]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _display_html(htmls: List[str]) -> List[str]:
+    """Display copies of style HTML: the catalog icons the styles reference, drawn in.
+
+    The style files hold icon references only (what agents read); every response the
+    Web UI renders goes through here. On any failure the HTML is returned as stored.
+    """
+    if not RESOURCE_BUCKET or not htmls:
+        return htmls
+    from sdpm.knowledge.assets.style_icons import inline_style_icons_many
+
+    try:
+        return inline_style_icons_many(
+            htmls, load=lambda ids: user_library.load_catalog_icons(s3_client, RESOURCE_BUCKET, ids))
+    except Exception as e:
+        logger.warning(f"Style icons not drawn: {e}")
+        return htmls
+
+
+def _with_display_html(styles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Listing entries with their ``html`` replaced by the display copy."""
+    shown = _display_html([style.get("html", "") for style in styles])
+    return [{**style, "html": html} if "html" in style else style for style, html in zip(styles, shown)]
+
+
 @app.get("/styles")
 def list_styles() -> Dict[str, Any]:
     """List available styles with full HTML for client-side rendering.
@@ -287,13 +311,14 @@ def list_styles() -> Dict[str, Any]:
     # Bundled styles (cached: references are static, deployed once)
     global _styles_cache  # noqa: PLW0603
     if _styles_cache is None and RESOURCE_BUCKET:
-        _styles_cache = user_library.list_builtin_styles(s3_client, RESOURCE_BUCKET)
+        _styles_cache = _with_display_html(user_library.list_builtin_styles(s3_client, RESOURCE_BUCKET))
 
     user_styles: List[Dict[str, Any]] = []
     try:
         user_styles = user_library.list_user_styles(s3_client, BUCKET_NAME, user_id, include_html=True)
     except Exception:
         pass
+    user_styles = _with_display_html(user_styles)
 
     # One entry per name — a user style replaces the bundled one (same rule as Local and MCP)
     from sdpm.knowledge.reference import build_styles_listing
@@ -308,7 +333,8 @@ def get_style(name: str) -> Dict[str, Any]:
     """Get full HTML for a single style (user or builtin).
 
     Returns:
-        Dict with name and fullHtml.
+        Dict with name, source, fullHtml (the stored file: Export / Copy) and html
+        (the display copy with the referenced catalog icons drawn in).
     """
     if not user_library.is_valid_style_name(name):
         return {"error": "Invalid style name"}, 400
@@ -319,7 +345,7 @@ def get_style(name: str) -> Dict[str, Any]:
     user_key = user_library.user_style_key(user_id, name)
     try:
         body = s3_client.get_object(Bucket=BUCKET_NAME, Key=user_key)["Body"].read().decode("utf-8")
-        return {"name": name, "fullHtml": body, "source": "user"}
+        return {"name": name, "fullHtml": body, "html": _display_html([body])[0], "source": "user"}
     except Exception:
         pass
 
@@ -328,7 +354,7 @@ def get_style(name: str) -> Dict[str, Any]:
         builtin_key = user_library.builtin_style_key(name)
         try:
             body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=builtin_key)["Body"].read().decode("utf-8")
-            return {"name": name, "fullHtml": body, "source": "builtin"}
+            return {"name": name, "fullHtml": body, "html": _display_html([body])[0], "source": "builtin"}
         except Exception:
             pass
 
@@ -874,7 +900,8 @@ def _read_specs(deck_id: str) -> Dict[str, Any]:
             art_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=art_key)
             content = art_resp["Body"].read().decode("utf-8")
             if content.strip():
-                art_direction_content = content
+                # the Web UI shows the deck's style copy: draw its referenced icons
+                art_direction_content = _display_html([content])[0] if ext == ".html" else content
                 break
         except Exception:
             pass

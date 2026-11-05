@@ -31,6 +31,15 @@ Entries before v0.5.0 were written retroactively as summaries.
   kernel (`shared/snapshot_random.py`), so OpenTelemetry trace and span ids and retry jitter
   do not repeat across instances restored from the same snapshot. / Nothing. To stay on
   V1, see [Security](docs/en/security.md#agentcore-runtime-platform-versions).
+- **Styles carry icon references only.** The style rule (`workflows/style.md`) and the 16
+  bundled styles no longer embed icon shapes (`<symbol>`): a style draws an icon with
+  `<svg class="icon"><use href="#<source>/<name>"/></svg>`, and every place that shows a
+  style (the Web UI gallery and previews in Cloud and Local, and the local browser gallery
+  opened by `list_styles`) draws the shape from the asset catalog. Composers read 3–20%
+  less per bundled style (`aws-dark` 20%). User styles that embed `<symbol>`s keep working
+  as they are and need no rebuild; their own shapes are used. Decks keep their
+  `specs/art-direction.html` copy until `apply_style` runs again. A style exported or
+  copied to My Styles from the Web UI contains references only.
 
 ### Fixed
 
@@ -39,6 +48,8 @@ Entries before v0.5.0 were written retroactively as summaries.
   OpenTelemetry trace and span ids (and botocore retry jitter) could be identical across
   instances. The MCP server now draws those values from the kernel
   (`shared/snapshot_random.py`, installed before the server starts). / Nothing.
+- **The Web UI style covers and per-slide previews show their icons.** They showed empty
+  circles, because the preview dropped the icon definitions placed before the first slide.
 
 ## [0.12.0] - 2026-11-05
 

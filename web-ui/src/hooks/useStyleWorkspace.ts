@@ -8,14 +8,14 @@
  *
  * Preview HTML is resolved from the preloaded styles array (passed via
  * setStyles) to eliminate the /styles/{name} fetch round-trip. Falls back to
- * fetchStyleHtml only when the style is not in the preloaded set (e.g.
+ * fetchStylePreviewHtml only when the style is not in the preloaded set (e.g.
  * direct navigation via URL hash before the list has loaded).
  */
 
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
-import { fetchStyleHtml, type StyleEntry } from "@/services/deckService"
+import { fetchStylePreviewHtml, type StyleEntry } from "@/services/deckService"
 
 export type StyleView = { mode: "list" } | { mode: "preview"; name: string } | { mode: "create" }
 
@@ -62,7 +62,7 @@ export function useStyleWorkspace(idToken: string | undefined) {
     // Fallback: fetch from server (e.g. direct URL navigation before list loaded)
     let cancelled = false
     setPreviewLoading(true)
-    fetchStyleHtml(view.name, idToken).then(html => {
+    fetchStylePreviewHtml(view.name, idToken).then(html => {
       if (!cancelled) { setPreviewHtml(html); setPreviewLoading(false) }
     })
     return () => { cancelled = true }

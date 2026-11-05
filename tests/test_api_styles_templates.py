@@ -18,6 +18,10 @@ from user_library_fakes import FakeS3, FakeTable, style_html
 
 RESOURCE = "sdpm-resource-test"
 _TEMPLATE = Path(__file__).resolve().parents[1] / "sdpm" / "templates" / "blank-dark.pptx"
+_HUB_SVG = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 -960 960 960"><path d="M1 1"/></svg>'
+_HUB_STYLE = (b'<html><head><title>Hub</title></head><body>\n'
+              b'<div class="slide"><svg class="icon"><use href="#material/hub"/></svg></div></body></html>')
+_HUB_SYMBOL = '<symbol id="material/hub" viewBox="0 -960 960 960"><path d="M1 1"/></symbol>'
 
 
 class _JsonEvent(_Event):
@@ -37,7 +41,9 @@ def api(index, monkeypatch):  # noqa: F811
         RESOURCE: {
             "references/examples/styles/report.html": style_html("Bundled report"),
             "references/examples/styles/minimal.html": style_html("Minimal"),
+            "references/examples/styles/hub.html": _HUB_STYLE,
             "templates/blank-dark.pptx": _TEMPLATE.read_bytes(),
+            "assets/material/hub.svg": _HUB_SVG,
         },
     }, etags={(RESOURCE, "templates/blank-dark.pptx"): '"e1"'})
     table = FakeTable()
@@ -45,6 +51,7 @@ def api(index, monkeypatch):  # noqa: F811
     monkeypatch.setattr(index, "table", table)
     monkeypatch.setattr(index, "RESOURCE_BUCKET", RESOURCE)
     monkeypatch.setattr(index, "_styles_cache", None)
+    monkeypatch.setattr(index.user_library, "_icon_cache", {})
     index.app.current_event = _JsonEvent("u1")
     index.s3, index.ddb = s3, table
     return index
@@ -61,7 +68,7 @@ def _call(api, fn, *args, user="u1", body=None):
 def test_list_styles_one_entry_per_name_user_first(api):
     styles = _call(api, api.list_styles)["styles"]
     assert [(s["name"], s["source"]) for s in styles] == [
-        ("mine", "user"), ("report", "user"), ("minimal", "builtin"),
+        ("mine", "user"), ("report", "user"), ("hub", "builtin"), ("minimal", "builtin"),
     ]
     report = styles[1]
     assert report == {
@@ -73,7 +80,7 @@ def test_list_styles_one_entry_per_name_user_first(api):
 def test_list_styles_without_user_styles_lists_bundled(api):
     styles = _call(api, api.list_styles, user="u3")["styles"]
     assert [(s["name"], s["description"], s["source"]) for s in styles] == [
-        ("minimal", "Minimal", "builtin"), ("report", "Bundled report", "builtin"),
+        ("hub", "Hub", "builtin"), ("minimal", "Minimal", "builtin"), ("report", "Bundled report", "builtin"),
     ]
 
 
@@ -101,7 +108,7 @@ def test_pin_persists_and_marks_listing(api):
     assert _call(api, api.pin_style, body={"name": "minimal", "pinned": True})["pinned_styles"] == ["report", "minimal"]
     assert api.ddb.items[("USER#u1", "STYLE_PINS")]["pinned_styles"] == ["report", "minimal"]
     pinned = {s["name"]: s["pinned"] for s in _call(api, api.list_styles)["styles"]}
-    assert pinned == {"mine": False, "report": True, "minimal": True}
+    assert pinned == {"mine": False, "report": True, "hub": False, "minimal": True}
 
     assert _call(api, api.pin_style, body={"name": "report", "pinned": False})["pinned_styles"] == ["minimal"]
     # Pins are per user
@@ -117,10 +124,45 @@ def test_pin_rejects_invalid_names(api, name):
 def test_get_style_user_first_then_builtin(api):
     assert _call(api, api.get_style, "report")["source"] == "user"
     assert _call(api, api.get_style, "minimal") == {
-        "name": "minimal", "fullHtml": style_html("Minimal").decode(), "source": "builtin",
+        "name": "minimal", "fullHtml": style_html("Minimal").decode(), "html": style_html("Minimal").decode(),
+        "source": "builtin",
     }
     assert _call(api, api.get_style, "nope")[1] == 404
     assert _call(api, api.get_style, "../x") == ({"error": "Invalid style name"}, 400)
+
+
+def test_list_styles_draws_referenced_catalog_icons(api):
+    hub = next(s for s in _call(api, api.list_styles)["styles"] if s["name"] == "hub")
+    assert _HUB_SYMBOL in hub["html"]
+    assert hub["html"].endswith(_HUB_STYLE.decode().split("<body>", 1)[1])
+
+
+def test_user_style_html_is_drawn_too(api):
+    api.s3.buckets[BUCKET]["user-styles/u1/mine.html"] = _HUB_STYLE
+    mine = next(s for s in _call(api, api.list_styles)["styles"] if s["name"] == "mine")
+    assert _HUB_SYMBOL in mine["html"]
+
+
+def test_get_style_keeps_the_source_and_returns_a_display_copy(api):
+    got = _call(api, api.get_style, "hub")
+    assert got["fullHtml"] == _HUB_STYLE.decode()
+    assert _HUB_SYMBOL in got["html"]
+
+
+def test_style_icons_fail_open(api, monkeypatch):
+    def broken(*a, **k):
+        raise OSError("S3 down")
+
+    monkeypatch.setattr(api.user_library, "load_catalog_icons", broken)
+    got = _call(api, api.get_style, "hub")
+    assert got["html"] == got["fullHtml"] == _HUB_STYLE.decode()
+
+
+def test_deck_art_direction_is_drawn(api):
+    api.s3.buckets[BUCKET]["decks/d1/specs/art-direction.html"] = _HUB_STYLE
+    assert _HUB_SYMBOL in api._read_specs("d1")["artDirection"]
+    api.s3.buckets[BUCKET]["decks/d2/specs/art-direction.md"] = b'<use href="#material/hub"/>'
+    assert api._read_specs("d2")["artDirection"] == '<use href="#material/hub"/>'
 
 
 def test_save_rename_delete_user_style_keep_pins_in_step(api):

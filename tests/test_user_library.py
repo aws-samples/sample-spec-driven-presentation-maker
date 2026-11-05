@@ -133,6 +133,47 @@ def test_merge_styles_user_replaces_builtin_of_same_name():
     assert next(s for s in merged if s["name"] == "report")["description"] == "My report"
 
 
+# --- icon catalog ------------------------------------------------------------
+
+
+class _CountingS3(FakeS3):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.reads: list[str] = []
+
+    def get_object(self, Bucket, Key):
+        self.reads.append(Key)
+        if Key == "assets/aws/broken.svg":
+            raise OSError("throttled")
+        return super().get_object(Bucket, Key)
+
+
+@pytest.fixture()
+def icon_s3(monkeypatch):
+    monkeypatch.setattr(user_library, "_icon_cache", {})
+    return _CountingS3({RESOURCE: {"assets/material/hub.svg": b"<svg/>", "assets/aws/Arch_X_48.svg": b"<svg id='a'/>"}})
+
+
+def test_load_catalog_icons_hit_and_miss(icon_s3):
+    got = user_library.load_catalog_icons(icon_s3, RESOURCE, {"material/hub", "aws/Arch_X_48", "material/nope"})
+    assert got == {"material/hub": b"<svg/>", "aws/Arch_X_48": b"<svg id='a'/>"}
+    assert sorted(icon_s3.reads) == ["assets/aws/Arch_X_48.svg", "assets/material/hub.svg", "assets/material/nope.svg"]
+
+
+def test_load_catalog_icons_caches_hits_and_misses_not_errors(icon_s3):
+    ids = {"material/hub", "material/nope", "aws/broken"}
+    user_library.load_catalog_icons(icon_s3, RESOURCE, ids)
+    icon_s3.reads.clear()
+    assert user_library.load_catalog_icons(icon_s3, RESOURCE, ids) == {"material/hub": b"<svg/>"}
+    assert icon_s3.reads == ["assets/aws/broken.svg"]
+
+
+@pytest.mark.parametrize("bad", ["../x", "material/../../secret", "nosource", "a/b/c", ""])
+def test_load_catalog_icons_never_queries_malformed_ids(icon_s3, bad):
+    assert user_library.load_catalog_icons(icon_s3, RESOURCE, {bad}) == {}
+    assert icon_s3.reads == []
+
+
 # --- pins --------------------------------------------------------------------
 
 

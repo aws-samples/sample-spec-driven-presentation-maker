@@ -71,6 +71,34 @@ describe("splitStyleSlides", () => {
   })
 })
 
+const SPRITE = `<svg width="0" height="0" style="position:absolute" aria-hidden="true" data-sdpm-icons><symbol id="material/hub" viewBox="0 0 1 1"><path d="M0 0"/></symbol></svg>`
+const ICON_STYLE = `<html><head><style>.slide{width:1920px}</style></head><body class="x">
+${SPRITE}
+<div class="slide cover"><svg class="icon"><use href="#material/hub"/></svg>S1</div>
+<div class="slide body">S2<svg><symbol id="local/x"><path/></symbol></svg></div>
+</body></html>`
+
+describe("icon sprite prelude", () => {
+  it("collects the sprite between <body> and the first slide", () => {
+    const result = splitStyleSlides(ICON_STYLE)!
+    expect(result.prelude).toBe(SPRITE)
+    // a symbol inside a slide stays with its slide
+    expect(result.prelude).not.toContain("local/x")
+  })
+
+  it("carries the sprite into the cover document", () => {
+    const cover = buildCoverDoc(ICON_STYLE)
+    expect(cover).toContain(`<body>${SPRITE}<div class="slide cover">`)
+    expect(cover).not.toContain("S2")
+  })
+
+  it("is empty without a sprite, leaving the cover as before", () => {
+    const html = `<html><head></head><body>\n<svg class="deco"><circle/></svg>\n<div class="slide cover">S1</div></body></html>`
+    expect(splitStyleSlides(html)!.prelude).toBe("")
+    expect(buildCoverDoc(html)).toContain(`<body><div class="slide cover">S1</body>`)
+  })
+})
+
 describe("buildCoverDoc", () => {
   it("returns first slide only with zoom reset injected when .slide markers exist", () => {
     const html = `<!DOCTYPE html><html><head><style>.slide{width:1920px}</style></head><body>
@@ -152,6 +180,20 @@ describe("StyleSlidePreview component", () => {
     expect(screen.getByText("1")).toBeTruthy()
     expect(screen.getByText("2")).toBeTruthy()
     expect(screen.getByText("3")).toBeTruthy()
+
+    Element.prototype.getBoundingClientRect = originalGBCR
+  })
+
+  it("gives every slide card the icon sprite", () => {
+    const originalGBCR = Element.prototype.getBoundingClientRect
+    Element.prototype.getBoundingClientRect = function () {
+      return { width: 600, height: 400, top: 0, left: 0, bottom: 400, right: 600, x: 0, y: 0, toJSON: () => ({}) }
+    }
+
+    const { container } = render(<StyleSlidePreview html={ICON_STYLE} loading={false} />)
+    const iframes = container.querySelectorAll("iframe")
+    expect(iframes.length).toBe(2)
+    for (const iframe of iframes) expect(iframe.getAttribute("srcdoc")).toContain(`<body>${SPRITE}<div class="slide`)
 
     Element.prototype.getBoundingClientRect = originalGBCR
   })
