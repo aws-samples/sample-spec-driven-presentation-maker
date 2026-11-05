@@ -17,7 +17,11 @@ Entries before v0.5.0 were written retroactively as summaries.
   lines that states the slide's finding, in dark orange (`aws-light`) or amber (`aws-dark`).
   The section label above the title is gone and content starts lower, at y 350 in
   `aws-light` and y 340 in `aws-dark`. The lead colour is part of the frame, so each slide
-  still has one orange emphasis. Style names and descriptions are unchanged; decks that
+  still has one orange emphasis. Service icons no longer sit on a category-tint circle with
+  a border: the icon stands alone at the same sizes, and its own colours (the category
+  square of an `Arch_` service icon, the category-coloured glyph of a `Res_` resource icon)
+  identify the category. Category colour stays on labels, group borders and group fills.
+  Style names and descriptions are unchanged; decks that
   already use either style keep their copy in `specs/art-direction.html` until
   `apply_style` is run again.
 - **The AWS design guide (`guides/aws-design.md`) no longer lists the "AWS default
