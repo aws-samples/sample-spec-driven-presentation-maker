@@ -175,6 +175,17 @@ describe("invokeAgentCore (Cloud)", () => {
     expect(fetchMock.mock.calls[0][0]).toBe("/api/agent/invoke")
     expect(FakeWebSocket.instances).toHaveLength(0)
   })
+
+  it("hands a Local stream's notice to the session events", async () => {
+    mode.local = true
+    fetchMock.mockResolvedValueOnce(new Response(
+      "id: 0\ndata: {\"notice\":{\"code\":\"context_not_carried_over\"}}\n\n" +
+      "id: 1\ndata: {\"event\":{\"contentBlockDelta\":{\"delta\":{\"text\":\"x\"}}}}\n\n",
+    ))
+    const onEvent = vi.fn()
+    await expect(invokeAgentCore("hi", "L1", vi.fn(), undefined, undefined, vi.fn(), undefined, "spec", "d1", undefined, undefined, { onEvent })).resolves.toBe("x")
+    expect(onEvent).toHaveBeenCalledWith({ localNotice: "context_not_carried_over" }, { own: true })
+  })
 })
 
 describe("steerAgentCore", () => {

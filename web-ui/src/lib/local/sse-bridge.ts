@@ -12,6 +12,7 @@ import path from "path"
 import { DECK_ROOT } from "./deck-paths"
 import { basename } from "./pathUtils"
 import { localTurnError, TURN_END, TURN_ERROR, isLocalTurnErrorCode, type LocalTurnErrorCode } from "./turnErrors"
+import type { LocalSessionNoticeCode } from "./sessionNotices"
 
 const DECK_ROOT_ABS = path.resolve(DECK_ROOT)
 
@@ -33,6 +34,8 @@ interface BridgeOptions {
   onError?: () => void
   /** Pre-buffered notifications to replay before subscribing to live events. */
   replay?: { id: number; msg: Record<string, unknown> }[]
+  /** A notice about the turn's session (lib/local/sessionNotices.ts), sent as the first event. */
+  notice?: LocalSessionNoticeCode
 }
 
 function extractSlugs(q: string): string {
@@ -40,7 +43,7 @@ function extractSlugs(q: string): string {
   return m ? m[1].trim() : ""
 }
 
-export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onError, replay }: BridgeOptions): ReadableStream {
+export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onError, replay, notice }: BridgeOptions): ReadableStream {
   const encoder = new TextEncoder()
 
   return new ReadableStream({
@@ -93,6 +96,8 @@ export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onErro
       }
 
       unsubscribe = subscribe(processMsg)
+      // A notice about this turn's session goes first; id 0 leaves the event numbering as it is.
+      if (notice) send({ notice: { code: notice } }, 0)
 
       function processMsg(msg: Record<string, unknown>) {
         if (msg.method === TURN_END || msg.method === TURN_ERROR) {

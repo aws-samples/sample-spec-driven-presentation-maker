@@ -54,6 +54,20 @@ Entries before v0.5.0 were written retroactively as summaries.
   (`shared/snapshot_random.py`, installed before the server starts). / Nothing.
 - **The Web UI style covers and per-slide previews show their icons.** They showed empty
   circles, because the preview dropped the icon definitions placed before the first slide.
+- **Local Web UI: a chat turn no longer hangs or ends silently.** When kiro-cli stops while
+  it answers, the chat shows that it stopped instead of loading forever, and the next send
+  works. A turn that ends because the model refused, or hit its output or step limit
+  (`refusal`, `max_tokens`, `max_turn_requests`), closes with a message saying so. An error
+  from another request during a turn no longer cuts the reply off. A kiro-cli that does not
+  answer at start-up gives a "did not respond in time" message after 30 s (initialize) or
+  3 minutes (session start or load) instead of waiting forever. kiro-cli's permission
+  requests are answered with an option it offered, which kiro-cli V3 needs. (#518) / Nothing.
+- **Local Web UI: decks without a saved Kiro session can be chatted with.** A deck made by
+  an MCP client or Kiro CLI has no `.session` file, and sending a message in it answered
+  HTTP 500 every time; so did a deck whose kiro session no longer exists (kiro-cli V2). The
+  chat now starts a new kiro session, saves it to the deck's `.session` and says above the
+  reply that the agent does not have the earlier conversation. Later messages, and the deck
+  reopened after kiro-cli was stopped, continue that session. / Nothing.
 
 ## [0.12.0] - 2026-11-05
 

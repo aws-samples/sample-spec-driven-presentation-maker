@@ -41,6 +41,7 @@ import { isResumable } from "@/lib/sessionState"
 import { useLocale, useTranslations } from "next-intl"
 import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsService"
 import type { ForkSessionPhase, KiroSessionSummary, SessionOrigin } from "@/lib/local/kiro-sessions.types"
+import { isLocalSessionNoticeCode, LOCAL_SESSION_NOTICE_KEYS } from "@/lib/local/sessionNotices"
 import { useReview, type SubmittedReview } from "@/components/review/ReviewProvider"
 import { ReviewDraftBar } from "@/components/review/ReviewDraftBar"
 import { stripWhitespace } from "@/lib/review/schema"
@@ -735,6 +736,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   <div className="mb-2 ml-10">
                     <McpStatusBar servers={msg.mcpStatus} />
                   </div>
+                )}
+                {IS_LOCAL && isLocalSessionNoticeCode(msg.localNotice) && (
+                  <p role="status" className="mb-2 ml-10 text-xs text-foreground-muted">
+                    {t(LOCAL_SESSION_NOTICE_KEYS[msg.localNotice])}
+                  </p>
                 )}
                 {msg.composerNote ? (
                   <div className="ml-8.5">
