@@ -6,12 +6,15 @@
  * session id (K, what the deck's `.session` stores); close and eviction drop every key of a
  * process; the size limit counts processes, not keys; a prompt to a session still answering
  * is refused; a turn ends with the answer to its session/prompt (result or error), whatever the
- * sub-agent sessions or other requests sent. kiro-cli is replaced by a fake child that answers
- * the ACP requests.
+ * sub-agent sessions or other requests sent, or with agent_exited when kiro-cli exits first;
+ * kiro-cli's own requests are answered (permissions by option kind, the rest with Method not
+ * found) and never taken for answers; setup requests time out and follow the caller's abort.
+ * kiro-cli is replaced by a fake child that answers the ACP requests.
  */
 
 import { EventEmitter } from "events"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { TURN_END, TURN_ERROR } from "./turnErrors"
 
 const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
 vi.mock("child_process", () => ({ spawn, default: { spawn } }))
@@ -23,24 +26,31 @@ vi.mock("./acp-adapter", () => ({
 type Rpc = { id: number; method: string; params: Record<string, unknown> }
 
 class FakeChild extends EventEmitter {
+  pid = 4242
   stdout = Object.assign(new EventEmitter(), { setEncoding: () => {} })
   stderr = Object.assign(new EventEmitter(), { setEncoding: () => {} })
-  stdin = { write: (line: string) => { this.handle(JSON.parse(line)); return true } }
+  stdin = Object.assign(new EventEmitter(), { write: (line: string) => { this.handle(JSON.parse(line)); return true } })
   killed = false
   prompts: number[] = []
   cancelled: string[] = []
+  /** What this client wrote back for kiro-cli's own requests. */
+  answers: Record<string, unknown>[] = []
   /** Methods answered with a JSON-RPC error instead of a result. */
   failing = new Set<string>()
+  /** Methods never answered (a kiro-cli that hangs). */
+  silent = new Set<string>()
   constructor(private readonly sessionId: string, private readonly lockedSessions: Set<string>) { super() }
 
-  private send(msg: Record<string, unknown>) {
+  send(msg: Record<string, unknown>) {
     // Answer after rpcRequestTo has registered the pending request.
     setImmediate(() => this.stdout.emit("data", JSON.stringify({ jsonrpc: "2.0", ...msg }) + "\n"))
   }
 
   private handle(req: Rpc) {
+    if (req.method === undefined) { this.answers.push(req as unknown as Record<string, unknown>); return }
     if (req.method === "session/cancel") this.cancelled.push(req.params.sessionId as string)
     if (req.id == null) return
+    if (this.silent.has(req.method)) return
     if (req.method === "session/new") this.send({ id: req.id, result: { sessionId: this.sessionId } })
     else if (req.method === "session/load" && this.lockedSessions.has(req.params.sessionId as string)) {
       this.send({ id: req.id, error: { message: "Internal error", data: "Failed to start session: Session is active in another process (PID 1)" } })
@@ -237,8 +247,8 @@ describe("turn state", () => {
     await acp.createNewProcessFor("C1")
     const child = children[0]
     const prompted = await acp.sendPrompt("C1", "build the deck")
-    const errors: unknown[] = []
-    prompted.subscribe((msg) => { if (msg.error) errors.push(msg.error) })
+    const ends: Record<string, unknown>[] = []
+    prompted.subscribe((msg) => { if (msg.method === TURN_ERROR || msg.method === TURN_END) ends.push(msg) })
     prompted.send()
     child.runSubagent("S1")
     await settle()
@@ -246,7 +256,7 @@ describe("turn state", () => {
 
     child.failPrompt()
     await settle()
-    expect(errors).toHaveLength(1)
+    expect(ends).toEqual([{ method: TURN_ERROR, params: { sessionId: "K1", message: "Internal error: model stream failed" } }])
     expect(acp.isSessionRunning("C1")).toBe(false)
     expect(acp.isSessionRunning("K1")).toBe(false)
 
@@ -261,17 +271,144 @@ describe("turn state", () => {
     const child = children[0]
     child.failing.add("session/set_config_option")
     const prompted = await acp.sendPrompt("C1", "build the deck")
+    const ends: Record<string, unknown>[] = []
+    prompted.subscribe((msg) => { if (msg.method === TURN_ERROR || msg.method === TURN_END) ends.push(msg) })
     prompted.send()
     await settle()
 
     await expect(acp.setConfigOption("C1", "model", "unknown")).rejects.toThrow(/session\/set_config_option failed/)
     await settle()
     expect(acp.isSessionRunning("C1")).toBe(true)
+    expect(ends).toEqual([])
     await expect(acp.sendPrompt("C1", "again")).rejects.toThrow(/still answering/)
 
     child.endTurn()
     await settle()
     expect(acp.isSessionRunning("C1")).toBe(false)
+    expect(ends).toEqual([{ method: TURN_END, params: { sessionId: "K1", stopReason: "end_turn" } }])
+  })
+
+  it.each(["end_turn", "cancelled", "refusal", "max_tokens", "max_turn_requests"])("ends the turn with stopReason %s and buffers the end for reconnects", async (stopReason) => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "build the deck")
+    prompted.send()
+    await settle()
+    children[0].endTurn(stopReason)
+    await settle()
+    expect(acp.isSessionRunning("C1")).toBe(false)
+    expect(acp.getBufferedEvents("C1").at(-1)?.msg).toEqual({ method: TURN_END, params: { sessionId: "K1", stopReason } })
+  })
+
+  it("ends a running turn with agent_exited when kiro-cli exits, and forgets the process", async () => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "build the deck")
+    const seen: Record<string, unknown>[] = []
+    prompted.subscribe((msg) => { seen.push(msg) })
+    prompted.send()
+    await settle()
+
+    children[0].kill()
+    await settle()
+    expect(seen.at(-1)).toMatchObject({ method: TURN_ERROR, params: { sessionId: "K1", code: "agent_exited" } })
+    expect(acp.isSessionRunning("C1")).toBe(false)
+    expect(acp.hasProcess("C1")).toBe(false)
+    expect(acp.hasProcess("K1")).toBe(false)
+  })
+
+  it("sends no turn event when an idle process exits", async () => {
+    await acp.createNewProcessFor("C1")
+    const seen: Record<string, unknown>[] = []
+    acp.subscribeToSession("C1")!.subscribe((msg) => { seen.push(msg) })
+    children[0].kill()
+    await settle()
+    expect(seen).toEqual([])
+  })
+})
+
+describe("requests from kiro-cli", () => {
+  async function promptRunning() {
+    await acp.createNewProcessFor("C1")
+    const child = children[0]
+    const prompted = await acp.sendPrompt("C1", "build the deck")
+    const ends: Record<string, unknown>[] = []
+    prompted.subscribe((msg) => { if (msg.method === TURN_ERROR || msg.method === TURN_END) ends.push(msg) })
+    prompted.send()
+    await settle()
+    return { child, ends, promptId: child.prompts[0] }
+  }
+
+  it("does not take a request whose id equals the prompt's for the prompt's answer", async () => {
+    const { child, ends, promptId } = await promptRunning()
+    child.send({ id: promptId, method: "session/request_permission", params: { sessionId: "K1", options: [{ optionId: "allow_once", kind: "allow_once" }] } })
+    await settle()
+    expect(acp.isSessionRunning("C1")).toBe(true)
+    expect(ends).toEqual([])
+    expect(child.answers).toEqual([{ jsonrpc: "2.0", id: promptId, result: { outcome: { outcome: "selected", optionId: "allow_once" } } }])
+
+    child.endTurn()
+    await settle()
+    expect(ends).toHaveLength(1)
+  })
+
+  it.each([
+    ["V2", [{ optionId: "allow_always", kind: "allow_always" }, { optionId: "allow_once", kind: "allow_once" }, { optionId: "reject_once", kind: "reject_once" }], "allow_once"],
+    ["V3", [{ optionId: "accept", kind: "allow_once" }, { optionId: "always-accept", kind: "allow_always" }, { optionId: "reject", kind: "reject_once" }, { optionId: "always-reject", kind: "reject_always" }], "accept"],
+    ["only always", [{ optionId: "trust", kind: "allow_always" }, { optionId: "no", kind: "reject_once" }], "trust"],
+  ])("approves a permission request with the offered allow option (%s)", async (_engine, options, optionId) => {
+    const { child } = await promptRunning()
+    child.send({ id: 77, method: "session/request_permission", params: { sessionId: "K1", options } })
+    await settle()
+    expect(child.answers).toEqual([{ jsonrpc: "2.0", id: 77, result: { outcome: { outcome: "selected", optionId } } }])
+  })
+
+  it("answers a request it does not implement with Method not found", async () => {
+    const { child, ends } = await promptRunning()
+    child.send({ id: 5, method: "_kiro/openExternalUrl", params: { url: "https://kiro.dev" } })
+    await settle()
+    expect(child.answers).toEqual([{ jsonrpc: "2.0", id: 5, error: { code: -32601, message: "Method not found: _kiro/openExternalUrl" } }])
+    expect(ends).toEqual([])
+    expect(acp.isSessionRunning("C1")).toBe(true)
+  })
+})
+
+describe("setup requests", () => {
+  it("time out when kiro-cli does not answer, kill the process and register nothing", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
+    try {
+      spawn.mockImplementationOnce(() => {
+        const child = new FakeChild("K1", locked)
+        child.silent.add("initialize")
+        children.push(child)
+        return child
+      })
+      const pending = acp.createNewProcessFor("C1").catch((e: unknown) => e)
+      await vi.advanceTimersByTimeAsync(30_000)
+      const error = await pending
+      const { AgentTimeoutError } = await import("./turnErrors")
+      expect(error).toBeInstanceOf(AgentTimeoutError)
+      expect((error as Error).message).toMatch(/initialize within 30s/)
+      expect(children[0].killed).toBe(true)
+      expect(acp.hasProcess("C1")).toBe(false)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("stop when the caller's signal aborts", async () => {
+    spawn.mockImplementationOnce(() => {
+      const child = new FakeChild("K1", locked)
+      child.silent.add("session/load")
+      children.push(child)
+      return child
+    })
+    const controller = new AbortController()
+    const pending = acp.getOrCreateProcess("K9", "sdpm-orchestrator", { signal: controller.signal }).catch((e: unknown) => e)
+    await settle()
+    controller.abort()
+    const error = await pending
+    expect((error as Error).name).toBe("AbortError")
+    expect(children[0].killed).toBe(true)
+    expect(acp.hasProcess("K9")).toBe(false)
   })
 })
 

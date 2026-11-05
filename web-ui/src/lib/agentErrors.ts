@@ -56,13 +56,17 @@ export function classifyAgentError(message: string): AgentErrorCode {
  *
  * @param message - Raw error text from the event
  * @param code - Stable code from the event, when present
- * @param translate - Optional translator for a resolved code; English is used when it returns undefined
+ * @param translate - Optional translator; asked first for a code this table does not know (the
+ *   Local turn codes in lib/local/turnErrors.ts), then for the resolved code. English is used
+ *   when it returns undefined
  */
 export function agentErrorMessage(
   message: string,
   code?: string,
-  translate?: (code: AgentErrorCode) => string | undefined,
+  translate?: (code: string) => string | undefined,
 ): string {
+  const own = code && !(code in MESSAGES) ? translate?.(code) : undefined
+  if (own) return own
   const resolved = (code && code in MESSAGES ? code : classifyAgentError(message)) as AgentErrorCode
   // Unclassified internal errors keep the raw message — it's more actionable
   // than a generic apology when nothing matched.
