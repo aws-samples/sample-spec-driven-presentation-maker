@@ -218,6 +218,13 @@ export class AgentStack extends cdk.Stack {
     const runtime = new bedrockagentcore.CfnRuntime(this, "AgentRuntime", {
       agentRuntimeName: "sdpm_agent",
       roleArn: role.roleArn,
+      // V2 restores each microVM from a snapshot taken after startup. The agent builds
+      // its clients, connections and per-session state on the first request, and draws
+      // the random module's values from the kernel (shared/snapshot_random.py). Each new
+      // version builds a new snapshot, so the environment below holds no per-deploy
+      // value: a deploy that changes neither the image nor the configuration creates
+      // no version.
+      platformVersion: "V2",
       agentRuntimeArtifact: {
         containerConfiguration: {
           containerUri: image.imageUri,
@@ -244,7 +251,6 @@ export class AgentStack extends cdk.Stack {
         MEMORY_ID: memoryId,
         AWS_DEFAULT_REGION: this.region,
         COMPOSER_MAX_CONCURRENCY: "10",
-        DEPLOY_TIMESTAMP: new Date().toISOString(),
         ...RUNTIME_OTEL_ENVIRONMENT,
       },
       description: "spec-driven-presentation-maker Strands Agent — connects to MCP Server for slide generation",

@@ -24,6 +24,7 @@ import session_runtime
 import stop_guard
 import ws_entry
 from errors import BAD_INPUT, AUTH, error_event
+from shared import snapshot_random
 
 logger = logging.getLogger("sdpm.agent")
 
@@ -101,6 +102,9 @@ async def agent_stream(payload, context):
 
 
 def main(port: int = 8080) -> None:
+    # Before the server starts (and so before the V2 snapshot): ids and jitter drawn from
+    # the random module stay distinct across restored microVMs (shared/snapshot_random.py).
+    snapshot_random.install()
     # Bounded graceful shutdown: on SIGTERM uvicorn would otherwise wait for the running
     # /invocations without limit (see stop_guard.py).
     app.run(port=port, timeout_graceful_shutdown=stop_guard.GRACEFUL_SHUTDOWN_S)

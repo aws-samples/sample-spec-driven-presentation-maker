@@ -23,6 +23,22 @@ Entries before v0.5.0 were written retroactively as summaries.
 - **The AWS design guide (`guides/aws-design.md`) no longer lists the "AWS default
   template" colour palette.** No bundled template matches it. Icon selection and the AWS
   service category colours stay.
+- **The agent runtime runs on AgentCore platform V2.** `platformVersion: "V2"` is now
+  declared in `infra/lib/agent-stack.ts`, so the SdpmAgent deploy moves the agent runtime
+  to V2, like the MCP runtime in 0.12.0. The agent's environment no longer carries
+  `DEPLOY_TIMESTAMP`, so a deploy that changes neither the image nor the configuration no
+  longer creates a runtime version. The agent draws the `random` module's values from the
+  kernel (`shared/snapshot_random.py`), so OpenTelemetry trace and span ids and retry jitter
+  do not repeat across instances restored from the same snapshot. / Nothing. To stay on
+  V1, see [Security](docs/en/security.md#agentcore-runtime-platform-versions).
+
+### Fixed
+
+- **MCP runtime: OpenTelemetry ids no longer repeat across V2 restores.** Every microVM
+  restored from the same snapshot started the `random` module from the same state, so
+  OpenTelemetry trace and span ids (and botocore retry jitter) could be identical across
+  instances. The MCP server now draws those values from the kernel
+  (`shared/snapshot_random.py`, installed before the server starts). / Nothing.
 
 ## [0.12.0] - 2026-11-05
 
