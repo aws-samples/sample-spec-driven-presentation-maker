@@ -88,15 +88,12 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 .diagram-node .icon{width:110px; height:110px}
 .diagram-hub .icon{width:144px; height:144px}
 .shape-oval{border-radius:50%}
-.icon-frame{display:flex; align-items:center; justify-content:center; width:144px; height:144px; border:var(--border-group) solid; border-radius:50%; background:var(--color-bg)}
+.icon-frame{display:flex; align-items:center; justify-content:center; width:144px; height:144px}
 .icon-frame .icon{width:108px; height:108px}
 .icon-frame.sm{width:104px; height:104px}
 .icon-frame.sm .icon{width:72px; height:72px}
 .icon-frame.lg{width:180px; height:180px}
 .icon-frame.lg .icon{width:138px; height:138px}
-.frame-integration{background:var(--cat-integration-tint); border-color:var(--cat-integration)}
-.frame-compute{background:var(--cat-compute-tint); border-color:var(--cat-compute)}
-.frame-database{background:var(--cat-database-tint); border-color:var(--cat-database)}
 .metric-focus{display:inline-block; padding:0 16px; background:var(--accent); color:var(--color-on-accent)}
 .route-tl{border-top:3px solid var(--color-muted); border-right:3px solid var(--color-muted)}
 .route-tr{border-top:3px solid var(--color-muted); border-left:3px solid var(--color-muted)}
@@ -121,8 +118,8 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 
 <!-- Part: Cover -->
 <div class="slide">
-<!-- Component: icon (.icon) — official AWS symbol with a 1–4 word label; its category-tint disc identifies the service at 72px in steps, 108px in columns, and 138px in a hub; may vary: service, matching category, role size; may not: mismatch category or mix icon families. -->
-<div class="el icon-frame lg frame-integration" style="left:1450px;top:380px;width:180px;height:180px"><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg></div>
+<!-- Component: icon (.icon) — official AWS symbol with a 1–4 word label, standing alone on the slide ground, a step surface, or a group tint; its glyph is drawn in its category colour, so that colour identifies the service and nothing sits behind it; 72px in steps, 108px in columns, 138px in a hub; may vary: service, matching category, role size; may not: mismatch category, add a backing shape, or mix icon families. -->
+<div class="el icon-frame lg" style="left:1450px;top:380px;width:180px;height:180px"><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg></div>
 <!-- Component: tag (.t-label) — section, category, or route metadata; may vary: wording/matching colour; may not: encode status or ornament because category means identity. -->
 <div class="el t-label muted" style="left:112px;top:300px;width:900px;height:34px">Bundled presentation style</div>
 <div class="el t-cover" style="left:112px;top:360px;width:1050px;height:240px">AWS architecture,<br>made legible</div>
@@ -224,7 +221,7 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="slide">
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:86px">Service catalogue</div>
 <div class="el t-lead" style="left:112px;top:158px;width:1696px;height:144px">Equal columns make a service catalogue scannable</div>
-<div class="el columns" style="left:112px;top:350px;width:1696px;height:490px"><div class="column icon-tile"><div class="t-label c-compute">Compute</div><div class="icon-frame frame-compute"><svg class="icon"><use href="#aws/Res_AWS-Lambda_Lambda-Function_48"/></svg></div><div class="t-heading">Functions</div><div class="t-caption muted">Run on demand</div></div><div class="column icon-tile"><div class="t-label c-integration">Integration</div><div class="icon-frame frame-integration"><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg></div><div class="t-heading">Event bus</div><div class="t-caption muted">Route by rule</div></div><div class="column icon-tile"><div class="t-label c-database">Database</div><div class="icon-frame frame-database"><svg class="icon"><use href="#aws/Res_Amazon-DynamoDB_Table_48"/></svg></div><div class="t-heading">Tables</div><div class="t-caption muted">Persist state</div></div></div>
+<div class="el columns" style="left:112px;top:350px;width:1696px;height:490px"><div class="column icon-tile"><div class="t-label c-compute">Compute</div><div class="icon-frame"><svg class="icon"><use href="#aws/Res_AWS-Lambda_Lambda-Function_48"/></svg></div><div class="t-heading">Functions</div><div class="t-caption muted">Run on demand</div></div><div class="column icon-tile"><div class="t-label c-integration">Integration</div><div class="icon-frame"><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg></div><div class="t-heading">Event bus</div><div class="t-caption muted">Route by rule</div></div><div class="column icon-tile"><div class="t-label c-database">Database</div><div class="icon-frame"><svg class="icon"><use href="#aws/Res_Amazon-DynamoDB_Table_48"/></svg></div><div class="t-heading">Tables</div><div class="t-caption muted">Persist state</div></div></div>
 <div class="el takeaway t-heading" style="left:112px;top:890px;width:1696px;height:90px">Category headers establish identity once.</div>
 </div>
 
@@ -233,14 +230,14 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="el t-title" style="left:112px;top:64px;width:1696px;height:86px">Process</div>
 <div class="el t-lead" style="left:112px;top:158px;width:1696px;height:144px">One orange step locates the current handoff</div>
 <!-- Component: step (.step) — equal verb-led stage with service; may vary: 3–6 stages; may not: vary peer size or use category as status. -->
-<div class="el step" style="left:112px;top:350px;width:360px;height:240px"><div class="t-label muted">01</div><div class="icon-frame sm frame-integration"><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg></div><div class="t-heading">Receive</div></div>
+<div class="el step" style="left:112px;top:350px;width:360px;height:240px"><div class="t-label muted">01</div><div class="icon-frame sm"><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg></div><div class="t-heading">Receive</div></div>
 <!-- Component: connector (.connector) — neutral orthogonal handoff; may vary: route/label; may not: use category colour, cross nodes, go diagonal, or invent causality. -->
 <div class="el connector" style="left:472px;top:469px;width:64px;height:3px"></div>
-<div class="el step" style="left:536px;top:350px;width:360px;height:240px"><div class="t-label muted">02</div><div class="icon-frame sm frame-database"><svg class="icon"><use href="#aws/Res_Amazon-DynamoDB_Table_48"/></svg></div><div class="t-heading">Validate</div></div>
+<div class="el step" style="left:536px;top:350px;width:360px;height:240px"><div class="t-label muted">02</div><div class="icon-frame sm"><svg class="icon"><use href="#aws/Res_Amazon-DynamoDB_Table_48"/></svg></div><div class="t-heading">Validate</div></div>
 <div class="el connector" style="left:896px;top:469px;width:64px;height:3px"></div>
-<div class="el step accent-outline" style="left:960px;top:350px;width:360px;height:240px"><div class="t-label muted">03</div><div class="icon-frame sm frame-compute"><svg class="icon"><use href="#aws/Res_AWS-Lambda_Lambda-Function_48"/></svg></div><div class="t-heading">Route</div></div>
+<div class="el step accent-outline" style="left:960px;top:350px;width:360px;height:240px"><div class="t-label muted">03</div><div class="icon-frame sm"><svg class="icon"><use href="#aws/Res_AWS-Lambda_Lambda-Function_48"/></svg></div><div class="t-heading">Route</div></div>
 <div class="el connector" style="left:1320px;top:469px;width:64px;height:3px"></div>
-<div class="el step" style="left:1384px;top:350px;width:424px;height:240px"><div class="t-label muted">04</div><div class="icon-frame sm frame-integration"><svg class="icon"><use href="#aws/Res_Amazon-CloudWatch_Rule_48"/></svg></div><div class="t-heading">Observe</div></div>
+<div class="el step" style="left:1384px;top:350px;width:424px;height:240px"><div class="t-label muted">04</div><div class="icon-frame sm"><svg class="icon"><use href="#aws/Res_Amazon-CloudWatch_Rule_48"/></svg></div><div class="t-heading">Observe</div></div>
 <div class="el t-label c-integration center" style="left:112px;top:630px;width:360px;height:34px">Integration</div>
 <div class="el t-label c-database center" style="left:536px;top:630px;width:360px;height:34px">Database</div>
 <div class="el t-label c-compute center" style="left:960px;top:630px;width:360px;height:34px">Compute</div>
@@ -287,7 +284,7 @@ body{margin:0; padding:40px; background:var(--gallery-bg); font-family:var(--fon
 <div class="el diagram-node cat-database" style="left:112px;top:660px;width:430px;height:220px"><svg class="icon"><use href="#aws/Res_Amazon-DynamoDB_Table_48"/></svg><div class="t-heading">Tables</div></div>
 <div class="el diagram-node cat-storage" style="left:1378px;top:660px;width:430px;height:220px"><svg class="icon"><use href="#aws/Arch_Amazon-Simple-Storage-Service_48"/></svg><div class="t-heading">Objects</div></div>
 <!-- Component: hub (.diagram-hub) — selected coordinator with 3–6 peers and edge-to-edge spokes; may vary: service/labels/count; may not: hide spokes or imply direction without arrows. -->
-<div class="el diagram-node diagram-hub shape-oval cat-integration accent-outline" style="left:765px;top:400px;width:390px;height:390px"><div class="t-label c-integration">Routing centre</div><div class="icon-frame lg frame-integration"><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg></div><div class="t-heading">Event bus</div></div>
+<div class="el diagram-node diagram-hub shape-oval cat-integration accent-outline" style="left:765px;top:400px;width:390px;height:390px"><div class="t-label c-integration">Routing centre</div><div class="icon-frame lg"><svg class="icon"><use href="#aws/Res_Amazon-EventBridge_Default-Event-Bus_48"/></svg></div><div class="t-heading">Event bus</div></div>
 <div class="el takeaway t-heading" style="left:112px;top:930px;width:1696px;height:80px">Spokes meet node edges so independence reads first.</div>
 </div>
 
