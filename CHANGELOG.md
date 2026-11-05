@@ -32,6 +32,14 @@ Entries before v0.5.0 were written retroactively as summaries.
   do not repeat across instances restored from the same snapshot. / Nothing. To stay on
   V1, see [Security](docs/en/security.md#agentcore-runtime-platform-versions).
 
+### Fixed
+
+- **MCP runtime: OpenTelemetry ids no longer repeat across V2 restores.** Every microVM
+  restored from the same snapshot started the `random` module from the same state, so
+  OpenTelemetry trace and span ids (and botocore retry jitter) could be identical across
+  instances. The MCP server now draws those values from the kernel
+  (`shared/snapshot_random.py`, installed before the server starts). / Nothing.
+
 ## [0.12.0] - 2026-11-05
 
 The Cloud Web UI now lets you send a message while the agent works, stop it for good,
