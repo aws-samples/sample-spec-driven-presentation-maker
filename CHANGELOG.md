@@ -10,6 +10,20 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Changed
+
+- **The bundled `aws-light` and `aws-dark` styles have a new content-slide frame.** Every
+  content slide now pairs a one-line topic title (a noun phrase) with a lead of up to two
+  lines that states the slide's finding, in dark orange (`aws-light`) or amber (`aws-dark`).
+  The section label above the title is gone and content starts lower, at y 350 in
+  `aws-light` and y 340 in `aws-dark`. The lead colour is part of the frame, so each slide
+  still has one orange emphasis. Style names and descriptions are unchanged; decks that
+  already use either style keep their copy in `specs/art-direction.html` until
+  `apply_style` is run again.
+- **The AWS design guide (`guides/aws-design.md`) no longer lists the "AWS default
+  template" colour palette.** No bundled template matches it. Icon selection and the AWS
+  service category colours stay.
+
 ## [0.12.0] - 2026-11-05
 
 The Cloud Web UI now lets you send a message while the agent works, stop it for good,

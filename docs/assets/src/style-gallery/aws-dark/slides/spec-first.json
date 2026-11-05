@@ -8,23 +8,23 @@
     {
       "_comment": "region: step-1",
       "x": 112,
-      "y": 335,
+      "y": 350,
       "w": 480,
-      "h": 455
+      "h": 440
     },
     {
       "_comment": "region: step-2",
       "x": 720,
-      "y": 335,
+      "y": 350,
       "w": 480,
-      "h": 455
+      "h": 440
     },
     {
       "_comment": "region: step-3",
       "x": 1328,
-      "y": 335,
+      "y": 350,
       "w": 480,
-      "h": 455
+      "h": 440
     },
     {
       "_comment": "region: takeaway",
@@ -36,27 +36,10 @@
     {
       "type": "textbox",
       "x": 112,
-      "y": 24,
-      "width": 760,
-      "height": 30,
-      "text": "{{bold:SPEC FIRST}}",
-      "fontSize": 12,
-      "fontColor": "#8FADD0",
-      "align": "left",
-      "verticalAlign": "top",
-      "marginLeft": 0,
-      "marginTop": 0,
-      "marginRight": 0,
-      "marginBottom": 0,
-      "_comment": "frame: section label"
-    },
-    {
-      "type": "textbox",
-      "x": 112,
-      "y": 64,
+      "y": 56,
       "width": 1696,
-      "height": 173,
-      "text": "{{bold:Agree on the content first}}",
+      "height": 88,
+      "text": "{{bold:Spec first}}",
       "fontSize": 36,
       "fontColor": "#FFFFFF",
       "align": "left",
@@ -65,15 +48,32 @@
       "marginTop": 0,
       "marginRight": 0,
       "marginBottom": 0,
-      "_comment": "frame: title"
+      "_comment": "frame: topic title"
+    },
+    {
+      "type": "textbox",
+      "x": 112,
+      "y": 152,
+      "width": 1696,
+      "height": 148,
+      "text": "{{bold:Agree on the content first}}",
+      "fontSize": 30,
+      "fontColor": "#FFB547",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0,
+      "_comment": "frame: lead"
     },
     {
       "type": "shape",
       "shape": "rounded_rectangle",
       "x": 112,
-      "y": 335,
+      "y": 350,
       "width": 480,
-      "height": 455,
+      "height": 440,
       "fill": "#1D2733",
       "adjustments": [
         0.0088
@@ -85,7 +85,7 @@
       "type": "shape",
       "shape": "oval",
       "x": 294,
-      "y": 395,
+      "y": 403,
       "width": 116,
       "height": 116,
       "fill": "#161D26",
@@ -96,7 +96,7 @@
       "type": "image",
       "src": "assets:material/description",
       "x": 313,
-      "y": 414,
+      "y": 422,
       "width": 78,
       "height": 78,
       "iconColor": "#FFFFFF"
@@ -104,7 +104,7 @@
     {
       "type": "textbox",
       "x": 136,
-      "y": 543,
+      "y": 551,
       "width": 432,
       "height": 60,
       "text": "{{bold:1 · Brief}}",
@@ -120,7 +120,7 @@
     {
       "type": "textbox",
       "x": 128,
-      "y": 619,
+      "y": 627,
       "width": 448,
       "height": 110,
       "text": "Who it is for, what they should do",
@@ -136,9 +136,9 @@
     {
       "type": "line",
       "x1": 592,
-      "y1": 562,
+      "y1": 570,
       "x2": 720,
-      "y2": 562,
+      "y2": 570,
       "color": "#8FADD0",
       "lineWidth": 2,
       "arrowEnd": "triangle"
@@ -147,9 +147,9 @@
       "type": "shape",
       "shape": "rounded_rectangle",
       "x": 720,
-      "y": 335,
+      "y": 350,
       "width": 480,
-      "height": 455,
+      "height": 440,
       "fill": "#1D2733",
       "adjustments": [
         0.0088
@@ -161,7 +161,7 @@
       "type": "shape",
       "shape": "oval",
       "x": 902,
-      "y": 395,
+      "y": 403,
       "width": 116,
       "height": 116,
       "fill": "#161D26",
@@ -172,7 +172,7 @@
       "type": "image",
       "src": "assets:material/palette",
       "x": 921,
-      "y": 414,
+      "y": 422,
       "width": 78,
       "height": 78,
       "iconColor": "#FFFFFF"
@@ -180,7 +180,7 @@
     {
       "type": "textbox",
       "x": 744,
-      "y": 543,
+      "y": 551,
       "width": 432,
       "height": 60,
       "text": "{{bold:2 · Style}}",
@@ -196,7 +196,7 @@
     {
       "type": "textbox",
       "x": 736,
-      "y": 619,
+      "y": 627,
       "width": 448,
       "height": 110,
       "text": "How every slide looks",
@@ -212,9 +212,9 @@
     {
       "type": "line",
       "x1": 1200,
-      "y1": 562,
+      "y1": 570,
       "x2": 1328,
-      "y2": 562,
+      "y2": 570,
       "color": "#8FADD0",
       "lineWidth": 2,
       "arrowEnd": "triangle"
@@ -223,9 +223,9 @@
       "type": "shape",
       "shape": "rounded_rectangle",
       "x": 1328,
-      "y": 335,
+      "y": 350,
       "width": 480,
-      "height": 455,
+      "height": 440,
       "fill": "#1D2733",
       "adjustments": [
         0.0088
@@ -237,7 +237,7 @@
       "type": "shape",
       "shape": "oval",
       "x": 1510,
-      "y": 395,
+      "y": 403,
       "width": 116,
       "height": 116,
       "fill": "#161D26",
@@ -248,7 +248,7 @@
       "type": "image",
       "src": "assets:material/format_list_numbered",
       "x": 1529,
-      "y": 414,
+      "y": 422,
       "width": 78,
       "height": 78,
       "iconColor": "#FFFFFF"
@@ -256,7 +256,7 @@
     {
       "type": "textbox",
       "x": 1352,
-      "y": 543,
+      "y": 551,
       "width": 432,
       "height": 60,
       "text": "{{bold:3 · Outline}}",
@@ -272,7 +272,7 @@
     {
       "type": "textbox",
       "x": 1344,
-      "y": 619,
+      "y": 627,
       "width": 448,
       "height": 110,
       "text": "One message per slide",
