@@ -1575,6 +1575,12 @@ _preload()
 if __name__ == "__main__":
     import uvicorn  # noqa: E402
 
+    from shared import snapshot_random  # noqa: E402
+
+    # Before the server starts (and so before the V2 snapshot): OpenTelemetry ids and
+    # retry jitter drawn from the random module stay distinct across restored microVMs.
+    snapshot_random.install()
+
     app = mcp.streamable_http_app()
     app.add_middleware(_CaptureHeadersMiddleware)
     uvicorn.run(app, host="0.0.0.0", port=8000)

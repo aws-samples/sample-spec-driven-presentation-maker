@@ -97,10 +97,10 @@ resolves credentials and opens connections on the first request after a restore.
 does the same: its Memory client, MCP connections, Bedrock models and session state are
 built on the first request, and its process owner is bound by that request. Values this
 stack takes from the kernel are not affected: `uuid.uuid4()` and `secrets` read
-`getrandom(2)` on every call, and SigV4 signing is HMAC-based and deterministic. The agent
-also rebinds the `random` module's functions to `random.SystemRandom`
-(`shared/snapshot_random.py`), so OpenTelemetry trace and span ids and retry jitter do not
-repeat across restored instances.
+`getrandom(2)` on every call, and SigV4 signing is HMAC-based and deterministic. Both
+processes also rebind the `random` module's functions to `random.SystemRandom` before they
+start (`shared/snapshot_random.py`), so OpenTelemetry trace and span ids and retry jitter
+do not repeat across restored instances.
 
 What remains is OpenSSL's own DRBG behind outbound TLS from both runtimes: seeded before
 the snapshot, it starts from the same state in every restored instance. Swapping in a
