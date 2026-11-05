@@ -10,8 +10,6 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
-## [0.12.1] - 2026-11-05
-
 ### Changed
 
 - **The bundled `aws-light` and `aws-dark` styles have a new content-slide frame.** Every
@@ -1513,8 +1511,7 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.1...HEAD
-[0.12.1]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.0...v0.12.1
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.0...HEAD
 [0.12.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.4...v0.11.0
 [0.10.4]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.3...v0.10.4
