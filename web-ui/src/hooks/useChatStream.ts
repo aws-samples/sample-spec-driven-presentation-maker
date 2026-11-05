@@ -10,7 +10,12 @@
  * A message sent while it works is a steer (steerAgentCore): its bubble appears where the
  * agent accepted it, and the reply after it goes into a new assistant message. Stop sends a
  * cancel (cancelAgentCore). `resume` follows a session that was working when the page
- * loaded; a send while it connects waits for its answer. Local keeps one request at a time and its own stop.
+ * loaded; a send while it connects waits for its answer.
+ *
+ * Local: one invoke at a time. A message sent while it runs is a steer too (steerLocalAgent):
+ * the invoke's stream reports it with the same `steer` events (a steer the prompt ended without
+ * reading continues the turn, as in Cloud). Stop ends the invoke at once; a steer the agent had
+ * not read by then is marked not delivered (the server clears it from kiro-cli's queue).
  *
  * Cloud background compose: `taskStart` gives the compose card a running task, which stays
  * running across later turns and messages until `taskEnd` closes it. `turnActive` is "a
@@ -28,7 +33,7 @@ import { useTranslations } from "next-intl"
 import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
 import { cancelAgentCore, invokeAgentCore, resumeAgentCore, steerAgentCore, stopRuntimeSession } from "@/services/agentCoreService"
-import { stopLocalAgent } from "@/services/localService"
+import { steerLocalAgent, stopLocalAgent } from "@/services/localService"
 import type { ToolUse } from "@/components/chat/ChatMessage"
 import type { McpServerStatus } from "@/components/chat/McpStatusBar"
 import type { UploadedFile } from "@/services/uploadService"
@@ -55,11 +60,11 @@ export interface Message {
   snippets?: { label: string; text: string }[]
   attachments?: { fileName: string; fileType: string }[]
   mcpStatus?: McpServerStatus[]
-  /** Cloud: the id of the steer this user message is. */
+  /** The id of the steer this user message is. */
   steerId?: string
-  /** Cloud: the steer was dropped by a stop before it reached the agent. */
+  /** The steer was dropped by a stop before it reached the agent. */
   steerNotDelivered?: boolean
-  /** Cloud: the steer is waiting for the agent (accepted) or the agent has read it (delivered). */
+  /** The steer is waiting for the agent (accepted) or the agent has read it (delivered). */
   steerState?: "accepted" | "delivered"
   /** Cloud: a composer's report to the orchestrator (`report_to_orchestrator`). */
   composerNote?: ComposerNote
@@ -462,6 +467,8 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   // works (a steer), or when the resume is over (a prompt). Null when no resume runs.
   const resumeGateRef = useRef<Promise<void> | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  // Local: the session the running invoke went to (a steer goes to the same one).
+  const localRunSessionRef = useRef<string | null>(null)
   const steersRef = useRef(new Map<string, PendingSteer>())
   const messagesRef = useRef(messages)
   messagesRef.current = messages
@@ -478,7 +485,11 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const stopGeneration = useCallback(() => {
     if (IS_LOCAL) {
       abortControllerRef.current?.abort()
-      stopLocalAgent({ sessionId }).catch((err) => notifyError(t("errorStopGeneration"), err))
+      stopLocalAgent({ sessionId: localRunSessionRef.current ?? sessionId }).catch((err) => notifyError(t("errorStopGeneration"), err))
+      // The stream is no longer read: a steer the agent had not read is dropped by this stop.
+      setMessages((prev) => prev.some((m) => m.steerState === "accepted" && !m.steerNotDelivered)
+        ? prev.map((m) => (m.steerState === "accepted" && !m.steerNotDelivered ? { ...m, steerNotDelivered: true } : m))
+        : prev)
       return
     }
     const token = auth.user?.access_token
@@ -507,14 +518,15 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     // state is known, then send as a steer or a prompt.
     if (!IS_LOCAL && resumeGateRef.current) await resumeGateRef.current
 
-    // Cloud, session working: a steer into the running work.
-    if (!IS_LOCAL && isLoadingRef.current) {
+    // Session working: a steer into the running work (Local: into the running invoke's turn).
+    if (isLoadingRef.current && (!IS_LOCAL || localRunSessionRef.current)) {
       const accessToken = auth.user?.access_token
-      if (!accessToken || !hasContent) return false
+      if ((!IS_LOCAL && !accessToken) || !hasContent) return false
       const id = crypto.randomUUID()
       steersRef.current.set(id, { display, snippets, attachments: sentAttachments })
       try {
-        await steerAgentCore(sessionId, userMessage, accessToken, id)
+        if (IS_LOCAL) await steerLocalAgent(localRunSessionRef.current as string, id, userMessage)
+        else await steerAgentCore(sessionId, userMessage, accessToken, id)
         return true
       } catch (err) {
         steersRef.current.delete(id)
@@ -546,12 +558,14 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
 
     const controller = new AbortController()
     abortControllerRef.current = controller
+    const runSessionId = options?.sessionIdOverride ?? sessionId
+    if (IS_LOCAL) localRunSessionRef.current = runSessionId
     const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: true, setTurnActive: setCloudTurnActive })
 
     try {
       await invokeAgentCore(
         userMessage,
-        options?.sessionIdOverride ?? sessionId,
+        runSessionId,
         run.onStreamUpdate,
         accessToken,
         userId,
@@ -599,6 +613,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       }
     } finally {
       abortControllerRef.current = null
+      localRunSessionRef.current = null
       isLoadingRef.current = false
       setIsLoading(false)
       setCloudTurnActive(false)

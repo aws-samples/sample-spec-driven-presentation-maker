@@ -10,7 +10,8 @@
  * follows a session that is working after a reload; `prepareAgentCore` builds the session
  * early on the new deck screen. Events go through the same parser as before.
  *
- * Local: Server-Sent Events from the Next.js API Route (unchanged).
+ * Local: Server-Sent Events from the Next.js API Route. A message sent into the running turn
+ * (services/localService.ts steerLocalAgent) comes back on that stream as `steer` events.
  */
 
 import * as parser from './strandsParser.js';
@@ -73,7 +74,7 @@ export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
 export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId, continuedFrom, translateError, onSession) => {
   // Local mode: proxy through Next.js API Route → kiro-cli acp
   if (IS_LOCAL) {
-    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom);
+    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom, onSession);
   }
 
   if (!userId) {
@@ -406,9 +407,10 @@ export const generateSessionId = (sub) => {
 /**
  * Invoke the local ACP agent via API Route.
  * Reads SSE stream from /api/agent/invoke and feeds events through the same
- * strandsParser used by the cloud path, so ChatPanel works unchanged.
+ * strandsParser used by the cloud path, so ChatPanel works unchanged. `steer` events (a
+ * message sent into this turn) go to `onSession.onEvent`, as the Cloud session's do.
  */
-const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom) => {
+const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom, onSession) => {
   const response = await fetch('/api/agent/invoke', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -457,6 +459,10 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
                 // A turn that ended without an answer carries a stable `code` (lib/local/turnErrors.ts).
                 if (event.code) error.code = event.code;
                 throw error;
+              }
+              if (event?.steer) {
+                onSession?.onEvent?.(event, { own: true });
+                continue;
               }
             }
             completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);

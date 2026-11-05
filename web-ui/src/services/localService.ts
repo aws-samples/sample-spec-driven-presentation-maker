@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * Local Service — client for the Local-only Next.js API routes (`src/app/api/`):
- * open in the OS, chat persistence, agent stop, agent definitions, models, and the
+ * open in the OS, chat persistence, agent stop and steer, agent definitions, models, and the
  * reconnect stream. Every function returns early in cloud mode, where those routes
  * do not exist.
  */
@@ -75,6 +75,29 @@ export async function saveLocalChat(deckId: string, messages: unknown[]): Promis
 export async function stopLocalAgent(target: { sessionId: string } | { newChat: true }): Promise<void> {
   if (!IS_LOCAL) return
   await postJson("/api/agent/stop", target)
+}
+
+/**
+ * Send a message into a session's running turn (a steer, `/api/agent/steer`). The turn's
+ * stream then reports it as `{steer: {id, state}}`.
+ *
+ * @param sessionId - Session whose turn runs
+ * @param id - The chat's id for the message
+ * @param text - The message
+ * @throws Error (with the route's `code` when it has one) when kiro-cli did not accept it
+ */
+export async function steerLocalAgent(sessionId: string, id: string, text: string): Promise<void> {
+  if (!IS_LOCAL) return
+  const response = await fetch("/api/agent/steer", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ sessionId, id, text }),
+  })
+  if (response.ok) return
+  const body = await response.text()
+  const error = Object.assign(new Error(`Steer failed: ${response.status}: ${body}`), { code: undefined as unknown })
+  try { error.code = JSON.parse(body).code } catch { /* non-JSON body */ }
+  throw error
 }
 
 /**

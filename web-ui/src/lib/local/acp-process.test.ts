@@ -8,12 +8,16 @@
  * is refused; a turn ends with the answer to its session/prompt (result or error), whatever the
  * sub-agent sessions or other requests sent, or with agent_exited when kiro-cli exits first;
  * kiro-cli's own requests are answered (permissions by option kind, the rest with Method not
- * found) and never taken for answers; setup requests time out and follow the caller's abort.
+ * found) and never taken for answers; setup requests time out and follow the caller's abort;
+ * a steer goes into the running turn and is reported accepted, delivered (V2 by its text, V3 by
+ * its messageId, or sent as a follow-up prompt when the prompt ended before kiro-cli read it) or
+ * discarded when Stop or an exit ends the turn first; either way kiro-cli's queue is cleared.
  * kiro-cli is replaced by a fake child that answers the ACP requests.
  */
 
 import { EventEmitter } from "events"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
+import { STEER_EVENT } from "./steer"
 import { TURN_END, TURN_ERROR } from "./turnErrors"
 
 const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
@@ -39,6 +43,10 @@ class FakeChild extends EventEmitter {
   failing = new Set<string>()
   /** Methods never answered (a kiro-cli that hangs). */
   silent = new Set<string>()
+  /** Every request this client sent, in order. */
+  requests: Rpc[] = []
+  /** The answer to `_session/steer` (V2 shape; V3 adds a messageId). */
+  steerAnswer: Record<string, unknown> = { queued: true }
   constructor(private readonly sessionId: string, private readonly lockedSessions: Set<string>) { super() }
 
   send(msg: Record<string, unknown>) {
@@ -50,7 +58,9 @@ class FakeChild extends EventEmitter {
     if (req.method === undefined) { this.answers.push(req as unknown as Record<string, unknown>); return }
     if (req.method === "session/cancel") this.cancelled.push(req.params.sessionId as string)
     if (req.id == null) return
+    this.requests.push(req)
     if (this.silent.has(req.method)) return
+    if (req.method === "_session/steer" && !this.failing.has(req.method)) { this.send({ id: req.id, result: this.steerAnswer }); return }
     if (req.method === "session/new") this.send({ id: req.id, result: { sessionId: this.sessionId } })
     else if (req.method === "session/load" && this.lockedSessions.has(req.params.sessionId as string)) {
       this.send({ id: req.id, error: { message: "Internal error", data: "Failed to start session: Session is active in another process (PID 1)" } })
@@ -420,5 +430,164 @@ describe("session held by another process", () => {
     expect(sessionConflict(error)?.code).toBe("session_locked")
     expect(acp.hasProcess("K9")).toBe(false)
     expect(children[0].killed).toBe(true)
+  })
+})
+
+describe("steer", () => {
+  const steerEvents = (seen: Record<string, unknown>[]) => seen
+    .filter((m) => m.method === STEER_EVENT || m.method === TURN_END || m.method === TURN_ERROR)
+    .map((m) => m.method === STEER_EVENT ? (m.params as { state: string }).state : m.method)
+
+  async function running() {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "count to sixty")
+    const seen: Record<string, unknown>[] = []
+    prompted.subscribe((msg) => { seen.push(msg) })
+    prompted.send()
+    await settle()
+    return { child: children[0], seen }
+  }
+
+  it("queues the message into the running turn and reports it delivered once V2 injects it (matched by text)", async () => {
+    const { child, seen } = await running()
+    await acp.steerSession("C1", "m1", "stop counting")
+    expect(child.requests.find((r) => r.method === "_session/steer")?.params).toEqual({ sessionId: "K1", message: "stop counting" })
+    expect(seen.at(-1)).toEqual({ method: STEER_EVENT, params: { sessionId: "K1", id: "m1", text: "stop counting", state: "accepted" } })
+
+    child.send({ method: "_kiro.dev/session/update", params: { sessionId: "K1", update: { sessionUpdate: "AgentExecutionSteeringInjected", messageId: "steer-abc", content: "stop counting" } } })
+    await settle()
+    expect(seen.at(-1)).toEqual({ method: STEER_EVENT, params: { sessionId: "K1", id: "m1", state: "delivered" } })
+
+    child.endTurn()
+    await settle()
+    expect(steerEvents(seen)).toEqual(["accepted", "delivered", TURN_END])
+    expect(child.requests.some((r) => r.method === "_session/steer/clear")).toBe(false)
+    // Buffered for a /stream reconnect.
+    expect(acp.getBufferedEvents("C1").filter((e) => e.msg.method === STEER_EVENT)).toHaveLength(2)
+  })
+
+  it("matches V3's steering_injected by messageId", async () => {
+    const { child, seen } = await running()
+    child.steerAnswer = { queued: true, messageId: "steer-9" }
+    await acp.steerSession("C1", "m1", "first")
+    child.steerAnswer = { queued: true, messageId: "steer-10" }
+    await acp.steerSession("C1", "m2", "first")
+    child.update("K1", { sessionUpdate: "session_info_update", _meta: { kiro: { kind: "steering_injected", messageId: "steer-10", content: "first" } } })
+    await settle()
+    expect(seen.at(-1)).toMatchObject({ method: STEER_EVENT, params: { id: "m2", state: "delivered" } })
+  })
+
+  it("refuses a message when no turn runs, and one kiro-cli does not queue", async () => {
+    await acp.createNewProcessFor("C1")
+    await expect(acp.steerSession("C1", "m1", "hi")).rejects.toMatchObject({ code: "session_idle" })
+    await expect(acp.steerSession("nobody", "m1", "hi")).rejects.toMatchObject({ code: "session_idle" })
+
+    const prompted = await acp.sendPrompt("C1", "count")
+    const seen: Record<string, unknown>[] = []
+    prompted.subscribe((msg) => { seen.push(msg) })
+    prompted.send()
+    await settle()
+    children[0].steerAnswer = { queued: false, messageId: "steer-1", dropped: "epoch_changed" }
+    await expect(acp.steerSession("C1", "m2", "late")).rejects.toMatchObject({ code: "steer_not_queued", message: expect.stringContaining("epoch_changed") })
+    children[0].failing.add("_session/steer")
+    await expect(acp.steerSession("C1", "m3", "broken")).rejects.toMatchObject({ code: "steer_not_queued", message: expect.stringContaining("_session/steer failed") })
+    expect(seen.filter((m) => m.method === STEER_EVENT)).toEqual([])
+  })
+
+  it("on Stop, reports an unread message discarded before the turn end and clears it before the next prompt", async () => {
+    const { child, seen } = await running()
+    await acp.steerSession("C1", "m1", "remember KUMQUAT")
+    acp.cancelSession("C1")
+    child.silent.add("_session/steer/clear")
+    child.endTurn("cancelled")
+    await settle()
+    expect(steerEvents(seen)).toEqual(["accepted", "discarded", TURN_END])
+    const clear = child.requests.find((r) => r.method === "_session/steer/clear")
+    expect(clear?.params).toEqual({ sessionId: "K1" })
+
+    // The next prompt waits until kiro-cli has emptied its queue.
+    let next = false
+    void acp.sendPrompt("C1", "next").then(() => { next = true })
+    await settle()
+    expect(next).toBe(false)
+    child.send({ id: clear!.id, result: { cleared: true } })
+    await settle()
+    expect(next).toBe(true)
+  })
+
+  it("takes a message back out when the turn ends while kiro-cli queues it", async () => {
+    const { child, seen } = await running()
+    child.silent.add("_session/steer")
+    const steered = acp.steerSession("C1", "m1", "too late")
+    await settle()
+    child.endTurn()
+    await settle()
+    const steer = child.requests.find((r) => r.method === "_session/steer")!
+    child.send({ id: steer.id, result: { queued: true } })
+    await expect(steered).rejects.toMatchObject({ code: "session_idle" })
+    expect(child.requests.at(-1)?.method).toBe("_session/steer/clear")
+    expect(seen.filter((m) => m.method === STEER_EVENT)).toEqual([])
+  })
+
+  it("continues a turn that ended before kiro-cli read a message with a follow-up prompt on the same stream", async () => {
+    const { child, seen } = await running()
+    await acp.steerSession("C1", "m1", "add a summary slide")
+    await acp.steerSession("C1", "m2", "and use blue")
+    child.endTurn()
+    await settle()
+    const methods = child.requests.map((r) => r.method)
+    expect(methods.slice(-2)).toEqual(["_session/steer/clear", "session/prompt"])
+    expect(child.requests.at(-1)?.params).toEqual({ sessionId: "K1", prompt: [{ type: "text", text: "add a summary slide\n\nand use blue" }] })
+    expect(steerEvents(seen)).toEqual(["accepted", "accepted", "delivered", "delivered"])
+    expect(acp.isSessionRunning("C1")).toBe(true)
+    await expect(acp.sendPrompt("C1", "another")).rejects.toThrow(/still answering/)
+
+    child.endTurn()
+    await settle()
+    expect(steerEvents(seen)).toEqual(["accepted", "accepted", "delivered", "delivered", TURN_END])
+    expect(acp.isSessionRunning("C1")).toBe(false)
+  })
+
+  it("ends the turn instead of continuing when Stop comes while the queue is cleared", async () => {
+    const { child, seen } = await running()
+    await acp.steerSession("C1", "m1", "more")
+    child.silent.add("_session/steer/clear")
+    child.endTurn()
+    await settle()
+    acp.cancelSession("C1")
+    const clear = child.requests.find((r) => r.method === "_session/steer/clear")!
+    child.send({ id: clear.id, result: { cleared: true } })
+    await settle()
+    expect(steerEvents(seen)).toEqual(["accepted", "discarded", TURN_END])
+    expect(seen.at(-1)).toMatchObject({ params: { stopReason: "cancelled" } })
+    expect(child.requests.filter((r) => r.method === "session/prompt")).toHaveLength(1)
+  })
+
+  it("leaves a message queued after the clear to kiro-cli, out of the follow-up prompt's text", async () => {
+    const { child, seen } = await running()
+    await acp.steerSession("C1", "m1", "first")
+    child.silent.add("_session/steer/clear")
+    child.endTurn()
+    await settle()
+    await acp.steerSession("C1", "m2", "second")
+    const clear = child.requests.find((r) => r.method === "_session/steer/clear")!
+    child.send({ id: clear.id, result: { cleared: true } })
+    await settle()
+    expect(child.requests.at(-1)?.params).toMatchObject({ prompt: [{ type: "text", text: "first" }] })
+    // kiro-cli reads "second" in the follow-up prompt itself.
+    child.send({ method: "_kiro.dev/session/update", params: { sessionId: "K1", update: { sessionUpdate: "AgentExecutionSteeringInjected", content: "second" } } })
+    await settle()
+    expect(seen.filter((m) => m.method === STEER_EVENT).map((m) => m.params)).toMatchObject([
+      { id: "m1", state: "accepted" }, { id: "m2", state: "accepted" }, { id: "m1", state: "delivered" }, { id: "m2", state: "delivered" },
+    ])
+  })
+
+  it("reports an unread message discarded when kiro-cli exits, without a clear", async () => {
+    const { child, seen } = await running()
+    await acp.steerSession("C1", "m1", "hello")
+    child.kill()
+    await settle()
+    expect(steerEvents(seen)).toEqual(["accepted", "discarded", TURN_ERROR])
+    expect(child.requests.some((r) => r.method === "_session/steer/clear")).toBe(false)
   })
 })

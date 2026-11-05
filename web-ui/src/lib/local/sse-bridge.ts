@@ -11,6 +11,7 @@ import path from "path"
 
 import { DECK_ROOT } from "./deck-paths"
 import { basename } from "./pathUtils"
+import { STEER_EVENT } from "./steer"
 import { localTurnError, TURN_END, TURN_ERROR, isLocalTurnErrorCode, type LocalTurnErrorCode } from "./turnErrors"
 
 const DECK_ROOT_ABS = path.resolve(DECK_ROOT)
@@ -98,6 +99,12 @@ export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onErro
         if (msg.method === TURN_END || msg.method === TURN_ERROR) {
           if (replaying) endedDuringReplay = msg
           else finish(msg)
+          return
+        }
+        // A message sent into the turn (lib/local/steer.ts), in the Cloud steer event's shape.
+        if (msg.method === STEER_EVENT) {
+          const { id, text, state } = (msg.params || {}) as { id?: string; text?: string; state?: string }
+          if (id && state) send({ steer: { id, ...(text !== undefined ? { text } : {}), state } })
           return
         }
         if (msg.method !== "session/update" && msg.method !== "_kiro.dev/session/update") return

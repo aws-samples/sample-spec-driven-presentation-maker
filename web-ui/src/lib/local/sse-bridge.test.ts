@@ -6,6 +6,7 @@ import { describe, expect, it, vi } from "vitest"
 
 import { DECK_ROOT } from "./deck-paths"
 import { createSSEStream } from "./sse-bridge"
+import { STEER_EVENT } from "./steer"
 import { TURN_END, TURN_ERROR } from "./turnErrors"
 
 const SID = "11111111-1111-4111-8111-111111111111"
@@ -63,6 +64,23 @@ describe("createSSEStream", () => {
     expect(events).toHaveLength(2)
     expect(events[1]).toMatchObject({ status: "error", code: stopReason })
     expect(b.onDone).toHaveBeenCalledOnce()
+  })
+
+  it("forwards a steer's states in the Cloud steer event's shape, between the turn's text", async () => {
+    const b = bridge()
+    b.push(text("one "))
+    b.push({ method: STEER_EVENT, params: { sessionId: SID, id: "m1", text: "stop", state: "accepted" } })
+    b.push({ method: STEER_EVENT, params: { sessionId: SID, id: "m1", state: "delivered" } })
+    b.push(text("STOPPED"))
+    b.push({ method: STEER_EVENT, params: { sessionId: SID, id: "m2", state: "discarded" } })
+    b.push(turnEnd("cancelled"))
+    expect(await b.events()).toEqual([
+      { event: { contentBlockDelta: { delta: { text: "one " } } } },
+      { steer: { id: "m1", text: "stop", state: "accepted" } },
+      { steer: { id: "m1", state: "delivered" } },
+      { event: { contentBlockDelta: { delta: { text: "STOPPED" } } } },
+      { steer: { id: "m2", state: "discarded" } },
+    ])
   })
 
   it("ignores JSON-RPC answers to other requests", async () => {
