@@ -11,8 +11,19 @@ import path from "path"
 
 import { DECK_ROOT } from "./deck-paths"
 import { basename } from "./pathUtils"
+import { localTurnError, TURN_END, TURN_ERROR, isLocalTurnErrorCode, type LocalTurnErrorCode } from "./turnErrors"
 
 const DECK_ROOT_ABS = path.resolve(DECK_ROOT)
+
+/**
+ * ACP stopReasons that end a turn without a full answer. end_turn and cancelled (Stop) close the
+ * stream quietly, and so does a stopReason this table does not know: every answer closes it.
+ */
+const STOP_REASON_ERRORS: Record<string, LocalTurnErrorCode> = {
+  refusal: "refusal",
+  max_tokens: "max_tokens",
+  max_turn_requests: "max_turn_requests",
+}
 
 interface BridgeOptions {
   sessionId: string
@@ -51,8 +62,24 @@ export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onErro
         try { controller.close() } catch {}
       }
 
-      // Replay buffered notifications first (for reconnecting to background sessions)
+      /** The process manager's end of the turn (lib/local/turnErrors.ts): the stream's last event. */
+      function finish(msg: Record<string, unknown>) {
+        const params = (msg.params || {}) as { stopReason?: string; code?: unknown; message?: string }
+        if (msg.method === TURN_ERROR) {
+          send(isLocalTurnErrorCode(params.code) ? localTurnError(params.code) : { status: "error", error: params.message || "ACP request failed" })
+          onError?.()
+        } else {
+          const code = params.stopReason ? STOP_REASON_ERRORS[params.stopReason] : undefined
+          if (code) send(localTurnError(code))
+        }
+        close()
+      }
+
+      // Replay buffered notifications first (for reconnecting to background sessions).
+      // A turn that ended meanwhile ends the replayed stream instead of leaving it open.
+      let unsubscribe = () => {}
       let replaying = true
+      let endedDuringReplay: Record<string, unknown> | null = null
       if (replay?.length) {
         for (const { id, msg } of replay) {
           eventId = id  // sync event ID counter
@@ -60,30 +87,19 @@ export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onErro
         }
       }
       replaying = false
+      if (endedDuringReplay) {
+        finish(endedDuringReplay)
+        return
+      }
 
-      const unsubscribe = subscribe(processMsg)
+      unsubscribe = subscribe(processMsg)
 
       function processMsg(msg: Record<string, unknown>) {
-        if (msg.id != null && msg.error) {
-          if (!replaying) {
-            const error = msg.error as { message?: string }
-            send({ status: "error", error: error.message || "ACP request failed" })
-            onError?.()
-            close()
-          }
+        if (msg.method === TURN_END || msg.method === TURN_ERROR) {
+          if (replaying) endedDuringReplay = msg
+          else finish(msg)
           return
         }
-
-        // End turn from RPC response
-        if (msg.id != null && msg.result) {
-          const r = msg.result as Record<string, unknown>
-          if (r.stopReason === "end_turn" || r.stopReason === "cancelled") {
-            if (!replaying) { close(); return }
-            // During replay, ignore end_turn from old responses
-            return
-          }
-        }
-
         if (msg.method !== "session/update" && msg.method !== "_kiro.dev/session/update") return
         const params = msg.params as Record<string, unknown>
         const msgSessionId = params.sessionId as string
@@ -195,8 +211,8 @@ export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onErro
         }
 
         // Don't close on session/update turn_end — it may fire before
-        // compose_slides tool_call_update(completed). Close only on
-        // RPC response end_turn (line 62 above).
+        // compose_slides tool_call_update(completed). Close only on the
+        // process manager's TURN_END / TURN_ERROR (finish above).
       }
     },
   })

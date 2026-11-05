@@ -510,6 +510,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               if (d.status === "starting" || d.status === "done") saveLocalChat()
             }
           },
+          stream.translateError,
         )
       }
 

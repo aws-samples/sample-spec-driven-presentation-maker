@@ -4,11 +4,13 @@
 /**
  * POST /api/agent/invoke answers a session conflict with 409 and a code the chat UI
  * translates: `session_busy` while the session is still answering, `session_locked` when
- * kiro-cli refuses to load a session another process holds. Other failures still throw.
+ * kiro-cli refuses to load a session another process holds. A kiro-cli that does not answer
+ * its setup requests in time gets 504 `agent_timeout`. Other failures still throw.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { SessionBusyError } from "@/lib/local/sessionErrors"
+import { AgentTimeoutError } from "@/lib/local/turnErrors"
 
 const acp = vi.hoisted(() => ({
   hasProcess: vi.fn(),
@@ -57,6 +59,15 @@ describe("POST /api/agent/invoke session conflicts", () => {
     expect(body.code).toBe("session_locked")
     expect(body.error).toContain("another kiro-cli process")
     expect(acp.sendPrompt).not.toHaveBeenCalled()
+  })
+
+  it("returns 504 agent_timeout when kiro-cli does not answer its setup requests", async () => {
+    acp.hasProcess.mockReturnValue(false)
+    acp.createNewProcessFor.mockRejectedValue(new AgentTimeoutError("initialize", 30_000))
+    const res = await invoke({ sessionId: "C1" })
+    expect(res.status).toBe(504)
+    expect(await res.json()).toMatchObject({ status: "error", code: "agent_timeout" })
+    expect(acp.createNewProcessFor).toHaveBeenCalledWith("C1", "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
   })
 
   it("rethrows failures that are not session conflicts", async () => {

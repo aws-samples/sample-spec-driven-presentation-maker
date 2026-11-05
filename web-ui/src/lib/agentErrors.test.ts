@@ -55,4 +55,10 @@ describe("agentErrorMessage with session_reload_required", () => {
   it("falls back to English when the translator returns undefined", () => {
     expect(agentErrorMessage("raw", "throttled", () => undefined)).toMatch(/temporarily busy/)
   })
+
+  it("asks the translator for a code outside its table before classifying", () => {
+    const translate = (code: string) => (code === "agent_exited" ? "translated" : undefined)
+    expect(agentErrorMessage("kiro-cli stopped", "agent_exited", translate)).toBe("translated")
+    expect(agentErrorMessage("timed out waiting", "future_code", translate)).toMatch(/took too long/)
+  })
 })

@@ -37,6 +37,7 @@ import { notifyError } from "@/lib/errors"
 import { agentErrorMessage, classifyAgentError } from "@/lib/agentErrors"
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
 import { isSessionConflictCode } from "@/lib/local/sessionErrors"
+import { isLocalTurnErrorCode, LOCAL_TURN_ERROR_KEYS } from "@/lib/local/turnErrors"
 
 export interface SendMessageOptions {
   displayContent?: string
@@ -116,6 +117,8 @@ export interface UseChatStreamReturn {
   turnActive: boolean
   /** Ref to current messages for external reads without re-render dependency. */
   messagesRef: React.MutableRefObject<Message[]>
+  /** The stream parser's translator for error codes (Local reconnect parses its own stream). */
+  translateError: (code: string) => string | undefined
 }
 
 type Block = { type: "text"; text: string } | { type: "tool"; tool: ToolUse }
@@ -466,7 +469,9 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const t = useTranslations("chat")
 
   const translateError = useCallback(
-    (code: string) => code === "session_reload_required" ? t("errorSessionReloadRequired") : undefined,
+    (code: string) => code === "session_reload_required"
+      ? t("errorSessionReloadRequired")
+      : isLocalTurnErrorCode(code) ? t(LOCAL_TURN_ERROR_KEYS[code]) : undefined,
     [t],
   )
 
@@ -570,6 +575,8 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
         const errorMessage = err instanceof Error ? err.message : String(err)
         const code = classifyAgentError(errorMessage)
         const conflictCode = (err as { code?: unknown }).code
+        // A Local turn that ended without an answer keeps what was already streamed.
+        const turnError = isLocalTurnErrorCode(conflictCode) ? t(LOCAL_TURN_ERROR_KEYS[conflictCode]) : null
         // Transport-level failures don't carry raw model errors worth showing —
         // always use the friendly classified message here.
         const displayMessage = isSessionConflictCode(conflictCode)
@@ -579,10 +586,14 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
             : agentErrorMessage(errorMessage, code)
         setMessages((prev) => {
           const updated = [...prev]
-          updated[updated.length - 1] = {
-            ...updated[updated.length - 1],
-            content: displayMessage,
-          }
+          const last = updated[updated.length - 1]
+          updated[updated.length - 1] = turnError
+            ? {
+                ...last,
+                content: last.content ? `${last.content}\n\n⚠ ${turnError}` : `⚠ ${turnError}`,
+                ...(last.blocks?.length ? { blocks: [...last.blocks, { type: "text" as const, text: `⚠ ${turnError}` }] } : {}),
+              }
+            : { ...last, content: displayMessage }
           return updated
         })
       }
@@ -641,5 +652,5 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   }, [sessionId, auth.user?.access_token, onToolEvent, onSendComplete, translateError])
 
   const turnActive = IS_LOCAL ? isLoading : cloudTurnActive
-  return { messages, setMessages, isLoading, sendMessage, stopGeneration, resume, reconnecting, stopping, turnActive, messagesRef }
+  return { messages, setMessages, isLoading, sendMessage, stopGeneration, resume, reconnecting, stopping, turnActive, messagesRef, translateError }
 }

@@ -20,12 +20,23 @@ import { syncToAgentsDir } from "./agents-sync"
 import type { ForkSessionPhase, ForkSessionPhaseDetail, SessionOrigin } from "./kiro-sessions.types"
 import { watchMcpServerReady } from "./mcp-ready"
 import { SessionBusyError } from "./sessionErrors"
+import { AgentTimeoutError, TURN_END, TURN_ERROR } from "./turnErrors"
 
 export { DECK_ROOT }
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 const MAX_PROCESSES = 3
 /** Matches the sdpm server's `timeout` in the ACP agent definitions. */
 const MCP_READY_TIMEOUT_MS = 120_000
+/**
+ * Setup requests that must not hang an invoke forever. session/new and session/load can wait
+ * for the agent's MCP servers (their own timeout is MCP_READY_TIMEOUT_MS) and session/load
+ * replays the whole history first, so they get that plus a margin. session/prompt has none:
+ * a turn lasts as long as the agent works, and Stop ends it.
+ */
+const INITIALIZE_TIMEOUT_MS = 30_000
+const SESSION_SETUP_TIMEOUT_MS = MCP_READY_TIMEOUT_MS + 60_000
+/** JSON-RPC "Method not found", the answer to agent requests this client does not implement. */
+const METHOD_NOT_FOUND = -32601
 
 type PendingResolve = (value: unknown) => void
 interface PendingRequest {
@@ -33,6 +44,11 @@ interface PendingRequest {
   reject: (reason?: unknown) => void
 }
 type NotifyListener = (msg: Record<string, unknown>) => void
+
+interface RequestOptions {
+  timeoutMs?: number
+  signal?: AbortSignal
+}
 
 interface SpawnProcessOptions {
   setMode?: boolean
@@ -50,6 +66,8 @@ interface ProcessState {
   listeners: Set<NotifyListener>
   lineBuffer: string
   running: boolean
+  /** The child has exited (or failed to spawn); requests to it fail at once. */
+  exited: boolean
   /** A session/prompt request has been sent and has not been answered yet. */
   promptInFlight: boolean
   /** JSON-RPC id of the current turn's session/prompt; its response (result or error) ends the turn. */
@@ -72,43 +90,82 @@ let availableModels: AcpModel[] = []
 
 // ── Per-process helpers ──
 
+function writeMessage(ps: ProcessState, msg: Record<string, unknown>): void {
+  if (ps.exited) return
+  ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", ...msg }) + "\n")
+}
+
+/** Buffer an event for /stream reconnects and hand it to every listener. */
+function emit(ps: ProcessState, msg: Record<string, unknown>): void {
+  ps.notifications.push({ id: ++ps.eventIdCounter, msg })
+  if (ps.notifications.length > 2000) ps.notifications.shift()
+  for (const fn of ps.listeners) fn(msg)
+}
+
+/** The turn started by sendPrompt is over: release the session and tell the listeners. */
+function endTurn(ps: ProcessState, event: Record<string, unknown>): void {
+  ps.promptRequestId = null
+  ps.running = false
+  ps.subSessionIds.clear()
+  emit(ps, { ...event, params: { sessionId: ps.sessionId, ...(event.params as Record<string, unknown>) } })
+}
+
+interface PermissionOption { optionId?: string; kind?: string }
+
+/**
+ * Answer a request kiro-cli sends to this client. Its id is kiro-cli's own and may equal one of
+ * ours, so it is never matched against our pending requests. Permission requests are approved
+ * with the offered option of kind allow_once (else allow_always): the optionId comes from the
+ * request, never a fixed string, since V2 and V3 name their options differently. Anything else
+ * is answered with Method not found, as JSON-RPC asks, instead of leaving kiro-cli waiting.
+ */
+function answerAgentRequest(ps: ProcessState, msg: Record<string, unknown>): void {
+  const method = msg.method as string
+  if (method === "session/request_permission") {
+    const options = ((msg.params as Record<string, unknown> | undefined)?.options ?? []) as PermissionOption[]
+    const pick = options.find((o) => o.kind === "allow_once")
+      ?? options.find((o) => o.kind === "allow_always")
+      ?? options.find((o) => o.kind === "reject_once")
+    const outcome = pick?.optionId ? { outcome: "selected", optionId: pick.optionId } : { outcome: "cancelled" }
+    writeMessage(ps, { id: msg.id, result: { outcome } })
+    return
+  }
+  writeMessage(ps, { id: msg.id, error: { code: METHOD_NOT_FOUND, message: `Method not found: ${method}` } })
+}
+
 function handleLine(ps: ProcessState, line: string) {
   if (!line.trim()) return
   let msg: Record<string, unknown>
   try { msg = JSON.parse(line) } catch { return }
 
-  // JSON-RPC response — resolve the pending promise, then fall through to the
-  // listeners. Returning here would short-circuit reuse: each turn would spawn
-  // a fresh process, dropping the prior turn's context (read_guides, upload
-  // result, hearing answers) and making the agent appear to drift back into Phase 1.
-  if (msg.id != null && ps.pending.has(msg.id as number)) {
-    const pending = ps.pending.get(msg.id as number)!
+  // A request from kiro-cli carries a method and an id.
+  if (msg.method !== undefined && msg.id != null) {
+    answerAgentRequest(ps, msg)
+    return
+  }
+
+  // A response to one of our requests. Only the answer to this turn's session/prompt ends the
+  // turn (kiro-cli sends no turn_end for sub-agent sessions); an error answer to any other
+  // request (set_config_option, a steer) rejects that request alone.
+  if (msg.id != null) {
+    const pending = ps.pending.get(msg.id as number)
+    if (!pending) return
     ps.pending.delete(msg.id as number)
-    // The answer to the main session's session/prompt is the end of the turn.
-    // kiro-cli sends no turn_end for sub-agent sessions, so they cannot hold it open.
-    if (msg.id === ps.promptRequestId) {
-      ps.promptRequestId = null
-      ps.running = false
-      ps.subSessionIds.clear()
-    }
+    let failure: Error | null = null
     if (msg.error) {
       const error = msg.error as { message?: string; data?: unknown }
       // kiro-cli puts the actual cause in `data` ("Internal error" alone is useless in logs)
       const detail = error.data === undefined ? "" : `: ${typeof error.data === "string" ? error.data : JSON.stringify(error.data)}`
-      pending.reject(new Error(`${error.message || "ACP request failed"}${detail}`))
-    } else {
-      pending.resolve(msg.result)
+      failure = new Error(`${error.message || "ACP request failed"}${detail}`)
     }
-  }
-
-  // Auto-approve permission requests
-  if (msg.method === "session/request_permission") {
-    const reqId = msg.id as string
-    if (reqId && ps.child) {
-      ps.child.stdin!.write(JSON.stringify({
-        jsonrpc: "2.0", id: reqId, result: { outcome: { outcome: "selected", optionId: "allow_always" } },
-      }) + "\n")
+    if (msg.id === ps.promptRequestId) {
+      const result = msg.result as { stopReason?: string } | undefined
+      endTurn(ps, failure
+        ? { method: TURN_ERROR, params: { message: failure.message } }
+        : { method: TURN_END, params: { stopReason: result?.stopReason ?? "end_turn" } })
     }
+    if (failure) pending.reject(failure)
+    else pending.resolve(msg.result)
     return
   }
 
@@ -125,27 +182,49 @@ function handleLine(ps: ProcessState, line: string) {
     if ((updType === "turn_end" || updType === "end_turn") && sid && sid !== ps.sessionId) {
       ps.subSessionIds.delete(sid)
     }
-    ps.notifications.push({ id: ++ps.eventIdCounter, msg })
-    if (ps.notifications.length > 2000) ps.notifications.shift()
+    emit(ps, msg)
+    return
   }
 
   for (const fn of ps.listeners) fn(msg)
 }
 
-function startRequest(ps: ProcessState, method: string, params: Record<string, unknown> = {}): { id: number; response: Promise<unknown> } {
+function startRequest(
+  ps: ProcessState,
+  method: string,
+  params: Record<string, unknown> = {},
+  opts: RequestOptions = {},
+): { id: number; response: Promise<unknown> } {
   if (!ps.child) throw new Error("Process not running")
   const id = ++ps.requestId
-  ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n")
-  return { id, response: new Promise((resolve, reject) => { ps.pending.set(id, { resolve, reject }) }) }
+  const response = new Promise<unknown>((resolve, reject) => {
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const settle = () => {
+      if (timer) clearTimeout(timer)
+      opts.signal?.removeEventListener("abort", onAbort)
+      ps.pending.delete(id)
+    }
+    const onAbort = () => { settle(); reject(new DOMException("Request cancelled", "AbortError")) }
+    ps.pending.set(id, {
+      resolve: (value) => { settle(); resolve(value) },
+      reject: (reason) => { settle(); reject(reason) },
+    })
+    if (ps.exited) { settle(); reject(new Error("ACP process has exited")); return }
+    if (opts.timeoutMs) timer = setTimeout(() => { settle(); reject(new AgentTimeoutError(method, opts.timeoutMs!)) }, opts.timeoutMs)
+    if (opts.signal?.aborted) onAbort()
+    else opts.signal?.addEventListener("abort", onAbort, { once: true })
+  })
+  writeMessage(ps, { id, method, params })
+  return { id, response }
 }
 
-function rpcRequestTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}): Promise<unknown> {
-  return startRequest(ps, method, params).response
+function rpcRequestTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}, opts?: RequestOptions): Promise<unknown> {
+  return startRequest(ps, method, params, opts).response
 }
 
 function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}): void {
   if (!ps.child) return
-  ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n")
+  writeMessage(ps, { method, params })
 }
 
 /** Ensure agents/ has files (first launch before Settings is opened). */
@@ -180,7 +259,7 @@ async function spawnProcess(
   const ps: ProcessState = {
     child, deckId: "", sessionId: null, agentName,
     requestId: 0, pending: new Map(), listeners: new Set(),
-    lineBuffer: "", running: false, promptInFlight: false, promptRequestId: null, notifications: [], eventIdCounter: 0,
+    lineBuffer: "", running: false, exited: false, promptInFlight: false, promptRequestId: null, notifications: [], eventIdCounter: 0,
     lastActivity: Date.now(), subSessionIds: new Set(),
   }
 
@@ -194,12 +273,24 @@ async function spawnProcess(
 
   child.stderr!.setEncoding("utf-8")
   child.stderr!.on("data", (d: string) => console.warn("[acp] stderr: %s", d.trim()))
+  // A write racing the exit (a Stop just as kiro-cli dies) fails with EPIPE; the exit handles it.
+  child.stdin!.on("error", (error) => console.warn("[acp] stdin: %s", error.message))
 
-  child.on("close", (code) => {
+  // The process is gone: fail what waits on it, end a running turn with an error the bridge
+  // forwards (otherwise the chat would spin forever), and drop it from the map.
+  const onExit = (code: number | null) => {
+    if (ps.exited) return
+    ps.exited = true
     console.log("[acp close] sessionId=%s code=%s", ps.sessionId, code)
-    for (const pending of ps.pending.values()) pending.reject(new Error(`ACP process exited with code ${code}`))
+    for (const pending of [...ps.pending.values()]) pending.reject(new Error(`ACP process exited with code ${code}`))
     ps.pending.clear()
+    if (ps.promptInFlight) endTurn(ps, { method: TURN_ERROR, params: { code: "agent_exited", message: `kiro-cli exited with code ${code}` } })
     forgetProcess(ps)
+  }
+  child.on("close", onExit)
+  child.on("error", (error) => {
+    console.warn("[acp] process error: %s", error.message)
+    if (child.pid === undefined) onExit(null) // spawn failed (kiro-cli not found); no close follows
   })
 
   try {
@@ -208,14 +299,14 @@ async function spawnProcess(
       protocolVersion: 1,
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
       clientInfo: { name: "sdpm-local", version: "0.1.0" },
-    })
+    }, { timeoutMs: INITIALIZE_TIMEOUT_MS, signal: opts.signal })
 
     // Create session
     const result = await rpcRequestTo(ps, "session/new", {
       cwd: MCP_LOCAL_DIR,
       mcpServers: [],
       agent: agentName,
-    }) as Record<string, unknown>
+    }, { timeoutMs: SESSION_SETUP_TIMEOUT_MS, signal: opts.signal }) as Record<string, unknown>
     ps.sessionId = result.sessionId as string
 
     // Restore existing session context if provided (Obsidian agent-client pattern)
@@ -247,7 +338,7 @@ async function spawnProcess(
           sessionId: existingSessionId,
           cwd: MCP_LOCAL_DIR,
           mcpServers: [],
-        }) as { modes?: { availableModes?: { id: string }[] } }
+        }, { timeoutMs: SESSION_SETUP_TIMEOUT_MS, signal: opts.signal }) as { modes?: { availableModes?: { id: string }[] } }
       } catch (error) {
         sdpmReady?.dispose()
         throw error
@@ -267,7 +358,7 @@ async function spawnProcess(
         }
         opts.onPhase?.("switching")
         try {
-          await rpcRequestTo(ps, "session/set_mode", { sessionId: existingSessionId, modeId: agentName })
+          await rpcRequestTo(ps, "session/set_mode", { sessionId: existingSessionId, modeId: agentName }, { timeoutMs: SESSION_SETUP_TIMEOUT_MS, signal: opts.signal })
         } catch (error) {
           sdpmReady?.dispose()
           throw error
@@ -364,9 +455,13 @@ export async function createNewProcess(agentName: string = "sdpm-orchestrator"):
 }
 
 /** Spawn a new process and register it under a client-provided key and its kiro session id. */
-export async function createNewProcessFor(clientSessionId: string, agentName: string = "sdpm-orchestrator"): Promise<ProcessState> {
+export async function createNewProcessFor(
+  clientSessionId: string,
+  agentName: string = "sdpm-orchestrator",
+  opts: SpawnProcessOptions = {},
+): Promise<ProcessState> {
   await evictIfNeeded()
-  const ps = await spawnProcess(agentName)
+  const ps = await spawnProcess(agentName, undefined, opts)
   processes.set(clientSessionId, ps)
   processes.set(ps.sessionId!, ps)
   return ps
@@ -399,7 +494,7 @@ export async function sendPrompt(sessionId: string, text: string, agentName?: st
       })
       ps.promptRequestId = id
       void response.catch(() => {
-        // handleLine forwards the same JSON-RPC error to the subscribed SSE bridge.
+        // handleLine (an answer) or the exit handler (no answer) ends the turn for the listeners.
       }).finally(() => { ps.promptInFlight = false })
     },
   }
