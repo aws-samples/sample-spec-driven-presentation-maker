@@ -20,6 +20,7 @@ import { syncToAgentsDir } from "./agents-sync"
 import type { ForkSessionPhase, ForkSessionPhaseDetail, SessionOrigin } from "./kiro-sessions.types"
 import { watchMcpServerReady } from "./mcp-ready"
 import { SessionBusyError } from "./sessionErrors"
+import { STEER_EVENT, SteerRejectedError, steerInjection, type SteerInjection } from "./steer"
 import { AgentTimeoutError, TURN_END, TURN_ERROR } from "./turnErrors"
 
 export { DECK_ROOT }
@@ -35,6 +36,8 @@ const MCP_READY_TIMEOUT_MS = 120_000
  */
 const INITIALIZE_TIMEOUT_MS = 30_000
 const SESSION_SETUP_TIMEOUT_MS = MCP_READY_TIMEOUT_MS + 60_000
+/** kiro-cli answers `_session/steer` and `_session/steer/clear` at once (it only queues). */
+const STEER_TIMEOUT_MS = 10_000
 /** JSON-RPC "Method not found", the answer to agent requests this client does not implement. */
 const METHOD_NOT_FOUND = -32601
 
@@ -77,6 +80,22 @@ interface ProcessState {
   lastActivity: number
   /** Sub-agent sessions seen during the current turn; used only as session/cancel targets. */
   subSessionIds: Set<string>
+  /** Turns ended so far; a steer whose turn ended while kiro-cli queued it is taken back. */
+  turnsEnded: number
+  /** Steers kiro-cli queued in this turn and has not reported read (lib/local/steer.ts). */
+  steers: PendingSteer[]
+  /** A `_session/steer/clear` in flight; the next prompt waits for it. */
+  steerClear: Promise<void> | null
+  /** Stop was pressed during this turn: a turn that ends now is not continued with its steers. */
+  stopRequested: boolean
+}
+
+interface PendingSteer {
+  /** The chat's id for the message. */
+  id: string
+  text: string
+  /** kiro-cli's id for it (V3 answers one; V2 does not). */
+  messageId?: string
 }
 
 /** Map keyed by sessionId; one process may sit under several keys (client id and kiro session id). */
@@ -105,9 +124,90 @@ function emit(ps: ProcessState, msg: Record<string, unknown>): void {
 /** The turn started by sendPrompt is over: release the session and tell the listeners. */
 function endTurn(ps: ProcessState, event: Record<string, unknown>): void {
   ps.promptRequestId = null
+  ps.promptInFlight = false
   ps.running = false
+  ps.stopRequested = false
+  ps.turnsEnded++
   ps.subSessionIds.clear()
+  discardSteers(ps)
   emit(ps, { ...event, params: { sessionId: ps.sessionId, ...(event.params as Record<string, unknown>) } })
+}
+
+/** Tell the listeners (and a reconnecting stream) where a steer is now. */
+function emitSteer(ps: ProcessState, params: { id: string; text?: string; state: "accepted" | "delivered" | "discarded" }): void {
+  emit(ps, { method: STEER_EVENT, params: { sessionId: ps.sessionId, ...params } })
+}
+
+/**
+ * Take what kiro-cli still queues for this session out of its queue. Left there, V2 and V3 both
+ * put it into the next prompt, after a Stop and (V2) after a normal end.
+ */
+function clearSteerQueue(ps: ProcessState): void {
+  if (ps.exited) return
+  const cleared = startRequest(ps, "_session/steer/clear", { sessionId: ps.sessionId }, { timeoutMs: STEER_TIMEOUT_MS }).response
+    .then(() => undefined, (error: Error) => { console.warn("[acp] _session/steer/clear: %s", error.message) })
+  const done = cleared.finally(() => { if (ps.steerClear === done) ps.steerClear = null })
+  ps.steerClear = done
+}
+
+/** The turn ended before kiro-cli read these steers: clear them and mark them not delivered. */
+function discardSteers(ps: ProcessState): void {
+  const left = ps.steers
+  if (!left.length) return
+  ps.steers = []
+  clearSteerQueue(ps)
+  for (const steer of left) emitSteer(ps, { id: steer.id, state: "discarded" })
+}
+
+/**
+ * The prompt ended (end_turn) before kiro-cli read these steers. As in Cloud, they are not
+ * dropped: they are taken out of kiro-cli's queue (left there, kiro-cli would put them into the
+ * user's next message) and sent as a follow-up prompt on the same turn and stream. A steer queued
+ * after the clear is read by kiro-cli in that prompt itself. A Stop or an exit meanwhile ends the
+ * turn instead, and a clear that fails ends it with the steers discarded.
+ */
+async function continueWithSteers(ps: ProcessState): Promise<void> {
+  ps.promptRequestId = null
+  const taken = [...ps.steers]
+  let cleared = true
+  try {
+    await rpcRequestTo(ps, "_session/steer/clear", { sessionId: ps.sessionId }, { timeoutMs: STEER_TIMEOUT_MS })
+  } catch (error) {
+    console.warn("[acp] _session/steer/clear: %s", error instanceof Error ? error.message : String(error))
+    cleared = false
+  }
+  if (ps.exited || !ps.running) return
+  if (!cleared || ps.stopRequested) {
+    endTurn(ps, { method: TURN_END, params: { stopReason: cleared ? "cancelled" : "end_turn" } })
+    return
+  }
+  ps.steers = ps.steers.filter((steer) => !taken.includes(steer))
+  console.log("[acp] sessionId=%s: prompt ended before %d steer(s) were read; sending them as a follow-up prompt", ps.sessionId, taken.length)
+  for (const steer of taken) emitSteer(ps, { id: steer.id, state: "delivered" })
+  startPrompt(ps, taken.map((steer) => steer.text).join("\n\n"))
+}
+
+/** Send session/prompt for the session's turn; its answer ends the turn (handleLine). */
+function startPrompt(ps: ProcessState, text: string): void {
+  const { id, response } = startRequest(ps, "session/prompt", {
+    sessionId: ps.sessionId,
+    prompt: [{ type: "text", text }],
+  })
+  ps.promptRequestId = id
+  // handleLine (an answer) or the exit handler (no answer) ends the turn for the listeners.
+  void response.catch(() => {})
+}
+
+/** kiro-cli put a steer into the turn: match it by its id, or by its text (V2 answers no id). */
+function deliverSteer(ps: ProcessState, injected: SteerInjection): void {
+  let at = injected.messageId ? ps.steers.findIndex((s) => s.messageId === injected.messageId) : -1
+  if (at < 0 && injected.content !== undefined) {
+    const content = injected.content.trim()
+    at = ps.steers.findIndex((s) => s.text.trim() === content)
+  }
+  if (at < 0) return
+  const [steer] = ps.steers.splice(at, 1)
+  emitSteer(ps, { id: steer.id, state: "delivered" })
 }
 
 interface PermissionOption { optionId?: string; kind?: string }
@@ -160,9 +260,11 @@ function handleLine(ps: ProcessState, line: string) {
     }
     if (msg.id === ps.promptRequestId) {
       const result = msg.result as { stopReason?: string } | undefined
-      endTurn(ps, failure
+      const stopReason = result?.stopReason ?? "end_turn"
+      if (!failure && stopReason === "end_turn" && ps.steers.length && !ps.stopRequested) void continueWithSteers(ps)
+      else endTurn(ps, failure
         ? { method: TURN_ERROR, params: { message: failure.message } }
-        : { method: TURN_END, params: { stopReason: result?.stopReason ?? "end_turn" } })
+        : { method: TURN_END, params: { stopReason } })
     }
     if (failure) pending.reject(failure)
     else pending.resolve(msg.result)
@@ -183,6 +285,10 @@ function handleLine(ps: ProcessState, line: string) {
       ps.subSessionIds.delete(sid)
     }
     emit(ps, msg)
+    if (sid === ps.sessionId && ps.steers.length) {
+      const injected = steerInjection(msg)
+      if (injected) deliverSteer(ps, injected)
+    }
     return
   }
 
@@ -260,7 +366,7 @@ async function spawnProcess(
     child, deckId: "", sessionId: null, agentName,
     requestId: 0, pending: new Map(), listeners: new Set(),
     lineBuffer: "", running: false, exited: false, promptInFlight: false, promptRequestId: null, notifications: [], eventIdCounter: 0,
-    lastActivity: Date.now(), subSessionIds: new Set(),
+    lastActivity: Date.now(), subSessionIds: new Set(), turnsEnded: 0, steers: [], steerClear: null, stopRequested: false,
   }
 
   child.stdout!.setEncoding("utf-8")
@@ -481,9 +587,12 @@ export async function createNewProcessFor(
  */
 export async function sendPrompt(sessionId: string, text: string, agentName?: string): Promise<{ sessionId: string; subscribe: (fn: NotifyListener) => () => void; send: () => void }> {
   const ps = await getOrCreateProcess(sessionId, agentName || "sdpm-orchestrator")
+  // Steers the last turn left must be out of kiro-cli's queue before this prompt.
+  if (ps.steerClear) await ps.steerClear
   if (ps.promptInFlight) throw new SessionBusyError()
   ps.promptInFlight = true
   ps.running = true
+  ps.stopRequested = false
   ps.subSessionIds.clear()
   ps.notifications = []; ps.eventIdCounter = 0
   ps.lastActivity = Date.now()
@@ -494,23 +603,43 @@ export async function sendPrompt(sessionId: string, text: string, agentName?: st
       ps.listeners.add(fn)
       return () => { ps.listeners.delete(fn) }
     },
-    send: () => {
-      const { id, response } = startRequest(ps, "session/prompt", {
-        sessionId: ps.sessionId,
-        prompt: [{ type: "text", text }],
-      })
-      ps.promptRequestId = id
-      void response.catch(() => {
-        // handleLine (an answer) or the exit handler (no answer) ends the turn for the listeners.
-      }).finally(() => { ps.promptInFlight = false })
-    },
+    send: () => startPrompt(ps, text),
   }
+}
+
+/**
+ * Send a message into the session's running turn (`_session/steer`). Resolves once kiro-cli
+ * queued it; the listeners then get its STEER_EVENT `accepted`, later `delivered` or `discarded`.
+ * Throws SteerRejectedError when no turn runs, kiro-cli does not queue it, or the turn ended
+ * meanwhile (the message is then taken back out of kiro-cli's queue).
+ */
+export async function steerSession(sessionId: string, id: string, text: string): Promise<void> {
+  const ps = processes.get(sessionId)
+  if (!ps || !ps.promptInFlight) throw new SteerRejectedError("session_idle")
+  const turn = ps.turnsEnded
+  let result: { queued?: boolean; messageId?: string; dropped?: string } | undefined
+  try {
+    result = await rpcRequestTo(ps, "_session/steer", { sessionId: ps.sessionId, message: text }, { timeoutMs: STEER_TIMEOUT_MS }) as typeof result
+  } catch (error) {
+    if (error instanceof AgentTimeoutError) throw error
+    throw new SteerRejectedError("steer_not_queued", error instanceof Error ? error.message : String(error))
+  }
+  // V3 drops a steer that raced the end of the turn (`dropped: "epoch_changed"`).
+  if (result?.queued !== true) throw new SteerRejectedError("steer_not_queued", result?.dropped)
+  if (ps.turnsEnded !== turn) {
+    clearSteerQueue(ps)
+    throw new SteerRejectedError("session_idle")
+  }
+  ps.steers.push({ id, text, ...(result.messageId ? { messageId: result.messageId } : {}) })
+  ps.lastActivity = Date.now()
+  emitSteer(ps, { id, text, state: "accepted" })
 }
 
 /** Cancel a session's active prompt. */
 export function cancelSession(sessionId: string): void {
   const ps = processes.get(sessionId)
   if (!ps) return
+  if (ps.running) ps.stopRequested = true
   if (ps.sessionId) {
     rpcNotifyTo(ps, "session/cancel", { sessionId: ps.sessionId })
     for (const subId of ps.subSessionIds) {
@@ -524,6 +653,7 @@ export function cancelSession(sessionId: string): void {
 export function cancelAll(): void {
   for (const ps of processes.values()) {
     if (ps.running && ps.sessionId) {
+      ps.stopRequested = true
       rpcNotifyTo(ps, "session/cancel", { sessionId: ps.sessionId })
       for (const subId of ps.subSessionIds) {
         rpcNotifyTo(ps, "session/cancel", { sessionId: subId })

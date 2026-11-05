@@ -10,6 +10,16 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ## [Unreleased]
 
+### Added
+
+- **Local mode: send a message while the agent works.** As in Cloud, the chat input stays
+  open during a turn, and a message sent then goes into the running turn through kiro-cli's
+  `_session/steer`. The bubble shows "Sent while the agent works", then "Read by the agent".
+  If the turn ends before the agent reads it, the turn continues with that message. Stop
+  marks an unread message "Not delivered" and removes it from kiro-cli's queue, so it does
+  not join your next message. When kiro-cli does not accept the message (no turn running any
+  more), the chat says so and keeps the text in the input.
+
 ### Changed
 
 - **The bundled `aws-light` and `aws-dark` styles have a new content-slide frame.** Every

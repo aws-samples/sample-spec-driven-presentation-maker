@@ -10,7 +10,8 @@
  * follows a session that is working after a reload; `prepareAgentCore` builds the session
  * early on the new deck screen. Events go through the same parser as before.
  *
- * Local: Server-Sent Events from the Next.js API Route (unchanged).
+ * Local: Server-Sent Events from the Next.js API Route. A message sent into the running turn
+ * (services/localService.ts steerLocalAgent) comes back on that stream as `steer` events.
  */
 
 import * as parser from './strandsParser.js';
@@ -406,7 +407,8 @@ export const generateSessionId = (sub) => {
 /**
  * Invoke the local ACP agent via API Route.
  * Reads SSE stream from /api/agent/invoke and feeds events through the same
- * strandsParser used by the cloud path, so ChatPanel works unchanged.
+ * strandsParser used by the cloud path, so ChatPanel works unchanged. `steer` events (a
+ * message sent into this turn) go to `onSession.onEvent`, as the Cloud session's do.
  */
 const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom, onSession) => {
   const response = await fetch('/api/agent/invoke', {
@@ -457,6 +459,10 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
                 // A turn that ended without an answer carries a stable `code` (lib/local/turnErrors.ts).
                 if (event.code) error.code = event.code;
                 throw error;
+              }
+              if (event?.steer) {
+                onSession?.onEvent?.(event, { own: true });
+                continue;
               }
               // A notice about this turn's session (lib/local/sessionNotices.ts) goes to the chat as a session event.
               if (event?.notice?.code) onSession?.onEvent?.({ localNotice: event.notice.code }, { own: true });

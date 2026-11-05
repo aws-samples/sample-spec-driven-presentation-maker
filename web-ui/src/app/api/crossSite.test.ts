@@ -22,6 +22,7 @@ const routes: [string, () => Promise<{ POST: (req: Request) => Promise<Response>
   ["agent/load", () => import("./agent/load/route")],
   ["agent/sessions/fork", () => import("./agent/sessions/fork/route")],
   ["agent/stop", () => import("./agent/stop/route")],
+  ["agent/steer", () => import("./agent/steer/route")],
   ["attachments", () => import("./attachments/route")],
   ["open", () => import("./open/route")],
   ["styles/pin", () => import("./styles/pin/route")],

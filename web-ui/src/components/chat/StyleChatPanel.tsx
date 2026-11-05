@@ -114,8 +114,8 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
       const snippetInfo = snippets.map((s) => `---snippet---\n${s.text}\n---/snippet---`).join("\n\n")
       fullMessage = `${fullMessage}\n\n${snippetInfo}`
     }
-    // Cloud, agent working: a steer. A steer that was not accepted keeps the input.
-    const steering = !IS_LOCAL && stream.isLoading
+    // Agent working: a steer. A steer that was not accepted keeps the input.
+    const steering = stream.isLoading
     const ok = await stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments)
     if (steering && !ok) return false
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -124,7 +124,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
   const isInitial = stream.messages.length === 0
 
   return (
-    <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={stream.isLoading && IS_LOCAL} className="flex flex-col h-full">
+    <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} className="flex flex-col h-full">
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-4 py-4"
@@ -197,7 +197,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
         onSend={handleSend}
         isLoading={stream.isLoading}
         onStop={stream.stopGeneration}
-        canSendWhileLoading={!IS_LOCAL}
+        canSendWhileLoading
         idToken={auth.user?.id_token}
         sessionId={sessionId}
         placeholder={t("placeholder")}

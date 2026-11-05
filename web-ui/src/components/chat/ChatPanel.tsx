@@ -577,8 +577,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (!configLoaded) return false
     const r = reviewRef.current
     if (!hasReviewDrafts || !r) {
-      // Cloud, agent working: a steer. A steer that was not accepted keeps the input.
-      if (!IS_LOCAL && stream.isLoading) return (await handleSend(text, uploadedFiles, snippets, attachments)) ? undefined : false
+      // Agent working: a steer. A steer that was not accepted keeps the input.
+      if (stream.isLoading) return (await handleSend(text, uploadedFiles, snippets, attachments)) ? undefined : false
       handleSend(text, uploadedFiles, snippets, attachments)
       return
     }
@@ -601,6 +601,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [configLoaded, hasReviewDrafts, handleSend, tReview, stream.isLoading])
 
   const isLoading = stream.isLoading || reconnectLoading || forkingSession !== null
+  // A send while the agent works is a steer. Local: only into this panel's own invoke (not a
+  // reconnect stream or a fork that is starting).
+  const canSendWhileLoading = !IS_LOCAL || (stream.isLoading && !reconnectLoading && forkingSession === null)
 
   // Sync streaming flag and flush any deferred sessionId swap once
   // streaming finishes — at that point loadHistory can safely re-fetch
@@ -630,7 +633,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   return (
     <>
-      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading && IS_LOCAL} className="flex flex-col h-full">
+      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading && !canSendWhileLoading} className="flex flex-col h-full">
       {continuedOrigin && (
         <div className="flex-none px-4 pt-3">
           <ContinuedFromChip origin={continuedOrigin} />
@@ -794,11 +797,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           onSend={handleInputSend}
           isLoading={isLoading}
           onStop={stream.stopGeneration}
-          canSendWhileLoading={!IS_LOCAL}
+          canSendWhileLoading={canSendWhileLoading}
           disabled={!configLoaded || reconnectLoading}
           placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
           topSlot={reviewActive ? <ReviewDraftBar inputBlank={inputBlank} /> : undefined}
-          sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading && IS_LOCAL, canSend: review.canSubmit } : undefined}
+          sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading && !canSendWhileLoading, canSend: review.canSubmit } : undefined}
           idToken={auth.user?.id_token}
           sessionId={sessionId}
           deckId={deckId}

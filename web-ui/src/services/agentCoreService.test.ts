@@ -176,6 +176,24 @@ describe("invokeAgentCore (Cloud)", () => {
     expect(FakeWebSocket.instances).toHaveLength(0)
   })
 
+  it("hands a Local stream's steer events to onSession instead of the parser", async () => {
+    mode.local = true
+    const lines = [
+      "data: {\"event\":{\"contentBlockDelta\":{\"delta\":{\"text\":\"one \"}}}}",
+      "data: {\"steer\":{\"id\":\"m1\",\"text\":\"stop\",\"state\":\"accepted\"}}",
+      "data: {\"event\":{\"contentBlockDelta\":{\"delta\":{\"text\":\"STOPPED\"}}}}",
+      "data: {\"steer\":{\"id\":\"m1\",\"state\":\"delivered\"}}",
+    ]
+    fetchMock.mockResolvedValueOnce(new Response(lines.join("\n") + "\n"))
+    const onEvent = vi.fn()
+    const done = invokeAgentCore("hi", "L1", vi.fn(), undefined, undefined, vi.fn(), undefined, "spec", undefined, undefined, undefined, { onEvent })
+    await expect(done).resolves.toBe("one STOPPED")
+    expect(onEvent.mock.calls).toEqual([
+      [{ steer: { id: "m1", text: "stop", state: "accepted" } }, { own: true }],
+      [{ steer: { id: "m1", state: "delivered" } }, { own: true }],
+    ])
+  })
+
   it("hands a Local stream's notice to the session events", async () => {
     mode.local = true
     fetchMock.mockResolvedValueOnce(new Response(
