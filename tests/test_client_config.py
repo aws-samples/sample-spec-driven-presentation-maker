@@ -3,7 +3,8 @@
 
 Guards the onboarding contract: every client configuration points at the absolute
 uv and checkout paths, never at a launcher or PATH lookup; registration goes
-through the client's own CLI; nothing is written to another app's config files.
+through the client's own CLI; nothing is written to another app's config files. The
+Kiro CLI agent is one file both engines (V2 and V3) load without converting it.
 """
 
 from __future__ import annotations
@@ -63,6 +64,39 @@ def test_kiro_agent_is_wiring_only():
     assert not {"write", "shell", "execute_bash"} & set(agent["tools"])
     assert cc.KIRO_AGENT_MARKER in agent["description"]
 
+
+@pytest.mark.parametrize("name", ["sdpm", "sdpm-dev"])
+def test_kiro_agent_loads_in_v2_and_v3_without_conversion(name):
+    agent = cc.kiro_agent_definition(POSIX, name)
+    # V2 fields stay: kiro-cli 2.x and `--v2` read them.
+    assert agent["allowedTools"] == cc._KIRO_AGENT_TOOLS
+    assert agent["toolsSettings"]["subagent"] == {"availableAgents": [name], "trustedAgents": [name]}
+    # V3 fields: a definition with `permissions` is loaded as-is (no rejection, no rewrite + .bak).
+    assert "kiroUpgrade" not in agent
+    assert f"subagent/{name}" in agent["tools"]
+    rules = agent["permissions"]["rules"]
+    assert all(r["effect"] == "allow" for r in rules)
+    assert {r["capability"] for r in rules} == {"mcp", "subagent", "fs_read", "web_search", "web_fetch"}
+    by_cap = {r["capability"]: r for r in rules}
+    assert by_cap["mcp"]["match"] == ["sdpm/*"]
+    assert by_cap["subagent"]["match"] == [name]  # only copies of itself, as availableAgents in V2
+    # Same trust in both engines: nothing that writes files or runs shell commands.
+    assert not {"fs_write", "shell", "skill"} & set(by_cap)
+
+
+def test_unregister_kiro_removes_our_upgrade_backups_only(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    cc.write_kiro_agent(POSIX, root=tmp_path)
+    agents = tmp_path / "agents"
+    ours = (agents / "sdpm.json").read_text()
+    (agents / "sdpm.json.bak").write_text(ours)
+    (agents / "sdpm.json.bak.1").write_text(ours)
+    (agents / "sdpm.json.bak.2").write_text('{"name": "sdpm", "prompt": "mine"}')
+    (agents / "sdpm-dev.json.bak").write_text(ours)  # another agent's backup
+    cc.remove_kiro_agent(dry_run=True, root=tmp_path)
+    assert (agents / "sdpm.json.bak").exists() and "[dry-run] remove" in capsys.readouterr().out
+    cc.remove_kiro_agent(root=tmp_path)
+    assert sorted(p.name for p in agents.iterdir()) == ["sdpm-dev.json.bak", "sdpm.json.bak.2"]
 
 def test_write_kiro_agent_creates_refreshes_and_respects_foreign_file(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cc.shutil, "which", lambda _n: None)  # no kiro-cli validate step
