@@ -220,7 +220,7 @@ export class AgentStack extends cdk.Stack {
       roleArn: role.roleArn,
       // V2 restores each microVM from a snapshot taken after startup. The agent builds
       // its clients, connections and per-session state on the first request, and draws
-      // the random module's values from the kernel (agent/snapshot_random.py). Each new
+      // the random module's values from the kernel (shared/snapshot_random.py). Each new
       // version builds a new snapshot, so the environment below holds no per-deploy
       // value: a deploy that changes neither the image nor the configuration creates
       // no version.

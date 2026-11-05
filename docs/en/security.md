@@ -99,7 +99,7 @@ built on the first request, and its process owner is bound by that request. Valu
 stack takes from the kernel are not affected: `uuid.uuid4()` and `secrets` read
 `getrandom(2)` on every call, and SigV4 signing is HMAC-based and deterministic. The agent
 also rebinds the `random` module's functions to `random.SystemRandom`
-(`agent/snapshot_random.py`), so OpenTelemetry trace and span ids and retry jitter do not
+(`shared/snapshot_random.py`), so OpenTelemetry trace and span ids and retry jitter do not
 repeat across restored instances.
 
 What remains is OpenSSL's own DRBG behind outbound TLS from both runtimes: seeded before

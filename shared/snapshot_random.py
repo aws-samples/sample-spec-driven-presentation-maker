@@ -4,18 +4,21 @@
 
 AgentCore Runtime platform V2 restores every microVM from one snapshot taken after
 startup. The ``random`` module is seeded at import, so without this every restored
-instance would produce the same sequence. Libraries in this process call its
+instance would produce the same sequence. Libraries in the runtime processes call its
 module-level functions at use time: OpenTelemetry's trace and span id generators
-(``random.getrandbits``, including the X-Ray id generator), botocore's and Strands'
-retry jitter, and resilience.py's own backoff. Rebinding those functions to a
-``random.SystemRandom`` reads ``os.urandom`` on every call, which is fresh after a
-restore ([Optimize for V2](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-v2-optimize.html)).
+(``random.getrandbits``, including the X-Ray id generator) and botocore's retry
+jitter. Rebinding those functions to a ``random.SystemRandom`` reads ``os.urandom`` on
+every call, which is fresh after a restore
+([Optimize for V2](https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-v2-optimize.html)).
+
+Call install() from the process entry point, before the server starts (and so before
+the snapshot); importing this module changes nothing, so tests that import a server
+module keep the seeded ``random``.
 
 ``random.seed`` / ``getstate`` / ``setstate`` and ``random.Random`` instances are left
-alone; nothing in the agent relies on a seeded module-level sequence. A module that
-bound a function by name before install() (``from random import randrange``, as
-OpenTelemetry's metric exemplar reservoir does) keeps the seeded one; none of those
-produce ids.
+alone. A module that bound a function by name before install() (``from random import
+randrange``, as OpenTelemetry's metric exemplar reservoir does) keeps the seeded one;
+none of those produce ids.
 """
 
 import random

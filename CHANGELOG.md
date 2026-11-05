@@ -28,7 +28,7 @@ Entries before v0.5.0 were written retroactively as summaries.
   to V2, like the MCP runtime in 0.12.0. The agent's environment no longer carries
   `DEPLOY_TIMESTAMP`, so a deploy that changes neither the image nor the configuration no
   longer creates a runtime version. The agent draws the `random` module's values from the
-  kernel (`agent/snapshot_random.py`), so OpenTelemetry trace and span ids and retry jitter
+  kernel (`shared/snapshot_random.py`), so OpenTelemetry trace and span ids and retry jitter
   do not repeat across instances restored from the same snapshot. / Nothing. To stay on
   V1, see [Security](docs/en/security.md#agentcore-runtime-platform-versions).
 
