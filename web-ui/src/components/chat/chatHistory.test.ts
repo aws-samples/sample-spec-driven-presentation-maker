@@ -23,6 +23,15 @@ describe("parseLocalHistory", () => {
     expect(out[0]).toMatchObject({ role: "user", content: "hello", toolUses: [] })
     expect(out[1]).toMatchObject({ role: "assistant", content: "", toolUses: [] })
   })
+
+  it("keeps a reply's session notice", () => {
+    const out = parseLocalHistory(asHistory([
+      { role: "assistant", content: "OK", toolUses: [], localNotice: "context_not_carried_over" },
+      { role: "assistant", content: "OK", toolUses: [] },
+    ]))
+    expect(out[0].localNotice).toBe("context_not_carried_over")
+    expect(out[1]).not.toHaveProperty("localNotice")
+  })
 })
 
 describe("parseCloudHistory", () => {

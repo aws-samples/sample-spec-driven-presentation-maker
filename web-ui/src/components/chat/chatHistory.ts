@@ -79,6 +79,7 @@ export function parseLocalHistory(history: ChatMessage[]): Message[] {
       content: (typeof raw.content === "string" ? raw.content : "") as string,
       toolUses: (raw.toolUses as ToolUse[]) || [],
       blocks: (raw.blocks as ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[]) || undefined,
+      ...(typeof raw.localNotice === "string" ? { localNotice: raw.localNotice } : {}),
     }
   })
 }

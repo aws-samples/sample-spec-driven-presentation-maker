@@ -4,7 +4,8 @@
 /**
  * The process map: a new chat's process is reachable under the client id (C) and its kiro
  * session id (K, what the deck's `.session` stores); close and eviction drop every key of a
- * process; the size limit counts processes, not keys; a prompt to a session still answering
+ * process; the size limit counts processes, not keys; a deck's saved kiro session is restored (or
+ * its live process reused) under the client's id too; a prompt to a session still answering
  * is refused; a turn ends with the answer to its session/prompt (result or error), whatever the
  * sub-agent sessions or other requests sent, or with agent_exited when kiro-cli exits first;
  * kiro-cli's own requests are answered (permissions by option kind, the rest with Method not
@@ -154,6 +155,22 @@ describe("process map", () => {
     expect(acp.hasProcess("C1")).toBe(false)
     expect(acp.hasProcess("K1")).toBe(false)
     expect(children[0].killed).toBe(true)
+  })
+
+  it("restores a deck's saved kiro session under the client's own id as well", async () => {
+    const ps = await acp.getOrCreateProcess("D0", "sdpm-orchestrator", { kiroSessionId: "K9" })
+    expect(ps.sessionId).toBe("K9")
+    expect(acp.hasProcess("D0")).toBe(true)
+    expect(acp.hasProcess("K9")).toBe(true)
+    expect(await acp.getOrCreateProcess("D0")).toBe(ps)
+    expect(spawn).toHaveBeenCalledTimes(1)
+  })
+
+  it("reuses the live process of the saved kiro session for another client id", async () => {
+    const ps = await acp.createNewProcessFor("C1")
+    expect(await acp.getOrCreateProcess("D0", "sdpm-orchestrator", { kiroSessionId: "K1" })).toBe(ps)
+    expect(acp.hasProcess("D0")).toBe(true)
+    expect(spawn).toHaveBeenCalledTimes(1)
   })
 })
 
