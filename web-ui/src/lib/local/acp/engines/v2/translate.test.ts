@@ -92,17 +92,17 @@ describe("main session", () => {
   it("ends a completed tool with its parsed result, and leaves other updates out", () => {
     t.translate(mcpCall(MAIN, "t1", "list_styles"))
     expect(t.translate(update(MAIN, { sessionUpdate: "tool_call_update", toolCallId: "t1", status: "in_progress" }))).toEqual([])
-    expect(t.translate(completed(MAIN, "t1", "{\"styles\":[]}"))).toEqual([{ type: "tool_end", id: "t1", status: "success", result: { styles: [] } }])
+    const end = { type: "tool_end", status: "success", name: "Running: @sdpm/x" }
+    expect(t.translate(completed(MAIN, "t1", "{\"styles\":[]}"))).toEqual([{ ...end, id: "t1", result: { styles: [] } }])
     t.translate(mcpCall(MAIN, "t2", "x"))
-    expect(t.translate(completed(MAIN, "t2", "not json"))).toEqual([{ type: "tool_end", id: "t2", status: "success", result: {} }])
+    expect(t.translate(completed(MAIN, "t2", "not json"))).toEqual([{ ...end, id: "t2", result: {} }])
     t.translate(mcpCall(MAIN, "t3", "x"))
-    expect(t.translate(completed(MAIN, "t3", "21"))).toEqual([{ type: "tool_end", id: "t3", status: "success", result: {} }])
+    expect(t.translate(completed(MAIN, "t3", "21"))).toEqual([{ ...end, id: "t3", result: {} }])
   })
 
-  it("announces a completed tool no call announced, from the update's title", () => {
+  it("ends a completed tool no call announced as a result only, named by the update's title", () => {
     expect(t.translate(completed(MAIN, "t9", undefined, { title: "Tool Load", rawInput: { tool_ids: ["a"] } }))).toEqual([
-      { type: "tool_use", id: "t9", name: "Tool Load", input: { tool_ids: ["a"] } },
-      { type: "tool_end", id: "t9", status: "success", result: {} },
+      { type: "tool_end", id: "t9", status: "success", result: {}, name: "Tool Load" },
     ])
   })
 

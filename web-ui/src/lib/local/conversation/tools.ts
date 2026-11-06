@@ -3,7 +3,7 @@
 /**
  * The main session's tool cards: each tool call's name by its toolCallId, and the deck a tool
  * result names. The names come from `tool_start` / `tool_use`; a result is shown under the name
- * its call was given.
+ * its call was given, else under the name the result's own update gave.
  */
 import path from "path"
 
@@ -40,9 +40,9 @@ export class ToolTracker {
     return [data({ toolUse: { toolUseId: id, name, input } })]
   }
 
-  end(id: string, status: ToolEndStatus, result: Record<string, unknown>): { events: ChatEvent[]; deckId?: string } {
+  end(id: string, status: ToolEndStatus, result: Record<string, unknown>, fallbackName = ""): { events: ChatEvent[]; deckId?: string } {
     const shown = withDeckId(result)
-    const name = this.names.get(id) ?? ""
+    const name = this.names.get(id) ?? fallbackName
     return {
       events: [data({ toolResult: { toolUseId: id, name, status, content: JSON.stringify(shown.result) } })],
       ...(shown.deckId ? { deckId: shown.deckId } : {}),

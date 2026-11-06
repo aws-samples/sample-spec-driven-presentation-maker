@@ -22,7 +22,7 @@
  */
 import path from "path"
 import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
-import { getActiveAgent, type AgentConfig } from "./acp-adapter"
+import { getActiveAgent } from "./acp-adapter"
 import { syncToAgentsDir } from "./agents-sync"
 import { adapterFor, type AcpModel, type EngineCapabilities, type EngineId, type EngineSession } from "./acp/engine"
 import type { InitializeResponse, PromptResponse } from "./acp/schema"
@@ -269,7 +269,6 @@ async function spawnProcess(
   clientId: string | null,
   existingSessionId?: string,
   opts: SpawnProcessOptions = {},
-  adapter?: AgentConfig,
 ): Promise<ProcessState> {
   if (opts.signal?.aborted) throw new DOMException("Fork cancelled", "AbortError")
   opts.onPhase?.("starting")
@@ -279,7 +278,7 @@ async function spawnProcess(
   // spawn fails: launching from silently stale agent files is the exact bug
   // this re-derivation exists to prevent.
   syncToAgentsDir()
-  const cfg = adapter || getActiveAgent()
+  const cfg = getActiveAgent()
   const args = [...cfg.args]
   const flagIdx = args.indexOf("--agent")
   if (flagIdx >= 0 && flagIdx + 1 < args.length) {

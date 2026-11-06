@@ -44,7 +44,7 @@ export class ConversationState {
             out.push(...this.compose.end(event.status, shown.result))
             deckId ??= shown.deckId
           } else {
-            const ended = this.tools.end(event.id, event.status, event.result)
+            const ended = this.tools.end(event.id, event.status, event.result, event.name)
             out.push(...ended.events)
             deckId ??= ended.deckId
           }

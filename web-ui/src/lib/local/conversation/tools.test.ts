@@ -1,7 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Tool cards: a result is shown under its call's name; the deck a result names is its `deckId`,
+ * Tool cards: a result is shown under its call's name, else under the name its own update gave;
+ * the deck a result names is its `deckId`,
  * else the last segment of an `output_dir` under the deck root (the root itself is no deck), and
  * the shown result carries it.
  */
@@ -35,9 +36,17 @@ describe("ToolTracker", () => {
     const tools = new ToolTracker()
     expect(tools.start("t1", "list_styles")).toEqual([{ kind: "data", payload: { toolStart: { toolUseId: "t1", name: "list_styles" } } }])
     expect(tools.use("t1", "list_styles", { a: 1 })).toEqual([{ kind: "data", payload: { toolUse: { toolUseId: "t1", name: "list_styles", input: { a: 1 } } } }])
-    expect(tools.end("t1", "success", { count: 21 })).toEqual({
+    expect(tools.end("t1", "success", { count: 21 }, "Running: list_styles")).toEqual({
       events: [{ kind: "data", payload: { toolResult: { toolUseId: "t1", name: "list_styles", status: "success", content: "{\"count\":21}" } } }],
     })
+  })
+
+  it("shows a result no call announced under the name its update gave, without a card of its own", () => {
+    const tools = new ToolTracker()
+    expect(tools.end("t9", "success", {}, "Tool Load")).toEqual({
+      events: [{ kind: "data", payload: { toolResult: { toolUseId: "t9", name: "Tool Load", status: "success", content: "{}" } } }],
+    })
+    expect(tools.end("t10", "success", {}).events).toEqual([{ kind: "data", payload: { toolResult: { toolUseId: "t10", name: "", status: "success", content: "{}" } } }])
   })
 
   it("returns the deck a result names", () => {

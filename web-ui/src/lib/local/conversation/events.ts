@@ -22,7 +22,8 @@ export type LocalEvent =
   /** A tool call announced before its input (V2's tool_call_chunk). */
   | { type: "tool_start"; id: string; name: string }
   | { type: "tool_use"; id: string; name: string; input: Record<string, unknown> }
-  | { type: "tool_end"; id: string; status: ToolEndStatus; result: Record<string, unknown> }
+  /** `name`: the tool's name its own update gives, shown when no call announced the tool. */
+  | { type: "tool_end"; id: string; status: ToolEndStatus; result: Record<string, unknown>; name?: string }
   /** One group of a delegation to the composer; `toolCallId` is the delegation's tool call. */
   | { type: "composer_start"; group: string; prompt: string; toolCallId: string }
   | { type: "composer_tool"; group: string; id: string; name: string; input?: Record<string, unknown> }

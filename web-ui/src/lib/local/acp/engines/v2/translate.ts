@@ -20,8 +20,8 @@
  *    - any other `tool_call` → `tool_use`, named by `_meta.kiro.toolName` for an MCP tool
  *      (`mcpServerName` set) and by its title for a built-in one; the input is `rawInput`,
  *    - a completed `tool_call_update` → `tool_end`, its result read from
- *      `rawOutput.items[0].Json.content[0].text` (a `tool_use` from the update's title comes first
- *      when no call announced it).
+ *      `rawOutput.items[0].Json.content[0].text`, its `name` the update's title (shown when no
+ *      call announced the tool).
  * `AgentExecutionSteeringInjected` of the main session → `steer_injected`.
  * `_kiro.dev/mcp/server_initialized` → `mcp_status connected` (any session).
  */
@@ -73,8 +73,6 @@ export class V2Translator {
   /** Sub-agent sessions seen in this turn that no cancel has reached yet. */
   private readonly turnChildren = new Set<string>()
   private crew: Crew | null = null
-  /** The main session's tool calls this turn announced. */
-  private readonly knownCalls = new Set<string>()
 
   /** A session/load of `sessionId` starts: its updates are the replay until `finishLoad`. */
   startLoad(sessionId: string, onReplay?: (replayed: number, done: boolean) => void): void {
@@ -95,7 +93,6 @@ export class V2Translator {
     this.turnActive = true
     this.turnChildren.clear()
     this.crew = null
-    this.knownCalls.clear()
   }
 
   endTurn(): void {
@@ -164,25 +161,18 @@ export class V2Translator {
         return typeof text === "string" && text ? [{ type: "text", text }] : []
       }
       case "tool_call_chunk": {
-        this.knownCalls.add(id)
         const title = typeof update.title === "string" ? update.title : ""
         return [{ type: "tool_start", id, name: title === CREW_TOOL ? COMPOSE_TOOL : title }]
       }
       case "tool_call": {
-        this.knownCalls.add(id)
         if (toolMeta(update)?.toolName === CREW_TOOL) return this.crewStarted(id, update.rawInput as V2CrewInput | undefined)
         return [{ type: "tool_use", id, name: toolName(update), input: objectOr(update.rawInput) }]
       }
       case "tool_call_update": {
         if (update.status !== "completed") return []
-        const events: LocalEvent[] = []
-        if (!this.knownCalls.has(id)) {
-          this.knownCalls.add(id)
-          events.push({ type: "tool_use", id, name: typeof update.title === "string" ? update.title : "", input: objectOr(update.rawInput) })
-        }
         if (this.crew?.toolCallId === id) this.crew = null
-        events.push({ type: "tool_end", id, status: "success", result: toolResult(update.rawOutput) })
-        return events
+        const name = typeof update.title === "string" && update.title ? { name: update.title } : {}
+        return [{ type: "tool_end", id, status: "success", result: toolResult(update.rawOutput), ...name }]
       }
       case "AgentExecutionSteeringInjected":
         if (method !== KIRO_SESSION_UPDATE) return []
