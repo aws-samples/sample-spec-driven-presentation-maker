@@ -11,6 +11,15 @@ import type { NewSessionResponse, ToolCall, ToolCallUpdate } from "../../schema"
 export const KIRO_SESSION_UPDATE = "_kiro.dev/session/update"
 /** An MCP server of a session finished starting: `{sessionId, serverName}`. */
 export const KIRO_MCP_SERVER_INITIALIZED = "_kiro.dev/mcp/server_initialized"
+/** An MCP server of a session failed to start: `{sessionId, serverName, error}`. */
+export const KIRO_MCP_SERVER_INIT_FAILURE = "_kiro.dev/mcp/server_init_failure"
+/** The `--agent` was not found and another agent runs: `{sessionId, requestedAgent, fallbackAgent}`. */
+export const KIRO_AGENT_NOT_FOUND = "_kiro.dev/agent/not_found"
+
+/** session/load's error text when another kiro-cli process holds the session. */
+export const SESSION_LOCKED_MARKER = "Session is active in another process"
+/** session/load's error text for a session kiro-cli does not have (`-32603`, in `data`). */
+export const SESSION_NOT_FOUND_MARKER = "Session not found"
 
 /** session/new also answers the models the agent offers. */
 export interface V2NewSessionResponse extends NewSessionResponse {

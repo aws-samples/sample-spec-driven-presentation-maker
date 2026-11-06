@@ -5,7 +5,8 @@
  * Every Local POST route refuses a cross-site browser request before doing anything.
  * Local mode has no authentication; POST is the method another site can send without a
  * CORS preflight (text/plain or form bodies), so these routes check `Origin` first.
- * PUT / PATCH / DELETE always need a preflight, which these routes never grant.
+ * PUT / PATCH / DELETE always need a preflight, which these routes never grant; the agent
+ * engine's PUT, which ends kiro-cli processes, checks `Origin` as well.
  */
 
 import { describe, expect, it, vi } from "vitest"
@@ -29,6 +30,24 @@ const routes: [string, () => Promise<{ POST: (req: Request) => Promise<Response>
   ["styles/user", () => import("./styles/user/route")],
   ["templates/user", () => import("./templates/user/route")],
 ]
+
+const putRoutes: [string, () => Promise<{ PUT: (req: Request) => Promise<Response> | Response }>][] = [
+  ["agent/engine", () => import("./agent/engine/route")],
+]
+
+describe("Local PUT routes that change kiro-cli refuse cross-site requests", () => {
+  it.each(putRoutes)("%s", async (name, load) => {
+    const { PUT } = await load()
+    const req = new Request(`http://127.0.0.1:3000/api/${name}`, {
+      method: "PUT",
+      headers: { origin: "https://evil.example", "content-type": "application/json" },
+      body: JSON.stringify({ engine: "v3" }),
+    })
+    const res = await PUT(req)
+    expect(res.status).toBe(403)
+    expect(sideEffect).not.toHaveBeenCalled()
+  })
+})
 
 describe("Local POST routes refuse cross-site requests", () => {
   it.each(routes)("%s", async (name, load) => {

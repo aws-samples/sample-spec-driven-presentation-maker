@@ -4,8 +4,10 @@
  * Local ACP Agent Invoke — sends prompt to sessionId-keyed kiro-cli process.
  * A session conflict (turn still running, or the session locked by another
  * kiro-cli process) is answered with 409 and a SessionConflict body; a kiro-cli
- * that does not answer its setup requests in time with 504 and code `agent_timeout`.
- * A reopened deck without a kiro session to load gets a new one (lib/local/sessionNotices.ts).
+ * that does not answer its setup requests in time with 504 and code `agent_timeout`;
+ * one that cannot be made ready (lib/local/turnErrors.ts, AgentStartError) with 502 and its code.
+ * A reopened deck whose session kiro-cli does not have, or that has none, gets a new one; a deck
+ * whose session also ran on the other agent engine says so (lib/local/sessionNotices.ts).
  * The process manager saves the session to a deck the turn creates (and a fork's origin with it),
  * whether or not this stream is still read.
  */
@@ -14,18 +16,18 @@ import {
   createNewProcessFor,
   getBufferedEvents,
   hasProcess,
-  getOrCreateProcess,
+  openDeckSession,
+  openForkedSession,
   pendingOrigins,
   readSessionFromDeck,
-  saveSessionToDeck,
 } from "@/lib/local/acp-process"
 import { createSSEStream } from "@/lib/local/sse-bridge"
 import { withContinuedFrom, withInteractionMode } from "@/lib/local/interaction-mode"
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
-import { isSessionNotFound, sessionConflict } from "@/lib/local/sessionErrors"
+import { sessionConflict } from "@/lib/local/sessionErrors"
 import type { LocalSessionNoticeCode } from "@/lib/local/sessionNotices"
-import { AgentTimeoutError, localTurnError } from "@/lib/local/turnErrors"
+import { AgentStartError, AgentTimeoutError, localTurnError } from "@/lib/local/turnErrors"
 
 const MODE_TO_AGENT: Record<string, string> = {
   vibe: "sdpm-orchestrator",
@@ -73,30 +75,21 @@ export async function POST(req: Request) {
     const signal = req.signal
     if (clientSessionId && !hasProcess(clientSessionId)) {
       if (continuedFrom) {
-        // A fork must restore the copied history even if its preloaded process was evicted.
-        await getOrCreateProcess(clientSessionId, agentName, { setMode: true, signal })
+        // A fork must restore the copied history even if its preloaded process was evicted. The
+        // user already chats in it, so a copy kiro-cli could not read only gets the notice.
+        const { outcome } = await openForkedSession(clientSessionId, agentName, { signal })
+        if (outcome === "created") notice = "context_not_carried_over"
       } else if (deckId && deckId !== "new") {
-        // Existing deck reopened after evict — restore the kiro session its .session names
-        // (the client may still hold an earlier id for this page, e.g. the deck fallback id).
-        // A deck with no session to load (made by an MCP client or Kiro CLI, or its kiro session
-        // is gone) starts a new one, saved to .session, and the chat says the earlier
-        // conversation is not carried over.
-        const savedSessionId = readSessionFromDeck(deckId)
-        let restored = false
-        if (savedSessionId) {
-          try {
-            await getOrCreateProcess(clientSessionId, agentName, { signal, kiroSessionId: savedSessionId })
-            restored = true
-          } catch (error) {
-            if (!isSessionNotFound(error)) throw error
-            console.warn("[invoke] deck %s: kiro session %s not found, starting a new one", deckId, savedSessionId)
-          }
-        }
-        if (!restored) {
-          const ps = await createNewProcessFor(clientSessionId, agentName, { signal })
-          saveSessionToDeck(deckId, ps.sessionId!)
+        // Existing deck reopened after evict — open the kiro session its .session names (the
+        // client may still hold an earlier id for this page, e.g. the deck fallback id). A deck
+        // with no session to open (made by an MCP client or Kiro CLI, or its kiro session is gone)
+        // continues in a new one, and the chat says the earlier conversation is not carried over.
+        const { outcome, otherEngine } = await openDeckSession(clientSessionId, deckId, readSessionFromDeck(deckId), agentName, { signal })
+        if (outcome === "created") {
           isFirstPrompt = true
           notice = "context_not_carried_over"
+        } else if (otherEngine) {
+          notice = "context_from_other_engine"
         }
       } else {
         // Fresh session — spawn new process, register under client's sessionId
@@ -108,7 +101,7 @@ export async function POST(req: Request) {
     // Spec / Vibe and continuation facts are attached only to the first prompt.
     const continuedPrompt = withContinuedFrom(query, continuedFrom, isFirstPrompt)
     const prompt = withInteractionMode(continuedPrompt, mode, isFirstPrompt)
-    prompted = await sendPrompt(clientSessionId, prompt, agentName, { notice })
+    prompted = await sendPrompt(clientSessionId, prompt, { notice })
   } catch (error) {
     const conflict = sessionConflict(error)
     if (conflict) return Response.json(conflict, { status: 409 })
@@ -116,6 +109,7 @@ export async function POST(req: Request) {
       console.warn("[invoke] %s", error.message)
       return Response.json(localTurnError(error.code), { status: 504 })
     }
+    if (error instanceof AgentStartError) return Response.json(localTurnError(error.code), { status: 502 })
     // The client is gone; nobody reads this answer.
     if (req.signal.aborted) return new Response(null, { status: 499 })
     throw error

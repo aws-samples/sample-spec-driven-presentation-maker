@@ -15,6 +15,7 @@
  * - An error answer rejects with AcpRequestError, which keeps the JSON-RPC code and data.
  * - Requests time out (AgentTimeoutError) and follow the caller's abort signal. When the process
  *   exits, every request still waiting is rejected.
+ * - The last stderr lines are kept for the log of a kiro-cli that exits while starting.
  */
 import { spawn } from "child_process"
 
@@ -23,6 +24,8 @@ import type { AcpError, AcpNotification, PermissionOption, RequestPermissionRequ
 
 /** JSON-RPC "Method not found", the answer to agent requests this client does not implement. */
 export const METHOD_NOT_FOUND = -32601
+/** stderr lines kept for `stderrTail`. */
+const STDERR_TAIL_LINES = 20
 
 /** An error answer to one of our requests. `message` adds kiro-cli's `data`, where it puts the actual cause. */
 export class AcpRequestError extends Error {
@@ -55,6 +58,10 @@ export interface AcpConnection {
   readonly pid: number | undefined
   /** The child has exited (or failed to spawn); requests to it fail at once. */
   readonly exited: boolean
+  /** The child's exit code (null while it runs, or when it was killed or never started). */
+  readonly exitCode: number | null
+  /** The last lines kiro-cli wrote to stderr. */
+  stderrTail(): string[]
   /** Send a request; `id` is its JSON-RPC id. */
   startRequest(method: string, params?: Record<string, unknown>, opts?: RequestOptions): { id: number; response: Promise<unknown> }
   request(method: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<unknown>
@@ -81,6 +88,8 @@ export function spawnAcp(command: string, args: string[], opts: { cwd: string; e
   let requestId = 0
   let lineBuffer = ""
   let exited = false
+  let exitCode: number | null = null
+  const stderrLines: string[] = []
 
   function write(msg: Record<string, unknown>): void {
     if (exited) return
@@ -142,13 +151,18 @@ export function spawnAcp(command: string, args: string[], opts: { cwd: string; e
     for (const l of lines) handleLine(l)
   })
   child.stderr!.setEncoding("utf-8")
-  child.stderr!.on("data", (d: string) => console.warn("[acp] stderr: %s", d.trim()))
+  child.stderr!.on("data", (d: string) => {
+    console.warn("[acp] stderr: %s", d.trim())
+    stderrLines.push(...d.split("\n").filter((line) => line.trim()))
+    if (stderrLines.length > STDERR_TAIL_LINES) stderrLines.splice(0, stderrLines.length - STDERR_TAIL_LINES)
+  })
   // A write racing the exit (a Stop just as kiro-cli dies) fails with EPIPE; the exit handles it.
   child.stdin!.on("error", (error) => console.warn("[acp] stdin: %s", error.message))
 
   const onClose = (code: number | null) => {
     if (exited) return
     exited = true
+    exitCode = code
     for (const waiting of [...pending.values()]) waiting.reject(new Error(`ACP process exited with code ${code}`))
     pending.clear()
     for (const fn of [...exitListeners]) fn(code)
@@ -186,6 +200,8 @@ export function spawnAcp(command: string, args: string[], opts: { cwd: string; e
   return {
     get pid() { return child.pid },
     get exited() { return exited },
+    get exitCode() { return exitCode },
+    stderrTail: () => [...stderrLines],
     startRequest,
     request: (method, params, opts) => startRequest(method, params, opts).response,
     notify: (method, params = {}) => write({ method, params }),

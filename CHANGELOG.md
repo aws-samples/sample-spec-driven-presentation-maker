@@ -19,6 +19,18 @@ Entries before v0.5.0 were written retroactively as summaries.
   marks an unread message "Not delivered" and removes it from kiro-cli's queue, so it does
   not join your next message. When kiro-cli does not accept the message (no turn running any
   more), the chat says so and keeps the text in the input.
+- **Local Web UI: kiro-cli's V3 engine can run the sdpm agents.** Settings has a new
+  **Agent engine** section (Local only) to choose V3 or V2; the choice is saved in
+  `servers/local/.sdpm/acp-config.json` and takes effect from the next message, and decks
+  whose kiro-cli is idle reopen their session on the new engine. The agent definitions under
+  `servers/local/.kiro/agents/` are now generated in a form both engines read (V3 permission
+  rules next to the V2 fields; the marker file is `README.txt`). On V3 a deck keeps its
+  conversation, including decks started on V2; when a deck's session also ran on the other
+  engine, the chat says so above the reply, since each engine keeps its own history. kiro-cli's
+  permission requests are answered automatically only within the safe default: sdpm MCP
+  tools and file reads on the deck folder and kiro-cli's `tool-outputs/`, always with the
+  offered allow-once option. / Nothing; V2 stays the default for now. An old
+  `acp-config.json` keeps its command and environment; its `args` are no longer used.
 
 ### Changed
 
@@ -88,6 +100,12 @@ Entries before v0.5.0 were written retroactively as summaries.
   written while the chat's first stream was open, so a deck made after the tab was closed or
   the stream reconnected did not remember its conversation when reopened. The server now
   saves them as soon as the turn creates the deck. / Nothing.
+- **Local Web UI: kiro-cli start-up failures say what to do.** When kiro-cli is not
+  installed or too old, is not signed in, starts another agent than the sdpm one (its
+  definitions were rejected), or the sdpm MCP server fails to start, the chat now says which
+  and what to do instead of a generic error or a reply from an agent without the sdpm tools.
+  The start waits until the sdpm MCP server is ready, so a new or reopened chat no longer
+  begins without its tools. A tool call that fails shows as failed. / Nothing.
 
 ## [0.12.0] - 2026-11-05
 

@@ -1,12 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-/** The V2 engine adapter (kiro-cli's agent engine before V3). */
+/** The V2 engine adapter (kiro-cli's agent engine before V3): `kiro-cli acp --agent <name>`. */
 import type { EngineAdapter, EngineCapabilities } from "../../engine"
 import type { InitializeResponse } from "../../schema"
 import { V2Session } from "./session"
 
 export const v2Adapter: EngineAdapter = {
   id: "v2",
+  spawnArgs: (agentName) => ["acp", "--agent", agentName],
   capabilities(init: InitializeResponse): EngineCapabilities {
     const session = init.agentCapabilities?.sessionCapabilities ?? {}
     return {
