@@ -9,7 +9,7 @@
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
-import { SteerRejectedError } from "@/lib/local/steer"
+import { SteerRejectedError } from "@/lib/local/conversation/steer"
 import { AgentTimeoutError } from "@/lib/local/turnErrors"
 
 const acp = vi.hoisted(() => ({ steerSession: vi.fn() }))

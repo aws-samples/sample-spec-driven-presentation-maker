@@ -1,231 +1,51 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * SSE Bridge — translates kiro-cli acp JSON-RPC notifications into
- * SSE events matching the strandsParser format used by the web-ui.
+ * SSE Bridge — writes a turn's chat events (lib/local/conversation) as server-sent events in
+ * the strandsParser format the web-ui reads: `id: <n>` (the number the process manager gave the
+ * event, for Last-Event-ID) and `data: <payload>`.
+ *
+ * A stream replays the buffered events first, then follows the live ones. An `end` event writes
+ * its payload (an error), if any, and closes the stream; a replay that already holds the end
+ * closes without subscribing.
  *
  * Returns a ReadableStream that the API route can return as a Response.
  */
-
-import path from "path"
-
-import { DECK_ROOT } from "./deck-paths"
-import { basename } from "./pathUtils"
-import { STEER_EVENT } from "./steer"
-import { localTurnError, TURN_END, TURN_ERROR, isLocalTurnErrorCode, type LocalTurnErrorCode } from "./turnErrors"
-import type { LocalSessionNoticeCode } from "./sessionNotices"
-
-const DECK_ROOT_ABS = path.resolve(DECK_ROOT)
-
-/**
- * ACP stopReasons that end a turn without a full answer. end_turn and cancelled (Stop) close the
- * stream quietly, and so does a stopReason this table does not know: every answer closes it.
- */
-const STOP_REASON_ERRORS: Record<string, LocalTurnErrorCode> = {
-  refusal: "refusal",
-  max_tokens: "max_tokens",
-  max_turn_requests: "max_turn_requests",
-}
+import type { BufferedEvent, SsePayload } from "./conversation/events"
 
 interface BridgeOptions {
-  sessionId: string
-  subscribe: (fn: (msg: Record<string, unknown>) => void) => () => void
-  onDeckId?: (deckId: string) => void
-  onDone?: () => void
-  onError?: () => void
-  /** Pre-buffered notifications to replay before subscribing to live events. */
-  replay?: { id: number; msg: Record<string, unknown> }[]
-  /** A notice about the turn's session (lib/local/sessionNotices.ts), sent as the first event. */
-  notice?: LocalSessionNoticeCode
+  subscribe: (fn: (entry: BufferedEvent) => void) => () => void
+  /** Buffered events to write before subscribing to live ones. */
+  replay?: BufferedEvent[]
 }
 
-function extractSlugs(q: string): string {
-  const m = q.match(/slides?:\s*([a-z0-9,\-\s]+?)(?:\.|$|\n)/i)
-  return m ? m[1].trim() : ""
-}
-
-export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onError, replay, notice }: BridgeOptions): ReadableStream {
+export function createSSEStream({ subscribe, replay }: BridgeOptions): ReadableStream {
   const encoder = new TextEncoder()
 
   return new ReadableStream({
     start(controller) {
-      let subagentToolCallId: string | null = null
-      let totalGroups = 0
-      const subagentGroups = new Map<string, { group: number; slugs: string }>()
-      const subagentQueryQueue: string[] = []
-
-      let eventId = 0
-      function send(event: Record<string, unknown>, id?: number) {
-        const eid = id ?? ++eventId
-        try { controller.enqueue(encoder.encode(`id: ${eid}\ndata: ${JSON.stringify(event)}\n\n`)) } catch {}
-      }
-
-      function close() {
-        unsubscribe()
-        onDone?.()
-        try { controller.close() } catch {}
-      }
-
-      /** The process manager's end of the turn (lib/local/turnErrors.ts): the stream's last event. */
-      function finish(msg: Record<string, unknown>) {
-        const params = (msg.params || {}) as { stopReason?: string; code?: unknown; message?: string }
-        if (msg.method === TURN_ERROR) {
-          send(isLocalTurnErrorCode(params.code) ? localTurnError(params.code) : { status: "error", error: params.message || "ACP request failed" })
-          onError?.()
-        } else {
-          const code = params.stopReason ? STOP_REASON_ERRORS[params.stopReason] : undefined
-          if (code) send(localTurnError(code))
-        }
-        close()
-      }
-
-      // Replay buffered notifications first (for reconnecting to background sessions).
-      // A turn that ended meanwhile ends the replayed stream instead of leaving it open.
+      let closed = false
       let unsubscribe = () => {}
-      let replaying = true
-      let endedDuringReplay: Record<string, unknown> | null = null
-      if (replay?.length) {
-        for (const { id, msg } of replay) {
-          eventId = id  // sync event ID counter
-          processMsg(msg)
-        }
-      }
-      replaying = false
-      if (endedDuringReplay) {
-        finish(endedDuringReplay)
-        return
+
+      function send(id: number, payload: SsePayload) {
+        try { controller.enqueue(encoder.encode(`id: ${id}\ndata: ${JSON.stringify(payload)}\n\n`)) } catch {}
       }
 
-      unsubscribe = subscribe(processMsg)
-      // A notice about this turn's session goes first; id 0 leaves the event numbering as it is.
-      if (notice) send({ notice: { code: notice } }, 0)
-
-      function processMsg(msg: Record<string, unknown>) {
-        if (msg.method === TURN_END || msg.method === TURN_ERROR) {
-          if (replaying) endedDuringReplay = msg
-          else finish(msg)
-          return
-        }
-        // A message sent into the turn (lib/local/steer.ts), in the Cloud steer event's shape.
-        if (msg.method === STEER_EVENT) {
-          const { id, text, state } = (msg.params || {}) as { id?: string; text?: string; state?: string }
-          if (id && state) send({ steer: { id, ...(text !== undefined ? { text } : {}), state } })
-          return
-        }
-        if (msg.method !== "session/update" && msg.method !== "_kiro.dev/session/update") return
-        const params = msg.params as Record<string, unknown>
-        const msgSessionId = params.sessionId as string
-        const update = params.update as Record<string, unknown>
-        if (!update) return
-        const type = update.sessionUpdate as string
-
-        // --- Subagent session (compose_slides progress) ---
-        if (msgSessionId !== sessionId && subagentToolCallId) {
-          let groupInfo = subagentGroups.get(msgSessionId)
-          if (!groupInfo) {
-            const idx = subagentGroups.size
-            const slugs = subagentQueryQueue[idx] || `group ${idx + 1}`
-            groupInfo = { group: idx + 1, slugs }
-            subagentGroups.set(msgSessionId, groupInfo)
-            send({ toolStream: { toolUseId: subagentToolCallId, name: "compose_slides", data: { group: groupInfo.group, total_groups: totalGroups, slugs: groupInfo.slugs, status: "starting" } } })
-          }
-          const g = groupInfo
-          if (type === "tool_call") {
-            const title = (update.title || "") as string
-            const toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title
-            send({ toolStream: { toolUseId: subagentToolCallId, name: "compose_slides", data: { group: g.group, slugs: g.slugs, tool: toolName, toolUseId: update.toolCallId } } })
-          } else if (type === "tool_call_update") {
-            const status = update.status as string
-            if (status === "completed" || status === "error" || status === "failed") {
-              send({ toolStream: { toolUseId: subagentToolCallId, name: "compose_slides", data: { group: g.group, slugs: g.slugs, toolResult: update.toolCallId, toolStatus: status === "completed" ? "success" : "error" } } })
-            }
-          } else if (type === "turn_end" || type === "end_turn") {
-            send({ toolStream: { toolUseId: subagentToolCallId, name: "compose_slides", data: { group: g.group, slugs: g.slugs, status: "done" } } })
-          }
-          return
-        }
-
-        if (msgSessionId !== sessionId) return
-
-        // --- Main session events ---
-        if (type === "agent_message_chunk") {
-          const content = update.content as Record<string, unknown>
-          if (content?.text) {
-            send({ event: { contentBlockDelta: { delta: { text: content.text } } } })
-          }
-        }
-
-        if (type === "tool_call" || type === "tool_call_chunk") {
-          const toolCallId = update.toolCallId as string || ""
-          const title = (update.title || update.name || "") as string
-          let name = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title
-          const input = (update.rawInput || update.input || {}) as Record<string, unknown>
-          if (title === "Spawning agent crew" || name === "subagent") {
-            subagentToolCallId = toolCallId
-            subagentGroups.clear()
-            // Extract group queries from use_subagent input
-            // Cloud: input.content.queries[]  |  kiro-cli: input.stages[].prompt_template
-            const content = (input.content as Record<string, unknown> | undefined) || input
-            const queries = (content.queries as string[]) || []
-            const stages = (input.stages as Array<Record<string, unknown>>) || []
-            const groupTexts = queries.length > 0
-              ? queries
-              : stages.map((s) => (s.prompt_template as string) || (s.name as string) || "")
-            totalGroups = groupTexts.length
-            subagentQueryQueue.length = 0
-            groupTexts.forEach((q: string) => subagentQueryQueue.push(extractSlugs(q)))
-            // Build slide_groups for ComposeCard (Cloud format)
-            const slideGroups = groupTexts.map((q: string) => ({
-              slugs: extractSlugs(q).split(", ").map((s: string) => s.trim()).filter(Boolean),
-              instruction: q,
-            }))
-            name = "compose_slides"
-            if (type === "tool_call_chunk") {
-              send({ toolStart: { toolUseId: toolCallId, name } })
-            } else {
-              send({ toolUse: { toolUseId: toolCallId, name, input: { slide_groups: slideGroups } } })
-            }
-            return
-          }
-          // tool_call_chunk: show card immediately; tool_call: update with input
-          if (type === "tool_call_chunk") {
-            send({ toolStart: { toolUseId: toolCallId, name } })
-          } else {
-            send({ toolUse: { toolUseId: toolCallId, name, input } })
-          }
-        }
-
-        if (type === "tool_call_update") {
-          const toolCallId = update.toolCallId as string || ""
-          const title = (update.title || "") as string
-          let toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title
-          if (toolCallId === subagentToolCallId) toolName = "compose_slides"
-          const status = update.status as string
-          if (status === "completed") {
-            let result: Record<string, unknown> = {}
-            try {
-              const rawOutput = update.rawOutput as Record<string, unknown>
-              const items = rawOutput?.items as Array<Record<string, unknown>>
-              if (items?.[0]) {
-                const json = items[0].Json as Record<string, unknown>
-                const content = json?.content as Array<Record<string, unknown>>
-                if (content?.[0]?.text) result = JSON.parse(content[0].text as string)
-              }
-            } catch {}
-            // A deck's output_dir is a child of DECK_ROOT; the root itself (start_presentation's
-            // output_dir) is not a deck. The server reports normalized absolute paths.
-            if (result.output_dir && !result.deckId && String(result.output_dir).replace(/[\\/]+$/, "") !== DECK_ROOT_ABS) {
-              result.deckId = basename(result.output_dir as string)
-            }
-            if (result.deckId && onDeckId) onDeckId(result.deckId as string)
-            send({ toolResult: { toolUseId: toolCallId, name: toolName, status: "success", content: JSON.stringify(result) } })
-          }
-        }
-
-        // Don't close on session/update turn_end — it may fire before
-        // compose_slides tool_call_update(completed). Close only on the
-        // process manager's TURN_END / TURN_ERROR (finish above).
+      /** Write one event; true when it ended the turn and the stream closed. */
+      function write({ id, event }: BufferedEvent): boolean {
+        if (closed) return true
+        if (event.payload) send(id, event.payload)
+        if (event.kind !== "end") return false
+        closed = true
+        unsubscribe()
+        try { controller.close() } catch {}
+        return true
       }
+
+      for (const entry of replay ?? []) {
+        if (write(entry)) return
+      }
+      unsubscribe = subscribe((entry) => { write(entry) })
     },
   })
 }

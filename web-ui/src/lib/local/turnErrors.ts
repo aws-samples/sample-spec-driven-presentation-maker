@@ -1,25 +1,19 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * How a Local turn ends, shared by the ACP process manager, the SSE bridge and the chat UI.
+ * How a Local turn ends, shared by the ACP process manager, the conversation model and the chat UI.
  *
- * The process manager tells its listeners that the turn it started is over with one of two
- * events of its own (never sent by kiro-cli): `TURN_END` when session/prompt is answered with a
- * result (`params.stopReason`), `TURN_ERROR` when it is answered with an error or the kiro-cli
- * process ends first (`params.code` / `params.message`). Both are also buffered, so a stream
- * that reconnects after the end closes at once.
- *
- * The bridge sends `{status: "error", code, error}` with one of the codes below (the invoke
- * route answers `agent_timeout` with 504 before a stream exists); the chat UI shows the `chat.*`
- * message named here, in the user's language. `error` carries the English text for logs.
+ * The process manager ends the turn it started when session/prompt is answered with a result (its
+ * stopReason) or with an error, or when the kiro-cli process ends first (lib/local/conversation/
+ * turn.ts). The stream's last event is then `{status: "error", code, error}` with one of the
+ * codes below (the invoke route answers `agent_timeout` with 504 before a stream exists); the
+ * chat UI shows the `chat.*` message named here, in the user's language. `error` carries the
+ * English text for logs.
  *
  * - `agent_exited`: the kiro-cli process ended while the turn ran.
  * - `agent_timeout`: kiro-cli did not answer initialize / session/new / session/load in time.
  * - `refusal`, `max_tokens`, `max_turn_requests`: the turn's ACP stopReason.
  */
-
-export const TURN_END = "_sdpm/turn_end"
-export const TURN_ERROR = "_sdpm/turn_error"
 
 export type LocalTurnErrorCode = "agent_exited" | "agent_timeout" | "refusal" | "max_tokens" | "max_turn_requests"
 

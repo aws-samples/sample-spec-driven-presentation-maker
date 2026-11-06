@@ -3,16 +3,17 @@
 /**
  * Wait for an MCP server to finish initializing in an ACP session.
  *
- * `session/set_mode` answers before the new agent's MCP servers are up: kiro-cli
- * reports readiness separately as `_kiro.dev/mcp/server_initialized`. A prompt sent
- * in between runs without the server's tools — a forked session then greets the user
- * without `start_presentation` and improvises from local files.
+ * `session/set_mode` answers before the new agent's MCP servers are up: kiro-cli reports
+ * readiness separately, which the engine adapter turns into an `mcp_status` event (`connected`).
+ * A prompt sent in between runs without the server's tools — a forked session then greets the
+ * user without `start_presentation` and improvises from local files.
  */
+import type { McpStatusEvent } from "./conversation/events"
 
-export const MCP_SERVER_INITIALIZED = "_kiro.dev/mcp/server_initialized"
 export const SDPM_MCP_SERVER = "sdpm"
 
-type Listener = (msg: Record<string, unknown>) => void
+/** Receives every `mcp_status` event of a process. */
+export type McpStatusListener = (event: McpStatusEvent) => void
 
 export interface McpReadyWatch {
   /** Resolves true once the server is up, false after `timeoutMs`; rejects on abort. */
@@ -27,17 +28,15 @@ export interface McpReadyWatch {
  * The timeout only runs inside `wait`, so a long session replay does not eat it.
  */
 export function watchMcpServerReady(
-  listeners: Set<Listener>,
+  listeners: Set<McpStatusListener>,
   sessionId: string,
   serverName: string = SDPM_MCP_SERVER,
 ): McpReadyWatch {
   let seen = false
   let onSeen: (() => void) | null = null
 
-  const listener: Listener = (msg) => {
-    if (msg.method !== MCP_SERVER_INITIALIZED) return
-    const params = msg.params as { sessionId?: string; serverName?: string } | undefined
-    if (params?.sessionId !== sessionId || params?.serverName !== serverName) return
+  const listener: McpStatusListener = (event) => {
+    if (event.sessionId !== sessionId || event.server !== serverName || event.state !== "connected") return
     seen = true
     onSeen?.()
   }

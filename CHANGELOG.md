@@ -78,6 +78,16 @@ Entries before v0.5.0 were written retroactively as summaries.
   chat now starts a new kiro session, saves it to the deck's `.session` and says above the
   reply that the agent does not have the earlier conversation. Later messages, and the deck
   reopened after kiro-cli was stopped, continue that session. / Nothing.
+- **Local Web UI: reconnecting to a running chat no longer repeats its events.** When the
+  browser's stream to a running turn dropped and reconnected, it could show text and tool
+  steps twice: the live stream numbered its events differently from the buffer the
+  reconnect resumes from. The live stream and the replay now use the same event numbers.
+  / Nothing.
+- **Local Web UI: a deck created while no browser was listening keeps its conversation.**
+  The deck's `.session` (and, for a chat continued from a kiro session, its origin) was only
+  written while the chat's first stream was open, so a deck made after the tab was closed or
+  the stream reconnected did not remember its conversation when reopened. The server now
+  saves them as soon as the turn creates the deck. / Nothing.
 
 ## [0.12.0] - 2026-11-05
 

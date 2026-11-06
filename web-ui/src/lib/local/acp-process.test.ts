@@ -13,13 +13,20 @@
  * a steer goes into the running turn and is reported accepted, delivered (V2 by its text, V3 by
  * its messageId, or sent as a follow-up prompt when the prompt ended before kiro-cli read it) or
  * discarded when Stop or an exit ends the turn first; either way kiro-cli's queue is cleared.
+ * The turn's chat events are numbered once, here, and a stream and a reconnect see the same
+ * numbers; a turn's notice is its first event. A deck a tool result names gets the session's
+ * `.session` (and a fork's origin) once, with or without a listener; a forgotten process drops
+ * its pending origin.
  * kiro-cli is replaced by a fake child that answers the ACP requests.
  */
 
 import { EventEmitter } from "events"
+import fs from "fs"
+import os from "os"
+import path from "path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { STEER_EVENT } from "./steer"
-import { TURN_END, TURN_ERROR } from "./turnErrors"
+import type { BufferedEvent } from "./conversation/events"
+import type { SessionOrigin } from "./kiro-sessions.types"
 
 const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
 vi.mock("child_process", () => ({ spawn, default: { spawn } }))
@@ -81,10 +88,19 @@ class FakeChild extends EventEmitter {
   /** What kiro-cli 2.37 sends for a use_subagent call: sub-session updates and list_update, no turn_end. */
   runSubagent(subSessionId: string) {
     this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [{ sessionId: subSessionId, status: { type: "working" } }] } })
-    this.update(subSessionId, { sessionUpdate: "tool_call", toolCallId: `${subSessionId}-t`, title: "Running: @sdpm/generate_pptx" })
+    this.update(subSessionId, { sessionUpdate: "tool_call", toolCallId: `${subSessionId}-t`, title: "Running: @sdpm/generate_pptx", _meta: { kiro: { toolName: "generate_pptx", mcpServerName: "sdpm" } } })
     this.update(subSessionId, { sessionUpdate: "tool_call_update", toolCallId: `${subSessionId}-t`, status: "completed" })
     this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [{ sessionId: subSessionId, status: { type: "terminated" } }] } })
     this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [] } })
+  }
+
+  /** A main-session MCP tool call whose result is `result` (the V2 shape). */
+  toolResult(sessionId: string, toolCallId: string, result: Record<string, unknown>) {
+    this.update(sessionId, { sessionUpdate: "tool_call", toolCallId, title: "Running: @sdpm/init_presentation", rawInput: {}, _meta: { kiro: { toolName: "init_presentation", mcpServerName: "sdpm" } } })
+    this.update(sessionId, {
+      sessionUpdate: "tool_call_update", toolCallId, status: "completed", title: "Running: @sdpm/init_presentation",
+      rawOutput: { items: [{ Json: { content: [{ type: "text", text: JSON.stringify(result) }] } }] },
+    })
   }
 
   endTurn(stopReason = "end_turn") {
@@ -107,11 +123,18 @@ class FakeChild extends EventEmitter {
 const tick = () => new Promise((r) => setImmediate(r))
 const settle = async () => { for (let i = 0; i < 10; i++) await tick() }
 
+const isEnd = (e: BufferedEvent) => e.event.kind === "end"
+const payloadOf = (e: BufferedEvent) => e.event.payload as Record<string, unknown> | undefined
+const steerOf = (e: BufferedEvent) => payloadOf(e)?.steer as { id: string; text?: string; state: string } | undefined
+
 let children: FakeChild[]
 let locked: Set<string>
 let acp: typeof import("./acp-process")
+let deckRoot: string
 
 beforeEach(async () => {
+  deckRoot = fs.realpathSync(fs.mkdtempSync(path.join(os.tmpdir(), "sdpm-acp-process-"))) // nosemgrep: path-join-resolve-traversal — constant prefix
+  vi.stubEnv("SDPM_DECK_ROOT", deckRoot)
   children = []
   locked = new Set()
   spawn.mockReset()
@@ -126,6 +149,8 @@ beforeEach(async () => {
 
 afterEach(() => {
   for (const child of children) child.kill()
+  vi.unstubAllEnvs()
+  fs.rmSync(deckRoot, { recursive: true, force: true })
 })
 
 describe("process map", () => {
@@ -274,8 +299,8 @@ describe("turn state", () => {
     await acp.createNewProcessFor("C1")
     const child = children[0]
     const prompted = await acp.sendPrompt("C1", "build the deck")
-    const ends: Record<string, unknown>[] = []
-    prompted.subscribe((msg) => { if (msg.method === TURN_ERROR || msg.method === TURN_END) ends.push(msg) })
+    const ends: BufferedEvent["event"][] = []
+    prompted.subscribe((entry) => { if (isEnd(entry)) ends.push(entry.event) })
     prompted.send()
     child.runSubagent("S1")
     await settle()
@@ -283,7 +308,7 @@ describe("turn state", () => {
 
     child.failPrompt()
     await settle()
-    expect(ends).toEqual([{ method: TURN_ERROR, params: { sessionId: "K1", message: "Internal error: model stream failed" } }])
+    expect(ends).toEqual([{ kind: "end", payload: { status: "error", error: "Internal error: model stream failed" } }])
     expect(acp.isSessionRunning("C1")).toBe(false)
     expect(acp.isSessionRunning("K1")).toBe(false)
 
@@ -298,8 +323,8 @@ describe("turn state", () => {
     const child = children[0]
     child.failing.add("session/set_config_option")
     const prompted = await acp.sendPrompt("C1", "build the deck")
-    const ends: Record<string, unknown>[] = []
-    prompted.subscribe((msg) => { if (msg.method === TURN_ERROR || msg.method === TURN_END) ends.push(msg) })
+    const ends: BufferedEvent["event"][] = []
+    prompted.subscribe((entry) => { if (isEnd(entry)) ends.push(entry.event) })
     prompted.send()
     await settle()
 
@@ -312,7 +337,7 @@ describe("turn state", () => {
     child.endTurn()
     await settle()
     expect(acp.isSessionRunning("C1")).toBe(false)
-    expect(ends).toEqual([{ method: TURN_END, params: { sessionId: "K1", stopReason: "end_turn" } }])
+    expect(ends).toEqual([{ kind: "end", stopReason: "end_turn" }])
   })
 
   it.each(["end_turn", "cancelled", "refusal", "max_tokens", "max_turn_requests"])("ends the turn with stopReason %s and buffers the end for reconnects", async (stopReason) => {
@@ -323,20 +348,20 @@ describe("turn state", () => {
     children[0].endTurn(stopReason)
     await settle()
     expect(acp.isSessionRunning("C1")).toBe(false)
-    expect(acp.getBufferedEvents("C1").at(-1)?.msg).toEqual({ method: TURN_END, params: { sessionId: "K1", stopReason } })
+    expect(acp.getBufferedEvents("C1").at(-1)?.event).toMatchObject({ kind: "end", stopReason })
   })
 
   it("ends a running turn with agent_exited when kiro-cli exits, and forgets the process", async () => {
     await acp.createNewProcessFor("C1")
     const prompted = await acp.sendPrompt("C1", "build the deck")
-    const seen: Record<string, unknown>[] = []
-    prompted.subscribe((msg) => { seen.push(msg) })
+    const seen: BufferedEvent[] = []
+    prompted.subscribe((entry) => { seen.push(entry) })
     prompted.send()
     await settle()
 
     children[0].kill()
     await settle()
-    expect(seen.at(-1)).toMatchObject({ method: TURN_ERROR, params: { sessionId: "K1", code: "agent_exited" } })
+    expect(seen.at(-1)?.event).toMatchObject({ kind: "end", payload: { status: "error", code: "agent_exited" } })
     expect(acp.isSessionRunning("C1")).toBe(false)
     expect(acp.hasProcess("C1")).toBe(false)
     expect(acp.hasProcess("K1")).toBe(false)
@@ -344,8 +369,8 @@ describe("turn state", () => {
 
   it("sends no turn event when an idle process exits", async () => {
     await acp.createNewProcessFor("C1")
-    const seen: Record<string, unknown>[] = []
-    acp.subscribeToSession("C1")!.subscribe((msg) => { seen.push(msg) })
+    const seen: BufferedEvent[] = []
+    acp.subscribeToSession("C1")!.subscribe((entry) => { seen.push(entry) })
     children[0].kill()
     await settle()
     expect(seen).toEqual([])
@@ -357,8 +382,8 @@ describe("requests from kiro-cli", () => {
     await acp.createNewProcessFor("C1")
     const child = children[0]
     const prompted = await acp.sendPrompt("C1", "build the deck")
-    const ends: Record<string, unknown>[] = []
-    prompted.subscribe((msg) => { if (msg.method === TURN_ERROR || msg.method === TURN_END) ends.push(msg) })
+    const ends: BufferedEvent[] = []
+    prompted.subscribe((entry) => { if (isEnd(entry)) ends.push(entry) })
     prompted.send()
     await settle()
     return { child, ends, promptId: child.prompts[0] }
@@ -451,15 +476,17 @@ describe("session held by another process", () => {
 })
 
 describe("steer", () => {
-  const steerEvents = (seen: Record<string, unknown>[]) => seen
-    .filter((m) => m.method === STEER_EVENT || m.method === TURN_END || m.method === TURN_ERROR)
-    .map((m) => m.method === STEER_EVENT ? (m.params as { state: string }).state : m.method)
+  /** The steer states and the turn's end ("end", or "error" for a failed turn), in order. */
+  const steerEvents = (seen: BufferedEvent[]) => seen
+    .filter((e) => steerOf(e) || isEnd(e))
+    .map((e) => steerOf(e)?.state ?? (payloadOf(e)?.status === "error" ? "error" : "end"))
+  const steers = (seen: BufferedEvent[]) => seen.map(steerOf).filter(Boolean)
 
   async function running() {
     await acp.createNewProcessFor("C1")
     const prompted = await acp.sendPrompt("C1", "count to sixty")
-    const seen: Record<string, unknown>[] = []
-    prompted.subscribe((msg) => { seen.push(msg) })
+    const seen: BufferedEvent[] = []
+    prompted.subscribe((entry) => { seen.push(entry) })
     prompted.send()
     await settle()
     return { child: children[0], seen }
@@ -469,29 +496,29 @@ describe("steer", () => {
     const { child, seen } = await running()
     await acp.steerSession("C1", "m1", "stop counting")
     expect(child.requests.find((r) => r.method === "_session/steer")?.params).toEqual({ sessionId: "K1", message: "stop counting" })
-    expect(seen.at(-1)).toEqual({ method: STEER_EVENT, params: { sessionId: "K1", id: "m1", text: "stop counting", state: "accepted" } })
+    expect(seen.at(-1)?.event).toEqual({ kind: "data", payload: { steer: { id: "m1", text: "stop counting", state: "accepted" } } })
 
     child.send({ method: "_kiro.dev/session/update", params: { sessionId: "K1", update: { sessionUpdate: "AgentExecutionSteeringInjected", messageId: "steer-abc", content: "stop counting" } } })
     await settle()
-    expect(seen.at(-1)).toEqual({ method: STEER_EVENT, params: { sessionId: "K1", id: "m1", state: "delivered" } })
+    expect(seen.at(-1)?.event).toEqual({ kind: "data", payload: { steer: { id: "m1", state: "delivered" } } })
 
     child.endTurn()
     await settle()
-    expect(steerEvents(seen)).toEqual(["accepted", "delivered", TURN_END])
+    expect(steerEvents(seen)).toEqual(["accepted", "delivered", "end"])
     expect(child.requests.some((r) => r.method === "_session/steer/clear")).toBe(false)
     // Buffered for a /stream reconnect.
-    expect(acp.getBufferedEvents("C1").filter((e) => e.msg.method === STEER_EVENT)).toHaveLength(2)
+    expect(acp.getBufferedEvents("C1").filter(steerOf)).toHaveLength(2)
   })
 
-  it("matches V3's steering_injected by messageId", async () => {
+  it("matches an injection by messageId before its text", async () => {
     const { child, seen } = await running()
     child.steerAnswer = { queued: true, messageId: "steer-9" }
     await acp.steerSession("C1", "m1", "first")
     child.steerAnswer = { queued: true, messageId: "steer-10" }
     await acp.steerSession("C1", "m2", "first")
-    child.update("K1", { sessionUpdate: "session_info_update", _meta: { kiro: { kind: "steering_injected", messageId: "steer-10", content: "first" } } })
+    child.send({ method: "_kiro.dev/session/update", params: { sessionId: "K1", update: { sessionUpdate: "AgentExecutionSteeringInjected", messageId: "steer-10", content: "first" } } })
     await settle()
-    expect(seen.at(-1)).toMatchObject({ method: STEER_EVENT, params: { id: "m2", state: "delivered" } })
+    expect(seen.at(-1)?.event).toMatchObject({ payload: { steer: { id: "m2", state: "delivered" } } })
   })
 
   it("refuses a message when no turn runs, and one kiro-cli does not queue", async () => {
@@ -500,15 +527,15 @@ describe("steer", () => {
     await expect(acp.steerSession("nobody", "m1", "hi")).rejects.toMatchObject({ code: "session_idle" })
 
     const prompted = await acp.sendPrompt("C1", "count")
-    const seen: Record<string, unknown>[] = []
-    prompted.subscribe((msg) => { seen.push(msg) })
+    const seen: BufferedEvent[] = []
+    prompted.subscribe((entry) => { seen.push(entry) })
     prompted.send()
     await settle()
     children[0].steerAnswer = { queued: false, messageId: "steer-1", dropped: "epoch_changed" }
     await expect(acp.steerSession("C1", "m2", "late")).rejects.toMatchObject({ code: "steer_not_queued", message: expect.stringContaining("epoch_changed") })
     children[0].failing.add("_session/steer")
     await expect(acp.steerSession("C1", "m3", "broken")).rejects.toMatchObject({ code: "steer_not_queued", message: expect.stringContaining("_session/steer failed") })
-    expect(seen.filter((m) => m.method === STEER_EVENT)).toEqual([])
+    expect(steers(seen)).toEqual([])
   })
 
   it("on Stop, reports an unread message discarded before the turn end and clears it before the next prompt", async () => {
@@ -518,7 +545,7 @@ describe("steer", () => {
     child.silent.add("_session/steer/clear")
     child.endTurn("cancelled")
     await settle()
-    expect(steerEvents(seen)).toEqual(["accepted", "discarded", TURN_END])
+    expect(steerEvents(seen)).toEqual(["accepted", "discarded", "end"])
     const clear = child.requests.find((r) => r.method === "_session/steer/clear")
     expect(clear?.params).toEqual({ sessionId: "K1" })
 
@@ -543,7 +570,7 @@ describe("steer", () => {
     child.send({ id: steer.id, result: { queued: true } })
     await expect(steered).rejects.toMatchObject({ code: "session_idle" })
     expect(child.requests.at(-1)?.method).toBe("_session/steer/clear")
-    expect(seen.filter((m) => m.method === STEER_EVENT)).toEqual([])
+    expect(steers(seen)).toEqual([])
   })
 
   it("continues a turn that ended before kiro-cli read a message with a follow-up prompt on the same stream", async () => {
@@ -561,7 +588,7 @@ describe("steer", () => {
 
     child.endTurn()
     await settle()
-    expect(steerEvents(seen)).toEqual(["accepted", "accepted", "delivered", "delivered", TURN_END])
+    expect(steerEvents(seen)).toEqual(["accepted", "accepted", "delivered", "delivered", "end"])
     expect(acp.isSessionRunning("C1")).toBe(false)
   })
 
@@ -575,8 +602,8 @@ describe("steer", () => {
     const clear = child.requests.find((r) => r.method === "_session/steer/clear")!
     child.send({ id: clear.id, result: { cleared: true } })
     await settle()
-    expect(steerEvents(seen)).toEqual(["accepted", "discarded", TURN_END])
-    expect(seen.at(-1)).toMatchObject({ params: { stopReason: "cancelled" } })
+    expect(steerEvents(seen)).toEqual(["accepted", "discarded", "end"])
+    expect(seen.at(-1)?.event).toMatchObject({ kind: "end", stopReason: "cancelled" })
     expect(child.requests.filter((r) => r.method === "session/prompt")).toHaveLength(1)
   })
 
@@ -594,7 +621,7 @@ describe("steer", () => {
     // kiro-cli reads "second" in the follow-up prompt itself.
     child.send({ method: "_kiro.dev/session/update", params: { sessionId: "K1", update: { sessionUpdate: "AgentExecutionSteeringInjected", content: "second" } } })
     await settle()
-    expect(seen.filter((m) => m.method === STEER_EVENT).map((m) => m.params)).toMatchObject([
+    expect(steers(seen)).toMatchObject([
       { id: "m1", state: "accepted" }, { id: "m2", state: "accepted" }, { id: "m1", state: "delivered" }, { id: "m2", state: "delivered" },
     ])
   })
@@ -604,7 +631,106 @@ describe("steer", () => {
     await acp.steerSession("C1", "m1", "hello")
     child.kill()
     await settle()
-    expect(steerEvents(seen)).toEqual(["accepted", "discarded", TURN_ERROR])
+    expect(steerEvents(seen)).toEqual(["accepted", "discarded", "error"])
     expect(child.requests.some((r) => r.method === "_session/steer/clear")).toBe(false)
+  })
+})
+
+describe("chat events", () => {
+  it("numbers a turn's events once: a listener and a reconnect see the same ids", async () => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "hello")
+    const live: number[] = []
+    prompted.subscribe((entry) => { live.push(entry.id) })
+    prompted.send()
+    const child = children[0]
+    child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "one" } })
+    child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "two" } })
+    await settle()
+    child.endTurn()
+    await settle()
+    expect(live).toEqual([1, 2, 3])
+    expect(acp.getBufferedEvents("C1").map((e) => e.id)).toEqual(live)
+    expect(acp.getBufferedEvents("C1", 1).map((e) => e.id)).toEqual([2, 3])
+  })
+
+  it("buffers the turn's notice as its first event", async () => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "hello", undefined, { notice: "context_not_carried_over" })
+    expect(acp.getBufferedEvents("C1")).toEqual([{ id: 1, event: { kind: "data", payload: { notice: { code: "context_not_carried_over" } } } }])
+    prompted.send()
+    children[0].update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "hi" } })
+    await settle()
+    expect(acp.getBufferedEvents("C1").map((e) => e.id)).toEqual([1, 2])
+  })
+
+  it("keeps a sub-agent session's text and tool chunks out of the chat", async () => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "hello")
+    prompted.send()
+    const child = children[0]
+    child.update("S1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "composer says" } })
+    child.send({ method: "_kiro.dev/session/update", params: { sessionId: "S1", update: { sessionUpdate: "tool_call_chunk", toolCallId: "s1-t", title: "list_templates" } } })
+    child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "main says" } })
+    await settle()
+    expect(acp.getBufferedEvents("C1").map((e) => e.event)).toEqual([{ kind: "data", payload: { event: { contentBlockDelta: { delta: { text: "main says" } } } } }])
+  })
+})
+
+describe("deck detection", () => {
+  const ORIGIN: SessionOrigin = { sourceSessionId: "SRC", title: "earlier chat", cwd: "/workspace", updatedAt: "2026-11-05T00:00:00.000Z", forkedAt: "2026-11-06T00:00:00.000Z" }
+  const deckFile = (deckId: string, name: string) => path.join(deckRoot, deckId, name) // nosemgrep: path-join-resolve-traversal — constant deck ids in a tmpdir
+  const readDeckFile = (deckId: string, name: string) => fs.existsSync(deckFile(deckId, name)) ? fs.readFileSync(deckFile(deckId, name), "utf-8") : null
+  const makeDeck = (deckId: string) => fs.mkdirSync(path.join(deckRoot, deckId)) // nosemgrep: path-join-resolve-traversal — constant deck id in a tmpdir
+
+  async function turnWith(results: Record<string, unknown>[]) {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "make a deck")
+    prompted.send()
+    results.forEach((result, i) => children[0].toolResult("K1", `t${i}`, result))
+    await settle()
+  }
+
+  it("writes .session and the fork's origin with no listener, and drops the pending origin", async () => {
+    makeDeck("d1")
+    acp.pendingOrigins.set("C1", ORIGIN)
+    await turnWith([{ output_dir: deckRoot }, { output_dir: path.join(deckRoot, "d1") }]) // nosemgrep: path-join-resolve-traversal — constant deck id in a tmpdir
+    expect(readDeckFile("d1", ".session")).toBe("K1")
+    expect(JSON.parse(readDeckFile("d1", ".session-origin.json")!)).toEqual(ORIGIN)
+    expect(acp.pendingOrigins.has("C1")).toBe(false)
+  })
+
+  it("writes a deck's .session once, and a second deck's without the origin", async () => {
+    makeDeck("d1")
+    makeDeck("d2")
+    acp.pendingOrigins.set("C1", ORIGIN)
+    await turnWith([{ deckId: "d1" }])
+    fs.writeFileSync(deckFile("d1", ".session"), "edited")
+    children[0].toolResult("K1", "t9", { deckId: "d1" })
+    children[0].toolResult("K1", "t10", { deckId: "d2" })
+    await settle()
+    expect(readDeckFile("d1", ".session")).toBe("edited")
+    expect(readDeckFile("d2", ".session")).toBe("K1")
+    expect(readDeckFile("d2", ".session-origin.json")).toBeNull()
+  })
+
+  it("shows the deck id it found in the tool result", async () => {
+    makeDeck("d1")
+    await turnWith([{ output_dir: path.join(deckRoot, "d1") }]) // nosemgrep: path-join-resolve-traversal — constant deck id in a tmpdir
+    const result = acp.getBufferedEvents("C1").map(payloadOf).find((p) => p?.toolResult)?.toolResult as { content: string }
+    expect(JSON.parse(result.content)).toEqual({ output_dir: path.join(deckRoot, "d1"), deckId: "d1" }) // nosemgrep: path-join-resolve-traversal — constant deck id in a tmpdir
+  })
+
+  it.each([
+    ["exits", () => { children[0].kill() }],
+    ["is terminated", () => { acp.terminateProcess("C1") }],
+    ["is evicted", async () => { for (const id of ["C2", "C3", "C4"]) await acp.createNewProcessFor(id) }],
+  ])("drops the pending origin when the process %s", async (_case, forget) => {
+    await acp.createNewProcessFor("C1")
+    acp.pendingOrigins.set("C1", ORIGIN)
+    await forget()
+    await settle()
+    expect(acp.hasProcess("C1")).toBe(false)
+    expect(acp.pendingOrigins.has("C1")).toBe(false)
   })
 })

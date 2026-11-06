@@ -8,9 +8,17 @@ through the ACP process manager and the SSE bridge.
 |---|---|---|
 | `kiro-3.0.0-v2-turn.jsonl` | V2 (`kiro-cli acp --agent sdpm-orchestrator`) | initialize, session/new, session/prompt |
 | `kiro-3.0.0-v3-turn.jsonl` | V3 (`kiro-cli acp --agent-engine v3`, agent definitions converted with `kiro-cli agent upgrade`) | initialize, session/new, session/prompt |
+| `kiro-3.0.0-v2-compose.jsonl` | V2 (`kiro-cli acp --agent sdpm-orchestrator`), spike capture `s2_v2_gen` | initialize, session/new, session/prompt, session/prompt |
 
-Both turns answer the prompt "Call the sdpm list_styles tool once, then reply with only the
-number of styles" and end with `stopReason: end_turn`.
+The two `turn` captures answer the prompt "Call the sdpm list_styles tool once, then reply with
+only the number of styles" and end with `stopReason: end_turn`.
+
+`kiro-3.0.0-v2-compose.jsonl` holds two turns of one session (main session `fa1545df…`). The
+first is the same list_styles turn. In the second the orchestrator delegates to the
+sdpm-composer sub-agent: a crew `tool_call_chunk` (title `subagent`) and `tool_call`
+(`_meta.kiro.toolName: "subagent"`, one stage), `_kiro.dev/subagent/list_update`s, and the
+composer's own session (`621f8fd1…`) with its text, thoughts, tool chunks and the
+`list_templates` and `Summarizing` tool calls. Both turns end with `stopReason: end_turn`.
 
 Trimmed from the captures (the shapes the bridge reads are unchanged):
 

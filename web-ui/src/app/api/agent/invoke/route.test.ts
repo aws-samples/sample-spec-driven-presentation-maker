@@ -9,10 +9,14 @@
  *
  * A reopened deck restores the kiro session its `.session` names; with none to load (no
  * `.session`, or kiro-cli no longer has it) the turn runs in a new session, saved to `.session`,
- * and the stream opens with the `context_not_carried_over` notice.
+ * and the stream opens with the `context_not_carried_over` notice, which the route hands to
+ * sendPrompt (the process manager buffers it as the turn's first event). The route itself
+ * saves nothing for a deck the turn creates; the process manager does.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
+import type { BufferedEvent } from "@/lib/local/conversation/events"
+import type { LocalSessionNoticeCode } from "@/lib/local/sessionNotices"
 import { SessionBusyError } from "@/lib/local/sessionErrors"
 import { AgentTimeoutError } from "@/lib/local/turnErrors"
 
@@ -21,13 +25,13 @@ const acp = vi.hoisted(() => ({
   getOrCreateProcess: vi.fn(),
   createNewProcessFor: vi.fn(),
   sendPrompt: vi.fn(),
+  getBufferedEvents: vi.fn(),
   readSessionFromDeck: vi.fn(),
   saveSessionToDeck: vi.fn(),
 }))
 vi.mock("@/lib/local/acp-process", () => ({
   ...acp,
   pendingOrigins: new Map(),
-  saveOriginToDeck: vi.fn(),
 }))
 
 import { POST } from "./route"
@@ -83,13 +87,20 @@ describe("POST /api/agent/invoke session conflicts", () => {
   })
 })
 
-/** A prompt whose turn ends at once, so the SSE body can be read to the end. */
+/**
+ * sendPrompt for a turn that ends at once, so the SSE body can be read to the end. Like the
+ * process manager, it buffers the notice it is given as the turn's first event.
+ */
 function promptEndingAt(sessionId: string) {
-  let listener: ((msg: Record<string, unknown>) => void) | null = null
-  return {
-    sessionId,
-    subscribe: (fn: (msg: Record<string, unknown>) => void) => { listener = fn; return () => { listener = null } },
-    send: () => listener?.({ method: "_sdpm/turn_end", params: { sessionId, stopReason: "end_turn" } }),
+  return (_clientId: string, _text: string, _agent: string, opts: { notice?: LocalSessionNoticeCode } = {}) => {
+    const buffered: BufferedEvent[] = opts.notice ? [{ id: 1, event: { kind: "data", payload: { notice: { code: opts.notice } } } }] : []
+    acp.getBufferedEvents.mockReturnValue(buffered)
+    let listener: ((entry: BufferedEvent) => void) | null = null
+    return Promise.resolve({
+      sessionId,
+      subscribe: (fn: (entry: BufferedEvent) => void) => { listener = fn; return () => { listener = null } },
+      send: () => listener?.({ id: buffered.length + 1, event: { kind: "end", stopReason: "end_turn" } }),
+    })
   }
 }
 
@@ -106,27 +117,28 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
 
   it("restores the kiro session named in .session, under the client's id", async () => {
     acp.readSessionFromDeck.mockReturnValue("K1")
-    acp.sendPrompt.mockResolvedValue(promptEndingAt("K1"))
+    acp.sendPrompt.mockImplementation(promptEndingAt("K1"))
     const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
     expect(res.status).toBe(200)
     expect(acp.getOrCreateProcess).toHaveBeenCalledWith(DECK_FALLBACK_ID, "sdpm-orchestrator", { signal: expect.any(AbortSignal), kiroSessionId: "K1" })
     expect(acp.createNewProcessFor).not.toHaveBeenCalled()
     expect(acp.saveSessionToDeck).not.toHaveBeenCalled()
-    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "hi", "sdpm-orchestrator")
+    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "hi", "sdpm-orchestrator", { notice: undefined })
+    expect(acp.getBufferedEvents).toHaveBeenCalledWith(DECK_FALLBACK_ID)
     expect((await events(res)).some((e) => "notice" in e)).toBe(false)
   })
 
   it("starts a new session for a deck without .session, saves it and sends the notice first", async () => {
     acp.readSessionFromDeck.mockReturnValue(null)
     acp.createNewProcessFor.mockResolvedValue({ sessionId: "NEW1" })
-    acp.sendPrompt.mockResolvedValue(promptEndingAt("NEW1"))
+    acp.sendPrompt.mockImplementation(promptEndingAt("NEW1"))
     const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
     expect(res.status).toBe(200)
     expect(acp.getOrCreateProcess).not.toHaveBeenCalled()
     expect(acp.createNewProcessFor).toHaveBeenCalledWith(DECK_FALLBACK_ID, "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
     expect(acp.saveSessionToDeck).toHaveBeenCalledWith("mcp-made-deck", "NEW1")
     // A new session's first prompt carries the interaction mode.
-    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "Interaction mode: fast\n\nhi", "sdpm-orchestrator")
+    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "Interaction mode: fast\n\nhi", "sdpm-orchestrator", { notice: "context_not_carried_over" })
     expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
   })
 
@@ -134,7 +146,7 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
     acp.readSessionFromDeck.mockReturnValue(DECK_FALLBACK_ID)
     acp.getOrCreateProcess.mockRejectedValue(new Error(NOT_FOUND_ERROR))
     acp.createNewProcessFor.mockResolvedValue({ sessionId: "NEW2" })
-    acp.sendPrompt.mockResolvedValue(promptEndingAt("NEW2"))
+    acp.sendPrompt.mockImplementation(promptEndingAt("NEW2"))
     const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
     expect(res.status).toBe(200)
     expect(acp.saveSessionToDeck).toHaveBeenCalledWith("mcp-made-deck", "NEW2")

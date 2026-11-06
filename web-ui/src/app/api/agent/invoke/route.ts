@@ -6,15 +6,17 @@
  * kiro-cli process) is answered with 409 and a SessionConflict body; a kiro-cli
  * that does not answer its setup requests in time with 504 and code `agent_timeout`.
  * A reopened deck without a kiro session to load gets a new one (lib/local/sessionNotices.ts).
+ * The process manager saves the session to a deck the turn creates (and a fork's origin with it),
+ * whether or not this stream is still read.
  */
 import {
   sendPrompt,
   createNewProcessFor,
+  getBufferedEvents,
   hasProcess,
   getOrCreateProcess,
   pendingOrigins,
   readSessionFromDeck,
-  saveOriginToDeck,
   saveSessionToDeck,
 } from "@/lib/local/acp-process"
 import { createSSEStream } from "@/lib/local/sse-bridge"
@@ -106,7 +108,7 @@ export async function POST(req: Request) {
     // Spec / Vibe and continuation facts are attached only to the first prompt.
     const continuedPrompt = withContinuedFrom(query, continuedFrom, isFirstPrompt)
     const prompt = withInteractionMode(continuedPrompt, mode, isFirstPrompt)
-    prompted = await sendPrompt(clientSessionId!, prompt, agentName)
+    prompted = await sendPrompt(clientSessionId, prompt, agentName, { notice })
   } catch (error) {
     const conflict = sessionConflict(error)
     if (conflict) return Response.json(conflict, { status: 409 })
@@ -118,22 +120,10 @@ export async function POST(req: Request) {
     if (req.signal.aborted) return new Response(null, { status: 499 })
     throw error
   }
-  const { sessionId, subscribe, send } = prompted
+  const { subscribe, send } = prompted
 
-  const stream = createSSEStream({
-    sessionId,
-    subscribe,
-    notice,
-    onDeckId: (createdDeckId) => {
-      saveSessionToDeck(createdDeckId, sessionId)
-      const origin = pendingOrigins.get(sessionId)
-      if (origin) {
-        saveOriginToDeck(createdDeckId, origin)
-        pendingOrigins.delete(sessionId)
-      }
-    },
-    onError: () => pendingOrigins.delete(sessionId),
-  })
+  // The turn's buffered events (its notice) first, then the live ones.
+  const stream = createSSEStream({ subscribe, replay: getBufferedEvents(clientSessionId) })
 
   send()
 
