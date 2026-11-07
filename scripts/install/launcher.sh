@@ -3,258 +3,57 @@
 # SPDX-License-Identifier: MIT-0
 #
 # sdpm — the one launcher for a local SDPM installation (~/.sdpm).
-#   sdpm webui      browser surface
-#   sdpm mcp        MCP surface (for a terminal check; clients get the uv command directly)
-#   sdpm register   wire the MCP server into the clients on this machine
-#   sdpm update     fetch, hand over to the fetched checkout_update.py (local changes go to
-#                   a git stash, then fast-forward), sync, rebuild, then client_config.py
-#                   refresh — which replaces this file with the checkout's launcher.sh and
-#                   re-registers the clients
-# Anything that could drift between this file and launcher.ps1 (client detection,
-# configuration rendering, registration commands) lives once in
-# servers/local/client_config.py; both launchers only delegate to it.
+# sdpm-bootstrap 1
+#
+# A bootstrap: it finds the checkout and uv, and hands every command to the checkout.
+#   sdpm update   fetch, then the checkout's servers/local/checkout_update.py (it follows the
+#                 latest release, or main with --channel main, and never moves backwards)
+#   anything else servers/local/sdpm_command.py (status, webui, mcp, register, doctor, …)
+# Everything that can change between versions lives in those two files, so this one stays
+# as it is. launcher.ps1 is the same file for Windows, line for line.
 set -uo pipefail
 
 SDPM_HOME="${SDPM_HOME:-$HOME/.sdpm}"
 CHECKOUT="$SDPM_HOME/checkout"
-PROFILE_FILE="$SDPM_HOME/.profile"
 UV_PATH_FILE="$SDPM_HOME/.uv-path"
 # This file, as installed (the copy `sdpm update` refreshes).
 SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
-# Kiro agent name chosen at install time (--agent-name); SDPM_AGENT_NAME overrides per call.
-if [[ -z "${SDPM_AGENT_NAME:-}" && -f "$SDPM_HOME/.agent-name" ]]; then
-  SDPM_AGENT_NAME=$(cat "$SDPM_HOME/.agent-name" 2>/dev/null || true)
-fi
-export SDPM_AGENT_NAME="${SDPM_AGENT_NAME:-sdpm}"
-REPO_URL="https://github.com/aws-samples/sample-spec-driven-presentation-maker.git"
-WEBUI_PORT="${SDPM_WEBUI_PORT:-3000}"
 
-# ---------------------------------------------------------------------------
-# Resolution
-# ---------------------------------------------------------------------------
-
-require_checkout() {
-  [[ -d "$CHECKOUT/.git" ]] || { echo "SDPM is not installed at $CHECKOUT. Re-run the installer." >&2; exit 1; }
-}
-
-profile() {
-  if [[ -f "$PROFILE_FILE" ]]; then cat "$PROFILE_FILE"; else echo full; fi
-}
-
-webui_installed() { [[ "$(profile)" == "full" && -d "$CHECKOUT/web-ui/build" ]]; }
-
-# Absolute path of uv, recorded by the installer; re-resolved and re-recorded if stale.
+# Absolute path of uv, recorded at install time; re-resolved and re-recorded if stale.
 resolve_uv() {
-  local recorded=""
+  local recorded="" found
   [[ -f "$UV_PATH_FILE" ]] && recorded=$(cat "$UV_PATH_FILE" 2>/dev/null || true)
   if [[ -n "$recorded" && -x "$recorded" ]]; then echo "$recorded"; return 0; fi
-  local found
   found=$(command -v uv 2>/dev/null || true)
   [[ -z "$found" && -x "$HOME/.local/bin/uv" ]] && found="$HOME/.local/bin/uv"
-  [[ -n "$found" ]] || { echo "uv not found. Re-run the installer (it installs uv)." >&2; exit 1; }
+  [[ -n "$found" ]] || { echo "uv not found. Re-run the installer (it installs uv)." >&2; return 1; }
   case "$found" in /*) ;; *) found="$(cd "$(dirname "$found")" && pwd)/$(basename "$found")" ;; esac
   mkdir -p "$SDPM_HOME" && echo "$found" > "$UV_PATH_FILE"
   echo "$found"
 }
 
-# uv never rewrites the lockfile here (--frozen): a tracked file changed in the checkout
-# would stop the next `sdpm update`.
+[[ -d "$CHECKOUT/.git" ]] || { echo "SDPM is not installed at $CHECKOUT. Re-run the installer." >&2; exit 1; }
+uv=$(resolve_uv) || exit 1
+# No project, a fresh environment (never a .venv or VIRTUAL_ENV), Python 3.11+.
+py=("$uv" run --no-project --isolated --python ">=3.11" python)
 
-# Run a Python entry point inside the local server's environment (no stdout of our own).
-py() {
-  local uv; uv=$(resolve_uv) || exit 1
-  exec "$uv" run --frozen --directory "$CHECKOUT/servers/local" python "$@"
-}
-
-# client_config.py, told exactly which uv and checkout the clients must point at.
-cfg() {
-  local uv; uv=$(resolve_uv) || exit 1
-  exec "$uv" run --frozen --directory "$CHECKOUT/servers/local" python client_config.py --uv "$uv" --checkout "$CHECKOUT" "$@"
-}
-
-cfg_call() {
-  local uv; uv=$(resolve_uv) || return 1
-  "$uv" run --frozen --directory "$CHECKOUT/servers/local" python client_config.py --uv "$uv" --checkout "$CHECKOUT" "$@"
-}
-
-# ---------------------------------------------------------------------------
-# Surfaces
-# ---------------------------------------------------------------------------
-
-open_url() {
-  if command -v open >/dev/null 2>&1; then open "$1" >/dev/null 2>&1
-  elif command -v xdg-open >/dev/null 2>&1; then xdg-open "$1" >/dev/null 2>&1
-  else printf 'Open %s in your browser.\n' "$1"
+if [[ "${1:-}" == "update" ]]; then
+  shift
+  git -C "$CHECKOUT" fetch --quiet --prune origin \
+      '+refs/heads/main:refs/remotes/origin/main' '+refs/tags/*:refs/tags/*' \
+    || { echo "sdpm update could not fetch from $(git -C "$CHECKOUT" remote get-url origin 2>/dev/null); nothing was changed." >&2; exit 1; }
+  updater="$CHECKOUT/servers/local/checkout_update.py"
+  if grep -q '^UPDATER_CONTRACT = ' "$updater" 2>/dev/null; then
+    exec "${py[@]}" "$updater" --checkout "$CHECKOUT" --uv "$uv" update --launcher "$SELF" "$@"
   fi
-}
+  # Only a checkout reset by hand gets here: run origin/main's file from a temp dir.
+  tmp=$(mktemp -d) || exit 1
+  git -C "$CHECKOUT" --work-tree="$tmp" restore --source=refs/remotes/origin/main --worktree \
+      -- servers/local/checkout_update.py || { rm -rf "$tmp"; exit 1; }
+  "${py[@]}" "$tmp/servers/local/checkout_update.py" --checkout "$CHECKOUT" --uv "$uv" update --launcher "$SELF" "$@"
+  rc=$?; rm -rf "$tmp"; exit "$rc"
+fi
 
-port_is_open() {
-  (exec 3<>"/dev/tcp/127.0.0.1/$WEBUI_PORT") >/dev/null 2>&1
-}
-
-wait_and_open_browser() {
-  (
-    local i
-    for ((i=0; i<240; i++)); do
-      if port_is_open; then open_url "http://localhost:$WEBUI_PORT"; exit 0; fi
-      sleep 0.5
-    done
-    echo "SDPM did not become ready on port $WEBUI_PORT within 120 seconds." >&2
-  ) &
-}
-
-webui() {
-  require_checkout
-  if ! webui_installed; then
-    echo "The browser Web UI is not installed in this profile ($(profile))." >&2
-    echo "Add it with:  sdpm update --with-webui   (needs Node.js 20+)" >&2
-    exit 1
-  fi
-  if port_is_open; then
-    echo "Port $WEBUI_PORT is already in use; opening the existing service."
-    open_url "http://localhost:$WEBUI_PORT"
-    return 0
-  fi
-  wait_and_open_browser
-  cd "$CHECKOUT/web-ui" || exit 1
-  NEXT_PUBLIC_MODE=local npm run start -- --hostname 127.0.0.1 --port "$WEBUI_PORT"
-}
-
-mcp() {
-  require_checkout
-  # Foreground stdio server for a terminal check. Nothing else may touch stdout here.
-  py server.py
-}
-
-# ---------------------------------------------------------------------------
-# Maintenance
-# ---------------------------------------------------------------------------
-
-report_failure() {
-  echo "SDPM $1 failed while $2 (exit $3)." >&2
-  echo "Review the output above and repair the checkout at $CHECKOUT, then rerun 'sdpm $1'." >&2
-}
-
-step() {
-  local what="$1" op="$2" status; shift 2
-  echo "> $what..."
-  "$@"; status=$?
-  [[ "$status" -eq 0 ]] || { report_failure "$op" "$what" "$status"; return "$status"; }
-}
-
-build_mcp() {
-  local uv; uv=$(resolve_uv) || return 1
-  step "Syncing the MCP server environment" update "$uv" sync --frozen --directory "$CHECKOUT/servers/local" || return $?
-}
-
-# checkout_update.py as of the fetched main, run before anything is checked out: it moves
-# local changes to a git stash (never discards them) and fast-forwards. The newest version
-# of that step runs even over an old checkout; this file only fetches and hands over.
-fast_forward() {
-  local uv tmp status
-  uv=$(resolve_uv) || return 1
-  tmp=$(mktemp -d) || return 1
-  git -C "$CHECKOUT" --work-tree="$tmp" restore --source=FETCH_HEAD --worktree -- servers/local/checkout_update.py &&
-    "$uv" run --no-project python "$tmp/servers/local/checkout_update.py" --checkout "$CHECKOUT" pull
-  status=$?
-  rm -rf "$tmp"
-  return "$status"
-}
-
-build_webui() {
-  step "Installing Web UI dependencies" update bash -c "cd '$CHECKOUT/web-ui' && npm ci" || return $?
-  step "Building the Web UI (Local mode)" update bash -c "cd '$CHECKOUT/web-ui' && NEXT_PUBLIC_MODE=local npm run build" || return $?
-}
-
-update() {
-  require_checkout
-  local with_webui=0 before
-  for arg in "$@"; do [[ "$arg" == "--with-webui" ]] && with_webui=1; done
-  before=$(git -C "$CHECKOUT" rev-parse HEAD 2>/dev/null || true)
-  echo "> Fetching main from $REPO_URL"
-  step "Fetching main" update git -C "$CHECKOUT" fetch --tags --prune origin main || return $?
-  step "Fast-forwarding main" update fast_forward || return $?
-  build_mcp || return $?
-  if [[ "$with_webui" -eq 1 ]]; then
-    command -v npm >/dev/null 2>&1 || { echo "Node.js 20+ is required for the Web UI: https://nodejs.org/" >&2; return 1; }
-    echo full > "$PROFILE_FILE"
-  fi
-  if [[ "$(profile)" == "full" ]]; then build_webui || return $?; fi
-  # The new checkout's code: this file, the clients that have the server, leftovers, notes.
-  step "Refreshing the sdpm command and MCP clients" update \
-    cfg_call refresh --launcher "$SELF" ${before:+--since "$before"} || return $?
-  echo "Update complete."
-  echo "  sdpm webui     open the browser Web UI" ; [[ "$(profile)" == "full" ]] || echo "  (not installed — sdpm update --with-webui)"
-}
-
-uninstall() {
-  require_checkout
-  echo "This removes $SDPM_HOME, the sdpm command and desktop shortcuts."
-  read -r -p "Continue? [y/N] " answer
-  [[ "$answer" =~ ^[Yy]$ ]] || { echo "Aborted."; return 0; }
-  cfg_call unregister || true
-  local launcher_dir; launcher_dir="${SDPM_LAUNCHER_DIR:-$HOME/.local/bin}"
-  rm -f "$launcher_dir/sdpm" "$HOME/Desktop/SDPM.command" "$HOME/.local/share/applications/sdpm.desktop"
-  rm -rf "$SDPM_HOME"
-  echo "SDPM removed."
-}
-
-version() {
-  require_checkout
-  local ref commit
-  ref=$(git -C "$CHECKOUT" describe --tags --always 2>/dev/null || echo main)
-  commit=$(git -C "$CHECKOUT" rev-parse --short HEAD)
-  echo "$ref ($commit)"
-}
-
-status() {
-  require_checkout
-  echo "SDPM $(version)"
-  echo "  checkout   $CHECKOUT"
-  echo "  profile    $(profile)"
-  if webui_installed; then echo "  webui      installed        → sdpm webui"
-  else                     echo "  webui      not installed    → sdpm update --with-webui"; fi
-  echo "  mcp        installed        → sdpm register  (connect your MCP clients)"
-  echo ""
-  cfg_call status 2>/dev/null || true
-}
-
-help_text() {
-  cat <<'HELP'
-Usage: sdpm [COMMAND]
-
-Surfaces
-  webui                 Start the browser Web UI and open it
-  mcp                   Run the MCP server on stdio (terminal check)
-
-MCP clients
-  register [CLIENT..]   Register the server with detected (or named) clients
-  unregister [CLIENT..] Remove it again
-  mcp-config [CLIENT..] Print the configuration with this machine's paths (--json, --all)
-
-Maintenance
-  update [--with-webui] Pull main, sync, rebuild what is installed, refresh this
-                        command and the registered MCP clients
-  doctor                Check the local environment
-  uninstall             Remove SDPM from this machine
-  version | path | help
-
-No command: show status.
-HELP
-}
-
-case "${1:-}" in
-  "") status ;;
-  webui|launch) webui ;;
-  mcp) mcp ;;
-  register) shift; require_checkout; cfg register "$@" ;;
-  unregister) shift; require_checkout; cfg unregister "$@" ;;
-  mcp-config) shift; require_checkout; cfg print "$@" ;;
-  update) shift; update "$@" ;;
-  doctor) require_checkout; uv=$(resolve_uv) || exit 1; (cd "$CHECKOUT" && "$uv" run --frozen python scripts/doctor.py) ;;
-  uninstall) uninstall ;;
-  version|--version|-v) version ;;
-  path) echo "$CHECKOUT" ;;
-  help|--help|-h) help_text ;;
-  *) echo "Unknown command: $1" >&2; help_text >&2; exit 2 ;;
-esac
+cmd="$CHECKOUT/servers/local/sdpm_command.py"
+[[ -f "$cmd" ]] || { echo "This checkout predates the sdpm command; run: sdpm update" >&2; exit 1; }
+exec "${py[@]}" "$cmd" --checkout "$CHECKOUT" --uv "$uv" --launcher "$SELF" "$@"
