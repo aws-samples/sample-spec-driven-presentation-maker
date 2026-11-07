@@ -6,6 +6,8 @@ on:
     paths:
       - "scripts/install/**"
       - "servers/local/client_config.py"
+      - "sdpm/sdpm/_launcher_bridge.py"
+      - "sdpm/sdpm/knowledge/assets/download.py"
       - "servers/local/pyproject.toml"
       - ".gitignore"
       - ".github/workflows/installer.yml"
@@ -14,6 +16,8 @@ on:
     paths:
       - "scripts/install/**"
       - "servers/local/client_config.py"
+      - "sdpm/sdpm/_launcher_bridge.py"
+      - "sdpm/sdpm/knowledge/assets/download.py"
       - "servers/local/pyproject.toml"
       - ".gitignore"
       - ".github/workflows/installer.yml"
@@ -100,6 +104,36 @@ jobs:
           MIRROR="$(mktemp -d)/mirror.git"; git clone -q --bare . "$MIRROR"; git -C "$MIRROR" branch -f main HEAD
           SDPM_REPO_URL="$MIRROR" bash scripts/install/dist/install.sh --mcp-only --non-interactive --skip-libreoffice --no-register
           "$SDPM_LAUNCHER_DIR/sdpm" version
+      # Every install made before the refresh step carries the #397 launcher, which never
+      # replaced itself. Its `sdpm update` must leave the install as a new one would.
+      - name: Update from the #397 launcher
+        shell: bash
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export KIRO_HOME="$(mktemp -d)/kiro"
+          checkout="$SDPM_HOME/checkout"
+          git show 7c53267d:scripts/install/launcher.sh > "$SDPM_LAUNCHER_DIR/sdpm"
+          # What such an install has: a Kiro agent in the 2.x-only format, the pre-0.12
+          # environments, and a checkout behind main.
+          mkdir -p "$KIRO_HOME/agents"
+          echo '{"name": "sdpm", "description": "SDPM (managed by `sdpm register`)", "tools": ["@sdpm"]}' > "$KIRO_HOME/agents/sdpm.json"
+          for venv in servers/local/.venv sdpm/.venv; do mkdir -p "$checkout/$venv"; echo "home = /usr/bin" > "$checkout/$venv/pyvenv.cfg"; done
+          git -C "$checkout" reset -q --hard HEAD~1
+          "$SDPM_LAUNCHER_DIR/sdpm" update | tee update.log
+          grep -q "Refreshing the sdpm command and MCP clients (once" update.log
+          cmp "$SDPM_LAUNCHER_DIR/sdpm" scripts/install/launcher.sh
+          test -x "$SDPM_LAUNCHER_DIR/sdpm"
+          test ! -e "$checkout/servers/local/.venv" && test ! -e "$checkout/sdpm/.venv"
+          python3 -c '
+          import json, os; a = json.load(open(os.environ["KIRO_HOME"] + "/agents/sdpm.json"))
+          assert a["permissions"]["rules"] and "subagent/sdpm" in a["tools"], a
+          assert a["mcpServers"]["sdpm"]["command"].startswith("/"), a
+          print("kiro agent OK")'
+          python3 scripts/install/mcp_smoke.py "$SDPM_LAUNCHER_DIR/sdpm" mcp
+          # The new launcher refreshes by itself; the bridge stays out of it.
+          "$SDPM_LAUNCHER_DIR/sdpm" update | tee update2.log
+          if grep -q "(once" update2.log; then echo "the bridge ran for a new launcher" >&2; exit 1; fi
+          grep -q "sdpm command: up to date" update2.log
 
   full-profile:
     runs-on: ubuntu-latest
@@ -178,3 +212,32 @@ jobs:
           $s = (Get-Content config.json -Raw | ConvertFrom-Json).server.sdpm
           python scripts/install/mcp_smoke.py $s.command @($s.args)
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      - name: Update from the #397 launcher
+        shell: pwsh
+        run: |
+          $env:KIRO_HOME = Join-Path ([IO.Path]::GetTempPath()) ("kiro-" + [guid]::NewGuid())
+          $checkout = Join-Path $env:SDPM_HOME "checkout"
+          $launcher = Join-Path $env:SDPM_LAUNCHER_DIR "sdpm.ps1"
+          $sdpm = Join-Path $env:SDPM_LAUNCHER_DIR "sdpm.cmd"
+          # As the installer of that version wrote it.
+          git show "7c53267d:scripts/install/launcher.ps1" | Set-Content -Path $launcher -Encoding UTF8
+          New-Item -ItemType Directory -Force -Path (Join-Path $env:KIRO_HOME "agents") | Out-Null
+          '{"name": "sdpm", "description": "SDPM (managed by `sdpm register`)", "tools": ["@sdpm"]}' | Set-Content -Path (Join-Path $env:KIRO_HOME "agents\sdpm.json") -Encoding UTF8
+          foreach ($venv in @("servers\local\.venv", "sdpm\.venv")) {
+            New-Item -ItemType Directory -Force -Path (Join-Path $checkout $venv) | Out-Null
+            "home = C:\Python" | Set-Content -Path (Join-Path $checkout "$venv\pyvenv.cfg")
+          }
+          git -C $checkout reset -q --hard HEAD~1
+          & $sdpm update | Tee-Object -FilePath update.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (-not (Select-String -Path update.log -SimpleMatch "Refreshing the sdpm command and MCP clients (once" -Quiet)) { throw "the bridge did not run" }
+          if ((Get-Content $launcher -Raw) -ne (Get-Content (Join-Path $checkout "scripts\install\launcher.ps1") -Raw)) { throw "launcher not refreshed" }
+          if ((Test-Path (Join-Path $checkout "servers\local\.venv")) -or (Test-Path (Join-Path $checkout "sdpm\.venv"))) { throw "leftovers remain" }
+          $agent = Get-Content (Join-Path $env:KIRO_HOME "agents\sdpm.json") -Raw | ConvertFrom-Json
+          if (-not $agent.permissions.rules -or -not [IO.Path]::IsPathRooted($agent.mcpServers.sdpm.command)) { throw "kiro agent not refreshed" }
+          python scripts/install/mcp_smoke.py $sdpm mcp
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          & $sdpm update | Tee-Object -FilePath update2.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          if (Select-String -Path update2.log -SimpleMatch "(once" -Quiet) { throw "the bridge ran for a new launcher" }
+          if (-not (Select-String -Path update2.log -SimpleMatch "sdpm command: up to date" -Quiet)) { throw "launcher refreshed twice" }

@@ -15,6 +15,8 @@ export const KIRO_MCP_SERVER_INITIALIZED = "_kiro.dev/mcp/server_initialized"
 export const KIRO_MCP_SERVER_INIT_FAILURE = "_kiro.dev/mcp/server_init_failure"
 /** The `--agent` was not found and another agent runs: `{sessionId, requestedAgent, fallbackAgent}`. */
 export const KIRO_AGENT_NOT_FOUND = "_kiro.dev/agent/not_found"
+/** The sub-agents kiro-cli runs, as the full list each time (`[]` once none is left). */
+export const KIRO_SUBAGENT_LIST_UPDATE = "_kiro.dev/subagent/list_update"
 
 /** session/load's error text when another kiro-cli process holds the session. */
 export const SESSION_LOCKED_MARKER = "Session is active in another process"
@@ -35,6 +37,15 @@ export interface V2ToolMeta {
 /** The crew tool call's input: one stage per composer group. */
 export interface V2CrewInput {
   stages?: { name?: string; role?: string; prompt_template?: string }[]
+}
+
+/**
+ * `_kiro.dev/subagent/list_update`'s params. A crew's sub-agent session is named after its stage
+ * (`sessionName`); `status.type` is `working` while it runs and `terminated` once it finished.
+ */
+export interface V2SubagentListUpdate {
+  subagents?: { sessionId?: string; sessionName?: string; agentName?: string; status?: { type?: string; message?: string } }[]
+  pendingStages?: unknown[]
 }
 
 /** A finished MCP tool call's output. */

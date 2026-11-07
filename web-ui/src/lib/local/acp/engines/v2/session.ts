@@ -77,10 +77,10 @@ export class V2Session implements EngineSession {
     this.translator.endTurn()
   }
 
-  /** The main session and the sub-agent sessions this turn ran (V2 cancels each of them). */
+  /** The main session and the sub-agent sessions kiro-cli lists as working (V2 cancels each of them). */
   cancelTargets(): string[] {
     const main = this.translator.mainSessionId
-    return main ? [main, ...this.translator.takeChildren()] : []
+    return main ? [main, ...this.translator.workingChildren()] : []
   }
 
   models(): AcpModelList | null {

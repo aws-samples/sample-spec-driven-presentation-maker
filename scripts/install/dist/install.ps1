@@ -169,6 +169,8 @@ $script:EmbeddedLauncher = @'
 #   sdpm webui      browser surface
 #   sdpm mcp        MCP surface (terminal check; clients get the uv command directly)
 #   sdpm register   wire the MCP server into the clients on this machine
+#   sdpm update     pull, sync, rebuild, then client_config.py refresh - which replaces
+#                   this file with the checkout's launcher.ps1 and re-registers the clients
 # Client detection, configuration rendering and registration commands live once in
 # servers/local/client_config.py; this file and launcher.sh only delegate to it.
 [CmdletBinding()]
@@ -178,6 +180,8 @@ param(
 )
 
 $ErrorActionPreference = "Stop"
+# This file, as installed (the copy `sdpm update` refreshes).
+$LauncherPath = $PSCommandPath
 $SdpmHome = if ($env:SDPM_HOME) { $env:SDPM_HOME } else { Join-Path $env:USERPROFILE ".sdpm" }
 $Checkout = Join-Path $SdpmHome "checkout"
 $ProfileFile = Join-Path $SdpmHome ".profile"
@@ -298,7 +302,6 @@ function Invoke-Step {
 function Build-Mcp {
     $uv = Resolve-Uv
     Invoke-Step "Syncing the MCP server environment" { & $uv sync --directory $ServerDir }
-    Invoke-Step "Installing icon catalogs" { & $uv run --directory $ServerDir python -m sdpm.knowledge.assets.download --sources aws,material }
 }
 
 function Build-WebUi {
@@ -313,6 +316,7 @@ function Build-WebUi {
 function Invoke-Update {
     Assert-Checkout
     $withWebUi = $Rest -contains "--with-webui"
+    $before = (& git -C $Checkout rev-parse HEAD 2>$null)
     Write-Host "> Fetching main from $RepoUrl"
     Invoke-Step "Fetching main" { & git -C $Checkout fetch --tags --prune origin main }
     Invoke-Step "Checking out main" { & git -C $Checkout checkout -q main }
@@ -323,10 +327,13 @@ function Invoke-Update {
         "full" | Set-Content -Path $ProfileFile -Encoding ASCII
     }
     if ((Get-Profile) -eq "full") { Build-WebUi }
+    # The new checkout's code: this file, the clients that have the server, leftovers, notes.
+    $refreshArgs = @("refresh", "--launcher", $LauncherPath)
+    if ($before) { $refreshArgs += @("--since", "$before".Trim()) }
+    Invoke-Step "Refreshing the sdpm command and MCP clients" { Invoke-Cfg $refreshArgs }
     Write-Host "Update complete." -ForegroundColor Green
     if ((Get-Profile) -eq "full") { Write-Host "  sdpm webui     open the browser Web UI" }
     else { Write-Host "  sdpm webui     (not installed - sdpm update --with-webui)" }
-    Write-Host "  sdpm register  connect your MCP clients"
 }
 
 function Invoke-Uninstall {
@@ -375,7 +382,8 @@ MCP clients
   mcp-config [CLIENT..] Print the configuration with this machine's paths (--json, --all)
 
 Maintenance
-  update [--with-webui] Pull main, sync dependencies, rebuild what is installed
+  update [--with-webui] Pull main, sync, rebuild what is installed, refresh this
+                        command and the registered MCP clients
   doctor                Check the local environment
   uninstall             Remove SDPM from this machine
   version | path | help
