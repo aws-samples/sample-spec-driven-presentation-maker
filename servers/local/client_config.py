@@ -663,15 +663,35 @@ def registered(clients: list[Client], agent_name: str = DEFAULT_KIRO_AGENT) -> d
         if client.id == "kiro-cli":
             result[client.id] = kiro_agent_registered(agent_name)
             continue
-        if client.list_cmd is None:
-            result[client.id] = None
-            continue
-        try:
-            out = subprocess.run(client.list_cmd, capture_output=True, text=True, timeout=20, check=False)
-            result[client.id] = SERVER_NAME in (out.stdout + out.stderr)
-        except (OSError, subprocess.TimeoutExpired):
-            result[client.id] = None
+        listing = _list_output(client)
+        result[client.id] = None if listing is None else SERVER_NAME in listing
     return result
+
+
+def _list_output(client: Client) -> Optional[str]:
+    """What ``client.list_cmd`` prints; None when there is no such command or it cannot run."""
+    if client.list_cmd is None:
+        return None
+    try:
+        out = subprocess.run(client.list_cmd, capture_output=True, text=True, timeout=20, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return out.stdout + out.stderr
+
+
+# One line per server in both `claude mcp list` ("sdpm: <command> <args> - ✓ Connected") and
+# `codex mcp list` (a table whose first column is the name).
+_SERVER_LINE = re.compile(rf"^\s*{re.escape(SERVER_NAME)}(:|\s)")
+
+
+def entry_checkout(listing: str, target: Target) -> Optional[str]:
+    """Whose ``sdpm`` entry a client lists: "here" when it runs ``target``'s checkout,
+    "other" when it runs another one (``make register-dev`` uses the same name), None when
+    the client has no ``sdpm`` entry."""
+    lines = [line for line in listing.splitlines() if _SERVER_LINE.match(line)]
+    if not lines:
+        return None
+    return "here" if any(target.server_dir in line for line in lines) else "other"
 
 
 # ---------------------------------------------------------------------------
@@ -750,27 +770,44 @@ def refresh_registrations(
     clients: Optional[list[Client]] = None,
     run: Callable[[list[str]], int] = _run,
     run_quiet: Callable[[list[str]], int] = _run_quiet,
-) -> tuple[int, list[Client]]:
-    """Register again every client that already has the server; add none.
+) -> tuple[int, list[Client], list[Client]]:
+    """Register again every client whose server runs this install; add none.
 
-    Returns the number of failures and the detected clients that do not have it (for one
-    "add with sdpm register" line). The Kiro agent file is the registration itself, so it is
-    refreshed even when kiro-cli is not on PATH. A client whose CLI can remove the server is
-    cleared first: ``claude mcp add`` refuses a name that exists.
+    Returns the number of failures, the detected clients that do not have the server (for
+    one "add with sdpm register" line), and the clients whose ``sdpm`` entry runs another
+    checkout — a developer's ``make register-dev`` — which are left alone. The Kiro agent
+    file is the registration itself, so it is refreshed even when kiro-cli is not on PATH.
+    A client whose CLI can remove the server is cleared first: ``claude mcp add`` refuses a
+    name that exists.
     """
     clients = detect() if clients is None else list(clients)
     if not any(c.id == "kiro-cli" for c in clients) and kiro_agent_registered(agent_name):
         clients.insert(0, by_id("kiro-cli"))
-    status = registered(clients, agent_name)
-    ours = [c for c in clients if status.get(c.id) is True]
-    missing = [c for c in clients if status.get(c.id) is False and _selectable(c)]
+    ours: list[Client] = []
+    missing: list[Client] = []
+    elsewhere: list[Client] = []
+    for client in clients:
+        if client.id == "kiro-cli":
+            # Ours by marker, under the install-time name; register-dev uses another name.
+            state = "here" if kiro_agent_registered(agent_name) else None
+        else:
+            listing = _list_output(client)
+            if listing is None:
+                continue  # cannot tell (no list command): never touched
+            state = entry_checkout(listing, target)
+        if state == "here":
+            ours.append(client)
+        elif state == "other":
+            elsewhere.append(client)
+        elif _selectable(client):
+            missing.append(client)
     if not ours:
-        return 0, missing
+        return 0, missing, elsewhere
     for client in ours:
         if client.unregister is not None:
             run_quiet(client.unregister())
     failures = register(ours, target, run=run, agent_name=agent_name, chosen=ours, cleanup=False)
-    return failures, missing
+    return failures, missing, elsewhere
 
 
 # Upgrading notes. In CHANGELOG.md, the bullets that follow a paragraph
@@ -865,8 +902,10 @@ def refresh(
     checkout = Path(target.checkout)
     if launcher is not None:
         print(f"  sdpm command: {refresh_launcher(launcher, checkout)}")
-    failures, missing = refresh_registrations(target, agent_name=agent_name, clients=clients,
-                                              run=run, run_quiet=run_quiet)
+    failures, missing, elsewhere = refresh_registrations(target, agent_name=agent_name, clients=clients,
+                                                         run=run, run_quiet=run_quiet)
+    for client in elsewhere:
+        print(f"  {client.label}: its {SERVER_NAME} server runs another checkout — left alone")
     if missing:
         print(f"  Also found {', '.join(c.label for c in missing)} — add with: "
               f"sdpm register {' '.join(c.id for c in missing)}")

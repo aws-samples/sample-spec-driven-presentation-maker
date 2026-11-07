@@ -255,7 +255,8 @@ AWS 構成では見出しに 3 つのボタンがあります。
   - SDPM が登録済みのクライアントに登録し直す（Kiro CLI のエージェントはインストール時に
     決めた名前で、Claude Code、Codex）。クライアントを足すことはしません。SDPM が未登録の
     クライアントが見つかれば名前を表示するので、`sdpm register` で足せます。VS Code と
-    Cursor は登録済みかどうかを返さないため、そのままにします
+    Cursor は登録済みかどうかを返さないため、そのままにします。Claude Code や Codex の
+    `sdpm` サーバーが別のチェックアウト（`make register-dev`）を動かしている場合もそのままです
   - 前の版が残し、もう使われないものを消す（`servers/local/.venv`、`sdpm/.venv`、旧 Kiro
     インストーラーのファイル）
   - CHANGELOG の Upgrading にあるローカルインストール向けの注記から、この更新の後にすること

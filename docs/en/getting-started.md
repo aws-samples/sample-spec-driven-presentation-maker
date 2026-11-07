@@ -267,7 +267,8 @@ Public decks work as PPTX decks do: anyone who can view the deck can present and
   - registers SDPM again with the clients that already have it (the Kiro CLI agent under
     the name chosen at install, Claude Code, Codex). It adds no client: clients it finds
     without SDPM are named, and `sdpm register` adds them. VS Code and Cursor cannot report
-    whether they have SDPM, so they are left as they are
+    whether they have SDPM, so they are left as they are, and so is a Claude Code or Codex
+    `sdpm` server that runs another checkout (`make register-dev`)
   - removes what earlier versions left and nothing uses (`servers/local/.venv`,
     `sdpm/.venv`, the old Kiro installer's files)
   - prints what to do after this update, from the CHANGELOG's Upgrading notes for local

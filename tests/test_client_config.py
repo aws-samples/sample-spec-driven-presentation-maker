@@ -397,18 +397,59 @@ def test_update_leftovers_lists_old_environments_and_our_files_only(tmp_path, mo
     assert checkout / "sdpm/.venv" not in cc.update_leftovers(checkout, root=kiro)
 
 
+def _listing(monkeypatch, outputs: dict):
+    """What each client's `mcp list` prints; a client absent from ``outputs`` cannot tell."""
+    monkeypatch.setattr(cc, "_list_output", lambda c: outputs.get(c.id) if c.list_cmd else None)
+
+
+CLAUDE_HERE = ("Checking MCP server health...\n\n"
+               f"sdpm: {POSIX.uv} run --directory {POSIX.server_dir} python server.py - ✓ Connected\n")
+CODEX_NONE = "Name  Command  Args\nother  npx  -y other-server\n"
+
+
 def test_refresh_registrations_registers_again_only_what_is_registered(monkeypatch, tmp_path):
     monkeypatch.setenv("KIRO_HOME", str(tmp_path))  # no Kiro agent
     clients = [cc.by_id("claude-code"), cc.by_id("codex"), cc.by_id("vscode")]
-    monkeypatch.setattr(cc, "registered", lambda cs, _n: {"claude-code": True, "codex": False, "vscode": None})
+    _listing(monkeypatch, {"claude-code": CLAUDE_HERE, "codex": CODEX_NONE})
     monkeypatch.setattr(cc, "claude_plugin_installed", lambda: pytest.fail("no cleanup offers during refresh"))
     removed, added = [], []
-    failures, missing = cc.refresh_registrations(
+    failures, missing, elsewhere = cc.refresh_registrations(
         POSIX, clients=clients, run=lambda a: (added.append(a), 0)[1], run_quiet=lambda a: (removed.append(a), 0)[1])
-    assert failures == 0
+    assert failures == 0 and elsewhere == []
     assert removed == [["claude", "mcp", "remove", "--scope", "user", "sdpm"]]  # `mcp add` refuses an existing name
     assert added == [cc.by_id("claude-code").register(POSIX)]
     assert [c.id for c in missing] == ["codex"]  # found, not registered: named, never added
+
+
+def test_refresh_registrations_leaves_an_entry_for_another_checkout_alone(monkeypatch, tmp_path):
+    # `make register-dev CLIENTS=claude-code` registers the same name with a working tree.
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    dev = cc.Target(uv=POSIX.uv, checkout="/home/u/.sdpm/checkout-dev", platform="linux")
+    clients = [cc.by_id("claude-code"), cc.by_id("codex")]
+    _listing(monkeypatch, {
+        "claude-code": f"sdpm: {dev.uv} run --directory {dev.server_dir} python server.py - ✓ Connected\n",
+        "codex": f"Name  Command  Args\nsdpm  {dev.uv}  run --directory {dev.server_dir} python server.py\n"
+                 f"sdpm-dev  {POSIX.uv}  run --directory {POSIX.server_dir} python server.py\n",
+    })
+    calls = []
+    failures, missing, elsewhere = cc.refresh_registrations(
+        POSIX, clients=clients, run=lambda a: (calls.append(a), 0)[1], run_quiet=lambda a: (calls.append(a), 0)[1])
+    assert calls == []  # neither removed nor added
+    assert failures == 0 and missing == []
+    assert [c.id for c in elsewhere] == ["claude-code", "codex"]
+
+
+def test_refresh_names_the_entries_it_leaves_alone(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    _listing(monkeypatch, {"claude-code": "sdpm: uv run --directory /work/tree/servers/local python server.py\n"})
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    target = cc.Target(uv=POSIX.uv, checkout=str(checkout), platform="linux")
+    calls = []
+    rc = cc.refresh(target, launcher=None, since=None, clients=[cc.by_id("claude-code")],
+                    run=lambda a: (calls.append(a), 0)[1], run_quiet=lambda a: (calls.append(a), 0)[1])
+    assert rc == 0 and calls == []
+    assert "Claude Code: its sdpm server runs another checkout — left alone" in capsys.readouterr().out
 
 
 def test_refresh_registrations_refreshes_the_kiro_agent_without_kiro_cli(monkeypatch, tmp_path):
@@ -417,8 +458,8 @@ def test_refresh_registrations_refreshes_the_kiro_agent_without_kiro_cli(monkeyp
     (tmp_path / "agents").mkdir()
     old = {"name": "work", "description": "SDPM " + cc.KIRO_AGENT_MARKER, "tools": ["@sdpm"]}  # 2.x-only file
     (tmp_path / "agents" / "work.json").write_text(json.dumps(old))
-    failures, missing = cc.refresh_registrations(POSIX, agent_name="work", clients=[], run=lambda _a: 0)
-    assert failures == 0 and missing == []
+    failures, missing, elsewhere = cc.refresh_registrations(POSIX, agent_name="work", clients=[], run=lambda _a: 0)
+    assert failures == 0 and missing == [] and elsewhere == []
     agent = json.loads((tmp_path / "agents" / "work.json").read_text())
     assert agent == cc.kiro_agent_definition(POSIX, "work")
     assert not (tmp_path / "agents" / "sdpm.json").exists()  # the name chosen at install, nothing else

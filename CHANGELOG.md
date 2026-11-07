@@ -49,7 +49,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   the MCP clients that already have it: the Kiro CLI agent (under the name chosen at
   install), Claude Code and Codex. It adds no client; clients it finds without SDPM are
   named with the `sdpm register` command that adds them. VS Code and Cursor cannot report
-  whether they have SDPM, so they are left as they are. It removes what earlier versions
+  whether they have SDPM, so they are left as they are, and so is a Claude Code or Codex
+  `sdpm` server that runs another checkout (`make register-dev`). It removes what earlier versions
   left and nothing uses: `servers/local/.venv` and `sdpm/.venv` (before 0.12), the files of
   the old Kiro installer, and the `.bak` copies kiro-cli 3.x made of the `sdpm` agent. Last,
   it prints the Upgrading notes for local installs that are new since your previous
