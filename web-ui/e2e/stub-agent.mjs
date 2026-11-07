@@ -17,6 +17,13 @@
  * names the source in `_meta.parentSessionId`) and deletes a fork (`session/delete`), as
  * kiro-cli 3.1 does; it advertises them in initialize. V2 answers them with Method not found.
  *
+ * Models: `auto` (no effort), `stub-effort` (effort low / medium / high, default medium) and
+ * `stub-plain`, kept per session. V3 reports them as config options, in session/new's answer and
+ * in a `config_option_update` (before session/new's answer and after a load's, as kiro-cli does),
+ * and changes them with session/set_config_option (`model`, `effortLevel`); V2 answers them in
+ * `models` on session/new and session/load (names are the ids) and changes the model with
+ * session/set_model. The prompt's last text says which model (and effort) the session ran on.
+ *
  * On prompt it writes a deck to SDPM_DECK_ROOT (deck.json + slide JSON + preview PNG) and
  * streams: text → an sdpm tool call and its result (with the deckId) → two composer groups in
  * parallel, each with one tool of its own (V3: two `agent-subtask` delegations whose tools carry
@@ -39,10 +46,49 @@ const MODES = ["sdpm-orchestrator", "sdpm-composer", "sdpm-style", "sdpm-transla
 
 /** sessionId → its current mode. */
 const sessions = new Map()
+/** sessionId → its model and effort. */
+const sessionModels = new Map()
 let sessionCount = 0
 /** V3 fork id → its source. */
 const forks = new Map()
 const V3_SOURCE = { sessionId: "sess_e2e-v3-source", cwd: "/tmp/e2e-project", title: "E2E V3 source" }
+
+const MODELS = [
+  { value: "auto", name: "Auto", _meta: { kiro: { rateMultiplier: 1, hasEffort: false } } },
+  { value: "stub-effort", name: "Stub Effort", _meta: { kiro: { rateMultiplier: 2, hasEffort: true, effortLevels: ["low", "medium", "high"], defaultEffortLevel: "medium" } } },
+  { value: "stub-plain", name: "Stub Plain", _meta: { kiro: { hasEffort: false } } },
+]
+
+function modelOf(sessionId) {
+  if (!sessionModels.has(sessionId)) sessionModels.set(sessionId, { model: "auto", effort: null })
+  return sessionModels.get(sessionId)
+}
+
+function setModel(sessionId, model) {
+  const effort = MODELS.find((m) => m.value === model)?._meta.kiro.defaultEffortLevel ?? null
+  sessionModels.set(sessionId, { model, effort })
+}
+
+/** V3: the session's mode, model and (for a model with effort) effort options. */
+function configOptions(sessionId) {
+  const { model, effort } = modelOf(sessionId)
+  const options = [
+    { type: "select", id: "mode", name: "Mode", category: "mode", currentValue: sessions.get(sessionId), options: MODES.map((value) => ({ value, name: value })) },
+    { type: "select", id: "model", name: "Model", category: "model", currentValue: model, options: MODELS },
+  ]
+  const levels = MODELS.find((m) => m.value === model)?._meta.kiro.effortLevels
+  if (levels) options.push({ type: "select", id: "effortLevel", name: "Effort", category: "thought_level", currentValue: effort, options: levels.map((value) => ({ value, name: value })) })
+  return options
+}
+
+function configUpdate(sessionId) {
+  update(sessionId, { sessionUpdate: "config_option_update", configOptions: configOptions(sessionId) })
+}
+
+/** V2: the models as session/new and session/load answer them. */
+function v2Models(sessionId) {
+  return { currentModelId: modelOf(sessionId).model, availableModels: MODELS.map((m) => ({ modelId: m.value, name: m.value })) }
+}
 
 // 1x1 transparent PNG
 const PNG_1X1 = Buffer.from(
@@ -71,11 +117,16 @@ function mcpStatus(sessionId, status) {
   send({ method: "_kiro/mcp/status", params: { sessionId, servers: [{ name: "sdpm", status }] } })
 }
 
-/** Answer a request that opens or switches a session, with the sdpm server's readiness around it. */
-function answerReady(msg, sessionId, result) {
+/**
+ * Answer a request that opens or switches a session, with the sdpm server's readiness around it
+ * (V3: `before` / `after` the answer, while the server connects).
+ */
+function answerReady(msg, sessionId, result, { before = () => {}, after = () => {} } = {}) {
   if (ENGINE === "v3") {
     mcpStatus(sessionId, "connecting")
+    before()
     answer(msg, result)
+    after()
     mcpStatus(sessionId, "connected")
   } else {
     send({ method: "_kiro.dev/mcp/server_initialized", params: { sessionId, serverName: "sdpm" } })
@@ -168,6 +219,8 @@ function handlePrompt(msg) {
   if (ENGINE === "v3") delegationsV3(sessionId)
   else crewV2(sessionId)
   text(sessionId, "Done! Your deck is ready.")
+  const { model, effort } = modelOf(sessionId)
+  text(sessionId, ` (model: ${model}${ENGINE === "v3" && effort ? `, effort: ${effort}` : ""})`)
   answer(msg, { stopReason: "end_turn" })
 }
 
@@ -210,16 +263,38 @@ rl.on("line", (line) => {
     case "session/new": {
       const sessionId = `stub-${ENGINE}-${process.pid}-${++sessionCount}`
       sessions.set(sessionId, ENGINE === "v3" ? msg.params?._meta?.kiro?.modeId ?? "vibe" : AGENT)
-      answerReady(msg, sessionId, { sessionId, modes: modes(sessionId) })
+      if (ENGINE === "v3") answerReady(msg, sessionId, { sessionId, modes: modes(sessionId), configOptions: configOptions(sessionId) }, { before: () => configUpdate(sessionId) })
+      else answerReady(msg, sessionId, { sessionId, modes: modes(sessionId), models: v2Models(sessionId) })
       break
     }
     case "session/load": {
       const sessionId = msg.params.sessionId
       if (!sessions.has(sessionId)) sessions.set(sessionId, ENGINE === "v3" ? "sdpm-orchestrator" : AGENT)
       const parent = forks.has(sessionId) ? { parentSessionId: forks.get(sessionId) } : {}
-      answerReady(msg, sessionId, { modes: modes(sessionId), ...(ENGINE === "v3" ? { _meta: { createdAt: STARTED_AT, ...parent } } : {}) })
+      if (ENGINE === "v3") answerReady(msg, sessionId, { modes: modes(sessionId), _meta: { createdAt: STARTED_AT, ...parent } }, { after: () => configUpdate(sessionId) })
+      else answerReady(msg, sessionId, { modes: modes(sessionId), models: v2Models(sessionId) })
       break
     }
+    case "session/set_config_option": {
+      const { sessionId, configId, value } = msg.params
+      if (ENGINE !== "v3") {
+        send({ id: msg.id, error: { code: -32601, message: `Method not found: ${msg.method}` } })
+        break
+      }
+      if (configId === "model") setModel(sessionId, value)
+      else if (configId === "effortLevel") modelOf(sessionId).effort = value
+      configUpdate(sessionId)
+      answer(msg, { configOptions: configOptions(sessionId) })
+      break
+    }
+    case "session/set_model":
+      if (ENGINE !== "v2") {
+        send({ id: msg.id, error: { code: -32601, message: `Method not found: ${msg.method}` } })
+        break
+      }
+      setModel(msg.params.sessionId, msg.params.modelId)
+      answer(msg, {})
+      break
     case "session/set_mode":
       sessions.set(msg.params.sessionId, msg.params.modeId)
       answerReady(msg, msg.params.sessionId, {})

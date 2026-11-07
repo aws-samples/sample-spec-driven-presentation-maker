@@ -54,6 +54,8 @@ vi.mock("@/services/localService", () => ({
   localStreamUrl: vi.fn(() => null),
   hasLocalStream: vi.fn(async () => false),
   stopLocalAgent: vi.fn(async () => undefined),
+  getLocalSessionModels: vi.fn(async () => null),
+  setLocalSessionModel: vi.fn(async () => null),
 }))
 vi.mock("@/services/kiroSessionsService", () => ({ forkKiroSession: vi.fn(), listKiroSessions: vi.fn(async () => ({ recent: [] })) }))
 
