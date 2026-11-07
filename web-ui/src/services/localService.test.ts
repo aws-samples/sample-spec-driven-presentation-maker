@@ -75,7 +75,7 @@ describe("localService (local mode)", () => {
   it("maps the model list to the ModelPicker shape", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ available: [{ modelId: "m1", name: "Model 1", description: "d" }] }))
     await expect(listLocalModels()).resolves.toEqual([{ modelId: "m1", displayName: "Model 1", description: "d" }])
-    expect(call(0).url).toBe("/api/agent/models")
+    expect(call(0)).toEqual({ url: "/api/agent/models", method: "POST", body: {} })
   })
 
   it("builds the stream URL and probes whether the session still streams", async () => {
