@@ -25,7 +25,7 @@ WIN = cc.Target(uv=r"C:\Users\u\.local\bin\uv.exe", checkout=r"C:\Users\u\.sdpm\
 def test_server_config_is_absolute_uv_plus_checkout_posix():
     assert cc.server_config(POSIX) == {
         "command": "/home/u/.local/bin/uv",
-        "args": ["run", "--directory", "/home/u/.sdpm/checkout/servers/local", "python", "server.py"],
+        "args": ["run", "--directory", "/home/u/.sdpm/checkout/servers/local", "--frozen", "python", "server.py"],
     }
 
 
@@ -116,6 +116,88 @@ def test_write_kiro_agent_creates_refreshes_and_respects_foreign_file(tmp_path, 
     assert cc.kiro_agent_registered(root=tmp_path) is False
     cc.remove_kiro_agent(root=tmp_path)
     assert path.exists()  # still theirs
+
+
+# What kirocrew and kiro-cli's own conversion add to an agent file, as found on a machine
+# after `sdpm update` (#529) had dropped them: another MCP server and its tool, shell
+# settings for kiro-cli 2.x and their 3.x rules, kiroUpgrade.
+FOREIGN_SERVER = {"command": "/opt/aim", "args": ["mcp", "start-server", "creds"], "x-kirocrew": {"managed": True}}
+DENY_V2 = {"deniedCommands": ["git reset --hard.*"]}
+DENY_V3 = {"capability": "shell", "match": ["git reset --hard*"], "effect": "deny"}
+
+
+def _agent_with_additions(target: cc.Target) -> dict:
+    agent = cc.kiro_agent_definition(target)
+    agent["mcpServers"]["sdpm"]["env"] = {"SDPM_X": "1"}
+    agent["mcpServers"]["creds-agent"] = FOREIGN_SERVER
+    agent["tools"] = ["@creds-agent", *agent["tools"], "web"]
+    agent["toolsSettings"]["execute_bash"] = DENY_V2
+    agent["toolsSettings"]["shell"] = DENY_V2
+    agent["permissions"]["rules"] = [DENY_V3, *agent["permissions"]["rules"], {"capability": "skill", "effect": "allow"}]
+    agent["kiroUpgrade"] = {"revision": 2, "fingerprint": "sha256:x"}
+    return agent
+
+
+def test_write_kiro_agent_keeps_what_other_tools_added(tmp_path, monkeypatch):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    path = tmp_path / "agents" / "sdpm.json"
+    path.parent.mkdir()
+    path.write_text(json.dumps(_agent_with_additions(POSIX)))
+    moved = cc.Target(uv="/new/uv", checkout="/new/checkout", platform="linux")
+    assert cc.write_kiro_agent(moved, root=tmp_path) == 0
+    agent = json.loads(path.read_text())
+    ours = cc.kiro_agent_definition(moved)
+    # Ours, brought up to date.
+    assert agent["mcpServers"]["sdpm"] == {**ours["mcpServers"]["sdpm"], "env": {"SDPM_X": "1"}}
+    assert all(t in agent["tools"] for t in ours["tools"])
+    assert all(r in agent["permissions"]["rules"] for r in ours["permissions"]["rules"])
+    # Theirs, untouched and in their place.
+    assert agent["mcpServers"]["creds-agent"] == FOREIGN_SERVER
+    assert agent["tools"][0] == "@creds-agent" and "web" in agent["tools"]
+    assert agent["toolsSettings"]["execute_bash"] == DENY_V2 and agent["toolsSettings"]["shell"] == DENY_V2
+    assert agent["permissions"]["rules"][0] == DENY_V3
+    assert {"capability": "skill", "effect": "allow"} in agent["permissions"]["rules"]
+    assert agent["kiroUpgrade"] == {"revision": 2, "fingerprint": "sha256:x"}
+    # Writing again changes nothing (no duplicated entries).
+    before = path.read_text()
+    assert cc.write_kiro_agent(moved, root=tmp_path) == 0
+    assert path.read_text() == before
+
+
+def test_write_kiro_agent_gives_v2_additions_their_v3_rule(tmp_path, monkeypatch):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    path = tmp_path / "agents" / "sdpm.json"
+    path.parent.mkdir()
+    old = {"name": "sdpm", "description": "SDPM " + cc.KIRO_AGENT_MARKER,
+           "mcpServers": {"creds-agent": FOREIGN_SERVER}, "tools": ["@sdpm", "@creds-agent"],
+           "allowedTools": ["@sdpm", "@creds-agent"],
+           "toolsSettings": {"subagent": {"availableAgents": ["sdpm", "helper"], "trustedAgents": ["sdpm", "helper"]}}}
+    path.write_text(json.dumps(old))
+    assert cc.write_kiro_agent(POSIX, root=tmp_path) == 0
+    agent = json.loads(path.read_text())
+    rules = agent["permissions"]["rules"]
+    # Trusted in 2.x, so trusted in 3.x: the meaning is kept, not widened or dropped.
+    assert {"capability": "mcp", "match": ["creds-agent/*"], "effect": "allow"} in rules
+    assert {"capability": "subagent", "match": ["helper"], "effect": "allow"} in rules
+    assert agent["allowedTools"][:2] == ["@sdpm", "@creds-agent"]
+    assert agent["toolsSettings"]["subagent"]["trustedAgents"] == ["sdpm", "helper"]
+    assert agent["mcpServers"]["creds-agent"] == FOREIGN_SERVER
+
+
+def test_write_kiro_agent_leaves_v2_additions_without_a_v3_form_and_names_them(tmp_path, monkeypatch, capsys):
+    # Writing `permissions` would make kiro-cli 3.x ignore the 2.x deny list: a denied command would run.
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    path = tmp_path / "agents" / "sdpm.json"
+    path.parent.mkdir()
+    old = {"name": "sdpm", "description": "SDPM " + cc.KIRO_AGENT_MARKER, "tools": ["@sdpm", "execute_bash"],
+           "allowedTools": ["@sdpm", "execute_bash"], "toolsSettings": {"execute_bash": DENY_V2}}
+    path.write_text(json.dumps(old))
+    assert cc.write_kiro_agent(POSIX, root=tmp_path) == 0
+    assert json.loads(path.read_text()) == old
+    out = capsys.readouterr().out
+    assert "allowedTools: execute_bash" in out and "toolsSettings.execute_bash" in out
+    assert "left" in out and "sdpm register kiro-cli" in out
+    assert cc.kiro_agent_registered(root=tmp_path) is True  # still ours; unregister removes it
 
 
 def test_write_kiro_agent_dry_run_and_remove(tmp_path, monkeypatch, capsys):
@@ -320,3 +402,271 @@ def test_register_claude_code_without_plugin_runs_only_add(monkeypatch):
     ran = []
     cc.register([cc.by_id("claude-code")], POSIX, assume_yes=True, run=lambda a: (ran.append(a), 0)[1])
     assert len(ran) == 1
+
+
+# ---------------------------------------------------------------------------
+# refresh — the end of `sdpm update`
+# ---------------------------------------------------------------------------
+
+OLD_LAUNCHER = "#!/usr/bin/env bash\n# sdpm — the one launcher for a local SDPM installation (~/.sdpm).\necho old\n"
+NEW_LAUNCHER = OLD_LAUNCHER.replace("echo old", "# ends with client_config.py refresh\necho new")
+
+
+def _checkout_with_launchers(root: Path) -> Path:
+    install = root / "checkout" / "scripts" / "install"
+    install.mkdir(parents=True)
+    (install / "launcher.sh").write_text(NEW_LAUNCHER)
+    (install / "launcher.ps1").write_text(NEW_LAUNCHER)
+    return root / "checkout"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX modes and inodes")
+def test_refresh_launcher_renames_a_new_file_over_the_old_and_keeps_its_mode(tmp_path):
+    checkout = _checkout_with_launchers(tmp_path)
+    installed = tmp_path / "bin" / "sdpm"
+    installed.parent.mkdir()
+    installed.write_text(OLD_LAUNCHER)
+    installed.chmod(0o755)
+    running = installed.open("rb")  # what a running bash holds
+    inode = installed.stat().st_ino
+    assert cc.refresh_launcher(installed, checkout) == "updated"
+    assert installed.read_text() == NEW_LAUNCHER
+    assert installed.stat().st_ino != inode and installed.stat().st_mode & 0o777 == 0o755
+    assert running.read().decode() == OLD_LAUNCHER  # the running copy is untouched
+    running.close()
+    assert sorted(p.name for p in installed.parent.iterdir()) == ["sdpm"]  # no temp file left
+    assert cc.refresh_launcher(installed, checkout) == "up to date"
+
+
+def test_refresh_launcher_leaves_links_and_foreign_files_alone(tmp_path):
+    checkout = _checkout_with_launchers(tmp_path)
+    (tmp_path / "bin").mkdir()
+    foreign = tmp_path / "bin" / "sdpm"
+    foreign.write_text("#!/bin/sh\necho my own sdpm\n")
+    assert "not an SDPM launcher" in cc.refresh_launcher(foreign, checkout)
+    assert foreign.read_text() == "#!/bin/sh\necho my own sdpm\n"
+    if sys.platform != "win32":
+        link = tmp_path / "bin" / "sdpm-dev"
+        link.symlink_to(checkout / "scripts" / "install" / "launcher.sh")
+        assert "is a link" in cc.refresh_launcher(link, checkout)
+        assert link.is_symlink()
+    assert "not refreshed" in cc.refresh_launcher(tmp_path / "bin" / "missing", checkout)
+
+
+def test_refresh_launcher_ps1_is_written_with_a_bom(tmp_path):
+    checkout = _checkout_with_launchers(tmp_path)
+    installed = tmp_path / "sdpm.ps1"
+    installed.write_bytes(b"\xef\xbb\xbf" + OLD_LAUNCHER.replace("\n", "\r\n").encode())  # Set-Content -Encoding UTF8
+    assert cc.refresh_launcher(installed, checkout) == "updated"
+    assert installed.read_bytes() == b"\xef\xbb\xbf" + NEW_LAUNCHER.encode()
+    assert cc.refresh_launcher(installed, checkout) == "up to date"
+
+
+def test_update_leftovers_lists_old_environments_and_our_files_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    checkout, kiro = tmp_path / "checkout", tmp_path / "kiro"
+    for venv in ("servers/local/.venv", "sdpm/.venv"):
+        (checkout / venv).mkdir(parents=True)
+        (checkout / venv / "pyvenv.cfg").write_text("home = /usr/bin\n")
+    (checkout / ".venv").mkdir()  # the workspace environment in use
+    (checkout / ".venv" / "pyvenv.cfg").write_text("home = /usr/bin\n")
+    (checkout / "agent" / ".venv").mkdir(parents=True)  # not in the list
+    cc.write_kiro_agent(POSIX, root=kiro)
+    (kiro / "agents" / "sdpm.json.bak").write_text((kiro / "agents" / "sdpm.json").read_text())
+    found = cc.update_leftovers(checkout, root=kiro)
+    assert found == [checkout / "servers/local/.venv", checkout / "sdpm/.venv", kiro / "agents" / "sdpm.json.bak"]
+    (checkout / "sdpm/.venv/pyvenv.cfg").unlink()  # a directory that is not an environment stays
+    assert checkout / "sdpm/.venv" not in cc.update_leftovers(checkout, root=kiro)
+
+
+def _listing(monkeypatch, outputs: dict):
+    """What each client's `mcp list` prints; a client absent from ``outputs`` cannot tell."""
+    monkeypatch.setattr(cc, "_list_output", lambda c: outputs.get(c.id) if c.list_cmd else None)
+
+
+CLAUDE_HERE = ("Checking MCP server health...\n\n"
+               f"sdpm: {POSIX.uv} run --directory {POSIX.server_dir} python server.py - ✓ Connected\n")
+CODEX_NONE = "Name  Command  Args\nother  npx  -y other-server\n"
+
+
+def test_refresh_registrations_registers_again_only_what_is_registered(monkeypatch, tmp_path):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))  # no Kiro agent
+    clients = [cc.by_id("claude-code"), cc.by_id("codex"), cc.by_id("vscode")]
+    _listing(monkeypatch, {"claude-code": CLAUDE_HERE, "codex": CODEX_NONE})
+    monkeypatch.setattr(cc, "claude_plugin_installed", lambda: pytest.fail("no cleanup offers during refresh"))
+    removed, added = [], []
+    failures, missing, elsewhere = cc.refresh_registrations(
+        POSIX, clients=clients, run=lambda a: (added.append(a), 0)[1], run_quiet=lambda a: (removed.append(a), 0)[1])
+    assert failures == 0 and elsewhere == []
+    assert removed == [["claude", "mcp", "remove", "--scope", "user", "sdpm"]]  # `mcp add` refuses an existing name
+    assert added == [cc.by_id("claude-code").register(POSIX)]
+    assert [c.id for c in missing] == ["codex"]  # found, not registered: named, never added
+
+
+def test_refresh_register_missing_adds_the_clients_without_the_server(monkeypatch, tmp_path, capsys):
+    # The installer's --register over an existing install: refresh, then add what is missing.
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    target = cc.Target(uv=POSIX.uv, checkout=str(checkout), platform="linux")
+    here = f"sdpm: {target.uv} run --directory {target.server_dir} --frozen python server.py - ✓ Connected\n"
+    _listing(monkeypatch, {"claude-code": here, "codex": CODEX_NONE})
+    added = []
+    rc = cc.refresh(target, launcher=None, since=None, clients=[cc.by_id("claude-code"), cc.by_id("codex")],
+                    run=lambda a: (added.append(a), 0)[1], run_quiet=lambda a: 0, register_missing=True)
+    assert rc == 0
+    assert added == [cc.by_id("claude-code").register(target), cc.by_id("codex").register(target)]
+    assert "add with: sdpm register" not in capsys.readouterr().out
+
+
+def test_refresh_registrations_leaves_an_entry_for_another_checkout_alone(monkeypatch, tmp_path):
+    # `make register-dev CLIENTS=claude-code` registers the same name with a working tree.
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    dev = cc.Target(uv=POSIX.uv, checkout="/home/u/.sdpm/checkout-dev", platform="linux")
+    clients = [cc.by_id("claude-code"), cc.by_id("codex")]
+    _listing(monkeypatch, {
+        "claude-code": f"sdpm: {dev.uv} run --directory {dev.server_dir} python server.py - ✓ Connected\n",
+        "codex": f"Name  Command  Args\nsdpm  {dev.uv}  run --directory {dev.server_dir} python server.py\n"
+                 f"sdpm-dev  {POSIX.uv}  run --directory {POSIX.server_dir} python server.py\n",
+    })
+    calls = []
+    failures, missing, elsewhere = cc.refresh_registrations(
+        POSIX, clients=clients, run=lambda a: (calls.append(a), 0)[1], run_quiet=lambda a: (calls.append(a), 0)[1])
+    assert calls == []  # neither removed nor added
+    assert failures == 0 and missing == []
+    assert [c.id for c in elsewhere] == ["claude-code", "codex"]
+
+
+def test_refresh_names_the_entries_it_leaves_alone(monkeypatch, tmp_path, capsys):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    _listing(monkeypatch, {"claude-code": "sdpm: uv run --directory /work/tree/servers/local python server.py\n"})
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    target = cc.Target(uv=POSIX.uv, checkout=str(checkout), platform="linux")
+    calls = []
+    rc = cc.refresh(target, launcher=None, since=None, clients=[cc.by_id("claude-code")],
+                    run=lambda a: (calls.append(a), 0)[1], run_quiet=lambda a: (calls.append(a), 0)[1])
+    assert rc == 0 and calls == []
+    assert "Claude Code: its sdpm server runs another checkout — left alone" in capsys.readouterr().out
+
+
+def test_refresh_registrations_refreshes_the_kiro_agent_without_kiro_cli(monkeypatch, tmp_path):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    (tmp_path / "agents").mkdir()
+    old = {"name": "work", "description": "SDPM " + cc.KIRO_AGENT_MARKER, "tools": ["@sdpm"]}  # 2.x-only file
+    (tmp_path / "agents" / "work.json").write_text(json.dumps(old))
+    failures, missing, elsewhere = cc.refresh_registrations(POSIX, agent_name="work", clients=[], run=lambda _a: 0)
+    assert failures == 0 and missing == [] and elsewhere == []
+    agent = json.loads((tmp_path / "agents" / "work.json").read_text())
+    assert agent == cc.kiro_agent_definition(POSIX, "work")
+    assert not (tmp_path / "agents" / "sdpm.json").exists()  # the name chosen at install, nothing else
+
+
+CHANGELOG_OLD = """# Changelog
+
+## [0.12.0] - 2026-11-05
+
+### Upgrading from 0.11
+
+**AWS stack.** Deploy everything.
+
+- **Self sign-up is off.** / Set `auth.selfSignUp`.
+
+**Local installs (`sdpm update`).**
+
+- **Old step.** Do the old
+  thing once.
+"""
+
+CHANGELOG_NEW = """# Changelog
+
+## [Unreleased]
+
+### Upgrading from 0.12
+
+**Local installs (`sdpm update`).**
+
+- **Kiro CLI.** Start the agent itself:
+  `kiro-cli chat --agent sdpm`.
+- **Second.** Another thing.
+
+**AWS stack.** Deploy.
+
+- **Not for local installs.** / Deploy.
+
+### Fixed
+
+- A fix.
+
+## [0.12.0] - 2026-11-05
+
+### Upgrading from 0.11
+
+**AWS stack.** Deploy everything.
+
+- **Self sign-up is off.** / Set `auth.selfSignUp`.
+
+**Local installs (`sdpm update`).**
+
+- **Old step.** Do the old thing once.
+"""
+
+
+def test_local_install_notes_reads_only_the_local_installs_blocks():
+    assert cc.local_install_notes(CHANGELOG_NEW) == [
+        ("Unreleased", "**Kiro CLI.** Start the agent itself: `kiro-cli chat --agent sdpm`."),
+        ("Unreleased", "**Second.** Another thing."),
+        ("0.12.0", "**Old step.** Do the old thing once."),
+    ]
+
+
+def test_upgrade_notes_shows_what_the_previous_checkout_did_not_have(tmp_path, capsys):
+    import subprocess
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
+
+    git("init", "-q")
+    (tmp_path / "CHANGELOG.md").write_text(CHANGELOG_OLD)
+    git("add", "CHANGELOG.md")
+    git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "old")
+    since = subprocess.run(["git", "-C", str(tmp_path), "rev-parse", "HEAD"],
+                           capture_output=True, text=True, check=True).stdout.strip()
+    (tmp_path / "CHANGELOG.md").write_text(CHANGELOG_NEW)
+    notes = cc.upgrade_notes(tmp_path, since)
+    # "Old step" was re-wrapped, not changed: it is not shown again.
+    assert [text.split("**")[1] for _v, text in notes] == ["Kiro CLI.", "Second."]
+    assert cc.upgrade_notes(tmp_path, None) == [] and cc.upgrade_notes(tmp_path, "--output=x") == []
+    cc.print_upgrade_notes(notes, tmp_path)
+    out = capsys.readouterr().out
+    assert "What to do after this update" in out and "Unreleased" in out and "**" not in out
+
+
+def test_cli_refresh_runs_every_part(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path / "kiro"))
+    monkeypatch.setattr(cc, "detect", lambda *_a: [])
+    checkout = _checkout_with_launchers(tmp_path)
+    (checkout / "sdpm" / ".venv").mkdir(parents=True)
+    (checkout / "sdpm" / ".venv" / "pyvenv.cfg").write_text("")
+    installed = tmp_path / "sdpm"
+    installed.write_text(OLD_LAUNCHER)
+    rc = cc.main(["--uv", "/x/uv", "--checkout", str(checkout), "refresh", "--launcher", str(installed)])
+    assert rc == 0
+    assert installed.read_text() == NEW_LAUNCHER
+    assert not (checkout / "sdpm" / ".venv").exists()
+    out = capsys.readouterr().out
+    assert "sdpm command: updated" in out and "removed" in out
+
+
+def test_outcomes_print_on_a_narrow_windows_console(monkeypatch):
+    # A piped Python on Windows writes the ANSI code page; ✓ must not stop the refresh.
+    import io
+
+    raw = io.BytesIO()
+    narrow = io.TextIOWrapper(raw, encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", narrow)
+    cc.tolerate_narrow_console()
+    cc.print_outcomes([cc.Outcome(cc.by_id("claude-code"), "registered", "→ ask for slides")])
+    narrow.flush()
+    assert b"Claude Code" in raw.getvalue() and b"registered" in raw.getvalue()

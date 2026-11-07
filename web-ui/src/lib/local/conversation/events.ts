@@ -28,6 +28,7 @@ export type LocalEvent =
   | { type: "composer_start"; group: string; prompt: string; toolCallId: string }
   | { type: "composer_tool"; group: string; id: string; name: string; input?: Record<string, unknown> }
   | { type: "composer_tool_end"; group: string; id: string; status: ToolEndStatus }
+  /** The group's composer finished (`success`) or stopped without finishing (`error`). */
   | { type: "composer_end"; group: string; status: ToolEndStatus }
   /** kiro-cli put a steer into the running turn (matched by its messageId, else by its text). */
   | { type: "steer_injected"; messageId?: string; content?: string }
@@ -43,7 +44,7 @@ export interface ComposeStreamData {
   group: number
   slugs: string
   total_groups?: number
-  status?: "starting"
+  status?: "starting" | "done" | "error"
   tool?: string
   toolUseId?: string
   toolResult?: string

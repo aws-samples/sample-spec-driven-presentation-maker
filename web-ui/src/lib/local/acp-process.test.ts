@@ -7,7 +7,7 @@
  * process; the size limit counts processes, not keys; a deck's saved kiro session is restored (or
  * its live process reused) under the client's id too, and only ids the process holds are keys;
  * a start that fails (another mode, a failed sdpm server, no sign-in, an early exit) registers
- * nothing; the configured engine starts kiro-cli, and an engine switch ends the idle deck
+ * nothing; the configured engine starts kiro-cli (V3 without acp-config.json), and an engine switch ends the idle deck
  * processes of the other engine (a running one at the end of its turn); a deck's
  * `.session-engine` tells when its session also ran on the other engine; a prompt to a session still answering
  * is refused; a turn ends with the answer to its session/prompt (result or error), whatever the
@@ -126,11 +126,15 @@ class FakeChild extends EventEmitter {
     this.send({ method: "session/update", params: { sessionId, update } })
   }
 
-  /** What kiro-cli 2.37 sends for a use_subagent call: sub-session updates and list_update, no turn_end. */
-  runSubagent(subSessionId: string) {
+  /**
+   * What kiro-cli 2.37 sends for a use_subagent call: sub-session updates and list_update, no
+   * turn_end. `finish: false` leaves the sub-agent working.
+   */
+  runSubagent(subSessionId: string, finish = true) {
     this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [{ sessionId: subSessionId, status: { type: "working" } }] } })
     this.update(subSessionId, { sessionUpdate: "tool_call", toolCallId: `${subSessionId}-t`, title: "Running: @sdpm/generate_pptx", _meta: { kiro: { toolName: "generate_pptx", mcpServerName: "sdpm" } } })
     this.update(subSessionId, { sessionUpdate: "tool_call_update", toolCallId: `${subSessionId}-t`, status: "completed" })
+    if (!finish) return
     this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [{ sessionId: subSessionId, status: { type: "terminated" } }] } })
     this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [] } })
   }
@@ -187,6 +191,7 @@ beforeEach(async () => {
   })
   configDir = fs.mkdtempSync(path.join(os.tmpdir(), "sdpm-acp-config-")) // nosemgrep: path-join-resolve-traversal — constant prefix
   vi.stubEnv("SDPM_ACP_CONFIG_DIR", configDir)
+  useEngine("v2") // the fake child speaks V2 unless a test chooses V3
   vi.resetModules()
   acp = await import("./acp-process")
 })
@@ -354,14 +359,14 @@ describe("turn state", () => {
     }
   })
 
-  it("cancel reaches the main session and this turn's sub-agents, and ends the turn", async () => {
+  it("cancel reaches the main session and the sub-agents still working, and ends the turn", async () => {
     await acp.createNewProcessFor("C1")
     const child = children[0]
     await turn(child, "C1", ["S1"])
 
     const prompted = await acp.sendPrompt("C1", "again")
     prompted.send()
-    child.runSubagent("S2")
+    child.runSubagent("S2", false)
     await settle()
     acp.cancelSession("C1")
     expect(child.cancelled).toEqual(["K1", "S2"])
@@ -752,6 +757,29 @@ describe("chat events", () => {
     await settle()
     expect(acp.getBufferedEvents("C1").map((e) => e.event)).toEqual([{ kind: "data", payload: { event: { contentBlockDelta: { delta: { text: "main says" } } } } }])
   })
+
+  it.each(["end_turn", "max_tokens", "refusal", "cancelled", "an error"])("closes a Compose card still open when the turn ends with %s, its running group failed, before the end event", async (how) => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "compose")
+    prompted.send()
+    const child = children[0]
+    child.update("K1", {
+      sessionUpdate: "tool_call", toolCallId: "crew", title: "Spawning agent crew",
+      rawInput: { stages: [{ name: "g1", prompt_template: "assigned_slugs: intro" }] }, _meta: { kiro: { toolName: "subagent" } },
+    })
+    await settle()
+    if (how === "cancelled") acp.cancelSession("C1")
+    if (how === "an error") child.failPrompt()
+    else child.endTurn(how)
+    await settle()
+    const events = acp.getBufferedEvents("C1").map((e) => e.event)
+    const card = { toolUseId: "crew", name: "compose_slides" }
+    expect(events.slice(-3, -1).map((e) => e.payload)).toEqual([
+      { toolStream: { ...card, data: { group: 1, slugs: "intro", status: "error" } } },
+      { toolResult: { ...card, status: "error", content: "{}" } },
+    ])
+    expect(events.at(-1)?.kind).toBe("end")
+  })
 })
 
 describe("deck detection", () => {
@@ -893,6 +921,12 @@ describe("engines", () => {
     useEngine("v2")
     await acp.createNewProcessFor("C2", "sdpm-style")
     expect(spawn.mock.calls[1].slice(0, 2)).toEqual(["kiro-cli", ["acp", "--agent", "sdpm-style"]])
+  })
+
+  it("starts kiro-cli on V3 when acp-config.json does not exist", async () => {
+    fs.rmSync(path.join(configDir, "acp-config.json")) // nosemgrep: path-join-resolve-traversal — constant name in a tmpdir
+    await acp.createNewProcessFor("C1")
+    expect(spawn.mock.calls[0].slice(0, 2)).toEqual(["kiro-cli", ["acp", "--agent-engine", "v3"]])
   })
 
   it("ends only the idle deck processes of another engine when the engine changes", async () => {

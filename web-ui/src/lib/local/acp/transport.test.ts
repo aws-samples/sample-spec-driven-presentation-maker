@@ -6,7 +6,8 @@
  * runs before the request's promise settles; kiro-cli's permission requests are answered with
  * the offered allow_once option (V3's four options included) and logged; a request whose id
  * equals one of ours is answered, never taken for our answer; requests this client does not
- * implement get Method not found; an exit fails the requests still waiting.
+ * implement get Method not found; an exit fails the requests still waiting, and the exit with the
+ * end of stdout is an exit even while a child of kiro-cli holds its stderr.
  */
 
 import { EventEmitter } from "events"
@@ -74,6 +75,19 @@ describe("requests", () => {
     expect(exits).toEqual([1])
     expect(conn.exited).toBe(true)
     await expect(conn.request("session/new", {})).rejects.toThrow(/has exited/)
+  })
+
+  it("calls it exited when kiro-cli exits and its stdout ends, while a child of its still holds stderr", async () => {
+    const pending = conn.request("session/prompt", {})
+    const exits: (number | null)[] = []
+    conn.onExit((code) => exits.push(code))
+    child.emit("exit", null)
+    expect(exits).toEqual([])
+    child.stdout.emit("close")
+    await expect(pending).rejects.toThrow(/exited with code null/)
+    expect(exits).toEqual([null])
+    child.emit("close", null)
+    expect(exits).toEqual([null])
   })
 
   it("passes notifications on in line order", () => {

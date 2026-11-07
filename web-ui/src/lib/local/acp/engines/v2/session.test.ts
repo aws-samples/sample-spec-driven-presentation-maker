@@ -121,12 +121,15 @@ describe("V2Session", () => {
     }
   })
 
-  it("cancels the main session and the sub-agent sessions this turn ran", async () => {
+  it("cancels the main session and the sub-agent sessions kiro-cli lists as working", async () => {
     const { ctx } = context({ "session/new": NEW })
     const session = new V2Session(ctx)
     await session.newSession("sdpm-orchestrator")
     session.beginTurn()
-    session.translate({ method: "session/update", params: { sessionId: "S2", update: { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "x" } } } })
+    session.translate({ method: "_kiro.dev/subagent/list_update", params: { subagents: [
+      { sessionId: "S1", status: { type: "terminated" } },
+      { sessionId: "S2", status: { type: "working" } },
+    ] } })
     expect(session.cancelTargets()).toEqual(["K1", "S2"])
   })
 

@@ -42,17 +42,17 @@ function put(body: unknown, headers: Record<string, string> = {}) {
 
 describe("/api/agent/engine", () => {
   it("answers the configured engine and the default", async () => {
-    expect(await (await route.GET()).json()).toEqual({ engine: "v2", default: "v2" })
-    fs.writeFileSync(path.resolve(dir, "acp-config.json"), JSON.stringify({ version: 2, engine: "v3" }))
-    expect(await (await route.GET()).json()).toEqual({ engine: "v3", default: "v2" })
+    expect(await (await route.GET()).json()).toEqual({ engine: "v3", default: "v3" })
+    fs.writeFileSync(path.resolve(dir, "acp-config.json"), JSON.stringify({ version: 2, engine: "v2" }))
+    expect(await (await route.GET()).json()).toEqual({ engine: "v2", default: "v3" })
   })
 
   it("saves the engine and ends the idle deck processes of the other one", async () => {
-    const res = await put({ engine: "v3" })
+    const res = await put({ engine: "v2" })
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ ok: true, engine: "v3" })
-    expect(JSON.parse(fs.readFileSync(path.resolve(dir, "acp-config.json"), "utf-8"))).toMatchObject({ version: 2, engine: "v3" })
-    expect(terminateIdleProcesses).toHaveBeenCalledWith("v3")
+    expect(await res.json()).toEqual({ ok: true, engine: "v2" })
+    expect(JSON.parse(fs.readFileSync(path.resolve(dir, "acp-config.json"), "utf-8"))).toMatchObject({ version: 2, engine: "v2" })
+    expect(terminateIdleProcesses).toHaveBeenCalledWith("v2")
   })
 
   it.each([

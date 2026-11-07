@@ -13,9 +13,12 @@
  * (an existing session).
  *
  * On prompt it writes a deck to SDPM_DECK_ROOT (deck.json + slide JSON + preview PNG) and
- * streams: text → an sdpm tool call and its result (with the deckId) → (V3) two delegations to
- * the composer, each with one tool of its own → text → end_turn. The deck and session ids carry
- * the engine (`e2e-<engine>-deck`, `stub-<engine>-<pid>`), so one sandbox serves both engines.
+ * streams: text → an sdpm tool call and its result (with the deckId) → two composer groups in
+ * parallel, each with one tool of its own (V3: two `agent-subtask` delegations whose tools carry
+ * their `agentSubtaskId`; V2: one crew with two stages, each run in a sub-agent session that
+ * `_kiro.dev/subagent/list_update` names after its stage) → text → end_turn. The deck and session
+ * ids carry the engine (`e2e-<engine>-deck`, `stub-<engine>-<pid>`), so one sandbox serves both
+ * engines.
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -89,6 +92,12 @@ function text(sessionId, t) {
   update(sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: t } })
 }
 
+/** The two composer groups: their slugs, in the orchestrator's delegation template. */
+const GROUPS = [
+  { name: "intro", prompt: `deck_id: ${DECK_ID}\nassigned_slugs: ["intro"]\nmode: pptx` },
+  { name: "outro", prompt: `deck_id: ${DECK_ID}\nassigned_slugs: ["outro"]\nmode: pptx` },
+]
+
 /** An sdpm tool call that completes with `result`, in the engine's shape. */
 function sdpmTool(sessionId, toolCallId, tool, input, result, extraMeta = {}) {
   if (ENGINE === "v3") {
@@ -105,15 +114,42 @@ function sdpmTool(sessionId, toolCallId, tool, input, result, extraMeta = {}) {
   }
 }
 
-/** V3: a delegation to the composer, its one tool, and its end. */
-function delegation(sessionId, n) {
-  const toolCallId = `invoke_subagent_stub-${n}`
-  const agentSubtaskId = `stub-subtask-${n}`
-  const rawInput = { name: "sdpm-composer", prompt: `assigned_slugs: ["intro"]\nGroup ${n} of the stub deck.` }
-  const meta = { _meta: { kiro: { kind: "agent-subtask", agentSubtaskId } } }
-  update(sessionId, { sessionUpdate: "tool_call", toolCallId, title: "Sub-agent: sdpm-composer", kind: "other", status: "pending", rawInput, ...meta })
-  sdpmTool(sessionId, `stub-composer-tool-${n}`, "list_templates", {}, { templates: [] }, { agentSubtaskId })
-  update(sessionId, { sessionUpdate: "tool_call_update", toolCallId, title: "Sub-agent: sdpm-composer", status: "completed", rawInput, rawOutput: "done", ...meta })
+/** V3: one delegation to the composer per group, in parallel: all calls, then each one's tool, then their ends. */
+function delegationsV3(sessionId) {
+  const delegations = GROUPS.map((group, i) => ({
+    toolCallId: `invoke_subagent_stub-${i + 1}`,
+    agentSubtaskId: `stub-subtask-${i + 1}`,
+    rawInput: { name: "sdpm-composer", prompt: group.prompt },
+  }))
+  const call = (d, extra) => ({ toolCallId: d.toolCallId, title: "Sub-agent: sdpm-composer", kind: "other", rawInput: d.rawInput, _meta: { kiro: { kind: "agent-subtask", agentSubtaskId: d.agentSubtaskId } }, ...extra })
+  for (const d of delegations) update(sessionId, { sessionUpdate: "tool_call", ...call(d, { status: "pending" }) })
+  delegations.forEach((d, i) => sdpmTool(sessionId, `stub-composer-tool-${i + 1}`, "list_templates", {}, { templates: [] }, { agentSubtaskId: d.agentSubtaskId }))
+  for (const d of delegations) update(sessionId, { sessionUpdate: "tool_call_update", ...call(d, { status: "completed", rawOutput: "done" }) })
+}
+
+/** V2: the subagent list, as the full list kiro-cli sends each time. */
+function subagentList(children, status) {
+  send({ method: "_kiro.dev/subagent/list_update", params: {
+    subagents: children.map((child) => ({ sessionId: child.sessionId, sessionName: child.name, agentName: "sdpm-composer", status: { type: status } })),
+    pendingStages: [],
+  } })
+}
+
+/** V2: one crew with a stage per group; each stage runs in its own sub-agent session, then the crew completes. */
+function crewV2(sessionId) {
+  const toolCallId = "stub-crew-1"
+  send({ method: "_kiro.dev/session/update", params: { sessionId, update: { sessionUpdate: "tool_call_chunk", toolCallId, title: "subagent", kind: "other" } } })
+  update(sessionId, {
+    sessionUpdate: "tool_call", toolCallId, title: "Spawning agent crew",
+    rawInput: { mode: "blocking", task: "Compose the stub deck", stages: GROUPS.map((g) => ({ name: g.name, role: "sdpm-composer", prompt_template: g.prompt })) },
+    _meta: { kiro: { toolName: "subagent" } },
+  })
+  const children = GROUPS.map((g, i) => ({ name: g.name, sessionId: `${sessionId}-composer-${i + 1}` }))
+  subagentList(children, "working")
+  children.forEach((child, i) => sdpmTool(child.sessionId, `stub-composer-tool-${i + 1}`, "list_templates", {}, { templates: [] }))
+  subagentList(children, "terminated")
+  subagentList([], "terminated")
+  update(sessionId, { sessionUpdate: "tool_call_update", toolCallId, status: "completed", title: "Spawning agent crew" })
 }
 
 function handlePrompt(msg) {
@@ -121,10 +157,8 @@ function handlePrompt(msg) {
   text(sessionId, "Creating your deck… ")
   const outputDir = createDeckOnDisk()
   sdpmTool(sessionId, "stub-tool-1", "init_deck_workspace", { template: "e2e" }, { deckId: DECK_ID, output_dir: outputDir })
-  if (ENGINE === "v3") {
-    delegation(sessionId, 1)
-    delegation(sessionId, 2)
-  }
+  if (ENGINE === "v3") delegationsV3(sessionId)
+  else crewV2(sessionId)
   text(sessionId, "Done! Your deck is ready.")
   answer(msg, { stopReason: "end_turn" })
 }
