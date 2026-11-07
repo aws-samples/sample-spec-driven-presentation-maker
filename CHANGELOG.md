@@ -140,6 +140,18 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
 
 ### Fixed
 
+- **Kiro CLI 3.x: the `sdpm` agent no longer delegates to itself, and its composers run in
+  parallel.** The agent could delegate only to itself (`subagent/sdpm`). The V3 engine hides
+  the sdpm tools until it loads them and shows that delegation as a tool described like the
+  whole job, so the agent handed the request to a copy of itself several levels deep: the
+  first sdpm tool came after 34–59 s instead of 11–14 s, and the innermost copy built
+  every slide alone. `sdpm register kiro-cli` now writes two wiring-only agents, `sdpm` and
+  `sdpm-composer` (`<name>-composer` for another `--agent-name`); `sdpm` delegates only to
+  the composer, which has the sdpm tools and file reading and cannot delegate. The previous
+  Kiro installer's `sdpm-composer.json` is replaced. An `sdpm-composer` agent you wrote
+  yourself is left alone, and `sdpm` is then written without delegation (no parallel
+  composers). `sdpm unregister` removes both. / Run `sdpm update`: it rewrites the agent and
+  removes the self-delegation, keeping what other tools added.
 - **Deploying `SdpmAuth` alone no longer removes the CloudFront URL from the Web UI's
   Cognito app client.** Each `SdpmAuth` deploy that changed the client reset its callback
   and logout URLs to `http://localhost:3000`, so nobody could sign in to the Web UI, and a

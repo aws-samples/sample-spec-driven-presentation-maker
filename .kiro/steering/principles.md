@@ -140,7 +140,7 @@ Users install once (`scripts/install/dist/install.{sh,ps1}` → `~/.sdpm/checkou
 every surface from that checkout: `sdpm webui`, `sdpm register` (MCP clients), `sdpm update`.
 Nothing behavioural lives on the client side — a client holds the one line that starts the
 server; Kiro CLI holds it inside a generated `sdpm` agent (wiring only: no prompt, no
-`file://`, sub-agents restricted to itself). Rules that follow:
+`file://`, sub-agents restricted to its composer agent). Rules that follow:
 
 - Never write another application's config file; use the client's CLI (`kiro-cli mcp`,
   `claude mcp`, `code --add-mcp`, `codex mcp`) or print the JSON. Files we create must carry

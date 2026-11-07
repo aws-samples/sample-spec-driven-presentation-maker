@@ -136,9 +136,12 @@ jobs:
           test -x "$SDPM_LAUNCHER_DIR/sdpm"
           test ! -e "$checkout/servers/local/.venv" && test ! -e "$checkout/sdpm/.venv"
           python3 -c '
-          import json, os; a = json.load(open(os.environ["KIRO_HOME"] + "/agents/sdpm.json"))
-          assert a["permissions"]["rules"] and "subagent/sdpm" in a["tools"], a
+          import json, os; d = os.environ["KIRO_HOME"] + "/agents/"; a = json.load(open(d + "sdpm.json"))
+          assert a["permissions"]["rules"] and "subagent/sdpm-composer" in a["tools"], a
+          assert "subagent/sdpm" not in a["tools"], a
           assert a["mcpServers"]["sdpm"]["command"].startswith("/"), a
+          c = json.load(open(d + "sdpm-composer.json"))
+          assert c["permissions"]["rules"] and not any(t.startswith("subagent/") for t in c["tools"]), c
           print("kiro agent OK")'
           python3 scripts/install/mcp_smoke.py "$SDPM_LAUNCHER_DIR/sdpm" mcp
           # The new launcher refreshes by itself; the bridge stays out of it.

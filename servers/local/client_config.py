@@ -120,34 +120,52 @@ class Client:
 
 # Kiro's unit of configuration is the agent (tools, allowed tools, MCP servers), so SDPM is a
 # dedicated agent rather than an entry in the global mcp.json that would put 20 tools and an
-# approval prompt per run_python into every session. The agent is wiring only: no prompt, no
-# file:// pointer — the role documents come from the server (start_* tools).
+# approval prompt per run_python into every session. It is two agents, as in the Web UI's
+# catalog: `<name>` (the orchestrator users start) and `<name>-composer`, the only agent it
+# delegates to. Both are wiring only: no prompt, no file:// pointer — the role documents come
+# from the server (start_* tools).
 KIRO_AGENT_MARKER = "(managed by `sdpm register`)"
 DEFAULT_KIRO_AGENT = "sdpm"
 _KIRO_AGENT_TOOLS = ["@sdpm", "use_subagent", "read", "glob", "grep", "web_search", "web_fetch"]
+_KIRO_COMPOSER_TOOLS = ["@sdpm", "read", "glob", "grep"]
+# What the previous Kiro installer's sdpm-composer.json pointed its prompt at (kiro_leftovers).
+_LEGACY_COMPOSER_FINGERPRINT = "skills/sdpm-composer/SKILL.md"
 
 
-def _kiro_permission_rules(name: str) -> list[dict]:
+def kiro_composer_name(name: str = DEFAULT_KIRO_AGENT) -> str:
+    return f"{name}-composer"
+
+
+def _kiro_subagent_rule(agent: str) -> dict:
+    return {"capability": "subagent", "match": [agent], "effect": "allow"}
+
+
+def _kiro_permission_rules(composer: Optional[str]) -> list[dict]:
     """The V3 form of allowedTools + trustedAgents: the same tools run without approval."""
     return [
         {"capability": "mcp", "match": [f"{SERVER_NAME}/*"], "effect": "allow"},
-        {"capability": "subagent", "match": [name], "effect": "allow"},
+        *([_kiro_subagent_rule(composer)] if composer else []),
         {"capability": "fs_read", "effect": "allow"},  # read, glob, grep
         {"capability": "web_search", "effect": "allow"},
         {"capability": "web_fetch", "effect": "allow"},
     ]
 
 
-def kiro_agent_definition(t: Target, name: str = DEFAULT_KIRO_AGENT) -> dict:
+def kiro_agent_definition(t: Target, name: str = DEFAULT_KIRO_AGENT, *, with_composer: bool = True) -> dict:
     """One file both Kiro CLI engines load as-is.
 
     The V2 engine reads ``tools`` / ``allowedTools`` / ``toolsSettings``; the V3 engine
-    (kiro-cli 3.x) reads ``tools`` (``subagent/<name>``) and ``permissions`` and ignores
+    (kiro-cli 3.x) reads ``tools`` (``subagent/<composer>``) and ``permissions`` and ignores
     the V2 fields. V3 rejects — or, with auto-upgrade on, rewrites and backs up — only a
     definition without ``permissions``, so this one is never converted.
+
+    ``with_composer=False`` is for a machine where ``<name>-composer`` is a user's own agent:
+    no delegation at all, so this agent builds every slide itself.
     """
     cfg = server_config(t)
-    return {
+    composer = kiro_composer_name(name) if with_composer else None
+    tools = [tool for tool in _KIRO_AGENT_TOOLS if composer or tool != "use_subagent"]
+    agent = {
         "name": name,
         "description": (
             "Spec-Driven Presentation Maker — slides from material or dialogue. "
@@ -157,12 +175,38 @@ def kiro_agent_definition(t: Target, name: str = DEFAULT_KIRO_AGENT) -> dict:
         # @sdpm is trusted: composing a deck is dozens of run_python calls, and run_python
         # is a local sandbox confined to the deck directory. Nothing here writes files or
         # runs shell commands outside that sandbox.
-        "tools": [*_KIRO_AGENT_TOOLS, f"subagent/{name}"],
-        "allowedTools": list(_KIRO_AGENT_TOOLS),
-        # Composers are copies of this agent: spawning it needs no approval, and no other
-        # agent (say, a stale one from an old installer) can be picked by mistake.
-        "toolsSettings": {"subagent": {"availableAgents": [name], "trustedAgents": [name]}},
-        "permissions": {"rules": _kiro_permission_rules(name)},
+        "tools": [*tools, *([f"subagent/{composer}"] if composer else [])],
+        "allowedTools": tools,
+    }
+    if composer:
+        # Composers are the composer agent, never this one: V3 defers the MCP tools and shows
+        # each sub-agent up front as a tool described by its description, so an agent that may
+        # delegate to itself hands the whole job to a copy of itself, level after level.
+        # Spawning the composer needs no approval, and no other agent (say, a stale one from an
+        # old installer) can be picked by mistake.
+        agent["toolsSettings"] = {"subagent": {"availableAgents": [composer], "trustedAgents": [composer]}}
+    agent["permissions"] = {"rules": _kiro_permission_rules(composer)}
+    agent["resources"] = []
+    return agent
+
+
+def kiro_composer_definition(t: Target, name: str = DEFAULT_KIRO_AGENT) -> dict:
+    """The agent ``<name>`` delegates slides to: the sdpm tools and file reading, no delegation
+    of its own. Its role document comes from ``start_composing``, named in its spawn prompt."""
+    cfg = server_config(t)
+    return {
+        "name": kiro_composer_name(name),
+        "description": (
+            "Composer for an sdpm deck: writes and builds the slides it is assigned. Spawn it only "
+            "with the composer prompt from the sdpm orchestrator role document. " + KIRO_AGENT_MARKER
+        ),
+        "mcpServers": {SERVER_NAME: {**cfg, "timeout": 120000}},
+        "tools": list(_KIRO_COMPOSER_TOOLS),
+        "allowedTools": list(_KIRO_COMPOSER_TOOLS),
+        "permissions": {"rules": [
+            {"capability": "mcp", "match": [f"{SERVER_NAME}/*"], "effect": "allow"},
+            {"capability": "fs_read", "effect": "allow"},  # read, glob, grep
+        ]},
         "resources": [],
     }
 
@@ -171,11 +215,34 @@ def kiro_agent_path(name: str = DEFAULT_KIRO_AGENT, root: Optional[Path] = None)
     return (root or kiro_home()) / "agents" / f"{name}.json"
 
 
-def _is_our_agent_file(path: Path) -> bool:
+def _file_contains(path: Path, text: str) -> bool:
     try:
-        return KIRO_AGENT_MARKER in path.read_text(encoding="utf-8", errors="replace")
+        return text in path.read_text(encoding="utf-8", errors="replace")
     except OSError:
         return False
+
+
+def _is_our_agent_file(path: Path) -> bool:
+    return _file_contains(path, KIRO_AGENT_MARKER)
+
+
+def _composer_file_state(path: Path) -> str:
+    """"missing", "ours" (our marker), "legacy" (the previous Kiro installer's composer, which
+    may be replaced) or "foreign" (a user's own agent of that name, left alone)."""
+    if not path.exists():
+        return "missing"
+    if _is_our_agent_file(path):
+        return "ours"
+    if _file_contains(path, _LEGACY_COMPOSER_FINGERPRINT):
+        return "legacy"
+    return "foreign"
+
+
+def _read_agent_file(path: Path) -> object:
+    try:
+        return json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return None  # ours by its marker, but unreadable: write it new
 
 
 def _as_list(value: object) -> list:
@@ -219,28 +286,71 @@ def _v3_form_of_added_v2(current: dict, name: str) -> tuple[list[dict], list[str
         if key not in ("availableAgents", "trustedAgents"):
             unmatched.append(f"toolsSettings.subagent.{key}")
     for agent in _as_list(subagent.get("trustedAgents")):
-        if agent != name:
-            rules.append({"capability": "subagent", "match": [agent], "effect": "allow"})
+        if agent not in (name, kiro_composer_name(name)):
+            rules.append(_kiro_subagent_rule(agent))
     return rules, unmatched
 
 
-def merged_kiro_agent(current: object, t: Target, name: str = DEFAULT_KIRO_AGENT) -> tuple[Optional[dict], list[str]]:
-    """Our definition applied to the file as it is: the keys and entries sdpm owns (name,
-    description, the ``sdpm`` server, its tools, allowed tools, subagent settings and
-    permission rules) are brought up to date; everything else another tool or Kiro added
-    (other MCP servers and tools, other tools' settings, ``kiroUpgrade``, …) stays.
+def _swapped(items: list, stale: list, new: object) -> list:
+    """``items`` with each of ``stale`` replaced in place by ``new`` (dropped when ``new`` is
+    None or already there)."""
+    out: list = []
+    for item in items:
+        if item in stale or item == new:
+            if new is None or new in out:
+                continue
+            item = new
+        out.append(item)
+    return out
 
-    Returns ``(None, names)`` when the file has only V2 fields and some of those additions
-    cannot be given their V3 form with the same meaning: then the file is not rewritten.
+
+def _without_stale_delegation(current: dict, name: str, with_composer: bool) -> dict:
+    """``current`` without the delegation entries an earlier sdpm wrote that no longer apply.
+
+    Before the composer agent, ``<name>`` delegated to itself (``subagent/<name>``,
+    ``availableAgents`` / ``trustedAgents`` ``[<name>]``, a ``subagent`` rule matching
+    ``<name>``). Those entries are sdpm's, and :func:`_with` only adds, so they are swapped
+    here for the composer's. Without a composer (``<name>-composer`` is a user's own agent),
+    sdpm's delegation entries are removed instead, and ``use_subagent`` with them once no
+    other agent is left for it.
     """
-    ours = kiro_agent_definition(t, name)
-    if not isinstance(current, dict):
-        return ours, []
-    extra_rules: list[dict] = []
-    if "permissions" not in current:
-        extra_rules, unmatched = _v3_form_of_added_v2(current, name)
-        if unmatched:
-            return None, unmatched
+    composer = kiro_composer_name(name)
+    stale = [name] if with_composer else [name, composer]
+    new = composer if with_composer else None
+    cleaned = dict(current)
+    settings = _as_dict(current.get("toolsSettings"))
+    subagent = _as_dict(settings.get("subagent"))
+    for key in ("availableAgents", "trustedAgents"):
+        if key in subagent:
+            subagent[key] = _swapped(_as_list(subagent[key]), stale, new)
+            if not subagent[key]:
+                del subagent[key]
+    if "subagent" in settings:
+        if subagent:
+            settings["subagent"] = subagent
+        else:
+            del settings["subagent"]
+    if "toolsSettings" in current:
+        if settings:
+            cleaned["toolsSettings"] = settings
+        else:
+            del cleaned["toolsSettings"]
+    stale_tools = [f"subagent/{agent}" for agent in stale]
+    if not with_composer and not subagent.get("availableAgents"):
+        stale_tools.append("use_subagent")
+    for key in ("tools", "allowedTools"):
+        if key in current:
+            cleaned[key] = _swapped(_as_list(current[key]), stale_tools, f"subagent/{new}" if new else None)
+    permissions = _as_dict(current.get("permissions"))
+    if "rules" in permissions:
+        permissions["rules"] = _swapped(_as_list(permissions["rules"]), [_kiro_subagent_rule(a) for a in stale],
+                                        _kiro_subagent_rule(new) if new else None)
+        cleaned["permissions"] = permissions
+    return cleaned
+
+
+def _merged_owned(current: dict, ours: dict, extra_rules: list[dict]) -> dict:
+    """``current`` with the keys and entries sdpm owns brought up to ``ours``; the rest stays."""
     merged = dict(current)
     merged["name"] = ours["name"]
     merged["description"] = ours["description"]
@@ -249,81 +359,134 @@ def merged_kiro_agent(current: object, t: Target, name: str = DEFAULT_KIRO_AGENT
     merged["mcpServers"] = servers
     merged["tools"] = _with(_as_list(current.get("tools")), ours["tools"])
     merged["allowedTools"] = _with(_as_list(current.get("allowedTools")), ours["allowedTools"])
-    settings = _as_dict(current.get("toolsSettings"))
-    subagent = _as_dict(settings.get("subagent"))
-    for key, value in ours["toolsSettings"]["subagent"].items():
-        subagent[key] = _with(_as_list(subagent.get(key)), value)
-    settings["subagent"] = subagent
-    merged["toolsSettings"] = settings
+    if "toolsSettings" in ours:
+        settings = _as_dict(current.get("toolsSettings"))
+        subagent = _as_dict(settings.get("subagent"))
+        for key, value in ours["toolsSettings"]["subagent"].items():
+            subagent[key] = _with(_as_list(subagent.get(key)), value)
+        settings["subagent"] = subagent
+        merged["toolsSettings"] = settings
     permissions = _as_dict(current.get("permissions"))
     permissions["rules"] = _with(_as_list(permissions.get("rules")), [*ours["permissions"]["rules"], *extra_rules])
     merged["permissions"] = permissions
     if not isinstance(merged.get("resources"), list):
         merged["resources"] = ours["resources"]
-    return merged, []
+    return merged
+
+
+def merged_kiro_agent(current: object, t: Target, name: str = DEFAULT_KIRO_AGENT, *,
+                      with_composer: bool = True) -> tuple[Optional[dict], list[str]]:
+    """Our definition applied to the file as it is: the keys and entries sdpm owns (name,
+    description, the ``sdpm`` server, its tools, allowed tools, subagent settings and
+    permission rules) are brought up to date, and the self-delegation of earlier versions is
+    taken out (:func:`_without_stale_delegation`); everything else another tool or Kiro added
+    (other MCP servers and tools, other tools' settings, ``kiroUpgrade``, …) stays.
+
+    Returns ``(None, names)`` when the file has only V2 fields and some of those additions
+    cannot be given their V3 form with the same meaning: then the file is not rewritten.
+    """
+    ours = kiro_agent_definition(t, name, with_composer=with_composer)
+    if not isinstance(current, dict):
+        return ours, []
+    extra_rules: list[dict] = []
+    if "permissions" not in current:
+        extra_rules, unmatched = _v3_form_of_added_v2(current, name)
+        if unmatched:
+            return None, unmatched
+    return _merged_owned(_without_stale_delegation(current, name, with_composer), ours, extra_rules), []
+
+
+def merged_kiro_composer(current: object, t: Target, name: str = DEFAULT_KIRO_AGENT) -> dict:
+    """The composer agent applied to our composer file as it is (what others added stays)."""
+    ours = kiro_composer_definition(t, name)
+    return _merged_owned(current, ours, []) if isinstance(current, dict) else ours
 
 
 def write_kiro_agent(t: Target, *, name: str = DEFAULT_KIRO_AGENT, dry_run: bool = False,
                      root: Optional[Path] = None) -> int:
-    """Create or refresh the agent file we own. A user's own agent of that name is left alone;
-    in ours, what other tools added is kept (:func:`merged_kiro_agent`)."""
+    """Create or refresh the two agent files we own, ``<name>`` and ``<name>-composer``. A
+    user's own agent of either name is left alone; in ours, what other tools added is kept
+    (:func:`merged_kiro_agent`). The previous Kiro installer's ``sdpm-composer`` is replaced.
+    When ``<name>-composer`` is a user's own agent, ``<name>`` is written without delegation."""
     path = kiro_agent_path(name, root)
     if path.exists() and not _is_our_agent_file(path):
         print(f"{path} exists and is not managed by sdpm — leaving it alone.")
         print("  Use `sdpm register kiro-cli --agent-name <other>` or add the server to that agent yourself:")
         print("  " + json.dumps(server_config(t)))
         return 0
-    current: object = None
-    if path.exists():
-        try:
-            current = json.loads(path.read_text(encoding="utf-8"))
-        except (OSError, ValueError):
-            current = None  # ours by its marker, but unreadable: write it new
-    agent, unmatched = merged_kiro_agent(current, t, name)
+    composer_path = kiro_agent_path(kiro_composer_name(name), root)
+    composer_state = _composer_file_state(composer_path)
+    with_composer = composer_state != "foreign"
+    agent, unmatched = merged_kiro_agent(_read_agent_file(path) if path.exists() else None, t, name,
+                                         with_composer=with_composer)
     if agent is None:
         print(f"{path} has settings another tool added for kiro-cli 2.x only: {', '.join(unmatched)}.")
         print("  sdpm cannot write their kiro-cli 3.x form (permissions) with the same meaning, so it left")
         print("  the file as it is. Move them into `permissions` (or remove them), then run")
         print(f"  `sdpm register kiro-cli`. The sdpm server it should run: {json.dumps(server_config(t))}")
         return 0
-    text = json.dumps(agent, indent=2, ensure_ascii=False) + "\n"
+    files: list[tuple[Path, dict]] = []
+    if with_composer:
+        if composer_state == "legacy":
+            print(f"{composer_path} is the previous Kiro installer's composer — replacing it.")
+        current = _read_agent_file(composer_path) if composer_state == "ours" else None
+        files.append((composer_path, merged_kiro_composer(current, t, name)))
+    else:
+        print(f"{composer_path} exists and is not managed by sdpm — leaving it alone.")
+        print(f"  So `{name}` is written without a composer agent: it builds every slide itself, and")
+        print("  composers do not run in parallel. Rename or remove that file, then run")
+        print("  `sdpm register kiro-cli` again to add the composer.")
+    files.append((path, agent))  # after its composer: the orchestrator never names a missing agent
     if dry_run:
-        print("[dry-run] write " + str(path))
+        for p, _agent in files:
+            print("[dry-run] write " + str(p))
         return 0
     path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_text(text, encoding="utf-8")
+    for p, content in files:
+        p.write_text(json.dumps(content, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
     if shutil.which("kiro-cli"):
-        rc = _run(["kiro-cli", "agent", "validate", "--path", str(path)])
-        if rc != 0:
-            print(f"  kiro-cli agent validate rejected {path}", file=sys.stderr)
-            return 1
+        for p, _agent in files:
+            if _run(["kiro-cli", "agent", "validate", "--path", str(p)]) != 0:
+                print(f"  kiro-cli agent validate rejected {p}", file=sys.stderr)
+                return 1
     return 0
 
 
 def _kiro_upgrade_backups(name: str, root: Optional[Path] = None) -> list[Path]:
-    """`<name>.json.bak[.N]` copies of our file that kiro-cli 3.x left when it converted the
-    pre-V3 definition at launch. Only copies that still carry our marker are ours."""
-    path = kiro_agent_path(name, root)
-    try:
-        candidates = sorted(path.parent.iterdir())
-    except OSError:
-        return []
-    prefix = path.name + ".bak"
-    return [p for p in candidates
-            if p.is_file() and (p.name == prefix or p.name.startswith(prefix + ".")) and _is_our_agent_file(p)]
+    """`<agent>.json.bak[.N]` copies of our two files that kiro-cli 3.x left when it converted
+    a pre-V3 definition at launch. Only copies that still carry our marker are ours."""
+    found: list[Path] = []
+    for agent in (name, kiro_composer_name(name)):
+        path = kiro_agent_path(agent, root)
+        try:
+            candidates = sorted(path.parent.iterdir())
+        except OSError:
+            return []
+        prefix = path.name + ".bak"
+        found += [p for p in candidates
+                  if p.is_file() and (p.name == prefix or p.name.startswith(prefix + ".")) and _is_our_agent_file(p)]
+    return found
 
 
 def remove_kiro_agent(*, name: str = DEFAULT_KIRO_AGENT, dry_run: bool = False, root: Optional[Path] = None) -> None:
-    path = kiro_agent_path(name, root)
-    ours = [path] if path.exists() and _is_our_agent_file(path) else []
+    paths = [kiro_agent_path(agent, root) for agent in (name, kiro_composer_name(name))]
+    ours = [p for p in paths if p.exists() and _is_our_agent_file(p)]
     for p in ours + _kiro_upgrade_backups(name, root):
         print(("[dry-run] remove " if dry_run else "removed ") + str(p))
         if not dry_run:
             p.unlink()
 
 
-def kiro_agent_registered(name: str = DEFAULT_KIRO_AGENT, root: Optional[Path] = None) -> bool:
+def _kiro_agent_ours(name: str = DEFAULT_KIRO_AGENT, root: Optional[Path] = None) -> bool:
+    """The orchestrator file is ours: an install to refresh, complete or not."""
     return _is_our_agent_file(kiro_agent_path(name, root))
+
+
+def kiro_agent_registered(name: str = DEFAULT_KIRO_AGENT, root: Optional[Path] = None) -> bool:
+    """Both agents are in place — or the composer's name is a user's own agent, which
+    :func:`write_kiro_agent` leaves alone and writes the orchestrator without."""
+    return _kiro_agent_ours(name, root) and _composer_file_state(
+        kiro_agent_path(kiro_composer_name(name), root)) in ("ours", "foreign")
 
 
 def _claude_code_register(t: Target) -> list[str]:
@@ -349,7 +512,8 @@ CLIENTS: tuple[Client, ...] = (
         label="Kiro CLI",
         detect=lambda: _which("kiro-cli"),
         manual_target="~/.kiro/agents/sdpm.json",
-        note="Creates a dedicated agent: start it with `kiro-cli chat --agent sdpm` (or /agent sdpm).",
+        note="Creates a dedicated agent and its composer agent: start it with `kiro-cli chat --agent sdpm` "
+             "(or /agent sdpm).",
     ),
     Client(
         id="claude-code",
@@ -441,13 +605,8 @@ def kiro_leftovers(root: Optional[Path] = None) -> list[Path]:
     root = root or kiro_home()
     found: list[Path] = []
     agent = root / "agents" / "sdpm-composer.json"
-    if agent.is_file():
-        try:
-            text = agent.read_text(encoding="utf-8", errors="replace")
-        except OSError:
-            text = ""
-        if "skills/sdpm-composer/SKILL.md" in text:
-            found.append(agent)
+    if agent.is_file() and _file_contains(agent, _LEGACY_COMPOSER_FINGERPRINT):
+        found.append(agent)
     for name in _LEGACY_SKILLS:
         entry = root / "skills" / name
         if entry.is_symlink() or (entry.is_dir() and (entry / "SKILL.md").exists()):
@@ -495,8 +654,10 @@ def manual_json(target: Target) -> str:
 def render_client(client: Client, target: Target, agent_name: str = DEFAULT_KIRO_AGENT) -> str:
     lines = [f"## {client.label}"]
     if client.id == "kiro-cli":
-        lines.append(f"`sdpm register kiro-cli` writes this agent to {kiro_agent_path(agent_name)}:")
-        lines.extend("  " + ln for ln in json.dumps(kiro_agent_definition(target, agent_name), indent=2).splitlines())
+        lines.append("`sdpm register kiro-cli` writes these two agents:")
+        for agent in (kiro_agent_definition(target, agent_name), kiro_composer_definition(target, agent_name)):
+            lines.append(f"{kiro_agent_path(agent['name'])}:")
+            lines.extend("  " + ln for ln in json.dumps(agent, indent=2).splitlines())
         lines.append(client.note)
         return "\n".join(lines)
     if client.register is not None:
@@ -531,6 +692,7 @@ def config_document(clients: list[Client], target: Target, agent_name: str = DEF
                 "label": c.label,
                 "register": c.register(target) if c.register else None,
                 "agent": kiro_agent_definition(target, agent_name) if c.id == "kiro-cli" else None,
+                "composer_agent": kiro_composer_definition(target, agent_name) if c.id == "kiro-cli" else None,
                 "unregister": c.unregister() if c.unregister else None,
                 "manual_target": c.manual_target,
                 "deeplink": c.deeplink(target) if c.deeplink else None,
@@ -884,7 +1046,7 @@ def refresh_registrations(
     name that exists.
     """
     clients = detect() if clients is None else list(clients)
-    if not any(c.id == "kiro-cli" for c in clients) and kiro_agent_registered(agent_name):
+    if not any(c.id == "kiro-cli" for c in clients) and _kiro_agent_ours(agent_name):
         clients.insert(0, by_id("kiro-cli"))
     ours: list[Client] = []
     missing: list[Client] = []
@@ -892,7 +1054,8 @@ def refresh_registrations(
     for client in clients:
         if client.id == "kiro-cli":
             # Ours by marker, under the install-time name; register-dev uses another name.
-            state = "here" if kiro_agent_registered(agent_name) else None
+            # An install from before the composer agent has only the first file: refreshed too.
+            state = "here" if _kiro_agent_ours(agent_name) else None
         else:
             listing = _list_output(client)
             if listing is None:

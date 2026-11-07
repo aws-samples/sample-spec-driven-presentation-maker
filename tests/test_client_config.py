@@ -4,7 +4,8 @@
 Guards the onboarding contract: every client configuration points at the absolute
 uv and checkout paths, never at a launcher or PATH lookup; registration goes
 through the client's own CLI; nothing is written to another app's config files. The
-Kiro CLI agent is one file both engines (V2 and V3) load without converting it.
+Kiro CLI agents (orchestrator + composer) are files both engines (V2 and V3) load without
+converting them.
 """
 
 from __future__ import annotations
@@ -54,32 +55,48 @@ def test_every_client_has_cli_registration_or_manual_instructions():
         assert client.label in rendered
 
 
-def test_kiro_agent_is_wiring_only():
-    agent = cc.kiro_agent_definition(POSIX)
-    assert agent["name"] == "sdpm"
+@pytest.mark.parametrize("definition", [cc.kiro_agent_definition, cc.kiro_composer_definition],
+                         ids=["orchestrator", "composer"])
+def test_kiro_agents_are_wiring_only(definition):
+    agent = definition(POSIX)
     assert agent["mcpServers"]["sdpm"]["command"] == POSIX.uv
     assert agent["mcpServers"]["sdpm"]["args"] == cc.server_config(POSIX)["args"]
     assert "prompt" not in agent and "file://" not in json.dumps(agent)
-    assert "@sdpm" in agent["allowedTools"] and "use_subagent" in agent["tools"]
+    assert "@sdpm" in agent["allowedTools"]
     assert not {"write", "shell", "execute_bash"} & set(agent["tools"])
     assert cc.KIRO_AGENT_MARKER in agent["description"]
+
+
+def test_kiro_composer_has_no_delegation():
+    # A composer that could delegate would start the chain again one level down.
+    composer = cc.kiro_composer_definition(POSIX, "sdpm-dev")
+    assert composer["name"] == "sdpm-dev-composer"
+    assert composer["tools"] == composer["allowedTools"] == ["@sdpm", "read", "glob", "grep"]
+    assert "toolsSettings" not in composer
+    assert composer["permissions"]["rules"] == [
+        {"capability": "mcp", "match": ["sdpm/*"], "effect": "allow"},
+        {"capability": "fs_read", "effect": "allow"},
+    ]
 
 
 @pytest.mark.parametrize("name", ["sdpm", "sdpm-dev"])
 def test_kiro_agent_loads_in_v2_and_v3_without_conversion(name):
     agent = cc.kiro_agent_definition(POSIX, name)
+    composer = f"{name}-composer"
     # V2 fields stay: kiro-cli 2.x and `--v2` read them.
     assert agent["allowedTools"] == cc._KIRO_AGENT_TOOLS
-    assert agent["toolsSettings"]["subagent"] == {"availableAgents": [name], "trustedAgents": [name]}
+    assert agent["toolsSettings"]["subagent"] == {"availableAgents": [composer], "trustedAgents": [composer]}
     # V3 fields: a definition with `permissions` is loaded as-is (no rejection, no rewrite + .bak).
     assert "kiroUpgrade" not in agent
-    assert f"subagent/{name}" in agent["tools"]
+    # The composer agent only: V3 shows each sub-agent up front while it defers the MCP tools,
+    # so `subagent/<name>` made the agent hand the whole job to a copy of itself (M1).
+    assert [t for t in agent["tools"] if t.startswith("subagent/")] == [f"subagent/{composer}"]
     rules = agent["permissions"]["rules"]
     assert all(r["effect"] == "allow" for r in rules)
     assert {r["capability"] for r in rules} == {"mcp", "subagent", "fs_read", "web_search", "web_fetch"}
     by_cap = {r["capability"]: r for r in rules}
     assert by_cap["mcp"]["match"] == ["sdpm/*"]
-    assert by_cap["subagent"]["match"] == [name]  # only copies of itself, as availableAgents in V2
+    assert by_cap["subagent"]["match"] == [composer]  # its composer agent only, as availableAgents in V2
     # Same trust in both engines: nothing that writes files or runs shell commands.
     assert not {"fs_write", "shell", "skill"} & set(by_cap)
 
@@ -92,6 +109,7 @@ def test_unregister_kiro_removes_our_upgrade_backups_only(tmp_path, monkeypatch,
     (agents / "sdpm.json.bak").write_text(ours)
     (agents / "sdpm.json.bak.1").write_text(ours)
     (agents / "sdpm.json.bak.2").write_text('{"name": "sdpm", "prompt": "mine"}')
+    (agents / "sdpm-composer.json.bak").write_text((agents / "sdpm-composer.json").read_text())
     (agents / "sdpm-dev.json.bak").write_text(ours)  # another agent's backup
     cc.remove_kiro_agent(dry_run=True, root=tmp_path)
     assert (agents / "sdpm.json.bak").exists() and "[dry-run] remove" in capsys.readouterr().out
@@ -102,7 +120,8 @@ def test_write_kiro_agent_creates_refreshes_and_respects_foreign_file(tmp_path, 
     monkeypatch.setattr(cc.shutil, "which", lambda _n: None)  # no kiro-cli validate step
     assert cc.write_kiro_agent(POSIX, root=tmp_path) == 0
     path = tmp_path / "agents" / "sdpm.json"
-    assert json.loads(path.read_text())["mcpServers"]["sdpm"]["command"] == POSIX.uv
+    assert json.loads(path.read_text()) == cc.kiro_agent_definition(POSIX)
+    assert json.loads((tmp_path / "agents" / "sdpm-composer.json").read_text()) == cc.kiro_composer_definition(POSIX)
     assert cc.kiro_agent_registered(root=tmp_path) is True
     # refresh with a new target overwrites our own file
     other = cc.Target(uv="/new/uv", checkout="/new/checkout", platform="linux")
@@ -180,7 +199,9 @@ def test_write_kiro_agent_gives_v2_additions_their_v3_rule(tmp_path, monkeypatch
     assert {"capability": "mcp", "match": ["creds-agent/*"], "effect": "allow"} in rules
     assert {"capability": "subagent", "match": ["helper"], "effect": "allow"} in rules
     assert agent["allowedTools"][:2] == ["@sdpm", "@creds-agent"]
-    assert agent["toolsSettings"]["subagent"]["trustedAgents"] == ["sdpm", "helper"]
+    # The self-delegation is sdpm's and goes; the other agent stays where it was.
+    assert agent["toolsSettings"]["subagent"]["trustedAgents"] == ["sdpm-composer", "helper"]
+    assert {"capability": "subagent", "match": ["sdpm"], "effect": "allow"} not in rules
     assert agent["mcpServers"]["creds-agent"] == FOREIGN_SERVER
 
 
@@ -197,17 +218,99 @@ def test_write_kiro_agent_leaves_v2_additions_without_a_v3_form_and_names_them(t
     out = capsys.readouterr().out
     assert "allowedTools: execute_bash" in out and "toolsSettings.execute_bash" in out
     assert "left" in out and "sdpm register kiro-cli" in out
-    assert cc.kiro_agent_registered(root=tmp_path) is True  # still ours; unregister removes it
+    assert cc._kiro_agent_ours(root=tmp_path) is True  # still ours; unregister removes it
+    assert not (tmp_path / "agents" / "sdpm-composer.json").exists()  # the two are written together
 
 
 def test_write_kiro_agent_dry_run_and_remove(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
     assert cc.write_kiro_agent(POSIX, dry_run=True, root=tmp_path) == 0
-    assert not (tmp_path / "agents" / "sdpm.json").exists()
-    assert "[dry-run] write" in capsys.readouterr().out
+    assert not (tmp_path / "agents").exists()
+    out = capsys.readouterr().out
+    assert "[dry-run] write " + str(tmp_path / "agents" / "sdpm-composer.json") in out
+    assert "[dry-run] write " + str(tmp_path / "agents" / "sdpm.json") in out
     cc.write_kiro_agent(POSIX, root=tmp_path)
     cc.remove_kiro_agent(root=tmp_path)
-    assert not (tmp_path / "agents" / "sdpm.json").exists()
+    assert list((tmp_path / "agents").iterdir()) == []  # both files of the unit
+
+
+# What `sdpm register` wrote before the composer agent (0.12 and main up to 845865c2): the
+# agent delegated to itself.
+def _self_delegating_agent(target: cc.Target, name: str = "sdpm") -> dict:
+    agent = cc.kiro_agent_definition(target, name)
+    agent["tools"] = [*cc._KIRO_AGENT_TOOLS, f"subagent/{name}"]
+    agent["toolsSettings"] = {"subagent": {"availableAgents": [name], "trustedAgents": [name]}}
+    agent["permissions"]["rules"][1] = {"capability": "subagent", "match": [name], "effect": "allow"}
+    return agent
+
+
+@pytest.mark.parametrize("name", ["sdpm", "sdpm-dev"])
+def test_refreshing_a_self_delegating_agent_removes_the_self_delegation(tmp_path, monkeypatch, name):
+    # `_with` only adds: without the swap, `sdpm update` would keep `subagent/sdpm` (M1).
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    agents = tmp_path / "agents"
+    agents.mkdir()
+    (agents / f"{name}.json").write_text(json.dumps(_self_delegating_agent(POSIX, name)))
+    assert cc.kiro_agent_registered(name, root=tmp_path) is False  # status: register again
+    assert cc.write_kiro_agent(POSIX, name=name, root=tmp_path) == 0
+    agent = json.loads((agents / f"{name}.json").read_text())
+    assert agent == cc.kiro_agent_definition(POSIX, name)
+    assert f"subagent/{name}" not in agent["tools"]
+    assert name not in agent["toolsSettings"]["subagent"]["availableAgents"]
+    assert {"capability": "subagent", "match": [name], "effect": "allow"} not in agent["permissions"]["rules"]
+    assert json.loads((agents / f"{name}-composer.json").read_text()) == cc.kiro_composer_definition(POSIX, name)
+    assert cc.kiro_agent_registered(name, root=tmp_path) is True
+
+
+def test_refreshing_a_self_delegating_agent_keeps_what_other_tools_added(tmp_path, monkeypatch):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    path = tmp_path / "agents" / "sdpm.json"
+    path.parent.mkdir()
+    old = _self_delegating_agent(POSIX)
+    old["tools"].append("subagent/helper")
+    old["toolsSettings"]["subagent"]["availableAgents"].append("helper")
+    old["permissions"]["rules"].append({"capability": "subagent", "match": ["helper"], "effect": "allow"})
+    path.write_text(json.dumps(old))
+    assert cc.write_kiro_agent(POSIX, root=tmp_path) == 0
+    agent = json.loads(path.read_text())
+    assert [t for t in agent["tools"] if t.startswith("subagent/")] == ["subagent/sdpm-composer", "subagent/helper"]
+    assert agent["toolsSettings"]["subagent"] == {"availableAgents": ["sdpm-composer", "helper"],
+                                                  "trustedAgents": ["sdpm-composer"]}
+    subagent_rules = [r["match"] for r in agent["permissions"]["rules"] if r["capability"] == "subagent"]
+    assert subagent_rules == [["sdpm-composer"], ["helper"]]
+
+
+def test_write_kiro_agent_replaces_the_old_installers_composer(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    composer = tmp_path / "agents" / "sdpm-composer.json"
+    composer.parent.mkdir()
+    composer.write_text('{"name": "sdpm-composer", "prompt": "file:///old/skills/sdpm-composer/SKILL.md"}')
+    assert cc.write_kiro_agent(POSIX, root=tmp_path) == 0
+    assert json.loads(composer.read_text()) == cc.kiro_composer_definition(POSIX)
+    assert "previous Kiro installer" in capsys.readouterr().out
+    assert cc.kiro_leftovers(tmp_path) == []
+
+
+def test_write_kiro_agent_leaves_a_users_composer_alone_and_does_not_delegate(tmp_path, monkeypatch, capsys):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    agents = tmp_path / "agents"
+    agents.mkdir()
+    theirs = '{"name": "sdpm-composer", "prompt": "You compose sdpm slides.", "model": "x"}'
+    (agents / "sdpm-composer.json").write_text(theirs)
+    (agents / "sdpm.json").write_text(json.dumps(_self_delegating_agent(POSIX)))
+    assert cc.write_kiro_agent(POSIX, root=tmp_path) == 0
+    assert (agents / "sdpm-composer.json").read_text() == theirs
+    out = capsys.readouterr().out
+    assert "not managed by sdpm" in out and "without a composer agent" in out
+    # Variant B: no delegation at all, so neither itself nor their agent is picked.
+    agent = json.loads((agents / "sdpm.json").read_text())
+    assert agent == cc.kiro_agent_definition(POSIX, with_composer=False)
+    assert "use_subagent" not in agent["tools"] and not any(t.startswith("subagent/") for t in agent["tools"])
+    assert "toolsSettings" not in agent
+    assert {r["capability"] for r in agent["permissions"]["rules"]} == {"mcp", "fs_read", "web_search", "web_fetch"}
+    assert cc.kiro_agent_registered(root=tmp_path) is True
+    cc.remove_kiro_agent(root=tmp_path)
+    assert sorted(p.name for p in agents.iterdir()) == ["sdpm-composer.json"]  # still theirs
 
 
 def test_claude_code_and_codex_use_double_dash_form():
@@ -350,8 +453,11 @@ def test_register_kiro_offers_and_removes_leftovers(tmp_path, monkeypatch, capsy
     agent = tmp_path / "agents" / "sdpm-composer.json"
     agent.write_text('{"prompt": "file:///c/skills/sdpm-composer/SKILL.md"}')
     monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    (tmp_path / "skills").mkdir()
+    (tmp_path / "skills" / "sdpm-composer").symlink_to(tmp_path / "nowhere")
     cc.register([cc.by_id("kiro-cli")], POSIX, assume_yes=True, run=lambda _a: 0)
-    assert not agent.exists()
+    assert json.loads(agent.read_text()) == cc.kiro_composer_definition(POSIX)  # replaced by ours
+    assert not (tmp_path / "skills" / "sdpm-composer").is_symlink()
     assert (tmp_path / "agents" / "sdpm.json").exists()
     assert "previous Kiro installer" in capsys.readouterr().out
 
@@ -373,6 +479,15 @@ def test_unregister_kiro_removes_leftovers(tmp_path, monkeypatch):
     (tmp_path / "skills" / "sdpm-create").symlink_to(tmp_path / "gone")
     cc.unregister([cc.by_id("kiro-cli")], run=lambda _a: 0)
     assert not (tmp_path / "skills" / "sdpm-create").is_symlink()
+
+
+def test_unregister_kiro_removes_both_agents(tmp_path, monkeypatch):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    cc.write_kiro_agent(POSIX)
+    assert sorted(p.name for p in (tmp_path / "agents").iterdir()) == ["sdpm-composer.json", "sdpm.json"]
+    cc.unregister([cc.by_id("kiro-cli")], run=lambda _a: 0)
+    assert list((tmp_path / "agents").iterdir()) == []
 
 
 def test_register_kiro_offers_to_remove_global_entry(tmp_path, monkeypatch, capsys):
@@ -560,6 +675,8 @@ def test_refresh_registrations_refreshes_the_kiro_agent_without_kiro_cli(monkeyp
     assert failures == 0 and missing == [] and elsewhere == []
     agent = json.loads((tmp_path / "agents" / "work.json").read_text())
     assert agent == cc.kiro_agent_definition(POSIX, "work")
+    assert json.loads((tmp_path / "agents" / "work-composer.json").read_text()) == cc.kiro_composer_definition(
+        POSIX, "work")
     assert not (tmp_path / "agents" / "sdpm.json").exists()  # the name chosen at install, nothing else
 
 
