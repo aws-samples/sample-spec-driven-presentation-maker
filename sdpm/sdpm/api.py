@@ -478,10 +478,17 @@ def _resolve_template(
 
 
 def _get_output_base_dir() -> Path:
-    """Get output base directory from config, with WSL fallback."""
-    env_dir = os.environ.get("SDPM_OUTPUT_DIR")
-    if env_dir:
-        return Path(env_dir)
+    """Deck root shared by every local surface (CLI, both local MCP servers, Local Web UI).
+
+    Order: $SDPM_DECK_ROOT → $SDPM_OUTPUT_DIR → ``output_dir`` in config.json (``~``
+    expanded; defaults to ~/Documents/SDPM-Presentations). If config.json cannot be read,
+    the WSL Windows Documents folder or ~/Documents/SDPM-Presentations is used.
+    web-ui/src/lib/local/deck-paths.ts ``resolveDeckRoot`` follows the same order.
+    """
+    for name in ("SDPM_DECK_ROOT", "SDPM_OUTPUT_DIR"):
+        env_dir = os.environ.get(name)
+        if env_dir:
+            return Path(env_dir)
     try:
         from sdpm.config import get_output_dir
 

@@ -14,7 +14,7 @@ import { describe, expect, it, vi } from "vitest"
 const sideEffect = vi.fn()
 vi.mock("@/lib/local/acp-process", () => new Proxy({}, { get: (_t, key) => (key === "then" ? undefined : key === "pendingOrigins" ? new Map() : sideEffect) }))
 vi.mock("@/lib/local/kiro-sessions", () => ({ findSession: sideEffect, listSessions: sideEffect }))
-vi.mock("@/lib/local/sdpmPaths", () => ({ getState: sideEffect, updateState: sideEffect, getUserStylesDir: sideEffect, getUserConfigDir: sideEffect, SDPM_ROOT: "/nonexistent" }))
+vi.mock("@/lib/local/sdpmPaths", () => ({ getState: sideEffect, updateState: sideEffect, getUserStylesDir: sideEffect, getUserConfigDir: sideEffect, getConfiguredOutputDir: () => null, SDPM_ROOT: "/nonexistent" }))
 vi.mock("child_process", () => ({ execFile: sideEffect, execFileSync: sideEffect, default: { execFile: sideEffect, execFileSync: sideEffect } }))
 
 const routes: [string, () => Promise<{ POST: (req: Request) => Promise<Response> | Response }>][] = [

@@ -11,7 +11,20 @@ import fs from "fs"
 import path from "path"
 import os from "os"
 
-export const DECK_ROOT = process.env.SDPM_DECK_ROOT || path.join(os.homedir(), "Documents", "SDPM-Presentations")
+import { getConfiguredOutputDir } from "./sdpmPaths"
+
+/**
+ * Deck root, in the order the CLI and both local MCP servers use (sdpm.api._get_output_base_dir):
+ * SDPM_DECK_ROOT → SDPM_OUTPUT_DIR → `output_dir` in config.json → ~/Documents/SDPM-Presentations.
+ */
+export function resolveDeckRoot(): string {
+  return process.env.SDPM_DECK_ROOT
+    || process.env.SDPM_OUTPUT_DIR
+    || getConfiguredOutputDir()
+    || path.join(os.homedir(), "Documents", "SDPM-Presentations")
+}
+
+export const DECK_ROOT = resolveDeckRoot()
 
 /**
  * Resolve a user-provided deckId to an absolute directory path.
