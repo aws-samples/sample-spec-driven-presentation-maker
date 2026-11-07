@@ -5,8 +5,8 @@
  * Every Local POST route refuses a cross-site browser request before doing anything.
  * Local mode has no authentication; POST is the method another site can send without a
  * CORS preflight (text/plain or form bodies), so these routes check `Origin` first.
- * PUT / PATCH / DELETE always need a preflight, which these routes never grant; the agent
- * engine's PUT, which ends kiro-cli processes, checks `Origin` as well.
+ * PUT / PATCH / DELETE always need a preflight, which these routes never grant; the PUTs that
+ * change kiro-cli (engine, agent selection, model) check `Origin` as well.
  */
 
 import { describe, expect, it, vi } from "vitest"
@@ -21,6 +21,7 @@ const routes: [string, () => Promise<{ POST: (req: Request) => Promise<Response>
   ["agent/chat", () => import("./agent/chat/route")],
   ["agent/invoke", () => import("./agent/invoke/route")],
   ["agent/load", () => import("./agent/load/route")],
+  ["agent/models", () => import("./agent/models/route")],
   ["agent/sessions/fork", () => import("./agent/sessions/fork/route")],
   ["agent/stop", () => import("./agent/stop/route")],
   ["agent/steer", () => import("./agent/steer/route")],
@@ -33,6 +34,8 @@ const routes: [string, () => Promise<{ POST: (req: Request) => Promise<Response>
 
 const putRoutes: [string, () => Promise<{ PUT: (req: Request) => Promise<Response> | Response }>][] = [
   ["agent/engine", () => import("./agent/engine/route")],
+  ["agent/definitions", () => import("./agent/definitions/route")],
+  ["agent/models", () => import("./agent/models/route")],
 ]
 
 describe("Local PUT routes that change kiro-cli refuse cross-site requests", () => {
@@ -41,7 +44,7 @@ describe("Local PUT routes that change kiro-cli refuse cross-site requests", () 
     const req = new Request(`http://127.0.0.1:3000/api/${name}`, {
       method: "PUT",
       headers: { origin: "https://evil.example", "content-type": "application/json" },
-      body: JSON.stringify({ engine: "v3" }),
+      body: JSON.stringify({ engine: "v3", orchestrator: "x.json", modelId: "m", sessionId: "s" }),
     })
     const res = await PUT(req)
     expect(res.status).toBe(403)

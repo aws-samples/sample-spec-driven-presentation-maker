@@ -236,6 +236,30 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   each sdpm tool the sub-agent calls. / `sdpm update` rewrites the agent file (see
   Changed). Run `make register-dev` again for a development agent.
 
+### Security
+
+- **Local Web UI: the server answers only requests addressed to it by a loopback name.**
+  Every request to the Local server (API routes and pages) must carry a `Host` of
+  `127.0.0.1`, `localhost` or `[::1]` on the server's own port; anything else, or no `Host`,
+  gets 403 before a route runs. Before, a web page on another domain that resolved to
+  127.0.0.1 could reach the API, which has no sign-in. The check runs in one place
+  (`web-ui/src/proxy.ts`), so new routes are covered, and it has no mode check of its own, so
+  it applies wherever the API routes are served; the cloud build leaves it out with the API
+  routes. The agent selection and model `PUT`s now also refuse cross-site requests and
+  non-JSON bodies, and listing the models (which may start kiro-cli) is a `POST`, so a plain
+  `GET` has no side effects. Open the Web UI as `http://localhost:<port>` or
+  `http://127.0.0.1:<port>`; another host name pointing at the machine is refused.
+- **Cloud agent: `web_fetch` reaches public internet addresses only.** The agent's
+  `web_fetch` tool now fetches through the same URL fetcher as the MCP attachment tools
+  (`sdpm.tools.attachment.fetcher`). It rejects schemes other than http(s), ports other than
+  80 and 443, and hosts that are, or resolve to, private, loopback, link-local or reserved
+  addresses, including the instance metadata endpoints (`169.254.169.254`,
+  `fd00:ec2::254`) and the AgentCore platform server on localhost. Every redirect hop is
+  checked again, an HTTPS page cannot redirect to HTTP, and the connection goes to the
+  address that passed the check, so a second DNS answer cannot redirect it. The agent gets
+  a short error naming the URL and the reason. Public pages, PDFs and images are fetched
+  as before. (AgentCore review F4) / Nothing.
+
 ## [0.12.0] - 2026-11-05
 
 The Cloud Web UI now lets you send a message while the agent works, stop it for good,

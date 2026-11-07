@@ -220,6 +220,7 @@ Local            — Next.js API Routes → kiro-cli ACP, filesystem storage
 | UI components | `<CloudOnly>` / `<LocalOnly>` (declarative) |
 | Service layer | `IS_LOCAL` early return at function entry point |
 | API Routes (`src/app/api/`) | Local-only. Excluded from cloud build by `build:cloud` |
+| Request guard (`src/proxy.ts`) | Runs whenever the API routes are served, in either mode (no `IS_LOCAL` check). Refuses a non-loopback `Host` on every request; excluded from cloud build by `build:cloud` |
 | Local-only logic | Isolated in `src/lib/local/` |
 
 ### Web-first principle
@@ -229,8 +230,8 @@ Local            — Next.js API Routes → kiro-cli ACP, filesystem storage
 
 ### Build strategy
 - `output: "export"` and `trailingSlash: true` are cloud-only (`next.config.ts`)
-- `build:cloud` temporarily moves `src/app/api/` out to enable static export (with `trap EXIT` for safe restore)
-- This is a known workaround — Next.js does not support `output: "export"` + API Routes coexistence
+- `build:cloud` temporarily moves `src/app/api/` and `src/proxy.ts` out to enable static export (with `trap EXIT` for safe restore)
+- This is a known workaround — Next.js does not support `output: "export"` + API Routes / Proxy coexistence
 
 ### Session persistence (Local)
 - `.session` file in deck directory — ACP sessionId

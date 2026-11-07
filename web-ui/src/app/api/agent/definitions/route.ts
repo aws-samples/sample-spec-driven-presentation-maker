@@ -17,6 +17,7 @@ import {
   syncToAgentsDir,
   writeSelection,
 } from "@/lib/local/agents-sync"
+import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 export interface AgentDef {
   fileName: string
@@ -51,6 +52,8 @@ export async function GET() {
 
 /** PUT: update selection and sync to agents/ */
 export async function PUT(req: Request) {
+  const refused = rejectCrossSite(req, { requireJson: true })
+  if (refused) return refused
   const body = await req.json()
   // Validate role values are safe filenames (model is a free-form model ID)
   for (const [k, v] of Object.entries(body)) {
