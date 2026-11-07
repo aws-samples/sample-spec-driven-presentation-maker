@@ -28,7 +28,7 @@ export const ENGINE_IDS = ["v2", "v3"] as const
 export type EngineId = (typeof ENGINE_IDS)[number]
 
 /** The engine used when the file does not choose one. */
-export const DEFAULT_ENGINE: EngineId = "v2"
+export const DEFAULT_ENGINE: EngineId = "v3"
 
 export interface EngineConfig {
   version: 2
