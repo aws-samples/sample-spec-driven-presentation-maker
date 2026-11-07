@@ -28,6 +28,7 @@
     "presentationCount": "{count, plural, other {# 件のプレゼンテーション}}",
     "newDeck": "新規デッキ",
     "searchPlaceholder": "組織全体のスライドを検索…",
+    "searchPlaceholderLocal": "デッキを検索…",
     "clearSearch": "検索をクリア",
     "tabs": {
       "mine": "マイデッキ",

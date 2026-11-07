@@ -235,6 +235,17 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   sdpm` or `/agent sdpm`). When another agent delegates to `sdpm`, V3 asks you to approve
   each sdpm tool the sub-agent calls. / `sdpm update` rewrites the agent file (see
   Changed). Run `make register-dev` again for a development agent.
+- **Web UI: a reload or a direct link opens the deck with its conversation.** Reloading a
+  deck page, or opening `/decks/#<id>` from a link, put the chat on the empty "New" tab and
+  closed it, so the deck's saved conversation looked gone; only opening the deck from the
+  list showed it. Both now open the deck's chat tab (and the chat panel on a desktop
+  window), as the list does. The address is read once the page has loaded, which also stops
+  the hydration error React reported for direct links. / Nothing.
+- **Local Web UI: no wording for features that only the cloud Web UI has.** The search box
+  said "Search slides across the organization…", but the Local Web UI filters your decks by
+  name; it now says "Search decks…". The deck header no longer shows the Private / Internal
+  sharing button, since Local decks are never shared. The cloud Web UI is unchanged. /
+  Nothing.
 
 ### Security
 
