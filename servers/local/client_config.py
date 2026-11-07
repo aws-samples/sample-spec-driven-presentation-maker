@@ -120,7 +120,25 @@ DEFAULT_KIRO_AGENT = "sdpm"
 _KIRO_AGENT_TOOLS = ["@sdpm", "use_subagent", "read", "glob", "grep", "web_search", "web_fetch"]
 
 
+def _kiro_permission_rules(name: str) -> list[dict]:
+    """The V3 form of allowedTools + trustedAgents: the same tools run without approval."""
+    return [
+        {"capability": "mcp", "match": [f"{SERVER_NAME}/*"], "effect": "allow"},
+        {"capability": "subagent", "match": [name], "effect": "allow"},
+        {"capability": "fs_read", "effect": "allow"},  # read, glob, grep
+        {"capability": "web_search", "effect": "allow"},
+        {"capability": "web_fetch", "effect": "allow"},
+    ]
+
+
 def kiro_agent_definition(t: Target, name: str = DEFAULT_KIRO_AGENT) -> dict:
+    """One file both Kiro CLI engines load as-is.
+
+    The V2 engine reads ``tools`` / ``allowedTools`` / ``toolsSettings``; the V3 engine
+    (kiro-cli 3.x) reads ``tools`` (``subagent/<name>``) and ``permissions`` and ignores
+    the V2 fields. V3 rejects — or, with auto-upgrade on, rewrites and backs up — only a
+    definition without ``permissions``, so this one is never converted.
+    """
     cfg = server_config(t)
     return {
         "name": name,
@@ -132,11 +150,12 @@ def kiro_agent_definition(t: Target, name: str = DEFAULT_KIRO_AGENT) -> dict:
         # @sdpm is trusted: composing a deck is dozens of run_python calls, and run_python
         # is a local sandbox confined to the deck directory. Nothing here writes files or
         # runs shell commands outside that sandbox.
-        "tools": list(_KIRO_AGENT_TOOLS),
+        "tools": [*_KIRO_AGENT_TOOLS, f"subagent/{name}"],
         "allowedTools": list(_KIRO_AGENT_TOOLS),
         # Composers are copies of this agent: spawning it needs no approval, and no other
         # agent (say, a stale one from an old installer) can be picked by mistake.
         "toolsSettings": {"subagent": {"availableAgents": [name], "trustedAgents": [name]}},
+        "permissions": {"rules": _kiro_permission_rules(name)},
         "resources": [],
     }
 
@@ -175,12 +194,26 @@ def write_kiro_agent(t: Target, *, name: str = DEFAULT_KIRO_AGENT, dry_run: bool
     return 0
 
 
+def _kiro_upgrade_backups(name: str, root: Optional[Path] = None) -> list[Path]:
+    """`<name>.json.bak[.N]` copies of our file that kiro-cli 3.x left when it converted the
+    pre-V3 definition at launch. Only copies that still carry our marker are ours."""
+    path = kiro_agent_path(name, root)
+    try:
+        candidates = sorted(path.parent.iterdir())
+    except OSError:
+        return []
+    prefix = path.name + ".bak"
+    return [p for p in candidates
+            if p.is_file() and (p.name == prefix or p.name.startswith(prefix + ".")) and _is_our_agent_file(p)]
+
+
 def remove_kiro_agent(*, name: str = DEFAULT_KIRO_AGENT, dry_run: bool = False, root: Optional[Path] = None) -> None:
     path = kiro_agent_path(name, root)
-    if path.exists() and _is_our_agent_file(path):
-        print(("[dry-run] remove " if dry_run else "removed ") + str(path))
+    ours = [path] if path.exists() and _is_our_agent_file(path) else []
+    for p in ours + _kiro_upgrade_backups(name, root):
+        print(("[dry-run] remove " if dry_run else "removed ") + str(p))
         if not dry_run:
-            path.unlink()
+            p.unlink()
 
 
 def kiro_agent_registered(name: str = DEFAULT_KIRO_AGENT, root: Optional[Path] = None) -> bool:
