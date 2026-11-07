@@ -25,7 +25,7 @@ const radio = (name: RegExp) => screen.getByRole("radio", { name })
 
 describe("LocalEngineSetting", () => {
   it("shows the configured engine and saves another one with a toast", async () => {
-    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v2", default: "v2" })
+    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v2", default: "v3" })
     vi.mocked(setAgentEngine).mockResolvedValue(undefined)
     renderWithIntl(<LocalEngineSetting open />, { locale: "ja" })
     await waitFor(() => expect(radio(/^V2/).getAttribute("aria-checked")).toBe("true"))
@@ -38,7 +38,7 @@ describe("LocalEngineSetting", () => {
   })
 
   it("does not save the engine already chosen", async () => {
-    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v3", default: "v2" })
+    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v3", default: "v3" })
     renderWithIntl(<LocalEngineSetting open />)
     await waitFor(() => expect(radio(/^V3/).getAttribute("aria-checked")).toBe("true"))
     fireEvent.click(radio(/^V3/))
@@ -46,7 +46,7 @@ describe("LocalEngineSetting", () => {
   })
 
   it("puts the previous engine back when the save fails", async () => {
-    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v3", default: "v2" })
+    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v3", default: "v3" })
     vi.mocked(setAgentEngine).mockRejectedValue(new Error("HTTP 500"))
     renderWithIntl(<LocalEngineSetting open />)
     await waitFor(() => expect(radio(/^V3/).getAttribute("aria-checked")).toBe("true"))

@@ -168,6 +168,19 @@ export function spawnAcp(command: string, args: string[], opts: { cwd: string; e
     for (const fn of [...exitListeners]) fn(code)
   }
   child.on("close", onClose)
+  // kiro-cli's own children (V3's agent server) inherit its stderr and can keep it open for up
+  // to a minute after kiro-cli died, which holds back "close" (every stdio stream closed). The
+  // exit and the end of stdout (every JSON-RPC line read) are enough to call it exited.
+  let stdoutClosed = false
+  let exit: { code: number | null } | null = null
+  child.stdout!.on("close", () => {
+    stdoutClosed = true
+    if (exit) onClose(exit.code)
+  })
+  child.on("exit", (code: number | null) => {
+    exit = { code }
+    if (stdoutClosed) onClose(code)
+  })
   child.on("error", (error) => {
     console.warn("[acp] process error: %s", error.message)
     if (child.pid === undefined) onClose(null) // spawn failed (kiro-cli not found); no close follows

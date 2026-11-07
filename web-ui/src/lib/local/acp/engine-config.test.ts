@@ -43,16 +43,16 @@ afterEach(() => {
   fs.rmSync(dir, { recursive: true, force: true })
 })
 
-const DEFAULTS = { version: 2, engine: "v2", command: "kiro-cli", commandArgs: [], env: {} }
+const DEFAULTS = { version: 2, engine: "v3", command: "kiro-cli", commandArgs: [], env: {} }
 
 describe("readEngineConfig", () => {
   it("gives the defaults without a file, silently", () => {
     expect(cfg.readEngineConfig()).toEqual(DEFAULTS)
-    expect(cfg.DEFAULT_ENGINE).toBe("v2")
+    expect(cfg.DEFAULT_ENGINE).toBe("v3")
     expect(warn).not.toHaveBeenCalled()
   })
 
-  it.each([["not JSON", "{broken"], ["not an object", "[1, 2]"], ["an unknown version", { version: 3, engine: "v3" }]])(
+  it.each([["not JSON", "{broken"], ["not an object", "[1, 2]"], ["an unknown version", { version: 3, engine: "v2" }]])(
     "gives the defaults for a file that is %s, warns once and leaves it as it is",
     (_case, content) => {
       write(content)
@@ -94,8 +94,8 @@ describe("readEngineConfig", () => {
 
 describe("writeEngine", () => {
   it("writes the new format with the defaults when there is no file", () => {
-    expect(cfg.writeEngine("v3")).toEqual({ ...DEFAULTS, engine: "v3" })
-    expect(JSON.parse(fs.readFileSync(file(), "utf-8"))).toEqual({ ...DEFAULTS, engine: "v3" })
+    expect(cfg.writeEngine("v2")).toEqual({ ...DEFAULTS, engine: "v2" })
+    expect(JSON.parse(fs.readFileSync(file(), "utf-8"))).toEqual({ ...DEFAULTS, engine: "v2" })
     expect(fs.readdirSync(dir)).toEqual(["acp-config.json"])
   })
 
@@ -108,23 +108,23 @@ describe("writeEngine", () => {
   it("moves an old-format file to acp-config.v1.json.bak before writing the new one", () => {
     write(OLD_FORMAT)
     const old = fs.readFileSync(file(), "utf-8")
-    cfg.writeEngine("v3")
+    cfg.writeEngine("v2")
     expect(fs.readFileSync(file("acp-config.v1.json.bak"), "utf-8")).toBe(old)
-    expect(cfg.readEngineConfig()).toEqual({ ...DEFAULTS, engine: "v3", command: "/opt/kiro/bin/kiro-cli", env: { AWS_PROFILE: "work" } })
+    expect(cfg.readEngineConfig()).toEqual({ ...DEFAULTS, engine: "v2", command: "/opt/kiro/bin/kiro-cli", env: { AWS_PROFILE: "work" } })
   })
 
   it("keeps an existing backup and overwrites the old file", () => {
     fs.writeFileSync(file("acp-config.v1.json.bak"), "earlier backup")
     write(OLD_FORMAT)
-    cfg.writeEngine("v3")
+    cfg.writeEngine("v2")
     expect(fs.readFileSync(file("acp-config.v1.json.bak"), "utf-8")).toBe("earlier backup")
-    expect(cfg.readEngineConfig().engine).toBe("v3")
+    expect(cfg.readEngineConfig().engine).toBe("v2")
     expect(fs.readdirSync(dir).sort()).toEqual(["acp-config.json", "acp-config.v1.json.bak"])
   })
 
   it("creates the directory", () => {
     fs.rmSync(dir, { recursive: true })
-    cfg.writeEngine("v3")
-    expect(cfg.readEngineConfig().engine).toBe("v3")
+    cfg.writeEngine("v2")
+    expect(cfg.readEngineConfig().engine).toBe("v2")
   })
 })
