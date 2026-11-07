@@ -567,7 +567,9 @@ function Invoke-FastForward {
     try {
         & git -C $Checkout "--work-tree=$tmp" restore --source=FETCH_HEAD --worktree -- servers/local/checkout_update.py
         if ($LASTEXITCODE -ne 0) { return $false }
-        & uv run --no-project python (Join-Path $tmp "servers\local\checkout_update.py") --checkout $Checkout pull | Out-Host
+        # Write-Host, not Out-Host: it keeps the lines out of the return value while leaving them
+        # on the information stream, so `install.ps1 *>&1 | Tee-Object` still records the notice.
+        & uv run --no-project python (Join-Path $tmp "servers\local\checkout_update.py") --checkout $Checkout pull | ForEach-Object { Write-Host $_ }
         return ($LASTEXITCODE -eq 0)
     } finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
 }
