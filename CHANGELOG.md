@@ -140,6 +140,15 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
 
 ### Fixed
 
+- **Deploying `SdpmAuth` alone no longer removes the CloudFront URL from the Web UI's
+  Cognito app client.** Each `SdpmAuth` deploy that changed the client reset its callback
+  and logout URLs to `http://localhost:3000`, so nobody could sign in to the Web UI, and a
+  routine `SdpmWebUi` deploy did not put the URL back. `SdpmAuth` now owns the whole list
+  (`http://localhost:3000` and the Web UI's CloudFront URL, nothing else): `SdpmWebUi`
+  publishes its URL in SSM (`/sdpm/web-ui/site-url`), and a function in `SdpmAuth` writes
+  the list after every change to the client and whenever `SdpmWebUi` creates or changes its
+  URL. / Deploy `SdpmAuth` before `SdpmWebUi` once (`./scripts/deploy.sh` does); after
+  that, either stack can be deployed alone.
 - **`sdpm update` gets past changed files in the checkout.** Tools of earlier versions
   rewrote tracked files in `~/.sdpm/checkout` (uv `sdpm/uv.lock`, the Web UI build
   `web-ui/next-env.d.ts`), and the pull then stopped with "Your local changes … would be

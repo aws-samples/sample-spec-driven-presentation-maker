@@ -1,10 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * WebUiStack's UpdateCognitoCallbackUrls custom resource sets the callback and
- * logout URLs only. AuthStack owns every other WebClient field, including the
- * sdpm-mcp/invoke scope; the handler (infra/lambdas/cognito-callback-urls,
- * tests/test_cognito_callback_urls.py) passes those fields through.
+ * AuthStack owns the WebClient, including its callback/logout URLs. WebUiStack
+ * publishes its CloudFront site URL in SSM and calls AuthStack's WebClientUrls
+ * function (infra/lambdas/cognito-callback-urls,
+ * tests/test_cognito_callback_urls.py) when the URL is created or changes.
  * Asset bundling skipped.
  */
 
@@ -34,17 +34,32 @@ function synthWebUi(): Template {
 
 const t = synthWebUi();
 
-test("the callback URL custom resource carries the WebClient's URLs and nothing else", () => {
-  const resources = Object.values(t.findResources("Custom::CognitoCallbackUrls"));
+test("the site URL is published for AuthStack and AuthStack's function is called with it", () => {
+  // The CloudFront URL reaches the WebClient only through AuthStack's
+  // WebClientUrls function (service token from SSM), which reads this parameter.
+  const params = Object.values(t.findResources("AWS::SSM::Parameter"))
+    .filter((p) => p.Properties.Name === "/sdpm/web-ui/site-url");
+  assert.equal(params.length, 1);
+  const [scheme, domain] = params[0].Properties.Value["Fn::Join"][1];
+  assert.equal(scheme, "https://");
+  assert.match(domain["Fn::GetAtt"][0], /^Distribution/);
+  assert.equal(domain["Fn::GetAtt"][1], "DomainName");
+
+  const resources = Object.entries(t.findResources("Custom::WebClientUrls"));
   assert.equal(resources.length, 1);
-  const props = resources[0].Properties;
-  assert.deepEqual(
-    Object.keys(props).sort(),
-    ["CallbackURLs", "ClientId", "LogoutURLs", "ServiceToken", "UserPoolId"],
-  );
-  assert.equal(props.CallbackURLs[0], "http://localhost:3000");
-  assert.equal(props.CallbackURLs.length, 2);
-  assert.deepEqual(props.LogoutURLs, props.CallbackURLs);
+  const [, res] = resources[0];
+  assert.deepEqual(Object.keys(res.Properties).sort(), ["ServiceToken", "SiteUrl"]);
+  assert.deepEqual(res.Properties.SiteUrl, params[0].Properties.Value);
+  const tokenParam = res.Properties.ServiceToken.Ref;
+  assert.equal(t.toJSON().Parameters[tokenParam].Default, "/sdpm/auth/web-client-urls-fn-arn");
+  // Runs after the parameter holds the new URL.
+  const [paramId] = Object.entries(t.findResources("AWS::SSM::Parameter"))
+    .find(([, p]) => p.Properties.Name === "/sdpm/web-ui/site-url")!;
+  assert.ok([res.DependsOn].flat().includes(paramId));
+});
+
+test("no other writer of the WebClient URLs is left in this stack", () => {
+  assert.deepEqual(t.findResources("Custom::CognitoCallbackUrls"), {});
 });
 
 test("no custom resource calls UpdateUserPoolClient with a fixed payload", () => {
@@ -56,13 +71,9 @@ test("no custom resource calls UpdateUserPoolClient with a fixed payload", () =>
   }
 });
 
-test("the handler can read and update the WebClient, nothing more", () => {
-  const statements = Object.values(t.findResources("AWS::IAM::Policy"))
+test("this stack cannot change the WebClient", () => {
+  const actions = Object.values(t.findResources("AWS::IAM::Policy"))
     .flatMap((p) => p.Properties.PolicyDocument.Statement as Array<{ Action: string | string[] }>)
-    .filter((s) => JSON.stringify(s.Action).includes("cognito-idp:"));
-  assert.equal(statements.length, 1);
-  assert.deepEqual(
-    [statements[0].Action].flat().sort(),
-    ["cognito-idp:DescribeUserPoolClient", "cognito-idp:UpdateUserPoolClient"],
-  );
+    .flatMap((s) => [s.Action].flat());
+  assert.ok(!actions.some((a) => /^cognito-idp:(UpdateUserPoolClient|\*)$/.test(a)), JSON.stringify(actions));
 });
