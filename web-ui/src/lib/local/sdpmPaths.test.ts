@@ -75,6 +75,6 @@ describe("deck root order", () => {
       const text = typeof config === "string" ? config : value(JSON.stringify(config))
       fs.writeFileSync(path.join(configDir, "config.json"), text)
     }
-    expect(path.resolve(resolveDeckRoot())).toBe(path.resolve(expand(expected)))
+    expect(path.resolve(resolveDeckRoot())).toBe(path.resolve(expand(expected))) // nosemgrep: path-join-resolve-traversal — constant table rows in a tmpdir
   })
 })
