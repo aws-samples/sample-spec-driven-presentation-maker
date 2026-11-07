@@ -6,9 +6,10 @@
  * session/new then session/load (prompts go to the loaded id), a `Session not found` keeps the
  * new session as `created`, another mode is switched with set_mode after the session's MCP
  * record was cleared; Stop cancels the main session and this turn's sub-agent sessions; the
- * models come from session/new; the lock and auth errors are recognised. A fork copies the
- * stored session's files and opens the copy; a copy V2 cannot read is `created` under the
- * copy's id; `discardFork` removes only a copy this session made.
+ * models come from session/new and a load's answer, without `[Internal]` / `[Deprecated]` ones,
+ * and session/set_model changes the model (V2 has no effort); the lock and auth errors are
+ * recognised. A fork copies the stored session's files and opens the copy; a copy V2 cannot
+ * read is `created` under the copy's id; `discardFork` removes only a copy this session made.
  */
 
 import fs from "fs"
@@ -65,8 +66,35 @@ describe("V2Session", () => {
     await expect(session.newSession("sdpm-orchestrator")).resolves.toEqual({ sessionId: "K1" })
     expect(calls).toEqual([{ method: "session/new", params: { cwd: "/workspace/sdpm/servers/local", mcpServers: [] } }])
     expect(order).toEqual(["session/new", "wait K1"])
-    expect(session.models()).toEqual({ current: "auto", available: [{ modelId: "auto", name: "auto" }] })
+    expect(session.models()).toEqual({ current: "auto", available: [{ modelId: "auto", name: "auto" }], effort: null })
     expect(session.cancelTargets()).toEqual(["K1"])
+  })
+
+  it("takes the models of a load's answer, which keep the session's model", async () => {
+    const list = [
+      { modelId: "auto", name: "auto" },
+      { modelId: "claude-haiku-4.5", name: "claude-haiku-4.5", description: "Haiku" },
+      { modelId: "grok-4.7", name: "grok-4.7", description: "[Internal] Experimental" },
+    ]
+    const { ctx } = context({
+      "session/new": { ...NEW, models: { currentModelId: "auto", availableModels: list } },
+      "session/load": { modes: MODES("sdpm-orchestrator"), models: { currentModelId: "claude-haiku-4.5", availableModels: list } },
+    })
+    const session = new V2Session(ctx)
+    await session.openSession("K9", "sdpm-orchestrator")
+    expect(session.models()).toEqual({ current: "claude-haiku-4.5", available: list.slice(0, 2), effort: null })
+  })
+
+  it("changes the model with session/set_model and refuses an effort", async () => {
+    const { ctx, calls } = context({ "session/new": { ...NEW, models: { currentModelId: "auto", availableModels: [{ modelId: "auto" }, { modelId: "m2" }] } } })
+    const session = new V2Session(ctx)
+    await session.newSession("sdpm-orchestrator")
+    await session.setModel({ model: "m2" })
+    expect(calls[1]).toEqual({ method: "session/set_model", params: { sessionId: "K1", modelId: "m2" } })
+    expect(vi.mocked(ctx.request).mock.calls[1][2]).toEqual({ timeoutMs: 10_000 })
+    expect(session.models()?.current).toBe("m2")
+    await expect(session.setModel({ model: "auto", effort: "low" })).rejects.toThrow(/no effort/)
+    expect(calls).toHaveLength(2)
   })
 
   it("refuses a session in another mode (kiro_default for an agent V2 did not find)", async () => {

@@ -25,4 +25,6 @@ export const v3Adapter: EngineAdapter = {
   createSession: (ctx) => new V3Session(ctx),
   sessionsOpenableBy: ["v3"],
   listStoredSessions: listV3Sessions,
+  // A sub-agent whose definition has no `model` runs on the session's model and effort (S14).
+  subagentsFollowSessionModel: true,
 }

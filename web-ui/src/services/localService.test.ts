@@ -7,7 +7,7 @@ const mode = vi.hoisted(() => ({ local: true }))
 vi.mock("@/lib/mode", () => ({ get IS_LOCAL() { return mode.local } }))
 
 import {
-  getAgentDefinitions, getAgentEngine, hasLocalStream, listLocalModels, localStreamUrl,
+  getAgentDefinitions, getAgentEngine, getLocalSessionModels, hasLocalStream, listLocalModels, localStreamUrl, setLocalSessionModel,
   openInOs, saveLocalChat, setAgentEngine, stopLocalAgent, updateAgentSelection,
 } from "./localService"
 
@@ -75,7 +75,18 @@ describe("localService (local mode)", () => {
   it("maps the model list to the ModelPicker shape", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ available: [{ modelId: "m1", name: "Model 1", description: "d" }] }))
     await expect(listLocalModels()).resolves.toEqual([{ modelId: "m1", displayName: "Model 1", description: "d" }])
-    expect(call(0)).toEqual({ url: "/api/agent/models", method: "POST", body: {} })
+    expect(call(0)).toEqual({ url: "/api/agent/models", method: undefined, body: undefined })
+  })
+
+  it("reads a chat's models by its id and changes them with PUT", async () => {
+    const view = { engine: "v3", available: [{ modelId: "m1", name: "Model 1", effortLevels: ["low"] }], current: null, pending: { model: "m1" } }
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse(view)).mockResolvedValueOnce(jsonResponse(view))
+    await expect(getLocalSessionModels("a b")).resolves.toEqual(view)
+    await expect(setLocalSessionModel("s1", { model: "m1", effort: "low" })).resolves.toEqual(view)
+    expect(call(0).url).toBe("/api/agent/models?sessionId=a%20b")
+    expect(call(1)).toEqual({ url: "/api/agent/models", method: "PUT", body: { sessionId: "s1", model: "m1", effort: "low" } })
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: "x", code: "unknown_model" }, 400))
+    await expect(setLocalSessionModel("s1", { model: "x" })).rejects.toThrow("HTTP 400")
   })
 
   it("builds the stream URL and probes whether the session still streams", async () => {
@@ -102,6 +113,8 @@ describe("localService (cloud mode)", () => {
     await setAgentEngine("v3")
     expect(await getAgentDefinitions()).toEqual({ agents: [], selection: { orchestrator: "", composer: "", style: "", translate: "" } })
     expect(await listLocalModels()).toEqual([])
+    expect(await getLocalSessionModels("s1")).toBeNull()
+    expect(await setLocalSessionModel("s1", { model: "m1" })).toBeNull()
     expect(localStreamUrl("s1")).toBeNull()
     expect(await hasLocalStream("s1")).toBe(false)
     expect(fetch).not.toHaveBeenCalled()

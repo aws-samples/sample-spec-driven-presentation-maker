@@ -19,9 +19,15 @@
  * names its source in `_meta.parentSessionId`: another source means kiro-cli did not fork it
  * (`created`); none is taken as resumed. `createdAt` is the fork's time and says nothing here.
  * `discardFork` deletes (session/delete) only a fork this session made.
+ *
+ * The model and the effort are config options (session/set_config_option): the model first,
+ * then the effort option the new model brought. V3 accepts any value, so the process manager
+ * validates the choice first. The session keeps both; a load reports them again.
  */
 import { AgentStartError } from "../../../turnErrors"
-import type { AcpModelList, EngineErrorKind, EngineSession, ForkSessionOptions, LoadOutcome, OpenSessionOptions, SessionContext } from "../../engine"
+import type {
+  EngineErrorKind, EngineSession, ForkSessionOptions, LoadOutcome, ModelChoice, OpenSessionOptions, SessionContext, SessionModels,
+} from "../../engine"
 import type { AcpNotification, ForkSessionResponse, SessionModeState } from "../../schema"
 import { AcpRequestError } from "../../transport"
 import { V3Translator } from "./translate"
@@ -33,6 +39,8 @@ const AUTH_REQUIRED = -32000
 const NOT_FOUND_GRACE_MS = 2000
 /** A session created this long before the load started still counts as created by it (clock granularity). */
 const CREATED_MARGIN_MS = 1000
+/** kiro-cli answers set_config_option at once. */
+const CONFIG_TIMEOUT_MS = 10_000
 
 export class V3Session implements EngineSession {
   private readonly translator = new V3Translator()
@@ -51,6 +59,8 @@ export class V3Session implements EngineSession {
       cwd: this.ctx.cwd, mcpServers: [], _meta: { kiro: { modeId: agentName } },
     }, { timeoutMs: this.ctx.setupTimeoutMs, signal: this.ctx.signal }) as V3NewSessionResponse
     this.translator.mainSessionId = result.sessionId
+    // Its config_option_update came before the answer, when the session id was not known yet.
+    this.translator.readConfig(result.configOptions)
     if (result.modes?.currentModeId !== agentName) await this.rejected(agentName, result.modes?.currentModeId)
     await this.ctx.waitForMcp(result.sessionId)
     return { sessionId: result.sessionId }
@@ -96,8 +106,23 @@ export class V3Session implements EngineSession {
     return this.translator.mainSessionId ? [this.translator.mainSessionId] : []
   }
 
-  models(): AcpModelList | null {
+  models(): SessionModels | null {
     return this.translator.models()
+  }
+
+  async setModel(choice: ModelChoice): Promise<void> {
+    const sessionId = this.translator.mainSessionId
+    if (!sessionId) throw new Error("no session")
+    if (choice.model) {
+      await this.ctx.request("session/set_config_option", {
+        sessionId, configId: this.translator.configIds().model, value: choice.model,
+      }, { timeoutMs: CONFIG_TIMEOUT_MS })
+    }
+    if (choice.effort) {
+      const effortId = this.translator.configIds().effort
+      if (!effortId) throw new Error("no effort option")
+      await this.ctx.request("session/set_config_option", { sessionId, configId: effortId, value: choice.effort }, { timeoutMs: CONFIG_TIMEOUT_MS })
+    }
   }
 
   classifyError(error: unknown): EngineErrorKind | null {
