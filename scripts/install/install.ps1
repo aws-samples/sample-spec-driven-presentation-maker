@@ -23,7 +23,7 @@ if ($env:SDPM_SKIP_LIBREOFFICE -eq "1") { $SkipLibreOffice = $true }
 if ($env:SDPM_SKIP_SHORTCUT -eq "1") { $SkipShortcut = $true }
 # Profile: full | mcp. Asked interactively when neither switch nor SDPM_PROFILE is given.
 $script:Profile = if ($Full) { "full" } elseif ($McpOnly) { "mcp" } elseif ($env:SDPM_PROFILE) { $env:SDPM_PROFILE } else { "" }
-if ($AgentName) { $env:SDPM_AGENT_NAME = $AgentName } elseif (-not $env:SDPM_AGENT_NAME) { $env:SDPM_AGENT_NAME = "sdpm" }
+if ($AgentName) { $env:SDPM_AGENT_NAME = $AgentName }
 # Registration: ask | yes | no
 $script:RegisterMode = if ($Register) { "yes" } elseif ($NoRegister) { "no" } elseif ($env:SDPM_REGISTER) { $env:SDPM_REGISTER } else { "ask" }
 $InstallerVersion = "0.1.0"
@@ -33,6 +33,17 @@ $SdpmHome = if ($env:SDPM_HOME) { $env:SDPM_HOME } else { Join-Path $env:USERPRO
 $Checkout = Join-Path $SdpmHome "checkout"
 $LauncherDir = if ($env:SDPM_LAUNCHER_DIR) { $env:SDPM_LAUNCHER_DIR } else { Join-Path $env:USERPROFILE "bin" }
 $ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
+# Over an existing install, keep what it was installed with unless told otherwise.
+$agentNameFile = Join-Path $SdpmHome ".agent-name"
+if (-not $env:SDPM_AGENT_NAME -and (Test-Path $agentNameFile)) { $env:SDPM_AGENT_NAME = (Get-Content $agentNameFile -Raw).Trim() }
+if (-not $env:SDPM_AGENT_NAME) { $env:SDPM_AGENT_NAME = "sdpm" }
+$profileFile = Join-Path $SdpmHome ".profile"
+if (-not $script:Profile -and (Test-Path $profileFile)) {
+    $previous = (Get-Content $profileFile -Raw).Trim()
+    if ($previous -in @("full", "mcp")) { $script:Profile = $previous }
+}
+$script:Existing = $false   # this run updates an install (its clients are refreshed, not asked for)
+$script:Before = ""         # the commit that install was on
 
 if (-not (Get-Command Show-Header -ErrorAction SilentlyContinue)) {
     $tuiPath = Join-Path $ScriptDir "lib\tui.ps1"
@@ -131,18 +142,31 @@ function Install-MissingDependencies {
     }
 }
 
+# checkout_update.py as of the fetched main, run before anything is checked out: it moves
+# local changes to a git stash (never discards them) and fast-forwards. The same step as
+# `sdpm update`; the newest version of it runs even over an old checkout.
+function Invoke-FastForward {
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ("sdpm-update-" + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path $tmp | Out-Null
+    try {
+        & git -C $Checkout "--work-tree=$tmp" restore --source=FETCH_HEAD --worktree -- servers/local/checkout_update.py
+        if ($LASTEXITCODE -ne 0) { return $false }
+        & uv run --no-project python (Join-Path $tmp "servers\local\checkout_update.py") --checkout $Checkout pull | Out-Host
+        return ($LASTEXITCODE -eq 0)
+    } finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
+}
+
 function Setup-Checkout {
     Start-Step "Downloading SDPM" $Checkout
     New-Item -ItemType Directory -Force -Path $SdpmHome | Out-Null
     if (Test-Path (Join-Path $Checkout ".git")) {
+        $script:Existing = $true
+        $script:Before = "$(& git -C $Checkout rev-parse HEAD 2>$null)".Trim()
         $result = Run-WithSpinner -Exe "git" -Arguments @("-C", $Checkout, "fetch", "--tags", "--prune", "origin", "main")
         if (-not $result.Success) { Fail-Step "SDPM fetch failed" $result.Output $RepoHelp; exit 1 }
-
-        $result = Run-WithSpinner -Exe "git" -Arguments @("-C", $Checkout, "checkout", "main")
-        if (-not $result.Success) { Fail-Step "SDPM checkout failed" $result.Output $RepoHelp; exit 1 }
-
-        $result = Run-WithSpinner -Exe "git" -Arguments @("-C", $Checkout, "pull", "--ff-only", "origin", "main")
-        if (-not $result.Success) { Fail-Step "SDPM pull failed" $result.Output $RepoHelp; exit 1 }
+        if (-not (Invoke-FastForward)) {
+            Fail-Step "SDPM update failed (see the message above; nothing was discarded)" "" "$RepoHelp/blob/main/docs/en/getting-started.md#sdpm-update-stops"; exit 1
+        }
         Complete-Step "SDPM checkout updated ($($result.Elapsed))"
     } elseif (Test-Path $Checkout) {
         Fail-Step "$Checkout exists but is not a git checkout" "Move it aside and retry." $RepoHelp; exit 1
@@ -155,7 +179,7 @@ function Setup-Checkout {
 
 function Setup-Packages {
     Start-Step "Syncing the MCP server environment" "servers/local"
-    $result = Run-WithSpinner -Exe "uv" -Arguments @("sync", "--directory", (Join-Path $Checkout "servers\local"))
+    $result = Run-WithSpinner -Exe "uv" -Arguments @("sync", "--frozen", "--directory", (Join-Path $Checkout "servers\local"))
     if (-not $result.Success) { Fail-Step "uv sync failed" $result.Output "$RepoHelp/blob/main/docs/en/getting-started.md"; exit 1 }
     Complete-Step "MCP server ready ($($result.Elapsed))"
     $script:Profile | Set-Content -Path (Join-Path $SdpmHome ".profile") -Encoding ASCII
@@ -178,7 +202,7 @@ function Setup-IconSet {
     param([string]$Name, [string]$Manifest, [string]$Script)
     if (Test-Path $Manifest) { Start-Step "$Name icons" "already available"; Complete-Step "$Name icons skipped"; return }
     Start-Step "Downloading $Name icons" "official icon source"
-    $result = Run-WithSpinner -Exe "uv" -Arguments @("run", "--directory", (Join-Path $Checkout "sdpm"), "python", $Script)
+    $result = Run-WithSpinner -Exe "uv" -Arguments @("run", "--frozen", "--directory", (Join-Path $Checkout "sdpm"), "python", $Script)
     if ($result.Success) { Complete-Step "$Name icons downloaded ($($result.Elapsed))" }
     else { Fail-Step "$Name icon download failed; retry after installation" $result.Output $RepoHelp }
 }
@@ -229,9 +253,25 @@ function Invoke-Launcher {
 
 $script:RegisterFailed = $false
 
+# Over an existing install: register again the clients that have SDPM (as `sdpm update`
+# does), remove what earlier versions left, print the upgrading notes. -Register also adds
+# the detected clients that do not have it yet.
+function Invoke-RefreshClients {
+    param([string[]]$Extra = @())
+    $uv = (Get-Command uv).Source
+    $refreshArgs = @("refresh")
+    if ($script:Before) { $refreshArgs += @("--since", $script:Before) }
+    & $uv run --frozen --directory (Join-Path $Checkout "servers\local") python client_config.py --uv $uv --checkout $Checkout --agent-name $env:SDPM_AGENT_NAME @refreshArgs @Extra
+    if ($LASTEXITCODE -ne 0) { $script:RegisterFailed = $true }
+}
+
 function Register-Clients {
     Write-Host ""
     if ($script:RegisterMode -eq "no") { Write-Host "  Skipping client registration (-NoRegister). Later: sdpm register"; return }
+    if ($script:Existing) {
+        if ($script:RegisterMode -eq "yes") { Invoke-RefreshClients @("--register-missing") } else { Invoke-RefreshClients }
+        return
+    }
     if ($script:RegisterMode -eq "yes") {
         try { Invoke-Launcher @("register", "--yes"); if ($LASTEXITCODE -ne 0) { $script:RegisterFailed = $true } }
         catch { $script:RegisterFailed = $true }

@@ -164,8 +164,10 @@ IFS= read -r -d '' SDPM_LAUNCHER_CONTENT <<'__SDPM_LAUNCHER__' || true
 #   sdpm webui      browser surface
 #   sdpm mcp        MCP surface (for a terminal check; clients get the uv command directly)
 #   sdpm register   wire the MCP server into the clients on this machine
-#   sdpm update     pull, sync, rebuild, then client_config.py refresh — which replaces
-#                   this file with the checkout's launcher.sh and re-registers the clients
+#   sdpm update     fetch, hand over to the fetched checkout_update.py (local changes go to
+#                   a git stash, then fast-forward), sync, rebuild, then client_config.py
+#                   refresh — which replaces this file with the checkout's launcher.sh and
+#                   re-registers the clients
 # Anything that could drift between this file and launcher.ps1 (client detection,
 # configuration rendering, registration commands) lives once in
 # servers/local/client_config.py; both launchers only delegate to it.
@@ -213,21 +215,24 @@ resolve_uv() {
   echo "$found"
 }
 
+# uv never rewrites the lockfile here (--frozen): a tracked file changed in the checkout
+# would stop the next `sdpm update`.
+
 # Run a Python entry point inside the local server's environment (no stdout of our own).
 py() {
   local uv; uv=$(resolve_uv) || exit 1
-  exec "$uv" run --directory "$CHECKOUT/servers/local" python "$@"
+  exec "$uv" run --frozen --directory "$CHECKOUT/servers/local" python "$@"
 }
 
 # client_config.py, told exactly which uv and checkout the clients must point at.
 cfg() {
   local uv; uv=$(resolve_uv) || exit 1
-  exec "$uv" run --directory "$CHECKOUT/servers/local" python client_config.py --uv "$uv" --checkout "$CHECKOUT" "$@"
+  exec "$uv" run --frozen --directory "$CHECKOUT/servers/local" python client_config.py --uv "$uv" --checkout "$CHECKOUT" "$@"
 }
 
 cfg_call() {
   local uv; uv=$(resolve_uv) || return 1
-  "$uv" run --directory "$CHECKOUT/servers/local" python client_config.py --uv "$uv" --checkout "$CHECKOUT" "$@"
+  "$uv" run --frozen --directory "$CHECKOUT/servers/local" python client_config.py --uv "$uv" --checkout "$CHECKOUT" "$@"
 }
 
 # ---------------------------------------------------------------------------
@@ -297,7 +302,21 @@ step() {
 
 build_mcp() {
   local uv; uv=$(resolve_uv) || return 1
-  step "Syncing the MCP server environment" update "$uv" sync --directory "$CHECKOUT/servers/local" || return $?
+  step "Syncing the MCP server environment" update "$uv" sync --frozen --directory "$CHECKOUT/servers/local" || return $?
+}
+
+# checkout_update.py as of the fetched main, run before anything is checked out: it moves
+# local changes to a git stash (never discards them) and fast-forwards. The newest version
+# of that step runs even over an old checkout; this file only fetches and hands over.
+fast_forward() {
+  local uv tmp status
+  uv=$(resolve_uv) || return 1
+  tmp=$(mktemp -d) || return 1
+  git -C "$CHECKOUT" --work-tree="$tmp" restore --source=FETCH_HEAD --worktree -- servers/local/checkout_update.py &&
+    "$uv" run --no-project python "$tmp/servers/local/checkout_update.py" --checkout "$CHECKOUT" pull
+  status=$?
+  rm -rf "$tmp"
+  return "$status"
 }
 
 build_webui() {
@@ -312,8 +331,7 @@ update() {
   before=$(git -C "$CHECKOUT" rev-parse HEAD 2>/dev/null || true)
   echo "> Fetching main from $REPO_URL"
   step "Fetching main" update git -C "$CHECKOUT" fetch --tags --prune origin main || return $?
-  step "Checking out main" update git -C "$CHECKOUT" checkout -q main || return $?
-  step "Fast-forwarding main" update git -C "$CHECKOUT" pull -q --ff-only origin main || return $?
+  step "Fast-forwarding main" update fast_forward || return $?
   build_mcp || return $?
   if [[ "$with_webui" -eq 1 ]]; then
     command -v npm >/dev/null 2>&1 || { echo "Node.js 20+ is required for the Web UI: https://nodejs.org/" >&2; return 1; }
@@ -391,7 +409,7 @@ case "${1:-}" in
   unregister) shift; require_checkout; cfg unregister "$@" ;;
   mcp-config) shift; require_checkout; cfg print "$@" ;;
   update) shift; update "$@" ;;
-  doctor) require_checkout; (cd "$CHECKOUT" && make doctor) ;;
+  doctor) require_checkout; uv=$(resolve_uv) || exit 1; (cd "$CHECKOUT" && "$uv" run --frozen python scripts/doctor.py) ;;
   uninstall) uninstall ;;
   version|--version|-v) version ;;
   path) echo "$CHECKOUT" ;;
@@ -415,7 +433,7 @@ LAUNCHER_DIR="${SDPM_LAUNCHER_DIR:-$HOME/.local/bin}"
 DEPS_ONLY=0
 PROFILE="${SDPM_PROFILE:-}"          # full | mcp ; asked interactively when empty
 REGISTER="${SDPM_REGISTER:-ask}"     # ask | yes | no
-export SDPM_AGENT_NAME="${SDPM_AGENT_NAME:-sdpm}"   # name of the Kiro CLI agent
+SDPM_AGENT_NAME="${SDPM_AGENT_NAME:-}"   # name of the Kiro CLI agent
 NON_INTERACTIVE="${SDPM_NON_INTERACTIVE:-0}"
 SKIP_LIBREOFFICE="${SDPM_SKIP_LIBREOFFICE:-0}"
 SKIP_SHORTCUT="${SDPM_SKIP_SHORTCUT:-0}"
@@ -430,6 +448,7 @@ Options:
   --mcp-only           Install the MCP server only (no Node.js, no Web UI)
   --register           Register the MCP server with every detected client without asking
   --agent-name NAME    Name of the Kiro CLI agent (default: sdpm)
+                       Over an existing install, the profile and agent name it has are kept
   --no-register        Skip client registration (print the configuration instead)
   --deps-only          Install git, uv, LibreOffice, and poppler only
   --non-interactive    Accept dependency installation prompts; default profile: full
@@ -466,6 +485,15 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+
+# Over an existing install, keep what it was installed with unless told otherwise.
+if [[ -z "$SDPM_AGENT_NAME" && -f "$SDPM_HOME/.agent-name" ]]; then
+  SDPM_AGENT_NAME="$(cat "$SDPM_HOME/.agent-name" 2>/dev/null || true)"
+fi
+export SDPM_AGENT_NAME="${SDPM_AGENT_NAME:-sdpm}"
+if [[ -z "$PROFILE" && -f "$SDPM_HOME/.profile" ]]; then
+  case "$(cat "$SDPM_HOME/.profile" 2>/dev/null)" in full) PROFILE=full ;; mcp) PROFILE=mcp ;; esac
+fi
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]:-$0}")"
 if ! SCRIPT_DIR="$(cd "$SCRIPT_DIR" 2>/dev/null && pwd)"; then
@@ -634,13 +662,33 @@ install_missing_dependencies() {
   done
 }
 
+# checkout_update.py as of the fetched main, run before anything is checked out: it moves
+# local changes to a git stash (never discards them) and fast-forwards. The same step as
+# `sdpm update`; the newest version of it runs even over an old checkout.
+fast_forward() {
+  local tmp status
+  tmp=$(mktemp -d) || return 1
+  git -C "$CHECKOUT" --work-tree="$tmp" restore --source=FETCH_HEAD --worktree -- servers/local/checkout_update.py &&
+    uv run --no-project python "$tmp/servers/local/checkout_update.py" --checkout "$CHECKOUT" pull
+  status=$?
+  rm -rf "$tmp"
+  return "$status"
+}
+
+EXISTING=0   # 1: this run updates an install (its clients are refreshed, not asked for)
+BEFORE=""    # the commit that install was on
+
 setup_checkout() {
   start_step "Downloading SDPM" "$CHECKOUT"
   mkdir -p "$SDPM_HOME"
   if [[ -d "$CHECKOUT/.git" ]]; then
-    if run_with_spinner "git -C '$CHECKOUT' fetch --tags --prune origin main && git -C '$CHECKOUT' checkout main && git -C '$CHECKOUT' pull --ff-only origin main"; then
-      complete_step "SDPM checkout updated ($LAST_ELAPSED)"
-    else fail_step "SDPM update failed" "$LAST_LOG" "$REPO_HELP"; exit 1; fi
+    EXISTING=1
+    BEFORE="$(git -C "$CHECKOUT" rev-parse HEAD 2>/dev/null || true)"
+    if ! run_with_spinner "git -C '$CHECKOUT' fetch --tags --prune origin main"; then
+      fail_step "SDPM fetch failed" "$LAST_LOG" "$REPO_HELP"; exit 1
+    fi
+    if fast_forward; then complete_step "SDPM checkout updated ($LAST_ELAPSED)"
+    else fail_step "SDPM update failed (see the message above; nothing was discarded)" "" "$REPO_HELP/blob/main/docs/en/getting-started.md#sdpm-update-stops"; exit 1; fi
   elif [[ -e "$CHECKOUT" ]]; then
     fail_step "$CHECKOUT exists but is not a git checkout" "Move it aside and retry." "$REPO_HELP"; exit 1
   elif run_with_spinner "git clone --branch main --single-branch '$REPO_URL' '$CHECKOUT'"; then
@@ -650,7 +698,7 @@ setup_checkout() {
 
 setup_packages() {
   start_step "Syncing the MCP server environment" "servers/local"
-  if run_with_spinner "uv sync --directory '$CHECKOUT/servers/local'"; then complete_step "MCP server ready ($LAST_ELAPSED)"
+  if run_with_spinner "uv sync --frozen --directory '$CHECKOUT/servers/local'"; then complete_step "MCP server ready ($LAST_ELAPSED)"
   else fail_step "uv sync failed" "$LAST_LOG" "$REPO_HELP/blob/main/docs/en/getting-started.md"; exit 1; fi
   echo "$PROFILE" > "$SDPM_HOME/.profile"
   echo "$SDPM_AGENT_NAME" > "$SDPM_HOME/.agent-name"
@@ -673,7 +721,7 @@ setup_icon_set() {
     start_step "$name icons" "already available"; complete_step "$name icons skipped"; return
   fi
   start_step "Downloading $name icons" "official icon source"
-  if run_with_spinner "uv run --directory '$CHECKOUT/sdpm' python '$script'"; then complete_step "$name icons downloaded ($LAST_ELAPSED)"
+  if run_with_spinner "uv run --frozen --directory '$CHECKOUT/sdpm' python '$script'"; then complete_step "$name icons downloaded ($LAST_ELAPSED)"
   else fail_step "$name icon download failed; retry after installation" "$LAST_LOG" "$REPO_HELP"; fi
 }
 
@@ -724,10 +772,24 @@ REGISTER_FAILED=0
 
 # The register step prints its own result table (✓ registered / – skipped / ✗ failed),
 # which is the part of the completion screen that matters; nothing else repeats it.
+# Over an existing install: register again the clients that have SDPM (as `sdpm update`
+# does), remove what earlier versions left, print the upgrading notes. --register also adds
+# the detected clients that do not have it yet.
+refresh_clients() {
+  local uv_path; uv_path="$(command -v uv)"
+  uv run --frozen --directory "$CHECKOUT/servers/local" python client_config.py --uv "$uv_path" \
+    --checkout "$CHECKOUT" --agent-name "$SDPM_AGENT_NAME" refresh ${BEFORE:+--since "$BEFORE"} \
+    ${1:+"$1"} || REGISTER_FAILED=1
+}
+
 register_clients() {
   echo ""
   if [[ "$REGISTER" == "no" ]]; then
     echo "  Skipping client registration (--no-register). Later: sdpm register"; return 0
+  fi
+  if [[ "$EXISTING" == "1" ]]; then
+    if [[ "$REGISTER" == "yes" ]]; then refresh_clients --register-missing; else refresh_clients; fi
+    return 0
   fi
   if [[ "$REGISTER" == "yes" ]]; then
     "$LAUNCHER_DIR/sdpm" register --yes || REGISTER_FAILED=1

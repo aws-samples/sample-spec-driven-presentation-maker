@@ -46,6 +46,10 @@ What happens:
    later), ✗ failed. Nothing is written for an unticked client.
 
 Running the installer again repairs an existing installation. It never creates a second one.
+It keeps that installation's profile and Kiro agent name (unless you pass `--full`,
+`--mcp-only` or `--agent-name`), and instead of the client checklist it registers SDPM
+again with the clients that already have it, as `sdpm update` does; `--register` also adds
+the detected clients that do not.
 
 ### Installer options
 
@@ -114,7 +118,7 @@ an agent file that SDPM owns. You do not edit any existing configuration file by
 
 | Client | What `sdpm register` does |
 |---|---|
-| Kiro CLI | Writes a dedicated agent `~/.kiro/agents/sdpm.json` (MCP server, tools, trusted `@sdpm` and `use_subagent` for parallel composers, no prompt text). Both Kiro CLI engines (V2 and V3) load the file as-is. Start it with `kiro-cli chat --agent sdpm` or `/agent sdpm`; in V3, another agent that delegates to `sdpm` asks you to approve each sdpm tool. Nothing is added to other sessions. `--agent-name` picks another name. An agent file you wrote yourself is never touched |
+| Kiro CLI | Writes a dedicated agent `~/.kiro/agents/sdpm.json` (MCP server, tools, trusted `@sdpm` and `use_subagent` for parallel composers, no prompt text). Both Kiro CLI engines (V2 and V3) load the file as-is. Start it with `kiro-cli chat --agent sdpm` or `/agent sdpm`; in V3, another agent that delegates to `sdpm` asks you to approve each sdpm tool. Nothing is added to other sessions. `--agent-name` picks another name. An agent file you wrote yourself is never touched, and in the file SDPM writes, what other tools added (other MCP servers, their tools and settings) is kept |
 | Claude Code | `claude mcp add --scope user sdpm -- …`. Composers run as Claude Code sub-agents, which inherit the server. Approve the sdpm tools once ("don't ask again"), or launch with `claude --allowedTools "mcp__sdpm__*"`. If the old plugin `sdpm@sdpm` is still installed, `sdpm register` offers `claude plugin uninstall`; otherwise every tool appears twice |
 | Visual Studio Code | `code --add-mcp …` |
 | Codex (CLI, IDE extension, ChatGPT desktop app) | `codex mcp add sdpm -- …` |
@@ -129,7 +133,7 @@ Every configuration is the same entry, with absolute paths:
   "mcpServers": {
     "sdpm": {
       "command": "/Users/you/.local/bin/uv",
-      "args": ["run", "--directory", "/Users/you/.sdpm/checkout/servers/local", "python", "server.py"]
+      "args": ["run", "--directory", "/Users/you/.sdpm/checkout/servers/local", "--frozen", "python", "server.py"]
     }
   }
 }
@@ -262,6 +266,9 @@ Public decks work as PPTX decks do: anyone who can view the deck can present and
 
 - `sdpm update` pulls the latest `main` and rebuilds what is installed.
   `sdpm update --with-webui` also adds the Web UI to an MCP-only install.
+  Changes to tracked files in `~/.sdpm/checkout` (tools of earlier versions rewrote some)
+  are moved to a git stash before the pull, never discarded: the update lists the files and
+  prints the `git stash apply` command that brings them back.
   It then brings the rest of the install up to date:
   - replaces the `sdpm` command with the new version
   - registers SDPM again with the clients that already have it (the Kiro CLI agent under
@@ -281,6 +288,49 @@ Public decks work as PPTX decks do: anyone who can view the deck can present and
   disconnect your MCP clients.
 
 To remove a deployment from your AWS account, see [Uninstall (AWS)](uninstall.md).
+
+## Troubleshooting
+
+### `sdpm update` stops
+
+An install whose `sdpm` command comes from before 0.13.0 can stop at the pull:
+
+```
+error: Your local changes to the following files would be overwritten by merge:
+        sdpm/uv.lock
+Please commit your changes or stash them before you merge.
+Aborting
+SDPM update failed while Fast-forwarding main (exit 1).
+```
+
+The files are ones that version's tools rewrote (`sdpm/uv.lock` by uv,
+`web-ui/next-env.d.ts` by the Web UI build). The pull stops before any new code runs, so
+that update cannot get past it by itself. Run the installer again: it moves the changes to a
+git stash, updates, and keeps your profile, agent name and registered clients.
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
+```
+
+```powershell
+irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
+```
+
+Or move the changes aside yourself and update again (the `-c` options give the stash an
+author on a machine where git has none):
+
+```bash
+git -C ~/.sdpm/checkout -c user.name=sdpm -c user.email=sdpm@localhost stash && sdpm update
+```
+
+```powershell
+git -C $HOME\.sdpm\checkout -c user.name=sdpm -c user.email=sdpm@localhost stash; sdpm update
+```
+
+Nothing is discarded either way; `git -C ~/.sdpm/checkout stash list` shows what was set
+aside. From 0.13.0 on, `sdpm update` sets such changes aside by itself. If it still stops
+("could not fast-forward main"), the checkout has commits of its own or an untracked file
+where `main` now has one; git's message above names them, and nothing was discarded.
 
 ## Next steps
 

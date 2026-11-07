@@ -25,7 +25,7 @@ WIN = cc.Target(uv=r"C:\Users\u\.local\bin\uv.exe", checkout=r"C:\Users\u\.sdpm\
 def test_server_config_is_absolute_uv_plus_checkout_posix():
     assert cc.server_config(POSIX) == {
         "command": "/home/u/.local/bin/uv",
-        "args": ["run", "--directory", "/home/u/.sdpm/checkout/servers/local", "python", "server.py"],
+        "args": ["run", "--directory", "/home/u/.sdpm/checkout/servers/local", "--frozen", "python", "server.py"],
     }
 
 
@@ -116,6 +116,88 @@ def test_write_kiro_agent_creates_refreshes_and_respects_foreign_file(tmp_path, 
     assert cc.kiro_agent_registered(root=tmp_path) is False
     cc.remove_kiro_agent(root=tmp_path)
     assert path.exists()  # still theirs
+
+
+# What kirocrew and kiro-cli's own conversion add to an agent file, as found on a machine
+# after `sdpm update` (#529) had dropped them: another MCP server and its tool, shell
+# settings for kiro-cli 2.x and their 3.x rules, kiroUpgrade.
+FOREIGN_SERVER = {"command": "/opt/aim", "args": ["mcp", "start-server", "creds"], "x-kirocrew": {"managed": True}}
+DENY_V2 = {"deniedCommands": ["git reset --hard.*"]}
+DENY_V3 = {"capability": "shell", "match": ["git reset --hard*"], "effect": "deny"}
+
+
+def _agent_with_additions(target: cc.Target) -> dict:
+    agent = cc.kiro_agent_definition(target)
+    agent["mcpServers"]["sdpm"]["env"] = {"SDPM_X": "1"}
+    agent["mcpServers"]["creds-agent"] = FOREIGN_SERVER
+    agent["tools"] = ["@creds-agent", *agent["tools"], "web"]
+    agent["toolsSettings"]["execute_bash"] = DENY_V2
+    agent["toolsSettings"]["shell"] = DENY_V2
+    agent["permissions"]["rules"] = [DENY_V3, *agent["permissions"]["rules"], {"capability": "skill", "effect": "allow"}]
+    agent["kiroUpgrade"] = {"revision": 2, "fingerprint": "sha256:x"}
+    return agent
+
+
+def test_write_kiro_agent_keeps_what_other_tools_added(tmp_path, monkeypatch):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    path = tmp_path / "agents" / "sdpm.json"
+    path.parent.mkdir()
+    path.write_text(json.dumps(_agent_with_additions(POSIX)))
+    moved = cc.Target(uv="/new/uv", checkout="/new/checkout", platform="linux")
+    assert cc.write_kiro_agent(moved, root=tmp_path) == 0
+    agent = json.loads(path.read_text())
+    ours = cc.kiro_agent_definition(moved)
+    # Ours, brought up to date.
+    assert agent["mcpServers"]["sdpm"] == {**ours["mcpServers"]["sdpm"], "env": {"SDPM_X": "1"}}
+    assert all(t in agent["tools"] for t in ours["tools"])
+    assert all(r in agent["permissions"]["rules"] for r in ours["permissions"]["rules"])
+    # Theirs, untouched and in their place.
+    assert agent["mcpServers"]["creds-agent"] == FOREIGN_SERVER
+    assert agent["tools"][0] == "@creds-agent" and "web" in agent["tools"]
+    assert agent["toolsSettings"]["execute_bash"] == DENY_V2 and agent["toolsSettings"]["shell"] == DENY_V2
+    assert agent["permissions"]["rules"][0] == DENY_V3
+    assert {"capability": "skill", "effect": "allow"} in agent["permissions"]["rules"]
+    assert agent["kiroUpgrade"] == {"revision": 2, "fingerprint": "sha256:x"}
+    # Writing again changes nothing (no duplicated entries).
+    before = path.read_text()
+    assert cc.write_kiro_agent(moved, root=tmp_path) == 0
+    assert path.read_text() == before
+
+
+def test_write_kiro_agent_gives_v2_additions_their_v3_rule(tmp_path, monkeypatch):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    path = tmp_path / "agents" / "sdpm.json"
+    path.parent.mkdir()
+    old = {"name": "sdpm", "description": "SDPM " + cc.KIRO_AGENT_MARKER,
+           "mcpServers": {"creds-agent": FOREIGN_SERVER}, "tools": ["@sdpm", "@creds-agent"],
+           "allowedTools": ["@sdpm", "@creds-agent"],
+           "toolsSettings": {"subagent": {"availableAgents": ["sdpm", "helper"], "trustedAgents": ["sdpm", "helper"]}}}
+    path.write_text(json.dumps(old))
+    assert cc.write_kiro_agent(POSIX, root=tmp_path) == 0
+    agent = json.loads(path.read_text())
+    rules = agent["permissions"]["rules"]
+    # Trusted in 2.x, so trusted in 3.x: the meaning is kept, not widened or dropped.
+    assert {"capability": "mcp", "match": ["creds-agent/*"], "effect": "allow"} in rules
+    assert {"capability": "subagent", "match": ["helper"], "effect": "allow"} in rules
+    assert agent["allowedTools"][:2] == ["@sdpm", "@creds-agent"]
+    assert agent["toolsSettings"]["subagent"]["trustedAgents"] == ["sdpm", "helper"]
+    assert agent["mcpServers"]["creds-agent"] == FOREIGN_SERVER
+
+
+def test_write_kiro_agent_leaves_v2_additions_without_a_v3_form_and_names_them(tmp_path, monkeypatch, capsys):
+    # Writing `permissions` would make kiro-cli 3.x ignore the 2.x deny list: a denied command would run.
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    path = tmp_path / "agents" / "sdpm.json"
+    path.parent.mkdir()
+    old = {"name": "sdpm", "description": "SDPM " + cc.KIRO_AGENT_MARKER, "tools": ["@sdpm", "execute_bash"],
+           "allowedTools": ["@sdpm", "execute_bash"], "toolsSettings": {"execute_bash": DENY_V2}}
+    path.write_text(json.dumps(old))
+    assert cc.write_kiro_agent(POSIX, root=tmp_path) == 0
+    assert json.loads(path.read_text()) == old
+    out = capsys.readouterr().out
+    assert "allowedTools: execute_bash" in out and "toolsSettings.execute_bash" in out
+    assert "left" in out and "sdpm register kiro-cli" in out
+    assert cc.kiro_agent_registered(root=tmp_path) is True  # still ours; unregister removes it
 
 
 def test_write_kiro_agent_dry_run_and_remove(tmp_path, monkeypatch, capsys):
@@ -419,6 +501,22 @@ def test_refresh_registrations_registers_again_only_what_is_registered(monkeypat
     assert removed == [["claude", "mcp", "remove", "--scope", "user", "sdpm"]]  # `mcp add` refuses an existing name
     assert added == [cc.by_id("claude-code").register(POSIX)]
     assert [c.id for c in missing] == ["codex"]  # found, not registered: named, never added
+
+
+def test_refresh_register_missing_adds_the_clients_without_the_server(monkeypatch, tmp_path, capsys):
+    # The installer's --register over an existing install: refresh, then add what is missing.
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    checkout = tmp_path / "checkout"
+    checkout.mkdir()
+    target = cc.Target(uv=POSIX.uv, checkout=str(checkout), platform="linux")
+    here = f"sdpm: {target.uv} run --directory {target.server_dir} --frozen python server.py - ✓ Connected\n"
+    _listing(monkeypatch, {"claude-code": here, "codex": CODEX_NONE})
+    added = []
+    rc = cc.refresh(target, launcher=None, since=None, clients=[cc.by_id("claude-code"), cc.by_id("codex")],
+                    run=lambda a: (added.append(a), 0)[1], run_quiet=lambda a: 0, register_missing=True)
+    assert rc == 0
+    assert added == [cc.by_id("claude-code").register(target), cc.by_id("codex").register(target)]
+    assert "add with: sdpm register" not in capsys.readouterr().out
 
 
 def test_refresh_registrations_leaves_an_entry_for_another_checkout_alone(monkeypatch, tmp_path):

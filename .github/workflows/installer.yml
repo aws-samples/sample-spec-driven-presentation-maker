@@ -6,6 +6,9 @@ on:
     paths:
       - "scripts/install/**"
       - "servers/local/client_config.py"
+      - "servers/local/checkout_update.py"
+      - "web-ui/package.json"
+      - "web-ui/scripts/**"
       - "sdpm/sdpm/_launcher_bridge.py"
       - "sdpm/sdpm/knowledge/assets/download.py"
       - "servers/local/pyproject.toml"
@@ -16,6 +19,9 @@ on:
     paths:
       - "scripts/install/**"
       - "servers/local/client_config.py"
+      - "servers/local/checkout_update.py"
+      - "web-ui/package.json"
+      - "web-ui/scripts/**"
       - "sdpm/sdpm/_launcher_bridge.py"
       - "sdpm/sdpm/knowledge/assets/download.py"
       - "servers/local/pyproject.toml"
@@ -69,6 +75,11 @@ jobs:
           echo "SDPM_HOME=$SDPM_HOME" >> "$GITHUB_ENV"; echo "SDPM_LAUNCHER_DIR=$SDPM_LAUNCHER_DIR" >> "$GITHUB_ENV"
           export PATH="$HOME/.local/bin:$PATH"
           bash scripts/install/dist/install.sh --mcp-only --non-interactive --skip-libreoffice --no-register
+      - name: The install leaves the checkout's files as committed
+        shell: bash
+        run: |
+          git -C "$SDPM_HOME/checkout" status --porcelain | tee status.txt
+          test ! -s status.txt
       - name: Launcher — status, config, dry-run registration
         shell: bash
         run: |
@@ -134,6 +145,47 @@ jobs:
           "$SDPM_LAUNCHER_DIR/sdpm" update | tee update2.log
           if grep -q "(once" update2.log; then echo "the bridge ran for a new launcher" >&2; exit 1; fi
           grep -q "sdpm command: up to date" update2.log
+      # A real install that stopped (1c618b58): its tools had rewritten sdpm/uv.lock, which
+      # main deletes, and web-ui/next-env.d.ts. The #397 launcher's pull stops there; both
+      # documented recoveries and the new launcher's own update get past it, losing nothing.
+      - name: Update from a checkout with changed tracked files
+        shell: bash
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export KIRO_HOME="$(mktemp -d)/kiro"
+          checkout="$SDPM_HOME/checkout"; sdpm="$SDPM_LAUNCHER_DIR/sdpm"; head="$(git rev-parse HEAD)"
+          changed() {
+            git -C "$checkout" reset -q --hard 1c618b58
+            echo "# rewritten by uv" >> "$checkout/sdpm/uv.lock"
+            echo "// rewritten by next build" >> "$checkout/web-ui/next-env.d.ts"
+            git show 7c53267d:scripts/install/launcher.sh > "$sdpm"
+          }
+          updated() {
+            test "$(git -C "$checkout" rev-parse HEAD)" = "$head"
+            test -z "$(git -C "$checkout" status --porcelain)"
+            git -C "$checkout" show "stash@{0}:sdpm/uv.lock" | grep -q "rewritten by uv"   # set aside, not lost
+            grep -q "checkout_update.py" "$sdpm"   # the new launcher
+          }
+          # The #397 launcher stops, with the lines the troubleshooting entry quotes.
+          changed
+          if "$sdpm" update > old.log 2>&1; then cat old.log; echo "the old update did not stop" >&2; exit 1; fi
+          grep -q "Your local changes to the following files would be overwritten" old.log
+          grep -q "SDPM update failed while Fast-forwarding main" old.log
+          # Recovery 1: the documented line.
+          git -C "$checkout" -c user.name=sdpm -c user.email=sdpm@localhost stash && "$sdpm" update
+          updated
+          # Recovery 2: the installer again, without a profile option (it keeps mcp-only).
+          changed
+          bash scripts/install/dist/install.sh --non-interactive --skip-libreoffice | tee reinstall.log
+          updated
+          test "$(cat "$SDPM_HOME/.profile")" = mcp
+          grep -q "were set aside" reinstall.log
+          # The new launcher needs neither.
+          changed; cp scripts/install/launcher.sh "$sdpm"
+          "$sdpm" update | tee new.log
+          updated
+          grep -q "were set aside" new.log && grep -q "stash apply" new.log
+          python3 scripts/install/mcp_smoke.py "$sdpm" mcp
 
   full-profile:
     runs-on: ubuntu-latest
@@ -162,6 +214,18 @@ jobs:
           test "$(cat "$SDPM_HOME/.profile")" = full
           "$SDPM_LAUNCHER_DIR/sdpm" | tee status.log
           grep -q "webui      installed" status.log
+      # The Web UI build used to rewrite web-ui/next-env.d.ts, which stopped the next update.
+      - name: Install and update leave the checkout's files as committed
+        shell: bash
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          export KIRO_HOME="$(mktemp -d)/kiro"
+          git -C "$SDPM_HOME/checkout" status --porcelain | tee status.txt
+          test ! -s status.txt
+          "$SDPM_LAUNCHER_DIR/sdpm" update
+          git -C "$SDPM_HOME/checkout" status --porcelain | tee status.txt
+          test ! -s status.txt
+          test -z "$(git -C "$SDPM_HOME/checkout" stash list)"
 
   windows:
     runs-on: windows-latest
@@ -241,3 +305,50 @@ jobs:
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (Select-String -Path update2.log -SimpleMatch "(once" -Quiet) { throw "the bridge ran for a new launcher" }
           if (-not (Select-String -Path update2.log -SimpleMatch "sdpm command: up to date" -Quiet)) { throw "launcher refreshed twice" }
+      # A real install that stopped (1c618b58); see the unix job.
+      - name: Update from a checkout with changed tracked files
+        shell: pwsh
+        run: |
+          $ErrorActionPreference = "Continue"
+          $env:KIRO_HOME = Join-Path ([IO.Path]::GetTempPath()) ("kiro-" + [guid]::NewGuid())
+          $checkout = Join-Path $env:SDPM_HOME "checkout"
+          $launcher = Join-Path $env:SDPM_LAUNCHER_DIR "sdpm.ps1"
+          $sdpm = Join-Path $env:SDPM_LAUNCHER_DIR "sdpm.cmd"
+          $head = (git rev-parse HEAD).Trim()
+          function Set-Changed {
+            git -C $checkout reset -q --hard 1c618b58
+            Add-Content -Path (Join-Path $checkout "sdpm\uv.lock") -Value "# rewritten by uv"
+            Add-Content -Path (Join-Path $checkout "web-ui\next-env.d.ts") -Value "// rewritten by next build"
+            git show "7c53267d:scripts/install/launcher.ps1" | Set-Content -Path $launcher -Encoding UTF8
+          }
+          function Assert-Updated {
+            if ((git -C $checkout rev-parse HEAD).Trim() -ne $head) { throw "not at main" }
+            if (git -C $checkout status --porcelain) { git -C $checkout status; throw "checkout has changes" }
+            if (-not ((git -C $checkout show "stash@{0}:sdpm/uv.lock") -match "rewritten by uv")) { throw "changes lost" }
+            if (-not (Select-String -Path $launcher -SimpleMatch "checkout_update.py" -Quiet)) { throw "old launcher" }
+          }
+          # The #397 launcher stops, with the lines the troubleshooting entry quotes.
+          Set-Changed
+          & $sdpm update *>&1 | Tee-Object -FilePath old.log
+          if ($LASTEXITCODE -eq 0) { throw "the old update did not stop" }
+          if (-not (Select-String -Path old.log -SimpleMatch "Your local changes to the following files would be overwritten" -Quiet)) { throw "no git message" }
+          if (-not (Select-String -Path old.log -SimpleMatch "SDPM update failed while Fast-forwarding main" -Quiet)) { throw "no launcher message" }
+          # Recovery 1: the documented line.
+          git -C $checkout -c user.name=sdpm -c user.email=sdpm@localhost stash; & $sdpm update
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Assert-Updated
+          # Recovery 2: the installer again, without a profile switch (it keeps mcp-only).
+          Set-Changed
+          & ./scripts/install/dist/install.ps1 -NonInteractive -SkipLibreOffice *>&1 | Tee-Object -FilePath reinstall.log
+          Assert-Updated
+          if ((Get-Content (Join-Path $env:SDPM_HOME ".profile") -Raw).Trim() -ne "mcp") { throw "profile not kept" }
+          if (-not (Select-String -Path reinstall.log -SimpleMatch "were set aside" -Quiet)) { throw "no stash notice" }
+          # The new launcher needs neither.
+          Set-Changed
+          Copy-Item (Join-Path $checkout "scripts\install\launcher.ps1") $launcher -Force
+          & $sdpm update | Tee-Object -FilePath new.log
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+          Assert-Updated
+          if (-not (Select-String -Path new.log -SimpleMatch "stash apply" -Quiet)) { throw "no stash notice" }
+          python scripts/install/mcp_smoke.py $sdpm mcp
+          if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

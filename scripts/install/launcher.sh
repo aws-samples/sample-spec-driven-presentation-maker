@@ -6,8 +6,10 @@
 #   sdpm webui      browser surface
 #   sdpm mcp        MCP surface (for a terminal check; clients get the uv command directly)
 #   sdpm register   wire the MCP server into the clients on this machine
-#   sdpm update     pull, sync, rebuild, then client_config.py refresh — which replaces
-#                   this file with the checkout's launcher.sh and re-registers the clients
+#   sdpm update     fetch, hand over to the fetched checkout_update.py (local changes go to
+#                   a git stash, then fast-forward), sync, rebuild, then client_config.py
+#                   refresh — which replaces this file with the checkout's launcher.sh and
+#                   re-registers the clients
 # Anything that could drift between this file and launcher.ps1 (client detection,
 # configuration rendering, registration commands) lives once in
 # servers/local/client_config.py; both launchers only delegate to it.
@@ -55,21 +57,24 @@ resolve_uv() {
   echo "$found"
 }
 
+# uv never rewrites the lockfile here (--frozen): a tracked file changed in the checkout
+# would stop the next `sdpm update`.
+
 # Run a Python entry point inside the local server's environment (no stdout of our own).
 py() {
   local uv; uv=$(resolve_uv) || exit 1
-  exec "$uv" run --directory "$CHECKOUT/servers/local" python "$@"
+  exec "$uv" run --frozen --directory "$CHECKOUT/servers/local" python "$@"
 }
 
 # client_config.py, told exactly which uv and checkout the clients must point at.
 cfg() {
   local uv; uv=$(resolve_uv) || exit 1
-  exec "$uv" run --directory "$CHECKOUT/servers/local" python client_config.py --uv "$uv" --checkout "$CHECKOUT" "$@"
+  exec "$uv" run --frozen --directory "$CHECKOUT/servers/local" python client_config.py --uv "$uv" --checkout "$CHECKOUT" "$@"
 }
 
 cfg_call() {
   local uv; uv=$(resolve_uv) || return 1
-  "$uv" run --directory "$CHECKOUT/servers/local" python client_config.py --uv "$uv" --checkout "$CHECKOUT" "$@"
+  "$uv" run --frozen --directory "$CHECKOUT/servers/local" python client_config.py --uv "$uv" --checkout "$CHECKOUT" "$@"
 }
 
 # ---------------------------------------------------------------------------
@@ -139,7 +144,21 @@ step() {
 
 build_mcp() {
   local uv; uv=$(resolve_uv) || return 1
-  step "Syncing the MCP server environment" update "$uv" sync --directory "$CHECKOUT/servers/local" || return $?
+  step "Syncing the MCP server environment" update "$uv" sync --frozen --directory "$CHECKOUT/servers/local" || return $?
+}
+
+# checkout_update.py as of the fetched main, run before anything is checked out: it moves
+# local changes to a git stash (never discards them) and fast-forwards. The newest version
+# of that step runs even over an old checkout; this file only fetches and hands over.
+fast_forward() {
+  local uv tmp status
+  uv=$(resolve_uv) || return 1
+  tmp=$(mktemp -d) || return 1
+  git -C "$CHECKOUT" --work-tree="$tmp" restore --source=FETCH_HEAD --worktree -- servers/local/checkout_update.py &&
+    "$uv" run --no-project python "$tmp/servers/local/checkout_update.py" --checkout "$CHECKOUT" pull
+  status=$?
+  rm -rf "$tmp"
+  return "$status"
 }
 
 build_webui() {
@@ -154,8 +173,7 @@ update() {
   before=$(git -C "$CHECKOUT" rev-parse HEAD 2>/dev/null || true)
   echo "> Fetching main from $REPO_URL"
   step "Fetching main" update git -C "$CHECKOUT" fetch --tags --prune origin main || return $?
-  step "Checking out main" update git -C "$CHECKOUT" checkout -q main || return $?
-  step "Fast-forwarding main" update git -C "$CHECKOUT" pull -q --ff-only origin main || return $?
+  step "Fast-forwarding main" update fast_forward || return $?
   build_mcp || return $?
   if [[ "$with_webui" -eq 1 ]]; then
     command -v npm >/dev/null 2>&1 || { echo "Node.js 20+ is required for the Web UI: https://nodejs.org/" >&2; return 1; }
@@ -233,7 +251,7 @@ case "${1:-}" in
   unregister) shift; require_checkout; cfg unregister "$@" ;;
   mcp-config) shift; require_checkout; cfg print "$@" ;;
   update) shift; update "$@" ;;
-  doctor) require_checkout; (cd "$CHECKOUT" && make doctor) ;;
+  doctor) require_checkout; uv=$(resolve_uv) || exit 1; (cd "$CHECKOUT" && "$uv" run --frozen python scripts/doctor.py) ;;
   uninstall) uninstall ;;
   version|--version|-v) version ;;
   path) echo "$CHECKOUT" ;;

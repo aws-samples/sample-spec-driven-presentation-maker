@@ -60,10 +60,14 @@ class Target:
 
 
 def server_config(target: Target) -> dict:
-    """The stdio server definition every client receives (R3.1)."""
+    """The stdio server definition every client receives (R3.1).
+
+    ``--frozen``: uv uses the lockfile as it is and never rewrites it. A tracked file the
+    server's start changed in the checkout would get in the way of the next ``sdpm update``.
+    """
     return {
         "command": target.uv,
-        "args": ["run", "--directory", target.server_dir, "python", "server.py"],
+        "args": ["run", "--directory", target.server_dir, "--frozen", "python", "server.py"],
     }
 
 
@@ -174,16 +178,115 @@ def _is_our_agent_file(path: Path) -> bool:
         return False
 
 
+def _as_list(value: object) -> list:
+    return list(value) if isinstance(value, list) else []
+
+
+def _as_dict(value: object) -> dict:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _with(existing: list, ours: list) -> list:
+    """``existing`` in its order, then each of ``ours`` it does not have yet."""
+    merged = list(existing)
+    merged.extend(item for item in ours if item not in existing)
+    return merged
+
+
+def _v3_form_of_added_v2(current: dict, name: str) -> tuple[list[dict], list[str]]:
+    """For a file without ``permissions`` (only the V2 engine's fields): the V3 permission
+    rules for what other tools added to ``allowedTools`` / ``toolsSettings``, and the names
+    of the additions that have no rule with the same meaning sdpm can write.
+
+    Writing ``permissions`` makes the V3 engine read only that, so an addition without its
+    rule would silently stop applying there (a denied command would run, say).
+    """
+    rules: list[dict] = []
+    unmatched: list[str] = []
+    for tool in _as_list(current.get("allowedTools")):
+        if tool in _KIRO_AGENT_TOOLS:
+            continue
+        if isinstance(tool, str) and tool.startswith("@") and "/" not in tool and len(tool) > 1:
+            rules.append({"capability": "mcp", "match": [f"{tool[1:]}/*"], "effect": "allow"})
+        else:
+            unmatched.append(f"allowedTools: {tool}")
+    settings = _as_dict(current.get("toolsSettings"))
+    for key in settings:
+        if key != "subagent":
+            unmatched.append(f"toolsSettings.{key}")
+    subagent = _as_dict(settings.get("subagent"))
+    for key in subagent:
+        if key not in ("availableAgents", "trustedAgents"):
+            unmatched.append(f"toolsSettings.subagent.{key}")
+    for agent in _as_list(subagent.get("trustedAgents")):
+        if agent != name:
+            rules.append({"capability": "subagent", "match": [agent], "effect": "allow"})
+    return rules, unmatched
+
+
+def merged_kiro_agent(current: object, t: Target, name: str = DEFAULT_KIRO_AGENT) -> tuple[Optional[dict], list[str]]:
+    """Our definition applied to the file as it is: the keys and entries sdpm owns (name,
+    description, the ``sdpm`` server, its tools, allowed tools, subagent settings and
+    permission rules) are brought up to date; everything else another tool or Kiro added
+    (other MCP servers and tools, other tools' settings, ``kiroUpgrade``, …) stays.
+
+    Returns ``(None, names)`` when the file has only V2 fields and some of those additions
+    cannot be given their V3 form with the same meaning: then the file is not rewritten.
+    """
+    ours = kiro_agent_definition(t, name)
+    if not isinstance(current, dict):
+        return ours, []
+    extra_rules: list[dict] = []
+    if "permissions" not in current:
+        extra_rules, unmatched = _v3_form_of_added_v2(current, name)
+        if unmatched:
+            return None, unmatched
+    merged = dict(current)
+    merged["name"] = ours["name"]
+    merged["description"] = ours["description"]
+    servers = _as_dict(current.get("mcpServers"))
+    servers[SERVER_NAME] = {**_as_dict(servers.get(SERVER_NAME)), **ours["mcpServers"][SERVER_NAME]}
+    merged["mcpServers"] = servers
+    merged["tools"] = _with(_as_list(current.get("tools")), ours["tools"])
+    merged["allowedTools"] = _with(_as_list(current.get("allowedTools")), ours["allowedTools"])
+    settings = _as_dict(current.get("toolsSettings"))
+    subagent = _as_dict(settings.get("subagent"))
+    for key, value in ours["toolsSettings"]["subagent"].items():
+        subagent[key] = _with(_as_list(subagent.get(key)), value)
+    settings["subagent"] = subagent
+    merged["toolsSettings"] = settings
+    permissions = _as_dict(current.get("permissions"))
+    permissions["rules"] = _with(_as_list(permissions.get("rules")), [*ours["permissions"]["rules"], *extra_rules])
+    merged["permissions"] = permissions
+    if not isinstance(merged.get("resources"), list):
+        merged["resources"] = ours["resources"]
+    return merged, []
+
+
 def write_kiro_agent(t: Target, *, name: str = DEFAULT_KIRO_AGENT, dry_run: bool = False,
                      root: Optional[Path] = None) -> int:
-    """Create or refresh the agent file we own. A user's own agent of that name is left alone."""
+    """Create or refresh the agent file we own. A user's own agent of that name is left alone;
+    in ours, what other tools added is kept (:func:`merged_kiro_agent`)."""
     path = kiro_agent_path(name, root)
     if path.exists() and not _is_our_agent_file(path):
         print(f"{path} exists and is not managed by sdpm — leaving it alone.")
         print("  Use `sdpm register kiro-cli --agent-name <other>` or add the server to that agent yourself:")
         print("  " + json.dumps(server_config(t)))
         return 0
-    text = json.dumps(kiro_agent_definition(t, name), indent=2, ensure_ascii=False) + "\n"
+    current: object = None
+    if path.exists():
+        try:
+            current = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            current = None  # ours by its marker, but unreadable: write it new
+    agent, unmatched = merged_kiro_agent(current, t, name)
+    if agent is None:
+        print(f"{path} has settings another tool added for kiro-cli 2.x only: {', '.join(unmatched)}.")
+        print("  sdpm cannot write their kiro-cli 3.x form (permissions) with the same meaning, so it left")
+        print("  the file as it is. Move them into `permissions` (or remove them), then run")
+        print(f"  `sdpm register kiro-cli`. The sdpm server it should run: {json.dumps(server_config(t))}")
+        return 0
+    text = json.dumps(agent, indent=2, ensure_ascii=False) + "\n"
     if dry_run:
         print("[dry-run] write " + str(path))
         return 0
@@ -897,8 +1000,13 @@ def refresh(
     run: Callable[[list[str]], int] = _run,
     run_quiet: Callable[[list[str]], int] = _run_quiet,
     clients: Optional[list[Client]] = None,
+    register_missing: bool = False,
 ) -> int:
-    """The end of ``sdpm update``: launcher, registered clients, leftovers, upgrading notes."""
+    """The end of ``sdpm update``: launcher, registered clients, leftovers, upgrading notes.
+
+    ``register_missing`` (the installer's ``--register`` over an existing install) also
+    registers the detected clients that do not have the server yet.
+    """
     checkout = Path(target.checkout)
     if launcher is not None:
         print(f"  sdpm command: {refresh_launcher(launcher, checkout)}")
@@ -906,7 +1014,9 @@ def refresh(
                                                          run=run, run_quiet=run_quiet)
     for client in elsewhere:
         print(f"  {client.label}: its {SERVER_NAME} server runs another checkout — left alone")
-    if missing:
+    if missing and register_missing:
+        failures += register(missing, target, run=run, agent_name=agent_name, chosen=missing, cleanup=False)
+    elif missing:
         print(f"  Also found {', '.join(c.label for c in missing)} — add with: "
               f"sdpm register {' '.join(c.id for c in missing)}")
     remove_leftovers(update_leftovers(checkout, agent_name))
@@ -978,6 +1088,8 @@ def main(argv: Optional[list[str]] = None) -> int:
     p = sub.add_parser("refresh", help="end of `sdpm update`: launcher, registered clients, leftovers, notes")
     p.add_argument("--launcher", help="the installed sdpm command to replace with the checkout's launcher")
     p.add_argument("--since", help="commit the update started from (selects the upgrading notes)")
+    p.add_argument("--register-missing", action="store_true",
+                   help="also register the detected clients that do not have the server")
     agent_name_option(p)
 
     args = parser.parse_args(argv)
@@ -1014,7 +1126,7 @@ def main(argv: Optional[list[str]] = None) -> int:
 
     if args.command == "refresh":
         return refresh(target, launcher=Path(args.launcher).absolute() if args.launcher else None,
-                       since=args.since, agent_name=args.agent_name)
+                       since=args.since, agent_name=args.agent_name, register_missing=args.register_missing)
 
     if args.command == "status":
         clients = detect()
