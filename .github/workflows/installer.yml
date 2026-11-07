@@ -345,7 +345,7 @@ jobs:
           if (-not (Select-String -Path reinstall.log -SimpleMatch "were set aside" -Quiet)) { throw "no stash notice" }
           # The new launcher needs neither.
           Set-Changed
-          Copy-Item (Join-Path $checkout "scripts\install\launcher.ps1") $launcher -Force
+          Copy-Item scripts\install\launcher.ps1 $launcher -Force
           & $sdpm update | Tee-Object -FilePath new.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Assert-Updated
