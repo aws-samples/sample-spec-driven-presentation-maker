@@ -34,6 +34,7 @@ import { SessionPickerDialog } from "./SessionPickerDialog"
 import { ContinuedFromChip } from "./ContinuedFromChip"
 import { EngineBadge } from "./EngineBadge"
 import { ForkProgressCard } from "./ForkProgressCard"
+import { LocalModelPicker } from "./LocalModelPicker"
 import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
 import { toast } from "sonner"
@@ -815,6 +816,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           onTextareaFocus={slashPickerItems.ensure}
           onInputChange={handleInputChange}
         >
+          {/* Local: this chat's kiro-cli model and effort */}
+          {IS_LOCAL && (
+            <div className="px-2 pt-1">
+              <LocalModelPicker
+                sessionId={sessionId}
+                isNewChat={deckId === "new" && stream.messages.length === 0}
+                busy={isLoading}
+                disabled={forkingSession !== null || reconnectLoading}
+              />
+            </div>
+          )}
           {/* Options expander — the only option (web images) is cloud-only */}
           {!IS_LOCAL && (
           <div className="px-2">
