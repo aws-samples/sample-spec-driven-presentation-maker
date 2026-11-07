@@ -943,6 +943,11 @@ class TimingWriter:
         self._index = index
         self.slide_slug = slide_slug or registry.slide_slug
         self.effect_ids: list[tuple[str, int]] = []
+        #: ``(sequence id, p:cTn/@id)`` for each interactive sequence. An
+        #: interactive sequence has no PowerPoint-side identity of its own —
+        #: only a trigger shape and a position — so without this its author's
+        #: label is lost on read and comes back as ``interactive-<ordinal>``.
+        self.sequence_ids: list[tuple[str, int]] = []
         self.max_ctn_id = 0
         self._next_id = 1
         self._effect_ids = EffectIdAllocator()
@@ -1003,7 +1008,7 @@ class TimingWriter:
 
         if self._builds:
             timing.append(self._build_list())
-        if self.effect_ids:
+        if self.effect_ids or self.sequence_ids:
             timing.append(self._effect_id_extension())
         self.max_ctn_id = self._next_id - 1
         return timing
@@ -1043,10 +1048,15 @@ class TimingWriter:
         delay = _int(trigger.get("delayMs") or 0, f"interactive sequence {sequence_id!r} delayMs")
 
         seq = sub(parent, "p:seq", concurrent="1", nextAc="seek")
+        # Keep the id: the extension below maps it back to this sequence's
+        # author-given label. Media cTn renumbering runs only over appended
+        # media nodes, so this value stays the one in the tree.
+        ctn_id = self._id()
+        self.sequence_ids.append((str(sequence_id), ctn_id))
         ctn = sub(
             seq,
             "p:cTn",
-            id=self._id(),
+            id=ctn_id,
             restart="whenNotActive",
             fill="hold",
             # A trigger sequence must not let the click bubble up to the main
@@ -2442,6 +2452,12 @@ class TimingWriter:
 
     # -- effect-ID extension ----------------------------------------------
     def _effect_id_extension(self) -> etree._Element:
+        """Carry the JSON's own labels for effects and interactive sequences.
+
+        ``sdpm:sequences`` is a sibling of ``sdpm:effects`` rather than more
+        entries inside it, so a reader that only knows about effects ignores it
+        instead of mistaking a sequence for an effect.
+        """
         ext_lst = element("p:extLst")
         ext = sub(ext_lst, "p:ext", uri=SDPM_EFFECT_EXT_URI)
         effects = etree.SubElement(ext, "{%s}effects" % SDPM_NS, nsmap={"sdpm": SDPM_NS})
@@ -2449,6 +2465,12 @@ class TimingWriter:
             node = etree.SubElement(effects, "{%s}effect" % SDPM_NS)
             node.set("id", effect_id)
             node.set("cTn", str(ctn_id))
+        if self.sequence_ids:
+            sequences = etree.SubElement(ext, "{%s}sequences" % SDPM_NS)
+            for sequence_id, ctn_id in self.sequence_ids:
+                node = etree.SubElement(sequences, "{%s}sequence" % SDPM_NS)
+                node.set("id", sequence_id)
+                node.set("cTn", str(ctn_id))
         return ext_lst
 
     # -- helpers ----------------------------------------------------------
@@ -2506,6 +2528,7 @@ def write_slide_timing(
         "mediaNodes": len(media_nodes),
         "removedRepresentations": removed,
         "effectIds": [effect_id for effect_id, _ in writer.effect_ids],
+        "sequenceIds": [sequence_id for sequence_id, _ in writer.sequence_ids],
         "maxCTnId": writer.max_ctn_id,
         "catalogLoaded": writer.catalog_loaded,
     }

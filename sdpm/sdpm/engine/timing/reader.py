@@ -1039,6 +1039,8 @@ class _TimingReader:
         self.slide_slug = slide_slug
         self.targets: set[int] = set()
         self._effect_ids = EffectIdAllocator()
+        #: ``p:cTn/@id`` -> interactive sequence label, from the sdpm extension.
+        self._ext_sequence_ids: dict[str, str] = {}
         self._ext_ids: dict[str, str] = {}
         #: ``p:bldLst`` decoded ahead of the sequences, keyed the way the build
         #: list itself keys a build. It has to be decoded first: the writer
@@ -1123,6 +1125,16 @@ class _TimingReader:
                 if not effect_id or not ctn:
                     raise _Unsupported("an sdpm:effect entry is missing its id or cTn")
                 self._ext_ids[ctn] = effect_id
+            # Optional: packages written before interactive sequences carried
+            # their own label have no sdpm:sequences, and fall back to the
+            # positional id.
+            sequences = ext.find(f"{{{SDPM_NS}}}sequences")
+            if sequences is not None:
+                for node in sequences:
+                    sequence_id, ctn = node.get("id"), node.get("cTn")
+                    if not sequence_id or not ctn:
+                        raise _Unsupported("an sdpm:sequence entry is missing its id or cTn")
+                    self._ext_sequence_ids[ctn] = sequence_id
 
     # -- media ---------------------------------------------------------
     def _read_media(self, node: etree._Element) -> None:
@@ -1196,7 +1208,9 @@ class _TimingReader:
         if target_el is None:
             raise _Unsupported("an interactive sequence trigger has no p:tgtEl")
         trigger_target = self._read_target(cond, allow_range=False)
-        sequence_id = f"interactive-{ordinal}"
+        # The author's own label when the package carries it, the positional
+        # name otherwise — a sequence has no other identity in the XML.
+        sequence_id = self._ext_sequence_ids.get(ctn.get("id") or "") or f"interactive-{ordinal}"
         effects = self._read_groups(
             ctn, sequence=f"interactive:{sequence_id}", interactive=True,
             trigger_target=trigger_target,

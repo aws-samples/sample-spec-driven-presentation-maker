@@ -162,10 +162,8 @@ class TestSemanticAnimations:
         }
         assert sequences[0]["effects"][0]["id"] == "boom"
 
-    def test_the_interactive_sequence_id_is_deterministic_without_a_persisted_name(self, tmp_path):
-        """PowerPoint persists no name for a trigger sequence, so the importer
-        numbers them by position rather than inventing one."""
-        motion = _read(_package(tmp_path, _slide(animations={
+    def _two_sequences(self):
+        return {
             "mainSequence": [],
             "interactiveSequences": [
                 {"id": "author-chose-this", "trigger": {"type": "onShapeClick", "target": "hero"},
@@ -174,10 +172,41 @@ class TestSemanticAnimations:
                 {"id": "and-this", "trigger": {"type": "onShapeClick", "target": "aside"},
                  "effects": [_effect("b", start={"type": "withPrevious", "delayMs": 0})]},
             ],
-        })))
+        }
+
+    def test_the_interactive_sequence_keeps_the_name_its_author_gave_it(self, tmp_path):
+        """PowerPoint stores no name for a trigger sequence, so sdpm persists
+        the author's own label in its extension, the way it already does for
+        effect IDs. Without this a sequence came back as ``interactive-0`` and
+        an author's JSON stopped matching itself after a round-trip."""
+        motion = _read(_package(tmp_path, _slide(animations=self._two_sequences())))
+        assert [s["id"] for s in motion.animations["interactiveSequences"]] == [
+            "author-chose-this", "and-this",
+        ]
+
+    def test_the_interactive_sequence_id_is_deterministic_without_a_persisted_name(self, tmp_path):
+        """A package PowerPoint wrote, or one sdpm wrote before it persisted
+        sequence names, carries no ``sdpm:sequences``. Those are still numbered
+        by position rather than given an invented name."""
+        from sdpm.engine.timing.reader import SDPM_NS
+
+        def drop_sequence_names(slide_element):
+            found = slide_element.findall(f".//{{{SDPM_NS}}}sequences")
+            assert found, "the writer should have persisted sequence names to strip"
+            for node in found:
+                node.getparent().remove(node)
+
+        package = _mutate(
+            _package(tmp_path, _slide(animations=self._two_sequences())),
+            drop_sequence_names,
+        )
+        motion = _read(package)
         assert [s["id"] for s in motion.animations["interactiveSequences"]] == [
             "interactive-0", "interactive-1",
         ]
+        # the effect IDs inside them are unaffected: they have their own entries
+        assert [e["id"] for s in motion.animations["interactiveSequences"]
+                for e in s["effects"]] == ["a", "b"]
 
 
 # --- identity --------------------------------------------------------------
