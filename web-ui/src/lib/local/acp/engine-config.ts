@@ -55,11 +55,10 @@ const configPath = () => path.resolve(engineConfigDir(), CONFIG_FILE)
 
 /** Each distinct warning once per server process: the file is read on every kiro-cli start. */
 const warned = new Set<string>()
-function warnOnce(message: string, ...args: unknown[]): void {
-  const key = `${message} ${JSON.stringify(args)}`
-  if (warned.has(key)) return
-  warned.add(key)
-  console.warn(`[acp-config] ${message}`, ...args)
+function warnOnce(message: string): void {
+  if (warned.has(message)) return
+  warned.add(message)
+  console.warn("[acp-config] %s", message)
 }
 
 const isObject = (value: unknown): value is Record<string, unknown> =>
@@ -76,7 +75,7 @@ function readEnv(value: unknown): Record<string, string> {
   const env: Record<string, string> = {}
   for (const [key, entry] of Object.entries(value)) {
     if (typeof entry === "string") env[key] = entry
-    else warnOnce("env.%s is not a string; ignored", key)
+    else warnOnce(`env.${key} is not a string; ignored`)
   }
   return env
 }
@@ -84,7 +83,7 @@ function readEnv(value: unknown): Record<string, string> {
 function readCommand(value: unknown): string {
   if (value === undefined) return DEFAULT_COMMAND
   if (typeof value === "string" && value) return value
-  warnOnce("command is not a non-empty string; using %s", DEFAULT_COMMAND)
+  warnOnce(`command is not a non-empty string; using ${DEFAULT_COMMAND}`)
   return DEFAULT_COMMAND
 }
 
@@ -92,7 +91,7 @@ function fromVersion2(raw: Record<string, unknown>): EngineConfig {
   let engine = DEFAULT_ENGINE
   if (raw.engine !== undefined) {
     if (isEngineId(raw.engine)) engine = raw.engine
-    else warnOnce("engine %j is not one of %s; using %s", raw.engine, ENGINE_IDS.join(", "), DEFAULT_ENGINE)
+    else warnOnce(`engine ${JSON.stringify(raw.engine)} is not one of ${ENGINE_IDS.join(", ")}; using ${DEFAULT_ENGINE}`)
   }
   let commandArgs: string[] = []
   if (raw.commandArgs !== undefined) {
@@ -108,7 +107,7 @@ function fromOldFormat(raw: Record<string, unknown>): EngineConfig {
   const active = agents.find((agent) => agent.id === raw.activeAgent) ?? agents[0]
   if (!active) return defaults()
   if (Array.isArray(active.args) && active.args.length) {
-    warnOnce("the old-format args %j are not used: the agent engine (Settings → Agent engine) sets kiro-cli's arguments", active.args)
+    warnOnce(`the old-format args ${JSON.stringify(active.args)} are not used: the agent engine (Settings → Agent engine) sets kiro-cli's arguments`)
   }
   return { ...defaults(), command: readCommand(active.path), env: readEnv(active.env) }
 }
@@ -124,7 +123,7 @@ function readRaw(): { raw: Record<string, unknown> | null; exists: boolean } {
     const raw: unknown = JSON.parse(text)
     if (isObject(raw)) return { raw, exists: true }
   } catch { /* reported below */ }
-  warnOnce("%s is not a JSON object; using the defaults", configPath())
+  warnOnce(`${configPath()} is not a JSON object; using the defaults`)
   return { raw: null, exists: true }
 }
 
@@ -133,7 +132,7 @@ export function readEngineConfig(): EngineConfig {
   if (!raw) return defaults()
   if (raw.version === undefined) return fromOldFormat(raw)
   if (raw.version !== 2) {
-    warnOnce("%s has version %j, which this app does not read; using the defaults", configPath(), raw.version)
+    warnOnce(`${configPath()} has version ${JSON.stringify(raw.version)}, which this app does not read; using the defaults`)
     return defaults()
   }
   return fromVersion2(raw)
