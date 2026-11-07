@@ -7,7 +7,7 @@
  * process; the size limit counts processes, not keys; a deck's saved kiro session is restored (or
  * its live process reused) under the client's id too, and only ids the process holds are keys;
  * a start that fails (another mode, a failed sdpm server, no sign-in, an early exit) registers
- * nothing; the configured engine starts kiro-cli, and an engine switch ends the idle deck
+ * nothing; the configured engine starts kiro-cli (V3 without acp-config.json), and an engine switch ends the idle deck
  * processes of the other engine (a running one at the end of its turn); a deck's
  * `.session-engine` tells when its session also ran on the other engine; a prompt to a session still answering
  * is refused; a turn ends with the answer to its session/prompt (result or error), whatever the
@@ -191,6 +191,7 @@ beforeEach(async () => {
   })
   configDir = fs.mkdtempSync(path.join(os.tmpdir(), "sdpm-acp-config-")) // nosemgrep: path-join-resolve-traversal — constant prefix
   vi.stubEnv("SDPM_ACP_CONFIG_DIR", configDir)
+  useEngine("v2") // the fake child speaks V2 unless a test chooses V3
   vi.resetModules()
   acp = await import("./acp-process")
 })
@@ -920,6 +921,12 @@ describe("engines", () => {
     useEngine("v2")
     await acp.createNewProcessFor("C2", "sdpm-style")
     expect(spawn.mock.calls[1].slice(0, 2)).toEqual(["kiro-cli", ["acp", "--agent", "sdpm-style"]])
+  })
+
+  it("starts kiro-cli on V3 when acp-config.json does not exist", async () => {
+    fs.rmSync(path.join(configDir, "acp-config.json")) // nosemgrep: path-join-resolve-traversal — constant name in a tmpdir
+    await acp.createNewProcessFor("C1")
+    expect(spawn.mock.calls[0].slice(0, 2)).toEqual(["kiro-cli", ["acp", "--agent-engine", "v3"]])
   })
 
   it("ends only the idle deck processes of another engine when the engine changes", async () => {

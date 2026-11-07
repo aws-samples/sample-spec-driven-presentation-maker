@@ -63,8 +63,8 @@ describe("localService (local mode)", () => {
   })
 
   it("reads the agent engine and saves it with PUT", async () => {
-    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ engine: "v2", default: "v2" }))
-    await expect(getAgentEngine()).resolves.toEqual({ engine: "v2", default: "v2" })
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ engine: "v2", default: "v3" }))
+    await expect(getAgentEngine()).resolves.toEqual({ engine: "v2", default: "v3" })
     await setAgentEngine("v3")
     expect(call(0).url).toBe("/api/agent/engine")
     expect(call(1)).toEqual({ url: "/api/agent/engine", method: "PUT", body: { engine: "v3" } })

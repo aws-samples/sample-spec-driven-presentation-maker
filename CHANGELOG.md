@@ -15,10 +15,48 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Upgrading from 0.12
 
+**If `sdpm update` stops with "Your local changes to the following files would be
+overwritten by merge"** (`sdpm/uv.lock`, `web-ui/next-env.d.ts`): the `sdpm` command of an
+install from before this release cannot get past files its tools rewrote. Run the installer
+again (it keeps your profile, agent name and registered clients), or set the changes aside
+and update again:
+`git -C ~/.sdpm/checkout -c user.name=sdpm -c user.email=sdpm@localhost stash && sdpm update`.
+See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
+
 **Local installs (`sdpm update`).**
 
 - **Kiro CLI.** `sdpm update` has rewritten the `sdpm` agent in the form kiro-cli 2.x and
   3.x both load. Start it as its own agent: `kiro-cli chat --agent sdpm` (or `/agent sdpm`).
+
+**Local Web UI.** These items apply to the browser Web UI on your machine (`sdpm webui`, or
+`npm run dev:local` in `web-ui/`). Each item below is "what changes / what to do".
+
+- **The Local Web UI runs kiro-cli on its V3 agent engine.** New chats and reopened decks
+  start `kiro-cli acp --agent-engine v3`; the sdpm agents run as V3 modes. kiro-cli 3.0 or
+  later is needed. / Nothing if kiro-cli is 3.0 or later (`kiro-cli --version`). To go back
+  to the V2 engine, open Settings → Agent engine and pick V2, or write
+  `{"version": 2, "engine": "v2"}` to `servers/local/.sdpm/acp-config.json`. The setting
+  takes effect from the next message.
+- **Agent definitions are generated in a form both engines read.**
+  `servers/local/.kiro/agents/` now carries `permissions` rules and `subagent/sdpm-composer`,
+  and its marker file is `README.txt` (V3 reads every `.md` there as an agent). / Nothing;
+  the directory is regenerated on the next chat. A definition you added to `acp-agents/`
+  without `permissions` is converted the same way. One that has `permissions` is used as
+  written.
+- **An old `servers/local/.sdpm/acp-config.json` keeps only the command and environment.**
+  Its `args` (for example `--agent sdpm-spec`) are no longer used: V2-only flags would keep
+  kiro-cli on V2. / Nothing. The file is rewritten in the new form the first time you change
+  the engine in Settings, and the old one is kept as `acp-config.v1.json.bak`.
+- **Existing decks keep their conversation.** V3 loads the V2 session a deck's `.session`
+  names and carries its history over. A deck whose session kiro-cli no longer has starts a
+  new one and says so above the reply. / Nothing. If you switch back to V2, decks started
+  under V3 start a new conversation, and decks you continued under V3 resume from where they
+  were before the switch. The two engines keep separate histories after that: switching back
+  and forth, each engine continues from its own last turn in that deck, so the turns made
+  under the other engine are not in its context. When that happens, the chat says so above
+  the reply; the deck files themselves are always up to date.
+- **Your global Kiro steering applies to the sdpm agents.** Rules in `~/.kiro/steering` that
+  are always included reach the sdpm agents' context, under V3 as under V2. / Nothing.
 
 ### Added
 
@@ -39,8 +77,7 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   engine, the chat says so above the reply, since each engine keeps its own history. kiro-cli's
   permission requests are answered automatically only within the safe default: sdpm MCP
   tools and file reads on the deck folder and kiro-cli's `tool-outputs/`, always with the
-  offered allow-once option. / Nothing; V2 stays the default for now. An old
-  `acp-config.json` keeps its command and environment; its `args` are no longer used.
+  offered allow-once option. / See Upgrading from 0.12.
 
 ### Changed
 
@@ -60,6 +97,14 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   installer installs the catalogs, and the MCP server does when they are missing). /
   Nothing. If you installed with `SDPM_LAUNCHER_DIR` and that directory is not on `PATH`,
   set it again for that first update, or run the installer again.
+- **Running the installer over an install keeps its choices.** It uses the install's
+  profile and Kiro agent name unless `--full`, `--mcp-only` or `--agent-name` says
+  otherwise, and instead of the client checklist it registers SDPM again with the clients
+  that have it, removes leftovers and prints the upgrading notes, as `sdpm update` does.
+  `--register` also adds the detected clients without SDPM; `--no-register` touches no
+  client. / Nothing.
+- **Local Web UI runs kiro-cli on its V3 engine by default.** V2 stays selectable in
+  Settings → Agent engine. / See Upgrading from 0.12.
 - **The bundled `aws-light` and `aws-dark` styles have a new content-slide frame.** Every
   content slide now pairs a one-line topic title (a noun phrase) with a lead of up to two
   lines that states the slide's finding, in dark orange (`aws-light`) or amber (`aws-dark`).
@@ -95,6 +140,29 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **`sdpm update` gets past changed files in the checkout.** Tools of earlier versions
+  rewrote tracked files in `~/.sdpm/checkout` (uv `sdpm/uv.lock`, the Web UI build
+  `web-ui/next-env.d.ts`), and the pull then stopped with "Your local changes … would be
+  overwritten". The update now moves changes to tracked files into a git stash named after
+  the update, lists them and prints the `git stash apply` command that brings them back;
+  nothing is reset or cleaned, and untracked files are not touched. The step is
+  `servers/local/checkout_update.py`, run as of the fetched `main` before anything is
+  checked out, so later fixes to it reach old checkouts too. Running the installer over an
+  existing install does the same. Our tools no longer change tracked files: uv runs with
+  `--frozen` in the launcher, the installer and the MCP client configuration (`sdpm update`
+  registers the clients again with it), and the Web UI build (`npm run build`) leaves
+  `web-ui/next-env.d.ts` as committed. / Nothing; an install from before this release, see
+  Upgrading above.
+- **The `sdpm` Kiro agent keeps what other tools added.** `sdpm register kiro-cli` and
+  `sdpm update` rewrote `~/.kiro/agents/sdpm.json` whole, dropping other MCP servers, their
+  tools, other tools' settings (for example `toolsSettings.execute_bash`) and kiro-cli's
+  `kiroUpgrade`. They now update only what SDPM owns (the `sdpm` server, its tools, allowed
+  tools, subagent settings and permission rules) and keep the rest. A file with only
+  kiro-cli 2.x fields gets the 3.x permission rule of each addition that has one with the
+  same meaning (an allowed MCP server, a trusted agent); when an addition has none, such as
+  a 2.x deny list, the file is left as it is and the message names the setting. / Nothing.
+  Settings already dropped by an earlier rewrite have to be added again by the tool that
+  added them.
 - **MCP runtime: OpenTelemetry ids no longer repeat across V2 restores.** Every microVM
   restored from the same snapshot started the `random` module from the same state, so
   OpenTelemetry trace and span ids (and botocore retry jitter) could be identical across
