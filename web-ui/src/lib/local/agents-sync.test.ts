@@ -9,6 +9,7 @@ import {
   SELECTION_DEFAULTS,
   readSelection,
   syncToAgentsDir,
+  withPermissions,
   writeSelection,
   type SyncDirs,
 } from "./agents-sync"
@@ -42,12 +43,19 @@ afterEach(() => {
 })
 
 describe("syncToAgentsDir", () => {
-  it("derives all four roles plus the README marker", () => {
+  it("derives all four roles plus the README marker, as README.txt (V3 reads every .md here as an agent)", () => {
     syncToAgentsDir(readSelection(dirs), dirs)
     const files = fs.readdirSync(dirs.agentsDir).sort()
-    expect(files).toEqual([...ROLES.map((r) => `${r}.json`), "README.md"].sort())
-    expect(fs.readFileSync(path.join(dirs.agentsDir, "README.md"), "utf-8"))
+    expect(files).toEqual([...ROLES.map((r) => `${r}.json`), "README.txt"].sort())
+    expect(fs.readFileSync(path.join(dirs.agentsDir, "README.txt"), "utf-8"))
       .toContain("do not hand-edit")
+  })
+
+  it("replaces an old README.md marker", () => {
+    fs.mkdirSync(dirs.agentsDir, { recursive: true })
+    fs.writeFileSync(path.join(dirs.agentsDir, "README.md"), "old marker")
+    syncToAgentsDir(readSelection(dirs), dirs)
+    expect(fs.readdirSync(dirs.agentsDir)).not.toContain("README.md")
   })
 
   it("applies the selected model, and removes it when unset", () => {
@@ -150,7 +158,7 @@ describe("syncToAgentsDir", () => {
 
     // Old generation fully restored — directory exists, old content, no leftovers
     const files = fs.readdirSync(dirs.agentsDir).sort()
-    expect(files).toEqual([...ROLES.map((r) => `${r}.json`), "README.md"].sort())
+    expect(files).toEqual([...ROLES.map((r) => `${r}.json`), "README.txt"].sort())
     for (const r of ROLES) {
       const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, `${r}.json`), "utf-8"))
       expect(agent.model).toBe("old-model")
@@ -160,7 +168,101 @@ describe("syncToAgentsDir", () => {
   })
 })
 
+/** The orchestrator entry of the catalog, in V2's form. */
+const ORCHESTRATOR_V2 = {
+  name: "sdpm-orchestrator",
+  tools: ["@sdpm/list_styles", "@sdpm/start_presentation", "use_subagent", "read", "glob", "grep", "web_search", "web_fetch"],
+  allowedTools: ["@sdpm/list_styles", "@sdpm/start_presentation", "use_subagent", "read", "glob", "grep", "web_search", "web_fetch"],
+  toolsSettings: { subagent: { availableAgents: ["sdpm-composer"], trustedAgents: ["sdpm-composer"] } },
+  mcpServers: { sdpm: { command: "uv", args: ["run", "python", "server_acp.py"], timeout: 120000 } },
+  prompt: "file://../acp-agents/prompts/orchestrator.md",
+  welcomeMessage: "Drop material",
+  resources: [],
+}
+
+describe("withPermissions (definitions both engines read)", () => {
+  it("keeps the V2 fields, adds subagent/<name> to tools and derives permissions.rules from allowedTools", () => {
+    const converted = withPermissions(ORCHESTRATOR_V2, "sdpm-orchestrator.json")
+    const { tools, permissions, ...rest } = converted
+    expect({ ...rest, tools: ORCHESTRATOR_V2.tools }).toEqual(ORCHESTRATOR_V2)
+    expect(tools).toEqual([...ORCHESTRATOR_V2.tools, "subagent/sdpm-composer"])
+    expect(permissions).toEqual({ rules: [
+      { capability: "mcp", match: ["sdpm/list_styles", "sdpm/start_presentation"], effect: "allow" },
+      { capability: "fs_read", effect: "allow" },
+      { capability: "web_search", effect: "allow" },
+      { capability: "web_fetch", effect: "allow" },
+      { capability: "subagent", match: ["sdpm-composer"], effect: "allow" },
+    ] })
+    expect(ORCHESTRATOR_V2.tools).not.toContain("subagent/sdpm-composer")
+  })
+
+  it("does not add a subagent tool twice and makes no rule for an agent without allowed tools", () => {
+    const converted = withPermissions({ name: "a", tools: ["subagent/x"], toolsSettings: { subagent: { availableAgents: ["x"] } } }, "a.json")
+    expect(converted.tools).toEqual(["subagent/x"])
+    expect(converted.permissions).toEqual({ rules: [] })
+  })
+
+  it("uses an entry that already has permissions as it is", () => {
+    const v3 = { name: "a", tools: ["read"], permissions: { rules: [{ capability: "fs_read", effect: "ask" }] } }
+    expect(withPermissions(v3, "a.json")).toBe(v3)
+  })
+
+  it("makes no rule for an allowed tool V3 has no capability for, with one warning", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      const agent = { name: "a", allowedTools: ["read", "shell"] }
+      expect(withPermissions(agent, "unknown-tool.json").permissions).toEqual({ rules: [{ capability: "fs_read", effect: "allow" }] })
+      withPermissions(agent, "unknown-tool.json")
+      expect(warn).toHaveBeenCalledOnce()
+      expect(String(warn.mock.calls[0][2])).toBe("shell")
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it("ignores a field that is not a list of names, with a warning", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      const converted = withPermissions({ name: "a", tools: "read", allowedTools: ["read"] }, "bad.json")
+      expect(converted.tools).toBe("read")
+      expect(converted.permissions).toEqual({ rules: [{ capability: "fs_read", effect: "allow" }] })
+      expect(warn).toHaveBeenCalledOnce()
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it("is applied to every generated definition", () => {
+    writeCatalogAgent("sdpm-orchestrator", ORCHESTRATOR_V2)
+    syncToAgentsDir(readSelection(dirs), dirs)
+    for (const r of ROLES) {
+      const agent = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, `${r}.json`), "utf-8")) // nosemgrep: path-join-resolve-traversal — constant role names
+      expect(agent.permissions).toBeDefined()
+    }
+    const orchestrator = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-orchestrator.json"), "utf-8"))
+    expect(orchestrator.tools).toContain("subagent/sdpm-composer")
+    expect(orchestrator.allowedTools).toEqual(ORCHESTRATOR_V2.allowedTools)
+  })
+
+  it("refuses to write a definition without permissions, keeping the old output", () => {
+    syncToAgentsDir(readSelection(dirs), dirs)
+    const before = fs.readdirSync(dirs.agentsDir).sort()
+    writeCatalogAgent("sdpm-translate", { permissions: null })
+    expect(() => syncToAgentsDir(readSelection(dirs), dirs)).toThrow(/has no permissions/)
+    expect(fs.readdirSync(dirs.agentsDir).sort()).toEqual(before)
+  })
+})
+
 describe("selection persistence", () => {
+  it("drops keys other than the four roles and the model, on read and on the next write", () => {
+    fs.mkdirSync(path.dirname(dirs.configPath), { recursive: true })
+    fs.writeFileSync(dirs.configPath, JSON.stringify({ spec: "sdpm-spec.json", vibe: "x.json", single: "y.json", composer: "sdpm-composer.json", model: "auto" }))
+    const sel = readSelection(dirs)
+    expect(sel).toEqual({ ...SELECTION_DEFAULTS, model: "auto" })
+    writeSelection({ ...sel, ...({ spec: "z.json" } as object) } as typeof sel, dirs)
+    expect(JSON.parse(fs.readFileSync(dirs.configPath, "utf-8"))).toEqual({ ...SELECTION_DEFAULTS, model: "auto" })
+  })
+
   it("round-trips and merges over defaults", () => {
     writeSelection({ ...SELECTION_DEFAULTS, translate: "my-custom-translate.json", model: "m1" }, dirs)
     const sel = readSelection(dirs)

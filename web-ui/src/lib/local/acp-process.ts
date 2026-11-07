@@ -1,29 +1,53 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ACP Process Manager — manages multiple kiro-cli acp child processes,
- * keyed by sessionId. Enables background processing: switching decks
- * does not interrupt running agents.
+ * ACP Process Manager — manages multiple kiro-cli acp child processes, one conversation each.
+ * Enables background processing: switching decks does not interrupt running agents.
  *
- * A new chat's process is registered under the client-generated id and under
- * its kiro session id (the one saved to the deck's `.session`), so reopening the
- * deck reuses the live process instead of loading the session into a second
- * kiro-cli, which the first one still locks.
+ * Each process is a transport connection (acp/transport.ts), the engine's session for it
+ * (acp/engine.ts; the engine is read from acp-config.json at every start) and the chat's
+ * conversation model (conversation/). Every kiro-cli notification goes through the engine's
+ * `translate`: its MCP events to the process's MCP record (mcp-ready.ts), recorded from the start
+ * so a setup wait never misses one, the rest to the conversation model, whose chat events are
+ * numbered and buffered here (the SSE `id:`, the same for live and replayed events) and handed to
+ * the listeners. A process enters the map only once its session runs the requested agent's mode
+ * and its sdpm server is ready; a start that fails is killed and reported as AgentStartError,
+ * AgentTimeoutError or SessionLockedError.
+ *
+ * Map keys (`register`, the only place that adds them): every client id that uses the process
+ * and its current kiro session id (the one saved to the deck's `.session`), so a second tab or a
+ * reopened deck reuses the live process instead of loading the session into a second kiro-cli,
+ * which the first one still locks. An id the process does not hold (a saved id kiro-cli replaced)
+ * is never a key.
+ *
+ * Decks: a deck a tool result names gets the session's `.session` (and a fork's origin) here,
+ * whether or not a browser is listening; a reopened deck's process is bound to it. Next to
+ * `.session`, `.session-engine` records the engines that ran the session's turns, so a deck
+ * continued on the other engine says so (its turns there are in the other engine's copy). A
+ * deck-bound process whose engine is no longer the configured one is ended once idle (Settings,
+ * or the end of its turn), and the deck's next message opens `.session` on the new engine.
  *
  * Max MAX_PROCESSES concurrent processes. Idle processes are evicted LRU.
  */
-import { spawn, type ChildProcess } from "child_process"
 import path from "path"
 import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
-import { getActiveAgent, type AgentConfig } from "./acp-adapter"
 import { syncToAgentsDir } from "./agents-sync"
+import { adapterFor, type AcpModel, type EngineCapabilities, type EngineId, type EngineSession, type LoadOutcome } from "./acp/engine"
+import { isEngineId, readEngineConfig } from "./acp/engine-config"
+import type { InitializeResponse, PromptResponse } from "./acp/schema"
+import { AcpRequestError, METHOD_NOT_FOUND, spawnAcp, type AcpAnswer, type AcpConnection } from "./acp/transport"
+import { ConversationState } from "./conversation"
+import { data, type BufferedEvent, type ChatEvent, type LocalEvent } from "./conversation/events"
+import { SteerRejectedError, steerEvent, type SteerState } from "./conversation/steer"
+import { turnEnded, turnFailed } from "./conversation/turn"
 import type { ForkSessionPhase, ForkSessionPhaseDetail, SessionOrigin } from "./kiro-sessions.types"
-import { watchMcpServerReady } from "./mcp-ready"
-import { SessionBusyError } from "./sessionErrors"
-import { STEER_EVENT, SteerRejectedError, steerInjection, type SteerInjection } from "./steer"
-import { AgentTimeoutError, TURN_END, TURN_ERROR } from "./turnErrors"
+import { McpRecord, SDPM_MCP_SERVER, waitForMcp } from "./mcp-ready"
+import { SessionBusyError, SessionLockedError } from "./sessionErrors"
+import type { LocalSessionNoticeCode } from "./sessionNotices"
+import { AgentStartError, AgentTimeoutError } from "./turnErrors"
 
 export { DECK_ROOT }
+export type { AcpModel, LoadOutcome }
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 const MAX_PROCESSES = 3
 /** Matches the sdpm server's `timeout` in the ACP agent definitions. */
@@ -38,104 +62,131 @@ const INITIALIZE_TIMEOUT_MS = 30_000
 const SESSION_SETUP_TIMEOUT_MS = MCP_READY_TIMEOUT_MS + 60_000
 /** kiro-cli answers `_session/steer` and `_session/steer/clear` at once (it only queues). */
 const STEER_TIMEOUT_MS = 10_000
-/** JSON-RPC "Method not found", the answer to agent requests this client does not implement. */
-const METHOD_NOT_FOUND = -32601
+/** Chat events kept for a reconnecting stream. */
+const MAX_BUFFERED_EVENTS = 2000
+/** What a deck's `.session` may hold: a kiro session id (V2 UUID, V3 `sess_<uuid>`). */
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 
-type PendingResolve = (value: unknown) => void
-interface PendingRequest {
-  resolve: PendingResolve
-  reject: (reason?: unknown) => void
-}
-type NotifyListener = (msg: Record<string, unknown>) => void
+type EventListener = (entry: BufferedEvent) => void
 
-interface RequestOptions {
-  timeoutMs?: number
-  signal?: AbortSignal
-}
-
-interface SpawnProcessOptions {
-  setMode?: boolean
+interface SpawnOptions {
+  /** Open this saved session instead of creating one. */
+  open?: string
   onPhase?: (phase: ForkSessionPhase, detail?: ForkSessionPhaseDetail) => void
   signal?: AbortSignal
 }
 
 interface ProcessState {
-  child: ChildProcess
+  conn: AcpConnection
+  engine: EngineId
+  session: EngineSession
+  /** What the engine advertised in its initialize answer (null until it answered). */
+  caps: EngineCapabilities | null
+  conversation: ConversationState
+  /** The client id the process was created for (the fork's id for a fork); keys `pendingOrigins`. */
+  clientId: string
+  /** Every client id the process is registered under (`clientId` among them). */
+  clientIds: Set<string>
+  /** The deck this conversation last created or was opened for. */
   deckId: string
+  /** Decks whose `.session` names this process's session. */
+  savedDecks: Set<string>
+  /** The process belongs to a deck: an engine switch ends it once it is idle. */
+  deckBound: boolean
+  /** Its sessions' MCP servers, recorded since kiro-cli started. */
+  mcp: McpRecord
   sessionId: string | null
   agentName: string
-  requestId: number
-  pending: Map<number, PendingRequest>
-  listeners: Set<NotifyListener>
-  lineBuffer: string
+  listeners: Set<EventListener>
   running: boolean
-  /** The child has exited (or failed to spawn); requests to it fail at once. */
-  exited: boolean
   /** A session/prompt request has been sent and has not been answered yet. */
   promptInFlight: boolean
   /** JSON-RPC id of the current turn's session/prompt; its response (result or error) ends the turn. */
   promptRequestId: number | null
-  notifications: { id: number; msg: Record<string, unknown> }[]
-  eventIdCounter: number
+  /** The current turn's chat events, numbered from 1. */
+  buffer: BufferedEvent[]
+  eventId: number
   lastActivity: number
-  /** Sub-agent sessions seen during the current turn; used only as session/cancel targets. */
-  subSessionIds: Set<string>
   /** Turns ended so far; a steer whose turn ended while kiro-cli queued it is taken back. */
   turnsEnded: number
-  /** Steers kiro-cli queued in this turn and has not reported read (lib/local/steer.ts). */
-  steers: PendingSteer[]
   /** A `_session/steer/clear` in flight; the next prompt waits for it. */
   steerClear: Promise<void> | null
   /** Stop was pressed during this turn: a turn that ends now is not continued with its steers. */
   stopRequested: boolean
 }
 
-interface PendingSteer {
-  /** The chat's id for the message. */
-  id: string
-  text: string
-  /** kiro-cli's id for it (V3 answers one; V2 does not). */
-  messageId?: string
-}
-
-/** Map keyed by sessionId; one process may sit under several keys (client id and kiro session id). */
+/** Map keyed by client ids and kiro session ids (`register`). */
 const processes = new Map<string, ProcessState>()
 export const pendingOrigins = new Map<string, SessionOrigin>()
 
 // Model info (shared, populated from first process)
-export interface AcpModel { modelId: string; name: string; description?: string }
 let currentModelId = ""
 let availableModels: AcpModel[] = []
 
 // ── Per-process helpers ──
 
-function writeMessage(ps: ProcessState, msg: Record<string, unknown>): void {
-  if (ps.exited) return
-  ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", ...msg }) + "\n")
+/** Number a chat event, buffer it for /stream reconnects and hand it to every listener. */
+function push(ps: ProcessState, event: ChatEvent): void {
+  const entry: BufferedEvent = { id: ++ps.eventId, event }
+  ps.buffer.push(entry)
+  if (ps.buffer.length > MAX_BUFFERED_EVENTS) ps.buffer.shift()
+  for (const fn of ps.listeners) fn(entry)
 }
 
-/** Buffer an event for /stream reconnects and hand it to every listener. */
-function emit(ps: ProcessState, msg: Record<string, unknown>): void {
-  ps.notifications.push({ id: ++ps.eventIdCounter, msg })
-  if (ps.notifications.length > 2000) ps.notifications.shift()
-  for (const fn of ps.listeners) fn(msg)
+/** One kiro-cli notification: through the engine to the MCP record and the conversation model. */
+function handleNotification(ps: ProcessState, msg: Parameters<EngineSession["translate"]>[0]): void {
+  const events = ps.session.translate(msg)
+  if (!events.length) return
+  const chat: LocalEvent[] = []
+  for (const event of events) {
+    if (event.type === "mcp_status" || event.type === "mcp_snapshot") ps.mcp.apply(event)
+    else chat.push(event)
+  }
+  if (!chat.length) return
+  const { events: out, deckId } = ps.conversation.apply(chat)
+  if (deckId) saveDeck(ps, deckId)
+  for (const event of out) push(ps, event)
+}
+
+/**
+ * A tool result named a deck: write the session to its `.session` once (and a new engine mark),
+ * and the fork's origin to the first deck the conversation creates.
+ */
+function saveDeck(ps: ProcessState, deckId: string): void {
+  if (ps.savedDecks.has(deckId) || !ps.sessionId) return
+  if (!saveSessionToDeck(deckId, ps.sessionId)) return
+  writeEngineMark(deckId, { last: ps.engine, engines: [ps.engine] })
+  ps.savedDecks.add(deckId)
+  ps.deckId = deckId
+  ps.deckBound = true
+  const origin = pendingOrigins.get(ps.clientId)
+  if (origin) {
+    saveOriginToDeck(deckId, origin)
+    pendingOrigins.delete(ps.clientId)
+  }
 }
 
 /** The turn started by sendPrompt is over: release the session and tell the listeners. */
-function endTurn(ps: ProcessState, event: Record<string, unknown>): void {
+function endTurn(ps: ProcessState, end: ChatEvent): void {
   ps.promptRequestId = null
   ps.promptInFlight = false
   ps.running = false
   ps.stopRequested = false
   ps.turnsEnded++
-  ps.subSessionIds.clear()
+  ps.session.endTurn()
   discardSteers(ps)
-  emit(ps, { ...event, params: { sessionId: ps.sessionId, ...(event.params as Record<string, unknown>) } })
+  push(ps, end)
+  // Settings switched the engine while this turn ran: the deck's next message opens it on the new one.
+  if (ps.deckBound && !ps.conn.exited && ps.engine !== readEngineConfig().engine) {
+    console.log("[acp] sessionId=%s: the agent engine is no longer %s; ending the deck's process", ps.sessionId, ps.engine)
+    forgetProcess(ps)
+    ps.conn.kill()
+  }
 }
 
 /** Tell the listeners (and a reconnecting stream) where a steer is now. */
-function emitSteer(ps: ProcessState, params: { id: string; text?: string; state: "accepted" | "delivered" | "discarded" }): void {
-  emit(ps, { method: STEER_EVENT, params: { sessionId: ps.sessionId, ...params } })
+function pushSteer(ps: ProcessState, steer: { id: string; text?: string; state: SteerState }): void {
+  push(ps, steerEvent(steer))
 }
 
 /**
@@ -143,8 +194,8 @@ function emitSteer(ps: ProcessState, params: { id: string; text?: string; state:
  * put it into the next prompt, after a Stop and (V2) after a normal end.
  */
 function clearSteerQueue(ps: ProcessState): void {
-  if (ps.exited) return
-  const cleared = startRequest(ps, "_session/steer/clear", { sessionId: ps.sessionId }, { timeoutMs: STEER_TIMEOUT_MS }).response
+  if (ps.conn.exited) return
+  const cleared = ps.conn.request("_session/steer/clear", { sessionId: ps.sessionId }, { timeoutMs: STEER_TIMEOUT_MS })
     .then(() => undefined, (error: Error) => { console.warn("[acp] _session/steer/clear: %s", error.message) })
   const done = cleared.finally(() => { if (ps.steerClear === done) ps.steerClear = null })
   ps.steerClear = done
@@ -152,11 +203,10 @@ function clearSteerQueue(ps: ProcessState): void {
 
 /** The turn ended before kiro-cli read these steers: clear them and mark them not delivered. */
 function discardSteers(ps: ProcessState): void {
-  const left = ps.steers
+  const left = ps.conversation.steers.takeAll()
   if (!left.length) return
-  ps.steers = []
   clearSteerQueue(ps)
-  for (const steer of left) emitSteer(ps, { id: steer.id, state: "discarded" })
+  for (const steer of left) pushSteer(ps, { id: steer.id, state: "discarded" })
 }
 
 /**
@@ -168,339 +218,215 @@ function discardSteers(ps: ProcessState): void {
  */
 async function continueWithSteers(ps: ProcessState): Promise<void> {
   ps.promptRequestId = null
-  const taken = [...ps.steers]
+  const taken = ps.conversation.steers.peek()
   let cleared = true
   try {
-    await rpcRequestTo(ps, "_session/steer/clear", { sessionId: ps.sessionId }, { timeoutMs: STEER_TIMEOUT_MS })
+    await ps.conn.request("_session/steer/clear", { sessionId: ps.sessionId }, { timeoutMs: STEER_TIMEOUT_MS })
   } catch (error) {
     console.warn("[acp] _session/steer/clear: %s", error instanceof Error ? error.message : String(error))
     cleared = false
   }
-  if (ps.exited || !ps.running) return
+  if (ps.conn.exited || !ps.running) return
   if (!cleared || ps.stopRequested) {
-    endTurn(ps, { method: TURN_END, params: { stopReason: cleared ? "cancelled" : "end_turn" } })
+    endTurn(ps, turnEnded(cleared ? "cancelled" : "end_turn"))
     return
   }
-  ps.steers = ps.steers.filter((steer) => !taken.includes(steer))
+  ps.conversation.steers.remove(taken)
   console.log("[acp] sessionId=%s: prompt ended before %d steer(s) were read; sending them as a follow-up prompt", ps.sessionId, taken.length)
-  for (const steer of taken) emitSteer(ps, { id: steer.id, state: "delivered" })
+  for (const steer of taken) pushSteer(ps, { id: steer.id, state: "delivered" })
   startPrompt(ps, taken.map((steer) => steer.text).join("\n\n"))
 }
 
-/** Send session/prompt for the session's turn; its answer ends the turn (handleLine). */
+/** Send session/prompt for the session's turn; its answer ends the turn (promptAnswered). */
 function startPrompt(ps: ProcessState, text: string): void {
-  const { id, response } = startRequest(ps, "session/prompt", {
+  const { id, response } = ps.conn.startRequest("session/prompt", {
     sessionId: ps.sessionId,
     prompt: [{ type: "text", text }],
-  })
+  }, { onAnswer: (answer) => { if (ps.promptRequestId === id) promptAnswered(ps, answer) } })
   ps.promptRequestId = id
-  // handleLine (an answer) or the exit handler (no answer) ends the turn for the listeners.
+  // promptAnswered (an answer) or the exit handler (no answer) ends the turn for the listeners.
   void response.catch(() => {})
 }
 
-/** kiro-cli put a steer into the turn: match it by its id, or by its text (V2 answers no id). */
-function deliverSteer(ps: ProcessState, injected: SteerInjection): void {
-  let at = injected.messageId ? ps.steers.findIndex((s) => s.messageId === injected.messageId) : -1
-  if (at < 0 && injected.content !== undefined) {
-    const content = injected.content.trim()
-    at = ps.steers.findIndex((s) => s.text.trim() === content)
+/**
+ * Only the answer to this turn's session/prompt ends the turn (kiro-cli sends no turn end for
+ * sub-agent sessions); an error answer to any other request (set_config_option, a steer) rejects
+ * that request alone. It is handled in line order, before the lines that follow it.
+ */
+function promptAnswered(ps: ProcessState, answer: AcpAnswer): void {
+  if (!answer.ok) {
+    endTurn(ps, turnFailed({ message: answer.error.message }))
+    return
   }
-  if (at < 0) return
-  const [steer] = ps.steers.splice(at, 1)
-  emitSteer(ps, { id: steer.id, state: "delivered" })
+  const stopReason = (answer.result as Partial<PromptResponse> | undefined)?.stopReason ?? "end_turn"
+  if (stopReason === "end_turn" && ps.conversation.steers.size && !ps.stopRequested) void continueWithSteers(ps)
+  else endTurn(ps, turnEnded(stopReason))
 }
 
-interface PermissionOption { optionId?: string; kind?: string }
+/** Reports a session/load's replay progress as the fork's `loading` phase, at most every 20 updates or 250 ms. */
+function replayProgress(onPhase: SpawnOptions["onPhase"]): (replayed: number, done: boolean) => void {
+  let lastReported = 0
+  let lastReportAt = Date.now()
+  return (replayed, done) => {
+    if (!onPhase) return
+    const now = Date.now()
+    if (done ? replayed !== lastReported : replayed % 20 === 0 || now - lastReportAt >= 250) {
+      lastReported = replayed
+      lastReportAt = now
+      onPhase("loading", { replayed })
+    }
+  }
+}
+
+const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
+/** What a failed start is reported as. The process is killed either way. */
+function startFailure(ps: ProcessState, error: unknown): unknown {
+  if (error instanceof Error && error.name === "AbortError") return error
+  if (error instanceof AgentTimeoutError) return error
+  if (error instanceof AgentStartError) {
+    console.warn("[acp] %s: %s", error.code, error.message)
+    return error
+  }
+  const kind = ps.session.classifyError(error)
+  if (kind === "session_locked") return new SessionLockedError(errorText(error))
+  if (kind === "auth_required") {
+    console.warn("[acp] agent_auth_required: %s", errorText(error))
+    return new AgentStartError("agent_auth_required", errorText(error))
+  }
+  if (ps.conn.exited) {
+    console.error("[acp] kiro-cli exited while starting (code %s): %s\n%s", ps.conn.exitCode, errorText(error), ps.conn.stderrTail().join("\n"))
+    return new AgentStartError("agent_start_failed", `kiro-cli exited while starting (code ${ps.conn.exitCode}): ${errorText(error)}`)
+  }
+  return error
+}
 
 /**
- * Answer a request kiro-cli sends to this client. Its id is kiro-cli's own and may equal one of
- * ours, so it is never matched against our pending requests. Permission requests are approved
- * with the offered option of kind allow_once (else allow_always): the optionId comes from the
- * request, never a fixed string, since V2 and V3 name their options differently. Anything else
- * is answered with Method not found, as JSON-RPC asks, instead of leaving kiro-cli waiting.
+ * Start kiro-cli on the configured engine and open a session in it: `opts.open` is restored with
+ * the engine's openSession, otherwise a new session is created. `clientId` is the client the
+ * process is created for (default: its kiro session id). The process is not registered yet.
  */
-function answerAgentRequest(ps: ProcessState, msg: Record<string, unknown>): void {
-  const method = msg.method as string
-  if (method === "session/request_permission") {
-    const options = ((msg.params as Record<string, unknown> | undefined)?.options ?? []) as PermissionOption[]
-    const pick = options.find((o) => o.kind === "allow_once")
-      ?? options.find((o) => o.kind === "allow_always")
-      ?? options.find((o) => o.kind === "reject_once")
-    const outcome = pick?.optionId ? { outcome: "selected", optionId: pick.optionId } : { outcome: "cancelled" }
-    writeMessage(ps, { id: msg.id, result: { outcome } })
-    return
-  }
-  writeMessage(ps, { id: msg.id, error: { code: METHOD_NOT_FOUND, message: `Method not found: ${method}` } })
-}
-
-function handleLine(ps: ProcessState, line: string) {
-  if (!line.trim()) return
-  let msg: Record<string, unknown>
-  try { msg = JSON.parse(line) } catch { return }
-
-  // A request from kiro-cli carries a method and an id.
-  if (msg.method !== undefined && msg.id != null) {
-    answerAgentRequest(ps, msg)
-    return
-  }
-
-  // A response to one of our requests. Only the answer to this turn's session/prompt ends the
-  // turn (kiro-cli sends no turn_end for sub-agent sessions); an error answer to any other
-  // request (set_config_option, a steer) rejects that request alone.
-  if (msg.id != null) {
-    const pending = ps.pending.get(msg.id as number)
-    if (!pending) return
-    ps.pending.delete(msg.id as number)
-    let failure: Error | null = null
-    if (msg.error) {
-      const error = msg.error as { message?: string; data?: unknown }
-      // kiro-cli puts the actual cause in `data` ("Internal error" alone is useless in logs)
-      const detail = error.data === undefined ? "" : `: ${typeof error.data === "string" ? error.data : JSON.stringify(error.data)}`
-      failure = new Error(`${error.message || "ACP request failed"}${detail}`)
-    }
-    if (msg.id === ps.promptRequestId) {
-      const result = msg.result as { stopReason?: string } | undefined
-      const stopReason = result?.stopReason ?? "end_turn"
-      if (!failure && stopReason === "end_turn" && ps.steers.length && !ps.stopRequested) void continueWithSteers(ps)
-      else endTurn(ps, failure
-        ? { method: TURN_ERROR, params: { message: failure.message } }
-        : { method: TURN_END, params: { stopReason } })
-    }
-    if (failure) pending.reject(failure)
-    else pending.resolve(msg.result)
-    return
-  }
-
-  // Buffer notifications
-  if (msg.method === "session/update" || msg.method === "_kiro.dev/session/update") {
-    const p = msg.params as Record<string, unknown>
-    const sid = p?.sessionId as string
-    // Only a turn's own updates name sub-agents; session/load replays the loaded
-    // session under its id before ps.sessionId switches to it.
-    if (sid && sid !== ps.sessionId && ps.promptRequestId !== null) ps.subSessionIds.add(sid)
-    // A sub-agent that reports turn_end no longer needs a cancel
-    const upd = p?.update as Record<string, unknown> | undefined
-    const updType = upd?.sessionUpdate as string | undefined
-    if ((updType === "turn_end" || updType === "end_turn") && sid && sid !== ps.sessionId) {
-      ps.subSessionIds.delete(sid)
-    }
-    emit(ps, msg)
-    if (sid === ps.sessionId && ps.steers.length) {
-      const injected = steerInjection(msg)
-      if (injected) deliverSteer(ps, injected)
-    }
-    return
-  }
-
-  for (const fn of ps.listeners) fn(msg)
-}
-
-function startRequest(
-  ps: ProcessState,
-  method: string,
-  params: Record<string, unknown> = {},
-  opts: RequestOptions = {},
-): { id: number; response: Promise<unknown> } {
-  if (!ps.child) throw new Error("Process not running")
-  const id = ++ps.requestId
-  const response = new Promise<unknown>((resolve, reject) => {
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const settle = () => {
-      if (timer) clearTimeout(timer)
-      opts.signal?.removeEventListener("abort", onAbort)
-      ps.pending.delete(id)
-    }
-    const onAbort = () => { settle(); reject(new DOMException("Request cancelled", "AbortError")) }
-    ps.pending.set(id, {
-      resolve: (value) => { settle(); resolve(value) },
-      reject: (reason) => { settle(); reject(reason) },
-    })
-    if (ps.exited) { settle(); reject(new Error("ACP process has exited")); return }
-    if (opts.timeoutMs) timer = setTimeout(() => { settle(); reject(new AgentTimeoutError(method, opts.timeoutMs!)) }, opts.timeoutMs)
-    if (opts.signal?.aborted) onAbort()
-    else opts.signal?.addEventListener("abort", onAbort, { once: true })
-  })
-  writeMessage(ps, { id, method, params })
-  return { id, response }
-}
-
-function rpcRequestTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}, opts?: RequestOptions): Promise<unknown> {
-  return startRequest(ps, method, params, opts).response
-}
-
-function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}): void {
-  if (!ps.child) return
-  writeMessage(ps, { method, params })
-}
-
-/** Ensure agents/ has files (first launch before Settings is opened). */
-async function spawnProcess(
-  agentName: string,
-  existingSessionId?: string,
-  opts: SpawnProcessOptions = {},
-  adapter?: AgentConfig,
-): Promise<ProcessState> {
-  if (opts.signal?.aborted) throw new DOMException("Fork cancelled", "AbortError")
+async function spawnProcess(agentName: string, clientId: string | null, opts: SpawnOptions = {}): Promise<{ ps: ProcessState; outcome: LoadOutcome }> {
+  if (opts.signal?.aborted) throw new DOMException("Request cancelled", "AbortError")
   opts.onPhase?.("starting")
+  const config = readEngineConfig()
   // Re-derive .kiro/agents/ from the acp-agents catalog + user selection on
   // every spawn (idempotent, all-or-nothing) — a `git pull` that updates the
   // catalog takes effect on the next spawn. If the derivation fails, the
   // spawn fails: launching from silently stale agent files is the exact bug
   // this re-derivation exists to prevent.
-  syncToAgentsDir()
-  const cfg = adapter || getActiveAgent()
-  let args = [...cfg.args]
-  const flagIdx = args.indexOf("--agent")
-  if (flagIdx >= 0 && flagIdx + 1 < args.length) {
-    args[flagIdx + 1] = agentName
+  try {
+    syncToAgentsDir()
+  } catch (error) {
+    console.error("[acp] agent definitions: %s", errorText(error))
+    throw new AgentStartError("agent_start_failed", `agent definitions: ${errorText(error)}`)
   }
-  const child = spawn(cfg.path, args, {
+  const engine = adapterFor(config.engine)
+  const conn = spawnAcp(config.command, [...config.commandArgs, ...engine.spawnArgs(agentName)], {
     cwd: MCP_LOCAL_DIR,
-    stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, ...cfg.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT },
+    env: { ...process.env, ...config.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT },
   })
-  const abortSpawn = () => child.kill()
+  const abortSpawn = () => conn.kill()
   opts.signal?.addEventListener("abort", abortSpawn, { once: true })
 
+  const mcp = new McpRecord()
   const ps: ProcessState = {
-    child, deckId: "", sessionId: null, agentName,
-    requestId: 0, pending: new Map(), listeners: new Set(),
-    lineBuffer: "", running: false, exited: false, promptInFlight: false, promptRequestId: null, notifications: [], eventIdCounter: 0,
-    lastActivity: Date.now(), subSessionIds: new Set(), turnsEnded: 0, steers: [], steerClear: null, stopRequested: false,
+    conn,
+    engine: engine.id,
+    session: engine.createSession({
+      request: (method, params, requestOpts) => conn.request(method, params, requestOpts),
+      cwd: MCP_LOCAL_DIR,
+      setupTimeoutMs: SESSION_SETUP_TIMEOUT_MS,
+      signal: opts.signal,
+      waitForMcp: async (sessionId) => {
+        if (!(await waitForMcp(mcp, sessionId, SDPM_MCP_SERVER, MCP_READY_TIMEOUT_MS, opts.signal))) {
+          console.warn("[acp] sdpm MCP server not connected after %dms (session %s); going on", MCP_READY_TIMEOUT_MS, sessionId)
+        }
+      },
+      clearMcp: (sessionId) => mcp.clear(sessionId),
+    }),
+    caps: null,
+    conversation: new ConversationState(),
+    clientId: clientId ?? "",
+    clientIds: new Set(),
+    deckId: "",
+    savedDecks: new Set(),
+    deckBound: false,
+    mcp,
+    sessionId: null,
+    agentName,
+    listeners: new Set(),
+    running: false, promptInFlight: false, promptRequestId: null, buffer: [], eventId: 0,
+    lastActivity: Date.now(), turnsEnded: 0, steerClear: null, stopRequested: false,
   }
-
-  child.stdout!.setEncoding("utf-8")
-  child.stdout!.on("data", (data: string) => {
-    ps.lineBuffer += data
-    const lines = ps.lineBuffer.split("\n")
-    ps.lineBuffer = lines.pop() || ""
-    for (const l of lines) handleLine(ps, l)
-  })
-
-  child.stderr!.setEncoding("utf-8")
-  child.stderr!.on("data", (d: string) => console.warn("[acp] stderr: %s", d.trim()))
-  // A write racing the exit (a Stop just as kiro-cli dies) fails with EPIPE; the exit handles it.
-  child.stdin!.on("error", (error) => console.warn("[acp] stdin: %s", error.message))
-
-  // The process is gone: fail what waits on it, end a running turn with an error the bridge
-  // forwards (otherwise the chat would spin forever), and drop it from the map.
-  const onExit = (code: number | null) => {
-    if (ps.exited) return
-    ps.exited = true
+  conn.onNotification((msg) => handleNotification(ps, msg))
+  // The process is gone: end a running turn with an error the stream forwards (otherwise the
+  // chat would spin forever), and drop it from the map. The transport has already failed what
+  // waited on it.
+  conn.onExit((code) => {
     console.log("[acp close] sessionId=%s code=%s", ps.sessionId, code)
-    for (const pending of [...ps.pending.values()]) pending.reject(new Error(`ACP process exited with code ${code}`))
-    ps.pending.clear()
-    if (ps.promptInFlight) endTurn(ps, { method: TURN_ERROR, params: { code: "agent_exited", message: `kiro-cli exited with code ${code}` } })
+    if (ps.promptInFlight) endTurn(ps, turnFailed({ code: "agent_exited", message: `kiro-cli exited with code ${code}` }))
     forgetProcess(ps)
-  }
-  child.on("close", onExit)
-  child.on("error", (error) => {
-    console.warn("[acp] process error: %s", error.message)
-    if (child.pid === undefined) onExit(null) // spawn failed (kiro-cli not found); no close follows
   })
 
   try {
-    // Initialize ACP
-    await rpcRequestTo(ps, "initialize", {
+    const init = await conn.request("initialize", {
       protocolVersion: 1,
       clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
       clientInfo: { name: "sdpm-local", version: "0.1.0" },
-    }, { timeoutMs: INITIALIZE_TIMEOUT_MS, signal: opts.signal })
+    }, { timeoutMs: INITIALIZE_TIMEOUT_MS, signal: opts.signal }) as InitializeResponse
+    ps.caps = engine.capabilities(init)
 
-    // Create session
-    const result = await rpcRequestTo(ps, "session/new", {
-      cwd: MCP_LOCAL_DIR,
-      mcpServers: [],
-      agent: agentName,
-    }, { timeoutMs: SESSION_SETUP_TIMEOUT_MS, signal: opts.signal }) as Record<string, unknown>
-    ps.sessionId = result.sessionId as string
-
-    // Restore existing session context if provided (Obsidian agent-client pattern)
-    if (existingSessionId) {
-      let replayed = 0
-      let lastReported = 0
-      let lastReportAt = Date.now()
-      const replayListener: NotifyListener = (msg) => {
-        if (msg.method !== "session/update" && msg.method !== "_kiro.dev/session/update") return
-        const params = msg.params as Record<string, unknown> | undefined
-        if (params?.sessionId !== existingSessionId) return
-        replayed++
-        const now = Date.now()
-        if (replayed % 20 === 0 || now - lastReportAt >= 250) {
-          lastReported = replayed
-          lastReportAt = now
-          opts.onPhase?.("loading", { replayed })
-        }
-      }
-
-      opts.onPhase?.("loading", { replayed: 0 })
-      ps.listeners.add(replayListener)
-      // Watch from before session/load: the source agent may already carry the
-      // sdpm server, and after set_mode its readiness can arrive before the reply.
-      const sdpmReady = opts.setMode ? watchMcpServerReady(ps.listeners, existingSessionId) : null
-      let loaded: { modes?: { availableModes?: { id: string }[] } }
-      try {
-        loaded = await rpcRequestTo(ps, "session/load", {
-          sessionId: existingSessionId,
-          cwd: MCP_LOCAL_DIR,
-          mcpServers: [],
-        }, { timeoutMs: SESSION_SETUP_TIMEOUT_MS, signal: opts.signal }) as { modes?: { availableModes?: { id: string }[] } }
-      } catch (error) {
-        sdpmReady?.dispose()
-        throw error
-      } finally {
-        ps.listeners.delete(replayListener)
-      }
-      if (replayed !== lastReported) opts.onPhase?.("loading", { replayed })
-
-      // After session/load, prompts must use the old sessionId
-      processes.delete(ps.sessionId!)
-      ps.sessionId = existingSessionId
-      if (opts.setMode) {
-        const available = loaded.modes?.availableModes
-        if (!available?.some((mode) => mode.id === agentName)) {
-          sdpmReady?.dispose()
-          throw new Error(`mode ${agentName} unavailable`)
-        }
-        opts.onPhase?.("switching")
-        try {
-          await rpcRequestTo(ps, "session/set_mode", { sessionId: existingSessionId, modeId: agentName }, { timeoutMs: SESSION_SETUP_TIMEOUT_MS, signal: opts.signal })
-        } catch (error) {
-          sdpmReady?.dispose()
-          throw error
-        }
-        // set_mode replies before the new agent's MCP servers are up; the first
-        // prompt (the continuation greeting) needs start_presentation.
-        if (sdpmReady && !(await sdpmReady.wait(MCP_READY_TIMEOUT_MS, opts.signal))) {
-          console.warn("[acp] sdpm MCP server not initialized after %dms (session %s)", MCP_READY_TIMEOUT_MS, existingSessionId)
-        }
-      }
+    let outcome: LoadOutcome = "created"
+    if (opts.open) {
+      // Restore existing session context (Obsidian agent-client pattern)
+      const opened = await ps.session.openSession(opts.open, agentName, {
+        onReplay: replayProgress(opts.onPhase),
+        onSwitching: () => opts.onPhase?.("switching"),
+      })
+      ps.sessionId = opened.sessionId
+      outcome = opened.outcome
+    } else {
+      ps.sessionId = (await ps.session.newSession(agentName)).sessionId
     }
+    if (!ps.clientId) ps.clientId = ps.sessionId
 
     // Extract model info from first process
-    if (!availableModels.length) {
-      const modelsData = result.models as { currentModelId?: string; availableModels?: AcpModel[] } | undefined
-      if (modelsData) {
-        currentModelId = modelsData.currentModelId || ""
-        availableModels = (modelsData.availableModels || [])
-          .filter(o => !o.description?.startsWith("[Internal]") && !o.description?.startsWith("[Deprecated]"))
-      }
+    const models = availableModels.length ? null : ps.session.models()
+    if (models) {
+      currentModelId = models.current
+      availableModels = models.available
+        .filter(o => !o.description?.startsWith("[Internal]") && !o.description?.startsWith("[Deprecated]"))
     }
 
     opts.signal?.removeEventListener("abort", abortSpawn)
-    return ps
+    return { ps, outcome }
   } catch (error) {
     opts.signal?.removeEventListener("abort", abortSpawn)
-    child.kill()
-    throw error
+    const failure = startFailure(ps, error)
+    conn.kill()
+    throw failure
   }
 }
 
-/** Remove every map key that refers to a process. */
+/** The only way into the map: the process under every client id that uses it and its kiro session id. */
+function register(ps: ProcessState, clientId: string): void {
+  ps.clientIds.add(clientId)
+  for (const id of ps.clientIds) processes.set(id, ps)
+  processes.set(ps.sessionId!, ps)
+  ps.lastActivity = Date.now()
+}
+
+/** Remove every map key that refers to a process, and the origin a fork left for its first deck. */
 function forgetProcess(ps: ProcessState): void {
+  let registered = false
   for (const [key, candidate] of processes) {
-    if (candidate === ps) processes.delete(key)
+    if (candidate === ps) {
+      processes.delete(key)
+      registered = true
+    }
   }
+  if (registered) pendingOrigins.delete(ps.clientId)
 }
 
 async function evictIfNeeded(): Promise<void> {
@@ -512,10 +438,18 @@ async function evictIfNeeded(): Promise<void> {
     if (!oldest || ps.lastActivity < oldest.lastActivity) oldest = ps
   }
   if (oldest) {
-    oldest.child.kill()
+    oldest.conn.kill()
     forgetProcess(oldest)
     await new Promise(r => setTimeout(r, 500))
   }
+}
+
+/** The live process of a client id or of the kiro session id it opens, registered under the client id. */
+function findLive(clientId: string, sessionId: string | null): ProcessState | null {
+  const ps = processes.get(clientId) ?? (sessionId ? processes.get(sessionId) : undefined)
+  if (!ps) return null
+  register(ps, clientId)
+  return ps
 }
 
 // ── Public API ──
@@ -531,75 +465,131 @@ export function terminateProcess(sessionId: string): void {
     ?? Array.from(processes.values()).find((candidate) => candidate.sessionId === sessionId)
   if (!ps) return
   forgetProcess(ps)
-  ps.child.kill()
+  ps.conn.kill()
 }
 
-/**
- * Get or create a process for a sessionId (the map key). With no live process, spawns one and
- * restores `kiroSessionId` (default: the key) with session/load; a live process already under
- * `kiroSessionId` is reused. Either way the process is then registered under both ids.
- */
-export async function getOrCreateProcess(
-  sessionId: string,
-  agentName: string = "sdpm-orchestrator",
-  opts: SpawnProcessOptions & { kiroSessionId?: string } = {},
-): Promise<ProcessState> {
-  const kiroSessionId = opts.kiroSessionId ?? sessionId
-  let ps = processes.get(sessionId) ?? processes.get(kiroSessionId)
-  if (ps) {
-    processes.set(sessionId, ps)
-    ps.lastActivity = Date.now()
-    return ps
+/** End every idle deck-bound process that runs another engine than `engine` (a Settings switch). */
+export function terminateIdleProcesses(engine: EngineId): void {
+  for (const ps of new Set(processes.values())) {
+    if (ps.promptInFlight || !ps.deckBound || ps.engine === engine) continue
+    console.log("[acp] sessionId=%s: the agent engine is now %s; ending the deck's %s process", ps.sessionId, engine, ps.engine)
+    forgetProcess(ps)
+    ps.conn.kill()
   }
-  // No live process — spawn new one and restore session context
-  await evictIfNeeded()
-  ps = await spawnProcess(agentName, kiroSessionId, opts)
-  processes.set(sessionId, ps)
-  processes.set(kiroSessionId, ps)
-  return ps
 }
 
-/** Spawn a brand-new process (no existing session). Returns the new sessionId. */
+/** What the engine of a session's process advertised (null without a process). For phase 3. */
+export function getCapabilities(sessionId: string): EngineCapabilities | null {
+  return processes.get(sessionId)?.caps ?? null
+}
+
+/** Spawn a brand-new process (no existing session), registered under its kiro session id. */
 export async function createNewProcess(agentName: string = "sdpm-orchestrator"): Promise<ProcessState> {
   await evictIfNeeded()
-  const ps = await spawnProcess(agentName)
-  processes.set(ps.sessionId!, ps)
+  const { ps } = await spawnProcess(agentName, null)
+  register(ps, ps.sessionId!)
   return ps
 }
 
-/** Spawn a new process and register it under a client-provided key and its kiro session id. */
+/** Spawn a new process for a new chat and register it under the client's id and its kiro session id. */
 export async function createNewProcessFor(
-  clientSessionId: string,
+  clientId: string,
   agentName: string = "sdpm-orchestrator",
-  opts: SpawnProcessOptions = {},
+  opts: { signal?: AbortSignal } = {},
 ): Promise<ProcessState> {
   await evictIfNeeded()
-  const ps = await spawnProcess(agentName, undefined, opts)
-  processes.set(clientSessionId, ps)
-  processes.set(ps.sessionId!, ps)
+  const { ps } = await spawnProcess(agentName, clientId, opts)
+  register(ps, clientId)
   return ps
 }
 
 /**
- * Send a prompt to a session's process.
+ * The process of a reopened deck, registered under `clientId`: the live process of the client or
+ * of the deck's saved session (`resumed`), else a new kiro-cli that opens the saved session (its
+ * engine tells `resumed` from `created`), or creates one when the deck has none (`created`). The
+ * process is bound to the deck either way. A created session is saved to `.session` with a new
+ * engine mark; a resumed one reports `otherEngine` when its turns also ran on the other engine.
+ */
+export async function openDeckSession(
+  clientId: string,
+  deckId: string,
+  savedSessionId: string | null,
+  agentName: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<{ ps: ProcessState; outcome: LoadOutcome; otherEngine: boolean }> {
+  let ps = findLive(clientId, savedSessionId)
+  let outcome: LoadOutcome = "resumed"
+  if (!ps) {
+    await evictIfNeeded()
+    const spawned = await spawnProcess(agentName, clientId, { ...opts, ...(savedSessionId ? { open: savedSessionId } : {}) })
+    ps = spawned.ps
+    outcome = spawned.outcome
+    register(ps, clientId)
+  }
+  ps.deckId = deckId
+  ps.savedDecks.add(deckId)
+  ps.deckBound = true
+  if (outcome === "created") {
+    saveSessionToDeck(deckId, ps.sessionId!)
+    writeEngineMark(deckId, { last: ps.engine, engines: [ps.engine] })
+    return { ps, outcome, otherEngine: false }
+  }
+  const mark = readEngineMark(deckId)
+  return { ps, outcome, otherEngine: mark.last !== ps.engine && mark.engines.includes(ps.engine) }
+}
+
+/**
+ * The process of a forked chat: `clientId` is the fork's id, which is also the copied kiro
+ * session's. The live process, or a new kiro-cli that opens the copy (`created` when kiro-cli
+ * could not read it and started an empty session).
+ */
+export async function openForkedSession(
+  clientId: string,
+  agentName: string,
+  opts: { signal?: AbortSignal; onPhase?: SpawnOptions["onPhase"] } = {},
+): Promise<{ ps: ProcessState; outcome: LoadOutcome }> {
+  const live = findLive(clientId, null)
+  if (live) return { ps: live, outcome: "resumed" }
+  await evictIfNeeded()
+  const { ps, outcome } = await spawnProcess(agentName, clientId, { ...opts, open: clientId })
+  register(ps, clientId)
+  return { ps, outcome }
+}
+
+/**
+ * Send a prompt to a session's process. The turn's chat events are numbered from 1; a `notice`
+ * about the turn's session (sessionNotices.ts) is the first of them.
  * Throws SessionBusyError while the process is still answering an earlier prompt
  * (the same session open in two panels or tabs); prompts are not queued.
  */
-export async function sendPrompt(sessionId: string, text: string, agentName?: string): Promise<{ sessionId: string; subscribe: (fn: NotifyListener) => () => void; send: () => void }> {
-  const ps = await getOrCreateProcess(sessionId, agentName || "sdpm-orchestrator")
+export async function sendPrompt(
+  sessionId: string,
+  text: string,
+  opts: { notice?: LocalSessionNoticeCode } = {},
+): Promise<{ sessionId: string; subscribe: (fn: EventListener) => () => void; send: () => void }> {
+  const ps = processes.get(sessionId)
+  if (!ps) throw new Error(`no kiro-cli process for session ${sessionId}`)
   // Steers the last turn left must be out of kiro-cli's queue before this prompt.
   if (ps.steerClear) await ps.steerClear
   if (ps.promptInFlight) throw new SessionBusyError()
   ps.promptInFlight = true
   ps.running = true
   ps.stopRequested = false
-  ps.subSessionIds.clear()
-  ps.notifications = []; ps.eventIdCounter = 0
+  ps.session.beginTurn()
+  ps.conversation.beginTurn()
+  ps.buffer = []; ps.eventId = 0
   ps.lastActivity = Date.now()
+  if (ps.deckBound) {
+    for (const deckId of ps.savedDecks) {
+      const mark = readEngineMark(deckId)
+      writeEngineMark(deckId, { last: ps.engine, engines: mark.engines.includes(ps.engine) ? mark.engines : [...mark.engines, ps.engine] })
+    }
+  }
+  if (opts.notice) push(ps, data({ notice: { code: opts.notice } }))
 
   return {
     sessionId: ps.sessionId!,
-    subscribe: (fn: NotifyListener) => {
+    subscribe: (fn: EventListener) => {
       ps.listeners.add(fn)
       return () => { ps.listeners.delete(fn) }
     },
@@ -609,20 +599,26 @@ export async function sendPrompt(sessionId: string, text: string, agentName?: st
 
 /**
  * Send a message into the session's running turn (`_session/steer`). Resolves once kiro-cli
- * queued it; the listeners then get its STEER_EVENT `accepted`, later `delivered` or `discarded`.
- * Throws SteerRejectedError when no turn runs, kiro-cli does not queue it, or the turn ended
- * meanwhile (the message is then taken back out of kiro-cli's queue).
+ * queued it; the listeners then get its steer event `accepted`, later `delivered` or `discarded`.
+ * Throws SteerRejectedError when no turn runs, kiro-cli does not queue it (or does not implement
+ * steering: then no later steer is sent to that process), or the turn ended meanwhile (the
+ * message is then taken back out of kiro-cli's queue).
  */
 export async function steerSession(sessionId: string, id: string, text: string): Promise<void> {
   const ps = processes.get(sessionId)
   if (!ps || !ps.promptInFlight) throw new SteerRejectedError("session_idle")
+  if (ps.caps && !ps.caps.steer) throw new SteerRejectedError("steer_not_queued", "kiro-cli does not support steering")
   const turn = ps.turnsEnded
   let result: { queued?: boolean; messageId?: string; dropped?: string } | undefined
   try {
-    result = await rpcRequestTo(ps, "_session/steer", { sessionId: ps.sessionId, message: text }, { timeoutMs: STEER_TIMEOUT_MS }) as typeof result
+    result = await ps.conn.request("_session/steer", { sessionId: ps.sessionId, message: text }, { timeoutMs: STEER_TIMEOUT_MS }) as typeof result
   } catch (error) {
     if (error instanceof AgentTimeoutError) throw error
-    throw new SteerRejectedError("steer_not_queued", error instanceof Error ? error.message : String(error))
+    if (error instanceof AcpRequestError && error.code === METHOD_NOT_FOUND && ps.caps) {
+      ps.caps.steer = false
+      console.warn("[acp] sessionId=%s: kiro-cli does not implement _session/steer; messages sent during a turn are refused", ps.sessionId)
+    }
+    throw new SteerRejectedError("steer_not_queued", errorText(error))
   }
   // V3 drops a steer that raced the end of the turn (`dropped: "epoch_changed"`).
   if (result?.queued !== true) throw new SteerRejectedError("steer_not_queued", result?.dropped)
@@ -630,9 +626,14 @@ export async function steerSession(sessionId: string, id: string, text: string):
     clearSteerQueue(ps)
     throw new SteerRejectedError("session_idle")
   }
-  ps.steers.push({ id, text, ...(result.messageId ? { messageId: result.messageId } : {}) })
+  ps.conversation.steers.add({ id, text, ...(result.messageId ? { messageId: result.messageId } : {}) })
   ps.lastActivity = Date.now()
-  emitSteer(ps, { id, text, state: "accepted" })
+  pushSteer(ps, { id, text, state: "accepted" })
+}
+
+/** Send session/cancel to every session the engine runs this turn on. */
+function cancelTurn(ps: ProcessState): void {
+  for (const target of ps.session.cancelTargets()) ps.conn.notify("session/cancel", { sessionId: target })
 }
 
 /** Cancel a session's active prompt. */
@@ -640,13 +641,7 @@ export function cancelSession(sessionId: string): void {
   const ps = processes.get(sessionId)
   if (!ps) return
   if (ps.running) ps.stopRequested = true
-  if (ps.sessionId) {
-    rpcNotifyTo(ps, "session/cancel", { sessionId: ps.sessionId })
-    for (const subId of ps.subSessionIds) {
-      rpcNotifyTo(ps, "session/cancel", { sessionId: subId })
-    }
-    ps.subSessionIds.clear()
-  }
+  if (ps.sessionId) cancelTurn(ps)
 }
 
 /** Cancel all processes (stop button with no specific session). */
@@ -654,11 +649,7 @@ export function cancelAll(): void {
   for (const ps of processes.values()) {
     if (ps.running && ps.sessionId) {
       ps.stopRequested = true
-      rpcNotifyTo(ps, "session/cancel", { sessionId: ps.sessionId })
-      for (const subId of ps.subSessionIds) {
-        rpcNotifyTo(ps, "session/cancel", { sessionId: subId })
-      }
-      ps.subSessionIds.clear()
+      cancelTurn(ps)
     }
   }
 }
@@ -668,21 +659,21 @@ export function isSessionRunning(sessionId: string): boolean {
   return processes.get(sessionId)?.running ?? false
 }
 
-/** Drain buffered notifications for a session. */
-export function getBufferedEvents(sessionId: string, afterId?: number): { id: number; msg: Record<string, unknown> }[] {
+/** The current turn's buffered chat events, after `afterId` when given (a reconnect's Last-Event-ID). */
+export function getBufferedEvents(sessionId: string, afterId?: number): BufferedEvent[] {
   const ps = processes.get(sessionId)
   if (!ps) return []
-  if (afterId == null) return [...ps.notifications]
-  return ps.notifications.filter(e => e.id > afterId)
+  if (afterId == null) return [...ps.buffer]
+  return ps.buffer.filter(e => e.id > afterId)
 }
 
-/** Subscribe to a session's process notifications. */
-export function subscribeToSession(sessionId: string): { sessionId: string | null; subscribe: (fn: NotifyListener) => () => void } | null {
+/** Subscribe to a session's chat events. */
+export function subscribeToSession(sessionId: string): { sessionId: string | null; subscribe: (fn: EventListener) => () => void } | null {
   const ps = processes.get(sessionId)
   if (!ps) return null
   return {
     sessionId: ps.sessionId,
-    subscribe: (fn: NotifyListener) => {
+    subscribe: (fn: EventListener) => {
       ps.listeners.add(fn)
       return () => { ps.listeners.delete(fn) }
     },
@@ -696,23 +687,82 @@ export function getModels(): { current: string; available: AcpModel[] } {
 export async function setConfigOption(sessionId: string, configId: string, value: string): Promise<void> {
   const ps = processes.get(sessionId)
   if (!ps?.sessionId) return
-  await rpcRequestTo(ps, "session/set_config_option", { sessionId: ps.sessionId, configId, value })
+  await ps.conn.request("session/set_config_option", { sessionId: ps.sessionId, configId, value })
 }
 
-/** Save sessionId to deck's .session file. */
-export function saveSessionToDeck(deckId: string, sessionId: string): void {
+// ── Deck files ──
+
+/** Save sessionId to deck's .session file. Returns whether it was written (the deck exists). */
+export function saveSessionToDeck(deckId: string, sessionId: string): boolean {
   const fs = require("fs") as typeof import("fs")
   const dir = resolveDeckDir(deckId)
-  if (!dir || !fs.existsSync(dir)) return
+  if (!dir || !fs.existsSync(dir)) return false
   fs.writeFileSync(path.join(dir, ".session"), sessionId, "utf-8")
+  return true
 }
 
-/** The kiro session id saved in a deck's .session file, or null when the deck has none. */
+/** The kiro session id saved in a deck's .session file, or null when the deck has none (or not a valid id). */
 export function readSessionFromDeck(deckId: string): string | null {
   const fs = require("fs") as typeof import("fs")
   const dir = resolveDeckDir(deckId)
   if (!dir) return null
-  try { return fs.readFileSync(path.join(dir, ".session"), "utf-8").trim() || null } catch { return null }
+  let saved: string
+  try { saved = fs.readFileSync(path.join(dir, ".session"), "utf-8").trim() } catch { return null }
+  if (!saved) return null
+  if (!SESSION_ID_PATTERN.test(saved)) {
+    console.warn("[acp] deck %s: .session does not hold a kiro session id; treating the deck as having none", deckId)
+    return null
+  }
+  return saved
+}
+
+/** The engines that ran turns of the session a deck's `.session` names (`.session-engine`). */
+export interface EngineMark {
+  /** The engine that started the session's last turn. */
+  last: EngineId
+  /** Every engine that started a turn of it. */
+  engines: EngineId[]
+}
+
+/** A deck from before the mark existed: every session then ran on V2. */
+const UNMARKED: EngineMark = { last: "v2", engines: ["v2"] }
+const ENGINE_MARK_FILE = ".session-engine"
+const brokenMarksWarned = new Set<string>()
+
+/** A deck's engine mark; a deck without one (or with a broken one, warned once) counts as V2 only. */
+export function readEngineMark(deckId: string): EngineMark {
+  const fs = require("fs") as typeof import("fs")
+  const dir = resolveDeckDir(deckId)
+  if (!dir) return UNMARKED
+  let text: string
+  try { text = fs.readFileSync(path.join(dir, ENGINE_MARK_FILE), "utf-8") } catch { return UNMARKED }
+  try {
+    const raw = JSON.parse(text) as { version?: unknown; last?: unknown; engines?: unknown }
+    if (raw?.version === 1 && isEngineId(raw.last) && Array.isArray(raw.engines) && raw.engines.length && raw.engines.every(isEngineId)) {
+      return { last: raw.last, engines: [...new Set(raw.engines as EngineId[])] }
+    }
+  } catch { /* reported below */ }
+  if (!brokenMarksWarned.has(deckId)) {
+    brokenMarksWarned.add(deckId)
+    console.warn("[acp] deck %s: %s is not readable; treating the deck as unmarked", deckId, ENGINE_MARK_FILE)
+  }
+  return UNMARKED
+}
+
+/** Replace a deck's engine mark (temp file + rename). A failure is logged: only a later notice is lost. */
+export function writeEngineMark(deckId: string, mark: EngineMark): void {
+  const fs = require("fs") as typeof import("fs")
+  const dir = resolveDeckDir(deckId)
+  if (!dir) return
+  const file = path.join(dir, ENGINE_MARK_FILE)
+  const tmp = `${file}.tmp-${process.pid}`
+  try {
+    fs.writeFileSync(tmp, JSON.stringify({ version: 1, last: mark.last, engines: mark.engines }), "utf-8")
+    fs.renameSync(tmp, file)
+  } catch (error) {
+    console.warn("[acp] deck %s: could not write %s: %s", deckId, ENGINE_MARK_FILE, errorText(error))
+    try { fs.rmSync(tmp, { force: true }) } catch { /* nothing to clean */ }
+  }
 }
 
 /** Save a fork's source metadata to the deck. */
@@ -750,7 +800,7 @@ export function readChatFromDeck(deckId: string): unknown[] {
 // Cleanup on process exit
 for (const sig of ["exit", "SIGINT", "SIGTERM"] as const) {
   process.on(sig, () => {
-    for (const ps of processes.values()) ps.child.kill()
+    for (const ps of processes.values()) ps.conn.kill()
     processes.clear()
     pendingOrigins.clear()
   })

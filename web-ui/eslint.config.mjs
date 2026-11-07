@@ -30,6 +30,49 @@ const eslintConfig = [
   },
   // Next.js default ignores
   ...(nextConfig.length > 2 ? nextConfig.slice(2) : []),
+  // Local ACP layers (lib/local): dependencies point one way, and kiro-cli's engine differences
+  // stay in acp/engines/<id>/. One block per file group: a later block that matches a file
+  // replaces an earlier block's options for this rule.
+  ...localAcpLayers(),
 ]
+
+function restrict(files, patterns, ignores = []) {
+  return {
+    files,
+    ignores,
+    rules: { "@typescript-eslint/no-restricted-imports": ["error", { patterns }] },
+  }
+}
+
+function localAcpLayers() {
+  const L = "src/lib/local"
+  const TESTS = ["**/*.test.ts", "**/*.test.tsx", "src/test/**"]
+  const engines = { regex: "(^|/)engines(/|$)", message: "Only acp/engine.ts (the registry) imports an engine adapter." }
+  const registry = { regex: "(^|/)engine$", message: "The engine registry loads the engine adapters; only the process manager uses it." }
+  const processManager = { regex: "(^|/)acp-process$", message: "The process manager depends on this layer, not the other way round." }
+  const transport = { regex: "(^|/)acp/transport$", message: "Only the process manager and the engine adapters speak to the transport." }
+  const bridge = { regex: "(^|/)sse-bridge$", message: "The SSE bridge is the outermost layer of lib/local." }
+  const routes = { regex: "^@/app/", message: "lib/local does not import API routes." }
+  const conversation = { regex: "(^|/)conversation(/(compose|tools|steer|turn|index))?$", message: "An engine adapter outputs LocalEvents; the conversation model is not its dependency." }
+  const conversationEvents = { regex: "(^|/)conversation/events$", allowTypeImports: true, message: "An engine adapter imports only the LocalEvent types." }
+  return [
+    restrict(["src/**/*.ts", "src/**/*.tsx"], [engines], [
+      `${L}/acp/engine.ts`, `${L}/acp/engines/**`, `${L}/conversation/**`, `${L}/sse-bridge.ts`, ...TESTS,
+    ]),
+    restrict([`${L}/conversation/**/*.ts`, `${L}/sse-bridge.ts`], [engines, registry, processManager, transport, bridge, routes], TESTS),
+    restrict([`${L}/acp/transport.ts`, `${L}/acp/schema.ts`], [
+      { regex: "(^|/)conversation(/|$)", message: "The transport knows JSON-RPC, not the conversation." },
+      engines, registry, processManager, bridge,
+    ]),
+    restrict([`${L}/acp/engines/v2/**/*.ts`], [
+      { regex: "(^|/)v3(/|$)", message: "An engine adapter does not depend on another engine." },
+      processManager, bridge, routes, conversation, conversationEvents,
+    ], TESTS),
+    restrict([`${L}/acp/engines/v3/**/*.ts`], [
+      { regex: "(^|/)v2(/|$)", message: "An engine adapter does not depend on another engine." },
+      processManager, bridge, routes, conversation, conversationEvents,
+    ], TESTS),
+  ]
+}
 
 export default eslintConfig

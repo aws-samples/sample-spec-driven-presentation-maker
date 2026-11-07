@@ -101,10 +101,11 @@ global_settings:
       expiration: "2027-03-29"
 
     - rule_id: "javascript.lang.security.detect-child-process.detect-child-process"
-      path: "web-ui/src/lib/local/acp-process.ts"
+      path: "web-ui/src/lib/local/acp/transport.ts"
       reason: >
-        spawn launches the local ACP agent process on the developer's machine.
-        Command path comes from hardcoded config, not user input. Local mode only.
+        spawn launches the local ACP agent process (kiro-cli) on the developer's machine.
+        Command and args come from the Local ACP config, not user input, and are passed
+        as an argument array without a shell. Local mode only.
       expiration: "2027-03-29"
 
     - rule_id: "javascript.lang.security.detect-child-process.detect-child-process"

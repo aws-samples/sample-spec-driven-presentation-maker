@@ -6,7 +6,8 @@
  * - `session_busy`: this server's process for the session is still answering a prompt
  *   (the same chat open in two panels or tabs).
  * - `session_locked`: kiro-cli refused to load the session because another process holds its
- *   lock (for example `kiro-cli chat --resume` in a terminal).
+ *   lock (for example `kiro-cli chat --resume` in a terminal). The engine adapter recognises
+ *   kiro-cli's error (`EngineSession.classifyError`); the process manager throws SessionLockedError.
  */
 
 export type SessionConflictCode = "session_busy" | "session_locked"
@@ -24,17 +25,12 @@ export class SessionBusyError extends Error {
   }
 }
 
-/** kiro-cli's session/load error while another live process holds the session lock. */
-const SESSION_LOCKED_MARKER = "Session is active in another process"
-
-/**
- * kiro-cli's session/load error for a session it does not have (V2). V3 answers such a load by
- * creating an empty session under that id, so for V3 only a missing `.session` is detectable.
- */
-const SESSION_NOT_FOUND_MARKER = "Session not found"
-
-export function isSessionNotFound(error: unknown): boolean {
-  return error instanceof Error && error.message.includes(SESSION_NOT_FOUND_MARKER)
+/** Thrown when kiro-cli refused to open a session another process holds; `message` is kiro-cli's. */
+export class SessionLockedError extends Error {
+  constructor(detail: string) {
+    super(detail)
+    this.name = "SessionLockedError"
+  }
 }
 
 /** Map a spawn/load/prompt failure to a 409 body, or null when it is not a session conflict. */
@@ -42,7 +38,7 @@ export function sessionConflict(error: unknown): SessionConflict | null {
   if (error instanceof SessionBusyError) {
     return { code: "session_busy", error: "This chat is still answering a previous message. Wait for it to finish, then send again." }
   }
-  if (error instanceof Error && error.message.includes(SESSION_LOCKED_MARKER)) {
+  if (error instanceof SessionLockedError) {
     return { code: "session_locked", error: `This chat session is in use by another kiro-cli process. Close it there, then send again. (${error.message})` }
   }
   return null

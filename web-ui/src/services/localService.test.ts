@@ -7,8 +7,8 @@ const mode = vi.hoisted(() => ({ local: true }))
 vi.mock("@/lib/mode", () => ({ get IS_LOCAL() { return mode.local } }))
 
 import {
-  getAgentDefinitions, hasLocalStream, listLocalModels, localStreamUrl,
-  openInOs, saveLocalChat, stopLocalAgent, updateAgentSelection,
+  getAgentDefinitions, getAgentEngine, hasLocalStream, listLocalModels, localStreamUrl,
+  openInOs, saveLocalChat, setAgentEngine, stopLocalAgent, updateAgentSelection,
 } from "./localService"
 
 function jsonResponse(body: unknown, status = 200): Response {
@@ -62,6 +62,16 @@ describe("localService (local mode)", () => {
     expect(call(1)).toEqual({ url: "/api/agent/definitions", method: "PUT", body: { model: null } })
   })
 
+  it("reads the agent engine and saves it with PUT", async () => {
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ engine: "v2", default: "v2" }))
+    await expect(getAgentEngine()).resolves.toEqual({ engine: "v2", default: "v2" })
+    await setAgentEngine("v3")
+    expect(call(0).url).toBe("/api/agent/engine")
+    expect(call(1)).toEqual({ url: "/api/agent/engine", method: "PUT", body: { engine: "v3" } })
+    vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: "x" }, 500))
+    await expect(setAgentEngine("v2")).rejects.toThrow("HTTP 500")
+  })
+
   it("maps the model list to the ModelPicker shape", async () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ available: [{ modelId: "m1", name: "Model 1", description: "d" }] }))
     await expect(listLocalModels()).resolves.toEqual([{ modelId: "m1", displayName: "Model 1", description: "d" }])
@@ -88,6 +98,8 @@ describe("localService (cloud mode)", () => {
     await saveLocalChat("d1", [])
     await stopLocalAgent({ newChat: true })
     await updateAgentSelection({ model: "m1" })
+    expect(await getAgentEngine()).toBeNull()
+    await setAgentEngine("v3")
     expect(await getAgentDefinitions()).toEqual({ agents: [], selection: { orchestrator: "", composer: "", style: "", translate: "" } })
     expect(await listLocalModels()).toEqual([])
     expect(localStreamUrl("s1")).toBeNull()

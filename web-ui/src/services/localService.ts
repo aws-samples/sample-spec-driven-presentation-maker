@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * Local Service — client for the Local-only Next.js API routes (`src/app/api/`):
- * open in the OS, chat persistence, agent stop and steer, agent definitions, models, and the
- * reconnect stream. Every function returns early in cloud mode, where those routes
+ * open in the OS, chat persistence, agent stop and steer, the agent engine, agent definitions,
+ * models, and the reconnect stream. Every function returns early in cloud mode, where those routes
  * do not exist.
  */
 
@@ -31,6 +31,9 @@ export interface LocalModel {
   displayName: string
   description?: string
 }
+
+/** The kiro-cli engine that runs the sdpm agents (`/api/agent/engine`). */
+export type AgentEngine = "v2" | "v3"
 
 const EMPTY_SELECTION: AgentSelection = { orchestrator: "", composer: "", style: "", translate: "" }
 
@@ -98,6 +101,28 @@ export async function steerLocalAgent(sessionId: string, id: string, text: strin
   const error = Object.assign(new Error(`Steer failed: ${response.status}: ${body}`), { code: undefined as unknown })
   try { error.code = JSON.parse(body).code } catch { /* non-JSON body */ }
   throw error
+}
+
+/**
+ * Read which kiro-cli engine runs the sdpm agents.
+ *
+ * @returns The configured engine and the app's default (null in cloud mode)
+ */
+export async function getAgentEngine(): Promise<{ engine: AgentEngine; default: AgentEngine } | null> {
+  if (!IS_LOCAL) return null
+  const response = await fetch("/api/agent/engine")
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  return response.json()
+}
+
+/**
+ * Choose the kiro-cli engine for the sdpm agents; it takes effect from the next message.
+ *
+ * @param engine - `v3` or `v2`
+ */
+export async function setAgentEngine(engine: AgentEngine): Promise<void> {
+  if (!IS_LOCAL) return
+  await postJson("/api/agent/engine", { engine }, "PUT")
 }
 
 /**
