@@ -75,6 +75,7 @@ class FetchResult:
     last_modified: str | None = None
     filename_from_header: str | None = None
     not_modified: bool = False
+    charset: str | None = None  # Content-Type charset parameter, if the server sent one
 
 
 @dataclass
@@ -202,12 +203,14 @@ def fetch_url(
     max_bytes: int = MAX_BODY_BYTES,
     etag: str | None = None,
     last_modified: str | None = None,
+    user_agent: str = "sdpm-attachment-fetcher/1.0",
 ) -> FetchResult:
     """Securely fetch a URL with full SSRF protection.
 
     Args:
         url: The URL to fetch.
         max_bytes: Maximum response body size.
+        user_agent: User-Agent header sent on every hop.
 
     Returns:
         FetchResult with data and metadata.
@@ -265,7 +268,7 @@ def fetch_url(
             headers = {
                 "Host": hostname,
                 "Accept-Encoding": "identity",
-                "User-Agent": "sdpm-attachment-fetcher/1.0",
+                "User-Agent": user_agent,
                 "Connection": "close",
             }
             if redirect_count == 0:
@@ -385,13 +388,20 @@ def fetch_url(
 
         # Extract metadata
         content_type = response.getheader("Content-Type")
+        charset: str | None = None
         if content_type:
-            content_type = content_type.split(";")[0].strip()
+            media_type, *params = content_type.split(";")
+            content_type = media_type.strip()
+            for param in params:
+                name, _, value = param.partition("=")
+                if name.strip().lower() == "charset" and value.strip():
+                    charset = value.strip().strip("\"'")
 
         return FetchResult(
             data=data,
             final_url=current_url,
             content_type=content_type,
+            charset=charset,
             content_length=len(data),
             etag=response.getheader("ETag"),
             last_modified=response.getheader("Last-Modified"),

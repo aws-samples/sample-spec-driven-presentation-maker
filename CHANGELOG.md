@@ -92,6 +92,19 @@ Entries before v0.5.0 were written retroactively as summaries.
   update`, which does not re-register). Until then, an already converted file keeps working,
   and a file V3 has not converted works only with auto-upgrade on.
 
+### Security
+
+- **Cloud agent: `web_fetch` reaches public internet addresses only.** The agent's
+  `web_fetch` tool now fetches through the same URL fetcher as the MCP attachment tools
+  (`sdpm.tools.attachment.fetcher`). It rejects schemes other than http(s), ports other than
+  80 and 443, and hosts that are, or resolve to, private, loopback, link-local or reserved
+  addresses, including the instance metadata endpoints (`169.254.169.254`,
+  `fd00:ec2::254`) and the AgentCore platform server on localhost. Every redirect hop is
+  checked again, an HTTPS page cannot redirect to HTTP, and the connection goes to the
+  address that passed the check, so a second DNS answer cannot redirect it. The agent gets
+  a short error naming the URL and the reason. Public pages, PDFs and images are fetched
+  as before. (AgentCore review F4) / Nothing.
+
 ## [0.12.0] - 2026-11-05
 
 The Cloud Web UI now lets you send a message while the agent works, stop it for good,
