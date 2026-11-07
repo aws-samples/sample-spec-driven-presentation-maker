@@ -220,7 +220,7 @@ Local            — Next.js API Routes → kiro-cli ACP, filesystem storage
 | UI components | `<CloudOnly>` / `<LocalOnly>` (declarative) |
 | Service layer | `IS_LOCAL` early return at function entry point |
 | API Routes (`src/app/api/`) | Local-only. Excluded from cloud build by `build:cloud` |
-| Request guard (`src/proxy.ts`) | Local-only. Refuses a non-loopback `Host` on every request; excluded from cloud build by `build:cloud` |
+| Request guard (`src/proxy.ts`) | Runs whenever the API routes are served, in either mode (no `IS_LOCAL` check). Refuses a non-loopback `Host` on every request; excluded from cloud build by `build:cloud` |
 | Local-only logic | Isolated in `src/lib/local/` |
 
 ### Web-first principle

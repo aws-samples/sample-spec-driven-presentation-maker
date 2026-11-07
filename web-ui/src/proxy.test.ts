@@ -10,9 +10,6 @@ import fs from "fs"
 import path from "path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const mode = vi.hoisted(() => ({ local: true }))
-vi.mock("@/lib/mode", () => ({ get IS_LOCAL() { return mode.local } }))
-
 // A string path: `build:cloud` moves proxy.ts out (not this test), and its type check must not
 // resolve the import.
 const PROXY_MODULE = "./proxy"
@@ -45,10 +42,9 @@ beforeEach(() => {
 
 afterEach(() => {
   vi.unstubAllEnvs()
-  mode.local = true
 })
 
-describe("Local proxy", () => {
+describe("proxy", () => {
   const routes = apiRoutes()
 
   it("finds the API routes and runs on every request (no matcher)", () => {
@@ -65,9 +61,11 @@ describe("Local proxy", () => {
     expect(proxy(request(pathname, "localhost:3000"))).toBeUndefined()
   })
 
-  it("passes everything through in cloud mode", () => {
-    mode.local = false
-    expect(proxy(request("/api/decks", "evil.example:3000"))).toBeUndefined()
+  it("refuses a foreign Host with NEXT_PUBLIC_MODE unset (the API routes are still served)", () => {
+    vi.stubEnv("NEXT_PUBLIC_MODE", undefined)
+    expect(proxy(request("/api/decks", "evil.example:3000"))?.status).toBe(403)
+    expect(proxy(request("/api/decks", "127.0.0.1:3000"))).toBeUndefined()
+    expect(proxy(request("/api/decks", "localhost:3000"))).toBeUndefined()
   })
 
   it("is moved out of the cloud build together with the API routes", () => {
