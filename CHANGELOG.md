@@ -106,6 +106,19 @@ Entries before v0.5.0 were written retroactively as summaries.
   and what to do instead of a generic error or a reply from an agent without the sdpm tools.
   The start waits until the sdpm MCP server is ready, so a new or reopened chat no longer
   begins without its tools. A tool call that fails shows as failed. / Nothing.
+- **Kiro CLI: the `sdpm` agent loads as-is in kiro-cli 3.x (V3).** `sdpm register` wrote
+  the agent in the 2.x format only (`allowedTools`, `toolsSettings`). V3 converts such a
+  file when it starts and saves the old one as `sdpm.json.bak`, `sdpm.json.bak.1`, and so
+  on, once more after every `sdpm register`. With `chat.enableAutoAgentUpgrade` set to
+  `false` it did not convert the file. Interactive chat then fell back to the default
+  agent without the sdpm tools, and `--no-interactive` stopped with exit code 4. The agent
+  file now also carries the V3 fields (`permissions.rules`, `subagent/<name>`), so V2 and
+  V3 both read it unchanged and it is never rewritten. `sdpm unregister` also removes the
+  `.bak` copies that V3 made of our file. Start the agent itself (`kiro-cli chat --agent
+  sdpm` or `/agent sdpm`). When another agent delegates to `sdpm`, V3 asks you to approve
+  each sdpm tool the sub-agent calls. / Run `sdpm register kiro-cli` once (after `sdpm
+  update`, which does not re-register). Until then, an already converted file keeps working,
+  and a file V3 has not converted works only with auto-upgrade on.
 
 ## [0.12.0] - 2026-11-05
 

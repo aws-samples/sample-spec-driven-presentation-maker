@@ -106,7 +106,7 @@ MCP サーバーなので、MCP に対応したエージェントならどれで
 
 | クライアント | `sdpm register` がすること |
 |---|---|
-| Kiro CLI | 専用エージェント `~/.kiro/agents/sdpm.json` を書き込みます（MCP サーバー、ツール、並列コンポーザーのための `@sdpm` と `use_subagent` の信頼設定。prompt テキストは無し）。`kiro-cli chat --agent sdpm` か `/agent sdpm` で開始します。他のセッションには何も足しません。`--agent-name` で別名にできます。自分で書いたエージェントファイルには触れません |
+| Kiro CLI | 専用エージェント `~/.kiro/agents/sdpm.json` を書き込みます（MCP サーバー、ツール、並列コンポーザーのための `@sdpm` と `use_subagent` の信頼設定。prompt テキストは無し）。Kiro CLI の V2 と V3 のどちらも、このファイルをそのまま読み込みます。`kiro-cli chat --agent sdpm` か `/agent sdpm` で開始します。V3 では、別のエージェントから `sdpm` に委譲すると、sdpm のツールごとに承認を求められます。他のセッションには何も足しません。`--agent-name` で別名にできます。自分で書いたエージェントファイルには触れません |
 | Claude Code | `claude mcp add --scope user sdpm -- …`。コンポーザーは Claude Code のサブエージェントとして動き、サーバーを引き継ぎます。sdpm ツールを 1 度承認する（「今後確認しない」）か、`claude --allowedTools "mcp__sdpm__*"` で起動します。旧 plugin `sdpm@sdpm` が残っていれば `sdpm register` が `claude plugin uninstall` を提案します。残すと全ツールが二重に見えます |
 | Visual Studio Code | `code --add-mcp …` |
 | Codex（CLI / IDE 拡張 / ChatGPT デスクトップアプリ） | `codex mcp add sdpm -- …` |

@@ -113,7 +113,7 @@ an agent file that SDPM owns. You do not edit any existing configuration file by
 
 | Client | What `sdpm register` does |
 |---|---|
-| Kiro CLI | Writes a dedicated agent `~/.kiro/agents/sdpm.json` (MCP server, tools, trusted `@sdpm` and `use_subagent` for parallel composers, no prompt text). Start it with `kiro-cli chat --agent sdpm` or `/agent sdpm`. Nothing is added to other sessions. `--agent-name` picks another name. An agent file you wrote yourself is never touched |
+| Kiro CLI | Writes a dedicated agent `~/.kiro/agents/sdpm.json` (MCP server, tools, trusted `@sdpm` and `use_subagent` for parallel composers, no prompt text). Both Kiro CLI engines (V2 and V3) load the file as-is. Start it with `kiro-cli chat --agent sdpm` or `/agent sdpm`; in V3, another agent that delegates to `sdpm` asks you to approve each sdpm tool. Nothing is added to other sessions. `--agent-name` picks another name. An agent file you wrote yourself is never touched |
 | Claude Code | `claude mcp add --scope user sdpm -- …`. Composers run as Claude Code sub-agents, which inherit the server. Approve the sdpm tools once ("don't ask again"), or launch with `claude --allowedTools "mcp__sdpm__*"`. If the old plugin `sdpm@sdpm` is still installed, `sdpm register` offers `claude plugin uninstall`; otherwise every tool appears twice |
 | Visual Studio Code | `code --add-mcp …` |
 | Codex (CLI, IDE extension, ChatGPT desktop app) | `codex mcp add sdpm -- …` |
