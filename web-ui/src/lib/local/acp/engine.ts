@@ -12,6 +12,10 @@
  *
  * The engine is chosen by configuration (`readEngineConfig().engine`), never guessed from
  * kiro-cli's answers; what an engine can do is read from its initialize answer (`EngineCapabilities`).
+ *
+ * Each engine also owns the store it saves sessions in (`listStoredSessions`) and declares which
+ * engines can open them (`sessionsOpenableBy`): the session catalog (kiro-sessions.ts) lists the
+ * stores the configured engine can open, and the engine's session forks one of them.
  */
 import type { LocalEvent } from "../conversation/events"
 import type { EngineId } from "./engine-config"
@@ -48,6 +52,8 @@ export interface SessionContext {
   request(method: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<unknown>
   /** The session's working directory (servers/local). */
   cwd: string
+  /** The environment kiro-cli runs with (where its stores are: `KIRO_HOME`). */
+  env: NodeJS.ProcessEnv
   /** Timeout of session/new, session/load and session/set_mode. */
   setupTimeoutMs: number
   /** The caller's abort signal for the setup requests. */
@@ -71,6 +77,36 @@ export interface OpenSessionOptions {
   onSwitching?: () => void
 }
 
+export interface ForkSessionOptions extends OpenSessionOptions {
+  /** The fork is being made. */
+  onCopying?: () => void
+  /** The fork exists under this id (before it is opened): a failure from here on leaves it to `discardFork`. */
+  onForked?: (sessionId: string) => void
+}
+
+/** A session saved in an engine's store, as the session picker lists it. */
+export interface StoredSession {
+  sessionId: string
+  /** The engine whose store holds it. */
+  engine: EngineId
+  title: string
+  /** Working directory the session was created in. */
+  cwd: string
+  /** ISO 8601 ("" when unknown). */
+  updatedAt: string
+  /** The agent (V2) or mode (V3) it ran, when known. */
+  agentName: string | null
+  /** A sub-agent's own session (V2), listed only with "Show all". */
+  subagent?: boolean
+}
+
+/** What an engine's store is read with: kiro-cli's environment and, when the store needs one, a connection. */
+export interface StoreContext {
+  env: NodeJS.ProcessEnv
+  /** An initialized kiro-cli of this engine (the process manager's `withEngineConnection`). */
+  connect(): Promise<{ request: SessionContext["request"]; caps: EngineCapabilities }>
+}
+
 /**
  * One kiro-cli process's conversation, as its engine runs it. `newSession` and `openSession`
  * return once the session runs the requested agent's mode (else AgentStartError
@@ -80,6 +116,14 @@ export interface EngineSession {
   newSession(agentName: string): Promise<{ sessionId: string }>
   /** Open an existing session; `sessionId` in the answer is the one prompts go to. */
   openSession(sessionId: string, agentName: string, opts?: OpenSessionOptions): Promise<{ sessionId: string; outcome: LoadOutcome }>
+  /**
+   * Make a new session from a stored one (any store this engine can open) and open it; the source
+   * is left as it is. `sessionId` is the fork's. `created`: kiro-cli could not read the fork, and
+   * its conversation would start empty.
+   */
+  forkSession(sourceId: string, agentName: string, opts?: ForkSessionOptions): Promise<{ sessionId: string; outcome: LoadOutcome }>
+  /** Delete a session this session forked (any other id is ignored with a warning). */
+  discardFork(sessionId: string): Promise<void>
   /** One kiro-cli notification as engine-independent events; replays and internal notifications are []. */
   translate(msg: AcpNotification): LocalEvent[]
   /** A prompt turn starts / ends (the process manager's turn, which steers may continue). */
@@ -98,6 +142,10 @@ export interface EngineAdapter {
   spawnArgs(agentName: string): string[]
   capabilities(init: InitializeResponse): EngineCapabilities
   createSession(ctx: SessionContext): EngineSession
+  /** The engines that can open (fork) the sessions in this engine's store. */
+  readonly sessionsOpenableBy: readonly EngineId[]
+  /** The sessions in this engine's store. */
+  listStoredSessions(ctx: StoreContext): Promise<StoredSession[]>
 }
 
 const ADAPTERS: Record<EngineId, EngineAdapter> = {
@@ -107,4 +155,9 @@ const ADAPTERS: Record<EngineId, EngineAdapter> = {
 
 export function adapterFor(id: EngineId): EngineAdapter {
   return ADAPTERS[id]
+}
+
+/** The adapters whose stored sessions `engine` can open. */
+export function storedSessionAdapters(engine: EngineId): EngineAdapter[] {
+  return Object.values(ADAPTERS).filter((adapter) => adapter.sessionsOpenableBy.includes(engine))
 }

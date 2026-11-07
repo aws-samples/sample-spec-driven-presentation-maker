@@ -342,7 +342,10 @@
     "forkFailed": "Couldn’t branch from that session. Please try again.",
     "loading": "Loading sessions",
     "error": "Sessions couldn’t be loaded. Please try again.",
-    "keyboardHint": "↑↓ to move · Enter to select · Esc to close"
+    "keyboardHint": "↑↓ to move · Enter to select · Esc to close",
+    "engineBadgeLabel": "Saved by the {engine} agent engine",
+    "v3SessionsHidden": "V3 sessions are listed when the agent engine is V3 (Settings).",
+    "engineUnavailable": "kiro-cli’s V3 sessions couldn’t be read. Only V2 sessions are listed."
   },
   "forkProgress": {
     "stepsLabel": "Branching progress",

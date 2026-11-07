@@ -39,6 +39,7 @@ type Engine = "v2" | "v3"
 
 const FIXTURES = path.resolve(__dirname, "../../test/fixtures/acp")
 const fixture = (name: string) => path.resolve(FIXTURES, `kiro-3.0.0-${name}.jsonl`) // nosemgrep: path-join-resolve-traversal — constant fixture names
+const fixture31 = (name: string) => path.resolve(FIXTURES, `kiro-3.1.0-${name}.jsonl`) // nosemgrep: path-join-resolve-traversal — constant fixture names
 const TURNS: Record<string, { engine: Engine; file: string }> = {
   V2: { engine: "v2", file: fixture("v2-turn") },
   V3: { engine: "v3", file: fixture("v3-turn") },
@@ -534,5 +535,66 @@ describe("kiro-cli 3.0.0 start-up", () => {
     expect(textOf(first)).toBe(capturedText(window(lines, 3), SETMODE_LOADED))
     const second = (await prompt("Call the sdpm list_styles tool once.", SETMODE_LOADED)).map((b) => b.data)
     expect(cardNames(second)).toEqual(["list_styles"])
+  })
+})
+
+describe("kiro-cli 3.1.0 V3, list and fork", () => {
+  const V3_SOURCE = "sess_73976169-6cea-4c01-9836-b1a9ce1e0d80"
+  const V3_FORK = "sess_4d702a52-b22c-4530-b15a-d539516c2141"
+  const V2_SOURCE = "ad46389c-6f86-48b2-a234-ebb9b023bd11"
+  const V2_FORK = "sess_96ed2eff-562a-4aad-ac31-73e2202d860f"
+
+  it("lists V3's sessions through a short-lived kiro-cli, killed afterwards", async () => {
+    replay("v3", fixture31("v3-list"))
+    const { adapterFor } = await import("./acp/engine")
+    const sessions = await acp.withEngineConnection("v3", (connect) => adapterFor("v3").listStoredSessions({ env: process.env, connect }))
+    expect(sessions).toEqual([{
+      sessionId: V3_SOURCE, engine: "v3", title: "Do not call any tool. Remember the codeword MANGO. Reply only OK",
+      cwd: "/home/user/proj", updatedAt: "2026-11-07T11:42:29.006Z", agentName: "vibe",
+    }])
+    await new Promise((r) => setImmediate(r))
+    expect(children[0].requests).toEqual(["initialize", "session/list"])
+    expect(children[0].killed).toBe(true)
+    expect(acp.hasProcess(V3_SOURCE)).toBe(false)
+  })
+
+  it.each([
+    ["a V3 session", "v3-fork", V3_SOURCE, V3_FORK, "MANGO"],
+    ["a V2 session V3 had not imported", "v3-fork-v2", V2_SOURCE, V2_FORK, "GUAVA"],
+  ])("forks %s in the agent's mode and continues from its history", async (_name, name, source, fork, word) => {
+    replay("v3", fixture31(name))
+    const phases: string[] = []
+    const { sessionId, outcome } = await acp.forkSession(source, "sdpm-orchestrator", { onPhase: (phase) => { phases.push(phase) } })
+    expect({ sessionId, outcome }).toEqual({ sessionId: fork, outcome: "resumed" })
+    expect(phases.slice(0, 3)).toEqual(["starting", "copying", "loading"])
+    expect(phases).not.toContain("switching")
+    expect(children[0].requests).toEqual(["initialize", "session/fork", "session/load"])
+    expect(acp.hasProcess(fork)).toBe(true)
+    const events = (await prompt("What codeword did I ask you to remember? Reply with the word only.", fork)).map((b) => b.data)
+    expect(textOf(events)).toBe(word)
+  })
+
+  it("deletes a fork whose load names another source, before killing its kiro-cli", async () => {
+    replay("v3", fixture31("v3-fork"), () => {}, (lines) => {
+      const promptAt = lines.findIndex((line) => marker(line)?.method === "session/prompt")
+      return [
+        ...lines.slice(0, promptAt).map((line) => {
+          const result = line.result as { _meta?: Record<string, unknown> } | undefined
+          return result?._meta?.parentSessionId ? { ...line, result: { ...result, _meta: { ...result._meta, parentSessionId: "sess_other" } } } : line
+        }),
+        { client: { id: 99, method: "session/delete" } },
+        { jsonrpc: "2.0", id: 99, result: {} },
+      ]
+    })
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      const { ForkNotReadError } = await import("./sessionErrors")
+      expect(await acp.forkSession(V3_SOURCE, "sdpm-orchestrator").catch((e: unknown) => e)).toBeInstanceOf(ForkNotReadError)
+      expect(children[0].requests).toEqual(["initialize", "session/fork", "session/load", "session/delete"])
+      expect(children[0].killed).toBe(true)
+      expect(acp.hasProcess(V3_FORK)).toBe(false)
+    } finally {
+      warn.mockRestore()
+    }
   })
 })

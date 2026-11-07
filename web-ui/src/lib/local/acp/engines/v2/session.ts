@@ -11,11 +11,15 @@
  * (outcome `created`): V2's process stays usable after a failed load. A loaded session in
  * another mode is switched with session/set_mode (its MCP record cleared first). Either way the
  * session is returned once its sdpm server is ready; V2 reports it before its answers.
+ *
+ * A fork is a copy of the stored session's files under a new UUID (stored-sessions.ts), opened
+ * as above; `discardFork` removes only a copy this session made.
  */
 import { AgentStartError } from "../../../turnErrors"
-import type { AcpModelList, EngineErrorKind, EngineSession, LoadOutcome, OpenSessionOptions, SessionContext } from "../../engine"
+import type { AcpModelList, EngineErrorKind, EngineSession, ForkSessionOptions, LoadOutcome, OpenSessionOptions, SessionContext } from "../../engine"
 import type { AcpNotification, LoadSessionResponse, SessionModeState } from "../../schema"
 import { AcpRequestError } from "../../transport"
+import { copyStoredSession, removeStoredSession, v2SessionsDir } from "./stored-sessions"
 import { V2Translator } from "./translate"
 import { SESSION_LOCKED_MARKER, SESSION_NOT_FOUND_MARKER, type V2NewSessionResponse } from "./types"
 
@@ -31,6 +35,8 @@ export class V2Session implements EngineSession {
   private modelList: AcpModelList | null = null
   private notFound: Promise<void>
   private notFoundSeen = () => {}
+  /** Copies this session made (`forkSession`): the only ids `discardFork` removes. */
+  private readonly forks = new Set<string>()
 
   constructor(private readonly ctx: SessionContext) {
     this.notFound = new Promise((resolve) => { this.notFoundSeen = resolve })
@@ -63,6 +69,24 @@ export class V2Session implements EngineSession {
     if (loaded?.modes?.currentModeId !== agentName) await this.switchMode(sessionId, agentName, loaded?.modes, opts)
     await this.ctx.waitForMcp(sessionId)
     return { sessionId, outcome: "resumed" }
+  }
+
+  async forkSession(sourceId: string, agentName: string, opts: ForkSessionOptions = {}): Promise<{ sessionId: string; outcome: LoadOutcome }> {
+    opts.onCopying?.()
+    const forkId = await copyStoredSession(sourceId, v2SessionsDir(this.ctx.env))
+    this.forks.add(forkId)
+    opts.onForked?.(forkId)
+    const opened = await this.openSession(forkId, agentName, opts)
+    // V2 could not read the copy (it continues in a new empty session): report the copy's id, to discard.
+    return opened.outcome === "created" ? { sessionId: forkId, outcome: "created" } : opened
+  }
+
+  async discardFork(sessionId: string): Promise<void> {
+    if (!this.forks.delete(sessionId)) {
+      console.warn("[acp] V2: not removing session %s, which this session did not fork", sessionId)
+      return
+    }
+    await removeStoredSession(sessionId, v2SessionsDir(this.ctx.env))
   }
 
   translate(msg: AcpNotification): ReturnType<EngineSession["translate"]> {

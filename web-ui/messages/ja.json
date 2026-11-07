@@ -342,7 +342,10 @@
     "forkFailed": "このセッションから分岐できませんでした。再試行してください。",
     "loading": "セッションを読み込み中",
     "error": "セッションを読み込めませんでした。再試行してください。",
-    "keyboardHint": "↑↓ で移動 · Enter で選択 · Esc で閉じる"
+    "keyboardHint": "↑↓ で移動 · Enter で選択 · Esc で閉じる",
+    "engineBadgeLabel": "{engine} エージェントエンジンのセッション",
+    "v3SessionsHidden": "V3 のセッションは、エージェントエンジンが V3 のときに表示されます（設定）。",
+    "engineUnavailable": "kiro-cli の V3 のセッションを読み込めませんでした。V2 のセッションだけを表示しています。"
   },
   "forkProgress": {
     "stepsLabel": "分岐の進捗",

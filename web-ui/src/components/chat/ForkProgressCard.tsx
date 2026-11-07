@@ -16,7 +16,7 @@ interface ForkProgressCardProps {
   onCancel: () => void
 }
 
-const PHASES: ForkSessionPhase[] = ["copying", "starting", "loading", "switching"]
+const PHASES: ForkSessionPhase[] = ["starting", "copying", "loading", "switching"]
 
 export function ForkProgressCard({ session, phase, replayed, onCancel }: ForkProgressCardProps) {
   const t = useTranslations("forkProgress")

@@ -34,8 +34,8 @@ describe("forkKiroSession", () => {
   it("parses phase and done events across arbitrary stream chunks", async () => {
     const sessionId = "22222222-2222-4222-8222-222222222222"
     const payload = [
-      'event: phase\ndata: {"phase":"copying"}\n\n',
       'event: phase\ndata: {"phase":"starting"}\n\n',
+      'event: phase\ndata: {"phase":"copying"}\n\n',
       'event: phase\ndata: {"phase":"loading","replayed":20}\n\n',
       'event: phase\ndata: {"phase":"switching"}\n\n',
       `event: done\ndata: ${JSON.stringify({ sessionId, origin })}\n\n`,
@@ -55,8 +55,8 @@ describe("forkKiroSession", () => {
     }, { onPhase, signal: controller.signal })).resolves.toEqual({ sessionId, origin })
 
     expect(onPhase.mock.calls).toEqual([
-      ["copying", undefined],
       ["starting", undefined],
+      ["copying", undefined],
       ["loading", { replayed: 20 }],
       ["switching", undefined],
     ])

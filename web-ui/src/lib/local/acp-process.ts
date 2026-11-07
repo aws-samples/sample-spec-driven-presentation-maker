@@ -27,12 +27,19 @@
  * deck-bound process whose engine is no longer the configured one is ended once idle (Settings,
  * or the end of its turn), and the deck's next message opens `.session` on the new engine.
  *
+ * Forks (`forkSession`): a new kiro-cli makes the fork with its engine (`EngineSession.forkSession`)
+ * and opens it; a fork kiro-cli could not read, or a start that fails or is cancelled once the
+ * fork exists, is deleted through that session (`discardFork`), never anything else.
+ *
+ * Listing the stored sessions (`withEngineConnection`) uses a live process of the engine, else a
+ * short-lived kiro-cli that opens no session and is killed when the listing is done.
+ *
  * Max MAX_PROCESSES concurrent processes. Idle processes are evicted LRU.
  */
 import path from "path"
 import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
 import { syncToAgentsDir } from "./agents-sync"
-import { adapterFor, type AcpModel, type EngineCapabilities, type EngineId, type EngineSession, type LoadOutcome } from "./acp/engine"
+import { adapterFor, type AcpModel, type EngineCapabilities, type EngineId, type EngineSession, type LoadOutcome, type StoreContext } from "./acp/engine"
 import { isEngineId, readEngineConfig } from "./acp/engine-config"
 import type { InitializeResponse, PromptResponse } from "./acp/schema"
 import { AcpRequestError, METHOD_NOT_FOUND, spawnAcp, type AcpAnswer, type AcpConnection } from "./acp/transport"
@@ -42,7 +49,7 @@ import { SteerRejectedError, steerEvent, type SteerState } from "./conversation/
 import { turnEnded, turnFailed } from "./conversation/turn"
 import type { ForkSessionPhase, ForkSessionPhaseDetail, SessionOrigin } from "./kiro-sessions.types"
 import { McpRecord, SDPM_MCP_SERVER, waitForMcp } from "./mcp-ready"
-import { SessionBusyError, SessionLockedError } from "./sessionErrors"
+import { ForkNotReadError, SessionBusyError, SessionLockedError } from "./sessionErrors"
 import type { LocalSessionNoticeCode } from "./sessionNotices"
 import { AgentStartError, AgentTimeoutError } from "./turnErrors"
 
@@ -64,6 +71,13 @@ const SESSION_SETUP_TIMEOUT_MS = MCP_READY_TIMEOUT_MS + 60_000
 const STEER_TIMEOUT_MS = 10_000
 /** Chat events kept for a reconnecting stream. */
 const MAX_BUFFERED_EVENTS = 2000
+const INITIALIZE_PARAMS = {
+  protocolVersion: 1,
+  clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
+  clientInfo: { name: "sdpm-local", version: "0.1.0" },
+}
+/** The agent a listing kiro-cli is started with (V3 ignores it; V2's store is read without kiro-cli). */
+const LISTING_AGENT = "sdpm-orchestrator"
 /** What a deck's `.session` may hold: a kiro session id (V2 UUID, V3 `sess_<uuid>`). */
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
 
@@ -72,6 +86,8 @@ type EventListener = (entry: BufferedEvent) => void
 interface SpawnOptions {
   /** Open this saved session instead of creating one. */
   open?: string
+  /** Fork this stored session and open the fork instead of creating one. */
+  fork?: string
   onPhase?: (phase: ForkSessionPhase, detail?: ForkSessionPhaseDetail) => void
   signal?: AbortSignal
 }
@@ -323,11 +339,13 @@ async function spawnProcess(agentName: string, clientId: string | null, opts: Sp
     throw new AgentStartError("agent_start_failed", `agent definitions: ${errorText(error)}`)
   }
   const engine = adapterFor(config.engine)
-  const conn = spawnAcp(config.command, [...config.commandArgs, ...engine.spawnArgs(agentName)], {
-    cwd: MCP_LOCAL_DIR,
-    env: { ...process.env, ...config.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT },
-  })
-  const abortSpawn = () => conn.kill()
+  const env = { ...process.env, ...config.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT }
+  const conn = spawnAcp(config.command, [...config.commandArgs, ...engine.spawnArgs(agentName)], { cwd: MCP_LOCAL_DIR, env })
+  /** The fork this start made (`opts.fork`), deleted again if the start fails. */
+  let forkId: string | null = null
+  // Once a fork exists, a cancel fails the pending request (its signal) and the catch below
+  // deletes the fork before the kill; until then the kill is the quickest way out.
+  const abortSpawn = () => { if (!forkId) conn.kill() }
   opts.signal?.addEventListener("abort", abortSpawn, { once: true })
 
   const mcp = new McpRecord()
@@ -337,6 +355,7 @@ async function spawnProcess(agentName: string, clientId: string | null, opts: Sp
     session: engine.createSession({
       request: (method, params, requestOpts) => conn.request(method, params, requestOpts),
       cwd: MCP_LOCAL_DIR,
+      env,
       setupTimeoutMs: SESSION_SETUP_TIMEOUT_MS,
       signal: opts.signal,
       waitForMcp: async (sessionId) => {
@@ -371,15 +390,20 @@ async function spawnProcess(agentName: string, clientId: string | null, opts: Sp
   })
 
   try {
-    const init = await conn.request("initialize", {
-      protocolVersion: 1,
-      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
-      clientInfo: { name: "sdpm-local", version: "0.1.0" },
-    }, { timeoutMs: INITIALIZE_TIMEOUT_MS, signal: opts.signal }) as InitializeResponse
+    const init = await conn.request("initialize", INITIALIZE_PARAMS, { timeoutMs: INITIALIZE_TIMEOUT_MS, signal: opts.signal }) as InitializeResponse
     ps.caps = engine.capabilities(init)
 
     let outcome: LoadOutcome = "created"
-    if (opts.open) {
+    if (opts.fork) {
+      const forked = await ps.session.forkSession(opts.fork, agentName, {
+        onCopying: () => opts.onPhase?.("copying"),
+        onForked: (id) => { forkId = id },
+        onReplay: replayProgress(opts.onPhase),
+        onSwitching: () => opts.onPhase?.("switching"),
+      })
+      ps.sessionId = forked.sessionId
+      outcome = forked.outcome
+    } else if (opts.open) {
       // Restore existing session context (Obsidian agent-client pattern)
       const opened = await ps.session.openSession(opts.open, agentName, {
         onReplay: replayProgress(opts.onPhase),
@@ -405,8 +429,58 @@ async function spawnProcess(agentName: string, clientId: string | null, opts: Sp
   } catch (error) {
     opts.signal?.removeEventListener("abort", abortSpawn)
     const failure = startFailure(ps, error)
+    if (forkId) await discardFork(ps, forkId)
     conn.kill()
     throw failure
+  }
+}
+
+/** Delete a fork through the session that made it; a failure is logged (the fork stays behind). */
+async function discardFork(ps: ProcessState, forkId: string): Promise<void> {
+  try {
+    await ps.session.discardFork(forkId)
+    console.log("[acp] removed the fork %s", forkId)
+  } catch (error) {
+    console.warn("[acp] could not remove the fork %s: %s", forkId, errorText(error))
+  }
+}
+
+/**
+ * Run `fn` with a lazy connection to an initialized kiro-cli of `engine`: a live registered
+ * process of that engine, else a short-lived one (the configured command, cwd servers/local, no
+ * session), started on the first `connect` and killed once `fn` is done. A short-lived one is
+ * never registered. Concurrent listings are shared by the session catalog, not here.
+ */
+export async function withEngineConnection<T>(engine: EngineId, fn: (connect: StoreContext["connect"]) => Promise<T>): Promise<T> {
+  const listing: { spawned?: Promise<{ conn: AcpConnection; caps: EngineCapabilities }> } = {}
+  const connect: StoreContext["connect"] = async () => {
+    const live = Array.from(new Set(processes.values())).find((ps) => ps.engine === engine && ps.caps && !ps.conn.exited)
+    if (live) return { request: (method, params, requestOpts) => live.conn.request(method, params, requestOpts), caps: live.caps! }
+    listing.spawned ??= startListingConnection(engine)
+    const { conn, caps } = await listing.spawned
+    return { request: (method, params, requestOpts) => conn.request(method, params, requestOpts), caps }
+  }
+  try {
+    return await fn(connect)
+  } finally {
+    void listing.spawned?.then(({ conn }) => conn.kill(), () => {})
+  }
+}
+
+/** A kiro-cli of `engine` that only answered initialize (it is killed by the caller, or here when initialize fails). */
+async function startListingConnection(engine: EngineId): Promise<{ conn: AcpConnection; caps: EngineCapabilities }> {
+  const config = readEngineConfig()
+  const adapter = adapterFor(engine)
+  const conn = spawnAcp(config.command, [...config.commandArgs, ...adapter.spawnArgs(LISTING_AGENT)], {
+    cwd: MCP_LOCAL_DIR, env: { ...process.env, ...config.env },
+  })
+  try {
+    const init = await conn.request("initialize", INITIALIZE_PARAMS, { timeoutMs: INITIALIZE_TIMEOUT_MS }) as InitializeResponse
+    console.log("[acp] started a %s kiro-cli (pid %s) to list its sessions", engine, conn.pid)
+    return { conn, caps: adapter.capabilities(init) }
+  } catch (error) {
+    conn.kill()
+    throw error
   }
 }
 
@@ -540,8 +614,40 @@ export async function openDeckSession(
 }
 
 /**
- * The process of a forked chat: `clientId` is the fork's id, which is also the copied kiro
- * session's. The live process, or a new kiro-cli that opens the copy (`created` when kiro-cli
+ * Fork a stored session (`sourceId`, any store the configured engine can open) in a new
+ * kiro-cli and open the fork, registered under the fork's id (its client id too, which keys
+ * `pendingOrigins`). A fork kiro-cli could not read is deleted again: ForkNotReadError.
+ */
+export async function forkSession(
+  sourceId: string,
+  agentName: string,
+  opts: { signal?: AbortSignal; onPhase?: SpawnOptions["onPhase"] } = {},
+): Promise<{ ps: ProcessState; sessionId: string; outcome: LoadOutcome }> {
+  await evictIfNeeded()
+  const { ps, outcome } = await spawnProcess(agentName, null, { ...opts, fork: sourceId })
+  const sessionId = ps.sessionId!
+  if (outcome === "created") {
+    console.warn("[acp] fork %s of %s: kiro-cli could not read it", sessionId, sourceId)
+    await discardFork(ps, sessionId)
+    ps.conn.kill()
+    throw new ForkNotReadError()
+  }
+  register(ps, sessionId)
+  return { ps, sessionId, outcome }
+}
+
+/** Delete a fork `forkSession` made and end its process (a fork that is not live is left alone). */
+export async function discardForkedSession(sessionId: string): Promise<void> {
+  const ps = processes.get(sessionId)
+  if (!ps || ps.sessionId !== sessionId) return
+  forgetProcess(ps)
+  await discardFork(ps, sessionId)
+  ps.conn.kill()
+}
+
+/**
+ * The process of a forked chat: `clientId` is the fork's id, which is also the forked kiro
+ * session's. The live process, or a new kiro-cli that opens the fork (`created` when kiro-cli
  * could not read it and started an empty session).
  */
 export async function openForkedSession(

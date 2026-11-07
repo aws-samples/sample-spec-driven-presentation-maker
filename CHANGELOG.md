@@ -216,6 +216,13 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   spinning after the turn was over (V3 never closed it, V2 kept groups without an end); now
   the end of the turn closes it, and a group still running then, after a Stop for example,
   shows as failed. / Nothing.
+- **Local Web UI: "Continue from a kiro session" lists kiro-cli's V3 sessions.** The list
+  read only V2's session files, so sessions saved by kiro-cli 3.x's default engine (V3) were
+  missing. With the agent engine set to V3, the list now has V3's sessions, from kiro-cli's
+  own session list, and the earlier V2 sessions next to them, newest first, each with a small
+  V3 / V2 badge. Picking one branches it with kiro-cli's fork; a V2 session is imported by
+  V3. With the agent engine set to V2, only V2 sessions are listed, and a line under the list
+  says so. The original session is never changed. / Nothing.
 - **Kiro CLI: the `sdpm` agent loads as-is in kiro-cli 3.x (V3).** `sdpm register` wrote
   the agent in the 2.x format only (`allowedTools`, `toolsSettings`). V3 converts such a
   file when it starts and saves the old one as `sdpm.json.bak`, `sdpm.json.bak.1`, and so

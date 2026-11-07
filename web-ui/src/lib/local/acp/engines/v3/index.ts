@@ -4,6 +4,7 @@
 import type { EngineAdapter, EngineCapabilities } from "../../engine"
 import type { InitializeResponse } from "../../schema"
 import { V3Session } from "./session"
+import { listV3Sessions } from "./stored-sessions"
 import type { V3AgentCapabilities } from "./types"
 
 export const v3Adapter: EngineAdapter = {
@@ -22,4 +23,6 @@ export const v3Adapter: EngineAdapter = {
     }
   },
   createSession: (ctx) => new V3Session(ctx),
+  sessionsOpenableBy: ["v3"],
+  listStoredSessions: listV3Sessions,
 }

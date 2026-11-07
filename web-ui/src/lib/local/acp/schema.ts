@@ -94,6 +94,48 @@ export interface LoadSessionResponse {
   _meta?: AcpMeta
 }
 
+/** One session of session/list. */
+export interface SessionInfo {
+  sessionId: string
+  cwd: string
+  title?: string | null
+  /** ISO 8601 */
+  updatedAt?: string | null
+  _meta?: AcpMeta
+}
+
+export interface ListSessionsRequest {
+  cwd?: string | null
+  cursor?: string | null
+  _meta?: AcpMeta
+}
+
+export interface ListSessionsResponse {
+  sessions: SessionInfo[]
+  nextCursor?: string | null
+  _meta?: AcpMeta
+}
+
+/** session/fork is unstable in ACP (`sessionCapabilities.fork`, not in the stable schema yet). */
+export interface ForkSessionRequest {
+  sessionId: string
+  cwd: string
+  mcpServers: unknown[]
+  _meta?: AcpMeta
+}
+
+export interface ForkSessionResponse {
+  sessionId: string
+  modes?: SessionModeState | null
+  configOptions?: SessionConfigOption[] | null
+  _meta?: AcpMeta
+}
+
+export interface DeleteSessionRequest {
+  sessionId: string
+  _meta?: AcpMeta
+}
+
 export interface TextContent {
   type: "text"
   text: string

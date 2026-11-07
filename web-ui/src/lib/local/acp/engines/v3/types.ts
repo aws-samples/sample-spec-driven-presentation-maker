@@ -35,6 +35,23 @@ export interface V3SessionMeta {
   id?: string
   createdAt?: string
   agentMode?: string
+  /** A fork's source (session/load of a fork, kiro-cli 3.1). */
+  parentSessionId?: string
+}
+
+/** `_meta.kiro` of a session/list row (kiro-cli 3.1.0). */
+export interface V3SessionInfoMeta {
+  agentMode?: string
+  modeId?: string
+  createdAt?: string
+  /** `idle`, or `busy` while another kiro-cli has it open. */
+  status?: string
+  parentSessionId?: string
+}
+
+/** session/list's `_meta.kiro`: `filter.workflowSessions: "exclude"` leaves out the sessions of kiro workflows. */
+export interface V3ListSessionsMeta {
+  kiro: { filter: { workflowSessions: "exclude" | "include" } }
 }
 
 export type V3NewSessionResponse = NewSessionResponse & { _meta?: V3SessionMeta | null }

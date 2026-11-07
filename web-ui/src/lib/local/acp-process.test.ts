@@ -20,7 +20,8 @@
  * The turn's chat events are numbered once, here, and a stream and a reconnect see the same
  * numbers; a turn's notice is its first event. A deck a tool result names gets the session's
  * `.session` (and a fork's origin) once, with or without a listener; a forgotten process drops
- * its pending origin.
+ * its pending origin. A fork cancelled once it exists is deleted before its kiro-cli is killed;
+ * listing the stored sessions uses a live process of the engine, else a short-lived kiro-cli.
  * kiro-cli is replaced by a fake child that answers the ACP requests.
  */
 
@@ -64,6 +65,8 @@ class FakeChild extends EventEmitter {
   newMode: string | null = null
   /** The sdpm server's state kiro-cli reports for each session it opens. */
   mcpState: "connected" | "failed" = "connected"
+  /** Forks made with session/fork (V3), by id: their source. */
+  forks = new Map<string, string>()
   constructor(private readonly sessionId: string, private readonly lockedSessions: Set<string>, readonly args: string[] = ["acp", "--agent", "sdpm-orchestrator"]) { super() }
 
   get engine(): "v2" | "v3" { return this.args.includes("--agent-engine") ? "v3" : "v2" }
@@ -112,8 +115,15 @@ class FakeChild extends EventEmitter {
       this.mcpReady(sessionId)
       this.send({ id: req.id, result: {
         modes: this.modes(this.loadedMode ?? (this.engine === "v3" ? "sdpm-orchestrator" : this.agent)),
-        ...(this.engine === "v3" ? { _meta: { createdAt: created ? new Date().toISOString() : "2026-01-01T00:00:00.000Z" } } : {}),
+        ...(this.engine === "v3" ? { _meta: {
+          createdAt: created ? new Date().toISOString() : "2026-01-01T00:00:00.000Z",
+          ...(this.forks.has(sessionId) ? { parentSessionId: this.forks.get(sessionId) } : {}),
+        } } : {}),
       } })
+    } else if (req.method === "session/fork") {
+      const forkId = `F${this.forks.size + 1}`
+      this.forks.set(forkId, req.params.sessionId as string)
+      this.send({ id: req.id, result: { sessionId: forkId } })
     } else if (req.method === "session/set_mode") {
       this.mcpReady(req.params.sessionId as string)
       this.send({ id: req.id, result: {} })
@@ -1090,6 +1100,94 @@ describe("engines", () => {
     expect(ps.deckBound).toBe(false)
     expect(phases[0]).toBe("starting")
     expect(await acp.openForkedSession("F1", "sdpm-orchestrator")).toMatchObject({ ps, outcome: "resumed" })
+  })
+})
+
+describe("forks and listing", () => {
+  it("forks on V3 and registers the fork under its id", async () => {
+    useEngine("v3")
+    const phases: string[] = []
+    const { ps, sessionId, outcome } = await acp.forkSession("sess_src", "sdpm-orchestrator", { onPhase: (phase) => { phases.push(phase) } })
+    expect({ sessionId, outcome }).toEqual({ sessionId: "F1", outcome: "resumed" })
+    expect(ps.clientId).toBe("F1")
+    expect([...new Set(phases)]).toEqual(["starting", "copying", "loading"])
+    expect(children[0].requests.map((r) => r.method)).toEqual(["initialize", "session/fork", "session/load"])
+    expect(acp.hasProcess("F1")).toBe(true)
+  })
+
+  it("deletes a fork cancelled during its load before killing its kiro-cli", async () => {
+    useEngine("v3")
+    const log = vi.spyOn(console, "log").mockImplementation(() => {})
+    try {
+      spawn.mockImplementationOnce((_command: string, args: string[]) => {
+        const child = new FakeChild("unused", locked, args)
+        child.silent.add("session/load")
+        const kill = child.kill.bind(child)
+        child.kill = () => { child.requests.push({ id: -1, method: "(killed)", params: {} }); return kill() }
+        children.push(child)
+        return child
+      })
+      const controller = new AbortController()
+      const pending = acp.forkSession("sess_src", "sdpm-orchestrator", { signal: controller.signal }).catch((e: unknown) => e)
+      await settle()
+      expect(children[0].requests.map((r) => r.method)).toEqual(["initialize", "session/fork", "session/load"])
+      controller.abort()
+      expect(await pending).toMatchObject({ name: "AbortError" })
+      expect(children[0].requests.map((r) => r.method).slice(3)).toEqual(["session/delete", "(killed)"])
+      expect(children[0].requests[3].params).toEqual({ sessionId: "F1" })
+      expect(acp.hasProcess("F1")).toBe(false)
+    } finally {
+      log.mockRestore()
+    }
+  })
+
+  it("discards a live fork through its process, and leaves an id it did not fork alone", async () => {
+    useEngine("v3")
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const log = vi.spyOn(console, "log").mockImplementation(() => {})
+    try {
+      await acp.createNewProcessFor("C1")
+      await acp.discardForkedSession("K1")
+      expect(children[0].requests.some((r) => r.method === "session/delete")).toBe(false)
+      expect(warn).toHaveBeenCalled()
+      await acp.forkSession("sess_src", "sdpm-orchestrator")
+      await acp.discardForkedSession("F1")
+      expect(children[1].requests.at(-1)).toMatchObject({ method: "session/delete", params: { sessionId: "F1" } })
+      expect(children[1].killed).toBe(true)
+      expect(acp.hasProcess("F1")).toBe(false)
+    } finally {
+      warn.mockRestore()
+      log.mockRestore()
+    }
+  })
+
+  it("lists through a live process of the engine without starting kiro-cli", async () => {
+    useEngine("v3")
+    await acp.createNewProcessFor("C1")
+    const answer = await acp.withEngineConnection("v3", async (connect) => (await connect()).request("session/list", {}))
+    expect(answer).toEqual({})
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(children[0].requests.at(-1)?.method).toBe("session/list")
+  })
+
+  it("otherwise lists through a short-lived kiro-cli in servers/local that is killed afterwards, and none when not asked", async () => {
+    useEngine("v2")
+    await acp.createNewProcessFor("C1")
+    const log = vi.spyOn(console, "log").mockImplementation(() => {})
+    try {
+      expect(await acp.withEngineConnection("v3", async () => "no connection")).toBe("no connection")
+      expect(spawn).toHaveBeenCalledTimes(1)
+      await acp.withEngineConnection("v3", async (connect) => (await connect()).request("session/list", {}))
+      await settle()
+      expect(spawn).toHaveBeenCalledTimes(2)
+      expect(spawn.mock.calls[1][1]).toEqual(["acp", "--agent-engine", "v3"])
+      expect(spawn.mock.calls[1][2]).toMatchObject({ cwd: expect.stringMatching(/servers[\\/]local$/) })
+      expect(children[1].requests.map((r) => r.method)).toEqual(["initialize", "session/list"])
+      expect(children[1].killed).toBe(true)
+      expect(children[0].killed).toBe(false)
+    } finally {
+      log.mockRestore()
+    }
   })
 })
 

@@ -32,6 +32,7 @@ import { ModeSelector } from "./ModeSelector"
 import { HtmlFormatPill } from "./HtmlFormatPill"
 import { SessionPickerDialog } from "./SessionPickerDialog"
 import { ContinuedFromChip } from "./ContinuedFromChip"
+import { EngineBadge } from "./EngineBadge"
 import { ForkProgressCard } from "./ForkProgressCard"
 import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
@@ -129,7 +130,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [sessionPickerOpen, setSessionPickerOpen] = useState(false)
   const [recentSessions, setRecentSessions] = useState<KiroSessionSummary[]>([])
   const [forkingSession, setForkingSession] = useState<KiroSessionSummary | null>(null)
-  const [forkProgress, setForkProgress] = useState<{ phase: ForkSessionPhase; replayed: number }>({ phase: "copying", replayed: 0 })
+  const [forkProgress, setForkProgress] = useState<{ phase: ForkSessionPhase; replayed: number }>({ phase: "starting", replayed: 0 })
   const forkAbortControllerRef = useRef<AbortController | null>(null)
   const [forkError, setForkError] = useState(false)
   const [continuedOrigin, setContinuedOrigin] = useState<SessionOrigin | undefined>(sessionOrigin)
@@ -234,7 +235,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     forkAbortControllerRef.current?.abort()
     forkAbortControllerRef.current = null
     setForkingSession(null)
-    setForkProgress({ phase: "copying", replayed: 0 })
+    setForkProgress({ phase: "starting", replayed: 0 })
   }, [])
 
   const forkAndStart = useCallback(async (summary: KiroSessionSummary) => {
@@ -244,7 +245,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     setSessionPickerOpen(false)
     setForkError(false)
     setForkingSession(summary)
-    setForkProgress({ phase: "copying", replayed: 0 })
+    setForkProgress({ phase: "starting", replayed: 0 })
 
     try {
       const result = await forkKiroSession({
@@ -697,8 +698,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                       <GitBranch className="h-4 w-4 flex-none text-brand-teal" aria-hidden="true" />
                       <span className="min-w-0 flex-1">
                         <span className="block truncate text-sm font-medium text-foreground">{recent.title}</span>
-                        <span className="mt-0.5 block truncate text-xs text-foreground-muted">
-                          {recent.project} · {formatRelativeTime(recent.updatedAt, locale)}
+                        <span className="mt-0.5 flex min-w-0 items-center gap-2 text-xs text-foreground-muted">
+                          <span className="truncate">{recent.project} · {formatRelativeTime(recent.updatedAt, locale)}</span>
+                          <EngineBadge engine={recent.engine} />
                         </span>
                       </span>
                     </button>

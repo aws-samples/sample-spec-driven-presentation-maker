@@ -14,6 +14,7 @@ vi.mock("@/lib/mode", () => ({
 }))
 
 const sessions: KiroSessionsResponse = {
+  engine: "v3",
   groups: [
     {
       cwd: "/work/alpha",
@@ -21,6 +22,7 @@ const sessions: KiroSessionsResponse = {
       sessions: [
         {
           sessionId: "11111111-1111-4111-8111-111111111111",
+          engine: "v2",
           title: "Investigate rendering latency",
           cwd: "/work/alpha",
           project: "alpha",
@@ -29,6 +31,7 @@ const sessions: KiroSessionsResponse = {
         },
         {
           sessionId: "22222222-2222-4222-8222-222222222222",
+          engine: "v3",
           title: "Plan migration rollout",
           cwd: "/work/alpha",
           project: "alpha",
@@ -101,10 +104,34 @@ describe("SessionPickerDialog", () => {
   })
 
   it("shows an empty state with guidance", async () => {
-    mockResponse({ groups: [], recent: [] })
+    mockResponse({ engine: "v3", groups: [], recent: [] })
     renderWithIntl(<SessionPickerDialog open onOpenChange={() => {}} onSelect={() => {}} />)
 
     expect(await screen.findByText("No sessions found")).toBeTruthy()
     expect(screen.getByText(/kiro-cli chat/)).toBeTruthy()
+  })
+
+  it("marks each session with the engine that saved it", async () => {
+    renderWithIntl(<SessionPickerDialog open onOpenChange={() => {}} onSelect={() => {}} />)
+
+    await screen.findByText("Investigate rendering latency")
+    expect(screen.getByRole("img", { name: "Saved by the V2 agent engine" }).textContent).toBe("V2")
+    expect(screen.getByRole("img", { name: "Saved by the V3 agent engine" }).textContent).toBe("V3")
+    expect(screen.queryByText(/V3 sessions are listed when/)).toBeNull()
+    expect(screen.queryByText(/couldn’t be read/)).toBeNull()
+  })
+
+  it("says V3 sessions are listed on V3 when the engine is V2", async () => {
+    mockResponse({ ...sessions, engine: "v2" })
+    renderWithIntl(<SessionPickerDialog open onOpenChange={() => {}} onSelect={() => {}} />)
+
+    expect(await screen.findByText("V3 sessions are listed when the agent engine is V3 (Settings).")).toBeTruthy()
+  })
+
+  it("says when V3's sessions could not be read", async () => {
+    mockResponse({ ...sessions, unavailable: ["v3"] })
+    renderWithIntl(<SessionPickerDialog open onOpenChange={() => {}} onSelect={() => {}} />)
+
+    expect(await screen.findByText("kiro-cli’s V3 sessions couldn’t be read. Only V2 sessions are listed.")).toBeTruthy()
   })
 })
