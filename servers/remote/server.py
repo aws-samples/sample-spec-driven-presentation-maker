@@ -997,8 +997,8 @@ def run_python(
 ) -> str:
     """Run Python inside the deck workspace — the way to read and write deck files
     (deck.json, specs/, slides/, includes/, attachments/). Helpers: read_json(path),
-    write_json(path, data), read_text(path), write_text(path, text), list_files(subdir=".");
-    plain open() also works. Writes persist (read-only decks: discarded, and the result
+    write_json(path, data), read_text(path), write_text(path, text), list_files(subdir=".")
+    (folders end with "/"); plain open() also works. Writes persist (read-only decks: discarded, and the result
     says so); output.pptx (output.html for HTML decks) rebuilds and changed slides are
     re-rendered and previewed when deck.json, slides/, includes/ or specs/outline.md
     changed. measure_slides measures text overflow and lints those slugs, and previews them;
