@@ -17,7 +17,7 @@ let dir: string
 let cfg: typeof import("./engine-config")
 let warn: ReturnType<typeof vi.spyOn>
 
-const file = (name = "acp-config.json") => path.resolve(dir, name)
+const file = (name = "acp-config.json") => path.resolve(dir, name) // nosemgrep: path-join-resolve-traversal — constant names in a tmpdir
 const write = (value: unknown) => fs.writeFileSync(file(), typeof value === "string" ? value : JSON.stringify(value))
 
 /** The old file a user still has (report S15): an agent list, `--agent sdpm-spec`, unused fields. */
@@ -82,7 +82,7 @@ describe("readEngineConfig", () => {
     expect(cfg.readEngineConfig()).toEqual({ ...DEFAULTS, command: "/opt/kiro/bin/kiro-cli", env: { AWS_PROFILE: "work" } })
     cfg.readEngineConfig()
     expect(warn).toHaveBeenCalledTimes(1)
-    expect(String(warn.mock.calls[0][0])).toContain("not used")
+    expect(warn.mock.calls[0].join(" ")).toContain("not used")
     expect(fs.readFileSync(file(), "utf-8")).toBe(before)
   })
 
