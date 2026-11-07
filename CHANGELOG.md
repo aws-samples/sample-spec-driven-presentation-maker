@@ -140,6 +140,15 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
 
 ### Fixed
 
+- **Deploying `SdpmAuth` alone no longer removes the CloudFront URL from the Web UI's
+  Cognito app client.** Each `SdpmAuth` deploy that changed the client reset its callback
+  and logout URLs to `http://localhost:3000`, so nobody could sign in to the Web UI, and a
+  routine `SdpmWebUi` deploy did not put the URL back. `SdpmAuth` now owns the whole list
+  (`http://localhost:3000` and the Web UI's CloudFront URL, nothing else): `SdpmWebUi`
+  publishes its URL in SSM (`/sdpm/web-ui/site-url`), and a function in `SdpmAuth` writes
+  the list after every change to the client and whenever `SdpmWebUi` creates or changes its
+  URL. / Deploy `SdpmAuth` before `SdpmWebUi` once (`./scripts/deploy.sh` does); after
+  that, either stack can be deployed alone.
 - **`sdpm update` gets past changed files in the checkout.** Tools of earlier versions
   rewrote tracked files in `~/.sdpm/checkout` (uv `sdpm/uv.lock`, the Web UI build
   `web-ui/next-env.d.ts`), and the pull then stopped with "Your local changes … would be
@@ -233,6 +242,16 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   non-JSON bodies, and listing the models (which may start kiro-cli) is a `POST`, so a plain
   `GET` has no side effects. Open the Web UI as `http://localhost:<port>` or
   `http://127.0.0.1:<port>`; another host name pointing at the machine is refused.
+- **Cloud agent: `web_fetch` reaches public internet addresses only.** The agent's
+  `web_fetch` tool now fetches through the same URL fetcher as the MCP attachment tools
+  (`sdpm.tools.attachment.fetcher`). It rejects schemes other than http(s), ports other than
+  80 and 443, and hosts that are, or resolve to, private, loopback, link-local or reserved
+  addresses, including the instance metadata endpoints (`169.254.169.254`,
+  `fd00:ec2::254`) and the AgentCore platform server on localhost. Every redirect hop is
+  checked again, an HTTPS page cannot redirect to HTTP, and the connection goes to the
+  address that passed the check, so a second DNS answer cannot redirect it. The agent gets
+  a short error naming the URL and the reason. Public pages, PDFs and images are fetched
+  as before. (AgentCore review F4) / Nothing.
 
 ## [0.12.0] - 2026-11-05
 

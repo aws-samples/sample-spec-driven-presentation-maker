@@ -29,6 +29,10 @@ USER bedrock_agentcore
 
 COPY agent/background.py agent/basic_agent.py agent/compose_messaging.py agent/cost_logger.py agent/errors.py agent/event_ring.py agent/factory.py agent/composition.py agent/mcp_clients.py agent/message_hooks.py agent/model_profiles.py agent/resilience.py agent/session.py agent/session_guard.py agent/session_handle.py agent/session_runtime.py agent/steer_inbox.py agent/stop_guard.py agent/streaming.py agent/token_holder.py agent/ws_entry.py ./
 COPY shared/__init__.py shared/session_owner.py shared/snapshot_random.py shared/
+# web_fetch uses sdpm's URL fetcher (the MCP attachment tools' SSRF check). The package
+# source is copied whole, without the engine's dependencies or bundled data: only the
+# sdpm.tools.attachment.fetcher import chain (stdlib + pydantic) runs in this image.
+COPY sdpm/sdpm/ sdpm/
 COPY agent/prompts/ prompts/
 COPY agent/modes/ modes/
 COPY agent/tools/ tools/

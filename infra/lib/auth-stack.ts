@@ -16,15 +16,15 @@
 
 import * as cdk from "aws-cdk-lib";
 import * as cognito from "aws-cdk-lib/aws-cognito";
+import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as logs from "aws-cdk-lib/aws-logs";
 import * as ssm from "aws-cdk-lib/aws-ssm";
+import { createHash } from "crypto";
 import * as path from "path";
 import { Construct } from "constructs";
 
 export interface AuthStackProps extends cdk.StackProps {
-  /** Amazon CloudFront site URL for OAuth callback (set after WebUiStack creates it). */
-  callbackUrls?: string[];
   /** OAuth callback URLs for external MCP clients (from config.yaml). */
   mcpCallbackUrls?: string[];
   /**
@@ -78,7 +78,19 @@ export const AUTH_SSM_PARAMS = {
   mcpCustomScope: "/sdpm/auth/mcp-custom-scope",
   cognitoDomainPrefix: "/sdpm/auth/cognito-domain-prefix",
   oidcDiscoveryUrl: "/sdpm/auth/oidc-discovery-url",
+  /** ARN of the function that sets the WebClient's callback/logout URLs. */
+  webClientUrlsFnArn: "/sdpm/auth/web-client-urls-fn-arn",
 } as const;
+
+/**
+ * SSM parameter where WebUiStack publishes its CloudFront site URL. AuthStack's
+ * WebClientUrls function reads it at run time, so AuthStack needs no reference
+ * to WebUiStack (which would be a circular dependency).
+ */
+export const WEB_UI_SITE_URL_PARAM = "/sdpm/web-ui/site-url";
+
+/** The Web UI dev server (`npm run dev`); always an allowed callback/logout URL. */
+export const WEB_UI_DEV_URL = "http://localhost:3000";
 
 export class AuthStack extends cdk.Stack {
   /** OIDC discovery URL for Runtime/Agent JWT authorizer. */
@@ -167,10 +179,11 @@ export class AuthStack extends cdk.Stack {
     /** Fully-qualified custom scope name (e.g. `sdpm-mcp/invoke`). */
     this.mcpCustomScope = `sdpm-mcp/${mcpScope.scopeName}`;
 
-    // This stack owns every WebClient setting. WebUiStack's
-    // UpdateCognitoCallbackUrls custom resource only adds the CloudFront URL to
-    // the callback/logout URLs (this stack cannot know that URL without a
-    // circular dependency) and passes every other field through unchanged.
+    // This stack owns every WebClient setting, including the callback/logout
+    // URLs: exactly WEB_UI_DEV_URL and the CloudFront site URL. The template can
+    // only hold WEB_UI_DEV_URL (the CloudFront URL is created later by WebUiStack,
+    // which depends on this stack), so the WebClientUrls function below adds the
+    // site URL that WebUiStack publishes in SSM.
     // The MCP runtime's JWT authorizer requires sdpm-mcp/invoke on the token the
     // agent forwards, so the scope is declared here, next to its resource server.
     // authFlows keeps the explicit auth flows the custom resource used to set.
@@ -185,12 +198,13 @@ export class AuthStack extends cdk.Stack {
           cognito.OAuthScope.EMAIL,
           cognito.OAuthScope.resourceServer(mcpResourceServer, mcpScope),
         ],
-        callbackUrls: ["http://localhost:3000", ...(props?.callbackUrls ?? [])],
-        logoutUrls: ["http://localhost:3000", ...(props?.callbackUrls ?? [])],
+        callbackUrls: [WEB_UI_DEV_URL],
+        logoutUrls: [WEB_UI_DEV_URL],
       },
       supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
       generateSecret: false,
     });
+    this.addWebClientUrls(this.userPoolClient);
 
     // External MCP clients — static app client when mcpCallbackUrls configured,
     // otherwise clients register dynamically via DCR.
@@ -315,5 +329,69 @@ export class AuthStack extends cdk.Stack {
       });
       mcpClientIdExport.overrideLogicalId("ExportsOutputRefUserPoolMcpClient2D19DB876064FDF5"); // pragma: allowlist secret
     }
+  }
+
+  /**
+   * Keep the WebClient's callback/logout URLs at exactly WEB_UI_DEV_URL and the
+   * Web UI site URL, whichever stack deploys and in whichever order.
+   *
+   * CloudFormation writes the template's URLs (WEB_UI_DEV_URL only) every time
+   * it updates the client. The WebClientUrls custom resource carries a hash of
+   * the client's synthesized properties, so CloudFormation runs it right after
+   * each such update, and it puts the site URL back in the same deployment.
+   * WebUiStack runs the same function (ARN in SSM) when its site URL is created
+   * or changes. The function is the only writer of the site URL.
+   */
+  private addWebClientUrls(client: cognito.UserPoolClient): void {
+    const fn = new lambda.Function(this, "WebClientUrlsFn", {
+      runtime: lambda.Runtime.PYTHON_3_13,
+      handler: "index.handler",
+      code: lambda.Code.fromAsset(path.join(__dirname, "..", "lambdas", "cognito-callback-urls")),
+      timeout: cdk.Duration.minutes(1),
+      memorySize: 128,
+      description: "Sets the WebClient callback/logout URLs to the dev URL and the published Web UI site URL",
+      environment: {
+        USER_POOL_ID: this.userPool.userPoolId,
+        CLIENT_ID: client.userPoolClientId,
+        DEV_URL: WEB_UI_DEV_URL,
+        SITE_URL_PARAM: WEB_UI_SITE_URL_PARAM,
+      },
+      logGroup: new logs.LogGroup(this, "WebClientUrlsFnLogs", {
+        retention: logs.RetentionDays.ONE_WEEK,
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+      }),
+    });
+    fn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["cognito-idp:DescribeUserPoolClient", "cognito-idp:UpdateUserPoolClient"],
+      resources: [this.userPool.userPoolArn],
+    }));
+    fn.addToRolePolicy(new iam.PolicyStatement({
+      actions: ["ssm:GetParameter"],
+      resources: [this.formatArn({
+        service: "ssm",
+        resource: "parameter",
+        resourceName: WEB_UI_SITE_URL_PARAM.slice(1),
+      })],
+    }));
+
+    // Evaluated at synth, after every change to the client has been made.
+    const cfnClient = client.node.defaultChild as cognito.CfnUserPoolClient;
+    const clientConfigHash = cdk.Lazy.string({
+      produce: () => createHash("sha256")
+        .update(JSON.stringify(this.resolve(cfnClient._toCloudFormation())))
+        .digest("hex"),
+    });
+    const webClientUrls = new cdk.CustomResource(this, "WebClientUrls", {
+      serviceToken: fn.functionArn,
+      resourceType: "Custom::WebClientUrls",
+      properties: { ClientConfigHash: clientConfigHash },
+    });
+    webClientUrls.node.addDependency(client);
+
+    new ssm.StringParameter(this, "WebClientUrlsFnArnParam", {
+      parameterName: AUTH_SSM_PARAMS.webClientUrlsFnArn,
+      stringValue: fn.functionArn,
+      description: "Function that sets the WebClient callback/logout URLs (custom resource service token)",
+    });
   }
 }
