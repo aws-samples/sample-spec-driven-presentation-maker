@@ -85,7 +85,8 @@ sdpm mcp                MCP サーバーを stdio で起動（ターミナルで
 sdpm register [CLIENT]  MCP クライアントに接続（検出クライアントのチェックリスト。--yes, --dry-run）
 sdpm unregister         接続を解除
 sdpm mcp-config [CLIENT]  このマシンのパス入りでクライアント設定を表示（--json, --all）
-sdpm update [--with-webui]  main を取得して同期し、入っているものを再ビルド（Web UI の追加も）
+sdpm update [--with-webui]  main を取得して同期し、入っているものを再ビルド（Web UI の追加も）。
+                        このコマンドと登録済みクライアントもそろえる（「更新とアンインストール」）
 sdpm doctor             環境チェック
 sdpm uninstall          ~/.sdpm・ランチャー・ショートカットを削除。登録解除も提案
 ```
@@ -249,6 +250,20 @@ AWS 構成では見出しに 3 つのボタンがあります。
 
 - `sdpm update` は最新の `main` を取得し、入っているものを再ビルドします。
   `sdpm update --with-webui` は MCP のみの構成に Web UI も足します。
+  続けて、インストールの残りもそろえます:
+  - `sdpm` コマンドを新しい版で置き換える
+  - SDPM が登録済みのクライアントに登録し直す（Kiro CLI のエージェントはインストール時に
+    決めた名前で、Claude Code、Codex）。クライアントを足すことはしません。SDPM が未登録の
+    クライアントが見つかれば名前を表示するので、`sdpm register` で足せます。VS Code と
+    Cursor は登録済みかどうかを返さないため、そのままにします
+  - 前の版が残し、もう使われないものを消す（`servers/local/.venv`、`sdpm/.venv`、旧 Kiro
+    インストーラーのファイル）
+  - CHANGELOG の Upgrading にあるローカルインストール向けの注記から、この更新の後にすること
+    があれば表示する
+
+  この動作より前に入れた環境の `sdpm` コマンドは自分を置き換えません。その環境で最初に打つ
+  `sdpm update` が、同じことを 1 回だけ行います。`SDPM_LAUNCHER_DIR` を指定してインストール
+  し、そのディレクトリが `PATH` にない場合は、その更新のときにもう一度指定してください。
 - `sdpm uninstall` は `~/.sdpm`、ランチャー、ショートカットを削除し、MCP クライアントの接続解除も提案します。
 
 AWS アカウントからデプロイを削除するには、[アンインストール（AWS）](uninstall.md)を参照してください。

@@ -90,7 +90,8 @@ sdpm mcp                run the MCP server on stdio (to check it from a terminal
 sdpm register [CLIENT]  connect MCP clients (checklist of detected clients; --yes, --dry-run)
 sdpm unregister         disconnect them again
 sdpm mcp-config [CLIENT]  print the client configuration with this machine's paths (--json, --all)
-sdpm update [--with-webui]  pull main, sync, rebuild what is installed (or add the Web UI)
+sdpm update [--with-webui]  pull main, sync, rebuild what is installed (or add the Web UI), refresh
+                        this command and the registered clients (see Update and uninstall)
 sdpm doctor             environment checks
 sdpm uninstall          remove ~/.sdpm, the launcher, shortcuts; offers to unregister
 ```
@@ -261,6 +262,20 @@ Public decks work as PPTX decks do: anyone who can view the deck can present and
 
 - `sdpm update` pulls the latest `main` and rebuilds what is installed.
   `sdpm update --with-webui` also adds the Web UI to an MCP-only install.
+  It then brings the rest of the install up to date:
+  - replaces the `sdpm` command with the new version
+  - registers SDPM again with the clients that already have it (the Kiro CLI agent under
+    the name chosen at install, Claude Code, Codex). It adds no client: clients it finds
+    without SDPM are named, and `sdpm register` adds them. VS Code and Cursor cannot report
+    whether they have SDPM, so they are left as they are
+  - removes what earlier versions left and nothing uses (`servers/local/.venv`,
+    `sdpm/.venv`, the old Kiro installer's files)
+  - prints what to do after this update, from the CHANGELOG's Upgrading notes for local
+    installs, when there is anything
+
+  An install made before this behaviour has a `sdpm` command that does not replace itself;
+  its first `sdpm update` does the same once. If you installed with `SDPM_LAUNCHER_DIR`
+  and that directory is not on `PATH`, set it again for that update.
 - `sdpm uninstall` removes `~/.sdpm`, the launcher and the shortcuts, and offers to
   disconnect your MCP clients.
 

@@ -362,3 +362,12 @@ def source_main(source: str, argv: list[str] | None = None) -> None:
     parser = argparse.ArgumentParser(description=f"Install the {source} asset catalog for SDPM.")
     parser.parse_args(argv)
     install_assets([source])
+
+
+if __name__ == "__main__":
+    # `python -m` on this module has never installed a catalog. Launchers from before the
+    # refresh step run it as a step of `sdpm update`, after the pull, so it is where they
+    # reach the new code: the bridge finishes their update (see sdpm._launcher_bridge).
+    from sdpm._launcher_bridge import run as _finish_old_launcher_update
+
+    _finish_old_launcher_update()

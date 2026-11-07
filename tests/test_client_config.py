@@ -320,3 +320,201 @@ def test_register_claude_code_without_plugin_runs_only_add(monkeypatch):
     ran = []
     cc.register([cc.by_id("claude-code")], POSIX, assume_yes=True, run=lambda a: (ran.append(a), 0)[1])
     assert len(ran) == 1
+
+
+# ---------------------------------------------------------------------------
+# refresh — the end of `sdpm update`
+# ---------------------------------------------------------------------------
+
+OLD_LAUNCHER = "#!/usr/bin/env bash\n# sdpm — the one launcher for a local SDPM installation (~/.sdpm).\necho old\n"
+NEW_LAUNCHER = OLD_LAUNCHER.replace("echo old", "# ends with client_config.py refresh\necho new")
+
+
+def _checkout_with_launchers(root: Path) -> Path:
+    install = root / "checkout" / "scripts" / "install"
+    install.mkdir(parents=True)
+    (install / "launcher.sh").write_text(NEW_LAUNCHER)
+    (install / "launcher.ps1").write_text(NEW_LAUNCHER)
+    return root / "checkout"
+
+
+@pytest.mark.skipif(sys.platform == "win32", reason="POSIX modes and inodes")
+def test_refresh_launcher_renames_a_new_file_over_the_old_and_keeps_its_mode(tmp_path):
+    checkout = _checkout_with_launchers(tmp_path)
+    installed = tmp_path / "bin" / "sdpm"
+    installed.parent.mkdir()
+    installed.write_text(OLD_LAUNCHER)
+    installed.chmod(0o755)
+    running = installed.open("rb")  # what a running bash holds
+    inode = installed.stat().st_ino
+    assert cc.refresh_launcher(installed, checkout) == "updated"
+    assert installed.read_text() == NEW_LAUNCHER
+    assert installed.stat().st_ino != inode and installed.stat().st_mode & 0o777 == 0o755
+    assert running.read().decode() == OLD_LAUNCHER  # the running copy is untouched
+    running.close()
+    assert sorted(p.name for p in installed.parent.iterdir()) == ["sdpm"]  # no temp file left
+    assert cc.refresh_launcher(installed, checkout) == "up to date"
+
+
+def test_refresh_launcher_leaves_links_and_foreign_files_alone(tmp_path):
+    checkout = _checkout_with_launchers(tmp_path)
+    (tmp_path / "bin").mkdir()
+    foreign = tmp_path / "bin" / "sdpm"
+    foreign.write_text("#!/bin/sh\necho my own sdpm\n")
+    assert "not an SDPM launcher" in cc.refresh_launcher(foreign, checkout)
+    assert foreign.read_text() == "#!/bin/sh\necho my own sdpm\n"
+    if sys.platform != "win32":
+        link = tmp_path / "bin" / "sdpm-dev"
+        link.symlink_to(checkout / "scripts" / "install" / "launcher.sh")
+        assert "is a link" in cc.refresh_launcher(link, checkout)
+        assert link.is_symlink()
+    assert "not refreshed" in cc.refresh_launcher(tmp_path / "bin" / "missing", checkout)
+
+
+def test_refresh_launcher_ps1_is_written_with_a_bom(tmp_path):
+    checkout = _checkout_with_launchers(tmp_path)
+    installed = tmp_path / "sdpm.ps1"
+    installed.write_bytes(b"\xef\xbb\xbf" + OLD_LAUNCHER.replace("\n", "\r\n").encode())  # Set-Content -Encoding UTF8
+    assert cc.refresh_launcher(installed, checkout) == "updated"
+    assert installed.read_bytes() == b"\xef\xbb\xbf" + NEW_LAUNCHER.encode()
+    assert cc.refresh_launcher(installed, checkout) == "up to date"
+
+
+def test_update_leftovers_lists_old_environments_and_our_files_only(tmp_path, monkeypatch):
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    checkout, kiro = tmp_path / "checkout", tmp_path / "kiro"
+    for venv in ("servers/local/.venv", "sdpm/.venv"):
+        (checkout / venv).mkdir(parents=True)
+        (checkout / venv / "pyvenv.cfg").write_text("home = /usr/bin\n")
+    (checkout / ".venv").mkdir()  # the workspace environment in use
+    (checkout / ".venv" / "pyvenv.cfg").write_text("home = /usr/bin\n")
+    (checkout / "agent" / ".venv").mkdir(parents=True)  # not in the list
+    cc.write_kiro_agent(POSIX, root=kiro)
+    (kiro / "agents" / "sdpm.json.bak").write_text((kiro / "agents" / "sdpm.json").read_text())
+    found = cc.update_leftovers(checkout, root=kiro)
+    assert found == [checkout / "servers/local/.venv", checkout / "sdpm/.venv", kiro / "agents" / "sdpm.json.bak"]
+    (checkout / "sdpm/.venv/pyvenv.cfg").unlink()  # a directory that is not an environment stays
+    assert checkout / "sdpm/.venv" not in cc.update_leftovers(checkout, root=kiro)
+
+
+def test_refresh_registrations_registers_again_only_what_is_registered(monkeypatch, tmp_path):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))  # no Kiro agent
+    clients = [cc.by_id("claude-code"), cc.by_id("codex"), cc.by_id("vscode")]
+    monkeypatch.setattr(cc, "registered", lambda cs, _n: {"claude-code": True, "codex": False, "vscode": None})
+    monkeypatch.setattr(cc, "claude_plugin_installed", lambda: pytest.fail("no cleanup offers during refresh"))
+    removed, added = [], []
+    failures, missing = cc.refresh_registrations(
+        POSIX, clients=clients, run=lambda a: (added.append(a), 0)[1], run_quiet=lambda a: (removed.append(a), 0)[1])
+    assert failures == 0
+    assert removed == [["claude", "mcp", "remove", "--scope", "user", "sdpm"]]  # `mcp add` refuses an existing name
+    assert added == [cc.by_id("claude-code").register(POSIX)]
+    assert [c.id for c in missing] == ["codex"]  # found, not registered: named, never added
+
+
+def test_refresh_registrations_refreshes_the_kiro_agent_without_kiro_cli(monkeypatch, tmp_path):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
+    (tmp_path / "agents").mkdir()
+    old = {"name": "work", "description": "SDPM " + cc.KIRO_AGENT_MARKER, "tools": ["@sdpm"]}  # 2.x-only file
+    (tmp_path / "agents" / "work.json").write_text(json.dumps(old))
+    failures, missing = cc.refresh_registrations(POSIX, agent_name="work", clients=[], run=lambda _a: 0)
+    assert failures == 0 and missing == []
+    agent = json.loads((tmp_path / "agents" / "work.json").read_text())
+    assert agent == cc.kiro_agent_definition(POSIX, "work")
+    assert not (tmp_path / "agents" / "sdpm.json").exists()  # the name chosen at install, nothing else
+
+
+CHANGELOG_OLD = """# Changelog
+
+## [0.12.0] - 2026-11-05
+
+### Upgrading from 0.11
+
+**AWS stack.** Deploy everything.
+
+- **Self sign-up is off.** / Set `auth.selfSignUp`.
+
+**Local installs (`sdpm update`).**
+
+- **Old step.** Do the old
+  thing once.
+"""
+
+CHANGELOG_NEW = """# Changelog
+
+## [Unreleased]
+
+### Upgrading from 0.12
+
+**Local installs (`sdpm update`).**
+
+- **Kiro CLI.** Start the agent itself:
+  `kiro-cli chat --agent sdpm`.
+- **Second.** Another thing.
+
+**AWS stack.** Deploy.
+
+- **Not for local installs.** / Deploy.
+
+### Fixed
+
+- A fix.
+
+## [0.12.0] - 2026-11-05
+
+### Upgrading from 0.11
+
+**AWS stack.** Deploy everything.
+
+- **Self sign-up is off.** / Set `auth.selfSignUp`.
+
+**Local installs (`sdpm update`).**
+
+- **Old step.** Do the old thing once.
+"""
+
+
+def test_local_install_notes_reads_only_the_local_installs_blocks():
+    assert cc.local_install_notes(CHANGELOG_NEW) == [
+        ("Unreleased", "**Kiro CLI.** Start the agent itself: `kiro-cli chat --agent sdpm`."),
+        ("Unreleased", "**Second.** Another thing."),
+        ("0.12.0", "**Old step.** Do the old thing once."),
+    ]
+
+
+def test_upgrade_notes_shows_what_the_previous_checkout_did_not_have(tmp_path, capsys):
+    import subprocess
+
+    def git(*args):
+        subprocess.run(["git", "-C", str(tmp_path), *args], check=True, capture_output=True)
+
+    git("init", "-q")
+    (tmp_path / "CHANGELOG.md").write_text(CHANGELOG_OLD)
+    git("add", "CHANGELOG.md")
+    git("-c", "user.name=t", "-c", "user.email=t@example.com", "commit", "-q", "-m", "old")
+    since = subprocess.run(["git", "-C", str(tmp_path), "rev-parse", "HEAD"],
+                           capture_output=True, text=True, check=True).stdout.strip()
+    (tmp_path / "CHANGELOG.md").write_text(CHANGELOG_NEW)
+    notes = cc.upgrade_notes(tmp_path, since)
+    # "Old step" was re-wrapped, not changed: it is not shown again.
+    assert [text.split("**")[1] for _v, text in notes] == ["Kiro CLI.", "Second."]
+    assert cc.upgrade_notes(tmp_path, None) == [] and cc.upgrade_notes(tmp_path, "--output=x") == []
+    cc.print_upgrade_notes(notes, tmp_path)
+    out = capsys.readouterr().out
+    assert "What to do after this update" in out and "Unreleased" in out and "**" not in out
+
+
+def test_cli_refresh_runs_every_part(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path / "kiro"))
+    monkeypatch.setattr(cc, "detect", lambda *_a: [])
+    checkout = _checkout_with_launchers(tmp_path)
+    (checkout / "sdpm" / ".venv").mkdir(parents=True)
+    (checkout / "sdpm" / ".venv" / "pyvenv.cfg").write_text("")
+    installed = tmp_path / "sdpm"
+    installed.write_text(OLD_LAUNCHER)
+    rc = cc.main(["--uv", "/x/uv", "--checkout", str(checkout), "refresh", "--launcher", str(installed)])
+    assert rc == 0
+    assert installed.read_text() == NEW_LAUNCHER
+    assert not (checkout / "sdpm" / ".venv").exists()
+    out = capsys.readouterr().out
+    assert "sdpm command: updated" in out and "removed" in out

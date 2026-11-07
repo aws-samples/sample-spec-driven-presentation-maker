@@ -6,6 +6,8 @@
 #   sdpm webui      browser surface
 #   sdpm mcp        MCP surface (for a terminal check; clients get the uv command directly)
 #   sdpm register   wire the MCP server into the clients on this machine
+#   sdpm update     pull, sync, rebuild, then client_config.py refresh — which replaces
+#                   this file with the checkout's launcher.sh and re-registers the clients
 # Anything that could drift between this file and launcher.ps1 (client detection,
 # configuration rendering, registration commands) lives once in
 # servers/local/client_config.py; both launchers only delegate to it.
@@ -15,6 +17,8 @@ SDPM_HOME="${SDPM_HOME:-$HOME/.sdpm}"
 CHECKOUT="$SDPM_HOME/checkout"
 PROFILE_FILE="$SDPM_HOME/.profile"
 UV_PATH_FILE="$SDPM_HOME/.uv-path"
+# This file, as installed (the copy `sdpm update` refreshes).
+SELF="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/$(basename "${BASH_SOURCE[0]}")"
 # Kiro agent name chosen at install time (--agent-name); SDPM_AGENT_NAME overrides per call.
 if [[ -z "${SDPM_AGENT_NAME:-}" && -f "$SDPM_HOME/.agent-name" ]]; then
   SDPM_AGENT_NAME=$(cat "$SDPM_HOME/.agent-name" 2>/dev/null || true)
@@ -136,8 +140,6 @@ step() {
 build_mcp() {
   local uv; uv=$(resolve_uv) || return 1
   step "Syncing the MCP server environment" update "$uv" sync --directory "$CHECKOUT/servers/local" || return $?
-  step "Installing icon catalogs" update "$uv" run --directory "$CHECKOUT/servers/local" \
-    python -m sdpm.knowledge.assets.download --sources aws,material || return $?
 }
 
 build_webui() {
@@ -147,8 +149,9 @@ build_webui() {
 
 update() {
   require_checkout
-  local with_webui=0
+  local with_webui=0 before
   for arg in "$@"; do [[ "$arg" == "--with-webui" ]] && with_webui=1; done
+  before=$(git -C "$CHECKOUT" rev-parse HEAD 2>/dev/null || true)
   echo "> Fetching main from $REPO_URL"
   step "Fetching main" update git -C "$CHECKOUT" fetch --tags --prune origin main || return $?
   step "Checking out main" update git -C "$CHECKOUT" checkout -q main || return $?
@@ -159,9 +162,11 @@ update() {
     echo full > "$PROFILE_FILE"
   fi
   if [[ "$(profile)" == "full" ]]; then build_webui || return $?; fi
+  # The new checkout's code: this file, the clients that have the server, leftovers, notes.
+  step "Refreshing the sdpm command and MCP clients" update \
+    cfg_call refresh --launcher "$SELF" ${before:+--since "$before"} || return $?
   echo "Update complete."
   echo "  sdpm webui     open the browser Web UI" ; [[ "$(profile)" == "full" ]] || echo "  (not installed — sdpm update --with-webui)"
-  echo "  sdpm register  connect your MCP clients"
 }
 
 uninstall() {
@@ -210,7 +215,8 @@ MCP clients
   mcp-config [CLIENT..] Print the configuration with this machine's paths (--json, --all)
 
 Maintenance
-  update [--with-webui] Pull main, sync dependencies, rebuild what is installed
+  update [--with-webui] Pull main, sync, rebuild what is installed, refresh this
+                        command and the registered MCP clients
   doctor                Check the local environment
   uninstall             Remove SDPM from this machine
   version | path | help
