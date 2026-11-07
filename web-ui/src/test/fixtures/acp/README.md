@@ -32,6 +32,13 @@ otherwise.
 | `kiro-3.0.0-v2-setmode-mcp.jsonl` | V2 loading an `sdpm-style` session, `s9_v2_2_load_setmode` | initialize, session/new, session/load, session/set_mode |
 | `kiro-3.0.0-v3-setmode-mcp.jsonl` | V3, the same, `s9_v3_2_load_setmode` | initialize, session/load, session/set_mode |
 | `kiro-3.0.0-v3-permission.jsonl` | V3 with `sdpm/list_styles` not allowed, `s2_v3_perm` (two permission requests) | initialize, session/new, session/prompt, session/prompt |
+| `kiro-3.1.0-v3-list.jsonl` | V3 listing its sessions with workflow sessions excluded, `s13_3_v3_list_fork` (one `vibe` session) | initialize, session/list |
+| `kiro-3.1.0-v3-fork.jsonl` | V3 forking that `vibe` session into servers/local in the sdpm-orchestrator mode, the same capture | initialize, session/fork, session/load, session/prompt |
+| `kiro-3.1.0-v3-fork-v2.jsonl` | V3 forking a V2 session it had not imported, the same capture | initialize, session/fork, session/load, session/prompt |
+
+The `kiro-3.1.0-*` files are kiro-cli 3.1.0 (KAS 0.66.70, 2026-11-07) captures with a
+temporary `KIRO_HOME`. The sources remembered a codeword (MANGO on V3, GUAVA on V2) that each
+fork's prompt asks for; each fork's load answers `_meta.parentSessionId` = the source.
 
 The two `turn` captures answer the prompt "Call the sdpm list_styles tool once, then reply with
 only the number of styles" and end with `stopReason: end_turn`.

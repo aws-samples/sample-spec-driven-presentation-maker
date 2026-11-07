@@ -1,6 +1,6 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-/** Local kiro-cli session list. */
+/** Local: the stored kiro-cli sessions the configured agent engine can open (`?all=1`: sdpm's own too). */
 import { listSessions } from "@/lib/local/kiro-sessions"
 
 export const dynamic = "force-dynamic"

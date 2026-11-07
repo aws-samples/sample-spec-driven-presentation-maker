@@ -6,9 +6,14 @@
  * session/new then session/load (prompts go to the loaded id), a `Session not found` keeps the
  * new session as `created`, another mode is switched with set_mode after the session's MCP
  * record was cleared; Stop cancels the main session and this turn's sub-agent sessions; the
- * models come from session/new; the lock and auth errors are recognised.
+ * models come from session/new; the lock and auth errors are recognised. A fork copies the
+ * stored session's files and opens the copy; a copy V2 cannot read is `created` under the
+ * copy's id; `discardFork` removes only a copy this session made.
  */
 
+import fs from "fs"
+import os from "os"
+import path from "path"
 import { describe, expect, it, vi } from "vitest"
 
 import { AgentStartError } from "../../../turnErrors"
@@ -19,7 +24,7 @@ import { V2Session } from "./session"
 
 const MODES = (current: string) => ({ currentModeId: current, availableModes: [{ id: "sdpm-orchestrator", name: "o" }, { id: "sdpm-style", name: "s" }] })
 
-function context(answers: Record<string, unknown | ((params: Record<string, unknown>) => unknown)>) {
+function context(answers: Record<string, unknown | ((params: Record<string, unknown>) => unknown)>, env: Record<string, string> = {}) {
   const calls: { method: string; params?: Record<string, unknown> }[] = []
   const order: string[] = []
   const ctx: SessionContext = {
@@ -37,6 +42,7 @@ function context(answers: Record<string, unknown | ((params: Record<string, unkn
       }
     }),
     cwd: "/workspace/sdpm/servers/local",
+    env: env as unknown as NodeJS.ProcessEnv,
     setupTimeoutMs: 1000,
     waitForMcp: vi.fn(async (sessionId: string) => { order.push(`wait ${sessionId}`) }),
     clearMcp: vi.fn((sessionId: string) => { order.push(`clear ${sessionId}`) }),
@@ -138,5 +144,69 @@ describe("V2Session", () => {
     expect(session.classifyError(new AcpRequestError({ message: "Internal error", data: "Failed to start session: Session is active in another process (PID 1)" }))).toBe("session_locked")
     expect(session.classifyError(new AcpRequestError({ code: -32000, message: "Authentication required" }))).toBe("auth_required")
     expect(session.classifyError(new Error("something else"))).toBeNull()
+  })
+
+  describe("forkSession", () => {
+    const SOURCE = "11111111-1111-4111-8111-111111111111"
+
+    function store() {
+      const dir = fs.mkdtempSync(path.join(os.tmpdir(), "v2-fork-"))
+      fs.writeFileSync(path.join(dir, `${SOURCE}.json`), JSON.stringify({ session_id: SOURCE, cwd: "/work/a", title: "T" })) // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
+      fs.writeFileSync(path.join(dir, `${SOURCE}.jsonl`), "") // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
+      return dir
+    }
+
+    it("copies the stored session and opens the copy", async () => {
+      const dir = store()
+      try {
+        const { ctx, calls, order } = context({ "session/new": NEW, "session/load": { modes: MODES("sdpm-orchestrator") } }, { SDPM_KIRO_SESSIONS_DIR: dir })
+        const onCopying = vi.fn()
+        const onForked = vi.fn()
+        const forked = await new V2Session(ctx).forkSession(SOURCE, "sdpm-orchestrator", { onCopying, onForked })
+        expect(forked.outcome).toBe("resumed")
+        expect(forked.sessionId).not.toBe(SOURCE)
+        expect(onCopying).toHaveBeenCalledOnce()
+        expect(onForked).toHaveBeenCalledWith(forked.sessionId)
+        expect(calls[1].params).toMatchObject({ sessionId: forked.sessionId })
+        expect(order).toEqual(["session/new", "session/load", `wait ${forked.sessionId}`])
+        expect(fs.readdirSync(dir).sort()).toEqual([`${SOURCE}.json`, `${SOURCE}.jsonl`, `${forked.sessionId}.json`, `${forked.sessionId}.jsonl`].sort())
+      } finally {
+        fs.rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it("reports a copy V2 cannot read as created, under the copy's id", async () => {
+      const dir = store()
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      try {
+        const { ctx } = context({
+          "session/new": NEW,
+          "session/load": () => { throw new AcpRequestError({ code: -32603, message: "Internal error", data: "Session not found: x" }) },
+        }, { SDPM_KIRO_SESSIONS_DIR: dir })
+        const forked = await new V2Session(ctx).forkSession(SOURCE, "sdpm-orchestrator")
+        expect(forked.outcome).toBe("created")
+        expect(forked.sessionId).not.toBe("K1")
+      } finally {
+        warn.mockRestore()
+        fs.rmSync(dir, { recursive: true, force: true })
+      }
+    })
+
+    it("discards only a copy it made", async () => {
+      const dir = store()
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      try {
+        const { ctx } = context({ "session/new": NEW, "session/load": { modes: MODES("sdpm-orchestrator") } }, { SDPM_KIRO_SESSIONS_DIR: dir })
+        const session = new V2Session(ctx)
+        const { sessionId } = await session.forkSession(SOURCE, "sdpm-orchestrator")
+        await session.discardFork(SOURCE)
+        expect(warn).toHaveBeenCalledOnce()
+        await session.discardFork(sessionId)
+        expect(fs.readdirSync(dir).sort()).toEqual([`${SOURCE}.json`, `${SOURCE}.jsonl`])
+      } finally {
+        warn.mockRestore()
+        fs.rmSync(dir, { recursive: true, force: true })
+      }
+    })
   })
 })

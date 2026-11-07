@@ -7,7 +7,9 @@
  * `_meta.createdAt` is not older than the load (less a second), `resumed` otherwise or without
  * one; another mode is switched with set_mode after the session's MCP record was cleared; Stop
  * cancels the main session only; the capabilities come from initialize; auth required is
- * recognised.
+ * recognised. A fork is session/fork into the session's cwd and the agent's mode, then a load of
+ * the fork: resumed when the load names the source as its parent, created when it names another,
+ * resumed with a warning when it names none; `discardFork` deletes only a fork it made.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -32,6 +34,7 @@ function context(answers: Record<string, unknown>) {
       return result
     }),
     cwd: "/workspace/sdpm/servers/local",
+    env: {} as NodeJS.ProcessEnv,
     setupTimeoutMs: 1000,
     waitForMcp: vi.fn(async (sessionId: string) => { order.push(`wait ${sessionId}`) }),
     clearMcp: vi.fn((sessionId: string) => { order.push(`clear ${sessionId}`) }),
@@ -132,5 +135,63 @@ describe("V3Session", () => {
     const session = new V3Session(context({}).ctx)
     expect(session.classifyError(new AcpRequestError({ code: -32000, message: "Authentication required. Not logged in." }))).toBe("auth_required")
     expect(session.classifyError(new AcpRequestError({ code: -32603, message: "Internal error" }))).toBeNull()
+  })
+
+  describe("forkSession", () => {
+    const SOURCE = "sess_73976169-6cea-4c01-9836-b1a9ce1e0d80"
+    const FORK = "sess_4d702a52-b22c-4530-b15a-d539516c2141"
+    const forkAnswers = (parentSessionId?: string) => ({
+      "session/fork": { sessionId: FORK },
+      "session/load": { modes: MODES("sdpm-orchestrator"), _meta: { createdAt: new Date().toISOString(), ...(parentSessionId ? { parentSessionId } : {}) } },
+    })
+
+    it("forks into the session's cwd and the agent's mode, then loads the fork", async () => {
+      const { ctx, calls, order } = context(forkAnswers(SOURCE))
+      const onCopying = vi.fn()
+      const onForked = vi.fn()
+      await expect(new V3Session(ctx).forkSession(SOURCE, "sdpm-orchestrator", { onCopying, onForked })).resolves.toEqual({ sessionId: FORK, outcome: "resumed" })
+      expect(calls[0]).toEqual({ method: "session/fork", params: { sessionId: SOURCE, cwd: "/workspace/sdpm/servers/local", mcpServers: [], _meta: { kiro: { modeId: "sdpm-orchestrator" } } } })
+      expect(calls[1]).toEqual({ method: "session/load", params: { sessionId: FORK, cwd: "/workspace/sdpm/servers/local", mcpServers: [] } })
+      expect(order).toEqual(["session/fork", "session/load", `wait ${FORK}`])
+      expect(onCopying).toHaveBeenCalledOnce()
+      expect(onForked).toHaveBeenCalledWith(FORK)
+    })
+
+    it("reports a fork whose load names another source as created", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      try {
+        const { ctx } = context(forkAnswers("sess_other"))
+        expect((await new V3Session(ctx).forkSession(SOURCE, "sdpm-orchestrator")).outcome).toBe("created")
+      } finally {
+        warn.mockRestore()
+      }
+    })
+
+    it("treats a fork's load without a parent as resumed, with a warning", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      try {
+        const { ctx } = context(forkAnswers())
+        expect((await new V3Session(ctx).forkSession(SOURCE, "sdpm-orchestrator")).outcome).toBe("resumed")
+        expect(warn).toHaveBeenCalledOnce()
+      } finally {
+        warn.mockRestore()
+      }
+    })
+
+    it("deletes only a fork it made", async () => {
+      const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+      try {
+        const { ctx, calls } = context(forkAnswers(SOURCE))
+        const session = new V3Session(ctx)
+        await session.forkSession(SOURCE, "sdpm-orchestrator")
+        await session.discardFork(SOURCE)
+        expect(warn).toHaveBeenCalledOnce()
+        await session.discardFork(FORK)
+        await session.discardFork(FORK)
+        expect(calls.filter((c) => c.method === "session/delete")).toEqual([{ method: "session/delete", params: { sessionId: FORK } }])
+      } finally {
+        warn.mockRestore()
+      }
+    })
   })
 })

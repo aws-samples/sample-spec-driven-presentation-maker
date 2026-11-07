@@ -91,7 +91,7 @@ Rules in `~/.kiro/steering` that are always included reach the sdpm agents' cont
 
 ### Continue from a kiro-cli session
 
-Any chat you had in `kiro-cli` on this machine can become the starting point of a deck. The empty chat shows your sessions from the last 24 hours as cards; the **+** menu → **Continue from kiro session** opens the full list grouped by project. Picking one forks the session into a new ID (the original files under `~/.kiro/sessions/cli/` are never modified), loads it into the orchestrator, and the agent immediately replies with what the work was about and one question — who the audience is and how long the talk is. A chip above the chat shows which session the deck was forked from.
+Any chat you had in `kiro-cli` on this machine can become the starting point of a deck. The empty chat shows your sessions from the last 24 hours as cards; the **+** menu → **Continue from a kiro session** opens the full list grouped by project, newest first. Each session has a small badge for the agent engine that saved it: with the agent engine set to V3, the list has kiro-cli's V3 sessions (from kiro-cli's own session list) and the earlier V2 sessions (`~/.kiro/sessions/cli/`, or `$KIRO_HOME/sessions/cli/`); with V2, only the V2 sessions. Picking one forks it into a new session with the configured engine (on V3, kiro-cli imports a V2 session and forks it; on V2, the session's files are copied), loads it into the orchestrator, and the agent immediately replies with what the work was about and one question — who the audience is and how long the talk is. The original session is never changed. A chip above the chat shows which session the deck was forked from.
 
 ---
 

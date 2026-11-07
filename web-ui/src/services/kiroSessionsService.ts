@@ -11,7 +11,7 @@ import type {
   KiroSessionsResponse,
 } from "@/lib/local/kiro-sessions.types"
 
-const EMPTY_SESSIONS: KiroSessionsResponse = { groups: [], recent: [] }
+const EMPTY_SESSIONS: KiroSessionsResponse = { engine: "v3", groups: [], recent: [] }
 
 export interface ForkKiroSessionOptions {
   onPhase?: (phase: ForkSessionPhase, detail?: ForkSessionPhaseDetail) => void
@@ -61,7 +61,7 @@ export async function forkKiroSession(
     const data = JSON.parse(dataLines.join("\n")) as Record<string, unknown>
     if (eventName === "phase") {
       const phase = data.phase
-      if (phase === "copying" || phase === "starting" || phase === "loading" || phase === "switching") {
+      if (phase === "starting" || phase === "copying" || phase === "loading" || phase === "switching") {
         options.onPhase?.(phase, typeof data.replayed === "number" ? { replayed: data.replayed } : undefined)
       }
       return

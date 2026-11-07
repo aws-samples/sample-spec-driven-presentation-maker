@@ -10,6 +10,7 @@ import { ForkProgressCard } from "./ForkProgressCard"
 
 const session: KiroSessionSummary = {
   sessionId: "11111111-1111-4111-8111-111111111111",
+  engine: "v2",
   title: "Investigate rendering latency",
   cwd: "/work/alpha",
   project: "alpha",
@@ -18,8 +19,8 @@ const session: KiroSessionSummary = {
 }
 
 const expectedStates: Record<ForkSessionPhase, string[]> = {
-  copying: ["active", "pending", "pending", "pending"],
-  starting: ["completed", "active", "pending", "pending"],
+  starting: ["active", "pending", "pending", "pending"],
+  copying: ["completed", "active", "pending", "pending"],
   loading: ["completed", "completed", "active", "pending"],
   switching: ["completed", "completed", "completed", "active"],
 }
@@ -32,7 +33,7 @@ afterEach(() => {
 describe("ForkProgressCard", () => {
   it("shows the session summary and advances through every phase", () => {
     const { container, rerender } = renderWithIntl(
-      <ForkProgressCard session={session} phase="copying" replayed={0} onCancel={() => {}} />,
+      <ForkProgressCard session={session} phase="starting" replayed={0} onCancel={() => {}} />,
     )
 
     expect(screen.getByText("Investigate rendering latency")).toBeTruthy()

@@ -4,6 +4,7 @@
 import type { EngineAdapter, EngineCapabilities } from "../../engine"
 import type { InitializeResponse } from "../../schema"
 import { V2Session } from "./session"
+import { listV2Sessions, v2SessionsDir } from "./stored-sessions"
 
 export const v2Adapter: EngineAdapter = {
   id: "v2",
@@ -18,4 +19,7 @@ export const v2Adapter: EngineAdapter = {
     }
   },
   createSession: (ctx) => new V2Session(ctx),
+  // V3 imports a V2 session when it loads or forks it.
+  sessionsOpenableBy: ["v2", "v3"],
+  listStoredSessions: (ctx) => listV2Sessions(v2SessionsDir(ctx.env)),
 }

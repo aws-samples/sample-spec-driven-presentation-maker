@@ -4,7 +4,7 @@
  * Playwright E2E config — runs the Web UI in Local mode against a stub
  * ACP agent (e2e/stub-agent.mjs), so no AWS and no kiro-cli are needed.
  *
- * Sandbox: decks and agent config live under e2e/.tmp (see global-setup.ts).
+ * Sandbox: decks, agent config and V2's session store live under e2e/.tmp (see global-setup.ts).
  */
 import { defineConfig } from "@playwright/test"
 import path from "path"
@@ -35,6 +35,7 @@ export default defineConfig({
       NEXT_PUBLIC_MODE: "local",
       SDPM_DECK_ROOT: path.join(TMP, "decks"),
       SDPM_ACP_CONFIG_DIR: path.join(TMP, "config"),
+      SDPM_KIRO_SESSIONS_DIR: path.join(TMP, "kiro-sessions"),
     },
   },
 })

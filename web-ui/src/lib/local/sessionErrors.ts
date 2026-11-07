@@ -33,6 +33,14 @@ export class SessionLockedError extends Error {
   }
 }
 
+/** Thrown by a fork when kiro-cli made the fork but could not read it (its conversation would be empty). */
+export class ForkNotReadError extends Error {
+  constructor() {
+    super("kiro-cli could not read the forked session")
+    this.name = "ForkNotReadError"
+  }
+}
+
 /** Map a spawn/load/prompt failure to a 409 body, or null when it is not a session conflict. */
 export function sessionConflict(error: unknown): SessionConflict | null {
   if (error instanceof SessionBusyError) {

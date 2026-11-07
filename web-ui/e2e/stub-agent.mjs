@@ -12,6 +12,11 @@
  * before and connected after. A V3 load answers a `_meta.createdAt` from before the stub started
  * (an existing session).
  *
+ * V3 also lists its sessions (`session/list`: one session, "E2E V3 source", in /tmp/e2e-project),
+ * forks one (`session/fork` → `sess_e2e-fork-<n>` in the mode of `_meta.kiro.modeId`; its load
+ * names the source in `_meta.parentSessionId`) and deletes a fork (`session/delete`), as
+ * kiro-cli 3.1 does; it advertises them in initialize. V2 answers them with Method not found.
+ *
  * On prompt it writes a deck to SDPM_DECK_ROOT (deck.json + slide JSON + preview PNG) and
  * streams: text → an sdpm tool call and its result (with the deckId) → two composer groups in
  * parallel, each with one tool of its own (V3: two `agent-subtask` delegations whose tools carry
@@ -35,6 +40,9 @@ const MODES = ["sdpm-orchestrator", "sdpm-composer", "sdpm-style", "sdpm-transla
 /** sessionId → its current mode. */
 const sessions = new Map()
 let sessionCount = 0
+/** V3 fork id → its source. */
+const forks = new Map()
+const V3_SOURCE = { sessionId: "sess_e2e-v3-source", cwd: "/tmp/e2e-project", title: "E2E V3 source" }
 
 // 1x1 transparent PNG
 const PNG_1X1 = Buffer.from(
@@ -163,6 +171,10 @@ function handlePrompt(msg) {
   answer(msg, { stopReason: "end_turn" })
 }
 
+function methodNotFound(msg) {
+  if (msg.id != null) send({ id: msg.id, error: { code: -32601, message: `Method not found: ${msg.method}` } })
+}
+
 const rl = readline.createInterface({ input: process.stdin })
 rl.on("line", (line) => {
   let msg
@@ -173,7 +185,27 @@ rl.on("line", (line) => {
   }
   switch (msg.method) {
     case "initialize":
-      answer(msg, { protocolVersion: 1, agentCapabilities: { loadSession: true } })
+      answer(msg, { protocolVersion: 1, agentCapabilities: {
+        loadSession: true,
+        ...(ENGINE === "v3" ? { sessionCapabilities: { list: {}, fork: {}, delete: {} } } : {}),
+      } })
+      break
+    case "session/list":
+      if (ENGINE !== "v3") { methodNotFound(msg); break }
+      answer(msg, { sessions: [{ ...V3_SOURCE, updatedAt: new Date().toISOString(), _meta: { kiro: { agentMode: "vibe", status: "idle" } } }] })
+      break
+    case "session/fork": {
+      if (ENGINE !== "v3") { methodNotFound(msg); break }
+      const sessionId = `sess_e2e-fork-${process.pid}-${forks.size + 1}`
+      forks.set(sessionId, msg.params.sessionId)
+      sessions.set(sessionId, msg.params?._meta?.kiro?.modeId ?? "vibe")
+      answer(msg, { sessionId })
+      break
+    }
+    case "session/delete":
+      if (ENGINE !== "v3") { methodNotFound(msg); break }
+      forks.delete(msg.params.sessionId)
+      answer(msg, {})
       break
     case "session/new": {
       const sessionId = `stub-${ENGINE}-${process.pid}-${++sessionCount}`
@@ -184,7 +216,8 @@ rl.on("line", (line) => {
     case "session/load": {
       const sessionId = msg.params.sessionId
       if (!sessions.has(sessionId)) sessions.set(sessionId, ENGINE === "v3" ? "sdpm-orchestrator" : AGENT)
-      answerReady(msg, sessionId, { modes: modes(sessionId), ...(ENGINE === "v3" ? { _meta: { createdAt: STARTED_AT } } : {}) })
+      const parent = forks.has(sessionId) ? { parentSessionId: forks.get(sessionId) } : {}
+      answerReady(msg, sessionId, { modes: modes(sessionId), ...(ENGINE === "v3" ? { _meta: { createdAt: STARTED_AT, ...parent } } : {}) })
       break
     }
     case "session/set_mode":
@@ -196,8 +229,8 @@ rl.on("line", (line) => {
       break
     default:
       // Another request (a steer): Method not found, as kiro-cli answers what it does not implement.
-      if (msg.id != null) send({ id: msg.id, error: { code: -32601, message: `Method not found: ${msg.method}` } })
-      // notifications (session/cancel etc.) — ignore
+      // Notifications (session/cancel etc.) are ignored.
+      methodNotFound(msg)
       break
   }
 })
