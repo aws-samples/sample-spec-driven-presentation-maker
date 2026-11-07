@@ -68,6 +68,10 @@ function localAcpLayers() {
       { regex: "(^|/)v3(/|$)", message: "An engine adapter does not depend on another engine." },
       processManager, bridge, routes, conversation, conversationEvents,
     ], TESTS),
+    restrict([`${L}/acp/engines/v3/**/*.ts`], [
+      { regex: "(^|/)v2(/|$)", message: "An engine adapter does not depend on another engine." },
+      processManager, bridge, routes, conversation, conversationEvents,
+    ], TESTS),
   ]
 }
 

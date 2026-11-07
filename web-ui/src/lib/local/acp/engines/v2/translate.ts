@@ -19,15 +19,20 @@
  *      `rawInput.stages[]`,
  *    - any other `tool_call` → `tool_use`, named by `_meta.kiro.toolName` for an MCP tool
  *      (`mcpServerName` set) and by its title for a built-in one; the input is `rawInput`,
- *    - a completed `tool_call_update` → `tool_end`, its result read from
- *      `rawOutput.items[0].Json.content[0].text`, its `name` the update's title (shown when no
- *      call announced the tool).
+ *    - a completed or failed `tool_call_update` → `tool_end` (`success` / `error`), its result
+ *      read from `rawOutput.items[0].Json.content[0].text`, its `name` the update's title (shown
+ *      when no call announced the tool).
  * `AgentExecutionSteeringInjected` of the main session → `steer_injected`.
- * `_kiro.dev/mcp/server_initialized` → `mcp_status connected` (any session).
+ * `_kiro.dev/mcp/server_initialized` → `mcp_status connected`, `server_init_failure` →
+ * `mcp_status failed` (any session). `_kiro.dev/agent/not_found` is logged and reported to
+ * `onAgentNotFound` (the session's mode check waits for it to say why).
  */
 import type { LocalEvent } from "../../../conversation/events"
 import type { AcpNotification } from "../../schema"
-import { KIRO_MCP_SERVER_INITIALIZED, KIRO_SESSION_UPDATE, type V2CrewInput, type V2ToolMeta, type V2ToolOutput } from "./types"
+import {
+  KIRO_AGENT_NOT_FOUND, KIRO_MCP_SERVER_INIT_FAILURE, KIRO_MCP_SERVER_INITIALIZED, KIRO_SESSION_UPDATE,
+  type V2CrewInput, type V2ToolMeta, type V2ToolOutput,
+} from "./types"
 
 /** The crew's tool name in `_meta.kiro.toolName` and its chunk's title. */
 const CREW_TOOL = "subagent"
@@ -73,6 +78,8 @@ export class V2Translator {
   /** Sub-agent sessions seen in this turn that no cancel has reached yet. */
   private readonly turnChildren = new Set<string>()
   private crew: Crew | null = null
+  /** Called with `_kiro.dev/agent/not_found`'s params. */
+  onAgentNotFound: ((params: Record<string, unknown>) => void) | null = null
 
   /** A session/load of `sessionId` starts: its updates are the replay until `finishLoad`. */
   startLoad(sessionId: string, onReplay?: (replayed: number, done: boolean) => void): void {
@@ -108,10 +115,18 @@ export class V2Translator {
   }
 
   translate(msg: AcpNotification): LocalEvent[] {
-    if (msg.method === KIRO_MCP_SERVER_INITIALIZED) {
+    if (msg.method === KIRO_MCP_SERVER_INITIALIZED || msg.method === KIRO_MCP_SERVER_INIT_FAILURE) {
       const params = objectOr(msg.params)
       if (typeof params.sessionId !== "string" || typeof params.serverName !== "string") return []
-      return [{ type: "mcp_status", sessionId: params.sessionId, server: params.serverName, state: "connected" }]
+      if (msg.method === KIRO_MCP_SERVER_INITIALIZED) return [{ type: "mcp_status", sessionId: params.sessionId, server: params.serverName, state: "connected" }]
+      const error = typeof params.error === "string" ? { error: params.error } : {}
+      return [{ type: "mcp_status", sessionId: params.sessionId, server: params.serverName, state: "failed", ...error }]
+    }
+    if (msg.method === KIRO_AGENT_NOT_FOUND) {
+      const params = objectOr(msg.params)
+      console.warn("[acp] kiro-cli did not find the agent: %j", params)
+      this.onAgentNotFound?.(params)
+      return []
     }
     if (msg.method !== "session/update" && msg.method !== KIRO_SESSION_UPDATE) return []
     const params = objectOr(msg.params)
@@ -169,10 +184,11 @@ export class V2Translator {
         return [{ type: "tool_use", id, name: toolName(update), input: objectOr(update.rawInput) }]
       }
       case "tool_call_update": {
-        if (update.status !== "completed") return []
+        if (update.status !== "completed" && update.status !== "failed") return []
         if (this.crew?.toolCallId === id) this.crew = null
         const name = typeof update.title === "string" && update.title ? { name: update.title } : {}
-        return [{ type: "tool_end", id, status: "success", result: toolResult(update.rawOutput), ...name }]
+        const status = update.status === "completed" ? "success" : "error"
+        return [{ type: "tool_end", id, status, result: toolResult(update.rawOutput), ...name }]
       }
       case "AgentExecutionSteeringInjected":
         if (method !== KIRO_SESSION_UPDATE) return []

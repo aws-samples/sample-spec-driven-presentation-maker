@@ -5,29 +5,33 @@
  * POST /api/agent/invoke answers a session conflict with 409 and a code the chat UI
  * translates: `session_busy` while the session is still answering, `session_locked` when
  * kiro-cli refuses to load a session another process holds. A kiro-cli that does not answer
- * its setup requests in time gets 504 `agent_timeout`. Other failures still throw.
+ * its setup requests in time gets 504 `agent_timeout`; one that cannot be made ready gets 502
+ * with its start-up code. Other failures still throw.
  *
- * A reopened deck restores the kiro session its `.session` names; with none to load (no
- * `.session`, or kiro-cli no longer has it) the turn runs in a new session, saved to `.session`,
- * and the stream opens with the `context_not_carried_over` notice, which the route hands to
- * sendPrompt (the process manager buffers it as the turn's first event). The route itself
- * saves nothing for a deck the turn creates; the process manager does.
+ * A reopened deck is opened by the process manager (openDeckSession, with the id its `.session`
+ * names); a `created` outcome (no `.session`, or kiro-cli no longer has it) runs the turn as the
+ * session's first prompt and opens the stream with the `context_not_carried_over` notice, a
+ * resumed session that also ran on the other engine with `context_from_other_engine`. A fork's
+ * first message after its process was evicted reopens the copy (openForkedSession); a copy
+ * kiro-cli could not read gets the notice instead of failing. The route hands the notice to
+ * sendPrompt (the process manager buffers it as the turn's first event) and saves nothing itself.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import type { BufferedEvent } from "@/lib/local/conversation/events"
+import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
 import type { LocalSessionNoticeCode } from "@/lib/local/sessionNotices"
-import { SessionBusyError } from "@/lib/local/sessionErrors"
-import { AgentTimeoutError } from "@/lib/local/turnErrors"
+import { SessionBusyError, SessionLockedError } from "@/lib/local/sessionErrors"
+import { AgentStartError, AgentTimeoutError, type AgentStartErrorCode } from "@/lib/local/turnErrors"
 
 const acp = vi.hoisted(() => ({
   hasProcess: vi.fn(),
-  getOrCreateProcess: vi.fn(),
+  openDeckSession: vi.fn(),
+  openForkedSession: vi.fn(),
   createNewProcessFor: vi.fn(),
   sendPrompt: vi.fn(),
   getBufferedEvents: vi.fn(),
   readSessionFromDeck: vi.fn(),
-  saveSessionToDeck: vi.fn(),
 }))
 vi.mock("@/lib/local/acp-process", () => ({
   ...acp,
@@ -36,7 +40,7 @@ vi.mock("@/lib/local/acp-process", () => ({
 
 import { POST } from "./route"
 
-const LOCK_ERROR = "Internal error: Failed to start session: Session is active in another process (PID 4242)"
+const ORIGIN: SessionOrigin = { sourceSessionId: "SRC", title: "earlier chat", cwd: "/workspace", updatedAt: "2026-11-05T00:00:00.000Z", forkedAt: "2026-11-06T00:00:00.000Z" }
 
 function invoke(body: Record<string, unknown>) {
   return POST(new Request("http://127.0.0.1:3000/api/agent/invoke", {
@@ -50,7 +54,7 @@ beforeEach(() => {
   for (const fn of Object.values(acp)) fn.mockReset()
 })
 
-describe("POST /api/agent/invoke session conflicts", () => {
+describe("POST /api/agent/invoke session conflicts and start-up failures", () => {
   it("returns 409 session_busy while the session is still answering", async () => {
     acp.hasProcess.mockReturnValue(true)
     acp.sendPrompt.mockRejectedValue(new SessionBusyError())
@@ -62,7 +66,7 @@ describe("POST /api/agent/invoke session conflicts", () => {
   it("returns 409 session_locked when another process holds the session", async () => {
     acp.hasProcess.mockReturnValue(false)
     acp.readSessionFromDeck.mockReturnValue("K1")
-    acp.getOrCreateProcess.mockRejectedValue(new Error(LOCK_ERROR))
+    acp.openDeckSession.mockRejectedValue(new SessionLockedError("Session is active in another process (PID 4242)"))
     const res = await invoke({ sessionId: "K1", deckId: "d1" })
     expect(res.status).toBe(409)
     const body = await res.json()
@@ -80,10 +84,23 @@ describe("POST /api/agent/invoke session conflicts", () => {
     expect(acp.createNewProcessFor).toHaveBeenCalledWith("C1", "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
   })
 
+  it.each<AgentStartErrorCode>(["agent_start_failed", "agent_auth_required", "agent_definition_rejected", "mcp_failed"])(
+    "returns 502 %s when kiro-cli cannot be made ready",
+    async (code) => {
+      acp.hasProcess.mockReturnValue(false)
+      acp.createNewProcessFor.mockRejectedValue(new AgentStartError(code, "details for the log"))
+      const res = await invoke({ sessionId: "C1" })
+      expect(res.status).toBe(502)
+      const body = await res.json()
+      expect(body).toMatchObject({ code, error: expect.any(String) })
+      expect(body.error).not.toContain("details for the log")
+    },
+  )
+
   it("rethrows failures that are not session conflicts", async () => {
     acp.hasProcess.mockReturnValue(false)
-    acp.createNewProcessFor.mockRejectedValue(new Error("spawn kiro-cli ENOENT"))
-    await expect(invoke({ sessionId: "C1" })).rejects.toThrow(/ENOENT/)
+    acp.createNewProcessFor.mockRejectedValue(new Error("unexpected"))
+    await expect(invoke({ sessionId: "C1" })).rejects.toThrow(/unexpected/)
   })
 })
 
@@ -92,7 +109,7 @@ describe("POST /api/agent/invoke session conflicts", () => {
  * process manager, it buffers the notice it is given as the turn's first event.
  */
 function promptEndingAt(sessionId: string) {
-  return (_clientId: string, _text: string, _agent: string, opts: { notice?: LocalSessionNoticeCode } = {}) => {
+  return (_clientId: string, _text: string, opts: { notice?: LocalSessionNoticeCode } = {}) => {
     const buffered: BufferedEvent[] = opts.notice ? [{ id: 1, event: { kind: "data", payload: { notice: { code: opts.notice } } } }] : []
     acp.getBufferedEvents.mockReturnValue(buffered)
     let listener: ((entry: BufferedEvent) => void) | null = null
@@ -110,46 +127,67 @@ async function events(res: Response): Promise<Record<string, unknown>[]> {
 }
 
 const DECK_FALLBACK_ID = "mcp-made-deck".padEnd(36, "0")
-const NOT_FOUND_ERROR = `Internal error: Failed to start session: Session not found: ${DECK_FALLBACK_ID}`
 
 describe("POST /api/agent/invoke on a reopened deck", () => {
   beforeEach(() => acp.hasProcess.mockReturnValue(false))
 
-  it("restores the kiro session named in .session, under the client's id", async () => {
+  it("opens the kiro session named in .session, under the client's id, without a notice", async () => {
     acp.readSessionFromDeck.mockReturnValue("K1")
+    acp.openDeckSession.mockResolvedValue({ ps: {}, outcome: "resumed", otherEngine: false })
     acp.sendPrompt.mockImplementation(promptEndingAt("K1"))
     const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
     expect(res.status).toBe(200)
-    expect(acp.getOrCreateProcess).toHaveBeenCalledWith(DECK_FALLBACK_ID, "sdpm-orchestrator", { signal: expect.any(AbortSignal), kiroSessionId: "K1" })
+    expect(acp.openDeckSession).toHaveBeenCalledWith(DECK_FALLBACK_ID, "mcp-made-deck", "K1", "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
     expect(acp.createNewProcessFor).not.toHaveBeenCalled()
-    expect(acp.saveSessionToDeck).not.toHaveBeenCalled()
-    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "hi", "sdpm-orchestrator", { notice: undefined })
+    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "hi", { notice: undefined })
     expect(acp.getBufferedEvents).toHaveBeenCalledWith(DECK_FALLBACK_ID)
     expect((await events(res)).some((e) => "notice" in e)).toBe(false)
   })
 
-  it("starts a new session for a deck without .session, saves it and sends the notice first", async () => {
-    acp.readSessionFromDeck.mockReturnValue(null)
-    acp.createNewProcessFor.mockResolvedValue({ sessionId: "NEW1" })
-    acp.sendPrompt.mockImplementation(promptEndingAt("NEW1"))
-    const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
+  it.each([["no .session", null], ["a session kiro-cli no longer has", "GONE"]])(
+    "runs a created session's first prompt with the notice first (%s)",
+    async (_case, saved) => {
+      acp.readSessionFromDeck.mockReturnValue(saved)
+      acp.openDeckSession.mockResolvedValue({ ps: {}, outcome: "created", otherEngine: false })
+      acp.sendPrompt.mockImplementation(promptEndingAt("NEW1"))
+      const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
+      expect(res.status).toBe(200)
+      expect(acp.openDeckSession).toHaveBeenCalledWith(DECK_FALLBACK_ID, "mcp-made-deck", saved, "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
+      // A new session's first prompt carries the interaction mode.
+      expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "Interaction mode: fast\n\nhi", { notice: "context_not_carried_over" })
+      expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
+    },
+  )
+
+  it("says so when the deck's session also ran on the other engine", async () => {
+    acp.readSessionFromDeck.mockReturnValue("K1")
+    acp.openDeckSession.mockResolvedValue({ ps: {}, outcome: "resumed", otherEngine: true })
+    acp.sendPrompt.mockImplementation(promptEndingAt("K1"))
+    const res = await invoke({ sessionId: "C1", deckId: "d1" })
+    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "hi", { notice: "context_from_other_engine" })
+    expect((await events(res))[0]).toEqual({ notice: { code: "context_from_other_engine" } })
+  })
+})
+
+describe("POST /api/agent/invoke on a forked chat", () => {
+  beforeEach(() => acp.hasProcess.mockReturnValue(false))
+
+  it("reopens the copy of an evicted fork, with the continuation in the first prompt", async () => {
+    acp.openForkedSession.mockResolvedValue({ ps: {}, outcome: "resumed" })
+    acp.sendPrompt.mockImplementation(promptEndingAt("F1"))
+    const res = await invoke({ sessionId: "F1", continuedFrom: ORIGIN })
     expect(res.status).toBe(200)
-    expect(acp.getOrCreateProcess).not.toHaveBeenCalled()
-    expect(acp.createNewProcessFor).toHaveBeenCalledWith(DECK_FALLBACK_ID, "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
-    expect(acp.saveSessionToDeck).toHaveBeenCalledWith("mcp-made-deck", "NEW1")
-    // A new session's first prompt carries the interaction mode.
-    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "Interaction mode: fast\n\nhi", "sdpm-orchestrator", { notice: "context_not_carried_over" })
-    expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
+    expect(acp.openForkedSession).toHaveBeenCalledWith("F1", "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
+    expect(acp.sendPrompt.mock.calls[0][2]).toEqual({ notice: undefined })
+    expect(acp.sendPrompt.mock.calls[0][1]).toContain("hi")
   })
 
-  it("starts a new session when kiro-cli no longer has the saved one", async () => {
-    acp.readSessionFromDeck.mockReturnValue(DECK_FALLBACK_ID)
-    acp.getOrCreateProcess.mockRejectedValue(new Error(NOT_FOUND_ERROR))
-    acp.createNewProcessFor.mockResolvedValue({ sessionId: "NEW2" })
-    acp.sendPrompt.mockImplementation(promptEndingAt("NEW2"))
-    const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
+  it("goes on with the notice when kiro-cli could not read the copy", async () => {
+    acp.openForkedSession.mockResolvedValue({ ps: {}, outcome: "created" })
+    acp.sendPrompt.mockImplementation(promptEndingAt("F1"))
+    const res = await invoke({ sessionId: "F1", continuedFrom: ORIGIN })
     expect(res.status).toBe(200)
-    expect(acp.saveSessionToDeck).toHaveBeenCalledWith("mcp-made-deck", "NEW2")
+    expect(acp.sendPrompt.mock.calls[0][2]).toEqual({ notice: "context_not_carried_over" })
     expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
   })
 })

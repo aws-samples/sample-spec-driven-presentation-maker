@@ -4,8 +4,9 @@
  * V2's notifications as LocalEvents, rule by rule (translate.ts): the load's replay is counted
  * and dropped; a sub-agent session reaches the chat only as the crew's group tools, in arrival
  * order, never with its text or chunks; the main session's text, tool chunks, calls (MCP tools
- * by `_meta.kiro.toolName`, built-ins by title) and completed results; the crew's call as one
- * composer start per stage; a steer injection; an MCP server's readiness.
+ * by `_meta.kiro.toolName`, built-ins by title) and completed or failed results; the crew's call
+ * as one composer start per stage; a steer injection; an MCP server's readiness or failure; a
+ * missing agent.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -40,10 +41,26 @@ beforeEach(() => {
   t.beginTurn()
 })
 
-describe("MCP readiness", () => {
-  it("reports server_initialized as connected, for any session", () => {
+describe("MCP readiness and the agent", () => {
+  it("reports server_initialized as connected and server_init_failure as failed, for any session", () => {
     expect(t.translate({ method: "_kiro.dev/mcp/server_initialized", params: { sessionId: CHILD, serverName: "sdpm" } }))
       .toEqual([{ type: "mcp_status", sessionId: CHILD, server: "sdpm", state: "connected" }])
+    expect(t.translate({ method: "_kiro.dev/mcp/server_init_failure", params: { sessionId: MAIN, serverName: "sdpm", error: "connection closed: initialize response" } }))
+      .toEqual([{ type: "mcp_status", sessionId: MAIN, server: "sdpm", state: "failed", error: "connection closed: initialize response" }])
+  })
+
+  it("logs agent/not_found and reports it to the mode check", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      const seen = vi.fn()
+      t.onAgentNotFound = seen
+      const params = { sessionId: MAIN, requestedAgent: "sdpm-spec", fallbackAgent: "kiro_default" }
+      expect(t.translate({ method: "_kiro.dev/agent/not_found", params })).toEqual([])
+      expect(seen).toHaveBeenCalledWith(params)
+      expect(warn).toHaveBeenCalledOnce()
+    } finally {
+      warn.mockRestore()
+    }
   })
 })
 
@@ -98,6 +115,12 @@ describe("main session", () => {
     expect(t.translate(completed(MAIN, "t2", "not json"))).toEqual([{ ...end, id: "t2", result: {} }])
     t.translate(mcpCall(MAIN, "t3", "x"))
     expect(t.translate(completed(MAIN, "t3", "21"))).toEqual([{ ...end, id: "t3", result: {} }])
+  })
+
+  it("ends a failed tool with an error", () => {
+    t.translate(mcpCall(MAIN, "t1", "list_styles"))
+    expect(t.translate(update(MAIN, { sessionUpdate: "tool_call_update", toolCallId: "t1", status: "failed", title: "Running: @sdpm/list_styles" })))
+      .toEqual([{ type: "tool_end", id: "t1", status: "error", result: {}, name: "Running: @sdpm/list_styles" }])
   })
 
   it("ends a completed tool no call announced as a result only, named by the update's title", () => {
