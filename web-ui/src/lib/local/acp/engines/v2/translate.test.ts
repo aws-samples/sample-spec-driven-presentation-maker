@@ -2,11 +2,13 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * V2's notifications as LocalEvents, rule by rule (translate.ts): the load's replay is counted
- * and dropped; a sub-agent session reaches the chat only as the crew's group tools, in arrival
- * order, never with its text or chunks; the main session's text, tool chunks, calls (MCP tools
- * by `_meta.kiro.toolName`, built-ins by title) and completed or failed results; the crew's call
- * as one composer start per stage; a steer injection; an MCP server's readiness or failure; a
- * missing agent.
+ * and dropped; a sub-agent session reaches the chat only as the tools of the crew group its
+ * list_update `sessionName` maps it to, never with its text or chunks; a group ends when its
+ * session terminated (success), stops otherwise (error) or the crew's call ends; the sessions
+ * listed working are cancelled with the main one; the main session's text, tool chunks, calls
+ * (MCP tools by `_meta.kiro.toolName`, built-ins by title) and completed or failed results; the
+ * crew's call as one composer start per stage; a steer injection; an MCP server's readiness or
+ * failure; a missing agent.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -137,6 +139,12 @@ describe("main session", () => {
 })
 
 describe("crew and sub-agent sessions", () => {
+  const listed = (...subagents: [string, string, string][]) => ({
+    method: "_kiro.dev/subagent/list_update",
+    params: { subagents: subagents.map(([sessionId, sessionName, type]) => ({ sessionId, sessionName, agentName: "sdpm-composer", status: { type } })), pendingStages: [] },
+  })
+  const twoStages = () => t.translate(crewCall([{ name: "a", prompt_template: "slides: one" }, { name: "b", prompt_template: "slides: two" }]))
+
   it("starts one composer group per stage", () => {
     expect(t.translate(crewCall([
       { name: "count-templates", role: "sdpm-composer", prompt_template: "slides: intro" },
@@ -147,8 +155,9 @@ describe("crew and sub-agent sessions", () => {
     ])
   })
 
-  it("maps sub-agent sessions to the groups in arrival order and shows only their tools", () => {
-    t.translate(crewCall([{ name: "a", prompt_template: "slides: one" }, { name: "b", prompt_template: "slides: two" }]))
+  it("maps sub-agent sessions to the groups by their list_update sessionName and shows only their tools", () => {
+    twoStages()
+    expect(t.translate(listed(["S1", "b", "working"], ["S2", "a", "working"]))).toEqual([])
     expect(t.translate(update("S2", { sessionUpdate: "agent_thought_chunk", content: { type: "text", text: "thinking" } }))).toEqual([])
     expect(t.translate(mcpCall("S1", "s1-t", "list_templates"))).toEqual([{ type: "composer_tool", group: "b", id: "s1-t", name: "list_templates", input: { __tool_use_purpose: "p" } }])
     expect(t.translate(mcpCall("S2", "s2-t", "start_composing"))).toEqual([{ type: "composer_tool", group: "a", id: "s2-t", name: "start_composing", input: { __tool_use_purpose: "p" } }])
@@ -158,28 +167,61 @@ describe("crew and sub-agent sessions", () => {
     expect(t.translate(kiroUpdate("S1", { sessionUpdate: "tool_call_chunk", toolCallId: "s1-v", title: "summary" }))).toEqual([])
   })
 
-  it("adds a group for a sub-agent session beyond the stages", () => {
-    t.translate(crewCall([{ name: "a" }]))
-    t.translate(text("S1", "x"))
-    expect(t.translate(text("S2", "y"))).toEqual([{ type: "composer_start", group: "#2", prompt: "", toolCallId: "crew" }])
+  it("maps sessions of stages with the same name one each, in stage order", () => {
+    t.translate(crewCall([{ name: "c" }, { name: "c" }]))
+    t.translate(listed(["S1", "c", "working"], ["S2", "c", "working"]))
+    expect(t.translate(mcpCall("S1", "s1-t", "x"))).toMatchObject([{ group: "c" }])
+    expect(t.translate(mcpCall("S2", "s2-t", "x"))).toMatchObject([{ group: "#2" }])
+  })
+
+  it("drops the updates of a sub-agent session no group is mapped to", () => {
+    twoStages()
+    expect(t.translate(mcpCall("S1", "s1-t", "list_templates"))).toEqual([])
+    t.translate(listed(["S3", "other", "working"]))
+    expect(t.translate(mcpCall("S3", "s3-t", "list_templates"))).toEqual([])
+  })
+
+  it("ends a group once when its session terminated, and failed on any other status but working", () => {
+    twoStages()
+    t.translate(listed(["S1", "a", "working"], ["S2", "b", "working"]))
+    expect(t.translate(listed(["S1", "a", "terminated"], ["S2", "b", "working"]))).toEqual([{ type: "composer_end", group: "a", status: "success" }])
+    expect(t.translate(listed(["S1", "a", "terminated"], ["S2", "b", "cancelled"]))).toEqual([{ type: "composer_end", group: "b", status: "error" }])
+    expect(t.translate(listed(["S1", "a", "terminated"]))).toEqual([])
+    expect(t.translate(listed())).toEqual([])
+  })
+
+  it("ends the groups still running with the crew's completed or failed update", () => {
+    twoStages()
+    t.translate(listed(["S1", "a", "terminated"]))
+    expect(t.translate(completed(MAIN, "crew"))).toEqual([
+      { type: "composer_end", group: "b", status: "success" },
+      { type: "tool_end", id: "crew", status: "success", result: {}, name: "Running: @sdpm/x" },
+    ])
+    twoStages()
+    expect(t.translate(update(MAIN, { sessionUpdate: "tool_call_update", toolCallId: "crew", status: "failed" }))).toEqual([
+      { type: "composer_end", group: "a", status: "error" },
+      { type: "composer_end", group: "b", status: "error" },
+      { type: "tool_end", id: "crew", status: "error", result: {} },
+    ])
   })
 
   it("drops a sub-agent session's updates when no crew runs, and after the crew completed", () => {
+    t.translate(listed(["S1", "a", "working"]))
     expect(t.translate(mcpCall("S1", "s1-t", "list_templates"))).toEqual([])
     t.translate(crewCall([{ name: "a" }]))
+    t.translate(listed(["S1", "a", "working"]))
     t.translate(completed(MAIN, "crew"))
     expect(t.translate(mcpCall("S1", "s1-t", "list_templates"))).toEqual([])
+    expect(t.translate(listed(["S1", "a", "terminated"]))).toEqual([])
   })
 
-  it("names the sub-agent sessions of this turn for a cancel once each, until they send again", () => {
-    t.translate(text("S1", "x"))
-    t.translate(text("S2", "y"))
-    expect(t.takeChildren()).toEqual(["S1", "S2"])
-    expect(t.takeChildren()).toEqual([])
-    t.translate(text("S2", "z"))
-    expect(t.takeChildren()).toEqual(["S2"])
-    t.endTurn()
-    t.translate(text("S3", "after the turn"))
-    expect(t.takeChildren()).toEqual([])
+  it("names the sub-agent sessions the last list_update has working, for a cancel", () => {
+    expect(t.workingChildren()).toEqual([])
+    t.translate(listed(["S1", "a", "working"], ["S2", "b", "working"]))
+    expect(t.workingChildren()).toEqual(["S1", "S2"])
+    t.translate(listed(["S1", "a", "terminated"], ["S2", "b", "working"]))
+    expect(t.workingChildren()).toEqual(["S2"])
+    t.translate(listed())
+    expect(t.workingChildren()).toEqual([])
   })
 })

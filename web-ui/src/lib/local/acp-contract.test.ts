@@ -8,11 +8,14 @@
  * - A turn: the main session's text arrives in order, the stream closes when session/prompt is
  *   answered, whatever stopReason it carries, and closes with an error when kiro-cli dies mid-turn.
  * - V2 delegating to the composer: only the main session's text reaches the chat, the composer's
- *   tool chunks make no cards of their own, the delegation is one Compose card, and the stream's
- *   ids are the buffer's, so a reconnect replays nothing twice.
+ *   tool chunks make no cards of their own, the delegation is one Compose card that finishes,
+ *   and the stream's ids are the buffer's, so a reconnect replays nothing twice.
+ * - The same delegation on V2 and V3 streams a Compose card of the same shape (tool names, one
+ *   card, its groups and how each ended, closed).
  * - V3 delegating: only the main session's text (no thoughts, nothing from a sub-agent) reaches
  *   the chat; Tool Load and Subagent Response make no cards; the delegation to the composer opens
- *   the Compose card; a delegation to another agent is one plain card; a tool update with no
+ *   the Compose card and its end closes it; two delegations in parallel are one card with two
+ *   groups, both done; a delegation to another agent is one plain card; a tool update with no
  *   call before it still gets its card.
  * - Start-up: a session is ready once its sdpm server is (V2 reports it before its answers, so
  *   the wait ends at once; V3 after, so it waits); a failed sdpm server, another mode and a
@@ -132,6 +135,33 @@ const textOf = (events: Line[]) => events
 /** The names of the cards a stream opened (toolStart / toolUse). */
 const cardNames = (events: Line[]) => events.flatMap((e) => [e.toolStart, e.toolUse].filter(Boolean)).map((t) => (t as { name: string }).name)
 
+/** The Compose card's stream events (`toolStream` data). */
+const streamedOf = (events: Line[]) => events.flatMap((e) => (e.toolStream ? [(e.toolStream as { data: Line }).data] : []))
+
+/** The statuses the Compose card closed with (`toolResult compose_slides`). */
+const composeResults = (events: Line[]) => events
+  .map((e) => e.toolResult as { name?: string; status?: string } | undefined)
+  .filter((r) => r?.name === "compose_slides")
+  .map((r) => r!.status)
+
+/**
+ * What a stream's Compose card looks like, without ids or text: the card names in order (V2's
+ * toolStart and toolUse of one call count once), the `toolUse compose_slides` count, the number of
+ * groups, each group's end states, and the statuses the card closed with.
+ */
+function composeShape(events: Line[]) {
+  const names = cardNames(events).filter((name, i, all) => name !== all[i - 1])
+  const streamed = streamedOf(events)
+  const groups = [...new Set(streamed.map((d) => d.group))]
+  return {
+    names,
+    uses: events.filter((e) => (e.toolUse as { name?: string } | undefined)?.name === "compose_slides").length,
+    groups: groups.length,
+    ends: groups.map((g) => streamed.filter((d) => d.group === g && (d.status === "done" || d.status === "error")).map((d) => d.status)),
+    results: composeResults(events),
+  }
+}
+
 let children: ReplayChild[]
 let acp: typeof import("./acp-process")
 let bridge: typeof import("./sse-bridge")
@@ -243,9 +273,8 @@ describe("kiro-cli 3.0.0 V2, a turn that delegates to the composer", () => {
     const { second } = await runCompose()
     const events = second.map((b) => b.data)
     expect(cardNames(events)).toEqual(["compose_slides", "compose_slides"])
-    const streamed = events.flatMap((e) => (e.toolStream ? [(e.toolStream as { data: Line }).data] : []))
-    expect(streamed.map((d) => d.status ?? d.tool ?? d.toolStatus)).toEqual(["starting", "list_templates", "success", "Summarizing", "success"])
-    expect(events.filter((e) => (e.toolResult as { name?: string } | undefined)?.name === "compose_slides")).toHaveLength(1)
+    expect(streamedOf(events).map((d) => d.status ?? d.tool ?? d.toolStatus)).toEqual(["starting", "list_templates", "success", "Summarizing", "success", "done"])
+    expect(composeResults(events)).toEqual(["success"])
   })
 
   it("numbers the stream's events as the buffer does, so a reconnect replays nothing twice", async () => {
@@ -276,6 +305,23 @@ describe("kiro-cli 3.0.0 V2, a turn that delegates to the composer", () => {
   })
 })
 
+describe("kiro-cli 3.0.0, the same delegation on V2 and V3", () => {
+  /** The captures' second turn: the orchestrator delegates one group to the composer. */
+  async function delegation(engine: Engine) {
+    replay(engine, fixture(`${engine}-compose`))
+    await acp.createNewProcessFor("C1")
+    await prompt("Call the sdpm list_styles tool once.")
+    return (await prompt("Delegate to the sdpm-composer sub-agent.")).map((b) => b.data)
+  }
+
+  it("streams the same Compose card shape: tool names, one card, its group and how it ended", async () => {
+    const v2 = composeShape(await delegation("v2"))
+    const v3 = composeShape(await delegation("v3"))
+    expect(v3).toEqual(v2)
+    expect(v2).toEqual({ names: ["compose_slides"], uses: 1, groups: 1, ends: [["done"]], results: ["success"] })
+  })
+})
+
 describe("kiro-cli 3.0.0 V3, turns that delegate", () => {
   const V3_COMPOSE_MAIN = "sess_1841ca0d-7448-4f52-9ced-50f300f95b10"
 
@@ -295,9 +341,11 @@ describe("kiro-cli 3.0.0 V3, turns that delegate", () => {
     const delegation = second.find((e) => e.toolUse)!.toolUse as { toolUseId: string; input: { slide_groups: unknown[] } }
     expect(delegation.toolUseId).toMatch(/^invoke_subagent_/)
     expect(delegation.input.slide_groups).toHaveLength(1)
-    const streamed = second.flatMap((e) => (e.toolStream ? [(e.toolStream as { data: Line }).data] : []))
-    expect(streamed.map((d) => d.status ?? d.tool ?? d.toolStatus)).toEqual(["starting", "list_templates", "success"])
-    expect(second.filter((e) => e.toolResult)).toEqual([])
+    expect(streamedOf(second).map((d) => d.status ?? d.tool ?? d.toolStatus)).toEqual(["starting", "list_templates", "success", "done"])
+    // The delegation's end closes the card.
+    expect(second.filter((e) => e.toolResult).map((e) => e.toolResult)).toEqual([
+      { toolUseId: delegation.toolUseId, name: "compose_slides", status: "success", content: "{}" },
+    ])
   })
 
   it("keeps a sub-agent's text chunk out of the chat", async () => {
@@ -313,14 +361,19 @@ describe("kiro-cli 3.0.0 V3, turns that delegate", () => {
     expect(textOf((await prompt("Delegate.")).map((b) => b.data))).not.toContain("COMPOSER SAYS")
   })
 
-  it("streams only the main session's text on two delegations in parallel, and opens one Compose card for both", async () => {
+  it("streams only the main session's text on two delegations in parallel, and shows both as one Compose card that finishes", async () => {
     const lines = replay("v3", fixture("v3-parallel-compose"))
     const ps = await acp.createNewProcessFor("C1")
     const events = (await prompt("Delegate to two sdpm-composer sub-agents in parallel.")).map((b) => b.data)
     expect(textOf(events)).toBe(capturedText(window(lines, 2), ps.sessionId!))
     expect(cardNames(events)).toEqual(["start_presentation", "compose_slides"])
-    const starting = events.flatMap((e) => (e.toolStream ? [(e.toolStream as { data: Line }).data] : [])).filter((d) => d.status === "starting")
-    expect(starting.map((d) => d.group)).toEqual([1, 2])
+    expect(composeShape(events)).toMatchObject({ uses: 1, groups: 2, ends: [["done"], ["done"]], results: ["success"] })
+    const starting = streamedOf(events).filter((d) => d.status === "starting")
+    expect(starting.map((d) => [d.group, d.total_groups])).toEqual([[1, 1], [2, 2]])
+    // The card closes after both groups are done, under the first delegation's tool call.
+    const closed = events.findIndex((e) => e.toolResult && (e.toolResult as { name: string }).name === "compose_slides")
+    expect(events.slice(closed + 1).some((e) => e.toolStream)).toBe(false)
+    expect((events[closed].toolResult as { toolUseId: string }).toolUseId).toBe((events.find((e) => e.toolUse && (e.toolUse as { name: string }).name === "compose_slides")!.toolUse as { toolUseId: string }).toolUseId)
   })
 
   it("(c) shows a delegation to another agent as one plain card, without its inner tools", async () => {

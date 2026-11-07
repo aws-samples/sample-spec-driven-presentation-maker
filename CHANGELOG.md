@@ -132,6 +132,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   and what to do instead of a generic error or a reply from an agent without the sdpm tools.
   The start waits until the sdpm MCP server is ready, so a new or reopened chat no longer
   begins without its tools. A tool call that fails shows as failed. / Nothing.
+- **Local Web UI: the Compose card shows each group's slides and finishes.** On both
+  engines the card lists the slides each composer group was assigned (the `assigned_slugs`
+  line of the delegation), marks every group done or failed as its composer ends, and closes
+  once all of them have. Groups delegated in parallel share one card. A card could keep
+  spinning after the turn was over (V3 never closed it, V2 kept groups without an end); now
+  the end of the turn closes it, and a group still running then, after a Stop for example,
+  shows as failed. / Nothing.
 - **Kiro CLI: the `sdpm` agent loads as-is in kiro-cli 3.x (V3).** `sdpm register` wrote
   the agent in the 2.x format only (`allowedTools`, `toolsSettings`). V3 converts such a
   file when it starts and saves the old one as `sdpm.json.bak`, `sdpm.json.bak.1`, and so
