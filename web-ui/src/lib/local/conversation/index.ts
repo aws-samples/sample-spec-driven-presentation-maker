@@ -2,9 +2,9 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * The conversation model of one Local chat, engine-independent: it turns the engine adapter's
- * `LocalEvent`s into the chat's `ChatEvent`s. It holds the turn's tool cards, its Compose card
- * and the steers kiro-cli queued; the process manager numbers and buffers what it returns and
- * saves the deck a tool result names.
+ * `LocalEvent`s into the chat's `ChatEvent`s. It holds the turn's tool cards, its Compose cards
+ * and the steers kiro-cli queued; the process manager numbers and buffers what it returns, ends
+ * the turn through `endTurn` before its end event, and saves the deck a tool result names.
  */
 import { ComposeTracker } from "./compose"
 import { data, type ChatEvent, type LocalEvent } from "./events"
@@ -20,6 +20,14 @@ export class ConversationState {
   beginTurn(): void {
     this.tools = new ToolTracker()
     this.compose = new ComposeTracker()
+  }
+
+  /**
+   * The turn is over (before its end event): an open Compose card closes, its groups that did
+   * not end failed.
+   */
+  endTurn(): ChatEvent[] {
+    return this.compose.endTurn()
   }
 
   /** The chat events for one notification's LocalEvents, and the deck a tool result named. */
@@ -39,10 +47,9 @@ export class ConversationState {
           out.push(...this.tools.use(event.id, event.name, event.input))
           break
         case "tool_end": {
-          if (event.id === this.compose.toolUseId) {
-            const shown = withDeckId(event.result)
-            out.push(...this.compose.end(event.status, shown.result))
-            deckId ??= shown.deckId
+          if (this.compose.isDelegation(event.id)) {
+            // The delegation's card ends with its groups (composer_end), not with its tool call.
+            deckId ??= withDeckId(event.result).deckId
           } else {
             const ended = this.tools.end(event.id, event.status, event.result, event.name)
             out.push(...ended.events)
@@ -63,12 +70,14 @@ export class ConversationState {
         case "composer_tool_end":
           out.push(...this.compose.toolEnd(event.group, event.id, event.status))
           break
+        case "composer_end":
+          out.push(...this.compose.groupEnd(event.group, event.status))
+          break
         case "steer_injected": {
           const steer = this.steers.match(event)
           if (steer) out.push(steerEvent({ id: steer.id, state: "delivered" }))
           break
         }
-        // composer_end: the group's done / error state comes with the Compose card rules (PR 2-3).
         // mcp_status / mcp_snapshot: the process manager's MCP readiness watch, not the chat.
         default:
           break

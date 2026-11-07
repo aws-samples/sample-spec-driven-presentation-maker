@@ -126,11 +126,15 @@ class FakeChild extends EventEmitter {
     this.send({ method: "session/update", params: { sessionId, update } })
   }
 
-  /** What kiro-cli 2.37 sends for a use_subagent call: sub-session updates and list_update, no turn_end. */
-  runSubagent(subSessionId: string) {
+  /**
+   * What kiro-cli 2.37 sends for a use_subagent call: sub-session updates and list_update, no
+   * turn_end. `finish: false` leaves the sub-agent working.
+   */
+  runSubagent(subSessionId: string, finish = true) {
     this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [{ sessionId: subSessionId, status: { type: "working" } }] } })
     this.update(subSessionId, { sessionUpdate: "tool_call", toolCallId: `${subSessionId}-t`, title: "Running: @sdpm/generate_pptx", _meta: { kiro: { toolName: "generate_pptx", mcpServerName: "sdpm" } } })
     this.update(subSessionId, { sessionUpdate: "tool_call_update", toolCallId: `${subSessionId}-t`, status: "completed" })
+    if (!finish) return
     this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [{ sessionId: subSessionId, status: { type: "terminated" } }] } })
     this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [] } })
   }
@@ -354,14 +358,14 @@ describe("turn state", () => {
     }
   })
 
-  it("cancel reaches the main session and this turn's sub-agents, and ends the turn", async () => {
+  it("cancel reaches the main session and the sub-agents still working, and ends the turn", async () => {
     await acp.createNewProcessFor("C1")
     const child = children[0]
     await turn(child, "C1", ["S1"])
 
     const prompted = await acp.sendPrompt("C1", "again")
     prompted.send()
-    child.runSubagent("S2")
+    child.runSubagent("S2", false)
     await settle()
     acp.cancelSession("C1")
     expect(child.cancelled).toEqual(["K1", "S2"])
@@ -751,6 +755,29 @@ describe("chat events", () => {
     child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "main says" } })
     await settle()
     expect(acp.getBufferedEvents("C1").map((e) => e.event)).toEqual([{ kind: "data", payload: { event: { contentBlockDelta: { delta: { text: "main says" } } } } }])
+  })
+
+  it.each(["end_turn", "max_tokens", "refusal", "cancelled", "an error"])("closes a Compose card still open when the turn ends with %s, its running group failed, before the end event", async (how) => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "compose")
+    prompted.send()
+    const child = children[0]
+    child.update("K1", {
+      sessionUpdate: "tool_call", toolCallId: "crew", title: "Spawning agent crew",
+      rawInput: { stages: [{ name: "g1", prompt_template: "assigned_slugs: intro" }] }, _meta: { kiro: { toolName: "subagent" } },
+    })
+    await settle()
+    if (how === "cancelled") acp.cancelSession("C1")
+    if (how === "an error") child.failPrompt()
+    else child.endTurn(how)
+    await settle()
+    const events = acp.getBufferedEvents("C1").map((e) => e.event)
+    const card = { toolUseId: "crew", name: "compose_slides" }
+    expect(events.slice(-3, -1).map((e) => e.payload)).toEqual([
+      { toolStream: { ...card, data: { group: 1, slugs: "intro", status: "error" } } },
+      { toolResult: { ...card, status: "error", content: "{}" } },
+    ])
+    expect(events.at(-1)?.kind).toBe("end")
   })
 })
 
