@@ -166,7 +166,7 @@ function saveDeck(ps: ProcessState, deckId: string): void {
   }
 }
 
-/** The turn started by sendPrompt is over: release the session and tell the listeners. */
+/** The turn started by sendPrompt is over: release the session, close what it left open (steers, a Compose card) and tell the listeners. */
 function endTurn(ps: ProcessState, end: ChatEvent): void {
   ps.promptRequestId = null
   ps.promptInFlight = false
@@ -175,6 +175,7 @@ function endTurn(ps: ProcessState, end: ChatEvent): void {
   ps.turnsEnded++
   ps.session.endTurn()
   discardSteers(ps)
+  for (const event of ps.conversation.endTurn()) push(ps, event)
   push(ps, end)
   // Settings switched the engine while this turn ran: the deck's next message opens it on the new one.
   if (ps.deckBound && !ps.conn.exited && ps.engine !== readEngineConfig().engine) {
