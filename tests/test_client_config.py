@@ -10,6 +10,7 @@ Kiro CLI agent is one file both engines (V2 and V3) load without converting it.
 from __future__ import annotations
 
 import json
+import subprocess
 import sys
 from pathlib import Path
 
@@ -321,18 +322,38 @@ def test_register_nothing_chosen_runs_nothing_and_says_skipped(capsys):
     assert "skipped" in out and "sdpm register claude-code" in out
 
 
-def test_picker_fallback_line_input(monkeypatch, capsys):
+def test_picker_line_input(monkeypatch, capsys):
+    import picker
+
+    monkeypatch.setattr("builtins.input", lambda _p: "2")
+    opts = [picker.Option("a", "A"), picker.Option("b", "B"), picker.Option("c", "C", enabled=False)]
+    assert picker.pick_line(opts, title="t") == ["b"]
+    monkeypatch.setattr("builtins.input", lambda _p: "")
+    assert picker.pick_line(opts, title="t") == ["a", "b"]  # Enter = defaults (all checked)
+    monkeypatch.setattr("builtins.input", lambda _p: "none")
+    assert picker.pick_line(opts, title="t") == []
+    assert "C" in capsys.readouterr().out  # disabled rows are shown
+
+
+class _NeverRead:
+    """An agent's open stdin pipe: reading it would wait forever."""
+
+    def read(self, *_a):
+        pytest.fail("stdin was read")
+
+    readline = read
+
+    def isatty(self):
+        return False
+
+
+def test_picker_without_a_terminal_reads_nothing(monkeypatch):
     import picker
 
     monkeypatch.setattr(picker, "_tty_available", lambda: False)
-    monkeypatch.setattr("builtins.input", lambda _p: "2")
-    opts = [picker.Option("a", "A"), picker.Option("b", "B"), picker.Option("c", "C", enabled=False)]
-    assert picker.pick(opts, title="t") == ["b"]
-    monkeypatch.setattr("builtins.input", lambda _p: "")
-    assert picker.pick(opts, title="t") == ["a", "b"]  # Enter = defaults (all checked)
-    monkeypatch.setattr("builtins.input", lambda _p: "none")
-    assert picker.pick(opts, title="t") == []
-    assert "C" in capsys.readouterr().out  # disabled rows are shown
+    monkeypatch.setattr(sys, "stdin", _NeverRead())
+    monkeypatch.setattr("builtins.input", lambda *_a: pytest.fail("input() was called"))
+    assert picker.pick([picker.Option("a", "A")], title="t") is None
 
 
 def test_unregister_uses_client_cli_or_explains(capsys):
@@ -723,3 +744,111 @@ def test_outcomes_print_on_a_narrow_windows_console(monkeypatch):
     cc.print_outcomes([cc.Outcome(cc.by_id("claude-code"), "registered", "→ ask for slides")])
     narrow.flush()
     assert b"Claude Code" in raw.getvalue() and b"registered" in raw.getvalue()
+
+
+# ---------------------------------------------------------------------------
+# No terminal, --record, and the old-launcher hook
+# ---------------------------------------------------------------------------
+
+
+def test_register_without_a_terminal_registers_nothing_and_exits_2(monkeypatch, capsys):
+    monkeypatch.setattr(cc, "detect", lambda *_a: [cc.by_id("claude-code"), cc.by_id("cursor")])
+    monkeypatch.setattr(cc, "tty_allowed", lambda *_a: False)
+    monkeypatch.setattr(sys, "stdin", _NeverRead())
+    monkeypatch.setattr("builtins.input", lambda *_a: pytest.fail("input() was called"))
+    monkeypatch.setattr(cc.subprocess, "run", lambda *_a, **_k: pytest.fail("a client CLI ran"))
+    assert cc.main(["--uv", "/x/uv", "--checkout", "/x/checkout", "register"]) == 2
+    out = capsys.readouterr().out
+    assert "sdpm register --yes" in out and "claude-code" in out
+
+
+def test_confirm_without_a_terminal_is_no(monkeypatch):
+    monkeypatch.setattr(cc, "tty_allowed", lambda *_a: False)
+    monkeypatch.setattr("builtins.input", lambda *_a: pytest.fail("input() was called"))
+    assert cc._confirm("Remove them?") is False
+
+
+def test_record_lists_what_register_and_unregister_did(tmp_path, monkeypatch):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path / "kiro"))
+    monkeypatch.setattr(cc, "detect", lambda *_a: [cc.by_id("claude-code"), cc.by_id("codex")])
+    ran = []
+
+    def fake_run(argv, **_kwargs):  # every client CLI call; nothing real runs
+        ran.append(argv)
+        return subprocess.CompletedProcess(argv, 1 if argv[0] == "codex" else 0)
+
+    monkeypatch.setattr(cc.subprocess, "run", fake_run)
+    monkeypatch.setattr(cc, "claude_plugin_installed", lambda: False)
+    record = tmp_path / "record.json"
+    assert cc.main(["--uv", "/x/uv", "--checkout", "/x/c", "register", "--yes", "--record", str(record)]) == 1
+    assert json.loads(record.read_text()) == {"registered": ["claude-code"]}
+    assert cc.main(["--uv", "/x/uv", "--checkout", "/x/c", "unregister", "--record", str(record)]) == 1
+    assert json.loads(record.read_text()) == {"unregistered": ["claude-code"]}
+
+
+def test_refresh_records_the_clients_that_run_this_checkout(monkeypatch, tmp_path):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    _listing(monkeypatch, {"claude-code": CLAUDE_HERE, "codex": CODEX_NONE})
+    record: dict = {}
+    cc.refresh_registrations(POSIX, clients=[cc.by_id("claude-code"), cc.by_id("codex")], run=lambda _a: 0,
+                             run_quiet=lambda _a: 0, record=record)
+    assert record == {"here": ["claude-code"], "registered": ["claude-code"]}
+
+
+@pytest.fixture
+def managed(tmp_path, monkeypatch):
+    """$SDPM_HOME/checkout and an old (#529) launcher."""
+    home = tmp_path / "home"
+    checkout = home / "checkout"
+    checkout.mkdir(parents=True)
+    monkeypatch.setenv("SDPM_HOME", str(home))
+    monkeypatch.delenv("SDPM_UPDATER", raising=False)
+    launcher = tmp_path / "sdpm"
+    launcher.write_text(OLD_LAUNCHER + "# ends with client_config.py refresh\n")
+    target = cc.Target(uv="/x/uv", checkout=str(checkout), platform=sys.platform)
+    return home, checkout, launcher, target
+
+
+def test_the_hook_hands_an_old_launchers_update_to_adopt(managed):
+    home, checkout, launcher, target = managed
+    since = "a" * 40
+    argv = cc.old_launcher_adopt(launcher, target, since)
+    assert argv[:7] == ["/x/uv", "run", "--no-project", "--isolated", "--python", ">=3.11", "python"]
+    assert argv[7] == str(checkout / "servers" / "local" / "checkout_update.py")
+    assert argv[argv.index("adopt"):] == ["adopt", "--from", since, "--launcher", str(launcher), "--prepared", "all"]
+
+
+def test_the_hook_stays_out_of_the_bootstrap_finish_and_other_checkouts(managed, monkeypatch, tmp_path):
+    home, checkout, launcher, target = managed
+    bootstrap = tmp_path / "bootstrap"
+    bootstrap.write_text(OLD_LAUNCHER + "# sdpm-bootstrap 1\n")
+    assert cc.old_launcher_adopt(bootstrap, target, None) is None
+    assert cc.old_launcher_adopt(None, target, None) is None
+    other = cc.Target(uv="/x/uv", checkout=str(tmp_path / "dev"), platform=sys.platform)
+    (tmp_path / "dev").mkdir()
+    assert cc.old_launcher_adopt(launcher, other, None) is None  # make register-dev
+    monkeypatch.setenv("SDPM_UPDATER", "1")
+    assert cc.old_launcher_adopt(launcher, target, None) is None  # finish's own refresh
+
+
+def test_the_hook_runs_adopt_outside_the_venv_from_the_home(managed, monkeypatch):
+    home, checkout, launcher, target = managed
+    monkeypatch.setenv("VIRTUAL_ENV", str(checkout / ".venv"))
+    seen = {}
+
+    def call(argv, env, cwd):
+        seen.update(argv=argv, env=env, cwd=cwd)
+        return 3
+
+    assert cc.run_adopt(["adopt"], call=call) == 3
+    assert "VIRTUAL_ENV" not in seen["env"] and seen["cwd"] == str(home)
+    monkeypatch.setattr(cc, "run_adopt", lambda argv: 7)
+    assert cc.main(["--uv", "/x/uv", "--checkout", str(checkout), "refresh", "--launcher", str(launcher),
+                    "--since", "b" * 40]) == 7
+
+
+def test_refresh_launcher_comes_from_checkout_update():
+    import checkout_update
+
+    assert cc.refresh_launcher is checkout_update.refresh_launcher
+    assert cc.LAUNCHER_FINGERPRINT == checkout_update.LAUNCHER_FINGERPRINT
