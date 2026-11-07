@@ -14,6 +14,9 @@
  */
 import { test, expect, type Page } from "@playwright/test"
 
+/** The workspace URL the stub's deck-created result navigates to (hash routing). */
+const DECK_URL = { v2: /#e2e-v2-deck$/, v3: /#e2e-v3-deck$/ } as const
+
 async function createDeck(page: Page, engine: "v2" | "v3") {
   await page.goto("/decks")
   await expect(page.getByRole("heading", { name: "Decks" })).toBeVisible()
@@ -34,7 +37,7 @@ async function createDeck(page: Page, engine: "v2" | "v3") {
   await expect(chatLog).toContainText("Done! Your deck is ready.", { timeout: 30_000 })
 
   // Deck-created tool result navigates to the workspace (hash routing)
-  await expect(page).toHaveURL(new RegExp(`#e2e-${engine}-deck$`), { timeout: 15_000 })
+  await expect(page).toHaveURL(DECK_URL[engine], { timeout: 15_000 })
 
   // Workspace polling picks up the slide — the Slides tab appears with a count
   const slidesTab = page.getByRole("tab", { name: /Slides/ })

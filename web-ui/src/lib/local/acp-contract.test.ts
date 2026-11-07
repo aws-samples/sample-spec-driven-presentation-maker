@@ -38,7 +38,7 @@ type Line = Record<string, unknown>
 type Engine = "v2" | "v3"
 
 const FIXTURES = path.resolve(__dirname, "../../test/fixtures/acp")
-const fixture = (name: string) => path.resolve(FIXTURES, `kiro-3.0.0-${name}.jsonl`)
+const fixture = (name: string) => path.resolve(FIXTURES, `kiro-3.0.0-${name}.jsonl`) // nosemgrep: path-join-resolve-traversal — constant fixture names
 const TURNS: Record<string, { engine: Engine; file: string }> = {
   V2: { engine: "v2", file: fixture("v2-turn") },
   V3: { engine: "v3", file: fixture("v3-turn") },
