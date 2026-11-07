@@ -1,8 +1,9 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * AuthStack sign-up settings: self sign-up default, the config switch, and the
- * Pre sign-up trigger for auth.allowedEmailDomains.
+ * AuthStack sign-up settings (self sign-up default, the config switch, the Pre
+ * sign-up trigger for auth.allowedEmailDomains) and the WebClient, including who
+ * sets its callback/logout URLs.
  */
 
 import { describe, test } from "node:test";
@@ -14,6 +15,12 @@ import { AuthStack, AuthStackProps } from "../lib/auth-stack";
 function synth(props: AuthStackProps = {}): Template {
   const app = new cdk.App();
   return Template.fromStack(new AuthStack(app, "SdpmAuth", props));
+}
+
+/** Lambda functions other than WebClientUrlsFn, which every mode has. */
+function preSignUpFunctionCount(t: Template): number {
+  return Object.keys(t.findResources("AWS::Lambda::Function"))
+    .filter((id) => !id.startsWith("WebClientUrlsFn")).length;
 }
 
 // Logical IDs of the deployed user pool and web client. A change here would make
@@ -28,7 +35,7 @@ describe("AuthStack sign-up", () => {
       AdminCreateUserConfig: { AllowAdminCreateUserOnly: true },
       LambdaConfig: Match.absent(),
     });
-    t.resourceCountIs("AWS::Lambda::Function", 0);
+    assert.equal(preSignUpFunctionCount(t), 0);
   });
 
   test("selfSignUp: true turns self sign-up on without a trigger", () => {
@@ -37,7 +44,7 @@ describe("AuthStack sign-up", () => {
       AdminCreateUserConfig: { AllowAdminCreateUserOnly: false },
       LambdaConfig: Match.absent(),
     });
-    t.resourceCountIs("AWS::Lambda::Function", 0);
+    assert.equal(preSignUpFunctionCount(t), 0);
   });
 
   test("allowedEmailDomains attaches the Pre sign-up trigger with the normalized domains", () => {
@@ -46,7 +53,7 @@ describe("AuthStack sign-up", () => {
       AdminCreateUserConfig: { AllowAdminCreateUserOnly: false },
       LambdaConfig: { PreSignUp: { "Fn::GetAtt": [Match.stringLikeRegexp("^PreSignUpFn"), "Arn"] } },
     });
-    t.resourceCountIs("AWS::Lambda::Function", 1);
+    assert.equal(preSignUpFunctionCount(t), 1);
     t.hasResourceProperties("AWS::Lambda::Function", {
       Handler: "index.handler",
       Environment: { Variables: { ALLOWED_EMAIL_DOMAINS: "example.com,example.org" } },
@@ -59,7 +66,7 @@ describe("AuthStack sign-up", () => {
 
   test("an empty allowedEmailDomains list attaches no trigger", () => {
     const t = synth({ selfSignUp: true, allowedEmailDomains: [] });
-    t.resourceCountIs("AWS::Lambda::Function", 0);
+    assert.equal(preSignUpFunctionCount(t), 0);
   });
 
   test("the user pool and web client keep their logical IDs in every mode", () => {
@@ -119,5 +126,70 @@ describe("AuthStack WebClient", () => {
       Name: "/sdpm/auth/mcp-custom-scope",
       Value: "sdpm-mcp/invoke",
     });
+  });
+
+  test("the template's callback/logout URLs are exactly the dev URL", () => {
+    const client = synth().findResources("AWS::Cognito::UserPoolClient")[WEB_CLIENT_ID].Properties;
+    assert.deepEqual(client.CallbackURLs, ["http://localhost:3000"]);
+    assert.deepEqual(client.LogoutURLs, ["http://localhost:3000"]);
+  });
+
+  test("WebClientUrlsFn adds only the Web UI site URL that WebUiStack publishes", () => {
+    const t = synth();
+    const fns = Object.entries(t.findResources("AWS::Lambda::Function"))
+      .filter(([id]) => id.startsWith("WebClientUrlsFn"));
+    assert.equal(fns.length, 1);
+    const [fnId, fn] = fns[0];
+    const env = fn.Properties.Environment.Variables;
+    assert.equal(env.DEV_URL, "http://localhost:3000");
+    assert.equal(env.SITE_URL_PARAM, "/sdpm/web-ui/site-url");
+    assert.deepEqual(env.CLIENT_ID, { Ref: WEB_CLIENT_ID });
+    assert.deepEqual(env.USER_POOL_ID, { Ref: USER_POOL_ID });
+    // Its ARN is the service token WebUiStack's custom resource uses.
+    t.hasResourceProperties("AWS::SSM::Parameter", {
+      Name: "/sdpm/auth/web-client-urls-fn-arn",
+      Value: { "Fn::GetAtt": [fnId, "Arn"] },
+    });
+  });
+
+  test("WebClientUrlsFn can read the site URL parameter and update the WebClient, nothing more", () => {
+    const t = synth();
+    const roleRef = Object.entries(t.findResources("AWS::Lambda::Function"))
+      .find(([id]) => id.startsWith("WebClientUrlsFn"))![1].Properties.Role["Fn::GetAtt"][0];
+    const statements = Object.values(t.findResources("AWS::IAM::Policy"))
+      .filter((p) => p.Properties.Roles.some((r: { Ref: string }) => r.Ref === roleRef))
+      .flatMap((p) => p.Properties.PolicyDocument.Statement);
+    assert.equal(statements.length, 2);
+    const [cognitoStmt, ssmStmt] = statements;
+    assert.deepEqual(
+      [cognitoStmt.Action].flat().sort(),
+      ["cognito-idp:DescribeUserPoolClient", "cognito-idp:UpdateUserPoolClient"],
+    );
+    assert.deepEqual(cognitoStmt.Resource, { "Fn::GetAtt": [USER_POOL_ID, "Arn"] });
+    assert.equal(ssmStmt.Action, "ssm:GetParameter");
+    assert.match(JSON.stringify(ssmStmt.Resource), /:parameter\/sdpm\/web-ui\/site-url"/);
+  });
+
+  test("WebClientUrls runs after the client and again whenever the client's template changes", () => {
+    const hashOf = (stack: AuthStack): string => {
+      const t = Template.fromStack(stack);
+      const resources = Object.entries(t.findResources("Custom::WebClientUrls"));
+      assert.equal(resources.length, 1);
+      const [, res] = resources[0];
+      assert.ok([res.DependsOn].flat().includes(WEB_CLIENT_ID));
+      assert.deepEqual(Object.keys(res.Properties).sort(), ["ClientConfigHash", "ServiceToken"]);
+      return res.Properties.ClientConfigHash;
+    };
+    const stack = (): AuthStack => new AuthStack(new cdk.App(), "SdpmAuth");
+    const base = hashOf(stack());
+    assert.match(base, /^[0-9a-f]{64}$/);
+    // Same template, same hash: a deploy that leaves the client alone runs nothing.
+    assert.equal(hashOf(stack()), base);
+    // Any change to the client, made at any point before synth, changes the hash,
+    // so CloudFormation calls the function after it rewrites the client.
+    const changed = stack();
+    (changed.userPoolClient.node.defaultChild as cdk.CfnResource)
+      .addPropertyOverride("AccessTokenValidity", 30);
+    assert.notEqual(hashOf(changed), base);
   });
 });

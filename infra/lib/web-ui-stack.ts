@@ -31,7 +31,7 @@ import { CfnWebACLAssociation } from "aws-cdk-lib/aws-wafv2";
 import { Construct } from "constructs";
 import * as path from "path";
 import { CommonWebAcl } from "./construct/common-web-acl";
-import { AUTH_SSM_PARAMS } from "./auth-stack";
+import { AUTH_SSM_PARAMS, WEB_UI_SITE_URL_PARAM } from "./auth-stack";
 
 interface WebUiStackProps extends cdk.StackProps {
   /** Amazon DynamoDB table from DataStack. */
@@ -84,9 +84,6 @@ export class WebUiStack extends cdk.Stack {
     // Export/Import. See docs/internal/ssm-cross-stack-refs.md.
     const userPoolId = ssm.StringParameter.valueForStringParameter(
       this, AUTH_SSM_PARAMS.userPoolId,
-    );
-    const userPoolArn = ssm.StringParameter.valueForStringParameter(
-      this, AUTH_SSM_PARAMS.userPoolArn,
     );
     const webClientId = ssm.StringParameter.valueForStringParameter(
       this, AUTH_SSM_PARAMS.webClientId,
@@ -461,38 +458,24 @@ function handler(event) {
     });
     awsExports.node.addDependency(deployment);
 
-    // --- Add Amazon CloudFront URL to Amazon Cognito callback/logout URLs ---
-    // AuthStack owns the WebClient (OAuth flows, scopes including the MCP custom
-    // scope, auth flows). It cannot know the CloudFront URL without a circular
-    // dependency, so this custom resource sets the callback/logout URLs and
-    // nothing else. UpdateUserPoolClient resets every field the call leaves out,
-    // so the handler reads the client first and passes every other field through.
-    const callbackUrlsFn = new lambda.Function(this, "CognitoCallbackUrlsFn", {
-      runtime: lambda.Runtime.PYTHON_3_13,
-      handler: "index.handler",
-      code: lambda.Code.fromAsset(path.join(__dirname, "..", "lambdas", "cognito-callback-urls")),
-      timeout: cdk.Duration.minutes(1),
-      description: "Sets the Web UI callback/logout URLs on the Cognito WebClient, keeping its other settings",
-      logGroup: new logs.LogGroup(this, "CognitoCallbackUrlsFnLogs", {
-        retention: logs.RetentionDays.ONE_WEEK,
-        removalPolicy: cdk.RemovalPolicy.DESTROY,
-      }),
+    // --- Amazon CloudFront URL on the Amazon Cognito WebClient ---
+    // AuthStack owns the WebClient, including its callback/logout URLs. It cannot
+    // reference the CloudFront URL (that would be a circular dependency), so this
+    // stack publishes the URL in SSM, and AuthStack's WebClientUrls function sets
+    // the URLs to exactly the dev URL and this site URL. The custom resource runs
+    // that function when the site URL is created or changes; AuthStack runs it
+    // after every change to the client.
+    const siteUrlParam = new ssm.StringParameter(this, "SiteUrlParam", {
+      parameterName: WEB_UI_SITE_URL_PARAM,
+      stringValue: this.siteUrl,
+      description: "Web UI CloudFront site URL (callback/logout URL on the Cognito WebClient)",
     });
-    callbackUrlsFn.addToRolePolicy(new iam.PolicyStatement({
-      actions: ["cognito-idp:DescribeUserPoolClient", "cognito-idp:UpdateUserPoolClient"],
-      resources: [userPoolArn],
-    }));
-    const webUiUrls = ["http://localhost:3000", this.siteUrl];
-    new cdk.CustomResource(this, "UpdateCognitoCallbackUrls", {
-      serviceToken: callbackUrlsFn.functionArn,
-      resourceType: "Custom::CognitoCallbackUrls",
-      properties: {
-        UserPoolId: userPoolId,
-        ClientId: webClientId,
-        CallbackURLs: webUiUrls,
-        LogoutURLs: webUiUrls,
-      },
+    const webClientUrls = new cdk.CustomResource(this, "WebClientUrls", {
+      serviceToken: ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.webClientUrlsFnArn),
+      resourceType: "Custom::WebClientUrls",
+      properties: { SiteUrl: this.siteUrl },
     });
+    webClientUrls.node.addDependency(siteUrlParam);
 
     // --- WAF: CloudFront WebACL (from us-east-1 stack) ---
     if (props.webAclId) {
