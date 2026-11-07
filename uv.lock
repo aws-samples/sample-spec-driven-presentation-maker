@@ -3188,11 +3188,11 @@ dependencies = [
     { name = "aws-opentelemetry-distro" },
     { name = "awslabs-aws-pricing-mcp-server" },
     { name = "bedrock-agentcore", extra = ["strands-agents"] },
+    { name = "charset-normalizer" },
     { name = "html2text" },
     { name = "mcp" },
     { name = "partial-json-parser" },
     { name = "pymupdf" },
-    { name = "requests" },
     { name = "strands-agents", extra = ["otel"] },
 ]
 
@@ -3201,11 +3201,11 @@ requires-dist = [
     { name = "aws-opentelemetry-distro", specifier = ">=0.10.0" },
     { name = "awslabs-aws-pricing-mcp-server" },
     { name = "bedrock-agentcore", extras = ["strands-agents"], specifier = ">=1.0.6" },
+    { name = "charset-normalizer" },
     { name = "html2text" },
     { name = "mcp", specifier = ">=1.30.0,<2" },
     { name = "partial-json-parser" },
     { name = "pymupdf" },
-    { name = "requests" },
     { name = "strands-agents", extras = ["otel"], specifier = ">=1.47.0" },
 ]
 

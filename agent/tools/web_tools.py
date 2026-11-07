@@ -1,17 +1,40 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Strands Agent tool for fetching web pages, PDFs, and images."""
+"""Strands Agent tool for fetching web pages, PDFs, and images.
 
+Requests go through sdpm's URL fetcher, the one the MCP attachment tools use: public
+http(s) addresses only, every redirect hop checked again, and the connection pinned to
+the IP that passed the check (so a DNS answer cannot change between check and connect).
+"""
 
+from urllib.parse import urldefrag
+
+import charset_normalizer
 import html2text
-import requests
+from sdpm.tools.attachment.errors import AttachmentError, SSRFBlocked
+from sdpm.tools.attachment.fetcher import fetch_url
 from strands import tool
 
 _IMAGE_FORMATS = {"image/png": "png", "image/jpeg": "jpeg", "image/gif": "gif", "image/webp": "webp"}
+_USER_AGENT = "Mozilla/5.0 (compatible; sdpm-agent/1.0)"
 
 
-def _detect_content_type(response: requests.Response) -> str:
-    return response.headers.get("Content-Type", "").split(";")[0].strip().lower()
+def _error(text: str) -> dict:
+    return {"status": "error", "content": [{"text": text}]}
+
+
+def _decode_html(data: bytes, charset: str | None) -> str:
+    """Decode with the declared charset; detect it when the server sent none or Latin-1.
+
+    Latin-1 is HTTP's default when no charset is given and turns UTF-8 pages into mojibake.
+    """
+    encoding = charset
+    if not encoding or encoding.lower().replace("-", "") == "iso88591":
+        encoding = charset_normalizer.detect(data)["encoding"] or "utf-8"
+    try:
+        return data.decode(encoding, errors="replace")
+    except LookupError:
+        return data.decode("utf-8", errors="replace")
 
 
 @tool
@@ -27,6 +50,8 @@ def web_fetch(
     - HTML pages are returned as Markdown text.
     - PDFs are returned as extracted text per page plus page images for visual analysis.
     - Images (PNG, JPEG, GIF, WebP) are returned as image content for vision analysis.
+
+    Public http(s) URLs on ports 80 and 443 can be fetched.
 
     For long HTML pages, use 'start' to paginate through the content.
     For PDFs, use 'page_start' to skip pages (e.g. page_start=5 for pages 6-10).
@@ -45,40 +70,38 @@ def web_fetch(
     Returns:
         Markdown text for HTML, or structured ToolResult for PDF/image.
     """
-    response = requests.get(
-        url=url,
-        timeout=60,
-        headers={"User-Agent": "Mozilla/5.0 (compatible; sdpm-agent/1.0)"},
-    )
-    response.raise_for_status()
+    # The fragment never reaches the server; the fetcher rejects URLs that carry one.
+    target, _fragment = urldefrag(url)
+    try:
+        fetched = fetch_url(target, user_agent=_USER_AGENT)
+    except SSRFBlocked as e:
+        return _error(f"Blocked {url}: {e.message}. web_fetch reaches public internet addresses only.")
+    except AttachmentError as e:
+        return _error(f"Could not fetch {url}: {e.message}")
 
-    ct = _detect_content_type(response)
+    ct = (fetched.content_type or "").lower()
+    data = fetched.data
 
     # --- Image ---
     if ct in _IMAGE_FORMATS:
         return {
             "status": "success",
             "content": [
-                {"image": {"format": _IMAGE_FORMATS[ct], "source": {"bytes": response.content}}},
-                {"text": f"Image fetched from {url} ({ct}, {len(response.content)} bytes)"},
+                {"image": {"format": _IMAGE_FORMATS[ct], "source": {"bytes": data}}},
+                {"text": f"Image fetched from {url} ({ct}, {len(data)} bytes)"},
             ],
         }
 
     # --- PDF ---
     if ct == "application/pdf":
-        return _handle_pdf(url, response.content, page_start=page_start)
+        return _handle_pdf(url, data, page_start=page_start)
 
     # --- HTML (default) ---
-    # Fix encoding: requests defaults to Latin-1 when charset is not in Content-Type header,
-    # causing mojibake for UTF-8 sites. Use apparent_encoding (charset-normalizer) as fallback.
-    if response.encoding is None or response.encoding.lower().replace("-", "") == "iso88591":
-        response.encoding = response.apparent_encoding
-
     h = html2text.HTML2Text()
     h.ignore_links = False
     h.ignore_images = not include_images
     h.body_width = 0
-    markdown = h.handle(response.text)
+    markdown = h.handle(_decode_html(data, fetched.charset))
 
     total = len(markdown)
     chunk = markdown[start : start + max_chars]

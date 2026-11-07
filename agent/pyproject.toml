@@ -12,7 +12,8 @@ dependencies = [
     "bedrock-agentcore[strands-agents]>=1.0.6",
     "aws-opentelemetry-distro>=0.10.0",
     "awslabs.aws-pricing-mcp-server",
-    "requests",
+    # web_fetch: decodes pages that declare no charset.
+    "charset-normalizer",
     "html2text",
     "pymupdf",
     "partial-json-parser",
