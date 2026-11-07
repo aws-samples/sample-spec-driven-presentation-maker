@@ -1,12 +1,18 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-/** Fork a kiro-cli session and stream copy/load progress as SSE. */
-import { getOrCreateProcess, pendingOrigins, terminateProcess } from "@/lib/local/acp-process"
+/**
+ * Fork a kiro-cli session and stream copy/load progress as SSE. A copy kiro-cli could not read
+ * (it started an empty session instead) fails the fork: a chat must not continue "from" a
+ * session without its history.
+ */
+import { openForkedSession, pendingOrigins, terminateProcess } from "@/lib/local/acp-process"
 import { forkSession, removeForkedSession } from "@/lib/local/kiro-sessions"
 import type { ForkSessionRequest, ForkSessionPhase, ForkSessionPhaseDetail } from "@/lib/local/kiro-sessions.types"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 export const dynamic = "force-dynamic"
+
+const COPY_NOT_READ = "kiro-cli could not read the copied session"
 
 export async function POST(req: Request) {
   const refused = rejectCrossSite(req)
@@ -71,14 +77,17 @@ export async function POST(req: Request) {
           forkId = fork.newId
           if (operationController.signal.aborted) throw new DOMException("Fork cancelled", "AbortError")
 
-          await getOrCreateProcess(fork.newId, body.agentName || "sdpm-orchestrator", {
-            setMode: true,
+          const { outcome } = await openForkedSession(fork.newId, body.agentName || "sdpm-orchestrator", {
             signal: operationController.signal,
             onPhase: (phase: ForkSessionPhase, detail?: ForkSessionPhaseDetail) => {
               send("phase", { phase, ...detail })
             },
           })
           if (operationController.signal.aborted) throw new DOMException("Fork cancelled", "AbortError")
+          if (outcome === "created") {
+            console.warn("[fork] %s: %s", fork.newId, COPY_NOT_READ)
+            throw new Error(COPY_NOT_READ)
+          }
 
           pendingOrigins.set(fork.newId, fork.origin)
           completed = true

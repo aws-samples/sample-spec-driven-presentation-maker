@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Local ACP Agent Steer — send a message into the session's running turn (lib/local/steer.ts).
+ * Local ACP Agent Steer — send a message into the session's running turn (lib/local/conversation/steer.ts).
  * Body `{sessionId, id, text}`; `id` is the chat's id for the message, which the turn's stream
  * then reports as `{steer: {id, state}}`. 200 `{steer: {id, state: "accepted"}}` once kiro-cli
  * queued it; 409 `{code, error}` when it did not (no turn running, not queued); 504
@@ -9,7 +9,7 @@
  */
 import { steerSession } from "@/lib/local/acp-process"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
-import { SteerRejectedError } from "@/lib/local/steer"
+import { SteerRejectedError } from "@/lib/local/conversation/steer"
 import { AgentTimeoutError, localTurnError } from "@/lib/local/turnErrors"
 
 export const dynamic = 'force-dynamic'

@@ -4,6 +4,7 @@
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
+import { LocalEngineSetting } from "@/components/LocalEngineSetting"
 import { ModelPicker } from "@/components/ModelPicker"
 import { usePreferences } from "@/hooks/usePreferences"
 import { getAllowedModels, getDefaultChatModelId, getDefaultCreateModelId } from "@/lib/allowedModels"
@@ -122,6 +123,9 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-5 pb-6 overflow-y-auto flex-1 min-h-0">
+          {/* ── Agent engine (Local only) ── */}
+          {IS_LOCAL && <LocalEngineSetting open={open} />}
+
           {/* ── Agents (Local only) ── */}
           {IS_LOCAL && agentDefs.length > 0 && (
             <section
@@ -133,10 +137,10 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                   id="agent-heading"
                   className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
-                  Agents
+                  {t("agents")}
                 </h3>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Choose which agent definition each role uses.
+                  {t("agentsDescription")}
                 </p>
               </div>
               <div className="flex flex-col gap-3">
@@ -159,7 +163,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                         value={agentSelection[role] || undefined}
                         onChange={(id) => id && onAgentChange(role, id)}
                         triggerId={`agent-${role}`}
-                        ariaLabel={`Select ${role} agent`}
+                        ariaLabel={t("selectAgent", { role })}
                       />
                     </div>
                   )
@@ -170,15 +174,15 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                       htmlFor="agent-model"
                       className="mb-1.5 block text-xs font-medium text-foreground"
                     >
-                      Model
+                      {t("agentModel")}
                     </label>
                     <ModelPicker
                       models={localModels}
                       value={agentSelection.model || undefined}
                       onChange={onLocalModelChange}
-                      inheritLabel="Default"
+                      inheritLabel={t("agentModelDefault")}
                       triggerId="agent-model"
-                      ariaLabel="Select agent model"
+                      ariaLabel={t("selectAgentModel")}
                     />
                   </div>
                 )}

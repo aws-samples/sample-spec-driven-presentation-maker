@@ -4,7 +4,9 @@
  * Playwright global setup — prepares an isolated sandbox under e2e/.tmp:
  * - decks/  : SDPM_DECK_ROOT for the dev server (keeps ~/Documents untouched)
  * - config/ : acp-config.json pointing the ACP process manager at the
- *             stub agent instead of kiro-cli (via SDPM_ACP_CONFIG_DIR)
+ *             stub agent instead of kiro-cli (via SDPM_ACP_CONFIG_DIR), on the
+ *             V3 engine; a test switches it with PUT /api/agent/engine, which
+ *             keeps the command
  */
 import fs from "fs"
 import path from "path"
@@ -16,21 +18,6 @@ export default async function globalSetup() {
   fs.mkdirSync(path.join(tmp, "config"), { recursive: true })
 
   const stubPath = path.resolve(__dirname, "stub-agent.mjs")
-  const config = {
-    activeAgent: "e2e-stub",
-    agents: [
-      {
-        id: "e2e-stub",
-        displayName: "E2E Stub Agent",
-        path: process.execPath,
-        args: [stubPath],
-        env: {},
-        subagentTool: "use_subagent",
-        subagentInstruction: "",
-        restartOnNewChat: true,
-        subagentQueryField: "query",
-      },
-    ],
-  }
+  const config = { version: 2, engine: "v3", command: process.execPath, commandArgs: [stubPath], env: {} }
   fs.writeFileSync(path.join(tmp, "config", "acp-config.json"), JSON.stringify(config, null, 2) + "\n")
 }

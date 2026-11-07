@@ -1,0 +1,10 @@
+{"client": {"id": 1, "method": "initialize"}}
+{"jsonrpc": "2.0", "result": {"protocolVersion": 1, "agentCapabilities": {"loadSession": true, "promptCapabilities": {"image": true, "audio": false, "embeddedContext": false}, "mcpCapabilities": {"http": true, "sse": false}, "sessionCapabilities": {}, "auth": {}}, "authMethods": [], "agentInfo": {"name": "Kiro CLI Agent", "title": "Kiro CLI Agent", "version": "3.0.0"}}, "id": 1}
+{"client": {"id": 2, "method": "session/new"}}
+{"jsonrpc": "2.0", "method": "_kiro.dev/mcp/server_initialized", "params": {"sessionId": "7f36556f-6963-42df-9224-6ff45a7a85ce", "serverName": "sdpm"}}
+{"jsonrpc": "2.0", "method": "_kiro.dev/subagent/list_update", "params": {"subagents": [], "pendingStages": []}}
+{"jsonrpc": "2.0", "method": "_kiro.dev/mcp/server_initialized", "params": {"sessionId": "7f36556f-6963-42df-9224-6ff45a7a85ce", "serverName": "sdpm"}}
+{"jsonrpc": "2.0", "result": {"sessionId": "7f36556f-6963-42df-9224-6ff45a7a85ce", "modes": {"currentModeId": "sdpm-orchestrator", "availableModes": [{"id": "sdpm-composer", "name": "sdpm-composer"}, {"id": "sdpm-orchestrator", "name": "sdpm-orchestrator"}, {"id": "sdpm-style", "name": "sdpm-style"}, {"id": "sdpm-translate", "name": "sdpm-translate"}]}, "models": {"currentModelId": "auto", "availableModels": [{"modelId": "auto", "name": "auto", "description": "Models chosen by task for optimal usage and consistent quality"}, {"modelId": "claude-opus-5.5", "name": "claude-opus-5.5", "description": "Claude Opus 5.5 model with 1M context window"}, {"modelId": "claude-sonnet-5.5", "name": "claude-sonnet-5.5", "description": "Claude Sonnet 5.5 model with 1M context window"}]}}, "id": 2}
+{"client": {"id": 3, "method": "session/load"}}
+{"jsonrpc": "2.0", "method": "_kiro.dev/metadata", "params": {"sessionId": "7f36556f-6963-42df-9224-6ff45a7a85ce", "contextUsagePercentage": 3.1624999046325684, "reasoning": {"support": "unavailable", "effortLevels": []}}}
+{"jsonrpc": "2.0", "error": {"code": -32603, "message": "Internal error", "data": "Failed to start session: Session not found: sess_53fd2ae9-a657-4048-97da-38fb5cfed6df"}, "id": 3}

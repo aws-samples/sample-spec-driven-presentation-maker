@@ -25,11 +25,7 @@ export async function GET(req: Request) {
   const afterId = lastEventId ? parseInt(lastEventId, 10) : undefined
   const buffered = getBufferedEvents(sessionId, afterId)
 
-  const stream = createSSEStream({
-    sessionId: sub.sessionId,
-    subscribe: sub.subscribe,
-    replay: buffered,
-  })
+  const stream = createSSEStream({ subscribe: sub.subscribe, replay: buffered })
 
   return new Response(stream, {
     headers: {
