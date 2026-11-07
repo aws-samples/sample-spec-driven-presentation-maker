@@ -155,8 +155,8 @@ export async function updateAgentSelection(patch: Partial<Record<keyof AgentSele
  */
 export async function listLocalModels(): Promise<LocalModel[]> {
   if (!IS_LOCAL) return []
-  const response = await fetch("/api/agent/models")
-  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  // POST: listing may start a kiro-cli process (the list comes from its session)
+  const response = await postJson("/api/agent/models", {})
   const data = await response.json()
   return (data.available || []).map((m: { modelId: string; name: string; description?: string }) => ({
     modelId: m.modelId, displayName: m.name, description: m.description,

@@ -231,6 +231,17 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
 
 ### Security
 
+- **Local Web UI: the server answers only requests addressed to it by a loopback name.**
+  Every request to the Local server (API routes and pages) must carry a `Host` of
+  `127.0.0.1`, `localhost` or `[::1]` on the server's own port; anything else, or no `Host`,
+  gets 403 before a route runs. Before, a web page on another domain that resolved to
+  127.0.0.1 could reach the API, which has no sign-in. The check runs in one place
+  (`web-ui/src/proxy.ts`), so new routes are covered, and it has no mode check of its own, so
+  it applies wherever the API routes are served; the cloud build leaves it out with the API
+  routes. The agent selection and model `PUT`s now also refuse cross-site requests and
+  non-JSON bodies, and listing the models (which may start kiro-cli) is a `POST`, so a plain
+  `GET` has no side effects. Open the Web UI as `http://localhost:<port>` or
+  `http://127.0.0.1:<port>`; another host name pointing at the machine is refused.
 - **Cloud agent: `web_fetch` reaches public internet addresses only.** The agent's
   `web_fetch` tool now fetches through the same URL fetcher as the MCP attachment tools
   (`sdpm.tools.attachment.fetcher`). It rejects schemes other than http(s), ports other than
