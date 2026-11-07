@@ -172,6 +172,16 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   a 2.x deny list, the file is left as it is and the message names the setting. / Nothing.
   Settings already dropped by an earlier rewrite have to be added again by the tool that
   added them.
+- **Registering with a Kiro CLI that is not signed in yet no longer fails.** `kiro-cli
+  agent validate` refuses to run before `kiro-cli login`, so `sdpm register`, the
+  installer's `--register` and `sdpm update` reported Kiro CLI as failed and exited with 1
+  although the agent file was written correctly. The `--full` installer always hit this,
+  having just installed kiro-cli. Registration now checks `kiro-cli whoami` first; when
+  kiro-cli is not signed in it skips the validation, reports the agent as registered and
+  says to run `kiro-cli login` first. / Nothing.
+- **Result marks are coloured only on a terminal.** `sdpm register`, `sdpm update` and
+  `sdpm doctor` printed ANSI colour codes into logs and agent output. They now colour the
+  ✓ / ✗ / ! marks only when the output is a terminal and `NO_COLOR` is not set. / Nothing.
 - **MCP runtime: OpenTelemetry ids no longer repeat across V2 restores.** Every microVM
   restored from the same snapshot started the `random` module from the same state, so
   OpenTelemetry trace and span ids (and botocore retry jitter) could be identical across
