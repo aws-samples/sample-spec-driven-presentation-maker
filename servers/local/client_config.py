@@ -929,7 +929,20 @@ def _default_target(args: argparse.Namespace) -> Target:
     return Target(uv=str(Path(uv).absolute()), checkout=str(checkout))
 
 
+def tolerate_narrow_console() -> None:
+    """Print marks (✓ → –) as '?' rather than fail where the console cannot show them.
+
+    Windows hands a piped Python its ANSI code page (cp1252, cp932), which has no ✓; a
+    UnicodeEncodeError there would stop `sdpm update` halfway through the refresh.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(errors="replace")
+
+
 def main(argv: Optional[list[str]] = None) -> int:
+    tolerate_narrow_console()
     parser = argparse.ArgumentParser(prog="sdpm mcp-config", description=__doc__.split("\n\n")[0])
     parser.add_argument("--uv", help="absolute path of uv (default: SDPM_UV, then PATH)")
     parser.add_argument("--checkout", help="checkout root (default: this file's repository)")

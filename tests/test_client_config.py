@@ -559,3 +559,16 @@ def test_cli_refresh_runs_every_part(tmp_path, monkeypatch, capsys):
     assert not (checkout / "sdpm" / ".venv").exists()
     out = capsys.readouterr().out
     assert "sdpm command: updated" in out and "removed" in out
+
+
+def test_outcomes_print_on_a_narrow_windows_console(monkeypatch):
+    # A piped Python on Windows writes the ANSI code page; ✓ must not stop the refresh.
+    import io
+
+    raw = io.BytesIO()
+    narrow = io.TextIOWrapper(raw, encoding="cp1252")
+    monkeypatch.setattr(sys, "stdout", narrow)
+    cc.tolerate_narrow_console()
+    cc.print_outcomes([cc.Outcome(cc.by_id("claude-code"), "registered", "→ ask for slides")])
+    narrow.flush()
+    assert b"Claude Code" in raw.getvalue() and b"registered" in raw.getvalue()
