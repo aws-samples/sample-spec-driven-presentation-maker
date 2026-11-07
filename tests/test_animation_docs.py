@@ -226,6 +226,30 @@ class TestGuideRules:
         section = guide[guide.index(heading) : guide.index("\n## ", guide.index(heading) + len(heading))]
         assert "only" in section and "PDF" in section and "print" in section
 
+    def test_inspecting_the_storyboard_is_a_rule(self, guide):
+        """An animated deck looks finished in the ordinary preview no matter
+        what its build order does, so "look at the frames" has to be a rule in
+        the guide rather than advice buried in a section about something else."""
+        heading = next(
+            (line for line in guide.splitlines()
+             if line.startswith("## ") and "storyboard" in line.lower()),
+            None,
+        )
+        assert heading, "the guide has no top-level rule section about the storyboard"
+        section = guide[guide.index(heading):guide.index("\n## ", guide.index(heading) + len(heading))]
+        # named the way it is reachable from both the CLI and run_python, not
+        # as a CLI script: test_reference_vocabulary_is_environment_neutral
+        # bans the script name from a guide, and rightly.
+        assert "from sdpm.api import storyboard" in section, "the rule does not give the call"
+        # the three things to look at, and why preview cannot stand in
+        assert "Frame 0" in section and "last frame" in section
+        assert "where it is authored" in section
+        # what a still frame cannot show, so silence is not read as "nothing happens"
+        for token in ("pulse", "colorPulse", "teeter", "spin", "growShrink"):
+            assert token in section
+        # and that it is a derived model rather than ground truth
+        assert "not fidelity" in section
+
     def test_it_explains_the_switches_and_the_override_precedence(self, guide):
         for token in ("animations.enabled", "transitions.enabled", "inherit", "independent"):
             assert token in guide

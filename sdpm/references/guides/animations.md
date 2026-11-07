@@ -15,6 +15,54 @@ transitions (PowerPoint's Transitions tab). Load it only when you need it:
 With neither switch enabled and no such field on your slides, nothing in this guide applies
 and you should not load it — a still deck is the default and stays the default.
 
+## Rule — look at the storyboard before calling an animated deck finished
+
+Build it, run the storyboard, **open every frame**, fix what the frames show, run it again.
+Not optional, and not replaceable by the ordinary preview.
+
+```python
+from sdpm.api import storyboard
+storyboard(deck_dir, output_dir=f"{deck_dir}/storyboard")
+```
+
+It returns a manifest — one entry per frame, with the elements on and off screen and a note
+for anything the frame cannot show — and writes the same manifest beside the PNGs. The build
+reports how many slides carry motion so this is not something you have to remember to check.
+
+`preview` draws every element where it is authored, so an animated slide looks finished in it
+no matter what the build order does. `storyboard` derives the state after each click and
+renders that, one PNG per click, with a manifest naming what is on and off screen in each.
+
+These all passed a clean build, a 605-field round trip, the layout and token checks and the
+morph lint, and every one of them was found by looking at a frame:
+
+* an icon with no entrance of its own, sitting in empty space until the tile under it arrived
+  — on all six slides of the deck it was found in
+* `afterEffect: hide` on the last step of a build, so the slide came to rest with a hole where
+  half of an A/B comparison used to be
+* `hideOnNextClick` stranding a tile, leaving a gap with an orphaned icon floating in it
+* a dim fired at the moment its tile appeared and never lifted, so the deck rested with a
+  receded tile for no reason
+* a motion path that moved a decorative icon 270px to nowhere in particular
+
+What to check in the frames, in order:
+
+1. **Frame 0** — before the first click. Anything visible here has no entrance. An icon or
+   label whose tile has not arrived yet is the most common defect and the easiest to miss.
+2. **The last frame** — it is the slide's resting state and should be the whole composition.
+   The manifest says `ends with [...] off screen` when it is not.
+3. **Each middle frame** — does it read on its own? An element should arrive with whatever it
+   belongs to, not before it.
+
+Two things a still frame cannot tell you, both named per frame in the manifest so they are not
+mistaken for "nothing happens": an emphasis that returns to where it started (`pulse`,
+`colorPulse`, `teeter`, `spin`, `growShrink`) looks identical in every frame, and a dim is
+*indicated* by recolouring text rather than reproduced, because PowerPoint uses the template's
+own Accent swatch.
+
+The storyboard is derived from the same catalog the writer uses, so it agreeing with the
+writer does not prove PowerPoint agrees with either. It finds authoring mistakes, not fidelity.
+
 ## Rule — the slide must carry its whole meaning with motion off
 
 Animation is a second reading of a slide that is already complete. No claim, number, label,
@@ -559,6 +607,15 @@ be written at any duration once an option names one.
   `interactiveSequences`.
 - `interactiveSequences[].trigger` takes the same object as `start`, and its `id` must be
   unique among sequences.
+- An interactive sequence's own `id` survives a round trip. PowerPoint stores no name for a
+  trigger sequence — only a trigger shape and a position — so sdpm persists the author's label
+  in the same extension that carries effect IDs. A package written before that, or one
+  PowerPoint wrote, has no such entry and its sequences come back as `interactive-0`,
+  `interactive-1`, by position.
+- The **first** effect of an interactive sequence starts on that sequence's own trigger, so
+  give it `{"type": "onShapeClick", "target": "<the trigger shape>"}`. Writing `onPageClick`
+  there generates the same package but reads back as `onShapeClick`, because the trigger is
+  what the XML records.
 
 ### Timing
 
@@ -660,7 +717,15 @@ a chart build or a SmartArt build — never two of them.
 
 `sequence` and `level` must agree — `asOneObject` and `byParagraphLevel2` contradict each
 other and are rejected with both values named. A level that only refines its sequence
-(`byParagraph` plus `byParagraphLevel2`) is fine.
+(`byParagraph` plus `byParagraphLevel2`) generates correctly.
+
+**Set one of them, not both.** They write into the one `p:bldP` this effect has, so a package
+can only carry one of the two, and a round trip returns whichever the bytes resolve to:
+`byParagraph` + `byParagraphLevel1` comes back as the level, `allAtOnce` +
+`allParagraphLevels` comes back as the sequence, and `asOneObject` + `asOneObject` comes back
+as neither. Each field survives on its own, so the pair buys nothing and costs a field.
+Generation warns when it sees both, naming the slide, the effect and the JSON path; see *Eight
+build spellings normalise rather than survive* for the byte-level reason.
 
 Use `target.paragraphRange` when the effect should animate a slice of the paragraphs rather
 than build the whole text frame.
@@ -892,6 +957,9 @@ All of these fail before a PPTX is reported as generated.
 
 ## Related guides
 
+- `read_guides(["animation-craft"])` — whether to animate at all, how long an effect should
+  run, how to stagger a group, and what the published guidance on motion says. This guide
+  covers what is possible; that one covers what is worth doing.
 - `read_guides(["import-pptx"])` — turning an attached PPTX into a deck, including what its
   animations become.
 - `read_guides(["hand-edit-sync"])` — bringing animations the user added in PowerPoint back

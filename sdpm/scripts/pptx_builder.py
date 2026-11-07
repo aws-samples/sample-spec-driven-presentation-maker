@@ -146,6 +146,50 @@ def cmd_generate(args):
         for w in other_warnings:
             print(f"  {w}")
 
+    if result.get("animated_slides"):
+        print(
+            f"\n▶  {result['animated_slides']} slide(s) carry motion. The PNGs above show every "
+            f"element where it is authored, so they cannot show build order."
+        )
+        print(f"  → storyboard {args.input} -o {{deck_dir}}/storyboard")
+        print("  → then LOOK AT the frames: frame 0 should not show an element whose tile has "
+              "not arrived, and the last frame should be the whole composition.")
+
+
+def cmd_storyboard(args):
+    """Export one still frame per click step and report what each frame shows."""
+    from sdpm.api import storyboard as api_storyboard
+
+    only = None
+    if getattr(args, "slides", None):
+        only = {s.strip() for s in args.slides.split(",") if s.strip()}
+
+    try:
+        result = api_storyboard(
+            deck_dir=args.input,
+            output_dir=args.output_dir,
+            only_slugs=only,
+        )
+    except (FileNotFoundError, RuntimeError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    current = None
+    for entry in result["manifest"]:
+        if entry["slide"] != current:
+            current = entry["slide"]
+            print(f"\n{current}")
+        print(
+            f"  page{entry['page']:02d}  frame {entry['frame']}  {entry['label']}"
+            f"  on screen: {len(entry['onScreen'])}"
+        )
+        if entry["offScreen"]:
+            print(f"           off screen: {', '.join(entry['offScreen'])}")
+        for note in entry["notes"]:
+            print(f"           ! {note}")
+    print(f"\nStoryboard: {result['preview_dir']}")
+    print(f"Frames JSON: {result['frames_json']}")
+
 
 def cmd_preview(args):
     """Export slides as PNG images from JSON."""
@@ -606,6 +650,19 @@ def main():
              "Default: a fresh temporary directory under _work/",
     )
 
+    p_story = subparsers.add_parser(
+        "storyboard",
+        help="Export one still frame per click step, to inspect animation build order",
+    )
+    p_story.add_argument("input", help="Deck directory (deck.json + slides/)")
+    p_story.add_argument(
+        "-o", "--output-dir",
+        help="Directory for the PNG files. Default: {deck_dir}/storyboard",
+    )
+    p_story.add_argument(
+        "--slides", help="Only these slugs (comma separated)",
+    )
+
     p_meas = subparsers.add_parser("measure", help="Measure text bounding boxes from slides JSON")
     p_meas.add_argument("input", help="Input JSON file")
     p_meas.add_argument("-p", "--pages", help="Slide numbers to measure (e.g. 1,3,5)")
@@ -687,6 +744,8 @@ def main():
         cmd_generate(args)
     elif args.command == "preview":
         cmd_preview(args)
+    elif args.command == "storyboard":
+        cmd_storyboard(args)
     elif args.command == "measure":
         cmd_measure(args)
     elif args.command == "search_assets":

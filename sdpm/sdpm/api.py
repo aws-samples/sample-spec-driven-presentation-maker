@@ -794,6 +794,7 @@ def _resolve_config(
         check_includes,
         check_morph_pairing,
         check_overlay_textbox,
+        check_text_build,
     )
 
     fs_warnings = check_font_size_tokens(data, input_path)
@@ -806,6 +807,12 @@ def _resolve_config(
     # Include references: a missing/empty include silently drops its content.
     include_warnings = check_includes(data, base_dir)
     warnings.extend(include_warnings)
+
+    # Text builds whose sequence/level pair cannot survive a round-trip. Unlike
+    # the morph check this is slide-local, so it runs for a partial build too:
+    # a composer verifying its own slides can see its own text build, and
+    # nothing about the answer depends on a neighbouring slide.
+    warnings.extend(check_text_build(data))
 
     # Morph identities that pair with nothing on the adjacent slide. The only
     # morph rule that has to be deck-level: every other one is checked within a
@@ -936,11 +943,24 @@ def generate(
             title = title.get("text", "(no title)")
         summary.append(f"page{i:02d} - {title}")
 
+    # Slides whose motion actually reached the package. The ordinary preview
+    # draws every element where it is authored, so it cannot show build order:
+    # an element revealed too early, never revealed, or hidden at the end of its
+    # own build all look correct in it. The caller is told to look at the
+    # storyboard instead, and told here rather than in a guide because this is
+    # the output an author already reads.
+    animated_slides = sum(
+        1 for s in config.slides
+        if (config.animations_enabled and s.get("animations"))
+        or (config.transitions_enabled and s.get("transition"))
+    )
+
     result: dict[str, Any] = {
         "output_path": str(out),
         "slide_count": len(config.slides),
         "slides": summary,
         "warnings": config.warnings,
+        "animated_slides": animated_slides,
     }
     if invalid_layouts:
         result["invalid_layouts"] = [
@@ -1006,6 +1026,62 @@ def measure(
 
             if svg_path:
                 shutil.rmtree(svg_path.parent, ignore_errors=True)
+
+
+def storyboard(
+    deck_dir: str | Path,
+    output_dir: str | Path | None = None,
+    only_slugs: set[str] | None = None,
+) -> dict[str, Any]:
+    """Render one still frame per click step, so animations can be inspected.
+
+    The ordinary preview draws every element where it is authored, so it cannot
+    show build order: an element revealed too early, never revealed, or hidden
+    at the end of its own build all look correct in it. This derives the state
+    after each click from the catalog and renders that, which is the only route
+    available without driving PowerPoint.
+
+    Args:
+        deck_dir: Deck directory (deck.json + slides/).
+        output_dir: Where the PNGs go. Defaults to ``<deck_dir>/storyboard``.
+        only_slugs: Restrict to these slides.
+
+    Returns:
+        Dict with ``manifest`` (one entry per frame, with its notes),
+        ``files``, ``frames_json`` and ``preview_dir``.
+    """
+    from sdpm.engine.storyboard import storyboard as build_storyboard
+    from sdpm.engine.timing.writer import load_capability_index
+    from sdpm.utils.io import write_json
+
+    deck_path = Path(deck_dir)
+    if not deck_path.is_dir():
+        raise FileNotFoundError(f"Not a deck directory: {deck_dir}")
+
+    deck_meta, slides = _assemble_slides_from_dir(deck_path, only_slugs=only_slugs)
+    derived_deck, frame_slides, manifest = build_storyboard(
+        deck_meta, slides, load_capability_index()
+    )
+
+    # The frames file lives in the deck directory so that specs/ — which the
+    # token-discipline check reads — stays reachable from its parent.
+    frames_json = deck_path / "storyboard-frames.json"
+    write_json(frames_json, {**derived_deck, "slides": frame_slides}, suffix="\n")
+
+    result = preview(
+        frames_json,
+        grid=False,
+        output_dir=str(output_dir or (deck_path / "storyboard")),
+    )
+    for entry, path in zip(manifest, result["files"]):
+        entry["file"] = path
+    write_json(Path(result["preview_dir"]) / "manifest.json", manifest, suffix="\n")
+    return {
+        "manifest": manifest,
+        "files": result["files"],
+        "frames_json": str(frames_json),
+        "preview_dir": result["preview_dir"],
+    }
 
 
 def preview(
