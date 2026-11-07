@@ -203,8 +203,8 @@ creates a desktop shortcut. If you installed only the MCP server, add the Web UI
 
 Local mode keeps decks in `~/Documents/SDPM-Presentations`. To use another folder, set
 `output_dir` in `~/.config/sdpm/config.json` ([User config](custom-template.md#user-config));
-the MCP server and the Web UI both read it. `SDPM_DECK_ROOT`, then `SDPM_OUTPUT_DIR`, take
-precedence over it.
+the MCP server and the Web UI both read it (restart the Web UI after changing it).
+`SDPM_DECK_ROOT`, then `SDPM_OUTPUT_DIR`, take precedence over it.
 
 ### Comments on the slides
 

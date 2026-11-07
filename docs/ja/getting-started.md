@@ -195,8 +195,8 @@ Kiro には無料プランがあります（[Kiro の料金](https://kiro.dev/pr
 
 ローカルモードはデッキを `~/Documents/SDPM-Presentations` に保存します。別のフォルダーにするには
 `~/.config/sdpm/config.json` の `output_dir` を設定します（[ユーザー設定](custom-template.md#ユーザー設定)）。
-MCP サーバーと Web UI の両方がこの値を使います。`SDPM_DECK_ROOT`、次に `SDPM_OUTPUT_DIR` を設定すると、
-そちらが優先されます。
+MCP サーバーと Web UI の両方がこの値を使います（変更したら Web UI を再起動します）。`SDPM_DECK_ROOT`、次に
+`SDPM_OUTPUT_DIR` を設定すると、そちらが優先されます。
 
 ### スライドへのコメント
 

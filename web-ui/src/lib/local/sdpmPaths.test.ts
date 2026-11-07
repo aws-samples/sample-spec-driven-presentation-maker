@@ -40,7 +40,10 @@ const DECK_ROOT_TABLE: Array<[string | undefined, string | undefined, object | s
   [undefined, undefined, undefined, "~/Documents/SDPM-Presentations"],
   [undefined, undefined, { output_dir: "<tmp>/cfg" }, "<tmp>/cfg"],
   [undefined, undefined, { output_dir: "~/cfg-decks" }, "~/cfg-decks"],
+  [undefined, undefined, { output_dir: "~" }, "~"],
+  [undefined, undefined, { output_dir: "" }, "~/Documents/SDPM-Presentations"],
   [undefined, undefined, { extra_sources: [] }, "~/Documents/SDPM-Presentations"],
+  // Python on WSL uses the Windows Documents folder here; the Web UI keeps the default.
   [undefined, undefined, "{not json", "~/Documents/SDPM-Presentations"],
   [undefined, "<tmp>/out", { output_dir: "<tmp>/cfg" }, "<tmp>/out"],
   ["<tmp>/deck", "<tmp>/out", { output_dir: "<tmp>/cfg" }, "<tmp>/deck"],
@@ -61,7 +64,7 @@ describe("deck root order", () => {
 
   it.each(DECK_ROOT_TABLE)("SDPM_DECK_ROOT=%j SDPM_OUTPUT_DIR=%j config=%j → %s", (deckRoot, outputDir, config, expected) => {
     const value = (text: string) => text.replaceAll("<tmp>", tmp)
-    const expand = (text: string) => value(text).replace(/^~(?=\/)/, os.homedir())
+    const expand = (text: string) => value(text).replace(/^~(?=\/|$)/, os.homedir())
     vi.stubEnv("SDPM_DECK_ROOT", deckRoot === undefined ? undefined : value(deckRoot))
     vi.stubEnv("SDPM_OUTPUT_DIR", outputDir === undefined ? undefined : value(outputDir))
     vi.stubEnv("XDG_CONFIG_HOME", path.join(tmp, "xdg"))

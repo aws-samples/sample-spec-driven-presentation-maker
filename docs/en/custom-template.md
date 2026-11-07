@@ -409,9 +409,9 @@ Full schema with defaults:
 }
 ```
 
-- `output_dir` — Base directory where generated PPTX files are written.
-  Supports `~` expansion. Can also be overridden per-run via
-  `$SDPM_OUTPUT_DIR`.
+- `output_dir` — Deck root: where the CLI and the MCP servers write decks and generated
+  PPTX files, and where the Local Web UI lists them. Supports `~` expansion; empty means
+  the default. `$SDPM_DECK_ROOT`, then `$SDPM_OUTPUT_DIR`, override it.
 - `extra_sources` — Additional asset manifests (see **Option B** above).
 
 The previously-shipped `sdpm/assets/config.json` is no longer read — it was

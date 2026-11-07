@@ -24,7 +24,10 @@ _TABLE = [
     (None, None, None, "~/Documents/SDPM-Presentations"),
     (None, None, {"output_dir": "<tmp>/cfg"}, "<tmp>/cfg"),
     (None, None, {"output_dir": "~/cfg-decks"}, "~/cfg-decks"),
+    (None, None, {"output_dir": "~"}, "~"),
+    (None, None, {"output_dir": ""}, "~/Documents/SDPM-Presentations"),
     (None, None, {"extra_sources": []}, "~/Documents/SDPM-Presentations"),
+    # Off WSL only: on WSL, Python falls back to the Windows Documents folder, the Web UI does not.
     (None, None, "{not json", "~/Documents/SDPM-Presentations"),
     (None, "<tmp>/out", {"output_dir": "<tmp>/cfg"}, "<tmp>/out"),
     ("<tmp>/deck", "<tmp>/out", {"output_dir": "<tmp>/cfg"}, "<tmp>/deck"),

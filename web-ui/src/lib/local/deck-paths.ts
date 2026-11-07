@@ -16,6 +16,9 @@ import { getConfiguredOutputDir } from "./sdpmPaths"
 /**
  * Deck root, in the order the CLI and both local MCP servers use (sdpm.api._get_output_base_dir):
  * SDPM_DECK_ROOT → SDPM_OUTPUT_DIR → `output_dir` in config.json → ~/Documents/SDPM-Presentations.
+ * One deliberate difference: on WSL with an unreadable config.json, Python uses the Windows
+ * Documents folder and this uses the default. Read once per process: restart after editing
+ * config.json.
  */
 export function resolveDeckRoot(): string {
   return process.env.SDPM_DECK_ROOT

@@ -481,9 +481,10 @@ def _get_output_base_dir() -> Path:
     """Deck root shared by every local surface (CLI, both local MCP servers, Local Web UI).
 
     Order: $SDPM_DECK_ROOT → $SDPM_OUTPUT_DIR → ``output_dir`` in config.json (``~``
-    expanded; defaults to ~/Documents/SDPM-Presentations). If config.json cannot be read,
-    the WSL Windows Documents folder or ~/Documents/SDPM-Presentations is used.
-    web-ui/src/lib/local/deck-paths.ts ``resolveDeckRoot`` follows the same order.
+    expanded; missing or empty means ~/Documents/SDPM-Presentations). If config.json cannot
+    be read, ~/Documents/SDPM-Presentations is used, except on WSL, where the Windows
+    Documents folder is used. web-ui/src/lib/local/deck-paths.ts ``resolveDeckRoot`` follows
+    the same order without the WSL case (the Web UI uses ~/Documents/SDPM-Presentations there).
     """
     for name in ("SDPM_DECK_ROOT", "SDPM_OUTPUT_DIR"):
         env_dir = os.environ.get(name)

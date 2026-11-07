@@ -145,8 +145,12 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   MCP server (`server.py`) read `SDPM_OUTPUT_DIR` and `output_dir` in `config.json`, so a
   deck made over MCP after changing `output_dir` did not appear in the Web UI. All of them
   now use one order: `SDPM_DECK_ROOT` → `SDPM_OUTPUT_DIR` → `output_dir` in
-  `~/.config/sdpm/config.json` (`~` expanded) → `~/Documents/SDPM-Presentations`. / Nothing.
-  If you set `output_dir`, decks there now show in the Web UI.
+  `~/.config/sdpm/config.json` (`~` expanded; empty means the default, no longer the
+  current folder) → `~/Documents/SDPM-Presentations`. / If you
+  set `output_dir` and also made decks in the Web UI, those decks stay in
+  `~/Documents/SDPM-Presentations` and no longer show in the Web UI: move them into your
+  `output_dir`, or set `SDPM_DECK_ROOT` to that old folder to keep using it. Otherwise,
+  nothing; decks in your `output_dir` now show in the Web UI.
 - **The Web UI's MCP server installs the icon catalogs by itself.** `server_acp.py` now
   fetches them in the background on first start when none is installed, as `server.py`
   does, instead of the agent asking the Web UI user to run an install command.
