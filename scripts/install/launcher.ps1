@@ -5,8 +5,10 @@
 #   sdpm webui      browser surface
 #   sdpm mcp        MCP surface (terminal check; clients get the uv command directly)
 #   sdpm register   wire the MCP server into the clients on this machine
-#   sdpm update     pull, sync, rebuild, then client_config.py refresh - which replaces
-#                   this file with the checkout's launcher.ps1 and re-registers the clients
+#   sdpm update     fetch, hand over to the fetched checkout_update.py (local changes go to
+#                   a git stash, then fast-forward), sync, rebuild, then client_config.py
+#                   refresh - which replaces this file with the checkout's launcher.ps1 and
+#                   re-registers the clients
 # Client detection, configuration rendering and registration commands live once in
 # servers/local/client_config.py; this file and launcher.sh only delegate to it.
 [CmdletBinding()]
@@ -62,19 +64,22 @@ function Resolve-Uv {
     return $found
 }
 
+# uv never rewrites the lockfile here (--frozen): a tracked file changed in the checkout
+# would stop the next `sdpm update`.
+
 # Run a Python entry point inside the local server's environment. The native command's
 # output flows straight through; the caller reads $LASTEXITCODE. Nothing of our own on stdout.
 function Invoke-Py {
     param([string[]]$PyArgs)
     $uv = Resolve-Uv
-    & $uv run --directory $ServerDir python @PyArgs
+    & $uv run --frozen --directory $ServerDir python @PyArgs
 }
 
 # client_config.py, told exactly which uv and checkout the clients must point at.
 function Invoke-Cfg {
     param([string[]]$CfgArgs)
     $uv = Resolve-Uv
-    & $uv run --directory $ServerDir python client_config.py --uv $uv --checkout $Checkout @CfgArgs
+    & $uv run --frozen --directory $ServerDir python client_config.py --uv $uv --checkout $Checkout @CfgArgs
 }
 
 # ---------------------------------------------------------------------------
@@ -117,7 +122,7 @@ function Invoke-Mcp {
     $uv = Resolve-Uv
     # -ArgumentList joins with spaces and drops PowerShell's quotes; quote each argument ourselves
     # so a checkout under a path with spaces survives.
-    $quoted = @("run", "--directory", $ServerDir, "python", "server.py") | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }
+    $quoted = @("run", "--directory", $ServerDir, "--frozen", "python", "server.py") | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }
     $proc = Start-Process -FilePath $uv -ArgumentList ($quoted -join " ") -NoNewWindow -Wait -PassThru
     exit $proc.ExitCode
 }
@@ -137,7 +142,21 @@ function Invoke-Step {
 
 function Build-Mcp {
     $uv = Resolve-Uv
-    Invoke-Step "Syncing the MCP server environment" { & $uv sync --directory $ServerDir }
+    Invoke-Step "Syncing the MCP server environment" { & $uv sync --frozen --directory $ServerDir }
+}
+
+# checkout_update.py as of the fetched main, run before anything is checked out: it moves
+# local changes to a git stash (never discards them) and fast-forwards. The newest version
+# of that step runs even over an old checkout; this file only fetches and hands over.
+function Invoke-FastForward {
+    $uv = Resolve-Uv
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ("sdpm-update-" + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path $tmp | Out-Null
+    try {
+        & git -C $Checkout "--work-tree=$tmp" restore --source=FETCH_HEAD --worktree -- servers/local/checkout_update.py
+        if ($LASTEXITCODE -ne 0) { return }
+        & $uv run --no-project python (Join-Path $tmp "servers\local\checkout_update.py") --checkout $Checkout pull
+    } finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
 }
 
 function Build-WebUi {
@@ -155,8 +174,7 @@ function Invoke-Update {
     $before = (& git -C $Checkout rev-parse HEAD 2>$null)
     Write-Host "> Fetching main from $RepoUrl"
     Invoke-Step "Fetching main" { & git -C $Checkout fetch --tags --prune origin main }
-    Invoke-Step "Checking out main" { & git -C $Checkout checkout -q main }
-    Invoke-Step "Fast-forwarding main" { & git -C $Checkout pull -q --ff-only origin main }
+    Invoke-Step "Fast-forwarding main" { Invoke-FastForward }
     Build-Mcp
     if ($withWebUi) {
         if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { throw "Node.js 20+ is required for the Web UI: https://nodejs.org/" }
@@ -237,7 +255,7 @@ switch ($Command.ToLowerInvariant()) {
     "unregister" { Assert-Checkout; Invoke-Cfg (@("unregister") + $Rest); exit $LASTEXITCODE }
     "mcp-config" { Assert-Checkout; Invoke-Cfg (@("print") + $Rest); exit $LASTEXITCODE }
     "update" { Invoke-Update }
-    "doctor" { Assert-Checkout; Push-Location $Checkout; try { & uv run python scripts/doctor.py; exit $LASTEXITCODE } finally { Pop-Location } }
+    "doctor" { Assert-Checkout; $uv = Resolve-Uv; Push-Location $Checkout; try { & $uv run --frozen python scripts/doctor.py; exit $LASTEXITCODE } finally { Pop-Location } }
     "uninstall" { Invoke-Uninstall }
     "version" { Write-Output (Get-Version) }
     "--version" { Write-Output (Get-Version) }

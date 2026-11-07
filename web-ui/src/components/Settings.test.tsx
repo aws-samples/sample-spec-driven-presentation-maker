@@ -50,7 +50,7 @@ describe("Settings (local) — agent selection", () => {
       selection: { orchestrator: "a.json", composer: "a.json", style: "a.json", translate: "a.json" },
     })
     vi.mocked(listLocalModels).mockResolvedValue([])
-    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v2", default: "v2" })
+    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v2", default: "v3" })
   })
 
   afterEach(() => {
@@ -90,7 +90,7 @@ describe("Settings (local) — sections", () => {
       selection: { orchestrator: "a.json", composer: "a.json", style: "a.json", translate: "a.json" },
     })
     vi.mocked(listLocalModels).mockResolvedValue([])
-    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v2", default: "v2" })
+    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v2", default: "v3" })
     renderWithIntl(<Settings open onOpenChange={() => {}} />, { locale: "ja" })
     expect(await screen.findByText("各役割で使うエージェント定義を選択します")).toBeTruthy()
     expect(screen.getByLabelText("orchestrator エージェントを選択")).toBeTruthy()
@@ -99,7 +99,7 @@ describe("Settings (local) — sections", () => {
   it("shows the agent engine even when the agent definitions cannot be listed", async () => {
     vi.mocked(getAgentDefinitions).mockRejectedValue(new Error("HTTP 500"))
     vi.mocked(listLocalModels).mockResolvedValue([])
-    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v3", default: "v2" })
+    vi.mocked(getAgentEngine).mockResolvedValue({ engine: "v3", default: "v3" })
     renderWithIntl(<Settings open onOpenChange={() => {}} />, { locale: "en" })
     const v2 = await screen.findByRole("radio", { name: /^V2 \(previous\)/ })
     expect(v2).toBeTruthy()

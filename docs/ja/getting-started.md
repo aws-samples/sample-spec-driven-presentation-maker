@@ -42,6 +42,10 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
    外したクライアントには何も書き込みません。
 
 インストーラーをもう一度実行すると、既存のインストールを修復します。2 つ目は作りません。
+そのインストールのプロファイルと Kiro エージェントの名前を引き継ぎ（`--full`、`--mcp-only`、
+`--agent-name` を渡した場合を除く）、クライアントのチェックリストの代わりに、SDPM が登録済みの
+クライアントに `sdpm update` と同じく登録し直します。`--register` を付けると、未登録の検出済み
+クライアントにも登録します。
 
 ### インストーラーのオプション
 
@@ -107,7 +111,7 @@ MCP サーバーなので、MCP に対応したエージェントならどれで
 
 | クライアント | `sdpm register` がすること |
 |---|---|
-| Kiro CLI | 専用エージェント `~/.kiro/agents/sdpm.json` を書き込みます（MCP サーバー、ツール、並列コンポーザーのための `@sdpm` と `use_subagent` の信頼設定。prompt テキストは無し）。Kiro CLI の V2 と V3 のどちらも、このファイルをそのまま読み込みます。`kiro-cli chat --agent sdpm` か `/agent sdpm` で開始します。V3 では、別のエージェントから `sdpm` に委譲すると、sdpm のツールごとに承認を求められます。他のセッションには何も足しません。`--agent-name` で別名にできます。自分で書いたエージェントファイルには触れません |
+| Kiro CLI | 専用エージェント `~/.kiro/agents/sdpm.json` を書き込みます（MCP サーバー、ツール、並列コンポーザーのための `@sdpm` と `use_subagent` の信頼設定。prompt テキストは無し）。Kiro CLI の V2 と V3 のどちらも、このファイルをそのまま読み込みます。`kiro-cli chat --agent sdpm` か `/agent sdpm` で開始します。V3 では、別のエージェントから `sdpm` に委譲すると、sdpm のツールごとに承認を求められます。他のセッションには何も足しません。`--agent-name` で別名にできます。自分で書いたエージェントファイルには触れません。SDPM が書くファイルでも、ほかのツールが足した設定（ほかの MCP サーバー、そのツールと設定）は残します |
 | Claude Code | `claude mcp add --scope user sdpm -- …`。コンポーザーは Claude Code のサブエージェントとして動き、サーバーを引き継ぎます。sdpm ツールを 1 度承認する（「今後確認しない」）か、`claude --allowedTools "mcp__sdpm__*"` で起動します。旧 plugin `sdpm@sdpm` が残っていれば `sdpm register` が `claude plugin uninstall` を提案します。残すと全ツールが二重に見えます |
 | Visual Studio Code | `code --add-mcp …` |
 | Codex（CLI / IDE 拡張 / ChatGPT デスクトップアプリ） | `codex mcp add sdpm -- …` |
@@ -122,7 +126,7 @@ MCP サーバーなので、MCP に対応したエージェントならどれで
   "mcpServers": {
     "sdpm": {
       "command": "/Users/you/.local/bin/uv",
-      "args": ["run", "--directory", "/Users/you/.sdpm/checkout/servers/local", "python", "server.py"]
+      "args": ["run", "--directory", "/Users/you/.sdpm/checkout/servers/local", "--frozen", "python", "server.py"]
     }
   }
 }
@@ -250,6 +254,9 @@ AWS 構成では見出しに 3 つのボタンがあります。
 
 - `sdpm update` は最新の `main` を取得し、入っているものを再ビルドします。
   `sdpm update --with-webui` は MCP のみの構成に Web UI も足します。
+  `~/.sdpm/checkout` の追跡ファイルに変更があれば（前の版のツールが書き換えたものもあります）、
+  取得の前に git stash に退避します。捨てることはしません。退避したファイルと、戻すための
+  `git stash apply` のコマンドを表示します。
   続けて、インストールの残りもそろえます:
   - `sdpm` コマンドを新しい版で置き換える
   - SDPM が登録済みのクライアントに登録し直す（Kiro CLI のエージェントはインストール時に
@@ -268,6 +275,50 @@ AWS 構成では見出しに 3 つのボタンがあります。
 - `sdpm uninstall` は `~/.sdpm`、ランチャー、ショートカットを削除し、MCP クライアントの接続解除も提案します。
 
 AWS アカウントからデプロイを削除するには、[アンインストール（AWS）](uninstall.md)を参照してください。
+
+## トラブルシューティング
+
+### `sdpm update` が止まる
+
+`sdpm` コマンドが 0.13.0 より前の版の環境では、取得の途中で次のように止まることがあります:
+
+```
+error: Your local changes to the following files would be overwritten by merge:
+        sdpm/uv.lock
+Please commit your changes or stash them before you merge.
+Aborting
+SDPM update failed while Fast-forwarding main (exit 1).
+```
+
+これらは、その版のツールが書き換えたファイルです（`sdpm/uv.lock` は uv、`web-ui/next-env.d.ts`
+は Web UI のビルド）。新しいコードが動く前に取得が止まるため、その update は自分では先に進めません。
+インストーラーをもう一度実行してください。変更を git stash に退避してから更新し、プロファイル、
+エージェントの名前、登録済みのクライアントは引き継ぎます。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
+```
+
+```powershell
+irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
+```
+
+または、自分で変更を退避してから更新し直します（`-c` のオプションは、git の利用者情報が
+未設定のマシンでも stash を作れるようにするためのものです）:
+
+```bash
+git -C ~/.sdpm/checkout -c user.name=sdpm -c user.email=sdpm@localhost stash && sdpm update
+```
+
+```powershell
+git -C $HOME\.sdpm\checkout -c user.name=sdpm -c user.email=sdpm@localhost stash; sdpm update
+```
+
+どちらでも捨てられるものはありません。退避したものは `git -C ~/.sdpm/checkout stash list` で
+確認できます。0.13.0 からは、`sdpm update` がこうした変更を自分で退避します。それでも止まる場合
+（「could not fast-forward main」）は、チェックアウトに独自のコミットがあるか、`main` に新しく
+入ったファイルと同じ場所に追跡されていないファイルがあります。git のメッセージにその名前が出ており、
+捨てられたものはありません。
 
 ## 次のステップ
 

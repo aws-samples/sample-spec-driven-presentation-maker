@@ -20,7 +20,7 @@ uv run python server.py
   "mcpServers": {
     "spec-driven-presentation-maker": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/spec-driven-presentation-maker/servers/local", "python", "server.py"]
+      "args": ["run", "--directory", "/path/to/spec-driven-presentation-maker/servers/local", "--frozen", "python", "server.py"]
     }
   }
 }
