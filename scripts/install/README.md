@@ -7,7 +7,8 @@ local installation (`~/.sdpm`) that serves every MCP client and the browser Web 
 - `lib/tui.*`: progress, confirmation, and failure-log helpers
 - `launcher.*`: installed `sdpm` command (`webui` / `mcp` / `register` / `update` / …). Client
   detection, configuration rendering and registration are not implemented here: both launchers
-  delegate to `servers/local/client_config.py` so the two cannot drift
+  delegate to `servers/local/client_config.py` so the two cannot drift. `sdpm update` ends with
+  `client_config.py refresh`, which replaces the installed launcher with the checkout's
 - `mcp_smoke.py`: MCP `initialize` + `tools/list` over any stdio command (CI uses it over `sdpm mcp`)
 - `update.*` / `uninstall.*`: explicit maintenance entry points
 - `dist/install.*`: generated, standalone files used by `curl | bash` and `irm | iex`
@@ -37,6 +38,19 @@ python3 scripts/install/mcp_smoke.py "$SDPM_LAUNCHER_DIR/sdpm" mcp
 
 `SDPM_REPO_URL` exists for exactly this: the installer clones `main`, so a local mirror
 serves the current tree under that name. `--deps-only` still installs just the dependencies.
+
+`sdpm update` from a launcher that predates the refresh step (every install before it
+carries the #397 launcher), in the same isolated home. Set `HOME` and `KIRO_HOME` to
+temporary directories as well and keep other MCP clients off `PATH`: the refresh registers
+again every client that already has SDPM.
+
+```bash
+git show 7c53267d:scripts/install/launcher.sh > "$SDPM_LAUNCHER_DIR/sdpm"
+git -C "$SDPM_HOME/checkout" reset -q --hard HEAD~1
+"$SDPM_LAUNCHER_DIR/sdpm" update                # "… (once: this sdpm command predates the step)"
+cmp "$SDPM_LAUNCHER_DIR/sdpm" scripts/install/launcher.sh
+"$SDPM_LAUNCHER_DIR/sdpm" update                # new launcher: "sdpm command: up to date"
+```
 
 ## Dependency policy
 

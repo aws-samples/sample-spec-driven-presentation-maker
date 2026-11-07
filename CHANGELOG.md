@@ -8,7 +8,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 Entries before v0.5.0 were written retroactively as summaries.
 
+Under an Upgrading section, the bullets after **Local installs (`sdpm update`).** are what
+`sdpm update` prints when it brings that version in; each says what to do.
+
 ## [Unreleased]
+
+### Upgrading from 0.12
+
+**Local installs (`sdpm update`).**
+
+- **Kiro CLI.** `sdpm update` has rewritten the `sdpm` agent in the form kiro-cli 2.x and
+  3.x both load. Start it as its own agent: `kiro-cli chat --agent sdpm` (or `/agent sdpm`).
 
 ### Added
 
@@ -34,6 +44,22 @@ Entries before v0.5.0 were written retroactively as summaries.
 
 ### Changed
 
+- **`sdpm update` brings the whole install up to date.** After the pull and the rebuild it
+  replaces the `sdpm` command with the checkout's launcher and registers SDPM again with
+  the MCP clients that already have it: the Kiro CLI agent (under the name chosen at
+  install), Claude Code and Codex. It adds no client; clients it finds without SDPM are
+  named with the `sdpm register` command that adds them. VS Code and Cursor cannot report
+  whether they have SDPM, so they are left as they are, and so is a Claude Code or Codex
+  `sdpm` server that runs another checkout (`make register-dev`). It removes what earlier versions
+  left and nothing uses: `servers/local/.venv` and `sdpm/.venv` (before 0.12), the files of
+  the old Kiro installer, and the `.bak` copies kiro-cli 3.x made of the `sdpm` agent. Last,
+  it prints the Upgrading notes for local installs that are new since your previous
+  version. The `sdpm` command of an install made before this change does not replace
+  itself; its first `sdpm update` does all of this once, and later updates run the new
+  command. The "Installing icon catalogs" step is gone: it never installed anything (the
+  installer installs the catalogs, and the MCP server does when they are missing). /
+  Nothing. If you installed with `SDPM_LAUNCHER_DIR` and that directory is not on `PATH`,
+  set it again for that first update, or run the installer again.
 - **The bundled `aws-light` and `aws-dark` styles have a new content-slide frame.** Every
   content slide now pairs a one-line topic title (a noun phrase) with a lead of up to two
   lines that states the slide's finding, in dark orange (`aws-light`) or amber (`aws-dark`).
@@ -123,9 +149,8 @@ Entries before v0.5.0 were written retroactively as summaries.
   V3 both read it unchanged and it is never rewritten. `sdpm unregister` also removes the
   `.bak` copies that V3 made of our file. Start the agent itself (`kiro-cli chat --agent
   sdpm` or `/agent sdpm`). When another agent delegates to `sdpm`, V3 asks you to approve
-  each sdpm tool the sub-agent calls. / Run `sdpm register kiro-cli` once (after `sdpm
-  update`, which does not re-register). Until then, an already converted file keeps working,
-  and a file V3 has not converted works only with auto-upgrade on.
+  each sdpm tool the sub-agent calls. / `sdpm update` rewrites the agent file (see
+  Changed). Run `make register-dev` again for a development agent.
 
 ## [0.12.0] - 2026-11-05
 
