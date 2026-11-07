@@ -7,9 +7,10 @@
  * `_meta.createdAt` is not older than the load (less a second), `resumed` otherwise or without
  * one; another mode is switched with set_mode after the session's MCP record was cleared; Stop
  * cancels the main session only; the capabilities come from initialize; auth required is
- * recognised. A fork is session/fork into the session's cwd and the agent's mode, then a load of
- * the fork: resumed when the load names the source as its parent, created when it names another,
- * resumed with a warning when it names none; `discardFork` deletes only a fork it made.
+ * recognised; the model and then the effort are set with set_config_option under the option ids
+ * kiro-cli reported. A fork is session/fork into the session's cwd and the agent's mode, then a
+ * load of the fork: resumed when the load names the source as its parent, created when it names
+ * another, resumed with a warning when it names none; `discardFork` deletes only a fork it made.
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest"
@@ -129,6 +130,37 @@ describe("V3Session", () => {
     expect(order).toEqual(["session/load", "clear sess_ff", "session/set_mode", "wait sess_ff"])
     expect(calls[1].params).toEqual({ sessionId: "sess_ff", modeId: "sdpm-orchestrator" })
     expect(onSwitching).toHaveBeenCalledOnce()
+  })
+
+  it("sets the model, then the effort option the model brought, with set_config_option", async () => {
+    const { ctx, calls } = context({ "session/new": { sessionId: "sess_1", modes: MODES("sdpm-orchestrator") } })
+    const session = new V3Session(ctx)
+    await session.newSession("sdpm-orchestrator")
+    const options = (effort: boolean) => [
+      { type: "select", id: "llm", category: "model", currentValue: "m", options: [{ value: "m", name: "M" }] },
+      ...(effort ? [{ type: "select", id: "effortKnob", category: "thought_level", currentValue: "medium", options: [{ value: "low" }, { value: "medium" }] }] : []),
+    ]
+    const configUpdate = (effort: boolean) => session.translate({ method: "session/update", params: { sessionId: "sess_1", update: { sessionUpdate: "config_option_update", configOptions: options(effort) } } })
+    configUpdate(false)
+    vi.mocked(ctx.request).mockImplementation(async (method, params) => {
+      calls.push({ method, params })
+      configUpdate(true)
+      return {}
+    })
+    await session.setModel({ model: "m", effort: "low" })
+    expect(calls.slice(1)).toEqual([
+      { method: "session/set_config_option", params: { sessionId: "sess_1", configId: "llm", value: "m" } },
+      { method: "session/set_config_option", params: { sessionId: "sess_1", configId: "effortKnob", value: "low" } },
+    ])
+    expect(vi.mocked(ctx.request).mock.calls.slice(1).every(([, , opts]) => opts?.timeoutMs === 10_000)).toBe(true)
+  })
+
+  it("rejects an effort when the session has no effort option", async () => {
+    const { ctx, calls } = context({ "session/new": { sessionId: "sess_1", modes: MODES("sdpm-orchestrator") } })
+    const session = new V3Session(ctx)
+    await session.newSession("sdpm-orchestrator")
+    await expect(session.setModel({ effort: "low" })).rejects.toThrow(/no effort option/)
+    expect(calls.map((call) => call.method)).toEqual(["session/new"])
   })
 
   it("recognises ACP's auth required", () => {

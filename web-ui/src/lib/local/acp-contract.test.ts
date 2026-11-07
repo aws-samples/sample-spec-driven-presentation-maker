@@ -2,7 +2,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Contract tests: kiro-cli 3.0.0's own output (src/test/fixtures/acp) replayed through the ACP
+ * Contract tests: kiro-cli 3.0.0's and 3.1.0's own output (src/test/fixtures/acp) replayed through the ACP
  * process manager, on the engine adapter the capture's engine needs, and the SSE bridge.
  *
  * - A turn: the main session's text arrives in order, the stream closes when session/prompt is
@@ -22,6 +22,9 @@
  *   missing sign-in fail the start; a load tells resumed from created; a loaded session in
  *   another mode is switched and waited for again; a sub-agent session's MCP state does not
  *   count for the main one. V3's permission requests are answered with its allow_once option.
+ * - Models (kiro-cli 3.1.0): V3 lists session/new's models without `[Internal]` ones, sets the
+ *   model and then its effort with set_config_option, and a load reports the session's model and
+ *   effort with the full list; V2 sets the model with set_model and has no effort.
  */
 
 import { EventEmitter } from "events"
@@ -596,5 +599,54 @@ describe("kiro-cli 3.1.0 V3, list and fork", () => {
     } finally {
       warn.mockRestore()
     }
+  })
+})
+
+describe("kiro-cli 3.1.0, model and effort", () => {
+  const V3_SESSION = "sess_8bac05b2-b5eb-407a-9d7f-65ca4e4ffdb0"
+  const HAIKU_LEVELS = ["low", "medium", "high", "xhigh", "max"]
+  let log: ReturnType<typeof vi.spyOn>
+  beforeEach(() => { log = vi.spyOn(console, "log").mockImplementation(() => {}) })
+  afterEach(() => { log.mockRestore() })
+
+  it("V3: lists session/new's models without [Internal] ones, then sets the model and its effort", async () => {
+    replay("v3", fixture31("v3-model-effort"))
+    await acp.createNewProcessFor("C1")
+    const before = acp.getSessionModels("C1")
+    expect(before.current).toEqual({ model: "auto", effort: null, effortLevels: [] })
+    expect(before.available.map((m) => m.modelId)).toEqual(["auto", "claude-haiku-5.5", "claude-haiku-4.5"])
+    expect(before.available[1]).toEqual({
+      modelId: "claude-haiku-5.5", name: "Claude Haiku 5.5", description: "Claude Haiku 5.5 model with 1M context window",
+      effortLevels: HAIKU_LEVELS, defaultEffort: "medium", rate: 0.06,
+    })
+
+    await acp.chooseSessionModel("C1", { model: "claude-haiku-5.5" })
+    expect(acp.getSessionModels("C1").current).toEqual({ model: "claude-haiku-5.5", effort: "medium", effortLevels: HAIKU_LEVELS })
+    await acp.chooseSessionModel("C1", { effort: "low" })
+    expect(acp.getSessionModels("C1").current).toEqual({ model: "claude-haiku-5.5", effort: "low", effortLevels: HAIKU_LEVELS })
+    expect(children[0].requests).toEqual(["initialize", "session/new", "session/set_config_option", "session/set_config_option"])
+
+    expect(textOf((await prompt("Do not call any tool. Reply only OK.")).map((b) => b.data))).toBe("OK")
+  })
+
+  it("V3: a loaded session reports its model and effort with the full list (not the load answer's single value)", async () => {
+    vi.useFakeTimers({ toFake: ["Date"] })
+    vi.setSystemTime(Date.parse("2026-11-07T13:30:00.000Z"))
+    replay("v3", fixture31("v3-model-load"))
+    const { outcome } = await acp.openDeckSession("C1", "d1", V3_SESSION, "sdpm-orchestrator")
+    expect(outcome).toBe("resumed")
+    const view = acp.getSessionModels("C1")
+    expect(view.current).toEqual({ model: "claude-haiku-5.5", effort: "low", effortLevels: HAIKU_LEVELS })
+    expect(view.available.map((m) => m.modelId)).toEqual(["auto", "claude-haiku-5.5", "claude-haiku-4.5"])
+  })
+
+  it("V2: sets the model with session/set_model, offers no effort, and the prompt still streams", async () => {
+    replay("v2", fixture31("v2-set-model"))
+    await acp.createNewProcessFor("C1")
+    expect(await acp.chooseSessionModel("C1", { model: "claude-haiku-4.5", effort: "low" }).catch((e: unknown) => e)).toMatchObject({ code: "effort_not_supported" })
+    const view = await acp.chooseSessionModel("C1", { model: "claude-haiku-4.5" })
+    expect(view.current).toEqual({ model: "claude-haiku-4.5", effort: null, effortLevels: [] })
+    expect(children[0].requests).toEqual(["initialize", "session/new", "session/set_model"])
+    expect(textOf((await prompt("Do not call any tool. Reply only OK.")).map((b) => b.data))).toBe("OK")
   })
 })

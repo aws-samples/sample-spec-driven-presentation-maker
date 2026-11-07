@@ -35,10 +35,18 @@ otherwise.
 | `kiro-3.1.0-v3-list.jsonl` | V3 listing its sessions with workflow sessions excluded, `s13_3_v3_list_fork` (one `vibe` session) | initialize, session/list |
 | `kiro-3.1.0-v3-fork.jsonl` | V3 forking that `vibe` session into servers/local in the sdpm-orchestrator mode, the same capture | initialize, session/fork, session/load, session/prompt |
 | `kiro-3.1.0-v3-fork-v2.jsonl` | V3 forking a V2 session it had not imported, the same capture | initialize, session/fork, session/load, session/prompt |
+| `kiro-3.1.0-v3-model-effort.jsonl` | V3, `s14c_1_v3_new_model_effort` (model Claude Haiku 5.5, then effort low) | initialize, session/new, session/set_config_option (model), session/set_config_option (effortLevel), session/prompt |
+| `kiro-3.1.0-v3-model-load.jsonl` | V3 loading that session in a new process, `s14c_2_v3_load` | initialize, session/load |
+| `kiro-3.1.0-v2-set-model.jsonl` | V2, `s14c_3_v2_set_model` (model claude-haiku-4.5) | initialize, session/new, session/set_model, session/prompt |
 
 The `kiro-3.1.0-*` files are kiro-cli 3.1.0 (KAS 0.66.70, 2026-11-07) captures with a
-temporary `KIRO_HOME`. The sources remembered a codeword (MANGO on V3, GUAVA on V2) that each
-fork's prompt asks for; each fork's load answers `_meta.parentSessionId` = the source.
+temporary `KIRO_HOME`. In the list and fork captures, the sources remembered a codeword (MANGO
+on V3, GUAVA on V2) that each fork's prompt asks for; each fork's load answers
+`_meta.parentSessionId` = the source. In the model captures (`v3-model-*`, `v2-set-model`, spike
+S14c), the `config_option_update`s and `configOptions` keep `mode` (sdpm modes), `model`
+(4 values: `auto`, `claude-haiku-5.5`, `claude-haiku-4.5` and the `[Internal]` `grok-4.7`, with
+`_meta.kiro` `rateMultiplier`, `hasEffort`, `effortLevels`, `defaultEffortLevel`), `effortLevel`
+and `thinking`; V2's `models.availableModels` keeps `auto`, `claude-haiku-5.5`, `claude-haiku-4.5`.
 
 The two `turn` captures answer the prompt "Call the sdpm list_styles tool once, then reply with
 only the number of styles" and end with `stopReason: end_turn`.

@@ -43,9 +43,28 @@ export type LoadOutcome = "resumed" | "created"
 /** What an engine recognises in an error kiro-cli answered (its texts and codes stay in the adapter). */
 export type EngineErrorKind = "session_locked" | "auth_required"
 
-export interface AcpModel { modelId: string; name: string; description?: string }
+/** A model the session offers. `effortLevels` / `defaultEffort` only for a model with effort levels; `rate` is kiro-cli's credit multiplier. */
+export interface ModelOption {
+  modelId: string
+  name: string
+  description?: string
+  effortLevels?: string[]
+  defaultEffort?: string
+  rate?: number
+}
 
-export interface AcpModelList { current: string; available: AcpModel[] }
+/** The session's model and the models it offers; `effort` is the current model's effort (null when it has none). */
+export interface SessionModels {
+  current: string
+  available: ModelOption[]
+  effort: { current: string; levels: string[] } | null
+}
+
+/** A change of the session's model and/or effort. */
+export interface ModelChoice {
+  model?: string
+  effort?: string
+}
 
 /** What a session gets from the process manager: its connection, the setup limits and the MCP record. */
 export interface SessionContext {
@@ -131,8 +150,16 @@ export interface EngineSession {
   endTurn(): void
   /** Where Stop sends session/cancel. */
   cancelTargets(): string[]
-  /** The models the session offers, or null before kiro-cli reported them. */
-  models(): AcpModelList | null
+  /**
+   * The session's model, its effort and the models it offers (kiro-cli's `[Internal]` and
+   * `[Deprecated]` ones left out), or null before kiro-cli reported them.
+   */
+  models(): SessionModels | null
+  /**
+   * Change the session's model, then its effort. The caller validated the choice against
+   * `models()`; rejects with the request's error (an effort the engine cannot set included).
+   */
+  setModel(choice: ModelChoice): Promise<void>
   classifyError(error: unknown): EngineErrorKind | null
 }
 
@@ -146,6 +173,11 @@ export interface EngineAdapter {
   readonly sessionsOpenableBy: readonly EngineId[]
   /** The sessions in this engine's store. */
   listStoredSessions(ctx: StoreContext): Promise<StoredSession[]>
+  /**
+   * A sub-agent whose definition names no model runs on the session's model and effort (V3).
+   * When false, agents-sync writes the Settings model into the composer's definition too.
+   */
+  readonly subagentsFollowSessionModel: boolean
 }
 
 const ADAPTERS: Record<EngineId, EngineAdapter> = {
