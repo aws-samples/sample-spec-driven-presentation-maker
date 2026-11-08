@@ -76,7 +76,8 @@ def list_files(subdir="."):
     d = _resolve(subdir)
     if not d.is_dir():
         raise FileNotFoundError(f"Not a directory: {subdir}")
-    return sorted(f.name for f in d.iterdir() if f.is_file())
+    # Folders end with "/" (slides/), so an empty listing never hides them.
+    return sorted(f.name + "/" if f.is_dir() else f.name for f in d.iterdir() if f.is_dir() or f.is_file())
 
 _safe_builtins = {
     "print": print, "len": len, "range": range, "enumerate": enumerate,

@@ -922,3 +922,32 @@ def test_get_preview_waits_for_pending_background_previews(monkeypatch):
     t1 = _time.monotonic()
     remote_server._wait_for_pending_previews("d9", timeout=5)
     assert _time.monotonic() - t1 < 0.05
+
+
+# ---------------------------------------------------------------------------
+# list_files: folders end with "/" on Local and Remote
+# ---------------------------------------------------------------------------
+
+
+class TestListFiles:
+    _EXPECTED_ROOT = ["deck.json", "includes/", "slides/", "specs/"]
+
+    def test_local_lists_folders_with_a_slash(self, deck_dir: Path):
+        code = 'print(list_files())\nprint(list_files("slides"))'
+        out = json.loads(sandbox_tools.run_python("list", code, str(deck_dir)))
+        root, slides = out["output"].splitlines()
+        assert root == repr(self._EXPECTED_ROOT)
+        assert slides == repr(["title.json"])
+
+    def test_remote_helper_matches_local(self, deck_dir: Path, tmp_path_factory, monkeypatch):
+        import importlib.util
+
+        helpers = tmp_path_factory.mktemp("helpers") / "_sdpm_helpers.py"
+        helpers.write_text(remote_sandbox._HELPERS_PY, encoding="utf-8")
+        spec = importlib.util.spec_from_file_location("_sdpm_helpers_test", helpers)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        (deck_dir / "__pycache__").mkdir()  # left by importing _sdpm_helpers in the sandbox
+        monkeypatch.chdir(deck_dir)
+        assert module.list_files() == self._EXPECTED_ROOT
+        assert module.list_files("slides") == ["title.json"]
