@@ -294,7 +294,7 @@ describe("useChatStream (Cloud) resume", () => {
     })
     const { result } = renderStream()
     const cut = vi.fn(() => history)
-    let done: Promise<void> | undefined
+    let done: Promise<boolean | undefined> | undefined
     act(() => { done = result.current.resume(cut) })
     expect(cut).toHaveBeenCalledWith("make it")
     expect(roles(result.current.messages)).toEqual(["user:earlier", "assistant:earlier reply", "user:make it", "assistant:On it"])
@@ -312,7 +312,7 @@ describe("useChatStream (Cloud) resume", () => {
       return new Promise((resolve) => { finish = () => resolve({ working: true, completion: "On it" }) })
     })
     const { result } = renderStream()
-    let done: Promise<void> | undefined
+    let done: Promise<boolean | undefined> | undefined
     act(() => { done = result.current.resume(() => []) })
     expect(roles(result.current.messages)).toEqual(["user:make it", "assistant:On it"])
     await act(async () => { finish!(); await done })

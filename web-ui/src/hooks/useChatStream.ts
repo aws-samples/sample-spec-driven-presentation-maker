@@ -12,27 +12,30 @@
  * cancel (cancelAgentCore). `resume` follows a session that was working when the page
  * loaded; a send while it connects waits for its answer.
  *
- * Local: one invoke at a time. A message sent while it runs is a steer too (steerLocalAgent):
- * the invoke's stream reports it with the same `steer` events (a steer the prompt ended without
- * reading continues the turn, as in Cloud). Stop ends the invoke at once; a steer the agent had
- * not read by then is marked not delivered (the server clears it from kiro-cli's queue).
+ * Local: one invoke at a time; its stream lasts the chat's work period (every turn of it). A
+ * message sent while it runs is a steer too (steerLocalAgent): the stream reports it with the
+ * same `steer` events (a steer the prompt ended without reading continues the turn, as in
+ * Cloud). Stop ends the invoke at once; a steer the agent had not read by then is marked not
+ * delivered (the server clears it from kiro-cli's queue). `resume` follows a period that runs
+ * (or ended unseen) when the deck is reloaded or reopened (resumeLocalAgent); a send while it
+ * connects waits for its answer, and a send while it follows is a steer into that period.
  *
- * Cloud background compose: `taskStart` gives the compose card a running task, which stays
- * running across later turns and messages until `taskEnd` closes it. `turnActive` is "a
- * turn runs" (Local: `isLoading`), so the panel can tell turns from the background wait.
+ * Background compose: `taskStart` gives the compose card a running task, which stays running
+ * across later turns and messages until `taskEnd` closes it. `turnActive` is "a turn runs"
+ * (between `turn` and `turnEnd`), so the panel can tell turns from the background wait.
  * A composer's report (`composerNote`) becomes a note message of its own.
  *
- * Does NOT manage: chat history loading, Local reconnect, @mentions, Options, saveLocalChat.
+ * Does NOT manage: chat history loading, @mentions, Options, saveLocalChat.
  * Those remain in each panel's orchestrator.
  */
 
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useEffect } from "react"
 import { useTranslations } from "next-intl"
 import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
-import { cancelAgentCore, invokeAgentCore, resumeAgentCore, steerAgentCore, stopRuntimeSession } from "@/services/agentCoreService"
+import { cancelAgentCore, invokeAgentCore, resumeAgentCore, resumeLocalAgent, steerAgentCore, stopRuntimeSession } from "@/services/agentCoreService"
 import { steerLocalAgent, stopLocalAgent } from "@/services/localService"
 import type { ToolUse } from "@/components/chat/ChatMessage"
 import type { McpServerStatus } from "@/components/chat/McpStatusBar"
@@ -102,6 +105,8 @@ export interface UseChatStreamOptions {
   onToolEvent?: (toolName: string, data: ToolUseCallbackData | undefined) => void
   /** Called after each send completes (success or abort). */
   onSendComplete?: () => void
+  /** Called when a turn ends (`turnEnd`), while the work may go on. */
+  onTurnEnd?: () => void
 }
 
 export interface UseChatStreamReturn {
@@ -112,19 +117,22 @@ export interface UseChatStreamReturn {
   sendMessage: (text: string, uploadedFiles?: UploadedFile[], snippets?: { label: string; text: string }[], sentAttachments?: { fileName: string; fileType: string }[], options?: SendMessageOptions) => Promise<boolean>
   stopGeneration: () => void
   /**
-   * Cloud: follow the session if it is working (after a reload). `cutHistory(prompt)` returns
-   * the messages before the prompt that opened the work, which the replay then rebuilds.
+   * Follow the session if it is working (after a reload or on a reopened deck; Local: also a
+   * period that ended while no page followed it). `cutHistory(prompt)` returns the messages
+   * before the prompt that opened the work, which the replay then rebuilds. Local resolves
+   * `true` when it followed a period, `false` when nothing ran (or the request failed), and
+   * `undefined` when it did not run or a newer resume or Stop ended it; Cloud resolves `undefined`.
    */
-  resume: (cutHistory: (prompt: string) => Message[]) => Promise<void>
+  resume: (cutHistory: (prompt: string) => Message[]) => Promise<boolean | undefined>
   /** Cloud: the connection dropped while the session works and is being restored. */
   reconnecting: boolean
   /** Cloud: a stop was sent and the session has not stopped yet. */
   stopping: boolean
-  /** A turn runs (Cloud: between `turn` and `turnEnd`; Local: `isLoading`). */
+  /** A turn runs (between `turn` and `turnEnd`); false while only background work goes on. */
   turnActive: boolean
   /** Ref to current messages for external reads without re-render dependency. */
   messagesRef: React.MutableRefObject<Message[]>
-  /** The stream parser's translator for error codes (Local reconnect parses its own stream). */
+  /** The stream parser's translator for error codes. */
   translateError: (code: string) => string | undefined
 }
 
@@ -201,13 +209,14 @@ function indexOfTool(messages: Message[], toolUseId: string | undefined): number
  * The handlers of one run: an invoke (its assistant placeholder already shown) or a resume
  * (`replayCut` set: the first prompt of the replay replaces the history after it).
  */
-function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, setTurnActive }: {
+function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, setTurnActive, onTurnEnd }: {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   onToolEvent?: (toolName: string, data: ToolUseCallbackData | undefined) => void
   steers: Map<string, PendingSteer>
   segmentOpen: boolean
   replayCut?: (prompt: string) => Message[]
   setTurnActive?: (active: boolean) => void
+  onTurnEnd?: () => void
 }) {
   let streamed = ""
   let segment: Segment = { start: 0, toolOrder: [], positions: new Map() }
@@ -227,6 +236,15 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, s
     if (open) return
     newSegment()
     setMessages((prev) => [...prev, emptyAssistant()])
+  }
+
+  /** A new assistant message with no user message before it (a hidden first prompt). */
+  const openAssistant = (base?: Message[]) => {
+    newSegment()
+    setMessages((prev) => {
+      const list = base ?? prev
+      return !base && isBlankAssistant(list[list.length - 1]) ? list : [...list, emptyAssistant()]
+    })
   }
 
   /** A user message the agent accepted (or a composer note), followed by a new assistant message. */
@@ -415,6 +433,7 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, s
       }
       if (ev.turn) setTurnActive?.(true)
       else if (ev.turnEnd || ev.work?.state === "idle") setTurnActive?.(false)
+      if (ev.turnEnd) onTurnEnd?.()
       const note = ev.composerNote
       if (note) {
         const key = `${note.toolUseId ?? ""}:${note.group ?? ""}:${note.text ?? ""}`
@@ -432,9 +451,14 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, s
         rendered.add(turn.id)
         // This page's own prompt: its bubble went up when it was sent.
         if (mine && !steers.has(turn.id)) return
-        const user = userFor(turn.id, turn.text ?? "", false)
+        // A hidden first message (a fork's): the reply starts without a user bubble.
+        if (!turn.text) {
+          openAssistant(cutPending && replayCut ? replayCut("") : undefined)
+          return
+        }
+        const user = userFor(turn.id, turn.text, false)
         if (cutPending && replayCut) {
-          pushUser(user, replayCut(turn.text ?? ""))
+          pushUser(user, replayCut(turn.text))
         } else {
           pushUser(user)
         }
@@ -460,13 +484,13 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, s
   return { onStreamUpdate, onToolUse, onSession }
 }
 
-export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComplete }: UseChatStreamOptions): UseChatStreamReturn {
+export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComplete, onTurnEnd }: UseChatStreamOptions): UseChatStreamReturn {
   const [messages, setMessages] = useState<Message[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [reconnecting, setReconnecting] = useState(false)
   const [stopping, setStopping] = useState(false)
-  // Cloud: a turn runs (`turn` … `turnEnd`); false while only background work goes on.
-  const [cloudTurnActive, setCloudTurnActive] = useState(false)
+  // A turn runs (`turn` … `turnEnd`); false while only background work goes on.
+  const [turnActiveState, setTurnActiveState] = useState(false)
   // Synchronous re-entry guard: setIsLoading(true) below is React state
   // and does not flip until the next render, so two near-simultaneous
   // triggers (Enter key repeat, double click, fast tap) both pass the
@@ -475,14 +499,20 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   // Updated synchronously at function entry and reset in finally.
   // Cloud: also "the session is working", which turns a send into a steer.
   const isLoadingRef = useRef(false)
-  // Cloud: a resume is waiting for its answer (working or not).
+  // A resume is waiting for its answer (working or not).
   const resumingRef = useRef(false)
-  // Cloud: settles when a send can be routed after a resume — at its ack when the session
+  // Settles when a send can be routed after a resume — at its ack when the session
   // works (a steer), or when the resume is over (a prompt). Null when no resume runs.
   const resumeGateRef = useRef<Promise<void> | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
-  // Local: the session the running invoke went to (a steer goes to the same one).
+  // Local: the session the running invoke (or the followed period) went to (a steer goes to the same one).
   const localRunSessionRef = useRef<string | null>(null)
+  // Local: the resume in flight (its token, stream, session and result), so a newer one, Stop
+  // and unmount end it, and a second one for the same session joins it.
+  const resumeRunRef = useRef(0)
+  const resumeControllerRef = useRef<AbortController | null>(null)
+  const resumeInFlightRef = useRef<{ sessionId: string; done: Promise<boolean | undefined> } | null>(null)
+  useEffect(() => () => resumeControllerRef.current?.abort(), [])
   const steersRef = useRef(new Map<string, PendingSteer>())
   const messagesRef = useRef(messages)
   messagesRef.current = messages
@@ -528,9 +558,12 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     if (!hasContent && !options?.continuedFrom) return false
     const display = options?.displayContent ?? userMessage
 
-    // Cloud, resume connecting (reload, wake, deck opened again): wait until the session's
-    // state is known, then send as a steer or a prompt.
-    if (!IS_LOCAL && resumeGateRef.current) await resumeGateRef.current
+    // Resume connecting (reload, wake, deck opened again): wait until the session's state is
+    // known, then send as a steer or a prompt (a newer resume that took over: wait for it too).
+    for (let gate = resumeGateRef.current, waited: Promise<void> | null = null; gate && gate !== waited; gate = resumeGateRef.current) {
+      await gate
+      waited = gate
+    }
 
     // Session working: a steer into the running work (Local: into the running invoke's turn).
     if (isLoadingRef.current && (!IS_LOCAL || localRunSessionRef.current)) {
@@ -568,13 +601,13 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       emptyAssistant(),
     ])
     setIsLoading(true)
-    setCloudTurnActive(true)
+    setTurnActiveState(true)
 
     const controller = new AbortController()
     abortControllerRef.current = controller
     const runSessionId = options?.sessionIdOverride ?? sessionId
     if (IS_LOCAL) localRunSessionRef.current = runSessionId
-    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: true, setTurnActive: setCloudTurnActive })
+    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: true, setTurnActive: setTurnActiveState, onTurnEnd })
 
     try {
       await invokeAgentCore(
@@ -630,22 +663,102 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       localRunSessionRef.current = null
       isLoadingRef.current = false
       setIsLoading(false)
-      setCloudTurnActive(false)
+      setTurnActiveState(false)
       setReconnecting(false)
       onSendComplete?.()
     }
     return ok
-  }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent, onSendComplete, t, translateError])
+  }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent, onSendComplete, onTurnEnd, t, translateError])
 
-  const resume = useCallback(async (cutHistory: (prompt: string) => Message[]) => {
-    if (IS_LOCAL || isLoadingRef.current || resumingRef.current) return
+  /** Local resume: follow the chat's work period over GET /api/agent/stream. */
+  const resumeLocal = useCallback(async (cutHistory: (prompt: string) => Message[]): Promise<boolean | undefined> => {
+    const previous = resumeControllerRef.current
+    // A send's invoke runs: it already follows the period.
+    if (isLoadingRef.current && !previous) return undefined
+    // The same session again (its history loaded twice): join the one in flight. Replacing it
+    // could lose a finished period whose replay the server already marked delivered.
+    const inFlight = resumeInFlightRef.current
+    if (previous && inFlight?.sessionId === sessionId) return inFlight.done
+    if (previous) {
+      // A resume for the deck's own session id (it arrived after the mount): it replaces the one in flight.
+      previous.abort()
+      resumeControllerRef.current = null
+      if (abortControllerRef.current === previous) abortControllerRef.current = null
+      isLoadingRef.current = false
+      localRunSessionRef.current = null
+      setIsLoading(false)
+    }
+    const token = ++resumeRunRef.current
+    const controller = new AbortController()
+    resumeControllerRef.current = controller
+    resumingRef.current = true
+    let openGate = () => {}
+    const gate = new Promise<void>((resolve) => { openGate = resolve })
+    resumeGateRef.current = gate
+    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: false, replayCut: cutHistory, setTurnActive: setTurnActiveState, onTurnEnd })
+    let followed = false
+    let settleDone: (value: boolean | undefined) => void = () => {}
+    resumeInFlightRef.current = { sessionId, done: new Promise((resolve) => { settleDone = resolve }) }
+    let result: boolean | undefined
+    try {
+      const { working } = await resumeLocalAgent(sessionId, {
+        onResumeAck: (ack: { working?: boolean }) => {
+          if (resumeRunRef.current !== token) return
+          resumingRef.current = false
+          if (ack.working) {
+            followed = true
+            isLoadingRef.current = true
+            // A send now is a steer into this period, and Stop ends it.
+            localRunSessionRef.current = sessionId
+            abortControllerRef.current = controller
+            setIsLoading(true)
+          }
+          openGate()
+        },
+        onStreamUpdate: run.onStreamUpdate,
+        onToolUse: run.onToolUse,
+        onSession: { onEvent: run.onSession.onEvent },
+        translateError,
+      }, { signal: controller.signal })
+      result = working
+    } catch (err) {
+      // A newer resume, Stop or unmount ended it (AbortError): nothing failed.
+      if (err instanceof DOMException && err.name === "AbortError") result = undefined
+      else {
+        console.error("Resume failed:", err)
+        result = false
+      }
+    } finally {
+      if (resumeRunRef.current === token) {
+        resumeControllerRef.current = null
+        resumeInFlightRef.current = null
+        resumingRef.current = false
+        if (abortControllerRef.current === controller) abortControllerRef.current = null
+        if (followed) {
+          if (localRunSessionRef.current === sessionId) localRunSessionRef.current = null
+          isLoadingRef.current = false
+          setIsLoading(false)
+          setTurnActiveState(false)
+          onSendComplete?.()
+        }
+      }
+      if (resumeGateRef.current === gate) resumeGateRef.current = null
+      openGate()
+    }
+    settleDone(result)
+    return result
+  }, [sessionId, onToolEvent, onSendComplete, onTurnEnd, translateError])
+
+  const resume = useCallback(async (cutHistory: (prompt: string) => Message[]): Promise<boolean | undefined> => {
+    if (IS_LOCAL) return resumeLocal(cutHistory)
+    if (isLoadingRef.current || resumingRef.current) return
     const accessToken = auth.user?.access_token
     if (!accessToken) return
     resumingRef.current = true
     let openGate = () => {}
     const gate = new Promise<void>((resolve) => { openGate = resolve })
     resumeGateRef.current = gate
-    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: false, replayCut: cutHistory, setTurnActive: setCloudTurnActive })
+    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: false, replayCut: cutHistory, setTurnActive: setTurnActiveState, onTurnEnd })
     let followed = false
     try {
       await resumeAgentCore(sessionId, accessToken, 0, {
@@ -672,14 +785,13 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       if (followed) {
         isLoadingRef.current = false
         setIsLoading(false)
-        setCloudTurnActive(false)
+        setTurnActiveState(false)
         onSendComplete?.()
       }
       if (resumeGateRef.current === gate) resumeGateRef.current = null
       openGate()
     }
-  }, [sessionId, auth.user?.access_token, onToolEvent, onSendComplete, translateError])
+  }, [sessionId, auth.user?.access_token, onToolEvent, onSendComplete, onTurnEnd, translateError, resumeLocal])
 
-  const turnActive = IS_LOCAL ? isLoading : cloudTurnActive
-  return { messages, setMessages, isLoading, sendMessage, stopGeneration, resume, reconnecting, stopping, turnActive, messagesRef, translateError }
+  return { messages, setMessages, isLoading, sendMessage, stopGeneration, resume, reconnecting, stopping, turnActive: turnActiveState, messagesRef, translateError }
 }

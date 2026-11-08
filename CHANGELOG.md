@@ -325,6 +325,14 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   written while the chat's first stream was open, so a deck made after the tab was closed or
   the stream reconnected did not remember its conversation when reopened. The server now
   saves them as soon as the turn creates the deck. / Nothing.
+- **Local Web UI: a reply that finished while the tab was closed shows when the deck is
+  reopened.** A reopened deck's chat showed only what had been saved while the tab was open
+  (on V3 often nothing), and a deck reopened while its reply still ran did not follow it: the
+  reconnect of its own followed only text and tool steps, and only of a running turn. It now
+  follows the chat's work the way Cloud's does. A reopened or reloaded deck replays the chat's
+  last work once, with the messages sent during it, also when it ended while no tab was open,
+  and then follows it live. A message sent while that work runs goes into it, and Stop stops
+  it. / Nothing.
 - **Local Web UI: kiro-cli start-up failures say what to do.** When kiro-cli is not
   installed or too old, is not signed in, starts another agent than the sdpm one (its
   definitions were rejected), or the sdpm MCP server fails to start, the chat now says which

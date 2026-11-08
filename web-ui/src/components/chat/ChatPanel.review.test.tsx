@@ -32,6 +32,7 @@ vi.mock("@/services/agentCoreService", () => ({
   setAgentConfig: vi.fn(),
   stopRuntimeSession: vi.fn(),
   invokeAgentCore,
+  resumeLocalAgent: vi.fn(async () => ({ working: false, completion: "" })),
 }))
 vi.mock("@/services/deckService", () => ({
   createReview,

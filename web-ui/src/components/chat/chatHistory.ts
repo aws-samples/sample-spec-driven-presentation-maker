@@ -237,3 +237,54 @@ export function cutAtPrompt(history: ChatMessage[], prompt: string): ChatMessage
   }
   return history
 }
+
+/**
+ * The text the user typed, from a prompt as ChatPanel.handleSend sent it: without the sdpm
+ * markers, the leading `[Attached:…]` lines and their blank line, and the trailing snippets.
+ */
+function typedText(prompt: string): string {
+  let text = prompt.replace(MARKER_RE, "")
+  if (text.startsWith("[Attached:")) {
+    const end = text.indexOf("\n\n")
+    text = end < 0 ? "" : text.slice(end + 2)
+  }
+  const snippets = text.indexOf("\n\n---snippet---\n")
+  return snippets < 0 ? text : text.slice(0, snippets)
+}
+
+/**
+ * Local mode: the messages before the user message that opened a work period. `.chat.json`
+ * keeps the typed text and the period's prompt is the text sent, so a user message matches
+ * either. The last match wins; the whole list when there is none (the prompt is not saved yet).
+ */
+export function cutLocalAtPrompt(messages: Message[], prompt: string): Message[] {
+  if (!prompt) return messages
+  const typed = typedText(prompt)
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.role === "user" && (m.content === prompt || m.content === typed)) return messages.slice(0, i)
+  }
+  return messages
+}
+
+/**
+ * A task still `running` in a history while nothing runs was stopped with its work: mark it
+ * cancelled, in `toolUses` and in `blocks`. The same array when no task runs.
+ */
+export function settleStaleTasks(messages: Message[]): Message[] {
+  const settle = (tool: ToolUse): ToolUse =>
+    tool.task?.state === "running" ? { ...tool, task: { ...tool.task, state: "cancelled" } } : tool
+  let changed = false
+  const next = messages.map((m) => {
+    const running = m.toolUses.some((t) => t.task?.state === "running")
+      || !!m.blocks?.some((b) => b.type === "tool" && b.tool.task?.state === "running")
+    if (!running) return m
+    changed = true
+    return {
+      ...m,
+      toolUses: m.toolUses.map(settle),
+      ...(m.blocks ? { blocks: m.blocks.map((b) => (b.type === "tool" ? { ...b, tool: settle(b.tool) } : b)) } : {}),
+    }
+  })
+  return changed ? next : messages
+}

@@ -3,7 +3,8 @@
 /**
  * ChatPanel resume (Cloud, R3): a deck whose session was working when the page last saw it
  * follows the session after the history load — the history is cut at the work's opening
- * prompt and the replay rebuilds it. An idle session opens no connection; Local is unchanged.
+ * prompt and the replay rebuilds it. An idle session opens no connection. Local's resume is in
+ * ChatPanel.local.test.tsx.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -51,8 +52,6 @@ vi.mock("@/services/deckService", () => ({
 }))
 vi.mock("@/services/localService", () => ({
   saveLocalChat: vi.fn(async () => undefined),
-  localStreamUrl: vi.fn(() => null),
-  hasLocalStream: vi.fn(async () => false),
   stopLocalAgent: vi.fn(async () => undefined),
   getLocalSessionModels: vi.fn(async () => null),
   setLocalSessionModel: vi.fn(async () => null),
@@ -199,18 +198,5 @@ describe("ChatPanel resume (Cloud)", () => {
     await act(async () => { live.finish!() })
     expect(screen.getByText("Composed 2 slides")).toBeTruthy()
     expect(screen.queryByRole("button", { name: "Stop generation" })).toBeNull()
-  })
-})
-
-describe("ChatPanel resume (Local)", () => {
-  it("does not resume", async () => {
-    mode.local = true
-    const localSession = "d1".padEnd(36, "0")
-    storeState(localSession, "working")
-    getChatHistory.mockResolvedValue({ messages: [], truncated: false })
-    renderWithIntl(<ChatPanel deckId="d1" />)
-    await waitFor(() => expect(getChatHistory).toHaveBeenCalled())
-    await act(async () => { await new Promise((r) => setTimeout(r, 20)) })
-    expect(resumeAgentCore).not.toHaveBeenCalled()
   })
 })

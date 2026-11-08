@@ -32,9 +32,11 @@
  * `_kiro.dev/subagent/list_update` names after its stage) → text → end_turn. The deck and session
  * ids carry the engine (`e2e-<engine>-deck`, `stub-<engine>-<pid>-<n>`), so one sandbox serves
  * both engines. A prompt that contains `deck=<slug>` names its deck `e2e-<engine>-<slug>` instead.
- * A prompt that contains `[slow]` then streams a text chunk every 200 ms for up to 30 s, and
- * answers `cancelled` when its session is cancelled (else end_turn); other sessions' prompts run
- * meanwhile. While `<SDPM_DECK_ROOT>/.stub-slow-start` exists, session/new answers after 3 s.
+ * A prompt that contains `[slow]` then streams a text chunk every 200 ms for up to 30 s
+ * (`[slow=<n>]`: n chunks), and answers `cancelled` when its session is cancelled (else end_turn);
+ * other sessions' prompts run meanwhile. When a slow prompt answers, the stub writes
+ * `<deck dir>/.stub-prompt-done`, so a test sees the turn end while no tab is open. While
+ * `<SDPM_DECK_ROOT>/.stub-slow-start` exists, session/new answers after 3 s.
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -238,20 +240,23 @@ function handlePrompt(msg) {
   text(sessionId, "Done! Your deck is ready.")
   const { model, effort } = modelOf(sessionId)
   text(sessionId, ` (model: ${model}${ENGINE === "v3" && effort ? `, effort: ${effort}` : ""})`)
-  if (!promptText.includes("[slow]")) {
+  const slow = /\[slow(?:=(\d+))?\]/.exec(promptText)
+  if (!slow) {
     answer(msg, { stopReason: "end_turn" })
     return
   }
-  // A long turn: a chunk every 200 ms, until it is cancelled or 30 s passed.
+  // A long turn: a chunk every 200 ms, until it is cancelled or its chunks are sent.
+  const limit = Number(slow[1] ?? 150)
   let chunks = 0
   const finish = (stopReason) => {
     clearInterval(timer)
     slowPrompts.delete(sessionId)
+    fs.writeFileSync(path.join(outputDir, ".stub-prompt-done"), stopReason)
     answer(msg, { stopReason })
   }
   const timer = setInterval(() => {
     text(sessionId, ` ${++chunks}`)
-    if (chunks >= 150) finish("end_turn")
+    if (chunks >= limit) finish("end_turn")
   }, 200)
   slowPrompts.set(sessionId, () => finish("cancelled"))
 }

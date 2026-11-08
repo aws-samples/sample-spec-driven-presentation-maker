@@ -10,7 +10,7 @@ vi.mock("@/lib/mode", () => ({
 
 import {
   cancelAgentCore, generateSessionId, invokeAgentCore, prepareAgentCore, resumeAgentCore,
-  setAgentConfig, steerAgentCore,
+  resumeLocalAgent, setAgentConfig, steerAgentCore,
 } from "./agentCoreService"
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/
@@ -203,6 +203,76 @@ describe("invokeAgentCore (Cloud)", () => {
     const onEvent = vi.fn()
     await expect(invokeAgentCore("hi", "L1", vi.fn(), undefined, undefined, vi.fn(), undefined, "spec", "d1", undefined, undefined, { onEvent })).resolves.toBe("x")
     expect(onEvent).toHaveBeenCalledWith({ localNotice: "context_not_carried_over" }, { own: true })
+  })
+
+  it("hands a Local stream's period events to onSession and task events to the parser", async () => {
+    mode.local = true
+    const lines = [
+      "data: {\"work\":{\"state\":\"busy\"}}",
+      "data: {\"turn\":{\"id\":\"t1\",\"why\":\"prompt\",\"text\":\"hi\"}}",
+      "data: {\"event\":{\"contentBlockDelta\":{\"delta\":{\"text\":\"x\"}}}}",
+      "data: {\"taskStart\":{\"toolUseId\":\"c1\",\"name\":\"compose_slides\",\"taskId\":\"k\"}}",
+      "data: {\"turnEnd\":{\"id\":\"t1\",\"how\":\"finished\"}}",
+      "data: {\"work\":{\"state\":\"idle\",\"how\":\"finished\"}}",
+    ]
+    fetchMock.mockResolvedValueOnce(new Response(lines.join("\n") + "\n"))
+    const onEvent = vi.fn()
+    const onToolUse = vi.fn()
+    await expect(invokeAgentCore("hi", "L1", vi.fn(), undefined, undefined, onToolUse, undefined, "spec", undefined, undefined, undefined, { onEvent })).resolves.toBe("x")
+    expect(onEvent.mock.calls).toEqual([
+      [{ work: { state: "busy" } }, { own: true }],
+      [{ turn: { id: "t1", why: "prompt", text: "hi" } }, { own: true }],
+      [{ turnEnd: { id: "t1", how: "finished" } }, { own: true }],
+      [{ work: { state: "idle", how: "finished" } }, { own: true }],
+    ])
+    expect(onToolUse).toHaveBeenCalledWith("compose_slides", expect.objectContaining({ taskStarted: true }))
+  })
+})
+
+describe("resumeLocalAgent", () => {
+  beforeEach(() => { mode.local = true })
+  const sse = (lines: string[]) => new Response(lines.map((l, i) => `id: ${i + 1}\ndata: ${l}\n\n`).join(""), { headers: { "Content-Type": "text/event-stream" } })
+
+  it("answers not working when nothing runs, and calls no parser callback", async () => {
+    fetchMock.mockResolvedValueOnce(Response.json({ running: false }))
+    const handlers = { onResumeAck: vi.fn(), onStreamUpdate: vi.fn(), onToolUse: vi.fn(), onSession: { onEvent: vi.fn() } }
+    await expect(resumeLocalAgent("a b", handlers)).resolves.toEqual({ working: false, completion: "" })
+    expect(handlers.onResumeAck).toHaveBeenCalledWith({ working: false })
+    expect(handlers.onStreamUpdate).not.toHaveBeenCalled()
+    expect(handlers.onToolUse).not.toHaveBeenCalled()
+    expect(handlers.onSession.onEvent).not.toHaveBeenCalled()
+    expect(fetchMock.mock.calls[0][0]).toBe("/api/agent/stream?sessionId=a%20b")
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({})
+  })
+
+  it("follows a period: acks working first, routes its events, and shows a failed turn in the reply", async () => {
+    fetchMock.mockResolvedValueOnce(sse([
+      "{\"turn\":{\"id\":\"t1\",\"why\":\"prompt\",\"text\":\"hi\"}}",
+      "{\"event\":{\"contentBlockDelta\":{\"delta\":{\"text\":\"part \"}}}}",
+      "{\"status\":\"error\",\"error\":\"boom\",\"code\":\"agent_exited\"}",
+    ]))
+    const order: string[] = []
+    const onResumeAck = vi.fn(() => { order.push("ack") })
+    const onEvent = vi.fn(() => { order.push("event") })
+    const onStreamUpdate = vi.fn()
+    const result = await resumeLocalAgent("L1", { onResumeAck, onStreamUpdate, onToolUse: vi.fn(), onSession: { onEvent } }, { lastEventId: 7 })
+    expect(onResumeAck).toHaveBeenCalledWith({ working: true })
+    expect(order[0]).toBe("ack")
+    expect(onEvent).toHaveBeenCalledWith({ turn: { id: "t1", why: "prompt", text: "hi" } }, { own: false })
+    expect(onStreamUpdate).toHaveBeenCalledWith("part ")
+    expect(result.working).toBe(true)
+    expect(result.completion.startsWith("part ⚠")).toBe(true)
+    expect(fetchMock.mock.calls[0][1].headers).toEqual({ "Last-Event-ID": "7" })
+  })
+
+  it("rejects with an AbortError when its signal aborts", async () => {
+    const controller = new AbortController()
+    fetchMock.mockImplementationOnce((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
+      init.signal?.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")))
+    }))
+    const done = resumeLocalAgent("L1", {}, { signal: controller.signal })
+    controller.abort()
+    await expect(done).rejects.toMatchObject({ name: "AbortError" })
   })
 })
 

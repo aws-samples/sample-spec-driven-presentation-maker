@@ -39,8 +39,6 @@ vi.mock("@/services/deckService", () => ({
 }))
 vi.mock("@/services/localService", () => ({
   saveLocalChat: vi.fn(async () => undefined),
-  localStreamUrl: vi.fn(() => null),
-  hasLocalStream: vi.fn(async () => false),
   stopLocalAgent: vi.fn(async () => undefined),
   getLocalSessionModels: vi.fn(async () => null),
   setLocalSessionModel: vi.fn(async () => null),

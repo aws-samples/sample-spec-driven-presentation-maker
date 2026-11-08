@@ -7,7 +7,7 @@ const mode = vi.hoisted(() => ({ local: true }))
 vi.mock("@/lib/mode", () => ({ get IS_LOCAL() { return mode.local } }))
 
 import {
-  getAgentDefinitions, getAgentEngine, getLocalSessionModels, hasLocalStream, listLocalModels, localStreamUrl, setLocalSessionModel,
+  getAgentDefinitions, getAgentEngine, getLocalSessionModels, listLocalModels, setLocalSessionModel,
   openInOs, saveLocalChat, setAgentEngine, stopLocalAgent, updateAgentSelection,
 } from "./localService"
 
@@ -88,18 +88,6 @@ describe("localService (local mode)", () => {
     vi.mocked(fetch).mockResolvedValueOnce(jsonResponse({ error: "x", code: "unknown_model" }, 400))
     await expect(setLocalSessionModel("s1", { model: "x" })).rejects.toThrow("HTTP 400")
   })
-
-  it("builds the stream URL and probes whether the session still streams", async () => {
-    expect(localStreamUrl("a b")).toBe("/api/agent/stream?sessionId=a%20b")
-    vi.mocked(fetch)
-      .mockResolvedValueOnce(new Response("", { headers: { "Content-Type": "text/event-stream" } }))
-      .mockResolvedValueOnce(jsonResponse({ running: false }))
-      .mockRejectedValueOnce(new TypeError("network"))
-    expect(await hasLocalStream("s1")).toBe(true)
-    expect(await hasLocalStream("s1")).toBe(false)
-    expect(await hasLocalStream("s1")).toBe(false)
-    expect(call(0).url).toBe("/api/agent/stream?sessionId=s1")
-  })
 })
 
 describe("localService (cloud mode)", () => {
@@ -115,8 +103,6 @@ describe("localService (cloud mode)", () => {
     expect(await listLocalModels()).toEqual([])
     expect(await getLocalSessionModels("s1")).toBeNull()
     expect(await setLocalSessionModel("s1", { model: "m1" })).toBeNull()
-    expect(localStreamUrl("s1")).toBeNull()
-    expect(await hasLocalStream("s1")).toBe(false)
     expect(fetch).not.toHaveBeenCalled()
   })
 })

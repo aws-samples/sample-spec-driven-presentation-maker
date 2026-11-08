@@ -10,8 +10,10 @@
  * follows a session that is working after a reload; `prepareAgentCore` builds the session
  * early on the new deck screen. Events go through the same parser as before.
  *
- * Local: Server-Sent Events from the Next.js API Route. A message sent into the running turn
- * (services/localService.ts steerLocalAgent) comes back on that stream as `steer` events.
+ * Local: Server-Sent Events from the Next.js API Routes. The invoke stream lasts the chat's work
+ * period: its turns and the messages sent into it (services/localService.ts steerLocalAgent),
+ * which come back as `steer` events. `resumeLocalAgent` follows that period after a reload or on
+ * a reopened deck (GET /api/agent/stream, which replays it first).
  */
 
 import * as parser from './strandsParser.js';
@@ -74,7 +76,7 @@ export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
 export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId, continuedFrom, translateError, onSession) => {
   // Local mode: proxy through Next.js API Route → kiro-cli acp
   if (IS_LOCAL) {
-    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom, onSession);
+    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom, onSession, translateError);
   }
 
   if (!userId) {
@@ -404,13 +406,17 @@ export const generateSessionId = (sub) => {
   return IS_LOCAL || !sub ? generateId() : newSessionId(sub)
 }
 
+/** Local stream events that go to `onSession.onEvent` instead of the parser (Local sends no `composerNote`). */
+const LOCAL_SESSION_EVENT_KEYS = ["work", "turn", "turnEnd", "steer"];
+
 /**
  * Invoke the local ACP agent via API Route.
- * Reads SSE stream from /api/agent/invoke and feeds events through the same
- * strandsParser used by the cloud path, so ChatPanel works unchanged. `steer` events (a
- * message sent into this turn) go to `onSession.onEvent`, as the Cloud session's do.
+ * Reads the SSE stream of /api/agent/invoke, which lasts the chat's work period (every turn of
+ * it, and the steers sent into it), and feeds its events through the same strandsParser as the
+ * cloud path, so ChatPanel works unchanged. `work` / `turn` / `turnEnd` / `steer` events go to
+ * `onSession.onEvent(ev, {own: true})`, as the Cloud session's do.
  */
-const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom, onSession) => {
+const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom, onSession, translateError) => {
   const response = await fetch('/api/agent/invoke', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -433,48 +439,75 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
     throw error;
   }
 
+  if (parser.resetParserState) parser.resetParserState();
+  return readLocalStream(response, { onStreamUpdate, onToolUse, onSession, translateError }, { own: true, throwOnError: true });
+}
+
+/**
+ * Local: follow a chat's work period after a reload or a reopened deck (GET /api/agent/stream).
+ * The server replays the running period (or a finished one no stream delivered) and then
+ * follows it live. The handlers get `onResumeAck({working})` first, then the events as in
+ * invokeAgentCore, with `{own: false}`; a failed turn shows in the reply (`⚠ …`). Resolves
+ * `{working, completion}` when the stream ends (`working`: there was a period to follow);
+ * rejects with the fetch's AbortError when `signal` aborts.
+ */
+export const resumeLocalAgent = async (sessionId, handlers = {}, { lastEventId, signal } = {}) => {
+  const headers = lastEventId != null ? { 'Last-Event-ID': String(lastEventId) } : {};
+  const response = await fetch(`/api/agent/stream?sessionId=${encodeURIComponent(sessionId)}`, { headers, signal });
+  if (!response.ok || !(response.headers.get('content-type') || '').includes('text/event-stream')) {
+    // intentional: the body ({running: false} or an error) carries nothing to show
+    await response.body?.cancel().catch(() => undefined);
+    handlers.onResumeAck?.({ working: false });
+    return { working: false, completion: '' };
+  }
+  handlers.onResumeAck?.({ working: true });
+  if (parser.resetParserState) parser.resetParserState();
+  const completion = await readLocalStream(response, handlers, { own: false, throwOnError: false });
+  return { working: true, completion };
+}
+
+/**
+ * Read a Local SSE stream: session events go to `onSession.onEvent(ev, {own})`, the rest to
+ * the parser. An `{status: "error"}` line throws when `throwOnError` is set (the invoke shows
+ * the error itself), else the parser shows it in the reply. Resolves the accumulated text.
+ */
+async function readLocalStream(response, { onStreamUpdate, onToolUse, onSession, translateError }, { own, throwOnError }) {
   let completion = '';
   let buffer = '';
-
-  if (parser.resetParserState) parser.resetParserState();
-
-  if (response.body) {
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          if (line.trim()) {
-            if (line.startsWith('data: ')) {
-              let event;
-              try { event = JSON.parse(line.substring(6).trim()); } catch { /* parser handles malformed lines */ }
-              if (event?.status === 'error' && event.error) {
-                const error = new Error(event.error);
-                // A turn that ended without an answer carries a stable `code` (lib/local/turnErrors.ts).
-                if (event.code) error.code = event.code;
-                throw error;
-              }
-              if (event?.steer) {
-                onSession?.onEvent?.(event, { own: true });
-                continue;
-              }
-              // A notice about this turn's session (lib/local/sessionNotices.ts) goes to the chat as a session event.
-              if (event?.notice?.code) onSession?.onEvent?.({ localNotice: event.notice.code }, { own: true });
-            }
-            completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
+  if (!response.body) return completion;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        if (line.startsWith('data: ')) {
+          let event;
+          try { event = JSON.parse(line.substring(6).trim()); } catch { /* parser handles malformed lines */ }
+          if (throwOnError && event?.status === 'error' && event.error) {
+            const error = new Error(event.error);
+            // A turn that ended without an answer carries a stable `code` (lib/local/turnErrors.ts).
+            if (event.code) error.code = event.code;
+            throw error;
           }
+          if (event && LOCAL_SESSION_EVENT_KEYS.some((k) => k in event)) {
+            onSession?.onEvent?.(event, { own });
+            continue;
+          }
+          // A notice about this turn's session (lib/local/sessionNotices.ts) goes to the chat as a session event.
+          if (event?.notice?.code) onSession?.onEvent?.({ localNotice: event.notice.code }, { own });
         }
+        completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse, translateError);
       }
-    } finally {
-      reader.releaseLock();
     }
+  } finally {
+    reader.releaseLock();
   }
-
   return completion;
 }
