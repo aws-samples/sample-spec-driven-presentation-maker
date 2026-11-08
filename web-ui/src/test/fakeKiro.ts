@@ -12,6 +12,9 @@
  * - `prompts` holds the unanswered session/prompt requests; `endTurn` / `failPrompt` answer the
  *   oldest one of a session (default: the oldest of all).
  * - The sdpm server's state is sent before the answer that opens a session (as V2 does).
+ * - Each child has a pid of its own, above any real pid limit (Linux 4 194 304, macOS 99 998), so
+ *   a signal that reached the real `process.kill` could only fail. `pgid`, `descendants` and
+ *   `surviveTerm` describe its process tree to `installFakeProcesses` (fakeProcesses.ts).
  */
 
 import { EventEmitter } from "events"
@@ -21,8 +24,29 @@ export type Rpc = { id: number; method: string; params: Record<string, unknown> 
 /** The fake kiro-cli's models: `m-effort` has effort levels (V3 only). */
 export const FAKE_MODELS = ["auto", "m-effort", "m-plain"]
 
+let lastFakePid = 5_000_000
+/** A pid no real process can have. */
+export const nextFakePid = () => ++lastFakePid
+
+/** A process below a fake kiro-cli (V3's agent server, V2's MCP servers) in the fake process table. */
+export interface FakeDescendant {
+  pid: number
+  pgid: number
+  ppid: number
+  /** Ended by a signal to its group or pid. */
+  dead?: boolean
+}
+
 export class FakeChild extends EventEmitter {
-  pid = 4242
+  pid = nextFakePid()
+  /** Its process group (default: its own when spawned detached, else the Local server's). */
+  pgid: number | undefined = undefined
+  /** Fake processes below it, listed while alive. */
+  descendants: FakeDescendant[] = []
+  /** Its descendants live on after SIGTERM (only SIGKILL ends them). */
+  surviveTerm = false
+  /** It exited on its own (`exit`). */
+  exited = false
   stdout = Object.assign(new EventEmitter(), { setEncoding: () => {} })
   stderr = Object.assign(new EventEmitter(), { setEncoding: () => {} })
   stdin = Object.assign(new EventEmitter(), { write: (line: string) => { this.handle(JSON.parse(line)); return true } })
@@ -241,6 +265,24 @@ export class FakeChild extends EventEmitter {
       setImmediate(() => this.emit("close", null))
     }
     return true
+  }
+
+  /** It exits on its own (a crash): `exit`, then the end of stdout. Its descendants stay. */
+  exit(code: number | null = 1) {
+    if (this.killed || this.exited) return
+    this.exited = true
+    setImmediate(() => {
+      this.emit("exit", code)
+      this.stdout.emit("close")
+    })
+  }
+
+  /** A fake descendant in a group of its own (V3's KAS, a V2 MCP server); returns it. */
+  addDescendant(pgid?: number): FakeDescendant {
+    const pid = nextFakePid()
+    const descendant = { pid, pgid: pgid ?? pid, ppid: this.pid }
+    this.descendants.push(descendant)
+    return descendant
   }
 }
 

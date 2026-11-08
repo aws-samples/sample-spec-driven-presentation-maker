@@ -33,8 +33,11 @@ import os from "os"
 import path from "path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
-vi.mock("child_process", () => ({ spawn, default: { spawn } }))
+import { nextFakePid } from "../../test/fakeKiro"
+import { installFakeProcesses } from "../../test/fakeProcesses"
+
+const { spawn, execFile, execFileSync } = vi.hoisted(() => ({ spawn: vi.fn(), execFile: vi.fn(), execFileSync: vi.fn() }))
+vi.mock("child_process", () => ({ spawn, execFile, execFileSync, default: { spawn, execFile, execFileSync } }))
 vi.mock("./agents-sync", () => ({ syncToAgentsDir: vi.fn(() => "d0") }))
 
 type Line = Record<string, unknown>
@@ -65,7 +68,7 @@ const marker = (m: Line) => m.client as { id: number; method: string } | undefin
  * answer before the capturing client's next request (V3's MCP readiness) come with it.
  */
 class ReplayChild extends EventEmitter {
-  pid = 4242
+  pid = nextFakePid()
   stdout = Object.assign(new EventEmitter(), { setEncoding: () => {} })
   stderr = Object.assign(new EventEmitter(), { setEncoding: () => {} })
   stdin = Object.assign(new EventEmitter(), { write: (line: string) => { this.handle(JSON.parse(line)); return true } })
@@ -174,6 +177,7 @@ let configDir: string
 beforeEach(async () => {
   children = []
   spawn.mockReset()
+  installFakeProcesses({ spawn, execFile, execFileSync })
   configDir = fs.mkdtempSync(path.resolve(os.tmpdir(), "sdpm-acp-contract-"))
   vi.stubEnv("SDPM_ACP_CONFIG_DIR", configDir)
   vi.resetModules()
