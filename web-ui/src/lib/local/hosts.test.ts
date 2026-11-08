@@ -101,26 +101,27 @@ describe("placement", () => {
 })
 
 describe("routing", () => {
-  it("hands each session's lines only to its own sink, and records each MCP line once", async () => {
+  it("hands the session's lines to its sink, and records each MCP line once", async () => {
     const a = await open("v3")
-    const composer = new Sink("aux")
-    const { hs } = await a.host.openSession("sdpm-composer", { kind: "new" }, { sink: composer })
-    expect(hs.sessionId).toBe("K1-2")
     const apply = vi.spyOn(a.host.mcp, "apply")
     const child = children[0]
     child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "to A" } })
-    child.update("K1-2", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "to B" } })
+    child.update("K9", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "not A's" } })
     child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: " again" } })
-    child.send({ method: "_kiro/mcp/status", params: { sessionId: "K1-2", servers: [{ name: "sdpm", status: "connected" }] } })
+    child.send({ method: "_kiro/mcp/status", params: { sessionId: "K1", servers: [{ name: "sdpm", status: "connected" }] } })
     await settle()
     expect(a.sink.texts()).toEqual(["to A", " again"])
-    expect(composer.texts()).toEqual(["to B"])
     expect(apply.mock.calls.map((call) => call[0])).toEqual([
-      { type: "mcp_snapshot", sessionId: "K1-2" },
-      { type: "mcp_status", sessionId: "K1-2", server: "sdpm", state: "connected" },
+      { type: "mcp_snapshot", sessionId: "K1" },
+      { type: "mcp_status", sessionId: "K1", server: "sdpm", state: "connected" },
     ])
-    expect([...a.sink.events, ...composer.events].some((e) => e.type === "mcp_status" || e.type === "mcp_snapshot")).toBe(false)
-    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(a.sink.events.some((e) => e.type === "mcp_status" || e.type === "mcp_snapshot")).toBe(false)
+  })
+
+  it("refuses a second session on a kiro-cli", async () => {
+    const a = await open("v3")
+    await expect(a.host.openSession("sdpm-composer", { kind: "new" }, { sink: new Sink("aux") })).rejects.toThrow("host already carries a session")
+    expect(children[0].requests.filter((r) => r.method === "session/new")).toHaveLength(1)
   })
 
   it("V2: counts server_initialized sent before the session/new answer, without waiting for the MCP timeout", async () => {
@@ -130,15 +131,17 @@ describe("routing", () => {
     expect(hs.sessionId).toBe("K1")
   })
 
-  it("V2: opens a composer session on the orchestrator's kiro-cli with set_mode", async () => {
-    const chat = await open("v2")
-    const aux = new Sink("aux")
-    const { hs } = await chat.host.openSession("sdpm-composer", { kind: "new" }, { sink: aux })
-    expect(hs.sessionId).toBe("K1-2")
-    expect(children[0].requests.map((r) => r.method).slice(-2)).toEqual(["session/new", "session/set_mode"])
-    expect(children[0].requests.at(-1)?.params).toEqual({ sessionId: "K1-2", modeId: "sdpm-composer" })
-    expect(chat.host.auxOpened).toBe(1)
-    expect(spawn).toHaveBeenCalledTimes(1)
+  it("fails an open at once with agent_start_failed when kiro-cli exits while the session waits for the sdpm server", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const host = await hosts.pool.acquireForChat("v3", "sdpm-orchestrator")
+    const child = children[0]
+    child.mcpState = "none"
+    const pending = host.openSession("sdpm-orchestrator", { kind: "new" }, { sink: new Sink() }).catch((e: unknown) => e)
+    await settle()
+    expect(child.requests.map((r) => r.method)).toContain("session/new")
+    child.exit(3)
+    expect(await pending).toMatchObject({ code: "agent_start_failed", message: "kiro-cli exited while starting (code 3)" })
+    warn.mockRestore()
   })
 })
 
@@ -204,30 +207,6 @@ describe("aborts", () => {
     expect(children[0].killed).toBe(true)
   })
 
-  it("deletes a session opened next to a chat's session and given up, once kiro-cli answered, and keeps the kiro-cli", async () => {
-    const log = vi.spyOn(console, "log").mockImplementation(() => {})
-    try {
-      const chat = await open("v3")
-      const child = children[0]
-      child.silent.add("session/new")
-      const controller = new AbortController()
-      const pending = chat.host.openSession("sdpm-composer", { kind: "new" }, { sink: new Sink("aux"), signal: controller.signal }).catch((e: unknown) => e)
-      await settle()
-      controller.abort()
-      await settle()
-      expect(child.deleted).toEqual([])
-      const request = child.requests.filter((r) => r.method === "session/new").at(-1)!
-      child.send({ method: "_kiro/mcp/status", params: { sessionId: "K1-2", servers: [{ name: "sdpm", status: "connected" }] } })
-      child.send({ id: request.id, result: { sessionId: "K1-2", modes: { currentModeId: "sdpm-composer", availableModes: [] } } })
-      expect(await pending).toMatchObject({ name: "AbortError" })
-      await settle()
-      expect(child.deleted).toEqual(["K1-2"])
-      expect(child.killed).toBe(false)
-      expect(chat.host.sessions.size).toBe(1)
-    } finally {
-      log.mockRestore()
-    }
-  })
 })
 
 describe("listings", () => {
@@ -258,14 +237,12 @@ describe("listings", () => {
 })
 
 describe("exit and steer", () => {
-  it("tells every sink when the kiro-cli exits", async () => {
+  it("tells the sink when the kiro-cli exits", async () => {
     const a = await open("v3")
-    const composer = new Sink("aux")
-    await a.host.openSession("sdpm-composer", { kind: "new" }, { sink: composer })
     children[0].kill()
     await settle()
     expect(a.sink.exits).toEqual([null])
-    expect(composer.exits).toEqual([null])
+    expect(a.host.session).toBeNull()
     expect(hosts.pool.hostsOf("v3")).toEqual([])
   })
 

@@ -38,8 +38,6 @@ otherwise.
 | `kiro-3.1.0-v3-model-effort.jsonl` | V3, `s14c_1_v3_new_model_effort` (model Claude Haiku 5.5, then effort low) | initialize, session/new, session/set_config_option (model), session/set_config_option (effortLevel), session/prompt |
 | `kiro-3.1.0-v3-model-load.jsonl` | V3 loading that session in a new process, `s14c_2_v3_load` | initialize, session/load |
 | `kiro-3.1.0-v2-set-model.jsonl` | V2, `s14c_3_v2_set_model` (model claude-haiku-4.5) | initialize, session/new, session/set_model, session/prompt |
-| `kiro-3.1.0-v3-multi-session.jsonl` | V3, lane 2 measurement `acp_multi.py`: three sessions in one kiro-cli (the third in `sdpm-composer`), two prompts at once, then one cancelled while the other runs, then the third closed | initialize, session/new, session/new, session/new, session/prompt, session/prompt, session/prompt, session/prompt, session/close |
-| `kiro-3.1.0-v2-multi-session.jsonl` | V2 (`--agent sdpm-orchestrator`), the same measurement: three sessions, the third switched to `sdpm-composer`, the same prompts and cancel (no close: V2 has none) | initialize, session/new, session/new, session/new, session/set_mode, session/prompt, session/prompt, session/prompt, session/prompt |
 
 The `kiro-3.1.0-*` files are kiro-cli 3.1.0 (KAS 0.66.70, 2026-11-07) captures with a
 temporary `KIRO_HOME`. In the list and fork captures, the sources remembered a codeword (MANGO
@@ -49,12 +47,6 @@ S14c), the `config_option_update`s and `configOptions` keep `mode` (sdpm modes),
 (4 values: `auto`, `claude-haiku-5.5`, `claude-haiku-4.5` and the `[Internal]` `grok-4.7`, with
 `_meta.kiro` `rateMultiplier`, `hasEffort`, `effortLevels`, `defaultEffortLevel`), `effortLevel`
 and `thinking`; V2's `models.availableModels` keeps `auto`, `claude-haiku-5.5`, `claude-haiku-4.5`.
-
-The two `multi-session` files are kiro-cli 3.1.0 (KAS 0.66.70, 2026-11-07) with several sessions
-in one process. Both pairs of prompts are sent at once; the second pair's first prompt ("Count from
-1 to 300") is cancelled (`session/cancel`, a notification, so no marker) and answers `cancelled`,
-while the other session's prompt still ends `end_turn`. V2 sends each new session's
-`_kiro.dev/mcp/server_initialized` before its session/new answer.
 
 The two `turn` captures answer the prompt "Call the sdpm list_styles tool once, then reply with
 only the number of styles" and end with `stopReason: end_turn`.

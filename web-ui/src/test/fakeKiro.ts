@@ -73,8 +73,8 @@ export class FakeChild extends EventEmitter {
   loadedMode: string | null = null
   /** The mode session/new answers (default: the requested agent's). */
   newMode: string | null = null
-  /** The sdpm server's state kiro-cli reports for each session it opens. */
-  mcpState: "connected" | "failed" = "connected"
+  /** The sdpm server's state kiro-cli reports for each session it opens (`none`: nothing yet). */
+  mcpState: "connected" | "failed" | "none" = "connected"
   /** Forks made with session/fork (V3), by id: their source. */
   forks = new Map<string, string>()
   /** Each session's model and effort (set_config_option / set_model change them). */
@@ -104,6 +104,7 @@ export class FakeChild extends EventEmitter {
 
   /** The sdpm server's state for a session, in the engine's shape, ahead of the answer (as V2 sends it). */
   private mcpReady(sessionId: string) {
+    if (this.mcpState === "none") return
     if (this.engine === "v2") {
       const failed = this.mcpState === "failed"
       this.send({ method: failed ? "_kiro.dev/mcp/server_init_failure" : "_kiro.dev/mcp/server_initialized", params: { sessionId, serverName: "sdpm", ...(failed ? { error: "connection closed" } : {}) } })

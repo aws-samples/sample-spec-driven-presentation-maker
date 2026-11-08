@@ -37,7 +37,6 @@ function context(answers: Record<string, unknown>) {
     cwd: "/workspace/sdpm/servers/local",
     env: {} as NodeJS.ProcessEnv,
     setupTimeoutMs: 1000,
-    hostAgent: "sdpm-orchestrator",
     waitForMcp: vi.fn(async (sessionId: string) => { order.push(`wait ${sessionId}`) }),
     clearMcp: vi.fn((sessionId: string) => { order.push(`clear ${sessionId}`) }),
   }

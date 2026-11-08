@@ -183,9 +183,9 @@ export function withPermissions(agent: Record<string, unknown>, fileName: string
  * mix of old and new generations — or no directory at all — and stale
  * files from removed catalog entries are swept away.
  *
- * The Settings model goes into every definition, except the composer's when
- * `opts.pinSubagentModel` is false: an engine whose sub-agents follow the
- * session's model (V3) then runs the composer on the chat's model and effort.
+ * The Settings model goes into every definition, the composer's included: each
+ * composer runs on a kiro-cli of its own, and the compose run then sets the
+ * chat's model and effort on its session.
  *
  * Returns the generation's digest (`agentsDigest`: SHA-256 over the file
  * names and contents). When the current directory already holds exactly
@@ -197,7 +197,6 @@ export function withPermissions(agent: Record<string, unknown>, fileName: string
 export function syncToAgentsDir(
   sel: AgentSelection = readSelection(),
   dirs: SyncDirs = DEFAULT_DIRS,
-  opts: { pinSubagentModel?: boolean } = {},
 ): string {
   if (!fs.existsSync(dirs.acpAgentsDir)) {
     throw new Error(`agents catalog not found: ${dirs.acpAgentsDir}`)
@@ -219,7 +218,7 @@ export function syncToAgentsDir(
     } catch (e) {
       throw new Error(`malformed agent definition in catalog: ${fileName} — ${e}`)
     }
-    if (sel.model && !(role === "composer" && opts.pinSubagentModel === false)) {
+    if (sel.model) {
       agent.model = sel.model
     } else {
       delete agent.model

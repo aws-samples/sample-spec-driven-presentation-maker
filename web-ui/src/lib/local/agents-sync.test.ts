@@ -68,18 +68,13 @@ describe("syncToAgentsDir", () => {
     expect(agent.model).toBeUndefined()
   })
 
-  it("leaves the model out of the composer's definition only when sub-agents follow the session's model", () => {
+  it("writes the Settings model into every definition, the composer's included", () => {
     const read = (file: string) => JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, file), "utf-8")) // nosemgrep: path-join-resolve-traversal — constant definition names in a tmpdir
     writeCatalogAgent("sdpm-composer", { model: "catalog-model" })
     syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "claude-x" }, dirs)
-    expect(read("sdpm-composer.json").model).toBe("claude-x")
-
-    syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "claude-x" }, dirs, { pinSubagentModel: false })
+    for (const file of ["sdpm-composer.json", "sdpm-orchestrator.json", "sdpm-style.json", "sdpm-translate.json"]) expect(read(file).model).toBe("claude-x")
+    syncToAgentsDir({ ...SELECTION_DEFAULTS }, dirs)
     expect(read("sdpm-composer.json").model).toBeUndefined()
-    for (const file of ["sdpm-orchestrator.json", "sdpm-style.json", "sdpm-translate.json"]) expect(read(file).model).toBe("claude-x")
-
-    syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "claude-x" }, dirs, { pinSubagentModel: true })
-    expect(read("sdpm-composer.json").model).toBe("claude-x")
   })
 
   it("re-derivation picks up catalog changes (the git-pull staleness fix)", () => {

@@ -45,7 +45,6 @@ function context(answers: Record<string, unknown | ((params: Record<string, unkn
     cwd: "/workspace/sdpm/servers/local",
     env: env as unknown as NodeJS.ProcessEnv,
     setupTimeoutMs: 1000,
-    hostAgent: "sdpm-orchestrator",
     waitForMcp: vi.fn(async (sessionId: string) => { order.push(`wait ${sessionId}`) }),
     clearMcp: vi.fn((sessionId: string) => { order.push(`clear ${sessionId}`) }),
   }
@@ -98,12 +97,17 @@ describe("V2Session", () => {
     expect(calls).toHaveLength(2)
   })
 
-  it("opens another agent's session on a kiro-cli started for the orchestrator: set_mode, then the MCP wait", async () => {
-    const { ctx, calls, order } = context({ "session/new": { sessionId: "K2", modes: { currentModeId: "sdpm-orchestrator", availableModes: [{ id: "sdpm-orchestrator", name: "o" }, { id: "sdpm-composer", name: "c" }] } } })
-    await expect(new V2Session(ctx).newSession("sdpm-composer")).resolves.toEqual({ sessionId: "K2" })
-    expect(calls.map((c) => c.method)).toEqual(["session/new", "session/set_mode"])
-    expect(calls[1].params).toEqual({ sessionId: "K2", modeId: "sdpm-composer" })
-    expect(order).toEqual(["session/new", "clear K2", "session/set_mode", "wait K2"])
+  it("refuses a session/new that answers another mode, even one that lists the requested agent", async () => {
+    vi.useFakeTimers()
+    try {
+      const { ctx, calls } = context({ "session/new": { sessionId: "K2", modes: { currentModeId: "sdpm-orchestrator", availableModes: [{ id: "sdpm-orchestrator", name: "o" }, { id: "sdpm-composer", name: "c" }] } } })
+      const pending = new V2Session(ctx).newSession("sdpm-composer").catch((e: unknown) => e)
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(await pending).toMatchObject({ code: "agent_definition_rejected" })
+      expect(calls.map((c) => c.method)).toEqual(["session/new"])
+    } finally {
+      vi.useRealTimers()
+    }
   })
 
   it("refuses another agent's session when its kiro-cli does not list that agent", async () => {

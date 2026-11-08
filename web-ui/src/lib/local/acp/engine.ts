@@ -82,8 +82,6 @@ export interface SessionContext {
   setupTimeoutMs: number
   /** The caller's abort signal for the setup requests. */
   signal?: AbortSignal
-  /** The agent the kiro-cli was started with (V2's `--agent`; V3 ignores it). */
-  hostAgent: string
   /**
    * Wait for the session's sdpm MCP server, as recorded on the host since kiro-cli started (mcp-ready.ts):
    * resolves when it is connected or the wait timed out (logged), rejects with McpFailedError.
@@ -195,11 +193,6 @@ export interface EngineAdapter {
   readonly sessionsOpenableBy: readonly EngineId[]
   /** The sessions in this engine's store. */
   listStoredSessions(ctx: StoreContext): Promise<StoredSession[]>
-  /**
-   * A sub-agent whose definition names no model runs on the session's model and effort (V3).
-   * When false, agents-sync writes the Settings model into the composer's definition too.
-   */
-  readonly subagentsFollowSessionModel: boolean
 }
 
 const ADAPTERS: Record<EngineId, EngineAdapter> = {

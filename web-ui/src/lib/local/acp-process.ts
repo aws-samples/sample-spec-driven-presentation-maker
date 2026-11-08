@@ -16,11 +16,10 @@
  *   this server holds), and registers nothing.
  * - **Release.** `releaseChat` is the one way out: the chat's ids are forgotten and its kiro-cli
  *   is killed. The pool releases the least recently active idle chat for its cap; an engine switch
- *   releases idle deck-bound chats of the other engine (a busy one when its period ends); a
- *   kiro-cli that opened composer sessions it cannot close ends once its chat is idle. A busy chat
- *   is never released. A
- *   chat that is released, or whose kiro-cli exited, is remembered as an orphan: the next message
- *   of its client id opens its kiro session again.
+ *   releases idle deck-bound chats of the other engine (a busy one when its period ends, or when
+ *   its prompt could not be prepared and no period runs). A busy chat is never released. A chat
+ *   that is released, or whose kiro-cli exited, is remembered as an orphan: the next message of its
+ *   client id opens its kiro session again.
  * - **Carry-over.** Texts for the agent a chat could not deliver (after Stop, after an exit) wait
  *   under the kiro session and go before the user's text of its next prompt.
  * - **Stop during start.** A start (an invoke opening its chat and sending its prompt) registers
@@ -117,7 +116,7 @@ const hooks: ChatHooks = {
     // The chat has moved on: what an earlier period of its ids left is not replayed any more.
     for (const id of idsOf(chat)) forgetUnseen(id)
   },
-  periodEnded(chat) { onPeriodEnd(chat) },
+  periodEnded(chat) { releaseChecks(chat) },
   hostExited(chat) { releaseChat(chat, { remember: true }) },
   release(chat) { releaseChat(chat, { remember: true }) },
 }
@@ -205,8 +204,8 @@ function endHost(chat: Chat): void {
   if (!host.exited) host.kill()
 }
 
-/** The release checks once a period's end was written to its listeners. */
-function onPeriodEnd(chat: Chat): void {
+/** The release checks once a period's end was written to its listeners (or a prompt's preparation failed with none running). */
+function releaseChecks(chat: Chat): void {
   if (chat.released) return
   const host = chat.hs.host
   if (host.exited) return
@@ -214,12 +213,6 @@ function onPeriodEnd(chat: Chat): void {
   // A prompt still being prepared keeps the chat until its own period ends.
   if (chat.deckBound && chat.engine !== readEngineConfig().engine && !chat.busy()) {
     console.log("[acp] sessionId=%s: the agent engine is no longer %s; ending the deck's chat", chat.sessionId, chat.engine)
-    releaseChat(chat, { remember: true })
-    return
-  }
-  // A kiro-cli that cannot close sessions keeps the composer sessions it opened: end it once idle.
-  if (!host.canClose() && host.auxOpened > 0 && !chat.busy()) {
-    console.log("[acp] sessionId=%s: ending its kiro-cli, which holds composer sessions it cannot close", chat.sessionId)
     releaseChat(chat, { remember: true })
   }
 }
@@ -479,6 +472,11 @@ export async function sendPrompt(
       }
       throwIfAborted(opts.signal)
     }
+  } catch (error) {
+    chat.reserved = false
+    // An engine switch waited for this prepare: the chat goes now, as at a period's end.
+    if (!chat.period) releaseChecks(chat)
+    throw error
   } finally {
     chat.reserved = false
   }
