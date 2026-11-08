@@ -7,8 +7,10 @@ CI runs it on ubuntu, macos and windows (.github/workflows/installer.yml, job
 release-channel); it runs the same way locally. Everything goes into ``--work``: the mirror
 (``SDPM_REPO_URL``), the install (``SDPM_HOME``, ``SDPM_LAUNCHER_DIR``) and the release
 manifests, served from files (``SDPM_RELEASE_BASE_URL=file://…``). The test tags (v99.x) sit
-on the mirror's ``main`` above every real tag, so the installs follow them. The real
-``HOME`` is used (uv's cache, the client CLIs on the runner); nothing else is touched.
+on the mirror's ``main`` above every real tag, so the installs follow them. ``HOME`` and
+``PATH`` are used as given, and step 9 installs with ``--register``: it registers every MCP
+client it finds there. On a machine with your own clients, run it with ``HOME`` and
+``KIRO_HOME`` set to temporary directories and no client CLIs on ``PATH``.
 
 Steps (the numbers of the design's §13): 1 a new install lands on the tag, 2 up to date,
 3 a main user stays, 4 --channel main, 5 the #397 / #529 / #532 launchers, 6 a changed
