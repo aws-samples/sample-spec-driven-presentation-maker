@@ -211,7 +211,8 @@ function onPeriodEnd(chat: Chat): void {
   const host = chat.hs.host
   if (host.exited) return
   // Settings switched the engine while this period ran: the deck's next message opens it on the new one.
-  if (chat.deckBound && chat.engine !== readEngineConfig().engine) {
+  // A prompt still being prepared keeps the chat until its own period ends.
+  if (chat.deckBound && chat.engine !== readEngineConfig().engine && !chat.busy()) {
     console.log("[acp] sessionId=%s: the agent engine is no longer %s; ending the deck's chat", chat.sessionId, chat.engine)
     releaseChat(chat, { remember: true })
     return
@@ -259,8 +260,8 @@ async function openChat(
 
 /**
  * Run `fn` with a lazy connection to an initialized kiro-cli of `engine`: a live one, else one
- * the pool starts on the first `connect` (kept when it can carry chats, else killed once `fn` is
- * done). Concurrent listings are shared by the session catalog, not here.
+ * the pool starts on the first `connect` and kills once `fn` is done. Concurrent listings are
+ * shared by the session catalog, not here.
  */
 export async function withEngineConnection<T>(engine: EngineId, fn: (connect: StoreContext["connect"]) => Promise<T>): Promise<T> {
   let acquired: ReturnType<typeof pool.acquireForListing> | undefined

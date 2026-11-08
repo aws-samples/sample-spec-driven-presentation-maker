@@ -94,7 +94,7 @@ export interface ChatHooks {
   periodStarted(chat: Chat): void
   /** A work period ended; its `end` was written to the listeners. */
   periodEnded(chat: Chat): void
-  /** The chat's kiro-cli exited; its period has ended. */
+  /** The chat's kiro-cli exited; its period has ended (not called while the chat opens). */
   hostExited(chat: Chat): void
   /** The pool needs the chat's place. */
   release(chat: Chat): void | Promise<void>
@@ -197,7 +197,8 @@ export class Chat implements SessionSink {
     if (this.turn) this.finishTurn("error", turnFailed({ code: "agent_exited", message: `kiro-cli exited with code ${code}` }))
     else this.maybeEndPeriod()
     for (const text of this.pendingHarness.splice(0)) this.keepForLater(text)
-    this.hooks.hostExited(this)
+    // An opening chat is not registered yet: its failed open drops the session and reports the exit.
+    if (!this.opening) this.hooks.hostExited(this)
   }
 
   // ── Period and turns ──

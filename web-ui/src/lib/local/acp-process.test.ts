@@ -384,6 +384,28 @@ describe("start-up failures", () => {
       error.mockRestore()
     }
   })
+
+  it.each([
+    ["v2", "session/new", null],
+    ["v3", "session/new", null],
+    ["v2", "session/load", "K9"],
+    ["v3", "session/load", "K9"],
+  ] as const)("fails with agent_start_failed when the %s kiro-cli exits during %s, and registers nothing", async (engine, method, saved) => {
+    useEngine(engine)
+    const error = vi.spyOn(console, "error").mockImplementation(() => {})
+    try {
+      nextChild((child) => { child.silent.add(method) })
+      const pending = acp.openDeckSession("C1", "d1", saved, "sdpm-orchestrator").catch((e: unknown) => e)
+      await settle()
+      expect(children[0].requests.map((r) => r.method)).toContain(method)
+      children[0].kill()
+      expect(await pending).toMatchObject({ code: "agent_start_failed" })
+      await settle()
+      for (const id of ["C1", "K1", "K9"]) expect(acp.hasProcess(id)).toBe(false)
+    } finally {
+      error.mockRestore()
+    }
+  })
 })
 
 describe("engines", () => {
@@ -449,6 +471,38 @@ describe("engines", () => {
     expect(children.map((c) => c.killed)).toEqual([true, false])
     expect(acp.hasProcess("C1")).toBe(false)
     expect(acp.hasProcess("C2")).toBe(true)
+  })
+
+  it("keeps a deck chat whose next prompt is being prepared when a hold ends its period after the switch", async () => {
+    const { chat } = await acp.openDeckSession("C1", "d1", "K9", "sdpm-orchestrator")
+    const child = children[0]
+    const first = await acp.sendPrompt("C1", "build")
+    first.send()
+    await settle()
+    // Chosen during the turn: applied before the next prompt, whose model change kiro-cli answers late.
+    await acp.chooseSessionModel("C1", { model: "m-plain" })
+    const release = chat.hold({ cancel: () => {}, dropped: () => {} })
+    child.endTurn()
+    await settle()
+    child.silent.add("session/set_model")
+    const next = acp.sendPrompt("C1", "next")
+    await settle()
+    useEngine("v3")
+    acp.terminateIdleProcesses("v3")
+    release()
+    await settle()
+    expect(child.killed).toBe(false)
+    expect(acp.hasProcess("C1")).toBe(true)
+
+    const setModel = child.requests.find((r) => r.method === "session/set_model")!
+    child.send({ id: setModel.id, result: {} })
+    const prompted = await next
+    prompted.send()
+    await settle()
+    child.endTurn()
+    await settle()
+    expect(child.killed).toBe(true)
+    expect(acp.hasProcess("C1")).toBe(false)
   })
 
   it("opens a V3 session with session/load alone and its mode, and reports an empty one as created", async () => {
