@@ -35,7 +35,7 @@ async function startChat(page: Page, message: string) {
 
 /** The stub process id in a deck's `.session` (`stub-<engine>-<pid>-<n>`). */
 async function stubPid(deckId: string): Promise<string> {
-  const file = path.join(deckDir(deckId), ".session")
+  const file = path.join(deckDir(deckId), ".session") // nosemgrep: path-join-resolve-traversal — constant deck ids in the sandbox
   await expect.poll(() => fs.existsSync(file), { timeout: 15_000 }).toBe(true)
   const id = fs.readFileSync(file, "utf-8").trim()
   expect(id).toMatch(/^stub-v[23]-\d+-\d+$/)

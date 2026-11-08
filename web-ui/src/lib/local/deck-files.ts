@@ -22,7 +22,7 @@ export function saveSessionToDeck(deckId: string, sessionId: string): boolean {
   const fs = require("fs") as typeof import("fs")
   const dir = resolveDeckDir(deckId)
   if (!dir || !fs.existsSync(dir)) return false
-  fs.writeFileSync(path.join(dir, ".session"), sessionId, "utf-8")
+  fs.writeFileSync(path.join(dir, ".session"), sessionId, "utf-8") // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
   return true
 }
 
@@ -32,7 +32,7 @@ export function readSessionFromDeck(deckId: string): string | null {
   const dir = resolveDeckDir(deckId)
   if (!dir) return null
   let saved: string
-  try { saved = fs.readFileSync(path.join(dir, ".session"), "utf-8").trim() } catch { return null }
+  try { saved = fs.readFileSync(path.join(dir, ".session"), "utf-8").trim() } catch { return null } // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
   if (!saved) return null
   if (!SESSION_ID_PATTERN.test(saved)) {
     console.warn("[acp] deck %s: .session does not hold a kiro session id; treating the deck as having none", deckId)
@@ -60,7 +60,7 @@ export function readEngineMark(deckId: string): EngineMark {
   const dir = resolveDeckDir(deckId)
   if (!dir) return UNMARKED
   let text: string
-  try { text = fs.readFileSync(path.join(dir, ENGINE_MARK_FILE), "utf-8") } catch { return UNMARKED }
+  try { text = fs.readFileSync(path.join(dir, ENGINE_MARK_FILE), "utf-8") } catch { return UNMARKED } // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
   try {
     const raw = JSON.parse(text) as { version?: unknown; last?: unknown; engines?: unknown }
     if (raw?.version === 1 && isEngineId(raw.last) && Array.isArray(raw.engines) && raw.engines.length && raw.engines.every(isEngineId)) {
@@ -79,7 +79,7 @@ export function writeEngineMark(deckId: string, mark: EngineMark): void {
   const fs = require("fs") as typeof import("fs")
   const dir = resolveDeckDir(deckId)
   if (!dir) return
-  const file = path.join(dir, ENGINE_MARK_FILE)
+  const file = path.join(dir, ENGINE_MARK_FILE) // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
   const tmp = `${file}.tmp-${process.pid}`
   try {
     fs.writeFileSync(tmp, JSON.stringify({ version: 1, last: mark.last, engines: mark.engines }), "utf-8")
@@ -95,7 +95,7 @@ export function saveOriginToDeck(deckId: string, origin: SessionOrigin): void {
   const fs = require("fs") as typeof import("fs")
   const dir = resolveDeckDir(deckId)
   if (!dir || !fs.existsSync(dir)) return
-  fs.writeFileSync(path.join(dir, ".session-origin.json"), JSON.stringify(origin), "utf-8")
+  fs.writeFileSync(path.join(dir, ".session-origin.json"), JSON.stringify(origin), "utf-8") // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
 }
 
 /** Read a fork's source metadata from the deck. */
@@ -103,7 +103,7 @@ export function readOriginFromDeck(deckId: string): SessionOrigin | null {
   const fs = require("fs") as typeof import("fs")
   const dir = resolveDeckDir(deckId)
   if (!dir) return null
-  try { return JSON.parse(fs.readFileSync(path.join(dir, ".session-origin.json"), "utf-8")) as SessionOrigin } catch { return null }
+  try { return JSON.parse(fs.readFileSync(path.join(dir, ".session-origin.json"), "utf-8")) as SessionOrigin } catch { return null } // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
 }
 
 /** Save chat messages to deck's .chat.json file. */
@@ -111,7 +111,7 @@ export function saveChatToDeck(deckId: string, messages: unknown[]): void {
   const fs = require("fs") as typeof import("fs")
   const dir = resolveDeckDir(deckId)
   if (!dir || !fs.existsSync(dir)) return
-  fs.writeFileSync(path.join(dir, ".chat.json"), JSON.stringify(messages), "utf-8")
+  fs.writeFileSync(path.join(dir, ".chat.json"), JSON.stringify(messages), "utf-8") // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
 }
 
 /** Read chat messages from deck's .chat.json file. */
@@ -119,5 +119,5 @@ export function readChatFromDeck(deckId: string): unknown[] {
   const fs = require("fs") as typeof import("fs")
   const dir = resolveDeckDir(deckId)
   if (!dir) return []
-  try { return JSON.parse(fs.readFileSync(path.join(dir, ".chat.json"), "utf-8")) } catch { return [] }
+  try { return JSON.parse(fs.readFileSync(path.join(dir, ".chat.json"), "utf-8")) } catch { return [] } // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
 }
