@@ -13,6 +13,14 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+## [0.13.0] - 2026-11-09
+
+The Local Web UI now runs kiro-cli on its V3 engine and composes slides in the background,
+as the Cloud Web UI does. Local installs follow releases instead of `main`, the Kiro CLI
+`sdpm` agent no longer hands requests to copies of itself, styles draw icons from the asset
+catalog instead of embedding them, and `start_composing` returns under 25,000 characters
+for a 3-slide deck instead of about 80,000.
+
 ### Upgrading from 0.12
 
 **If `sdpm update` stops with "Your local changes to the following files would be
@@ -23,25 +31,43 @@ and update again:
 `git -C ~/.sdpm/checkout -c user.name=sdpm -c user.email=sdpm@localhost stash && sdpm update`.
 See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
 
+**If you installed with `SDPM_LAUNCHER_DIR`** and that directory is not on `PATH`, set
+`SDPM_LAUNCHER_DIR` again for the first `sdpm update` after 0.12, or run the installer
+again. That update replaces the `sdpm` command only where it finds it.
+
 **Local installs (`sdpm update`).**
 
-- **Kiro CLI.** `sdpm update` has rewritten the `sdpm` agent in the form kiro-cli 2.x and
-  3.x both load. Start it as its own agent: `kiro-cli chat --agent sdpm` (or `/agent sdpm`).
 - **sdpm follows releases.** `sdpm update` and the installer now move your install to the
-  latest release, never to an older commit than the one you have. An install that is ahead
-  of the latest release (it followed `main`) stays where it is until a release contains it,
-  and says so in one line. To keep following every merged change instead, run
-  `sdpm update --channel main` once (`sdpm update --channel release` goes back).
+  latest release, never back to an older commit. The first `sdpm update` after 0.12 pulls
+  `main`, then moves to the latest release that contains the commit you had. An install
+  ahead of the latest release (one updated before 0.13.0 was out) stays and says so
+  (`Staying on …`) until a release contains it. To follow every merged change, run
+  `sdpm update --channel main` once (`--channel release` goes back).
+- **The `sdpm` command is a small bootstrap now.** The first `sdpm update` after 0.12
+  replaces it; commands, options and output stay the same. `~/.sdpm/state.json` now records
+  the installed version, the channel, the profile, the Kiro agent name and the registered
+  clients. It replaces `~/.sdpm/.profile` and `~/.sdpm/.agent-name`: the first update keeps
+  them, the next `sdpm update` or installer run removes them. Nothing to do, unless a script
+  of yours reads those two files: read `state.json` instead.
+- **Kiro CLI.** `sdpm update` has rewritten the `sdpm` agent (or the name you chose at
+  install). kiro-cli 2.x and 3.x both load it as it is, and it waits for the sdpm server
+  before its first turn, so kiro-cli 3.x no longer hands your request to a copy of itself.
+  What other tools added to the agent is kept. Start it as its own agent:
+  `kiro-cli chat --agent sdpm` (or `/agent sdpm`). Run `make register-dev` again for a
+  development agent.
+- **Browser Web UI (`sdpm webui`).** It now runs kiro-cli on its V3 engine, which needs
+  kiro-cli 3.0 or later (`kiro-cli --version`). With an older kiro-cli the chat says
+  kiro-cli could not start: update kiro-cli, or choose V2 in Settings → Agent engine. The
+  other Web UI changes are under "Local Web UI" in the CHANGELOG.
 
 **Local Web UI.** These items apply to the browser Web UI on your machine (`sdpm webui`, or
 `npm run dev:local` in `web-ui/`). Each item below is "what changes / what to do".
 
 - **The Local Web UI runs kiro-cli on its V3 agent engine.** New chats and reopened decks
-  start `kiro-cli acp --agent-engine v3`; the sdpm agents run as V3 modes. kiro-cli 3.0 or
-  later is needed. / Nothing if kiro-cli is 3.0 or later (`kiro-cli --version`). To go back
-  to the V2 engine, open Settings → Agent engine and pick V2, or write
-  `{"version": 2, "engine": "v2"}` to `servers/local/.sdpm/acp-config.json`. The setting
-  takes effect from the next message.
+  start `kiro-cli acp --agent-engine v3`; the sdpm agents run as V3 modes. / Check the
+  kiro-cli version as in **Browser Web UI** above. To go back to the V2 engine, open
+  Settings → Agent engine and pick V2, or write `{"version": 2, "engine": "v2"}` to
+  `servers/local/.sdpm/acp-config.json`. The setting takes effect from the next message.
 - **Agent definitions are generated in a form both engines read.**
   `servers/local/.kiro/agents/` now carries `permissions` rules, and its marker file is
   `README.txt` (V3 reads every `.md` there as an agent). The orchestrator dispatches
@@ -61,12 +87,33 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   and forth, each engine continues from its own last turn in that deck, so the turns made
   under the other engine are not in its context. When that happens, the chat says so above
   the reply; the deck files themselves are always up to date.
+- **Each chat runs its own kiro-cli, on V3 as on V2.** At most three kiro-cli processes with
+  a chat run at once; a new chat ends the least recently active idle one. A chat that is
+  working (opening, running a turn, preparing its prompt or composing in the background) is
+  never ended by that limit or by an engine switch; when every chat is working, one more
+  kiro-cli starts. A chat whose kiro-cli was ended reopens its session with your next
+  message. / Nothing.
+- **Slides are composed in the background.** The orchestrator hands the slides to composers
+  and ends its turn, so the chat answers while they work. Each composer runs in its own
+  kiro-cli, up to four at a time, next to the chats' kiro-cli processes: about 0.5 GB of
+  memory per idle composer, up to about 0.87 GB while it renders previews. Stop ends the
+  composers within about 1 s, and a change of direction you send while they work reaches
+  the running composers. A closed tab does not stop them; the reopened deck shows the
+  result. / Nothing; there is no setting or restart.
+- **Model and effort are chosen in the chat.** A pill above the chat input sets this chat's
+  model and, on V3, its effort. Settings → Model stays the default for new chats. The
+  composers run on the chat's model and effort instead of the Settings model. / Nothing.
+- **The Web UI lists the decks in your `output_dir`.** If you set `output_dir` in
+  `~/.config/sdpm/config.json` (or `SDPM_OUTPUT_DIR`), the Web UI now uses that folder, like
+  the MCP server and the CLI. / Decks you made in the Web UI before stay in
+  `~/Documents/SDPM-Presentations` and no longer show: move them into your `output_dir`, or
+  set `SDPM_DECK_ROOT` to that old folder. Restart the Web UI after changing `output_dir`.
 - **Your global Kiro steering applies to the sdpm agents.** Rules in `~/.kiro/steering` that
   are always included reach the sdpm agents' context, under V3 as under V2. / Nothing.
 
 ### Added
 
-- **Local mode: send a message while the agent works.** As in Cloud, the chat input stays
+- **Local Web UI: send a message while the agent works.** As in Cloud, the chat input stays
   open during a turn, and a message sent then goes into the running turn through kiro-cli's
   `_session/steer`. The bubble shows "Sent while the agent works", then "Read by the agent".
   If the turn ends before the agent reads it, the turn continues with that message. Stop
@@ -95,9 +142,10 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   dispatches the composers with `compose_slides` and ends its turn, so you can keep chatting
   while they write the slides. A change of direction reaches a running composer through
   `message_composer`; when every group has finished, the orchestrator gets the report once
-  and tells you. Stop ends the composers; a closed tab does not stop them, and the reopened
-  deck shows the result. Each composer runs in its own kiro-cli, up to four at a time, about
-  0.5 GB each and up to about 0.7 GB while it renders previews. On V3 and V2. / Nothing.
+  and tells you. Stop ends the composers within about 1 s; a closed tab does not stop them,
+  and the reopened deck shows the result. Each composer runs in its own kiro-cli, up to four
+  at a time: about 0.5 GB of memory per idle composer, up to about 0.87 GB while it renders
+  previews. On V3 and V2. / Nothing.
 
 ### Changed
 
@@ -108,11 +156,10 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   the new guides `slide-json-elements`, `slide-json-media`, `slide-json-effects` and
   `visual-forms` (HTML: slide scripts to `slide-html-scripts`). The composer role documents
   say which parts to read. The result for a 3-slide deck with any bundled style stays under
-  25,000 characters (it was about 80,000), so Kiro CLI V3 no longer moves it to a file.
-  `apply_style`'s `style_toc` entries gain `start` / `end`, and each slide's `comment` now
-  lists the comments inside its range. A client that read `deck.art_direction` reads
+  25,000 characters (it was about 80,000), so kiro-cli's V3 engine no longer moves it to a
+  file. `apply_style`'s `style_toc` entries gain `start` / `end`, and each slide's `comment`
+  now lists the comments inside its range. / A client that read `deck.art_direction` reads
   `specs/art-direction.html` instead.
-
 - **The installer and `sdpm update` follow the latest release.** The install line is the
   same, but it installs the newest release tag (`vX.Y.Z`, no pre-releases) instead of the
   tip of `main`, and `sdpm update` moves to the next release. Neither ever moves an install
@@ -133,7 +180,7 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
 - **`~/.sdpm/state.json` records the install.** The installed release and commit, the
   channel, the profile, the Kiro agent name and the registered clients. It replaces
   `~/.sdpm/.profile` and `~/.sdpm/.agent-name`, which the first update or installer run
-  after this release moves into it and removes. `~/.sdpm/.uv-path` stays. / Nothing.
+  with the new `sdpm` command moves into it and removes. `~/.sdpm/.uv-path` stays. / Nothing.
 - **Nothing waits for input without a terminal.** Without a terminal (an agent, CI, a pipe)
   the installer behaves as with `--non-interactive`; when sudo needs a password there, it
   prints the commands to run and exits 1. `sdpm update` never prompts and reports through
@@ -161,8 +208,7 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   itself; its first `sdpm update` does all of this once, and later updates run the new
   command. The "Installing icon catalogs" step is gone: it never installed anything (the
   installer installs the catalogs, and the MCP server does when they are missing). /
-  Nothing. If you installed with `SDPM_LAUNCHER_DIR` and that directory is not on `PATH`,
-  set it again for that first update, or run the installer again.
+  Nothing, unless you installed with `SDPM_LAUNCHER_DIR`: see Upgrading from 0.12.
 - **Running the installer over an install keeps its choices.** It uses the install's
   profile and Kiro agent name unless `--full`, `--mcp-only` or `--agent-name` says
   otherwise, and instead of the client checklist it registers SDPM again with the clients
@@ -171,8 +217,9 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   client. / Nothing.
 - **Local Web UI runs kiro-cli on its V3 engine by default.** V2 stays selectable in
   Settings → Agent engine. / See Upgrading from 0.12.
-- **Local Web UI: a chat that is opening, preparing its prompt or composing in the background
-  is never ended** by the limit of three kiro-cli processes or by an engine switch, and
+- **Local Web UI: each chat runs its own kiro-cli, and a chat that is working is never
+  ended** by the limit of three kiro-cli processes with a chat or by an engine switch, while
+  it opens, runs a turn, prepares its prompt or composes in the background.
   `servers/local/.kiro/agents/` is left as it is when nothing changed. / Nothing.
 - **The bundled `aws-light` and `aws-dark` styles have a new content-slide frame.** Every
   content slide now pairs a one-line topic title (a noun phrase) with a lead of up to two
@@ -216,7 +263,7 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   innermost copy then wrote every slide alone. The agent now waits for the sdpm server
   (`waitForReady`) and its description says a sub-agent runs only the role its prompt names.
   The first sdpm tool now starts in 7–10 s instead of 16–41 s, and composers run in parallel
-  again. Still one agent; `sdpm update` brings an existing `sdpm` agent up to date.
+  again. / `sdpm update` brings an existing `sdpm` agent up to date.
 - **The Local Web UI continues a deck made elsewhere on that deck.** A deck with no kiro
   session to resume (made by an MCP client or Kiro CLI, or whose session kiro-cli no longer
   has) started a new session whose first prompt did not say which deck it was, so the agent
@@ -236,11 +283,7 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   deck made over MCP after changing `output_dir` did not appear in the Web UI. All of them
   now use one order: `SDPM_DECK_ROOT` → `SDPM_OUTPUT_DIR` → `output_dir` in
   `~/.config/sdpm/config.json` (`~` expanded; empty means the default, no longer the
-  current folder) → `~/Documents/SDPM-Presentations`. / If you
-  set `output_dir` and also made decks in the Web UI, those decks stay in
-  `~/Documents/SDPM-Presentations` and no longer show in the Web UI: move them into your
-  `output_dir`, or set `SDPM_DECK_ROOT` to that old folder to keep using it. Otherwise,
-  nothing; decks in your `output_dir` now show in the Web UI.
+  current folder) → `~/Documents/SDPM-Presentations`. / See Upgrading from 0.12.
 - **The Web UI's MCP server installs the icon catalogs by itself.** `server_acp.py` now
   fetches them in the background on first start when none is installed, as `server.py`
   does, instead of the agent asking the Web UI user to run an install command.
@@ -1895,7 +1938,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.4...v0.11.0
 [0.10.4]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.3...v0.10.4
