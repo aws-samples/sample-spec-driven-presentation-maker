@@ -7,9 +7,11 @@
  *
  *     agents/ = f(acp-agents/ catalog, acp-agent-selection.json, model)
  *
- * It is re-derived idempotently on every agent spawn (acp-process.ts) and on
- * Settings save (api/agent/definitions/route.ts), so a `git pull` that
- * updates the catalog is picked up by the next spawn — no stale copies.
+ * It is re-derived idempotently before every chat is placed on a kiro-cli and
+ * every kiro-cli start (hosts.ts), and on Settings save
+ * (api/agent/definitions/route.ts), so a `git pull` that updates the catalog
+ * is picked up by the next new chat — no stale copies. A generation equal to
+ * what the directory holds leaves it untouched.
  * Hand-edits to agents/ are therefore lost by design; the README marker
  * written alongside the files says so. The marker is `README.txt`: V3 reads
  * every `.md` and `.json` in the directory as an agent.
@@ -21,6 +23,7 @@
  * allows without asking. A catalog entry that already has `permissions` was
  * written for V3 and is used as it is.
  */
+import { createHash } from "crypto"
 import fs from "fs"
 import path from "path"
 
@@ -183,12 +186,19 @@ export function withPermissions(agent: Record<string, unknown>, fileName: string
  * The Settings model goes into every definition, except the composer's when
  * `opts.pinSubagentModel` is false: an engine whose sub-agents follow the
  * session's model (V3) then runs the composer on the chat's model and effort.
+ *
+ * Returns the generation's digest (`agentsDigest`: SHA-256 over the file
+ * names and contents). When the current directory already holds exactly
+ * that generation, the swap is skipped and nothing is touched, so a
+ * kiro-cli reading `agents/` at that moment (a new session of a running
+ * one) never falls into the rename window. A current directory that cannot
+ * be read is swapped as before.
  */
 export function syncToAgentsDir(
   sel: AgentSelection = readSelection(),
   dirs: SyncDirs = DEFAULT_DIRS,
   opts: { pinSubagentModel?: boolean } = {},
-): void {
+): string {
   if (!fs.existsSync(dirs.acpAgentsDir)) {
     throw new Error(`agents catalog not found: ${dirs.acpAgentsDir}`)
   }
@@ -225,6 +235,8 @@ export function syncToAgentsDir(
     const permissions = (JSON.parse(content) as { permissions?: unknown }).permissions
     if (typeof permissions !== "object" || permissions === null) throw new Error(`generated agent definition ${fileName} has no permissions`)
   }
+  const digest = agentsDigest(staged)
+  if (currentDigest(dirs.agentsDir) === digest) return digest
   // Phase 2 — transactional replacement with backup: stage a sibling temp
   // dir, move the old output aside, swap the new one in, and restore the
   // backup if the swap fails. No failure path loses the old generation.
@@ -249,5 +261,29 @@ export function syncToAgentsDir(
     fs.rmSync(backupDir, { recursive: true, force: true })
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+  return digest
+}
+
+/** SHA-256 (hex) over the files sorted by name, each fed as `name + "\0" + content + "\0"`. */
+function agentsDigest(files: Array<{ fileName: string; content: string | Buffer }>): string {
+  const hash = createHash("sha256")
+  for (const { fileName, content } of [...files].sort((a, b) => (a.fileName < b.fileName ? -1 : a.fileName > b.fileName ? 1 : 0))) {
+    hash.update(fileName).update("\0").update(content).update("\0")
+  }
+  return hash.digest("hex")
+}
+
+/** The digest of what `agentsDir` holds now (its regular files), or null when it cannot be read. */
+function currentDigest(agentsDir: string): string | null {
+  try {
+    const files = fs.readdirSync(agentsDir, { withFileTypes: true }).map((entry) => {
+      if (!entry.isFile()) throw new Error(`${entry.name} is not a regular file`)
+      // entry.name comes from readdir of the generated directory
+      return { fileName: entry.name, content: fs.readFileSync(path.join(agentsDir, entry.name)) } // nosemgrep: path-join-resolve-traversal
+    })
+    return agentsDigest(files)
+  } catch {
+    return null
   }
 }

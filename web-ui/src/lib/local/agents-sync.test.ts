@@ -182,6 +182,56 @@ describe("syncToAgentsDir", () => {
   })
 })
 
+describe("syncToAgentsDir digest", () => {
+  const leftovers = () => fs.readdirSync(path.dirname(dirs.agentsDir)).filter((f) => f.includes(".bak-") || f.includes(".tmp-"))
+
+  it("returns the same digest for the same input", () => {
+    const first = syncToAgentsDir(readSelection(dirs), dirs)
+    expect(first).toMatch(/^[0-9a-f]{64}$/)
+    fs.rmSync(dirs.agentsDir, { recursive: true })
+    expect(syncToAgentsDir(readSelection(dirs), dirs)).toBe(first)
+  })
+
+  it("leaves agents/ as it is when nothing changed: same inode, no temp or backup directory", () => {
+    const first = syncToAgentsDir(readSelection(dirs), dirs)
+    const inode = fs.statSync(dirs.agentsDir).ino
+    const realMkdir = fs.mkdirSync
+    const made: string[] = []
+    const spy = vi.spyOn(fs, "mkdirSync").mockImplementation((dir, opts) => { made.push(String(dir)); return realMkdir(dir, opts) })
+    try {
+      expect(syncToAgentsDir(readSelection(dirs), dirs)).toBe(first)
+    } finally {
+      spy.mockRestore()
+    }
+    expect(fs.statSync(dirs.agentsDir).ino).toBe(inode)
+    expect(made.filter((dir) => dir.includes(".tmp-") || dir.includes(".bak-"))).toEqual([])
+    expect(leftovers()).toEqual([])
+  })
+
+  it("swaps and returns another digest when the selection changed", () => {
+    const first = syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "old-model" }, dirs)
+    const inode = fs.statSync(dirs.agentsDir).ino
+    const second = syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "new-model" }, dirs)
+    expect(second).not.toBe(first)
+    expect(fs.statSync(dirs.agentsDir).ino).not.toBe(inode)
+    expect(JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-orchestrator.json"), "utf-8")).model).toBe("new-model")
+  })
+
+  it.skipIf(process.platform === "win32" || process.getuid?.() === 0)("still swaps when a file in agents/ cannot be read", () => {
+    const first = syncToAgentsDir(readSelection(dirs), dirs)
+    const unreadable = path.join(dirs.agentsDir, "sdpm-style.json")
+    fs.chmodSync(unreadable, 0o000)
+    const inode = fs.statSync(dirs.agentsDir).ino
+    try {
+      expect(syncToAgentsDir(readSelection(dirs), dirs)).toBe(first)
+    } finally {
+      if (fs.existsSync(unreadable)) fs.chmodSync(unreadable, 0o644)
+    }
+    expect(fs.statSync(dirs.agentsDir).ino).not.toBe(inode)
+    expect(fs.readFileSync(unreadable, "utf-8")).toContain("sdpm-style")
+  })
+})
+
 /** The orchestrator entry of the catalog, in V2's form. */
 const ORCHESTRATOR_V2 = {
   name: "sdpm-orchestrator",
