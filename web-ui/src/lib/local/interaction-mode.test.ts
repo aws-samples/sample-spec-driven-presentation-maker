@@ -1,8 +1,10 @@
 import { describe, it, expect } from "vitest"
 import {
   continuedFromToken,
+  currentDeckToken,
   interactionToken,
   withContinuedFrom,
+  withCurrentDeck,
   withInteractionMode,
 } from "./interaction-mode"
 import type { SessionOrigin } from "./kiro-sessions.types"
@@ -44,5 +46,12 @@ describe("interaction-mode", () => {
       .toBe('Continued from: kiro session "Architecture discussion"\n\n')
     expect(withContinuedFrom("continue", origin, false)).toBe("continue")
     expect(withContinuedFrom("new", undefined, true)).toBe("new")
+  })
+
+  it("names the current deck by its absolute directory, on the first prompt only", () => {
+    expect(currentDeckToken("/decks/20261107-2357-mcp-intro")).toBe("Current deck: /decks/20261107-2357-mcp-intro")
+    expect(withCurrentDeck("continue", "/decks/d1", true)).toBe("Current deck: /decks/d1\n\ncontinue")
+    expect(withCurrentDeck("continue", "/decks/d1", false)).toBe("continue")
+    expect(withCurrentDeck("continue", null, true)).toBe("continue")
   })
 })

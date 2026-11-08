@@ -21,6 +21,9 @@ that work was about and what you would put on slides, followed by exactly one qu
 the audience is and how long the talk is (both feed the brief: audience shapes what they
 should believe, and length shapes how much of the material earns a slide). Do not summarise
 at length; the history is already yours. Then proceed as usual with the interaction mode.
+When the client states `Current deck: <path>`, that deck is the work target: pass the path as
+`deck_id`, read its `deck.json` and `specs/` first, and continue that deck instead of creating
+a new one.
 
 Related work: editing an existing PPTX → `read_guides(["import-pptx"])`; syncing the user's
 hand edits back → `read_guides(["hand-edit-sync"])`; translating a deck →

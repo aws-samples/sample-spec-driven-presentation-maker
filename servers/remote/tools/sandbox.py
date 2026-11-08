@@ -68,7 +68,12 @@ def list_files(subdir="."):
     d = _Path(subdir)
     if not d.is_dir():
         raise FileNotFoundError(f"Not a directory: {subdir}")
-    return sorted(f.name for f in d.iterdir() if f.is_file())
+    # Folders end with "/" (slides/), as on Local. __pycache__ is this module's own.
+    return sorted(
+        f.name + "/" if f.is_dir() else f.name
+        for f in d.iterdir()
+        if (f.is_dir() and f.name != "__pycache__") or f.is_file()
+    )
 '''
 
 # Prepended to every user code invocation so read_json / write_json / ...
