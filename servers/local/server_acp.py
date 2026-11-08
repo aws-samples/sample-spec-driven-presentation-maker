@@ -29,6 +29,7 @@ if (_SKILL_DIR / "sdpm" / "config.py").is_file():
 
 import os  # noqa: E402
 import sandbox_tools  # noqa: E402
+import compose_dispatch  # noqa: E402
 from sdpm import tools  # noqa: E402
 from sdpm.api import _get_output_base_dir  # noqa: E402
 from sdpm.tools.attachment.contracts import (  # noqa: E402
@@ -119,6 +120,12 @@ mcp.tool()(import_attachment)
 # Sandbox tools (shared)
 mcp.tool()(sandbox_tools.run_python)
 mcp.tool()(sandbox_tools.run_style_python)
+
+# Web UI compose tools: only for the kiro-cli the Local Web UI starts with SDPM_LOCAL_COMPOSE=1
+# (it runs the composers itself). Any other value, or none, registers nothing.
+if os.environ.get("SDPM_LOCAL_COMPOSE") == "1":
+    mcp.tool()(compose_dispatch.compose_slides)
+    mcp.tool()(compose_dispatch.message_composer)
 
 # ---------------------------------------------------------------------------
 # ACP-only tools
