@@ -20,9 +20,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { LocalEvent } from "./conversation/events"
 import type { HostSession, SessionSink } from "./hosts"
 import { FakeChild, settle, tick } from "../../test/fakeKiro"
+import { FAKE_OWN_PGID, installFakeProcesses } from "../../test/fakeProcesses"
 
-const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
-vi.mock("child_process", () => ({ spawn, default: { spawn } }))
+const { spawn, execFile, execFileSync } = vi.hoisted(() => ({ spawn: vi.fn(), execFile: vi.fn(), execFileSync: vi.fn() }))
+vi.mock("child_process", () => ({ spawn, execFile, execFileSync, default: { spawn, execFile, execFileSync } }))
 vi.mock("./agents-sync", () => ({ syncToAgentsDir: vi.fn(() => "d0") }))
 
 let children: FakeChild[]
@@ -52,10 +53,13 @@ class Sink implements SessionSink {
   texts() { return this.events.flatMap((e) => (e.type === "text" ? [e.text] : [])) }
 }
 
+let procs: ReturnType<typeof installFakeProcesses>
+
 beforeEach(async () => {
   children = []
   nextSetup = null
   spawn.mockReset()
+  procs = installFakeProcesses({ spawn, execFile, execFileSync })
   spawn.mockImplementation((_command: string, args: string[]) => {
     const child = new FakeChild(`K${children.length + 1}`, new Set(), args)
     nextSetup?.(child)
@@ -99,26 +103,27 @@ describe("placement", () => {
 })
 
 describe("routing", () => {
-  it("hands each session's lines only to its own sink, and records each MCP line once", async () => {
+  it("hands the session's lines to its sink, and records each MCP line once", async () => {
     const a = await open("v3")
-    const composer = new Sink("aux")
-    const { hs } = await a.host.openSession("sdpm-composer", { kind: "new" }, { sink: composer })
-    expect(hs.sessionId).toBe("K1-2")
     const apply = vi.spyOn(a.host.mcp, "apply")
     const child = children[0]
     child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "to A" } })
-    child.update("K1-2", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "to B" } })
+    child.update("K9", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "not A's" } })
     child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: " again" } })
-    child.send({ method: "_kiro/mcp/status", params: { sessionId: "K1-2", servers: [{ name: "sdpm", status: "connected" }] } })
+    child.send({ method: "_kiro/mcp/status", params: { sessionId: "K1", servers: [{ name: "sdpm", status: "connected" }] } })
     await settle()
     expect(a.sink.texts()).toEqual(["to A", " again"])
-    expect(composer.texts()).toEqual(["to B"])
     expect(apply.mock.calls.map((call) => call[0])).toEqual([
-      { type: "mcp_snapshot", sessionId: "K1-2" },
-      { type: "mcp_status", sessionId: "K1-2", server: "sdpm", state: "connected" },
+      { type: "mcp_snapshot", sessionId: "K1" },
+      { type: "mcp_status", sessionId: "K1", server: "sdpm", state: "connected" },
     ])
-    expect([...a.sink.events, ...composer.events].some((e) => e.type === "mcp_status" || e.type === "mcp_snapshot")).toBe(false)
-    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(a.sink.events.some((e) => e.type === "mcp_status" || e.type === "mcp_snapshot")).toBe(false)
+  })
+
+  it("refuses a second session on a kiro-cli", async () => {
+    const a = await open("v3")
+    await expect(a.host.openSession("sdpm-composer", { kind: "new" }, { sink: new Sink("aux") })).rejects.toThrow("host already carries a session")
+    expect(children[0].requests.filter((r) => r.method === "session/new")).toHaveLength(1)
   })
 
   it("V2: counts server_initialized sent before the session/new answer, without waiting for the MCP timeout", async () => {
@@ -128,15 +133,17 @@ describe("routing", () => {
     expect(hs.sessionId).toBe("K1")
   })
 
-  it("V2: opens a composer session on the orchestrator's kiro-cli with set_mode", async () => {
-    const chat = await open("v2")
-    const aux = new Sink("aux")
-    const { hs } = await chat.host.openSession("sdpm-composer", { kind: "new" }, { sink: aux })
-    expect(hs.sessionId).toBe("K1-2")
-    expect(children[0].requests.map((r) => r.method).slice(-2)).toEqual(["session/new", "session/set_mode"])
-    expect(children[0].requests.at(-1)?.params).toEqual({ sessionId: "K1-2", modeId: "sdpm-composer" })
-    expect(chat.host.auxOpened).toBe(1)
-    expect(spawn).toHaveBeenCalledTimes(1)
+  it("fails an open at once with agent_start_failed when kiro-cli exits while the session waits for the sdpm server", async () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    const host = await hosts.pool.acquireForChat("v3", "sdpm-orchestrator")
+    const child = children[0]
+    child.mcpState = "none"
+    const pending = host.openSession("sdpm-orchestrator", { kind: "new" }, { sink: new Sink() }).catch((e: unknown) => e)
+    await settle()
+    expect(child.requests.map((r) => r.method)).toContain("session/new")
+    child.exit(3)
+    expect(await pending).toMatchObject({ code: "agent_start_failed", message: "kiro-cli exited while starting (code 3)" })
+    warn.mockRestore()
   })
 })
 
@@ -188,6 +195,7 @@ describe("aborts", () => {
     await tick()
     controller.abort()
     expect(await pending).toMatchObject({ name: "AbortError" })
+    await settle()
     expect(children[0].killed).toBe(true)
   })
 
@@ -199,33 +207,10 @@ describe("aborts", () => {
     await settle()
     controller.abort()
     expect(await pending).toMatchObject({ name: "AbortError" })
+    await settle()
     expect(children[0].killed).toBe(true)
   })
 
-  it("deletes a session opened next to a chat's session and given up, once kiro-cli answered, and keeps the kiro-cli", async () => {
-    const log = vi.spyOn(console, "log").mockImplementation(() => {})
-    try {
-      const chat = await open("v3")
-      const child = children[0]
-      child.silent.add("session/new")
-      const controller = new AbortController()
-      const pending = chat.host.openSession("sdpm-composer", { kind: "new" }, { sink: new Sink("aux"), signal: controller.signal }).catch((e: unknown) => e)
-      await settle()
-      controller.abort()
-      await settle()
-      expect(child.deleted).toEqual([])
-      const request = child.requests.filter((r) => r.method === "session/new").at(-1)!
-      child.send({ method: "_kiro/mcp/status", params: { sessionId: "K1-2", servers: [{ name: "sdpm", status: "connected" }] } })
-      child.send({ id: request.id, result: { sessionId: "K1-2", modes: { currentModeId: "sdpm-composer", availableModes: [] } } })
-      expect(await pending).toMatchObject({ name: "AbortError" })
-      await settle()
-      expect(child.deleted).toEqual(["K1-2"])
-      expect(child.killed).toBe(false)
-      expect(chat.host.sessions.size).toBe(1)
-    } finally {
-      log.mockRestore()
-    }
-  })
 })
 
 describe("listings", () => {
@@ -239,6 +224,7 @@ describe("listings", () => {
       expect(env.SDPM_OUTPUT_DIR).toBe(env.SDPM_DECK_ROOT)
       expect(sync).toHaveBeenCalledTimes(1)
       listing.release()
+      await settle()
       expect(children[0].killed).toBe(true)
     } finally {
       log.mockRestore()
@@ -256,14 +242,12 @@ describe("listings", () => {
 })
 
 describe("exit and steer", () => {
-  it("tells every sink when the kiro-cli exits", async () => {
+  it("tells the sink when the kiro-cli exits", async () => {
     const a = await open("v3")
-    const composer = new Sink("aux")
-    await a.host.openSession("sdpm-composer", { kind: "new" }, { sink: composer })
     children[0].kill()
     await settle()
     expect(a.sink.exits).toEqual([null])
-    expect(composer.exits).toEqual([null])
+    expect(a.host.session).toBeNull()
     expect(hosts.pool.hostsOf("v3")).toEqual([])
   })
 
@@ -285,5 +269,169 @@ describe("exit and steer", () => {
     } finally {
       warn.mockRestore()
     }
+  })
+})
+
+describe("composer hosts", () => {
+  const quiet = () => { vi.spyOn(console, "log").mockImplementation(() => {}); vi.spyOn(console, "warn").mockImplementation(() => {}) }
+  const writeConfig = (config: Record<string, unknown>) => fs.writeFileSync(path.join(configDir, "acp-config.json"), JSON.stringify({ version: 2, ...config })) // nosemgrep: path-join-resolve-traversal — constant name in a tmpdir
+
+  it.each([["v2", ["acp", "--agent", "sdpm-composer"]], ["v3", ["acp", "--agent-engine", "v3"]]] as const)(
+    "starts a %s composer detached for sdpm-composer, without SDPM_LOCAL_COMPOSE even when the environment and acp-config.json set it",
+    async (engine, args) => {
+      quiet()
+      vi.stubEnv("SDPM_LOCAL_COMPOSE", "1")
+      writeConfig({ engine, env: { SDPM_LOCAL_COMPOSE: "1" } })
+      await hosts.pool.acquireForComposer(engine)
+      const [, spawnArgs, options] = spawn.mock.calls[0]
+      expect(spawnArgs).toEqual(args)
+      expect(options.detached).toBe(true)
+      expect("SDPM_LOCAL_COMPOSE" in options.env).toBe(false)
+      expect(options.env.SDPM_DECK_ROOT).toBeTruthy()
+    },
+  )
+
+  it("gives a chat's kiro-cli SDPM_LOCAL_COMPOSE=1 and no detached", async () => {
+    vi.stubEnv("SDPM_LOCAL_COMPOSE", "0")
+    await open("v3")
+    const options = spawn.mock.calls[0][2]
+    expect(options.env.SDPM_LOCAL_COMPOSE).toBe("1")
+    expect(options).not.toHaveProperty("detached")
+  })
+
+  it("lets a fifth composer wait until a composer's tree is gone; an abort while waiting leaves the queue", async () => {
+    quiet()
+    const four = await Promise.all([0, 1, 2, 3].map(() => hosts.pool.acquireForComposer("v3")))
+    const waited = vi.fn()
+    const controller = new AbortController()
+    const given = hosts.pool.acquireForComposer("v3", { signal: controller.signal, onWait: waited }).catch((e: unknown) => e)
+    const fifth = hosts.pool.acquireForComposer("v3", { onWait: waited })
+    await settle()
+    expect(spawn).toHaveBeenCalledTimes(4)
+    expect(waited).toHaveBeenCalledTimes(2)
+    controller.abort()
+    expect(await given).toMatchObject({ name: "AbortError" })
+    void four[0].end("SIGTERM")
+    await settle()
+    expect(children[0].killed).toBe(true)
+    // The slot frees with the gone poll, then the fifth starts.
+    await new Promise((r) => setTimeout(r, 150))
+    const host = await fifth
+    expect(spawn).toHaveBeenCalledTimes(5)
+    expect(host.role).toBe("composer")
+  })
+
+  it("holds a composer's slot after its kiro-cli exits while its agent server lives, and SIGKILLs that group after 2 s", async () => {
+    quiet()
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] })
+    const composers = []
+    for (let i = 0; i < 4; i++) {
+      nextSetup = (child) => { child.addDescendant(); child.surviveTerm = true }
+      const host = await hosts.pool.acquireForComposer("v3")
+      await host.openSession("sdpm-composer", { kind: "new" }, { sink: new Sink("aux") })
+      composers.push(host)
+    }
+    await settle()
+    const kas = children[0].descendants[0]
+    children[0].exit(1)
+    await settle()
+    // kiro-cli is gone, its KAS group is not: SIGTERM to both groups, the slot still taken.
+    expect(procs.sent()).toEqual([[-kas.pgid, "SIGTERM"]])
+    let fifth: unknown = null
+    void hosts.pool.acquireForComposer("v3").then((h) => { fifth = h })
+    await vi.advanceTimersByTimeAsync(1900)
+    expect(fifth).toBeNull()
+    expect(kas.dead).toBeFalsy()
+    await vi.advanceTimersByTimeAsync(200)
+    await settle()
+    expect(procs.sent()).toContainEqual([-kas.pgid, "SIGKILL"])
+    expect(kas.dead).toBe(true)
+    await vi.advanceTimersByTimeAsync(200)
+    await settle()
+    expect(fifth).not.toBeNull()
+  })
+
+  it("neither counts nor releases composer hosts for the chat cap, and never lists through one", async () => {
+    quiet()
+    for (let i = 0; i < 4; i++) await hosts.pool.acquireForComposer("v3")
+    for (let i = 0; i < 3; i++) await open("v3")
+    await settle()
+    expect(children.map((c) => c.killed)).toEqual([false, false, false, false, false, false, false])
+    const listing = await hosts.pool.acquireForListing("v3")
+    await listing.request("session/list", {})
+    // A chat's kiro-cli answered the listing; no composer's.
+    expect(children.slice(0, 4).every((c) => !c.requests.some((r) => r.method === "session/list"))).toBe(true)
+    expect(spawn).toHaveBeenCalledTimes(7)
+  })
+
+  it("ends a chat's tree with its kiro-cli's pid and its own groups, never the Local server's group", async () => {
+    quiet()
+    nextSetup = (child) => {
+      child.addDescendant() // V3's agent server
+      child.descendants.push({ pid: 5_900_001, pgid: FAKE_OWN_PGID, ppid: child.pid }) // left in the server's group
+    }
+    const { host } = await open("v3")
+    await settle()
+    host.kill()
+    await settle()
+    const [kas, inOwn] = children[0].descendants
+    expect(procs.sent()).toEqual(expect.arrayContaining([[-kas.pgid, "SIGTERM"], [inOwn.pid, "SIGTERM"], [children[0].pid, "SIGTERM"]]))
+    expect(procs.sent().some(([target]) => target === -FAKE_OWN_PGID || target === process.pid)).toBe(false)
+  })
+
+  it("killAll reads the table once, SIGKILLs composer trees and SIGTERMs chat trees, skipping a reused pid", async () => {
+    quiet()
+    await open("v3")
+    nextSetup = (child) => { child.addDescendant() }
+    const composer = await hosts.pool.acquireForComposer("v3")
+    await composer.openSession("sdpm-composer", { kind: "new" }, { sink: new Sink("aux") })
+    await settle()
+    const kas = children[1].descendants[0]
+    // The KAS ended and its pid came back as an unrelated process: not signalled.
+    const table = procs.table().replace(new RegExp(`^${kas.pid} (\\d+) \\d+ fake$`, "m"), `${kas.pid} $1 1 reused`)
+    execFileSync.mockImplementationOnce(() => table)
+    const before = procs.psCalls()
+    procs.signals.length = 0
+    hosts.pool.killAll()
+    expect(procs.psCalls() - before).toBe(0)
+    expect(execFileSync).toHaveBeenCalledTimes(1)
+    expect(procs.sent()).toEqual([[children[0].pid, "SIGTERM"], [-children[1].pid, "SIGKILL"], [children[1].pid, "SIGKILL"]])
+  })
+
+  it("starts nothing and frees the slot when the abort comes right after the slot was handed over", async () => {
+    quiet()
+    const controller = new AbortController()
+    const given = hosts.pool.acquireForComposer("v3", { signal: controller.signal }).catch((e: unknown) => e)
+    controller.abort()
+    expect(await given).toMatchObject({ name: "AbortError" })
+    expect(spawn).not.toHaveBeenCalled()
+    const waited = vi.fn()
+    await Promise.all([0, 1, 2, 3].map(() => hosts.pool.acquireForComposer("v3", { onWait: waited })))
+    expect(waited).not.toHaveBeenCalled()
+  })
+
+  it("killAll on Windows runs taskkill /T once per kiro-cli and reads no process table", async () => {
+    quiet()
+    const taskkill = vi.fn()
+    const pool = new hosts.HostPool({ platform: "win32", taskkill })
+    const chat = await pool.acquireForChat("v3", "sdpm-orchestrator")
+    await chat.openSession("sdpm-orchestrator", { kind: "new" }, { sink: new Sink() })
+    await pool.acquireForComposer("v3")
+    await settle()
+    const before = procs.psCalls()
+    pool.killAll()
+    expect(procs.psCalls()).toBe(before)
+    expect(taskkill.mock.calls).toEqual([[children[0].pid], [children[1].pid]])
+    expect(procs.sent()).toEqual([])
+  })
+
+  it("fails a composer open at once with agent_start_failed when its kiro-cli exits before the sdpm server is ready", async () => {
+    quiet()
+    nextSetup = (child) => { child.mcpState = "none" }
+    const host = await hosts.pool.acquireForComposer("v3")
+    const pending = host.openSession("sdpm-composer", { kind: "new" }, { sink: new Sink("aux") }).catch((e: unknown) => e)
+    await settle()
+    children[0].exit(9)
+    expect(await pending).toMatchObject({ code: "agent_start_failed" })
   })
 })

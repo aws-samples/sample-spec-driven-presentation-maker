@@ -25,6 +25,11 @@
  * - Models (kiro-cli 3.1.0): V3 lists session/new's models without `[Internal]` ones, sets the
  *   model and then its effort with set_config_option, and a load reports the session's model and
  *   effort with the full list; V2 sets the model with set_model and has no effort.
+ * - Compose in the background (kiro-cli 3.1.0, one kiro-cli per composer): the orchestrator's
+ *   compose_slides end, exactly as kiro-cli sent it (no name on V3, the update title on V2),
+ *   becomes `taskStart`; each group's composer opens, is prompted and steered on its own kiro-cli,
+ *   never the orchestrator's; its `steering_injected` leaves no follow-up prompt; the task ends
+ *   `completed` and wakes the orchestrator once with `<compose_result>`.
  */
 
 import { EventEmitter } from "events"
@@ -33,8 +38,11 @@ import os from "os"
 import path from "path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
-vi.mock("child_process", () => ({ spawn, default: { spawn } }))
+import { nextFakePid, settle } from "../../test/fakeKiro"
+import { installFakeProcesses } from "../../test/fakeProcesses"
+
+const { spawn, execFile, execFileSync } = vi.hoisted(() => ({ spawn: vi.fn(), execFile: vi.fn(), execFileSync: vi.fn() }))
+vi.mock("child_process", () => ({ spawn, execFile, execFileSync, default: { spawn, execFile, execFileSync } }))
 vi.mock("./agents-sync", () => ({ syncToAgentsDir: vi.fn(() => "d0") }))
 
 type Line = Record<string, unknown>
@@ -65,7 +73,7 @@ const marker = (m: Line) => m.client as { id: number; method: string } | undefin
  * answer before the capturing client's next request (V3's MCP readiness) come with it.
  */
 class ReplayChild extends EventEmitter {
-  pid = 4242
+  pid = nextFakePid()
   stdout = Object.assign(new EventEmitter(), { setEncoding: () => {} })
   stderr = Object.assign(new EventEmitter(), { setEncoding: () => {} })
   stdin = Object.assign(new EventEmitter(), { write: (line: string) => { this.handle(JSON.parse(line)); return true } })
@@ -74,6 +82,8 @@ class ReplayChild extends EventEmitter {
   answers: Line[] = []
   /** The methods of the requests this client sent, in order. */
   requests: string[] = []
+  /** The text of each session/prompt it sent. */
+  promptTexts: string[] = []
   private cursor = 0
   /** Stop before the prompt's answer (after this many of its lines) to model a crash. */
   stopPromptAfter: number | null = null
@@ -85,6 +95,7 @@ class ReplayChild extends EventEmitter {
     if (req.method === undefined) { this.answers.push(req); return }
     if (req.id == null) return
     this.requests.push(req.method as string)
+    if (req.method === "session/prompt") this.promptTexts.push(((req.params as { prompt: { text: string }[] }).prompt[0]).text)
     const at = this.lines.findIndex((line, i) => i >= this.cursor && marker(line))
     const expected = at >= 0 ? marker(this.lines[at])! : null
     if (!expected || expected.method !== req.method) {
@@ -174,6 +185,7 @@ let configDir: string
 beforeEach(async () => {
   children = []
   spawn.mockReset()
+  installFakeProcesses({ spawn, execFile, execFileSync })
   configDir = fs.mkdtempSync(path.resolve(os.tmpdir(), "sdpm-acp-contract-"))
   vi.stubEnv("SDPM_ACP_CONFIG_DIR", configDir)
   vi.resetModules()
@@ -441,6 +453,7 @@ describe("kiro-cli 3.0.0 start-up", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
     try {
       expect(await acp.createNewProcessFor("C1").catch((e: unknown) => e)).toMatchObject({ code: "mcp_failed" })
+      await settle()
       expect(children[0].killed).toBe(true)
       expect(acp.hasProcess("C1")).toBe(false)
     } finally {
@@ -556,6 +569,7 @@ describe("kiro-cli 3.1.0 V3, list and fork", () => {
     }])
     await new Promise((r) => setImmediate(r))
     expect(children[0].requests).toEqual(["initialize", "session/list"])
+    await settle()
     expect(children[0].killed).toBe(true)
     expect(acp.hasProcess(V3_SOURCE)).toBe(false)
   })
@@ -593,6 +607,7 @@ describe("kiro-cli 3.1.0 V3, list and fork", () => {
       const { ForkNotReadError } = await import("./sessionErrors")
       expect(await acp.forkSession(V3_SOURCE, "sdpm-orchestrator").catch((e: unknown) => e)).toBeInstanceOf(ForkNotReadError)
       expect(children[0].requests).toEqual(["initialize", "session/fork", "session/load", "session/delete"])
+      await settle()
       expect(children[0].killed).toBe(true)
       expect(acp.hasProcess(V3_FORK)).toBe(false)
     } finally {
@@ -650,63 +665,68 @@ describe("kiro-cli 3.1.0, model and effort", () => {
   })
 })
 
-describe("kiro-cli 3.1.0 several sessions in one process", () => {
-  const SESSIONS = {
-    v3: ["sess_a6aefba6-cb44-420e-8c62-c90122384043", "sess_7f1eea4e-d3f0-417f-a9ca-c76bbf3ec77f", "sess_fb238e25-db71-4d15-826f-b845b9a5c0a7"],
-    v2: ["949e74a4-fde1-4093-9216-f4da759669d8", "5e6b5136-57ec-4569-87d0-3d458428ec3a", "c8902cbe-ab1e-4a75-b71d-986fe7968ad8"],
-  }
-  type Events = import("./conversation/events").LocalEvent[]
+describe("kiro-cli 3.1.0 compose in the background, one kiro-cli per composer", () => {
+  const CAPTURED_DECKS = "/tmp/sdpm/decks"
+  const DECK = "20261108-2111-async-compose-spike"
+  const DECK_V2 = "20261108-2117-async-compose-spike"
 
-  /** A sink that records what the host routes to its session. */
-  function recordingSink(kind: "chat" | "aux") {
-    const events: Events = []
-    return {
-      events,
-      sink: { kind, onEvents: (e: Events) => { events.push(...e) }, onHostExit: () => {}, busy: () => false, lastActivity: () => 0, release: () => {} },
-      text: () => events.flatMap((e) => (e.type === "text" ? [e.text] : [])).join(""),
-    }
-  }
-
-  /** Send a prompt and resolve with its stopReason, read in line order. */
-  function promptOn(hs: import("./hosts").HostSession, text: string): Promise<string> {
-    return new Promise((resolve) => {
-      hs.prompt(text, (answer) => resolve(answer.ok ? (answer.result as { stopReason: string }).stopReason : "error"))
-    })
-  }
-
-  it.each(["v3", "v2"] as const)("%s: routes each session's lines to its own sink, cancels one prompt without the other, and is ready on every session", async (engine) => {
-    const lines = replay(engine, fixture31(`${engine}-multi-session`))
+  it.each(["v3", "v2"] as const)("%s: dispatch, composers on their own kiro-cli, a steer, one wake", async (engine) => {
+    const deckRoot = fs.realpathSync(fs.mkdtempSync(path.resolve(os.tmpdir(), "sdpm-contract-decks-")))
+    const deck = engine === "v3" ? DECK : DECK_V2
+    fs.mkdirSync(path.resolve(deckRoot, deck), { recursive: true }) // nosemgrep: path-join-resolve-traversal — constant deck name in a tmpdir
+    vi.stubEnv("SDPM_DECK_ROOT", deckRoot)
+    vi.resetModules()
+    acp = await import("./acp-process")
     const log = vi.spyOn(console, "log").mockImplementation(() => {})
+    vi.spyOn(console, "warn").mockImplementation(() => {})
     try {
-      const hosts = await import("./hosts")
-      const host = await hosts.pool.acquireForChat(engine, "sdpm-orchestrator")
-      // One chat and two sessions next to it (as a compose run's would be) on the chat's kiro-cli.
-      const sinks = [recordingSink("chat"), recordingSink("aux"), recordingSink("aux")]
-      const opened = []
-      for (const [i, agent] of ["sdpm-orchestrator", "sdpm-orchestrator", "sdpm-composer"].entries()) {
-        opened.push((await host.openSession(agent, { kind: "new" }, { sink: sinks[i].sink })).hs)
+      const relocate = (lines: Line[]) => lines.map((line) => JSON.parse(JSON.stringify(line).split(CAPTURED_DECKS).join(deckRoot)) as Line)
+      const captures = [
+        relocate(readFixture(fixture31(`${engine}-async-compose-orchestrator`))),
+        readFixture(fixture31(`${engine}-async-compose-composer`)),
+        readFixture(fixture31(`${engine}-async-compose-composer-2`)),
+      ]
+      fs.writeFileSync(path.resolve(configDir, "acp-config.json"), JSON.stringify({ version: 2, engine }))
+      spawn.mockImplementation(() => {
+        const child = new ReplayChild(captures[children.length])
+        children.push(child)
+        return child
+      })
+      const { chat } = await acp.createNewProcessFor("C1")
+      const events: Line[] = []
+      chat.subscribe((entry) => { if (entry.event.kind === "data") events.push(entry.event.payload as Line) })
+      const turn = async (text: string) => {
+        const prompted = await acp.sendPrompt("C1", text)
+        prompted.send()
+        for (let i = 0; i < 50 && chat.turn; i++) await settle()
       }
-      expect(opened.map((hs) => hs.sessionId)).toEqual(SESSIONS[engine])
-      expect(children).toHaveLength(1)
-      // V2 opens the composer's session on the orchestrator's kiro-cli by switching its mode.
-      if (engine === "v2") expect(children[0].requests.slice(-2)).toEqual(["session/new", "session/set_mode"])
-      for (const id of SESSIONS[engine]) expect(host.mcp.get(id, "sdpm")?.state).toBe("connected")
+      await turn("Make the deck and dispatch it.")
+      for (let i = 0; i < 20 && children.length < 3; i++) await settle()
+      expect(events.filter((e) => e.taskStart).map((e) => (e.taskStart as Line).name)).toEqual(["compose_slides"])
+      expect(events.some((e) => (e.toolResult as Line | undefined)?.name === "compose_slides")).toBe(false)
+      await turn("Quick question while that runs: what is 17 times 3?")
+      await turn("Tell the composer of group 1.")
+      for (let i = 0; i < 100 && !events.some((e) => e.taskEnd); i++) await settle()
+      for (let i = 0; i < 50 && children[0].promptTexts.length < 4; i++) await settle()
 
-      expect(await Promise.all([promptOn(opened[0], "Reply with the single word OK."), promptOn(opened[1], "Reply with the single word OK.")])).toEqual(["end_turn", "end_turn"])
-      const counting = promptOn(opened[0], "Count from 1 to 300.")
-      const other = promptOn(opened[1], "Reply with the single word OK.")
-      opened[0].cancel()
-      expect(await Promise.all([counting, other])).toEqual(["cancelled", "end_turn"])
-      if (engine === "v3") await opened[2].close()
-
-      for (const [i, id] of SESSIONS[engine].entries()) expect(sinks[i].text()).toBe(capturedText(lines, id))
-      expect(sinks[0].text()).toContain("OK")
-      expect(sinks[1].text()).toBe("OKOK")
-      expect(sinks[2].text()).toBe("")
-      expect(sinks.flatMap((s) => s.events).some((e) => e.type === "mcp_status" || e.type === "mcp_snapshot")).toBe(false)
-      expect(children[0].requests.at(-1)).toBe(engine === "v3" ? "session/close" : "session/prompt")
+      const [orchestrator, composer1, composer2] = children
+      const opening = engine === "v3" ? ["session/set_config_option"] : ["session/set_model"]
+      const closing = engine === "v3" ? ["session/close", "session/delete"] : []
+      expect(composer1.requests).toEqual(["initialize", "session/new", ...opening, "session/prompt", "_session/steer", ...closing])
+      expect(composer2.requests).toEqual(["initialize", "session/new", ...opening, "session/prompt", ...closing])
+      expect(orchestrator.requests).toEqual(["initialize", "session/new", "session/prompt", "session/prompt", "session/prompt", "session/prompt"])
+      expect(composer1.promptTexts[0]).toMatch(new RegExp(`^deck_id: ${deckRoot}/${deck}\\nassigned_slugs: cover\\nmode: pptx\\n`))
+      const message = events.find((e) => (e.toolResult as Line | undefined)?.name === "message_composer")?.toolResult as Line
+      expect(message.status).toBe("success")
+      const ended = events.filter((e) => e.taskEnd).map((e) => e.taskEnd as Line)
+      expect(ended).toHaveLength(1)
+      expect(ended[0].status).toBe("completed")
+      expect(JSON.parse(ended[0].content as string)).toMatchObject({ status: "completed", generated_slides: ["cover", "why"], build: "stale" })
+      expect(orchestrator.promptTexts[3]).toMatch(/^<compose_result task="[0-9a-f]{12}" status="completed">/)
+      expect(orchestrator.promptTexts.filter((t) => t.includes("<compose_result"))).toHaveLength(1)
+      expect(log.mock.calls.some((call) => String(call[0]).includes("steer sent"))).toBe(true)
     } finally {
-      log.mockRestore()
+      fs.rmSync(deckRoot, { recursive: true, force: true })
     }
   })
 })

@@ -9,6 +9,7 @@ import {
   SELECTION_DEFAULTS,
   readSelection,
   syncToAgentsDir,
+  withAsyncCompose,
   withPermissions,
   writeSelection,
   type SyncDirs,
@@ -68,18 +69,13 @@ describe("syncToAgentsDir", () => {
     expect(agent.model).toBeUndefined()
   })
 
-  it("leaves the model out of the composer's definition only when sub-agents follow the session's model", () => {
+  it("writes the Settings model into every definition, the composer's included", () => {
     const read = (file: string) => JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, file), "utf-8")) // nosemgrep: path-join-resolve-traversal — constant definition names in a tmpdir
     writeCatalogAgent("sdpm-composer", { model: "catalog-model" })
     syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "claude-x" }, dirs)
-    expect(read("sdpm-composer.json").model).toBe("claude-x")
-
-    syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "claude-x" }, dirs, { pinSubagentModel: false })
+    for (const file of ["sdpm-composer.json", "sdpm-orchestrator.json", "sdpm-style.json", "sdpm-translate.json"]) expect(read(file).model).toBe("claude-x")
+    syncToAgentsDir({ ...SELECTION_DEFAULTS }, dirs)
     expect(read("sdpm-composer.json").model).toBeUndefined()
-    for (const file of ["sdpm-orchestrator.json", "sdpm-style.json", "sdpm-translate.json"]) expect(read(file).model).toBe("claude-x")
-
-    syncToAgentsDir({ ...SELECTION_DEFAULTS, model: "claude-x" }, dirs, { pinSubagentModel: true })
-    expect(read("sdpm-composer.json").model).toBe("claude-x")
   })
 
   it("re-derivation picks up catalog changes (the git-pull staleness fix)", () => {
@@ -304,8 +300,9 @@ describe("withPermissions (definitions both engines read)", () => {
       expect(agent.permissions).toBeDefined()
     }
     const orchestrator = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-orchestrator.json"), "utf-8"))
-    expect(orchestrator.tools).toContain("subagent/sdpm-composer")
-    expect(orchestrator.allowedTools).toEqual(ORCHESTRATOR_V2.allowedTools)
+    expect(orchestrator.allowedTools).toEqual(withAsyncCompose(ORCHESTRATOR_V2).allowedTools)
+    const composer = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-composer.json"), "utf-8"))
+    expect(composer.tools).not.toContain("@sdpm/compose_slides")
   })
 
   it("refuses to write a definition without permissions, keeping the old output", () => {
@@ -334,5 +331,41 @@ describe("selection persistence", () => {
     expect(sel.orchestrator).toBe("sdpm-orchestrator.json")
     expect(sel.style).toBe("sdpm-style.json")
     expect(sel.model).toBe("m1")
+  })
+})
+
+describe("withAsyncCompose (the orchestrator dispatches with compose_slides)", () => {
+  it("adds compose_slides and message_composer, and drops the composer sub-agent and use_subagent", () => {
+    syncToAgentsDir(readSelection(dirs), dirs)
+    writeCatalogAgent("sdpm-orchestrator", ORCHESTRATOR_V2)
+    syncToAgentsDir(readSelection(dirs), dirs)
+    const orchestrator = JSON.parse(fs.readFileSync(path.join(dirs.agentsDir, "sdpm-orchestrator.json"), "utf-8"))
+    for (const key of ["tools", "allowedTools"]) {
+      expect(orchestrator[key]).toEqual(expect.arrayContaining(["@sdpm/compose_slides", "@sdpm/message_composer"]))
+      expect(orchestrator[key]).not.toContain("use_subagent")
+      expect(orchestrator[key]).not.toContain("subagent/sdpm-composer")
+    }
+    expect(orchestrator.tools.filter((t: string) => t === "@sdpm/compose_slides")).toHaveLength(1)
+    expect(orchestrator).not.toHaveProperty("toolsSettings")
+    const mcp = orchestrator.permissions.rules.find((r: { capability: string }) => r.capability === "mcp")
+    expect(mcp.match).toEqual(expect.arrayContaining(["sdpm/compose_slides", "sdpm/message_composer"]))
+    expect(orchestrator.permissions.rules.some((r: { capability: string }) => r.capability === "subagent")).toBe(false)
+  })
+
+  it("keeps a custom orchestrator's other sub-agents and use_subagent", () => {
+    const custom = { ...ORCHESTRATOR_V2, toolsSettings: { subagent: { availableAgents: ["sdpm-composer", "my-reviewer"], trustedAgents: ["sdpm-composer", "my-reviewer"] } } }
+    const converted = withAsyncCompose(custom)
+    expect(converted.toolsSettings).toEqual({ subagent: { availableAgents: ["my-reviewer"], trustedAgents: ["my-reviewer"] } })
+    expect(converted.tools).toContain("use_subagent")
+    expect(withPermissions(converted, "custom.json").tools).toContain("subagent/my-reviewer")
+    expect(withPermissions(converted, "custom.json").tools).not.toContain("subagent/sdpm-composer")
+  })
+
+  it("does not add a duplicate, and a second sync with equal input leaves agents/ as it is", () => {
+    expect(withAsyncCompose(withAsyncCompose(ORCHESTRATOR_V2))).toEqual(withAsyncCompose(ORCHESTRATOR_V2))
+    syncToAgentsDir(readSelection(dirs), dirs)
+    const inode = fs.statSync(dirs.agentsDir).ino
+    syncToAgentsDir(readSelection(dirs), dirs)
+    expect(fs.statSync(dirs.agentsDir).ino).toBe(inode)
   })
 })

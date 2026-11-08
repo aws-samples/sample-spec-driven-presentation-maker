@@ -1,0 +1,11 @@
+{
+  "_comment": "One example of each work-period and task event a Local chat streams (web-ui/src/lib/local); its key sets are Cloud's (agent/session_runtime.py, agent/streaming.py). Read by compose-run.test.ts and tests/test_agent_session_runtime.py.",
+  "events": {
+    "taskStart": { "taskStart": { "toolUseId": "tooluse_1", "name": "compose_slides", "taskId": "0123456789ab" } },
+    "taskEnd": { "taskEnd": { "toolUseId": "tooluse_1", "taskId": "0123456789ab", "name": "compose_slides", "status": "completed", "content": "{\"status\": \"completed\"}" } },
+    "turn": { "turn": { "id": "8b2f4c1e-0000-4000-8000-000000000001", "why": "prompt", "text": "Make the deck." } },
+    "turnEnd": { "turnEnd": { "id": "8b2f4c1e-0000-4000-8000-000000000001", "how": "finished" } },
+    "workBusy": { "work": { "state": "busy" } },
+    "workIdle": { "work": { "state": "idle", "how": "finished" } }
+  }
+}

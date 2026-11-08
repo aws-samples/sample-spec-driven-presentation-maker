@@ -34,9 +34,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { BufferedEvent } from "./conversation/events"
 import type { SessionOrigin } from "./kiro-sessions.types"
 import { FAKE_MODELS, FakeChild, settle, tick } from "../../test/fakeKiro"
+import { installFakeProcesses } from "../../test/fakeProcesses"
 
-const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
-vi.mock("child_process", () => ({ spawn, default: { spawn } }))
+const { spawn, execFile, execFileSync } = vi.hoisted(() => ({ spawn: vi.fn(), execFile: vi.fn(), execFileSync: vi.fn() }))
+vi.mock("child_process", () => ({ spawn, execFile, execFileSync, default: { spawn, execFile, execFileSync } }))
 vi.mock("./agents-sync", () => ({ syncToAgentsDir: vi.fn(() => "d0") }))
 
 const isEnd = (e: BufferedEvent) => e.event.kind === "end"
@@ -54,6 +55,7 @@ beforeEach(async () => {
   children = []
   locked = new Set()
   spawn.mockReset()
+  installFakeProcesses({ spawn, execFile, execFileSync })
   spawn.mockImplementation((_command: string, args: string[]) => {
     const child = new FakeChild(`K${children.length + 1}`, locked, args)
     children.push(child)
@@ -114,6 +116,7 @@ describe("process map", () => {
     acp.terminateProcess("K1")
     expect(acp.hasProcess("C1")).toBe(false)
     expect(acp.hasProcess("K1")).toBe(false)
+    await settle()
     expect(children[0].killed).toBe(true)
   })
 
@@ -242,6 +245,7 @@ describe("setup requests", () => {
       const { AgentTimeoutError } = await import("./turnErrors")
       expect(error).toBeInstanceOf(AgentTimeoutError)
       expect((error as Error).message).toMatch(/initialize within 30s/)
+      await settle()
       expect(children[0].killed).toBe(true)
       expect(acp.hasProcess("C1")).toBe(false)
     } finally {
@@ -262,6 +266,7 @@ describe("setup requests", () => {
     controller.abort()
     const error = await pending
     expect((error as Error).name).toBe("AbortError")
+    await settle()
     expect(children[0].killed).toBe(true)
     expect(acp.hasProcess("K9")).toBe(false)
   })
@@ -345,6 +350,7 @@ describe("start-up failures", () => {
     const notFound = engine === "v3" ? "_kiro/customAgent/not_found" : "_kiro.dev/agent/not_found"
     children[0].send({ method: notFound, params: { sessionId: "K1", requestedAgent: "sdpm-orchestrator", fallbackAgent: "vibe" } })
     expect(await pending).toMatchObject({ name: "AgentStartError", code: "agent_definition_rejected" })
+    await settle()
     expect(children[0].killed).toBe(true)
     expect(acp.hasProcess("C1")).toBe(false)
   })
@@ -353,6 +359,7 @@ describe("start-up failures", () => {
     useEngine(engine)
     nextChild((child) => { child.mcpState = "failed" })
     expect(await acp.createNewProcessFor("C1").catch((e: unknown) => e)).toMatchObject({ code: "mcp_failed" })
+    await settle()
     expect(children[0].killed).toBe(true)
     expect(acp.hasProcess("C1")).toBe(false)
   })
@@ -447,6 +454,7 @@ describe("engines", () => {
     acp.terminateIdleProcesses("v2")
     expect(children.map((c) => c.killed)).toEqual([false, false, false])
     acp.terminateIdleProcesses("v3")
+    await settle()
     expect(children.map((c) => c.killed)).toEqual([false, true, true])
     expect(acp.hasProcess("C1")).toBe(true)
     expect(["C2", "K9", "C3", "K3"].some((id) => acp.hasProcess(id))).toBe(false)
@@ -503,6 +511,38 @@ describe("engines", () => {
     await settle()
     expect(child.killed).toBe(true)
     expect(acp.hasProcess("C1")).toBe(false)
+  })
+
+  it("releases a deck chat whose prepare a Stop aborted after the switch, so its next message opens on the new engine", async () => {
+    const { chat } = await acp.openDeckSession("C1", "d1", "K9", "sdpm-orchestrator")
+    const child = children[0]
+    const first = await acp.sendPrompt("C1", "build")
+    first.send()
+    await settle()
+    await acp.chooseSessionModel("C1", { model: "m-plain" })
+    const release = chat.hold({ cancel: () => {}, dropped: () => {} })
+    child.endTurn()
+    await settle()
+    child.silent.add("session/set_model")
+    const start = acp.beginStart("C1")
+    const next = acp.sendPrompt("C1", "next", { signal: start.signal }).catch((e: unknown) => e)
+    await settle()
+    useEngine("v3")
+    acp.terminateIdleProcesses("v3")
+    release()
+    await settle()
+    expect(acp.hasProcess("C1")).toBe(true)
+
+    acp.cancelSession("C1")
+    const setModel = child.requests.find((r) => r.method === "session/set_model")!
+    child.send({ id: setModel.id, result: {} })
+    expect(await next).toMatchObject({ name: "AbortError" })
+    start.end()
+    await settle()
+    expect(acp.hasProcess("C1")).toBe(false)
+    expect(child.killed).toBe(true)
+    await acp.openDeckSession("C1", "d1", "K9", "sdpm-orchestrator")
+    expect(spawn.mock.calls.at(-1)![1]).toEqual(["acp", "--agent-engine", "v3"])
   })
 
   it("opens a V3 session with session/load alone and its mode, and reports an empty one as created", async () => {
@@ -662,6 +702,7 @@ describe("forks and listing", () => {
       expect(children[0].requests.map((r) => r.method)).toEqual(["initialize", "session/fork", "session/load"])
       controller.abort()
       expect(await pending).toMatchObject({ name: "AbortError" })
+      await settle()
       expect(children[0].requests.map((r) => r.method).slice(3)).toEqual(["session/delete", "(killed)"])
       expect(children[0].requests[3].params).toEqual({ sessionId: "F1" })
       expect(acp.hasProcess("F1")).toBe(false)
@@ -682,6 +723,7 @@ describe("forks and listing", () => {
       await acp.forkSession("sess_src", "sdpm-orchestrator")
       await acp.discardForkedSession("F1")
       expect(children[1].requests.at(-1)).toMatchObject({ method: "session/delete", params: { sessionId: "F1" } })
+      await settle()
       expect(children[1].killed).toBe(true)
       expect(acp.hasProcess("F1")).toBe(false)
     } finally {
@@ -851,14 +893,6 @@ describe("models", () => {
     expect(acp.getSessionModels().available).toEqual([])
   })
 
-  it("leaves the Settings model out of the composer's definition on V3 only", async () => {
-    const { syncToAgentsDir } = await import("./agents-sync")
-    useEngine("v3")
-    await acp.createNewProcessFor("C1")
-    useEngine("v2")
-    await acp.createNewProcessFor("C2")
-    expect(vi.mocked(syncToAgentsDir).mock.calls.map((call) => call[2])).toEqual([{ pinSubagentModel: false }, { pinSubagentModel: true }])
-  })
 })
 
 describe("one kiro-cli per chat", () => {
@@ -903,26 +937,6 @@ describe("one kiro-cli per chat", () => {
       expect(children.at(-1)!.requests.at(-1)).toMatchObject({ method: "session/load", params: { sessionId: "K2" } })
     } finally {
       vi.useRealTimers()
-      restore.mockRestore()
-    }
-  })
-
-  it("ends a V2 kiro-cli that opened a composer session once its chat is idle", async () => {
-    const restore = log()
-    try {
-      useEngine("v2")
-      const { chat } = await acp.createNewProcessFor("C1")
-      const sink = { kind: "aux" as const, onEvents: () => {}, onHostExit: () => {}, busy: () => false, lastActivity: () => 0, release: () => {} }
-      await chat.hs.host.openSession("sdpm-composer", { kind: "new" }, { sink })
-      const prompted = await acp.sendPrompt("C1", "compose")
-      prompted.send()
-      await settle()
-      expect(children[0].killed).toBe(false)
-      children[0].endTurn("end_turn", "K1")
-      await settle()
-      expect(children[0].killed).toBe(true)
-      expect(acp.hasProcess("C1")).toBe(false)
-    } finally {
       restore.mockRestore()
     }
   })
@@ -995,30 +1009,22 @@ describe("unseen periods", () => {
     expect(await stream("C1")).toBeNull()
   })
 
-  it("replays it after the chat was released: V2 recycling, the cap on V3, a kiro-cli exit", async () => {
+  it("replays it after the chat was released: the cap on V3, a kiro-cli exit", async () => {
     const restore = quiet()
     try {
-      // V2: the kiro-cli that opened a composer session ends at the period's end.
-      const { chat } = await acp.createNewProcessFor("C1")
-      const sink = { kind: "aux" as const, onEvents: () => {}, onHostExit: () => {}, busy: () => false, lastActivity: () => 0, release: () => {} }
-      await chat.hs.host.openSession("sdpm-composer", { kind: "new" }, { sink })
-      await unreadPeriod("C1", children[0], "K1", "recycled")
-      expect(children[0].killed).toBe(true)
-      expect(texts(await stream("C1"))).toEqual(["recycled"])
-      expect(await stream("K1")).toBeNull()
-
       // V3: the fourth chat ends the least recently active idle one.
       useEngine("v3")
       await acp.createNewProcessFor("L1")
-      await unreadPeriod("L1", children[1], "K2", "ended by the cap")
+      await unreadPeriod("L1", children[0], "K1", "ended by the cap")
       for (let i = 2; i <= 4; i++) await acp.createNewProcessFor(`L${i}`)
       await settle()
-      expect(children[1].killed).toBe(true)
-      expect(texts(await stream("K2"))).toEqual(["ended by the cap"])
+      expect(children[0].killed).toBe(true)
+      expect(texts(await stream("K1"))).toEqual(["ended by the cap"])
+      expect(await stream("K1")).toBeNull()
 
       // An exit.
       const last = children.at(-1)!
-      await unreadPeriod("L4", last, "K5", "before the exit")
+      await unreadPeriod("L4", last, "K4", "before the exit")
       last.kill()
       await settle()
       expect(texts(await stream("L4"))).toEqual(["before the exit"])

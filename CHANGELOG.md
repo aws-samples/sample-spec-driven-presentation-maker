@@ -43,8 +43,9 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   `{"version": 2, "engine": "v2"}` to `servers/local/.sdpm/acp-config.json`. The setting
   takes effect from the next message.
 - **Agent definitions are generated in a form both engines read.**
-  `servers/local/.kiro/agents/` now carries `permissions` rules and `subagent/sdpm-composer`,
-  and its marker file is `README.txt` (V3 reads every `.md` there as an agent). / Nothing;
+  `servers/local/.kiro/agents/` now carries `permissions` rules, and its marker file is
+  `README.txt` (V3 reads every `.md` there as an agent). The orchestrator dispatches
+  composers with `@sdpm/compose_slides` instead of the `sdpm-composer` sub-agent. / Nothing;
   the directory is regenerated on the next chat. A definition you added to `acp-agents/`
   without `permissions` is converted the same way. One that has `permissions` is used as
   written.
@@ -87,9 +88,16 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   shows the chat's model and opens a menu of the models kiro-cli offers and, on V3, the
   effort levels of the chosen model (V2 has no effort). The choice changes this chat's kiro
   session at once when it is idle, otherwise from the next message, and kiro-cli keeps it
-  with the session. Settings → Model stays the default for new chats; on V3 the composer
-  follows the chat's choice. Settings → Model lists the models without starting kiro-cli. /
+  with the session. Settings → Model stays the default for new chats; the composers follow
+  the chat's choice. Settings → Model lists the models without starting kiro-cli. /
   Nothing.
+- **Local Web UI: slides are composed in the background.** As in Cloud, the orchestrator
+  dispatches the composers with `compose_slides` and ends its turn, so you can keep chatting
+  while they write the slides. A change of direction reaches a running composer through
+  `message_composer`; when every group has finished, the orchestrator gets the report once
+  and tells you. Stop ends the composers; a closed tab does not stop them, and the reopened
+  deck shows the result. Each composer runs in its own kiro-cli, up to four at a time, about
+  0.5 GB each and up to about 0.7 GB while it renders previews. On V3 and V2. / Nothing.
 
 ### Changed
 
@@ -163,10 +171,9 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   client. / Nothing.
 - **Local Web UI runs kiro-cli on its V3 engine by default.** V2 stays selectable in
   Settings → Agent engine. / See Upgrading from 0.12.
-- **Local Web UI: a chat that is working is never ended** by the limit of three kiro-cli
-  processes, by an engine switch or by a change of the agent definitions; each chat keeps its
-  own kiro-cli, on V3 as on V2. `servers/local/.kiro/agents/` is left as it is when nothing
-  changed. / Nothing.
+- **Local Web UI: a chat that is opening, preparing its prompt or composing in the background
+  is never ended** by the limit of three kiro-cli processes or by an engine switch, and
+  `servers/local/.kiro/agents/` is left as it is when nothing changed. / Nothing.
 - **The bundled `aws-light` and `aws-dark` styles have a new content-slide frame.** Every
   content slide now pairs a one-line topic title (a noun phrase) with a lead of up to two
   lines that states the slide's finding, in dark orange (`aws-light`) or amber (`aws-dark`).

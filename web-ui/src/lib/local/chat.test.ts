@@ -26,9 +26,10 @@ import path from "path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { BufferedEvent } from "./conversation/events"
 import { FakeChild, settle } from "../../test/fakeKiro"
+import { installFakeProcesses } from "../../test/fakeProcesses"
 
-const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
-vi.mock("child_process", () => ({ spawn, default: { spawn } }))
+const { spawn, execFile, execFileSync } = vi.hoisted(() => ({ spawn: vi.fn(), execFile: vi.fn(), execFileSync: vi.fn() }))
+vi.mock("child_process", () => ({ spawn, execFile, execFileSync, default: { spawn, execFile, execFileSync } }))
 vi.mock("./agents-sync", () => ({ syncToAgentsDir: vi.fn(() => "d0") }))
 
 const isEnd = (e: BufferedEvent) => e.event.kind === "end"
@@ -47,6 +48,7 @@ beforeEach(async () => {
   children = []
   locked = new Set()
   spawn.mockReset()
+  installFakeProcesses({ spawn, execFile, execFileSync })
   spawn.mockImplementation((_command: string, args: string[]) => {
     const child = new FakeChild(`K${children.length + 1}`, locked, args)
     children.push(child)
@@ -228,6 +230,7 @@ describe("session held by another process", () => {
     const { sessionConflict } = await import("./sessionErrors")
     expect(sessionConflict(error)?.code).toBe("session_locked")
     expect(acp.hasProcess("K9")).toBe(false)
+    await settle()
     expect(children[0].killed).toBe(true)
   })
 })

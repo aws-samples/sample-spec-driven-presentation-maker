@@ -16,8 +16,13 @@
  * - Requests time out (AgentTimeoutError) and follow the caller's abort signal. When the process
  *   exits, every request still waiting is rejected.
  * - The last stderr lines are kept for the log of a kiro-cli that exits while starting.
+ * - `detached` (macOS and Linux) starts kiro-cli as the leader of a process group of its own, so its
+ *   tree can be ended without the Local server's group (process-tree.ts).
+ * - `SDPM_ACP_TRACE` (a file path; unset, nothing is written) gets every line written to and read
+ *   from kiro-cli, one JSON line `{t, pid, dir: "out" | "in", msg}`, for the manual E2E.
  */
 import { spawn } from "child_process"
+import fs from "fs"
 
 import { AgentTimeoutError } from "../turnErrors"
 import type { AcpError, AcpNotification, PermissionOption, RequestPermissionRequest, RequestPermissionResponse } from "./schema"
@@ -79,9 +84,24 @@ interface Pending {
   onAnswer?: (answer: AcpAnswer) => void
 }
 
+let traceWarned = false
+
+/** Append one line to `SDPM_ACP_TRACE` (see the header); a failing write turns the trace off with one warning. */
+function trace(pid: number | undefined, dir: "out" | "in", msg: unknown): void {
+  const file = process.env.SDPM_ACP_TRACE
+  if (!file || traceWarned) return
+  try {
+    fs.appendFileSync(file, JSON.stringify({ t: Date.now(), pid, dir, msg }) + "\n")
+  } catch (error) {
+    traceWarned = true
+    console.warn("[acp] SDPM_ACP_TRACE: %s; tracing off", error instanceof Error ? error.message : String(error))
+  }
+}
+
 /** Start `command args` (no shell) and speak JSON-RPC over its stdin and stdout. */
-export function spawnAcp(command: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv }): AcpConnection {
-  const child = spawn(command, args, { cwd: opts.cwd, stdio: ["pipe", "pipe", "pipe"], env: opts.env })
+export function spawnAcp(command: string, args: string[], opts: { cwd: string; env: NodeJS.ProcessEnv; detached?: boolean }): AcpConnection {
+  const detached = opts.detached === true && process.platform !== "win32"
+  const child = spawn(command, args, { cwd: opts.cwd, stdio: ["pipe", "pipe", "pipe"], env: opts.env, ...(detached ? { detached: true } : {}) })
   const pending = new Map<number, Pending>()
   const notificationListeners = new Set<(msg: AcpNotification) => void>()
   const exitListeners = new Set<(code: number | null) => void>()
@@ -93,7 +113,9 @@ export function spawnAcp(command: string, args: string[], opts: { cwd: string; e
 
   function write(msg: Record<string, unknown>): void {
     if (exited) return
-    child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", ...msg }) + "\n")
+    const line = { jsonrpc: "2.0", ...msg }
+    trace(child.pid, "out", line)
+    child.stdin!.write(JSON.stringify(line) + "\n")
   }
 
   function answerPermission(id: unknown, params: Partial<RequestPermissionRequest> | undefined): void {
@@ -102,7 +124,7 @@ export function spawnAcp(command: string, args: string[], opts: { cwd: string; e
       ?? options.find((o) => o.kind === "allow_always")
       ?? options.find((o) => o.kind === "reject_once")
     const outcome: RequestPermissionResponse["outcome"] = pick?.optionId ? { outcome: "selected", optionId: pick.optionId } : { outcome: "cancelled" }
-    console.log("[acp] permission %s \"%s\" → %s", params?.toolCall?.kind ?? "-", params?.toolCall?.title ?? "", pick?.optionId ? pick.kind : "cancelled")
+    console.log("[acp] pid %s permission %s \"%s\" → %s", child.pid, params?.toolCall?.kind ?? "-", params?.toolCall?.title ?? "", pick?.optionId ? pick.kind : "cancelled")
     write({ id, result: { outcome } })
   }
 
@@ -120,6 +142,7 @@ export function spawnAcp(command: string, args: string[], opts: { cwd: string; e
     let msg: Record<string, unknown>
     try { msg = JSON.parse(line) } catch { return }
     if (!msg || typeof msg !== "object") return
+    trace(child.pid, "in", msg)
 
     if (msg.method !== undefined && msg.id != null) {
       answerAgentRequest(msg)

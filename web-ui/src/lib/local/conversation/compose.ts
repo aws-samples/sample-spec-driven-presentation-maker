@@ -55,6 +55,61 @@ export function promptSlugs(prompt: string): string[] {
   return legacy ? legacy[1].split(",").map(unquote).filter(Boolean) : []
 }
 
+interface TaskGroup {
+  slugs: string
+  total: number
+}
+
+/**
+ * The cards of compose tasks (compose_slides dispatched in the background, compose-run.ts), in
+ * the same `toolStream` shapes: opened by the run under the dispatch's toolUseId, its groups
+ * numbered as dispatched, closed only when the task ends (never by a turn's end).
+ */
+export class TaskCards {
+  private readonly cards = new Map<string, Map<number, TaskGroup>>()
+
+  open(toolUseId: string, groups: { slugs: string[] }[]): void {
+    this.cards.set(toolUseId, new Map(groups.map((g, i) => [i + 1, { slugs: g.slugs.join(", ") || `group ${i + 1}`, total: groups.length }])))
+  }
+
+  has(toolUseId: string): boolean {
+    return this.cards.has(toolUseId)
+  }
+
+  starting(toolUseId: string, group: number): ChatEvent[] {
+    const g = this.group(toolUseId, group)
+    return g ? [this.stream(toolUseId, { group, total_groups: g.total, slugs: g.slugs, status: "starting" })] : []
+  }
+
+  tool(toolUseId: string, group: number, id: string, name: string): ChatEvent[] {
+    const g = this.group(toolUseId, group)
+    return g ? [this.stream(toolUseId, { group, slugs: g.slugs, tool: name, toolUseId: id })] : []
+  }
+
+  toolEnd(toolUseId: string, group: number, id: string, status: ToolEndStatus): ChatEvent[] {
+    const g = this.group(toolUseId, group)
+    return g ? [this.stream(toolUseId, { group, slugs: g.slugs, toolResult: id, toolStatus: status })] : []
+  }
+
+  groupEnd(toolUseId: string, group: number, status: "done" | "error"): ChatEvent[] {
+    const g = this.group(toolUseId, group)
+    return g ? [this.stream(toolUseId, { group, slugs: g.slugs, status })] : []
+  }
+
+  /** The task ended (its `taskEnd` is the run's). */
+  close(toolUseId: string): void {
+    this.cards.delete(toolUseId)
+  }
+
+  private group(toolUseId: string, group: number): TaskGroup | undefined {
+    return this.cards.get(toolUseId)?.get(group)
+  }
+
+  private stream(toolUseId: string, streamData: ComposeStreamData): ChatEvent {
+    return data({ toolStream: { toolUseId, name: COMPOSE_TOOL, data: streamData } })
+  }
+}
+
 export class ComposeTracker {
   private card: Card | null = null
   /** The toolCallIds of this turn's delegations: their tool ends belong to a card, not a tool card. */

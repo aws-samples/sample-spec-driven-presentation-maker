@@ -89,9 +89,13 @@ To run on kiro-cli's V2 engine instead (`kiro-cli acp --agent sdpm-orchestrator`
 
 Rules in `~/.kiro/steering` that are always included reach the sdpm agents' context, under V3 as under V2.
 
+### Compose in the background
+
+The orchestrator dispatches the composers with `compose_slides` and ends its turn, as on Cloud: the Local server starts them, the chat stays usable while they write the slides, and the Compose card follows each group. When the direction changes, ask in the chat; the orchestrator passes it to a running composer with `message_composer`. When every group has finished, the orchestrator gets the report and tells you the deck is ready. Stop ends the composers, and closing the tab does not: the deck still completes, and the reopened deck shows the result. Each composer runs in its own kiro-cli, up to four at a time, about 0.5 GB each and up to about 0.7 GB while it renders previews. This works on V3 and V2.
+
 ### Model and effort
 
-The pill above the chat input shows the chat's model (and, on V3, its effort) and opens a menu to change them. A change applies to this chat's kiro session: at once when the chat is idle, otherwise from your next message. On V3 you choose the model and, for models that have them, the effort level; on V2 only the model. kiro-cli keeps the choice with the session, so a reopened deck continues on it. Settings → **Model** stays the default for new chats; on V3 the composer sub-agent follows the chat's choice. The list comes from the last kiro-cli session that reported one (`servers/local/.sdpm/acp-models.json`), so neither the pill nor Settings starts kiro-cli; on a first run the pill appears after the first reply.
+The pill above the chat input shows the chat's model (and, on V3, its effort) and opens a menu to change them. A change applies to this chat's kiro session: at once when the chat is idle, otherwise from your next message. On V3 you choose the model and, for models that have them, the effort level; on V2 only the model. kiro-cli keeps the choice with the session, so a reopened deck continues on it. Settings → **Model** stays the default for new chats; the composers follow the chat's choice. The list comes from the last kiro-cli session that reported one (`servers/local/.sdpm/acp-models.json`), so neither the pill nor Settings starts kiro-cli; on a first run the pill appears after the first reply.
 
 ### Continue from a kiro-cli session
 

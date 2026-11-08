@@ -24,6 +24,4 @@ export const v2Adapter: EngineAdapter = {
   // V3 imports a V2 session when it loads or forks it.
   sessionsOpenableBy: ["v2", "v3"],
   listStoredSessions: (ctx) => listV2Sessions(v2SessionsDir(ctx.env)),
-  // Not observed on V2: the Settings model stays in every definition.
-  subagentsFollowSessionModel: false,
 }

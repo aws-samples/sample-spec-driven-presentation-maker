@@ -38,8 +38,12 @@ otherwise.
 | `kiro-3.1.0-v3-model-effort.jsonl` | V3, `s14c_1_v3_new_model_effort` (model Claude Haiku 5.5, then effort low) | initialize, session/new, session/set_config_option (model), session/set_config_option (effortLevel), session/prompt |
 | `kiro-3.1.0-v3-model-load.jsonl` | V3 loading that session in a new process, `s14c_2_v3_load` | initialize, session/load |
 | `kiro-3.1.0-v2-set-model.jsonl` | V2, `s14c_3_v2_set_model` (model claude-haiku-4.5) | initialize, session/new, session/set_model, session/prompt |
-| `kiro-3.1.0-v3-multi-session.jsonl` | V3, lane 2 measurement `acp_multi.py`: three sessions in one kiro-cli (the third in `sdpm-composer`), two prompts at once, then one cancelled while the other runs, then the third closed | initialize, session/new, session/new, session/new, session/prompt, session/prompt, session/prompt, session/prompt, session/close |
-| `kiro-3.1.0-v2-multi-session.jsonl` | V2 (`--agent sdpm-orchestrator`), the same measurement: three sessions, the third switched to `sdpm-composer`, the same prompts and cancel (no close: V2 has none) | initialize, session/new, session/new, session/new, session/set_mode, session/prompt, session/prompt, session/prompt, session/prompt |
+| `kiro-3.1.0-v3-async-compose-orchestrator.jsonl` | V3 orchestrator with `SDPM_LOCAL_COMPOSE=1`, web-2 spike: a 2-slide deck dispatched with one `compose_slides` (2 groups), a user turn during compose, a `message_composer` to group 1, the `<compose_result>` wake | initialize, session/new, session/prompt, session/prompt, session/prompt, session/prompt |
+| `kiro-3.1.0-v3-async-compose-composer.jsonl` | V3 composer of group 1 on its own kiro-cli (`modeId: sdpm-composer`, no `SDPM_LOCAL_COMPOSE`), the same spike: steered once (`steering_queued`, `steering_injected`), then closed and deleted | initialize, session/new, session/set_config_option (model), session/prompt, _session/steer, session/close, session/delete |
+| `kiro-3.1.0-v3-async-compose-composer-2.jsonl` | V3 composer of group 2, the same spike (no steer) | initialize, session/new, session/set_config_option (model), session/prompt, session/close, session/delete |
+| `kiro-3.1.0-v2-async-compose-orchestrator.jsonl` | V2 (`--agent sdpm-orchestrator`), the same flow | initialize, session/new, session/prompt, session/prompt, session/prompt, session/prompt |
+| `kiro-3.1.0-v2-async-compose-composer.jsonl` | V2 composer of group 1 (`--agent sdpm-composer`), steered once (`AgentExecutionSteeringInjected`) | initialize, session/new, session/set_model, session/prompt, _session/steer |
+| `kiro-3.1.0-v2-async-compose-composer-2.jsonl` | V2 composer of group 2 (no steer) | initialize, session/new, session/set_model, session/prompt |
 
 The `kiro-3.1.0-*` files are kiro-cli 3.1.0 (KAS 0.66.70, 2026-11-07) captures with a
 temporary `KIRO_HOME`. In the list and fork captures, the sources remembered a codeword (MANGO
@@ -50,11 +54,13 @@ S14c), the `config_option_update`s and `configOptions` keep `mode` (sdpm modes),
 `_meta.kiro` `rateMultiplier`, `hasEffort`, `effortLevels`, `defaultEffortLevel`), `effortLevel`
 and `thinking`; V2's `models.availableModels` keeps `auto`, `claude-haiku-5.5`, `claude-haiku-4.5`.
 
-The two `multi-session` files are kiro-cli 3.1.0 (KAS 0.66.70, 2026-11-07) with several sessions
-in one process. Both pairs of prompts are sent at once; the second pair's first prompt ("Count from
-1 to 300") is cancelled (`session/cancel`, a notification, so no marker) and answers `cancelled`,
-while the other session's prompt still ends `end_turn`. V2 sends each new session's
-`_kiro.dev/mcp/server_initialized` before its session/new answer.
+The `async-compose` files are kiro-cli 3.1.0 (2026-11-08) captures of the web-2 spike
+(`async_compose_spike.py`): one kiro-cli for the orchestrator and one per composer group, each in a
+temporary `KIRO_HOME` and `HOME`. The orchestrator's `compose_slides` and `message_composer` calls
+carry their whole input on the first `tool_call` (V3 `rawInput.arguments`, V2 `rawInput`); their
+completed updates carry no tool name (V3) or the title `Running: @sdpm/…` (V2). Tool inputs and
+outputs over 1 500 characters are cut, image bytes and thought chunks dropped. Group 1's composer
+capture answers its prompt only after the steer marker, group 2's at once.
 
 The two `turn` captures answer the prompt "Call the sdpm list_styles tool once, then reply with
 only the number of styles" and end with `stopReason: end_turn`.
