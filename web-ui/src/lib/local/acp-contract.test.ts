@@ -33,7 +33,7 @@ import os from "os"
 import path from "path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-import { nextFakePid } from "../../test/fakeKiro"
+import { nextFakePid, settle } from "../../test/fakeKiro"
 import { installFakeProcesses } from "../../test/fakeProcesses"
 
 const { spawn, execFile, execFileSync } = vi.hoisted(() => ({ spawn: vi.fn(), execFile: vi.fn(), execFileSync: vi.fn() }))
@@ -445,6 +445,7 @@ describe("kiro-cli 3.0.0 start-up", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
     try {
       expect(await acp.createNewProcessFor("C1").catch((e: unknown) => e)).toMatchObject({ code: "mcp_failed" })
+      await settle()
       expect(children[0].killed).toBe(true)
       expect(acp.hasProcess("C1")).toBe(false)
     } finally {
@@ -560,6 +561,7 @@ describe("kiro-cli 3.1.0 V3, list and fork", () => {
     }])
     await new Promise((r) => setImmediate(r))
     expect(children[0].requests).toEqual(["initialize", "session/list"])
+    await settle()
     expect(children[0].killed).toBe(true)
     expect(acp.hasProcess(V3_SOURCE)).toBe(false)
   })
@@ -597,6 +599,7 @@ describe("kiro-cli 3.1.0 V3, list and fork", () => {
       const { ForkNotReadError } = await import("./sessionErrors")
       expect(await acp.forkSession(V3_SOURCE, "sdpm-orchestrator").catch((e: unknown) => e)).toBeInstanceOf(ForkNotReadError)
       expect(children[0].requests).toEqual(["initialize", "session/fork", "session/load", "session/delete"])
+      await settle()
       expect(children[0].killed).toBe(true)
       expect(acp.hasProcess(V3_FORK)).toBe(false)
     } finally {

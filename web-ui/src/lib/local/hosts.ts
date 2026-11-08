@@ -24,6 +24,15 @@
  *   then to the host session's `translate`, whose events go to its sink.
  * - Listings (`acquireForListing`) use a live chat's kiro-cli of the engine; without one they start
  *   one, killed once the listing is done.
+ * - Composers (`acquireForComposer`): a kiro-cli of its own per compose group, started for
+ *   `sdpm-composer` in a process group of its own and without `SDPM_LOCAL_COMPOSE` (chat and listing
+ *   kiro-cli get `SDPM_LOCAL_COMPOSE=1`, so only an orchestrator's sdpm server lists compose_slides and
+ *   message_composer). At most MAX_COMPOSER_HOSTS live in the server; further starts wait in order.
+ *   A composer's slot is held until its whole process tree is gone, not only its kiro-cli.
+ * - Ending a kiro-cli (`end`, `kill`): its process tree (acp/process-tree.ts: every process group of
+ *   its descendants, V3's agent server and V2's MCP servers included) gets the signal; a tree not
+ *   gone COMPOSER_GONE_TIMEOUT_MS after SIGTERM gets SIGKILL. `killAll` (the Local server ends)
+ *   signals every tree synchronously from one process table.
  */
 import path from "path"
 import { syncToAgentsDir } from "./agents-sync"
@@ -31,6 +40,7 @@ import {
   adapterFor, type EngineAdapter, type EngineCapabilities, type EngineId, type EngineSession, type LoadOutcome, type SessionContext,
 } from "./acp/engine"
 import { readEngineConfig } from "./acp/engine-config"
+import { defaultProcessDeps, ProcessTree, type ProcessDeps, type ProcRow } from "./acp/process-tree"
 import type { InitializeResponse } from "./acp/schema"
 import { AcpRequestError, METHOD_NOT_FOUND, spawnAcp, type AcpAnswer, type AcpConnection } from "./acp/transport"
 import type { LocalEvent } from "./conversation/events"
@@ -61,6 +71,16 @@ export const INITIALIZE_PARAMS = {
 export const LISTING_AGENT = "sdpm-orchestrator"
 /** kiro-cli processes with a chat alive at once; a new one releases the least recently active idle one. */
 export const MAX_CHAT_HOSTS = 3
+/** Composer kiro-cli processes (their whole trees) alive at once in the server; further starts wait in order. */
+export const MAX_COMPOSER_HOSTS = 4
+/** A tree not gone this long after SIGTERM gets SIGKILL; a composer's slot is freed this long after SIGKILL at the latest. */
+export const COMPOSER_GONE_TIMEOUT_MS = 2000
+/** How often an ending tree is asked whether it is gone. */
+const GONE_POLL_MS = 100
+/** The agent a composer kiro-cli is started for. */
+export const COMPOSER_AGENT = "sdpm-composer"
+/** The environment key that makes the sdpm server list compose_slides and message_composer. */
+const LOCAL_COMPOSE_ENV = "SDPM_LOCAL_COMPOSE"
 
 /** What uses a host session: a chat (chat.ts) or a compose run's composer session (`aux`, compose-run.ts). */
 export interface SessionSink {
@@ -192,6 +212,17 @@ export class Host {
   lastActivity = Date.now()
   /** Initialize answered (rejects with the start's failure; the host is then killed). */
   readonly ready: Promise<void>
+  /** kiro-cli's process tree. */
+  readonly tree: ProcessTree
+  /** The whole tree is gone (resolves once). */
+  readonly gone: Promise<void>
+  private markGone: () => void = () => {}
+  private isGone = false
+  /** Signals already sent (each kind once). */
+  private readonly signalled = new Set<NodeJS.Signals>()
+  private ending: Promise<void> = Promise.resolve()
+  private poll: ReturnType<typeof setInterval> | null = null
+  private escalation: ReturnType<typeof setTimeout> | null = null
 
   constructor(
     readonly engine: EngineId,
@@ -199,8 +230,11 @@ export class Host {
     readonly role: HostRole,
     private readonly env: NodeJS.ProcessEnv,
     private readonly pool: HostPool,
+    deps: Partial<ProcessDeps> = {},
   ) {
     this.adapter = adapterFor(engine)
+    this.tree = new ProcessTree(conn.pid, deps)
+    this.gone = new Promise((resolve) => { this.markGone = resolve })
     conn.onNotification((msg) => {
       for (const event of this.adapter.translateMcp(msg)) {
         if (event.type === "mcp_status" || event.type === "mcp_snapshot") this.mcp.apply(event)
@@ -211,7 +245,10 @@ export class Host {
       if (events.length) hs.sink.onEvents(events)
     })
     conn.onExit((code) => {
-      this.pool.forget(this)
+      this.tree.markExited()
+      // A composer's slot is held until its tree is gone (its agent server or MCP servers may outlive it).
+      if (role === "composer") void this.end("SIGTERM")
+      else this.pool.forget(this)
       const hs = this.session
       this.session = null
       hs?.sink.onHostExit(code)
@@ -234,9 +271,70 @@ export class Host {
     return this.session?.sink.busy() ?? false
   }
 
+  /** End kiro-cli and its process tree (SIGTERM, then SIGKILL if it is not gone in time). */
   kill(): void {
+    if (this.role !== "composer") this.pool.forget(this)
+    void this.end("SIGTERM")
+  }
+
+  /**
+   * Send `signal` to the process tree (each kind once): a snapshot, then every recorded group.
+   * From then on the tree is asked every GONE_POLL_MS whether it is gone; one not gone
+   * COMPOSER_GONE_TIMEOUT_MS after SIGTERM gets SIGKILL, and one not gone that long after SIGKILL
+   * is given up (warned; a composer's slot is freed).
+   */
+  end(signal: NodeJS.Signals): Promise<void> {
+    if (this.isGone || this.signalled.has(signal)) return this.ending
+    this.signalled.add(signal)
+    const run = this.ending.then(() => this.tree.end(signal)).then(() => this.signalSent(signal))
+    this.ending = run.catch((error: unknown) => console.warn("[acp] ending kiro-cli pid %s: %s", this.conn.pid, errorText(error)))
+    return this.ending
+  }
+
+  /** Take a snapshot of the tree now (the session is ready: its servers are running). */
+  snapshot(): void {
+    void this.tree.snapshot()
+  }
+
+  private signalSent(signal: NodeJS.Signals): void {
+    if (this.isGone) return
+    if (!this.poll) {
+      this.poll = setInterval(() => this.checkGone(), GONE_POLL_MS)
+      this.poll.unref?.()
+    }
+    if (this.escalation) clearTimeout(this.escalation)
+    this.escalation = setTimeout(() => this.notGoneInTime(signal), COMPOSER_GONE_TIMEOUT_MS)
+    this.escalation.unref?.()
+  }
+
+  private notGoneInTime(signal: NodeJS.Signals): void {
+    this.escalation = null
+    if (this.checkGone()) return
+    const groups = this.tree.groups().join(", ") || "none recorded"
+    if (signal !== "SIGKILL") {
+      console.warn("[acp] kiro-cli pid %s %s, groups %s still alive %d ms after %s; SIGKILL", this.conn.pid, this.exited ? "exited" : "runs", groups, COMPOSER_GONE_TIMEOUT_MS, signal)
+      void this.end("SIGKILL")
+      return
+    }
+    console.warn("[acp] kiro-cli pid %s: groups %s still alive %d ms after SIGKILL; giving it up", this.conn.pid, groups, COMPOSER_GONE_TIMEOUT_MS)
+    this.finish()
+  }
+
+  private checkGone(): boolean {
+    if (!this.tree.gone()) return false
+    this.finish()
+    return true
+  }
+
+  private finish(): void {
+    if (this.isGone) return
+    this.isGone = true
+    if (this.poll) clearInterval(this.poll)
+    if (this.escalation) clearTimeout(this.escalation)
+    this.poll = null
+    this.escalation = null
     this.pool.forget(this)
-    this.conn.kill()
+    this.markGone()
   }
 
   remove(hs: HostSession): void {
@@ -336,6 +434,7 @@ export class Host {
       }
       if (signal?.aborted) throw abortError()
       signal?.removeEventListener("abort", onAbort)
+      this.snapshot()
       return { hs, outcome }
     } catch (error) {
       signal?.removeEventListener("abort", onAbort)
@@ -379,17 +478,68 @@ export async function discardFork(engine: EngineSession, forkId: string): Promis
   }
 }
 
+/** First come, first served places for composer kiro-cli processes. */
+class ComposerSlots {
+  private taken = 0
+  private readonly waiting: { resolve: () => void; reject: (error: unknown) => void; signal?: AbortSignal; onAbort: () => void }[] = []
+
+  constructor(private readonly max: number) {}
+
+  /** Every place is taken: a `take` now waits. */
+  full(): boolean {
+    return this.taken >= this.max
+  }
+
+  /** Resolves once a place is this caller's; an abort while waiting leaves the queue (AbortError). */
+  take(signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) return Promise.reject(abortError())
+    if (this.taken < this.max && !this.waiting.length) {
+      this.taken++
+      return Promise.resolve()
+    }
+    return new Promise((resolve, reject) => {
+      const entry = {
+        resolve, reject, signal,
+        onAbort: () => {
+          const at = this.waiting.indexOf(entry)
+          if (at >= 0) this.waiting.splice(at, 1)
+          reject(abortError())
+        },
+      }
+      signal?.addEventListener("abort", entry.onAbort, { once: true })
+      this.waiting.push(entry)
+    })
+  }
+
+  /** A place is free again: the oldest waiter gets it. */
+  free(): void {
+    const next = this.waiting.shift()
+    if (next) {
+      next.signal?.removeEventListener("abort", next.onAbort)
+      next.resolve()
+      return
+    }
+    this.taken = Math.max(0, this.taken - 1)
+  }
+}
+
 /** The kiro-cli processes of this server. */
 export class HostPool {
   private readonly hosts = new Set<Host>()
+  private readonly slots = new ComposerSlots(MAX_COMPOSER_HOSTS)
+  private readonly deps: ProcessDeps
+
+  constructor(deps: Partial<ProcessDeps> = {}) {
+    this.deps = { ...defaultProcessDeps, ...deps }
+  }
 
   hostsOf(engine: EngineId): Host[] {
     return [...this.hosts].filter((host) => host.engine === engine && !host.exited)
   }
 
-  /** Forget a host that ended (its exit, a kill). */
+  /** Forget a host that ended (a chat's or listing's exit or kill; a composer's tree gone). A composer frees its slot. */
   forget(host: Host): void {
-    this.hosts.delete(host)
+    if (this.hosts.delete(host) && host.role === "composer") this.slots.free()
   }
 
   /**
@@ -452,17 +602,83 @@ export class HostPool {
     }
   }
 
+  /**
+   * A kiro-cli of its own for one compose group: once a composer slot is free (`onWait` is called
+   * when it has to wait), started for COMPOSER_AGENT on `engine` and initialized. An abort while
+   * waiting leaves the queue; an abort during the start ends the starting tree with SIGKILL.
+   */
+  async acquireForComposer(engine: EngineId, opts: { signal?: AbortSignal; onWait?: () => void } = {}): Promise<Host> {
+    const { signal } = opts
+    if (signal?.aborted) throw abortError()
+    if (this.slots.full()) opts.onWait?.()
+    await this.slots.take(signal)
+    let host: Host
+    try {
+      host = this.start(engine, COMPOSER_AGENT, "composer")
+    } catch (error) {
+      this.slots.free()
+      throw error
+    }
+    let onAbort = () => {}
+    const aborted = new Promise<never>((_, reject) => {
+      onAbort = () => reject(abortError())
+      signal?.addEventListener("abort", onAbort, { once: true })
+    })
+    aborted.catch(() => {})
+    try {
+      await Promise.race([host.ready, aborted])
+    } catch (error) {
+      if (isAbort(error)) void host.end("SIGKILL")
+      throw error
+    } finally {
+      signal?.removeEventListener("abort", onAbort)
+    }
+    return host
+  }
+
+  /**
+   * The Local server ends: every process tree is signalled now, synchronously, from one process
+   * table (composer trees SIGKILL, chat and listing trees SIGTERM). Without a table, only the
+   * kiro-cli pids (and a composer's own group) are signalled.
+   */
   killAll(): void {
-    for (const host of [...this.hosts]) host.kill()
+    const hosts = [...this.hosts]
+    if (!hosts.length) return
+    let table: ProcRow[] | null = null
+    try {
+      table = this.deps.tableSync()
+    } catch (error) {
+      console.warn("[acp] ps failed while ending every kiro-cli (%s); signalling their pids", errorText(error))
+    }
+    for (const host of hosts) {
+      const signal: NodeJS.Signals = host.role === "composer" ? "SIGKILL" : "SIGTERM"
+      if (table) {
+        host.tree.record(table)
+        host.tree.signal(signal, table)
+        continue
+      }
+      const pid = host.conn.pid
+      if (pid === undefined || host.exited) continue
+      for (const target of host.role === "composer" ? [-pid, pid] : [pid]) {
+        try {
+          this.deps.kill(target, signal)
+        } catch { /* gone */ }
+      }
+    }
   }
 
   private start(engine: EngineId, agentName: string, role: HostRole): Host {
     const adapter = adapterFor(engine)
     syncDefinitions()
     const config = readEngineConfig()
-    const env = { ...process.env, ...config.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT }
-    const conn = spawnAcp(config.command, [...config.commandArgs, ...adapter.spawnArgs(agentName)], { cwd: MCP_LOCAL_DIR, env })
-    const host = new Host(engine, conn, role, env, this)
+    const env: NodeJS.ProcessEnv = { ...process.env, ...config.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT }
+    // Last, whatever process.env or acp-config.json held: only a chat's sdpm server lists the compose tools.
+    if (role === "composer") delete env[LOCAL_COMPOSE_ENV]
+    else env[LOCAL_COMPOSE_ENV] = "1"
+    const conn = spawnAcp(config.command, [...config.commandArgs, ...adapter.spawnArgs(agentName)], {
+      cwd: MCP_LOCAL_DIR, env, ...(role === "composer" ? { detached: true } : {}),
+    })
+    const host = new Host(engine, conn, role, env, this, this.deps)
     this.hosts.add(host)
     return host
   }

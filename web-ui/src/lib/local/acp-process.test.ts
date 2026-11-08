@@ -116,6 +116,7 @@ describe("process map", () => {
     acp.terminateProcess("K1")
     expect(acp.hasProcess("C1")).toBe(false)
     expect(acp.hasProcess("K1")).toBe(false)
+    await settle()
     expect(children[0].killed).toBe(true)
   })
 
@@ -244,6 +245,7 @@ describe("setup requests", () => {
       const { AgentTimeoutError } = await import("./turnErrors")
       expect(error).toBeInstanceOf(AgentTimeoutError)
       expect((error as Error).message).toMatch(/initialize within 30s/)
+      await settle()
       expect(children[0].killed).toBe(true)
       expect(acp.hasProcess("C1")).toBe(false)
     } finally {
@@ -264,6 +266,7 @@ describe("setup requests", () => {
     controller.abort()
     const error = await pending
     expect((error as Error).name).toBe("AbortError")
+    await settle()
     expect(children[0].killed).toBe(true)
     expect(acp.hasProcess("K9")).toBe(false)
   })
@@ -347,6 +350,7 @@ describe("start-up failures", () => {
     const notFound = engine === "v3" ? "_kiro/customAgent/not_found" : "_kiro.dev/agent/not_found"
     children[0].send({ method: notFound, params: { sessionId: "K1", requestedAgent: "sdpm-orchestrator", fallbackAgent: "vibe" } })
     expect(await pending).toMatchObject({ name: "AgentStartError", code: "agent_definition_rejected" })
+    await settle()
     expect(children[0].killed).toBe(true)
     expect(acp.hasProcess("C1")).toBe(false)
   })
@@ -355,6 +359,7 @@ describe("start-up failures", () => {
     useEngine(engine)
     nextChild((child) => { child.mcpState = "failed" })
     expect(await acp.createNewProcessFor("C1").catch((e: unknown) => e)).toMatchObject({ code: "mcp_failed" })
+    await settle()
     expect(children[0].killed).toBe(true)
     expect(acp.hasProcess("C1")).toBe(false)
   })
@@ -449,6 +454,7 @@ describe("engines", () => {
     acp.terminateIdleProcesses("v2")
     expect(children.map((c) => c.killed)).toEqual([false, false, false])
     acp.terminateIdleProcesses("v3")
+    await settle()
     expect(children.map((c) => c.killed)).toEqual([false, true, true])
     expect(acp.hasProcess("C1")).toBe(true)
     expect(["C2", "K9", "C3", "K3"].some((id) => acp.hasProcess(id))).toBe(false)
@@ -696,6 +702,7 @@ describe("forks and listing", () => {
       expect(children[0].requests.map((r) => r.method)).toEqual(["initialize", "session/fork", "session/load"])
       controller.abort()
       expect(await pending).toMatchObject({ name: "AbortError" })
+      await settle()
       expect(children[0].requests.map((r) => r.method).slice(3)).toEqual(["session/delete", "(killed)"])
       expect(children[0].requests[3].params).toEqual({ sessionId: "F1" })
       expect(acp.hasProcess("F1")).toBe(false)
@@ -716,6 +723,7 @@ describe("forks and listing", () => {
       await acp.forkSession("sess_src", "sdpm-orchestrator")
       await acp.discardForkedSession("F1")
       expect(children[1].requests.at(-1)).toMatchObject({ method: "session/delete", params: { sessionId: "F1" } })
+      await settle()
       expect(children[1].killed).toBe(true)
       expect(acp.hasProcess("F1")).toBe(false)
     } finally {

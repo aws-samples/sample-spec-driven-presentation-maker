@@ -230,6 +230,7 @@ describe("session held by another process", () => {
     const { sessionConflict } = await import("./sessionErrors")
     expect(sessionConflict(error)?.code).toBe("session_locked")
     expect(acp.hasProcess("K9")).toBe(false)
+    await settle()
     expect(children[0].killed).toBe(true)
   })
 })
