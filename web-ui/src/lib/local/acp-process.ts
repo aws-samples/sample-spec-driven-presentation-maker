@@ -22,6 +22,10 @@
  *   of its client id opens its kiro session again.
  * - **Carry-over.** Texts for the agent a chat could not deliver (after Stop, after an exit) wait
  *   under the kiro session and go before the user's text of its next prompt.
+ * - **Unseen periods.** A work period whose end no stream wrote (its tab was closed) is replayed
+ *   once by `/api/agent/stream` (`openStream`), also after its chat was released: `releaseChat`
+ *   keeps it under every id of the chat (at most MAX_UNSEEN_PERIODS). It counts as seen once a
+ *   stream wrote its end and was not cancelled before; the chat's next period drops it.
  * - **Decks.** `.session`, `.session-engine` and a fork's origin are the chat's (chat.ts,
  *   deck-files.ts); a deck reopened on the other engine says so (`otherEngine`).
  * - **Forks** (`forkSession`): the fork is made and opened with the engine's session; a fork
@@ -40,7 +44,7 @@ import { DECK_ROOT } from "./deck-paths"
 import type { EngineCapabilities, EngineId, LoadOutcome, ModelChoice, ModelOption, StoreContext } from "./acp/engine"
 import { ENGINE_IDS, readEngineConfig } from "./acp/engine-config"
 import { readModelCache, writeModelCache } from "./acp/model-cache"
-import { Chat, type ChatHooks, type EventListener } from "./chat"
+import { Chat, type ChatHooks, type EventListener, type Period } from "./chat"
 import type { BufferedEvent } from "./conversation/events"
 import { SteerRejectedError } from "./conversation/steer"
 import { readEngineMark, saveSessionToDeck, writeEngineMark } from "./deck-files"
@@ -71,6 +75,10 @@ export const pendingOrigins = new Map<string, SessionOrigin>()
 const orphans = new Map<string, string>()
 /** Kiro session id → texts for the agent its next user prompt starts with. */
 const carryOver = new Map<string, string[]>()
+/** Finished periods of released chats that no stream delivered, oldest first, with the ids they are kept under. */
+const MAX_UNSEEN_PERIODS = 50
+const unseen = new Map<Period, Set<string>>()
+const unseenById = new Map<string, Period>()
 
 /** The model list a session of each engine last reported in this server (also in acp-models.json). */
 const knownModels = new Map<EngineId, ModelOption[]>()
@@ -96,10 +104,52 @@ const hooks: ChatHooks = {
     const texts = [...(carryOver.get(sessionId) ?? []), text].slice(-MAX_CARRY_OVER_TEXTS)
     keepNewest(carryOver, sessionId, texts, MAX_CARRY_OVER_SESSIONS)
   },
-  periodStarted() {},
+  periodStarted(chat) {
+    // The chat has moved on: what an earlier period of its ids left is not replayed any more.
+    for (const id of idsOf(chat)) forgetUnseen(id)
+  },
   periodEnded(chat) { onPeriodEnd(chat) },
   hostExited(chat) { releaseChat(chat, { remember: true }) },
   release(chat) { releaseChat(chat, { remember: true }) },
+}
+
+/** Every id a chat is known by. */
+function idsOf(chat: Chat): string[] {
+  return [...chat.clientIds, ...(chat.sessionId ? [chat.sessionId] : [])]
+}
+
+/** Keep a finished period no stream delivered under `ids`; the oldest goes beyond MAX_UNSEEN_PERIODS. */
+function keepUnseen(period: Period, ids: string[]): void {
+  if (period.seen) return
+  const keys = unseen.get(period) ?? new Set<string>()
+  for (const id of ids) {
+    const earlier = unseenById.get(id)
+    if (earlier && earlier !== period) forgetUnseen(id)
+    keys.add(id)
+    unseenById.set(id, period)
+  }
+  unseen.set(period, keys)
+  while (unseen.size > MAX_UNSEEN_PERIODS) {
+    const [oldest, oldestKeys] = unseen.entries().next().value!
+    unseen.delete(oldest)
+    for (const id of oldestKeys) if (unseenById.get(id) === oldest) unseenById.delete(id)
+  }
+}
+
+function forgetUnseen(id: string): void {
+  const period = unseenById.get(id)
+  if (!period) return
+  unseenById.delete(id)
+  const keys = unseen.get(period)
+  keys?.delete(id)
+  if (keys && !keys.size) unseen.delete(period)
+}
+
+/** A stream wrote the period's end: it is delivered, and is not replayed again. */
+function markSeen(period: Period): void {
+  period.seen = true
+  for (const id of unseen.get(period) ?? []) if (unseenById.get(id) === period) unseenById.delete(id)
+  unseen.delete(period)
 }
 
 /** The chats (each once). */
@@ -127,6 +177,7 @@ function releaseChat(chat: Chat, opts: { remember: boolean }): void {
   if (opts.remember && chat.sessionId) {
     for (const id of chat.clientIds) keepNewest(orphans, id, chat.sessionId, MAX_ORPHANS)
   }
+  if (chat.lastPeriod && !chat.lastPeriod.seen) keepUnseen(chat.lastPeriod, idsOf(chat))
   for (const [id, candidate] of aliases) if (candidate === chat) aliases.delete(id)
   pendingOrigins.delete(chat.clientId)
   const host = chat.hs.host
@@ -367,7 +418,7 @@ export async function sendPrompt(
   sessionId: string,
   text: string,
   opts: { notice?: LocalSessionNoticeCode; displayText?: string } = {},
-): Promise<{ sessionId: string; replayFrom: number; subscribe: (fn: EventListener) => () => void; send: () => void }> {
+): Promise<{ sessionId: string; replayFrom: number; subscribe: (fn: EventListener) => () => void; send: () => void; onEnd: () => void }> {
   const chat = aliases.get(sessionId)
   if (!chat) throw new Error(`no chat for session ${sessionId}`)
   // Steers the last turn left must be out of kiro-cli's queue before this prompt.
@@ -393,11 +444,13 @@ export async function sendPrompt(
   if (carried) carryOver.delete(chat.sessionId!)
   const prompt = carried?.length ? [...carried, text].join("\n\n") : text
   const replayFrom = chat.beginPrompt(opts.displayText ?? text, opts.notice)
+  const period = chat.period!
   return {
     sessionId: chat.sessionId!,
     replayFrom,
     subscribe: (fn: EventListener) => chat.subscribe(fn),
     send: () => chat.startPrompt(prompt),
+    onEnd: () => markSeen(period),
   }
 }
 
@@ -437,6 +490,24 @@ export function getBufferedEvents(sessionId: string, afterId?: number): Buffered
   if (!period) return []
   if (afterId == null) return [...period.buffer]
   return period.buffer.filter((e) => e.id > afterId)
+}
+
+/**
+ * What `/api/agent/stream` writes for an id (a client id or a kiro session id): a busy chat's
+ * period from after `afterId`, then live; a finished period no stream delivered (of a chat, or
+ * kept after its chat was released), replayed to its end; else null (nothing runs). `onEnd` marks
+ * the period delivered once the stream wrote its end.
+ */
+export function openStream(id: string, afterId?: number): { replay: BufferedEvent[]; subscribe?: (fn: EventListener) => () => void; onEnd: () => void } | null {
+  const chat = aliases.get(id)
+  const after = (period: Period) => (afterId == null ? [...period.buffer] : period.buffer.filter((e) => e.id > afterId))
+  if (chat?.period) {
+    const period = chat.period
+    return { replay: after(period), subscribe: (fn) => chat.subscribe(fn), onEnd: () => markSeen(period) }
+  }
+  const period = chat?.lastPeriod && !chat.lastPeriod.seen ? chat.lastPeriod : unseenById.get(id) ?? null
+  if (!period) return null
+  return { replay: after(period), onEnd: () => markSeen(period) }
 }
 
 /** Subscribe to a chat's events. */

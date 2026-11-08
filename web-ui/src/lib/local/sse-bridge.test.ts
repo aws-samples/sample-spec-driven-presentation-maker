@@ -1,9 +1,10 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * The SSE bridge writes the process manager's numbered chat events as they are: `id:` is the
- * event's number, for live and replayed events alike; an end event writes its payload, if any,
- * and closes the stream; a replay that holds the end closes it without subscribing.
+ * The SSE bridge writes a chat's numbered events as they are: `id:` is the event's number, for
+ * live and replayed events alike; an end event writes its payload, if any, and closes the stream;
+ * a replay that holds the end closes it without subscribing. `onEnd` runs once after the end was
+ * written, never for a reader that went away before it, whose subscription stops at once.
  */
 
 import { describe, expect, it, vi } from "vitest"
@@ -19,8 +20,9 @@ const end = (id: number, extra: Omit<Extract<ChatEvent, { kind: "end" }>, "kind"
 function bridge(replay?: BufferedEvent[]) {
   let listener: ((entry: BufferedEvent) => void) | undefined
   const unsubscribe = vi.fn()
+  const onEnd = vi.fn()
   const subscribe = vi.fn((next: (entry: BufferedEvent) => void) => { listener = next; return unsubscribe })
-  const stream = createSSEStream({ subscribe, replay })
+  const stream = createSSEStream({ subscribe, replay, onEnd })
   const blocks = async () => {
     const body = await new Response(stream).text()
     return body.split("\n\n").filter(Boolean).map((block) => {
@@ -31,7 +33,7 @@ function bridge(replay?: BufferedEvent[]) {
       }
     })
   }
-  return { push: (entry: BufferedEvent) => listener?.(entry), blocks, subscribe, unsubscribe }
+  return { push: (entry: BufferedEvent) => listener?.(entry), blocks, subscribe, unsubscribe, onEnd, stream }
 }
 
 describe("createSSEStream", () => {
@@ -70,5 +72,28 @@ describe("createSSEStream", () => {
     const b = bridge([data(1, text("done")), end(2, { stopReason: "end_turn" })])
     expect(await b.blocks()).toEqual([{ id: 1, data: text("done") }])
     expect(b.subscribe).not.toHaveBeenCalled()
+  })
+
+  it("calls onEnd once, after the end was written", async () => {
+    const b = bridge()
+    b.push(data(1, text("hi")))
+    expect(b.onEnd).not.toHaveBeenCalled()
+    b.push(end(2))
+    b.push(end(3))
+    await b.blocks()
+    expect(b.onEnd).toHaveBeenCalledOnce()
+
+    const replayed = bridge([data(1, text("done")), end(2)])
+    await replayed.blocks()
+    expect(replayed.onEnd).toHaveBeenCalledOnce()
+  })
+
+  it("does not call onEnd for a reader that went away before the end, and stops its subscription", async () => {
+    const b = bridge()
+    b.push(data(1, text("hi")))
+    await b.stream.cancel()
+    expect(b.unsubscribe).toHaveBeenCalledOnce()
+    b.push(end(2))
+    expect(b.onEnd).not.toHaveBeenCalled()
   })
 })

@@ -983,3 +983,122 @@ describe("one kiro-cli for every V3 chat", () => {
     expect(spawn).not.toHaveBeenCalled()
   })
 })
+
+describe("unseen periods", () => {
+  const quiet = () => vi.spyOn(console, "log").mockImplementation(() => {})
+  /** What /api/agent/stream writes for `id`, read to its end (null: `{running: false}`). */
+  async function stream(id: string) {
+    const opened = acp.openStream(id)
+    if (!opened) return null
+    const { createSSEStream } = await import("./sse-bridge")
+    const text = await new Response(createSSEStream(opened)).text()
+    return text.split("\n\n").filter(Boolean).map((block) => JSON.parse(block.split("\n").find((l) => l.startsWith("data: "))!.slice(6)))
+  }
+  /** A period on `clientId` whose stream nobody read, with one text, ended. */
+  async function unreadPeriod(clientId: string, child: FakeChild, sessionId: string, text = "the reply") {
+    const prompted = await acp.sendPrompt(clientId, "hello")
+    prompted.send()
+    child.update(sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text } })
+    await settle()
+    child.endTurn("end_turn", sessionId)
+    await settle()
+  }
+  const texts = (events: Record<string, unknown>[] | null) => (events ?? []).flatMap((e) => {
+    const delta = (e.event as { contentBlockDelta?: { delta: { text: string } } } | undefined)?.contentBlockDelta
+    return delta ? [delta.delta.text] : []
+  })
+
+  it("replays a finished period no stream delivered once; the next /stream finds nothing", async () => {
+    await acp.createNewProcessFor("C1")
+    await unreadPeriod("C1", children[0], "K1")
+    const replayed = await stream("C1")
+    expect(texts(replayed)).toEqual(["the reply"])
+    expect(replayed?.at(-1)).toEqual({ work: { state: "idle", how: "finished" } })
+    expect(await stream("C1")).toBeNull()
+  })
+
+  it("leaves nothing to replay when the invoke stream wrote the period's end", async () => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "hello")
+    const { createSSEStream } = await import("./sse-bridge")
+    const body = new Response(createSSEStream({ subscribe: prompted.subscribe, replay: acp.getBufferedEvents("C1", prompted.replayFrom - 1), onEnd: prompted.onEnd })).text()
+    prompted.send()
+    await settle()
+    children[0].endTurn()
+    await body
+    expect(await stream("C1")).toBeNull()
+  })
+
+  it("keeps a period whose replay was cancelled before its end for the next /stream", async () => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "hello")
+    prompted.send()
+    await settle()
+    const { createSSEStream } = await import("./sse-bridge")
+    const live = createSSEStream(acp.openStream("C1")!)
+    await live.cancel()
+    children[0].endTurn()
+    await settle()
+    expect((await stream("C1"))?.length).toBeGreaterThan(0)
+    expect(await stream("C1")).toBeNull()
+  })
+
+  it("replays it after the chat was released: V2 recycling, an LRU close on V3, a kiro-cli exit", async () => {
+    const restore = quiet()
+    try {
+      // V2: the kiro-cli that opened a composer session ends at the period's end.
+      const { chat } = await acp.createNewProcessFor("C1")
+      const sink = { kind: "aux" as const, onEvents: () => {}, onHostExit: () => {}, busy: () => false, lastActivity: () => 0, release: () => {} }
+      await chat.hs.host.openSession("sdpm-composer", { kind: "new" }, { sink })
+      await unreadPeriod("C1", children[0], "K1", "recycled")
+      expect(children[0].killed).toBe(true)
+      expect(texts(await stream("C1"))).toEqual(["recycled"])
+      expect(await stream("K1")).toBeNull()
+
+      // V3: the ninth chat closes the least recently active idle one.
+      useEngine("v3")
+      await acp.createNewProcessFor("L1")
+      const shared = children[1]
+      await unreadPeriod("L1", shared, "K2", "closed by LRU")
+      for (let i = 2; i <= 9; i++) await acp.createNewProcessFor(`L${i}`)
+      await settle()
+      expect(shared.closed).toContain("K2")
+      expect(texts(await stream("K2"))).toEqual(["closed by LRU"])
+
+      // An exit.
+      await unreadPeriod("L9", shared, "K2-9", "before the exit")
+      shared.kill()
+      await settle()
+      expect(texts(await stream("L9"))).toEqual(["before the exit"])
+    } finally {
+      restore.mockRestore()
+    }
+  })
+
+  it("replays a kiro-cli exit's period with agent_exited", async () => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "hello")
+    prompted.send()
+    await settle()
+    children[0].kill()
+    await settle()
+    expect((await stream("C1"))?.at(-1)).toMatchObject({ status: "error", code: "agent_exited" })
+  })
+
+  it("keeps at most 50 such periods: the 51st drops every id of the oldest", async () => {
+    const restore = quiet()
+    try {
+      for (let i = 1; i <= 51; i++) {
+        await acp.createNewProcessFor(`C${i}`)
+        await unreadPeriod(`C${i}`, children[i - 1], `K${i}`)
+        acp.terminateProcess(`C${i}`)
+      }
+      expect(await stream("C1")).toBeNull()
+      expect(await stream("K1")).toBeNull()
+      expect(await stream("K2")).not.toBeNull()
+      expect(await stream("C51")).not.toBeNull()
+    } finally {
+      restore.mockRestore()
+    }
+  })
+})
