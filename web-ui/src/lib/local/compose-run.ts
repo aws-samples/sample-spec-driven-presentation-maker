@@ -134,6 +134,10 @@ interface Group {
   readonly pending: string[]
   /** Steers kiro-cli queued and has not injected yet. */
   steers: { text: string; messageId?: string }[]
+  /** Steers sent and not answered yet (the prompt's end waits for them). */
+  readonly inflight: Set<Promise<unknown>>
+  /** What kiro-cli injected before its steer's answer was read (messageId, else text). */
+  readonly injected: Set<string>
   /** At least one prompt was sent (the output check counts them). */
   prompted: boolean
   summary: string
@@ -173,7 +177,7 @@ export class ComposeTask implements WorkHold {
   ) {
     this.groups = dispatch.groups.map((g, i) => ({
       index: i + 1, slugs: g.slugs, instruction: g.instruction, state: "waiting", host: null, hs: null, abort: new AbortController(),
-      pending: [], steers: [], prompted: false, summary: "", outcome: null, startedAt: 0, promptAt: 0,
+      pending: [], steers: [], inflight: new Set(), injected: new Set(), prompted: false, summary: "", outcome: null, startedAt: 0, promptAt: 0,
     }))
   }
 
@@ -211,20 +215,29 @@ export class ComposeTask implements WorkHold {
       return true
     }
     const hs = g.hs
+    const message = COMPOSER_MESSAGE_PREFIX + text
     let answer: { queued?: boolean; messageId?: string; dropped?: string }
+    const sent = hs.steer(message)
+    g.inflight.add(sent)
     try {
-      answer = await hs.steer(COMPOSER_MESSAGE_PREFIX + text)
+      answer = await sent
     } catch (error) {
       console.warn("[compose] task %s group %d: steer failed: %s", this.id, group, errorText(error))
       return false
+    } finally {
+      g.inflight.delete(sent)
     }
     console.log("[compose] task %s group %d: steer sent %d ms after tool_use", this.id, group, Date.now() - usedAt)
     if (answer.queued !== true) {
       console.warn("[compose] task %s group %d: kiro-cli did not queue the message (%s)", this.id, group, answer.dropped ?? "not queued")
       return false
     }
-    if (hasEnded(g) || g.hs !== hs) return false
-    g.steers.push({ text: COMPOSER_MESSAGE_PREFIX + text, ...(answer.messageId ? { messageId: answer.messageId } : {}) })
+    const byId = answer.messageId ? g.injected.delete(answer.messageId) : false
+    const injected = g.injected.delete(message) || byId
+    if (!injected) {
+      if (hasEnded(g) || g.hs !== hs) return false
+      g.steers.push({ text: message, ...(answer.messageId ? { messageId: answer.messageId } : {}) })
+    }
     console.log("[compose] task %s group %d: message queued (messageId %s) for session %s on kiro-cli pid %s", this.id, group, answer.messageId ?? "-", hs.sessionId, hs.host.conn.pid)
     return true
   }
@@ -344,7 +357,11 @@ export class ComposeTask implements WorkHold {
       else if (event.type === "steer_injected") {
         const at = g.steers.findIndex((s) => (event.messageId && s.messageId === event.messageId) || (event.content !== undefined && s.text === event.content))
         if (at >= 0) g.steers.splice(at, 1)
-        else if (g.steers.length && !event.messageId) g.steers.shift()
+        // Its steer's answer is not read yet: remembered for it.
+        else {
+          if (event.messageId) g.injected.add(event.messageId)
+          if (event.content !== undefined) g.injected.add(event.content)
+        }
         console.log("[compose] task %s group %d: kiro-cli injected a message", this.id, g.index)
       }
     }
@@ -359,6 +376,11 @@ export class ComposeTask implements WorkHold {
       return
     }
     const stopReason = (answer.result as { stopReason?: string } | undefined)?.stopReason ?? "end_turn"
+    if (stopReason === "end_turn" && g.inflight.size) {
+      // A steer whose answer is not read yet decides whether a follow-up prompt is needed.
+      void Promise.allSettled([...g.inflight]).then(() => this.answered(g, hs, answer))
+      return
+    }
     console.log("[compose] task %s group %d: answered %s after %d ms", this.id, g.index, stopReason, ms)
     if (stopReason === "end_turn" && g.steers.length && !this.stopped) {
       void this.followUp(g, hs)

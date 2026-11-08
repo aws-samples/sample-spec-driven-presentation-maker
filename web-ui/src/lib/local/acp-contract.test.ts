@@ -25,6 +25,11 @@
  * - Models (kiro-cli 3.1.0): V3 lists session/new's models without `[Internal]` ones, sets the
  *   model and then its effort with set_config_option, and a load reports the session's model and
  *   effort with the full list; V2 sets the model with set_model and has no effort.
+ * - Compose in the background (kiro-cli 3.1.0, one kiro-cli per composer): the orchestrator's
+ *   compose_slides end, exactly as kiro-cli sent it (no name on V3, the update title on V2),
+ *   becomes `taskStart`; each group's composer opens, is prompted and steered on its own kiro-cli,
+ *   never the orchestrator's; its `steering_injected` leaves no follow-up prompt; the task ends
+ *   `completed` and wakes the orchestrator once with `<compose_result>`.
  */
 
 import { EventEmitter } from "events"
@@ -77,6 +82,8 @@ class ReplayChild extends EventEmitter {
   answers: Line[] = []
   /** The methods of the requests this client sent, in order. */
   requests: string[] = []
+  /** The text of each session/prompt it sent. */
+  promptTexts: string[] = []
   private cursor = 0
   /** Stop before the prompt's answer (after this many of its lines) to model a crash. */
   stopPromptAfter: number | null = null
@@ -88,6 +95,7 @@ class ReplayChild extends EventEmitter {
     if (req.method === undefined) { this.answers.push(req); return }
     if (req.id == null) return
     this.requests.push(req.method as string)
+    if (req.method === "session/prompt") this.promptTexts.push(((req.params as { prompt: { text: string }[] }).prompt[0]).text)
     const at = this.lines.findIndex((line, i) => i >= this.cursor && marker(line))
     const expected = at >= 0 ? marker(this.lines[at])! : null
     if (!expected || expected.method !== req.method) {
@@ -654,5 +662,71 @@ describe("kiro-cli 3.1.0, model and effort", () => {
     expect(view.current).toEqual({ model: "claude-haiku-4.5", effort: null, effortLevels: [] })
     expect(children[0].requests).toEqual(["initialize", "session/new", "session/set_model"])
     expect(textOf((await prompt("Do not call any tool. Reply only OK.")).map((b) => b.data))).toBe("OK")
+  })
+})
+
+describe("kiro-cli 3.1.0 compose in the background, one kiro-cli per composer", () => {
+  const CAPTURED_DECKS = "/tmp/sdpm/decks"
+  const DECK = "20261108-2111-async-compose-spike"
+  const DECK_V2 = "20261108-2117-async-compose-spike"
+
+  it.each(["v3", "v2"] as const)("%s: dispatch, composers on their own kiro-cli, a steer, one wake", async (engine) => {
+    const deckRoot = fs.realpathSync(fs.mkdtempSync(path.resolve(os.tmpdir(), "sdpm-contract-decks-")))
+    const deck = engine === "v3" ? DECK : DECK_V2
+    fs.mkdirSync(path.resolve(deckRoot, deck), { recursive: true }) // nosemgrep: path-join-resolve-traversal — constant deck name in a tmpdir
+    vi.stubEnv("SDPM_DECK_ROOT", deckRoot)
+    vi.resetModules()
+    acp = await import("./acp-process")
+    const log = vi.spyOn(console, "log").mockImplementation(() => {})
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      const relocate = (lines: Line[]) => lines.map((line) => JSON.parse(JSON.stringify(line).split(CAPTURED_DECKS).join(deckRoot)) as Line)
+      const captures = [
+        relocate(readFixture(fixture31(`${engine}-async-compose-orchestrator`))),
+        readFixture(fixture31(`${engine}-async-compose-composer`)),
+        readFixture(fixture31(`${engine}-async-compose-composer-2`)),
+      ]
+      fs.writeFileSync(path.resolve(configDir, "acp-config.json"), JSON.stringify({ version: 2, engine }))
+      spawn.mockImplementation(() => {
+        const child = new ReplayChild(captures[children.length])
+        children.push(child)
+        return child
+      })
+      const { chat } = await acp.createNewProcessFor("C1")
+      const events: Line[] = []
+      chat.subscribe((entry) => { if (entry.event.kind === "data") events.push(entry.event.payload as Line) })
+      const turn = async (text: string) => {
+        const prompted = await acp.sendPrompt("C1", text)
+        prompted.send()
+        for (let i = 0; i < 50 && chat.turn; i++) await settle()
+      }
+      await turn("Make the deck and dispatch it.")
+      for (let i = 0; i < 20 && children.length < 3; i++) await settle()
+      expect(events.filter((e) => e.taskStart).map((e) => (e.taskStart as Line).name)).toEqual(["compose_slides"])
+      expect(events.some((e) => (e.toolResult as Line | undefined)?.name === "compose_slides")).toBe(false)
+      await turn("Quick question while that runs: what is 17 times 3?")
+      await turn("Tell the composer of group 1.")
+      for (let i = 0; i < 100 && !events.some((e) => e.taskEnd); i++) await settle()
+      for (let i = 0; i < 50 && children[0].promptTexts.length < 4; i++) await settle()
+
+      const [orchestrator, composer1, composer2] = children
+      const opening = engine === "v3" ? ["session/set_config_option"] : ["session/set_model"]
+      const closing = engine === "v3" ? ["session/close", "session/delete"] : []
+      expect(composer1.requests).toEqual(["initialize", "session/new", ...opening, "session/prompt", "_session/steer", ...closing])
+      expect(composer2.requests).toEqual(["initialize", "session/new", ...opening, "session/prompt", ...closing])
+      expect(orchestrator.requests).toEqual(["initialize", "session/new", "session/prompt", "session/prompt", "session/prompt", "session/prompt"])
+      expect(composer1.promptTexts[0]).toMatch(new RegExp(`^deck_id: ${deckRoot}/${deck}\\nassigned_slugs: cover\\nmode: pptx\\n`))
+      const message = events.find((e) => (e.toolResult as Line | undefined)?.name === "message_composer")?.toolResult as Line
+      expect(message.status).toBe("success")
+      const ended = events.filter((e) => e.taskEnd).map((e) => e.taskEnd as Line)
+      expect(ended).toHaveLength(1)
+      expect(ended[0].status).toBe("completed")
+      expect(JSON.parse(ended[0].content as string)).toMatchObject({ status: "completed", generated_slides: ["cover", "why"], build: "stale" })
+      expect(orchestrator.promptTexts[3]).toMatch(/^<compose_result task="[0-9a-f]{12}" status="completed">/)
+      expect(orchestrator.promptTexts.filter((t) => t.includes("<compose_result"))).toHaveLength(1)
+      expect(log.mock.calls.some((call) => String(call[0]).includes("steer sent"))).toBe(true)
+    } finally {
+      fs.rmSync(deckRoot, { recursive: true, force: true })
+    }
   })
 })
