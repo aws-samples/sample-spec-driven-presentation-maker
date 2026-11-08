@@ -61,7 +61,7 @@ function localAcpLayers() {
       `${L}/acp/engine.ts`, `${L}/acp/engines/**`, `${L}/conversation/**`, `${L}/sse-bridge.ts`, ...TESTS,
     ]),
     restrict([`${L}/conversation/**/*.ts`, `${L}/sse-bridge.ts`], [engines, registry, processManager, transport, bridge, routes], TESTS),
-    restrict([`${L}/acp/transport.ts`, `${L}/acp/schema.ts`], [
+    restrict([`${L}/acp/transport.ts`, `${L}/acp/schema.ts`, `${L}/acp/process-tree.ts`], [
       { regex: "(^|/)conversation(/|$)", message: "The transport knows JSON-RPC, not the conversation." },
       engines, registry, processManager, bridge,
     ]),
