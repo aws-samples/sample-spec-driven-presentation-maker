@@ -16,6 +16,7 @@ import { useEffect, useState, useRef, useCallback } from "react"
 import { getDeck, DeckDetail } from "@/services/deckService"
 import { ChatTabKey } from "@/components/chat/ChatPanelShell"
 import { isHtmlPreview, previewIdentity } from "@/lib/preview"
+import { MOBILE_BREAKPOINT } from "@/hooks/UseMobile"
 
 /**
  * HTML deck URLs are 15-minute S3 presigned URLs. A stabilised URL is swapped for
@@ -67,12 +68,7 @@ export function useWorkspace(
   const [scrollToSlide, setScrollToSlide] = useState<string>("")
 
   /* ── Hash routing ── */
-  const initialHash = useRef(
-    typeof window !== "undefined" ? parseDeckIdFromHash(window.location.hash) : ""
-  )
-  const [activeDeckId, setActiveDeckId] = useState<string | null>(
-    initialHash.current || null
-  )
+  const [activeDeckId, setActiveDeckId] = useState<string | null>(null)
 
   // Restore hash if cleared externally (e.g. OIDC library)
   useEffect(() => {
@@ -81,10 +77,24 @@ export function useWorkspace(
     }
   }, [activeDeckId])
 
+  // The hash is read after mount, not in the initial state: the prerendered page has no
+  // hash, so reading it during the first render would not match the server markup.
+  // A deck hash opens that deck's chat tab (its saved conversation), as openDeck does, so a
+  // reload or a direct /decks/#<id> link shows the conversation as a click in the list does.
   useEffect(() => {
+    const deckId = parseDeckIdFromHash(window.location.hash)
+    if (deckId) {
+      setActiveDeckId(deckId)
+      if (deckId !== "new") {
+        setChatTab("deck")
+        if (window.innerWidth >= MOBILE_BREAKPOINT) setChatOpen(true)
+      }
+    }
     const onHashChange = () => {
       const deckId = parseDeckIdFromHash(window.location.hash)
-      if (deckId) setActiveDeckId(deckId)
+      if (!deckId) return
+      setActiveDeckId(deckId)
+      if (deckId !== "new") setChatTab("deck")
     }
     window.addEventListener("hashchange", onHashChange)
     return () => window.removeEventListener("hashchange", onHashChange)

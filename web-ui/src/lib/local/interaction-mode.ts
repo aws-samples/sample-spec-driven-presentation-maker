@@ -7,7 +7,8 @@
  * cannot know. The cloud agent passes it as a one-line system part
  * (agent/prompts/wiring/interaction_*.md); ACP agents have a single prompt file,
  * so here the same token is prepended to the first prompt of a fresh session.
- * The meaning of `dialogue` / `fast` is defined in the orchestrator workflow only.
+ * The meaning of `dialogue` / `fast` is defined in the orchestrator workflow only,
+ * as is the meaning of the `Current deck:` and `Continued from:` lines.
  */
 import type { SessionOrigin } from "./kiro-sessions.types"
 
@@ -40,4 +41,17 @@ export function withContinuedFrom(
 ): string {
   if (!origin || !isFirst) return query
   return `${continuedFromToken(origin)}\n\n${query}`
+}
+
+export function currentDeckToken(deckDir: string): string {
+  return `Current deck: ${deckDir}`
+}
+
+/**
+ * Prepend the deck's absolute directory to the first prompt of a new session on an existing
+ * deck (one with no kiro session to resume), so the agent works on that deck.
+ */
+export function withCurrentDeck(query: string, deckDir: string | null | undefined, isFirst: boolean): string {
+  if (!deckDir || !isFirst) return query
+  return `${currentDeckToken(deckDir)}\n\n${query}`
 }

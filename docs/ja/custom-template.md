@@ -409,8 +409,9 @@ Windows なら `%APPDATA%/sdpm/config.json`）に置きます。このファイ�
 }
 ```
 
-- `output_dir`: 生成した PPTX ファイルを書き出す基準のディレクトリ。`~` を展開します。実行ごとに
-  `$SDPM_OUTPUT_DIR` で上書きすることもできます。
+- `output_dir`: デッキの保存先。CLI と MCP サーバーがデッキと生成した PPTX ファイルをここに書き出し、
+  ローカルの Web UI はここにあるデッキを一覧に出します。`~` を展開し、空ならデフォルトを使います。
+  `$SDPM_DECK_ROOT`、次に `$SDPM_OUTPUT_DIR` を設定すると、そちらが優先されます。
 - `extra_sources`: 追加のアセットのマニフェスト（上の **方法 B** を参照）。
 
 以前同梱していた `sdpm/assets/config.json` は、もう読み込まれません。`pip install --upgrade` で
