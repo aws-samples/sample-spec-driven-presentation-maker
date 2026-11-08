@@ -639,7 +639,8 @@ def write_launcher(installed: Path, checkout: Path) -> str:
     try:
         with os.fdopen(fd, "wb") as handle:
             handle.write(new)
-        os.chmod(tmp, 0o755)
+        # The sdpm command in the user's own bin directory: rwx for the owner, r-x for the rest, as chmod +x.
+        os.chmod(tmp, 0o755)  # nosec B103 # nosemgrep: python.lang.security.audit.insecure-file-permissions.insecure-file-permissions
         os.replace(tmp, str(installed))
     except OSError:
         Path(tmp).unlink(missing_ok=True)
@@ -744,7 +745,8 @@ def fetch_manifest(tag: str, use: str, *, base: str, os_name: Optional[str] = No
     url = f"{base}/{tag}/{manifest_name(os_name, use)}"
     request = urllib.request.Request(url, headers={"User-Agent": "sdpm"})
     try:
-        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310 - https/file only
+        # base is the release URL or an SDPM_RELEASE_BASE_URL checked for https:// or file:// (release_base_url).
+        with urllib.request.urlopen(request, timeout=timeout) as response:  # nosec B310 # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
             body = response.read(MANIFEST_MAX_BYTES + 1)
     except urllib.error.HTTPError as error:
         if error.code == 404:

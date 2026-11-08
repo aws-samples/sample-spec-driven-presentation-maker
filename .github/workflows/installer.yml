@@ -320,17 +320,22 @@ jobs:
       - name: Install with a failing client registration
         shell: pwsh
         run: |
-          $fake = Join-Path ([IO.Path]::GetTempPath()) ("fake-" + [guid]::NewGuid())
-          New-Item -ItemType Directory -Path $fake | Out-Null
-          "@echo off`r`nif ""%1 %2""==""mcp add"" exit /b 1`r`nexit /b 0" | Set-Content -Path (Join-Path $fake "claude.cmd") -Encoding ASCII
-          $env:PATH = "$fake;$env:PATH"
+          # The installer rebuilds PATH from the registry plus %USERPROFILE%\bin (Refresh-Path),
+          # so the fake client goes there; removed again before the next steps.
+          $fakeDir = Join-Path $env:USERPROFILE "bin"
+          $fake = Join-Path $fakeDir "claude.cmd"
+          New-Item -ItemType Directory -Force -Path $fakeDir | Out-Null
+          "@echo off`r`nif ""%1 %2""==""mcp add"" exit /b 1`r`nexit /b 0" | Set-Content -Path $fake -Encoding ASCII
           $env:SDPM_HOME = Join-Path ([IO.Path]::GetTempPath()) ("sdpm-reg-" + [guid]::NewGuid())
           $env:SDPM_LAUNCHER_DIR = Join-Path ([IO.Path]::GetTempPath()) ("bin-reg-" + [guid]::NewGuid())
           $mirror = Join-Path ([IO.Path]::GetTempPath()) ("mirror-" + [guid]::NewGuid() + ".git")
           git clone -q --bare . $mirror; git -C $mirror branch -f main HEAD
           $env:SDPM_REPO_URL = $mirror
-          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/install/dist/install.ps1 -McpOnly -NonInteractive -SkipLibreOffice -Register *>&1 | Tee-Object -FilePath reg.log
-          $rc = $LASTEXITCODE
+          try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/install/dist/install.ps1 -McpOnly -NonInteractive -SkipLibreOffice -Register *>&1 | Tee-Object -FilePath reg.log
+            $rc = $LASTEXITCODE
+          } finally { Remove-Item $fake -ErrorAction SilentlyContinue }
+          if (-not (Select-String -Path reg.log -SimpleMatch "Claude Code" -Quiet)) { throw "the fake client was not detected" }
           if ($rc -ne 1) { throw "exit $rc, expected 1" }
           if (-not (Test-Path (Join-Path $env:SDPM_LAUNCHER_DIR "sdpm.cmd"))) { throw "sdpm.cmd was not written" }
           if (-not (Select-String -Path reg.log -SimpleMatch "Some steps did not finish" -Quiet)) { throw "no closing line" }

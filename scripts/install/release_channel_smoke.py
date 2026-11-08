@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import json
+import locale
 import os
 import re
 import shutil
@@ -36,6 +37,14 @@ REPO = Path(__file__).resolve().parents[2]
 WINDOWS = sys.platform == "win32"
 OLD_LAUNCHERS = {"7c53267d": "#397", "7a49558b": "#529", "7842f982": "#532"}
 USER_COMMIT = "1c618b58"   # a real install's commit (v0.10.4-1)
+
+
+def decode(data: bytes) -> str:
+    """UTF-8, else the ANSI code page: a Windows pipe gets the updater's output in the latter."""
+    try:
+        return data.decode("utf-8")
+    except UnicodeDecodeError:
+        return data.decode(locale.getpreferredencoding(False), errors="replace")
 
 
 class Failed(Exception):
@@ -78,7 +87,7 @@ class Smoke:
                                  stderr=subprocess.STDOUT, timeout=timeout, check=False)
         except subprocess.TimeoutExpired as error:
             raise Failed(f"timed out after {timeout:.0f} s (it waited for input?): {argv}") from error
-        text = res.stdout.decode("utf-8", errors="replace")
+        text = decode(res.stdout)
         if not quiet:
             print(text, flush=True)
         return res.returncode, text
@@ -386,6 +395,11 @@ class Smoke:
 
 
 def main() -> int:
+    for stream in (sys.stdout, sys.stderr):
+        # A Windows pipe has the ANSI code page: print '?' for what it cannot encode, never fail.
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(errors="replace")
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     parser.add_argument("--work", required=True, type=Path)
     parser.add_argument("--profile", choices=("mcp", "full"), default="mcp")
