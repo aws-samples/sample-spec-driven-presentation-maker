@@ -78,6 +78,13 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   permission requests are answered automatically only within the safe default: sdpm MCP
   tools and file reads on the deck folder and kiro-cli's `tool-outputs/`, always with the
   offered allow-once option. / See Upgrading from 0.12.
+- **Local Web UI: choose the model and effort in the chat.** A pill above the chat input
+  shows the chat's model and opens a menu of the models kiro-cli offers and, on V3, the
+  effort levels of the chosen model (V2 has no effort). The choice changes this chat's kiro
+  session at once when it is idle, otherwise from the next message, and kiro-cli keeps it
+  with the session. Settings → Model stays the default for new chats; on V3 the composer
+  follows the chat's choice. Settings → Model lists the models without starting kiro-cli. /
+  Nothing.
 
 ### Changed
 
@@ -184,6 +191,16 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   a 2.x deny list, the file is left as it is and the message names the setting. / Nothing.
   Settings already dropped by an earlier rewrite have to be added again by the tool that
   added them.
+- **Registering with a Kiro CLI that is not signed in yet no longer fails.** `kiro-cli
+  agent validate` refuses to run before `kiro-cli login`, so `sdpm register`, the
+  installer's `--register` and `sdpm update` reported Kiro CLI as failed and exited with 1
+  although the agent file was written correctly. The `--full` installer always hit this,
+  having just installed kiro-cli. Registration now checks `kiro-cli whoami` first; when
+  kiro-cli is not signed in it skips the validation, reports the agent as registered and
+  says to run `kiro-cli login` first. / Nothing.
+- **Result marks are coloured only on a terminal.** `sdpm register`, `sdpm update` and
+  `sdpm doctor` printed ANSI colour codes into logs and agent output. They now colour the
+  ✓ / ✗ / ! marks only when the output is a terminal and `NO_COLOR` is not set. / Nothing.
 - **MCP runtime: OpenTelemetry ids no longer repeat across V2 restores.** Every microVM
   restored from the same snapshot started the `random` module from the same state, so
   OpenTelemetry trace and span ids (and botocore retry jitter) could be identical across
@@ -258,9 +275,9 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   (`web-ui/src/proxy.ts`), so new routes are covered, and it has no mode check of its own, so
   it applies wherever the API routes are served; the cloud build leaves it out with the API
   routes. The agent selection and model `PUT`s now also refuse cross-site requests and
-  non-JSON bodies, and listing the models (which may start kiro-cli) is a `POST`, so a plain
-  `GET` has no side effects. Open the Web UI as `http://localhost:<port>` or
-  `http://127.0.0.1:<port>`; another host name pointing at the machine is refused.
+  non-JSON bodies, and listing the models is a `GET` that never starts kiro-cli. Open the
+  Web UI as `http://localhost:<port>` or `http://127.0.0.1:<port>`; another host name
+  pointing at the machine is refused.
 - **Cloud agent: `web_fetch` reaches public internet addresses only.** The agent's
   `web_fetch` tool now fetches through the same URL fetcher as the MCP attachment tools
   (`sdpm.tools.attachment.fetcher`). It rejects schemes other than http(s), ports other than

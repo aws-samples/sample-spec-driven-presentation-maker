@@ -313,6 +313,59 @@ def test_write_kiro_agent_leaves_a_users_composer_alone_and_does_not_delegate(tm
     assert sorted(p.name for p in agents.iterdir()) == ["sdpm-composer.json"]  # still theirs
 
 
+def _kiro_cli_present(monkeypatch, *, whoami: int, validate: int = 0) -> list[list[str]]:
+    """kiro-cli on PATH; `whoami` and `agent validate` exit with the given codes."""
+    ran: list[list[str]] = []
+    monkeypatch.setattr(cc.shutil, "which", lambda n: "/usr/local/bin/kiro-cli" if n == "kiro-cli" else None)
+    monkeypatch.setattr(cc, "_run_quiet", lambda a: (ran.append(a), whoami if a[1:] == ["whoami"] else 0)[1])
+    monkeypatch.setattr(cc, "_run", lambda a: (ran.append(a), validate)[1])
+    return ran
+
+
+def test_write_kiro_agent_signed_out_writes_skips_validate_and_says_login(tmp_path, monkeypatch, capsys):
+    ran = _kiro_cli_present(monkeypatch, whoami=1, validate=1)
+    notes: list[str] = []
+    assert cc.write_kiro_agent(POSIX, root=tmp_path, notes=notes) == 0
+    assert cc.kiro_agent_registered(root=tmp_path) is True
+    assert ran == [["kiro-cli", "whoami"]]  # validate never runs
+    assert notes == [cc.KIRO_LOGIN_FIRST]
+    out = capsys.readouterr().out.splitlines()
+    assert out == ["  Kiro CLI is not signed in yet: run `kiro-cli login`, then `kiro-cli chat --agent sdpm`."]
+
+
+def test_write_kiro_agent_signed_in_still_validates(tmp_path, monkeypatch, capsys):
+    path = str(tmp_path / "agents" / "sdpm-composer.json")  # validated first; a rejection stops there
+    ran = _kiro_cli_present(monkeypatch, whoami=0, validate=1)
+    notes: list[str] = []
+    assert cc.write_kiro_agent(POSIX, root=tmp_path, notes=notes) == 1
+    assert ran == [["kiro-cli", "whoami"], ["kiro-cli", "agent", "validate", "--path", path]]
+    assert notes == [] and "validate rejected" in capsys.readouterr().err
+
+
+def test_register_kiro_signed_out_is_registered_with_login_note(tmp_path, monkeypatch, capsys):
+    monkeypatch.setenv("KIRO_HOME", str(tmp_path))
+    _kiro_cli_present(monkeypatch, whoami=1, validate=1)
+    assert cc.register([cc.by_id("kiro-cli")], POSIX, assume_yes=True, run=lambda _a: 0) == 0
+    row = [ln for ln in capsys.readouterr().out.splitlines() if "Kiro CLI  " in ln]
+    assert len(row) == 1 and "registered" in row[0] and "failed" not in row[0]
+    assert "→ kiro-cli login first, then kiro-cli chat --agent sdpm" in row[0]
+
+
+@pytest.mark.parametrize(("tty", "no_color", "colored"),
+                         [(False, None, False), (True, "1", False), (True, None, True)],
+                         ids=["piped", "no-color", "terminal"])
+def test_result_marks_are_colored_only_on_a_terminal_without_no_color(monkeypatch, capsys, tty, no_color, colored):
+    if no_color is None:
+        monkeypatch.delenv("NO_COLOR", raising=False)
+    else:
+        monkeypatch.setenv("NO_COLOR", no_color)
+    monkeypatch.setattr(cc.sys.stdout, "isatty", lambda: tty)
+    cc.print_outcomes([cc.Outcome(cc.by_id("codex"), "registered", ""), cc.Outcome(cc.by_id("vscode"), "failed", "")])
+    out = capsys.readouterr().out
+    assert ("\x1b[" in out) is colored
+    assert "✓" in out and "✗" in out
+
+
 def test_claude_code_and_codex_use_double_dash_form():
     for cid in ("claude-code", "codex"):
         argv = cc.by_id(cid).register(POSIX)

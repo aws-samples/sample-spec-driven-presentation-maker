@@ -50,11 +50,19 @@ export async function GET() {
   })
 }
 
-/** PUT: update selection and sync to agents/ */
+/** PUT: update selection and sync to agents/ (JSON from the same site only). */
 export async function PUT(req: Request) {
   const refused = rejectCrossSite(req, { requireJson: true })
   if (refused) return refused
-  const body = await req.json()
+  let body: Record<string, unknown>
+  try {
+    body = await req.json()
+  } catch {
+    return Response.json({ error: "invalid JSON body" }, { status: 400 })
+  }
+  if (typeof body !== "object" || body === null || Array.isArray(body)) {
+    return Response.json({ error: "body must be a JSON object" }, { status: 400 })
+  }
   // Validate role values are safe filenames (model is a free-form model ID)
   for (const [k, v] of Object.entries(body)) {
     if (k === "model") continue

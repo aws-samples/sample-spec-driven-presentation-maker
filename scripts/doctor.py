@@ -10,6 +10,7 @@ Checks:
 Run: make doctor
 """
 
+import os
 import shutil
 import sys
 from pathlib import Path
@@ -17,7 +18,11 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT / "sdpm"))
 
-OK, NG, WARN = "\033[32m✓\033[0m", "\033[31m✗\033[0m", "\033[33m!\033[0m"
+# Colour only on a terminal, and not when NO_COLOR is set (https://no-color.org).
+if sys.stdout.isatty() and not os.environ.get("NO_COLOR"):
+    OK, NG, WARN = "\033[32m✓\033[0m", "\033[31m✗\033[0m", "\033[33m!\033[0m"
+else:
+    OK, NG, WARN = "✓", "✗", "!"
 
 
 def main() -> int:

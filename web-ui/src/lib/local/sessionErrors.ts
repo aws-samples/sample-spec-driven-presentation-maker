@@ -55,3 +55,20 @@ export function sessionConflict(error: unknown): SessionConflict | null {
 export function isSessionConflictCode(code: unknown): code is SessionConflictCode {
   return code === "session_busy" || code === "session_locked"
 }
+
+/**
+ * A chat's model choice that was not taken (PUT /api/agent/models):
+ * - `unknown_model`: not one of the models the chat is offered.
+ * - `effort_not_supported`: an effort for a model without effort levels (every V2 model).
+ * - `unknown_effort`: not one of the model's effort levels.
+ * - `models_unknown`: no model list is known yet (no kiro-cli has reported one).
+ * - `model_not_changed`: kiro-cli refused the change; `message` is its error.
+ */
+export type ModelChoiceErrorCode = "unknown_model" | "effort_not_supported" | "unknown_effort" | "models_unknown" | "model_not_changed"
+
+export class ModelChoiceError extends Error {
+  constructor(readonly code: ModelChoiceErrorCode, detail?: string) {
+    super(detail ?? code)
+    this.name = "ModelChoiceError"
+  }
+}

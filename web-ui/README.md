@@ -89,6 +89,10 @@ To run on kiro-cli's V2 engine instead (`kiro-cli acp --agent sdpm-orchestrator`
 
 Rules in `~/.kiro/steering` that are always included reach the sdpm agents' context, under V3 as under V2.
 
+### Model and effort
+
+The pill above the chat input shows the chat's model (and, on V3, its effort) and opens a menu to change them. A change applies to this chat's kiro session: at once when the chat is idle, otherwise from your next message. On V3 you choose the model and, for models that have them, the effort level; on V2 only the model. kiro-cli keeps the choice with the session, so a reopened deck continues on it. Settings → **Model** stays the default for new chats; on V3 the composer sub-agent follows the chat's choice. The list comes from the last kiro-cli session that reported one (`servers/local/.sdpm/acp-models.json`), so neither the pill nor Settings starts kiro-cli; on a first run the pill appears after the first reply.
+
 ### Continue from a kiro-cli session
 
 Any chat you had in `kiro-cli` on this machine can become the starting point of a deck. The empty chat shows your sessions from the last 24 hours as cards; the **+** menu → **Continue from a kiro session** opens the full list grouped by project, newest first. Each session has a small badge for the agent engine that saved it: with the agent engine set to V3, the list has kiro-cli's V3 sessions (from kiro-cli's own session list) and the earlier V2 sessions (`~/.kiro/sessions/cli/`, or `$KIRO_HOME/sessions/cli/`); with V2, only the V2 sessions. Picking one forks it into a new session with the configured engine (on V3, kiro-cli imports a V2 session and forks it; on V2, the session's files are copied), loads it into the orchestrator, and the agent immediately replies with what the work was about and one question — who the audience is and how long the talk is. The original session is never changed. A chip above the chat shows which session the deck was forked from.
