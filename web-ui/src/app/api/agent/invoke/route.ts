@@ -6,7 +6,8 @@
  * kiro-cli process) is answered with 409 and a SessionConflict body; a kiro-cli
  * that does not answer its setup requests in time with 504 and code `agent_timeout`;
  * one that cannot be made ready (lib/local/turnErrors.ts, AgentStartError) with 502 and its code.
- * A reopened deck whose session kiro-cli does not have, or that has none, gets a new one; a deck
+ * A reopened deck whose session kiro-cli does not have, or that has none, gets a new one whose
+ * first prompt names the deck (`Current deck: <dir>`); a deck
  * whose session also ran on the other agent engine says so (lib/local/sessionNotices.ts).
  * The process manager saves the session to a deck the turn creates (and a fork's origin with it),
  * whether or not this stream is still read.
@@ -22,7 +23,8 @@ import {
   readSessionFromDeck,
 } from "@/lib/local/acp-process"
 import { createSSEStream } from "@/lib/local/sse-bridge"
-import { withContinuedFrom, withInteractionMode } from "@/lib/local/interaction-mode"
+import { resolveDeckDir } from "@/lib/local/deck-paths"
+import { withContinuedFrom, withCurrentDeck, withInteractionMode } from "@/lib/local/interaction-mode"
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
 import { sessionConflict } from "@/lib/local/sessionErrors"
@@ -66,6 +68,7 @@ export async function POST(req: Request) {
   const agentName = MODE_TO_AGENT[mode || "spec"] || "sdpm-orchestrator"
   let isFirstPrompt = Boolean(continuedFrom)
   let notice: LocalSessionNoticeCode | undefined
+  let currentDeck: string | null = null
   if (clientSessionId && continuedFrom) pendingOrigins.set(clientSessionId, continuedFrom)
 
   let prompted: Awaited<ReturnType<typeof sendPrompt>>
@@ -84,10 +87,12 @@ export async function POST(req: Request) {
         // client may still hold an earlier id for this page, e.g. the deck fallback id). A deck
         // with no session to open (made by an MCP client or Kiro CLI, or its kiro session is gone)
         // continues in a new one, and the chat says the earlier conversation is not carried over.
+        // The new session's first prompt names the deck's directory, so the agent works on it.
         const { outcome, otherEngine } = await openDeckSession(clientSessionId, deckId, readSessionFromDeck(deckId), agentName, { signal })
         if (outcome === "created") {
           isFirstPrompt = true
           notice = "context_not_carried_over"
+          currentDeck = resolveDeckDir(deckId)
         } else if (otherEngine) {
           notice = "context_from_other_engine"
         }
@@ -98,9 +103,10 @@ export async function POST(req: Request) {
       }
     }
 
-    // Spec / Vibe and continuation facts are attached only to the first prompt.
+    // Spec / Vibe, the current deck and continuation facts are attached only to the first prompt.
     const continuedPrompt = withContinuedFrom(query, continuedFrom, isFirstPrompt)
-    const prompt = withInteractionMode(continuedPrompt, mode, isFirstPrompt)
+    const deckPrompt = withCurrentDeck(continuedPrompt, currentDeck, isFirstPrompt)
+    const prompt = withInteractionMode(deckPrompt, mode, isFirstPrompt)
     prompted = await sendPrompt(clientSessionId, prompt, { notice })
   } catch (error) {
     const conflict = sessionConflict(error)

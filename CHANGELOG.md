@@ -159,6 +159,19 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   yourself is left alone, and `sdpm` is then written without delegation (no parallel
   composers). `sdpm unregister` removes both. / Run `sdpm update`: it rewrites the agent and
   removes the self-delegation, keeping what other tools added.
+- **The Local Web UI continues a deck made elsewhere on that deck.** A deck with no kiro
+  session to resume (made by an MCP client or Kiro CLI, or whose session kiro-cli no longer
+  has) started a new session whose first prompt did not say which deck it was, so the agent
+  read other decks and asked which one to work on. That first prompt now starts with
+  `Current deck: <deck directory>`, and the orchestrator workflow reads that deck's
+  `deck.json` and `specs/` first and continues it. / Nothing.
+- **`run_python` shows folders and suggests decks.** The sandbox's `list_files()` returned
+  only files, so an agent looking at a deck concluded that `slides/` and `specs/` were
+  missing; it now returns folders too, ending with `/` (`slides/`), on Local and Cloud. A
+  `deck_id` that is not a deck directory names up to five deck folders called `<name>` or
+  `…-<name>` (deck folders are `YYYYMMDD-HHMM-<name>`), newest first. / Code that filters
+  `list_files()` by extension is unaffected; code that treats every entry as a file skips
+  names ending with `/`.
 - **The Local Web UI finds decks in the folder the MCP server writes to.** The Web UI and
   its MCP server (`server_acp.py`) read only `SDPM_DECK_ROOT`, while the CLI and the local
   MCP server (`server.py`) read `SDPM_OUTPUT_DIR` and `output_dir` in `config.json`, so a
