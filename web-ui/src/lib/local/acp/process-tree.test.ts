@@ -220,7 +220,7 @@ describe.skipIf(!hasPython)("ProcessTree, real processes", () => {
 
   /** sh in a group of its own, with a python grandchild that moves into another group. */
   async function start(script: string): Promise<ProcessTree> {
-    child = spawn("sh", ["-c", script], { detached: true, stdio: "ignore" })
+    child = spawn("sh", ["-c", script], { detached: true, stdio: "ignore" }) // nosemgrep: dangerous-spawn-shell — test only, script is one of this file's literals
     const tree = new ProcessTree(child.pid!)
     child.on("exit", () => tree.markExited())
     const until = Date.now() + 3000

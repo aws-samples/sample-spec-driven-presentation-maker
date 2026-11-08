@@ -304,7 +304,8 @@ describe("group end and task end", () => {
       await settle()
       const report = JSON.parse(kinds(events, "taskEnd")[0].content as string)
       expect(report.failed_groups).toHaveLength(1)
-      expect(report.failed_groups[0]).toMatchObject({ slugs: ["a"], error: expect.stringMatching(new RegExp(`^${_code}: `)) })
+      expect(report.failed_groups[0]).toMatchObject({ slugs: ["a"] })
+      expect(report.failed_groups[0].error.startsWith(`${_code}: `)).toBe(true)
       expect(c1.killed).toBe(true)
     },
   )
