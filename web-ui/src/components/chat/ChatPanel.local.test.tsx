@@ -7,7 +7,8 @@
  * (resumeLocalAgent, no EventSource): the replay rebuilds the period from its prompt, the Stop
  * button and the background line show while it runs, and the chat is saved on a task's start
  * and end and on a turn's end. A task still running in the history while nothing runs shows
- * stopped.
+ * stopped. A history load of an earlier session id that answers late does not put the saved
+ * history over the replay.
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
@@ -110,6 +111,25 @@ describe("ChatPanel resume (Local)", () => {
     expect(screen.queryByRole("button", { name: "Stop generation" })).toBeNull()
   })
 
+  it("keeps the replay when an earlier session id's history load answers late", async () => {
+    let lateLoad: () => void = () => {}
+    getChatHistory
+      .mockImplementationOnce(() => new Promise((resolve) => { lateLoad = () => resolve({ messages: HISTORY, truncated: false }) }))
+      .mockResolvedValueOnce({ messages: HISTORY, truncated: false })
+    const live = workingResume()
+    // The deck's .session arrives after the mount: the panel first loads under the padded deck id.
+    const { rerender } = renderWithIntl(<ChatPanel deckId="d1" />)
+    await waitFor(() => expect(getChatHistory).toHaveBeenCalledTimes(1))
+    rerender(<ChatPanel deckId="d1" chatSessionId="S1" />)
+    expect(await screen.findByText("Hel")).toBeTruthy()
+    await act(async () => { lateLoad() })
+    expect(screen.getByText("Hel")).toBeTruthy()
+    expect(screen.queryByText("stale partial")).toBeNull()
+    expect(resumeLocalAgent).toHaveBeenCalledTimes(1)
+    expect(live.sessionId).toBe("S1")
+    await act(async () => { live.finish!() })
+  })
+
   it("shows a task the history has running as stopped when nothing runs", async () => {
     const tool = {
       toolUseId: "c1", name: "compose_slides", task: { id: "k1", state: "running" },
@@ -149,6 +169,28 @@ describe("ChatPanel resume (Local)", () => {
     }))
     expect(screen.queryByText(BACKGROUND)).toBeNull()
     await act(async () => { live.finish!() })
+  })
+
+  it("saves a period replayed in one chunk with its whole reply", async () => {
+    getChatHistory.mockResolvedValue({ messages: HISTORY, truncated: false })
+    resumeLocalAgent.mockImplementationOnce(async (_sid: string, h: ResumeHandlers) => {
+      h.onResumeAck({ working: true })
+      h.onSession.onEvent({ work: { state: "busy" } }, { own: false })
+      h.onSession.onEvent({ turn: { id: "p1", why: "prompt", text: "make it" } }, { own: false })
+      h.onStreamUpdate("All done")
+      h.onSession.onEvent({ turnEnd: { id: "p1", how: "finished" } }, { own: false })
+      h.onSession.onEvent({ work: { state: "idle", how: "finished" } }, { own: false })
+      return { working: true, completion: "All done" }
+    })
+    renderWithIntl(<ChatPanel deckId="d1" chatSessionId="S1" />)
+    expect(await screen.findByText("All done")).toBeTruthy()
+    await waitFor(() => expect(saveLocalChat).toHaveBeenCalled())
+    // Every save holds the replayed reply (none of the messages before the replay rendered).
+    const saves = saveLocalChat.mock.calls as unknown as [string, { content: string }[]][]
+    for (const [deckId, messages] of saves) {
+      expect(deckId).toBe("d1")
+      expect(messages.map((m) => m.content)).toEqual(["earlier", "earlier reply", "make it", "All done"])
+    }
   })
 })
 

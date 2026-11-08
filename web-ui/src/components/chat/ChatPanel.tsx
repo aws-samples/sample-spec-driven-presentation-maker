@@ -223,15 +223,20 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [sessionId, auth.user?.id_token, onDeckCreated, onPreviewInvalidated, onWorkflowPhase])
 
   // --- useChatStream ---
+  // A send's or a replay's end, and a turn's end, save the chat once the render that holds their
+  // messages is committed (saveLocalChat reads messagesRef, which follows the render): a replayed
+  // period arrives in one chunk, so its messages are not rendered yet when its stream ends.
+  const [saveRequest, setSaveRequest] = useState(0)
+  useEffect(() => { if (saveRequest) saveLocalChat() }, [saveRequest, saveLocalChat])
+  const requestSave = useCallback(() => { if (IS_LOCAL) setSaveRequest((n) => n + 1) }, [])
   const mode = agentMode === "vibe" ? "vibe" : "spec"
   const stream = useChatStream({
     sessionId,
     mode,
     deckId: currentDeckId.current !== "new" ? currentDeckId.current : undefined,
     onToolEvent: handleToolEvent,
-    onSendComplete: () => saveLocalChat(),
-    // Later than the render of the turn's last output, as the tool saves.
-    onTurnEnd: () => setTimeout(() => saveLocalChat(), 100),
+    onSendComplete: requestSave,
+    onTurnEnd: requestSave,
   })
 
   const cancelFork = useCallback(() => {
@@ -319,6 +324,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   // --- Load chat history ---
   useEffect(() => {
+    // Local: a load the effect has re-run since (React's dev double run, a session id change)
+    // sets nothing, so it cannot put the saved history over a replay the newer load started.
+    let superseded = false
     async function loadHistory() {
       const idToken = auth.user?.id_token
       if (!IS_LOCAL && !idToken) return
@@ -335,6 +343,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         if (history.length > 0) {
           // Local mode: .chat.json is already in ChatPanel's internal format
           if (IS_LOCAL && isLocalHistoryFormat(history)) {
+            if (superseded) return
             loaded = parseLocalHistory(history)
             stream.setMessages(loaded)
           } else {
@@ -354,12 +363,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       // it was working as this page last saw it. Local: always (the server also replays a
       // period that ended while no page followed it).
       if (IS_LOCAL && deckId && deckId !== "new") {
+        if (superseded) return
         setResumeCut({ cut: (prompt: string) => cutLocalAtPrompt(loaded, prompt) })
       } else if (!IS_LOCAL && deckId && deckId !== "new" && isResumable(sessionId)) {
         setResumeCut({ cut: (prompt: string) => parseCloudHistory(cutAtPrompt(raw, prompt)) })
       }
     }
     if (auth.isAuthenticated) loadHistory()
+    return () => { superseded = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, auth.isAuthenticated])
 
