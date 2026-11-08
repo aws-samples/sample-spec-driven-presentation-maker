@@ -31,11 +31,14 @@
  *
  * Other notifications: `_kiro/mcp/status` (a full snapshot) → `mcp_snapshot` then one
  * `mcp_status` per server; `session_info_update` with `kind: "steering_injected"` →
- * `steer_injected`; `config_option_update` keeps the session's models; a custom agent that was
+ * `steer_injected`; `config_option_update` keeps the session's model, effort and model list
+(kiro-cli sends one before it answers set_config_option and after a load's answer, whose own
+`configOptions` list only the current values; a new session's first one comes before session/new
+is answered, so the session reads that answer's full list with `readConfig`); a custom agent that was
  * not found or not readable is logged (`onAgentNotFound` is told the former).
  */
 import type { LocalEvent, ToolEndStatus } from "../../../conversation/events"
-import type { AcpModelList } from "../../engine"
+import type { ModelOption, SessionModels } from "../../engine"
 import type { AcpNotification } from "../../schema"
 import {
   KIRO_CUSTOM_AGENT_CONFIG_ERROR, KIRO_CUSTOM_AGENT_NOT_FOUND, KIRO_MCP_STATUS,
@@ -113,7 +116,9 @@ export class V3Translator {
   private readonly subtasks = new Map<string, "composer" | "other">()
   /** Main-session tool calls already announced with `tool_use`. */
   private readonly announced = new Set<string>()
-  private modelList: AcpModelList | null = null
+  private modelList: SessionModels | null = null
+  /** The ids of the model and effort options in the last `config_option_update`. */
+  private optionIds: { model: string; effort: string | null } = { model: "model", effort: null }
 
   /** A session/load of `sessionId` starts: replayed updates are counted until `finishLoad`. */
   startLoad(sessionId: string, onReplay?: (replayed: number, done: boolean) => void): void {
@@ -128,9 +133,14 @@ export class V3Translator {
     this.onReplay = null
   }
 
-  /** The models of the session's last `config_option_update`, or null before one. */
-  models(): AcpModelList | null {
+  /** The model, effort and models of the session's last `config_option_update`, or null before one. */
+  models(): SessionModels | null {
     return this.modelList
+  }
+
+  /** The config option ids set_config_option takes for the model and the effort (null: the model has none). */
+  configIds(): { model: string; effort: string | null } {
+    return this.optionIds
   }
 
   translate(msg: AcpNotification): LocalEvent[] {
@@ -175,7 +185,7 @@ export class V3Translator {
           ...(typeof meta.content === "string" ? { content: meta.content } : {}),
         }]
       case "config_option_update":
-        this.readModels(update.configOptions)
+        this.readConfig(update.configOptions)
         return []
       default:
         // agent_thought_chunk, plan, usage, user_message_chunk, ... (shown from phase 3 on, if at all)
@@ -242,19 +252,43 @@ export class V3Translator {
     return events
   }
 
-  private readModels(options: unknown): void {
+  /** Keep the model, effort and models of a list of config options (session/new's answer, a config_option_update). */
+  readConfig(options: unknown): void {
     if (!Array.isArray(options)) return
-    const model = options.find((option): option is V3SelectOption => isObject(option) && (option.category === "model" || option.id === "model"))
+    const selects = options.filter((option): option is V3SelectOption => isObject(option))
+    const model = selects.find((option) => option.category === "model") ?? selects.find((option) => option.id === "model")
     if (!model || !Array.isArray(model.options)) return
+    const effort = selects.find((option) => option.category === "thought_level")
+    const levels = Array.isArray(effort?.options)
+      ? effort.options.map((option) => option?.value).filter((value): value is string => typeof value === "string")
+      : []
+    this.optionIds = { model: typeof model.id === "string" ? model.id : "model", effort: effort && typeof effort.id === "string" ? effort.id : null }
     this.modelList = {
       current: typeof model.currentValue === "string" ? model.currentValue : "",
-      available: model.options
-        .filter((option) => typeof option?.value === "string")
-        .map((option) => ({
-          modelId: option.value!,
-          name: option.name || option.value!,
-          ...(option.description ? { description: option.description } : {}),
-        })),
+      available: model.options.filter((option) => typeof option?.value === "string" && listed(option.description)).map(modelOption),
+      effort: effort && this.optionIds.effort && levels.length
+        ? { current: typeof effort.currentValue === "string" ? effort.currentValue : "", levels }
+        : null,
     }
+  }
+}
+
+/** kiro-cli marks the models it does not offer to users in their description. */
+const listed = (description: unknown) =>
+  typeof description !== "string" || !(description.startsWith("[Internal]") || description.startsWith("[Deprecated]"))
+
+const isStringList = (value: unknown): value is string[] =>
+  Array.isArray(value) && value.length > 0 && value.every((item) => typeof item === "string")
+
+function modelOption(option: NonNullable<V3SelectOption["options"]>[number]): ModelOption {
+  const meta = option._meta?.kiro ?? {}
+  const effort = meta.hasEffort === true && isStringList(meta.effortLevels)
+  return {
+    modelId: option.value!,
+    name: option.name || option.value!,
+    ...(option.description ? { description: option.description } : {}),
+    ...(effort ? { effortLevels: [...meta.effortLevels!] } : {}),
+    ...(effort && typeof meta.defaultEffortLevel === "string" ? { defaultEffort: meta.defaultEffortLevel } : {}),
+    ...(typeof meta.rateMultiplier === "number" && Number.isFinite(meta.rateMultiplier) ? { rate: meta.rateMultiplier } : {}),
   }
 }
