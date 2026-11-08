@@ -1,0 +1,294 @@
+{
+  "_comment": "Local compose reports (web-ui/src/lib/local/conversation/compose-report.ts) and their <compose_result> texts; read by compose-report.test.ts and tests/test_agent_background.py.",
+  "cases": [
+    {
+      "name": "completed",
+      "taskId": "281d55a6bd8a",
+      "input": {
+        "groups": [
+          {
+            "slugs": [
+              "cover"
+            ],
+            "instruction": "Compose the assigned slides from the approved specs.",
+            "status": "success",
+            "summary": "Wrote cover & checked <title>."
+          }
+        ],
+        "outlineSlugs": [
+          "cover"
+        ],
+        "cancelled": false,
+        "stale": false,
+        "outputFormat": "pptx",
+        "deckId": "/tmp/sdpm/decks/20261108-2111-async-compose-spike"
+      },
+      "status": "completed",
+      "report": {
+        "status": "completed",
+        "generated_slides": [
+          "cover"
+        ],
+        "failed_groups": [],
+        "partial": false,
+        "summaries": {
+          "cover": "Wrote cover & checked <title>."
+        },
+        "outline_check": {
+          "expected": [
+            "cover"
+          ],
+          "missing": [],
+          "extra": []
+        }
+      },
+      "text": "<compose_result task=\"281d55a6bd8a\" status=\"completed\">{\"status\":\"completed\",\"generated_slides\":[\"cover\"],\"failed_groups\":[],\"partial\":false,\"summaries\":{\"cover\":\"Wrote cover &amp; checked &lt;title&gt;.\"},\"outline_check\":{\"expected\":[\"cover\"],\"missing\":[],\"extra\":[]}}</compose_result>"
+    },
+    {
+      "name": "partial",
+      "taskId": "a1b2c3d4e5f6",
+      "input": {
+        "groups": [
+          {
+            "slugs": [
+              "cover",
+              "agenda"
+            ],
+            "instruction": "Compose the assigned slides from the approved specs.",
+            "status": "success",
+            "summary": "Done."
+          },
+          {
+            "slugs": [
+              "why"
+            ],
+            "instruction": "Compose the assigned slides from the approved specs.",
+            "status": "error",
+            "summary": "",
+            "error": "kiro-cli exited (code 1)"
+          }
+        ],
+        "outlineSlugs": [
+          "cover",
+          "agenda",
+          "why"
+        ],
+        "specWarnings": [
+          "why: no image"
+        ],
+        "cancelled": false,
+        "stale": true,
+        "outputFormat": "pptx",
+        "deckId": "/tmp/sdpm/decks/20261108-2111-async-compose-spike"
+      },
+      "status": "completed",
+      "report": {
+        "status": "partial",
+        "generated_slides": [
+          "cover",
+          "agenda"
+        ],
+        "failed_groups": [
+          {
+            "group_index": 2,
+            "slugs": [
+              "why"
+            ],
+            "instruction": "Compose the assigned slides from the approved specs.",
+            "error": "kiro-cli exited (code 1)"
+          }
+        ],
+        "partial": true,
+        "summaries": {
+          "cover, agenda": "Done."
+        },
+        "spec_warnings": [
+          "why: no image"
+        ],
+        "notice": "2/3 slides were generated; groups covering ['why'] failed. Successfully generated slides do NOT need regeneration. Tell the user which slides failed and why, and offer to retry — on retry, call compose_slides again with ONLY the failed groups (reuse each group's slugs and instruction from failed_groups). output.pptx may not hold the last version of every slide: call generate_pptx(deck_id) once before telling the user the deck is ready.",
+        "build": "stale",
+        "outline_check": {
+          "expected": [
+            "cover",
+            "agenda",
+            "why"
+          ],
+          "missing": [
+            "why"
+          ],
+          "extra": []
+        }
+      },
+      "text": "<compose_result task=\"a1b2c3d4e5f6\" status=\"completed\">{\"status\":\"partial\",\"generated_slides\":[\"cover\",\"agenda\"],\"failed_groups\":[{\"group_index\":2,\"slugs\":[\"why\"],\"instruction\":\"Compose the assigned slides from the approved specs.\",\"error\":\"kiro-cli exited (code 1)\"}],\"partial\":true,\"summaries\":{\"cover, agenda\":\"Done.\"},\"spec_warnings\":[\"why: no image\"],\"notice\":\"2/3 slides were generated; groups covering ['why'] failed. Successfully generated slides do NOT need regeneration. Tell the user which slides failed and why, and offer to retry — on retry, call compose_slides again with ONLY the failed groups (reuse each group's slugs and instruction from failed_groups). output.pptx may not hold the last version of every slide: call generate_pptx(deck_id) once before telling the user the deck is ready.\",\"build\":\"stale\",\"outline_check\":{\"expected\":[\"cover\",\"agenda\",\"why\"],\"missing\":[\"why\"],\"extra\":[]}}</compose_result>"
+    },
+    {
+      "name": "cancelled",
+      "taskId": "0123456789ab",
+      "input": {
+        "groups": [
+          {
+            "slugs": [
+              "cover"
+            ],
+            "instruction": "Compose the assigned slides from the approved specs.",
+            "status": "success",
+            "summary": "Done."
+          },
+          {
+            "slugs": [
+              "why"
+            ],
+            "instruction": "Compose the assigned slides from the approved specs.",
+            "status": "cancelled",
+            "summary": ""
+          }
+        ],
+        "outlineSlugs": [
+          "cover",
+          "why"
+        ],
+        "cancelled": true,
+        "stale": false,
+        "outputFormat": "pptx",
+        "deckId": "/tmp/sdpm/decks/20261108-2111-async-compose-spike"
+      },
+      "status": "cancelled",
+      "report": {
+        "status": "cancelled",
+        "generated_slides": [
+          "cover"
+        ],
+        "failed_groups": [
+          {
+            "group_index": 2,
+            "slugs": [
+              "why"
+            ],
+            "instruction": "Compose the assigned slides from the approved specs.",
+            "error": "cancelled"
+          }
+        ],
+        "partial": true,
+        "summaries": {
+          "cover": "Done."
+        },
+        "notice": "Stopped: the turn was cancelled; the deck may be partly built. generated_slides lists the groups that finished; slides of the other groups may be missing or incomplete. Do not call compose_slides again unless the user asks."
+      },
+      "text": "<compose_result task=\"0123456789ab\" status=\"cancelled\">{\"status\":\"cancelled\",\"generated_slides\":[\"cover\"],\"failed_groups\":[{\"group_index\":2,\"slugs\":[\"why\"],\"instruction\":\"Compose the assigned slides from the approved specs.\",\"error\":\"cancelled\"}],\"partial\":true,\"summaries\":{\"cover\":\"Done.\"},\"notice\":\"Stopped: the turn was cancelled; the deck may be partly built. generated_slides lists the groups that finished; slides of the other groups may be missing or incomplete. Do not call compose_slides again unless the user asks.\"}</compose_result>"
+    },
+    {
+      "name": "completed with a stale build",
+      "taskId": "fd016d732544",
+      "input": {
+        "groups": [
+          {
+            "slugs": [
+              "cover"
+            ],
+            "instruction": "Compose the assigned slides from the approved specs.",
+            "status": "success",
+            "summary": "Cover done."
+          },
+          {
+            "slugs": [
+              "why"
+            ],
+            "instruction": "Compose the assigned slides from the approved specs.",
+            "status": "success",
+            "summary": "Bullets done."
+          }
+        ],
+        "outlineSlugs": [
+          "cover",
+          "why"
+        ],
+        "cancelled": false,
+        "stale": true,
+        "outputFormat": "pptx",
+        "deckId": "/tmp/sdpm/decks/20261108-2111-async-compose-spike"
+      },
+      "status": "completed",
+      "report": {
+        "status": "completed",
+        "generated_slides": [
+          "cover",
+          "why"
+        ],
+        "failed_groups": [],
+        "partial": false,
+        "summaries": {
+          "cover": "Cover done.",
+          "why": "Bullets done."
+        },
+        "notice": "output.pptx may not hold the last version of every slide: call generate_pptx(deck_id) once before telling the user the deck is ready.",
+        "build": "stale",
+        "outline_check": {
+          "expected": [
+            "cover",
+            "why"
+          ],
+          "missing": [],
+          "extra": []
+        }
+      },
+      "text": "<compose_result task=\"fd016d732544\" status=\"completed\">{\"status\":\"completed\",\"generated_slides\":[\"cover\",\"why\"],\"failed_groups\":[],\"partial\":false,\"summaries\":{\"cover\":\"Cover done.\",\"why\":\"Bullets done.\"},\"notice\":\"output.pptx may not hold the last version of every slide: call generate_pptx(deck_id) once before telling the user the deck is ready.\",\"build\":\"stale\",\"outline_check\":{\"expected\":[\"cover\",\"why\"],\"missing\":[],\"extra\":[]}}</compose_result>"
+    },
+    {
+      "name": "stale HTML",
+      "taskId": "feedfacecafe",
+      "input": {
+        "groups": [
+          {
+            "slugs": [
+              "intro"
+            ],
+            "instruction": "Compose the assigned slides from the approved specs.",
+            "status": "success",
+            "summary": "Intro done."
+          },
+          {
+            "slugs": [
+              "end"
+            ],
+            "instruction": "Compose the assigned slides from the approved specs.",
+            "status": "success",
+            "summary": "End done."
+          }
+        ],
+        "outlineSlugs": [
+          "intro",
+          "end"
+        ],
+        "cancelled": false,
+        "stale": true,
+        "outputFormat": "html",
+        "deckId": "/tmp/sdpm/decks/20261108-2111-async-compose-spike"
+      },
+      "status": "completed",
+      "report": {
+        "status": "completed",
+        "generated_slides": [
+          "intro",
+          "end"
+        ],
+        "failed_groups": [],
+        "partial": false,
+        "summaries": {
+          "intro": "Intro done.",
+          "end": "End done."
+        },
+        "notice": "output.html may not hold the last version of every slide: call run_python(purpose=\"Rebuild output.html\", deck_id=\"/tmp/sdpm/decks/20261108-2111-async-compose-spike\", code=\"print('rebuild')\", measure_slides=[\"intro\"]) once before telling the user the deck is ready; it rebuilds output.html.",
+        "build": "stale",
+        "outline_check": {
+          "expected": [
+            "intro",
+            "end"
+          ],
+          "missing": [],
+          "extra": []
+        }
+      },
+      "text": "<compose_result task=\"feedfacecafe\" status=\"completed\">{\"status\":\"completed\",\"generated_slides\":[\"intro\",\"end\"],\"failed_groups\":[],\"partial\":false,\"summaries\":{\"intro\":\"Intro done.\",\"end\":\"End done.\"},\"notice\":\"output.html may not hold the last version of every slide: call run_python(purpose=\\\"Rebuild output.html\\\", deck_id=\\\"/tmp/sdpm/decks/20261108-2111-async-compose-spike\\\", code=\\\"print('rebuild')\\\", measure_slides=[\\\"intro\\\"]) once before telling the user the deck is ready; it rebuilds output.html.\",\"build\":\"stale\",\"outline_check\":{\"expected\":[\"intro\",\"end\"],\"missing\":[],\"extra\":[]}}</compose_result>"
+    }
+  ]
+}

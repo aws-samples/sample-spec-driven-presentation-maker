@@ -412,3 +412,43 @@ def test_strands_runs_mark_appended_after_appending_a_continuation():
     asyncio.run(_continuation.mark_appended(event))
     asyncio.run(_continuation.mark_appended(event))
     assert ran == [1]
+
+
+def _cloud_notice(prefix: str) -> str:
+    """The string constant of agent/modes/composer.py that starts with ``prefix`` (its
+    implicit concatenation joined by the parser)."""
+    import ast
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parent.parent / "agent" / "modes" / "composer.py").read_text()
+    found = [node.value for node in ast.walk(ast.parse(source))
+             if isinstance(node, ast.Constant) and isinstance(node.value, str) and node.value.startswith(prefix)]
+    assert len(found) == 1, found
+    return found[0]
+
+
+def test_local_compose_results_are_read_as_cloud_reads_them():
+    # The shared fixture: the Local Web UI builds these texts (compose-report.ts, compose-report.test.ts).
+    from pathlib import Path
+
+    background = load("background")
+    fixture = json.loads((Path(__file__).resolve().parent.parent / "web-ui" / "src" / "test" / "fixtures"
+                          / "composeResult.json").read_text())
+    cloud_keys = {"status", "generated_slides", "failed_groups", "partial", "summaries", "spec_warnings",
+                  "notice", "build", "build_error", "outline_check"}
+    cloud_cancelled = _cloud_notice("Stopped: the turn was cancelled")
+    for case in fixture["cases"]:
+        (task,) = background.delivered({"role": "user", "content": [{"text": case["text"]}]})
+        assert task["task_id"] == case["taskId"]
+        assert task["status"] == case["status"]
+        report = json.loads(background.result_text(task))
+        assert report == case["report"], case["name"]
+        assert set(report) <= cloud_keys - {"build_error"}, case["name"]
+        assert ("build" in report) == (report.get("build") == "stale"), case["name"]
+        if case["report"]["status"] == "cancelled":
+            local_first, _, local_rest = report["notice"].partition(". ")
+            cloud_first, _, cloud_rest = cloud_cancelled.partition(". ")
+            assert local_first != cloud_first, "the first sentence is Local's own"
+            assert local_rest == cloud_rest, "the rest is Cloud's verbatim"
+    assert sorted({c["report"]["status"] for c in fixture["cases"]}) == ["cancelled", "completed", "partial"]
+    assert [c["name"] for c in fixture["cases"] if "build" in c["report"]] == ["partial", "completed with a stale build", "stale HTML"]
