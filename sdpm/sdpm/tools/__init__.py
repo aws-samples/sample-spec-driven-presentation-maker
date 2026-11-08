@@ -44,9 +44,9 @@ def start_composing(
     assigned_slugs — call this first with those values and the mode.
 
     Validates the specs, then returns the composer role document, the slide spec for the
-    mode, and everything the deck gives you: deck.json, brief, outline, art direction,
-    template analysis (template_html in html mode), which slides exist, and your assigned
-    slides (plus any override-group head they inherit from, marked read-only).
+    mode, and everything the deck gives you: deck.json, brief, outline, a table of contents
+    of the art direction, template analysis (template_html in html mode), which slides exist,
+    and your assigned slides (plus any override-group head they inherit from, marked read-only).
     specs_ok=false with errors means stop and report.
     """
     from sdpm.entry import start_composing as _start

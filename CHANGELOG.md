@@ -93,6 +93,18 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
 
 ### Changed
 
+- **Composers get their inputs inline and read the rest on demand.** `start_composing` now
+  returns `deck.art_direction_toc` (each block of `specs/art-direction.html` as a line range
+  with its comments) instead of the whole style in `deck.art_direction`, and `static.slide_spec`
+  is the core of the slide format; element fields, effects, media and visual forms moved to
+  the new guides `slide-json-elements`, `slide-json-media`, `slide-json-effects` and
+  `visual-forms` (HTML: slide scripts to `slide-html-scripts`). The composer role documents
+  say which parts to read. The result for a 3-slide deck with any bundled style stays under
+  25,000 characters (it was about 80,000), so Kiro CLI V3 no longer moves it to a file.
+  `apply_style`'s `style_toc` entries gain `start` / `end`, and each slide's `comment` now
+  lists the comments inside its range. A client that read `deck.art_direction` reads
+  `specs/art-direction.html` instead.
+
 - **The installer and `sdpm update` follow the latest release.** The install line is the
   same, but it installs the newest release tag (`vX.Y.Z`, no pre-releases) instead of the
   tip of `main`, and `sdpm update` moves to the next release. Neither ever moves an install

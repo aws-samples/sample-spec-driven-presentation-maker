@@ -16,15 +16,17 @@ You work silently: no questions to the user, results go back to the orchestrator
 `start_composing(deck_id, assigned_slugs, mode="html")` — the call that gave you this
 document — also gave you your sources: `brief` (audience, message, constraints, and a
 **Sources** list), `outline` (one claim per slide plus `body` / `visual` / `evidence`; the
-whole deck, so you see where your slides sit), `art_direction` (the style), `deck` (template,
-slide size), `template_html` (the template's layouts, placeholders and decorations — its layout
-names are the source of truth), `deck_css` (absent before the layout pass), `slides_present`,
-and `existing_slides` (the HTML of your assigned slides, plus any prefix-group head, marked
-`readonly`). These are current; the only thing left to fetch is the parts of the brief's
-Sources your slides need. Facts come from the brief and its sources.
+whole deck, so you see where your slides sit), `art_direction_toc` (the map of the style,
+below), `deck` (template, slide size), `template_html` (the template's layouts, placeholders
+and decorations — its layout names are the source of truth), `deck_css` (absent before the
+layout pass), `slides_present`, and `existing_slides` (the HTML of your assigned slides, plus
+any prefix-group head, marked `readonly`). These are current. What is left to read is the parts
+of the style your slides use and the parts of the brief's Sources your slides need. Facts come
+from the brief and its sources.
 
-`slide_spec`, returned with this document, is the slide format and what a slide can use;
-`read_guides(["slide-html-spec"])` brings it back if it has left your context.
+`slide_spec`, returned with this document, is the slide format and what a slide can use; the
+`slide-html-scripts` guide says how a slide script runs. `read_guides(["slide-html-spec"])`
+brings the format back if it has left your context.
 
 ## Building a slide
 
@@ -45,7 +47,12 @@ Sources your slides need. Facts come from the brief and its sources.
   style: its `Frame:` comments say what repeats on every slide, its `Component:` comments the
   parts slides are built from, its `Pattern:` slides how it builds each slide type and which
   regions that divides into. Match its density and its look; its patterns show how it draws,
-  and a slide may show more than they do. Slide text is words, without emoji.
+  and a slide may show more than they do. Slide text is words, without emoji. Read the parts
+  your slides use (the `:root` tokens, the rules, the frames, and the components and patterns
+  that fit your slides' `visual`) and more whenever a slide calls for it: each line of
+  `art_direction_toc.toc` is a line range of the file (1-based, inclusive) with its comments,
+  and one `run_python` prints a range with `read_text`. With an empty `toc`, read the file in
+  parts.
 - **Use the helpers.** `grid(purpose, spec)` computes exact coordinates for row × column
   layouts; `search_assets` finds icons. Code goes in `<pre><code>`, diagrams in HTML / SVG.
 - **Check, then move on.** Write each slide with `run_python`

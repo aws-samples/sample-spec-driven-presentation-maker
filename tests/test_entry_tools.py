@@ -3,6 +3,7 @@
 """Role entry tools: one call returns the role document plus what the role reads first."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -227,7 +228,11 @@ class TestStartComposing:
         assert d["deck"]["template"]
         assert "Audience: engineers" in d["brief"]
         assert "[demo-2]" in d["outline"]  # whole outline, not just assigned rows
-        assert "<html" in d["art_direction"].lower()
+        toc = d["art_direction_toc"]
+        assert toc["path"] == "specs/art-direction.html" and "art_direction" not in d
+        assert toc["lines"] == len((deck / toc["path"]).read_text(encoding="utf-8").splitlines())
+        assert toc["toc"] and all(re.match(r"\d+-\d+: \S", line) for line in toc["toc"])
+        assert any("Pattern:" in line for line in toc["toc"])
         assert d["template_analysis"] and d["template_analysis"]["layouts"]
         assert d["assigned_slugs"] == ["intro", "closing"]
         assert d["slides_present"] == ["demo-1", "demo-2", "intro"]
@@ -406,8 +411,108 @@ def test_apply_style_returns_a_line_numbered_toc(tmp_path: Path):
     assert all("slide" in lines[e["line"] - 1] for e in slides)
     # a nested element whose class merely contains "slide-" is not a slide
     assert not any("slide-title" in e["classes"] for e in slides)
+    # the ranges tile the file from the <style> block on, and each slide's range holds the
+    # comments that describe it (the ones above its opening and the ones inside it)
+    assert all(a["end"] + 1 == b["start"] for a, b in zip(toc, toc[1:]))
+    assert toc[-1]["end"] == len(lines)
+    assert all(e["start"] <= e["line"] <= e["end"] for e in toc)
+    for number, line in enumerate(lines, 1):
+        m = re.match(r"\s*<!--\s*((?:Frame|Component|Pattern):.{0,20})", line)
+        if m:
+            (block,) = [e for e in toc if e["start"] <= number <= e["end"]]
+            assert m.group(1) in (block.get("comment") or ""), (number, m.group(1))
     # every bundled style maps; a file without .slide blocks maps to nothing
     styles_dir = Path(__file__).resolve().parents[1] / "sdpm" / "references" / "examples" / "styles"
     for path in styles_dir.glob("*.html"):
         assert len([e for e in style_toc(path.read_text(encoding="utf-8")) if e["kind"] == "slide"]) >= 8, path.name
     assert style_toc("<html><body><p>plain</p></body></html>") == []
+
+
+# ---------------------------------------------------------------------------
+# Size budget: the start_composing result reaches the composer inline
+# ---------------------------------------------------------------------------
+
+# Kiro CLI V3 moves a tool result of 30,000+ characters to a file and shows the model
+# only its ends; Claude Code caps MCP output too. 25,000 leaves room for larger groups.
+_RESULT_BUDGET = 25_000
+
+_BUDGET_OUTLINE = """# Deck
+
+## Why
+- [intro] Why this matters now
+  - body: One paragraph of context on the change the audience faces
+  - visual: A single statement with one supporting figure
+  - evidence: brief Sources 1
+- [problem] Three things slow teams down today
+  - body: Three pain points, each with its cost
+  - visual: Three cards with an icon each
+  - evidence: brief Sources 1
+- [closing] What to do next
+  - body: Call to action with owners and dates
+  - visual: A three-step flow
+  - evidence: brief Sources 1
+"""
+_BUDGET_SLUGS = ["intro", "problem", "closing"]
+_STYLES_DIR = Path(__file__).resolve().parents[1] / "sdpm" / "references" / "examples" / "styles"
+
+
+def _layout_pass_slide(slug: str, mode: str) -> str:
+    """What a layout pass leaves for the content pass: frame elements and named regions."""
+    if mode == "html":
+        return (
+            f'<section data-layout="Title Only">\n  <h1 data-ph="title">The claim of the {slug} slide</h1>\n'
+            '  <div class="section-label" style="position:absolute;left:120px;top:96px;width:800px;height:40px">Section</div>\n'
+            '  <div data-region="body" style="left:120px;top:300px;width:1680px;height:520px"></div>\n'
+            '  <div data-region="takeaway" style="left:120px;top:860px;width:1680px;height:110px"></div>\n'
+            '  <aside class="notes"></aside>\n</section>\n'
+        )
+    return json.dumps({
+        "layout": "Title Only",
+        "placeholders": {"0": f"The claim of the {slug} slide"},
+        "notes": "",
+        "elements": [
+            {"_comment": "region: body", "x": 120, "y": 300, "w": 1680, "h": 520},
+            {"_comment": "region: takeaway", "x": 120, "y": 860, "w": 1680, "h": 110},
+            {"type": "textbox", "x": 120, "y": 96, "width": 800, "height": 40, "text": "Section",
+             "fontSize": 14, "fontColor": "#111111", "marginTop": 0},
+            {"type": "line", "x1": 120, "y1": 260, "x2": 1800, "y2": 260, "color": "#111111", "lineWidth": 2},
+        ],
+    }, ensure_ascii=False, indent=2)
+
+
+@pytest.mark.parametrize("mode", ["pptx", "html"])
+def test_start_composing_fits_the_tool_result_budget(mode: str, tmp_path: Path):
+    """Layout pass and content pass of a 3-slide deck, for every built-in style."""
+    deck_dir = Path(tools.init_deck_workspace(str(tmp_path / "deck"), output_format=mode)["output_dir"])
+    specs = deck_dir / "specs"
+    slides = deck_dir / "slides"
+    sizes: dict[str, int] = {}
+    for style in sorted(p.stem for p in _STYLES_DIR.glob("*.html")):
+        tools.apply_style(str(deck_dir), style=style, template="blank-dark")
+        (specs / "brief.md").write_text("# Brief\n\nAudience: engineers.\n\n## Sources\n1. pasted notes\n", encoding="utf-8")
+        (specs / "outline.md").write_text(_BUDGET_OUTLINE, encoding="utf-8")
+        for path in slides.glob("*"):
+            path.unlink()
+        for pass_name in ("layout", "content"):
+            if pass_name == "content":
+                for slug in _BUDGET_SLUGS:
+                    suffix = "html" if mode == "html" else "json"
+                    (slides / f"{slug}.{suffix}").write_text(_layout_pass_slide(slug, mode), encoding="utf-8")
+            result = tools.start_composing(str(deck_dir), _BUDGET_SLUGS, mode=mode)
+            assert result["deck"]["specs_ok"] is True
+            assert len(result["deck"]["existing_slides"]) == (3 if pass_name == "content" else 0)
+            sizes[f"{style}/{pass_name}"] = len(json.dumps(result, ensure_ascii=False))
+    over = {key: size for key, size in sizes.items() if size > _RESULT_BUDGET}
+    assert not over, over
+
+
+def test_every_slide_format_guide_fits_the_tool_result_budget():
+    """The parts of the format a composer reads on demand come back inline too."""
+    names = ["slide-json-spec", "slide-json-elements", "slide-json-media", "slide-json-effects",
+             "visual-forms", "slide-html-spec", "slide-html-scripts"]
+    for name in names:
+        result = tools.read_guides([name])
+        assert result["documents"][0]["content"], name
+        assert len(json.dumps(result, ensure_ascii=False)) <= _RESULT_BUDGET, name
+    spec = tools.start_composing()["static"]["slide_spec"]
+    assert all(name in spec for name in names[1:5])
