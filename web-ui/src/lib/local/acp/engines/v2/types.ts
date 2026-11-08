@@ -4,8 +4,7 @@
  * kiro-cli V2's extensions to ACP, as kiro-cli 3.0.0 sends them (`kiro-cli acp --agent <name>`;
  * captures in src/test/fixtures/acp/kiro-3.0.0-v2-*.jsonl).
  */
-import type { AcpModel } from "../../engine"
-import type { NewSessionResponse, ToolCall, ToolCallUpdate } from "../../schema"
+import type { LoadSessionResponse, NewSessionResponse, ToolCall, ToolCallUpdate } from "../../schema"
 
 /** V2's own update channel: tool call chunks and steer injections. */
 export const KIRO_SESSION_UPDATE = "_kiro.dev/session/update"
@@ -23,9 +22,20 @@ export const SESSION_LOCKED_MARKER = "Session is active in another process"
 /** session/load's error text for a session kiro-cli does not have (`-32603`, in `data`). */
 export const SESSION_NOT_FOUND_MARKER = "Session not found"
 
+/** The session's model and the models it offers (V2 names them by id); session/set_model changes it. */
+export interface V2SessionModels {
+  currentModelId?: string
+  availableModels?: { modelId?: string; name?: string; description?: string }[]
+}
+
 /** session/new also answers the models the agent offers. */
 export interface V2NewSessionResponse extends NewSessionResponse {
-  models?: { currentModelId?: string; availableModels?: AcpModel[] }
+  models?: V2SessionModels
+}
+
+/** session/load answers them too, with the model the session kept. */
+export interface V2LoadSessionResponse extends LoadSessionResponse {
+  models?: V2SessionModels
 }
 
 /** `_meta.kiro` of a tool_call: MCP tools name their server; the crew is toolName "subagent". */

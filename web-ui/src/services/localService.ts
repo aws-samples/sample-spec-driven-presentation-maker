@@ -32,6 +32,32 @@ export interface LocalModel {
   description?: string
 }
 
+/** A model of the chat's kiro session (`/api/agent/models`); names are kiro-cli's. */
+export interface LocalModelOption {
+  modelId: string
+  name: string
+  description?: string
+  /** Only for a model with effort levels (V3). */
+  effortLevels?: string[]
+  defaultEffort?: string
+  /** kiro-cli's credit multiplier (V3). */
+  rate?: number
+}
+
+/** A change of the chat's model and/or effort. */
+export interface LocalModelChoice {
+  model?: string
+  effort?: string
+}
+
+/** A chat's models: what its live session runs (null without one) and the choice for its next message. */
+export interface LocalSessionModels {
+  engine: AgentEngine
+  available: LocalModelOption[]
+  current: { model: string; effort: string | null; effortLevels: string[] } | null
+  pending: LocalModelChoice | null
+}
+
 /** The kiro-cli engine that runs the sdpm agents (`/api/agent/engine`). */
 export type AgentEngine = "v2" | "v3"
 
@@ -155,12 +181,40 @@ export async function updateAgentSelection(patch: Partial<Record<keyof AgentSele
  */
 export async function listLocalModels(): Promise<LocalModel[]> {
   if (!IS_LOCAL) return []
-  // POST: listing may start a kiro-cli process (the list comes from its session)
-  const response = await postJson("/api/agent/models", {})
+  // The last list a kiro-cli session reported; never starts one (empty until a session has).
+  const response = await fetch("/api/agent/models")
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
   const data = await response.json()
   return (data.available || []).map((m: { modelId: string; name: string; description?: string }) => ({
     modelId: m.modelId, displayName: m.name, description: m.description,
   }))
+}
+
+/**
+ * A chat's models: its live session's model and effort, the models it is offered, and the
+ * choice that applies from its next message. Never starts kiro-cli.
+ *
+ * @param sessionId - The chat's session id (ChatPanel's)
+ * @returns The chat's models, or null in cloud mode
+ */
+export async function getLocalSessionModels(sessionId: string): Promise<LocalSessionModels | null> {
+  if (!IS_LOCAL) return null
+  const response = await fetch(`/api/agent/models?sessionId=${encodeURIComponent(sessionId)}`)
+  if (!response.ok) throw new Error(`HTTP ${response.status}`)
+  return response.json()
+}
+
+/**
+ * Choose the chat's model and/or effort: at once when it is idle, else from its next message.
+ *
+ * @param sessionId - The chat's session id
+ * @param choice - The model, the effort, or both
+ * @returns The chat's models after the choice, or null in cloud mode
+ */
+export async function setLocalSessionModel(sessionId: string, choice: LocalModelChoice): Promise<LocalSessionModels | null> {
+  if (!IS_LOCAL) return null
+  const response = await postJson("/api/agent/models", { sessionId, ...choice }, "PUT")
+  return response.json()
 }
 
 function streamPath(sessionId: string): string {

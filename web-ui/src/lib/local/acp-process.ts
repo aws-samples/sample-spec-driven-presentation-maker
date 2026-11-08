@@ -34,13 +34,24 @@
  * Listing the stored sessions (`withEngineConnection`) uses a live process of the engine, else a
  * short-lived kiro-cli that opens no session and is killed when the listing is done.
  *
+ * Models: each chat chooses its kiro session's model and effort (`chooseSessionModel`). An idle
+ * live process changes them at once (the engine's setModel, one change at a time); otherwise the
+ * choice waits under the chat's client id and is applied right before its next session/prompt,
+ * so a turn never switches models half-way. The models are listed without starting kiro-cli:
+ * from the chat's live session, else the last list a session of the configured engine reported
+ * (kept in acp-models.json, acp/model-cache.ts).
+ *
  * Max MAX_PROCESSES concurrent processes. Idle processes are evicted LRU.
  */
 import path from "path"
 import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
 import { syncToAgentsDir } from "./agents-sync"
-import { adapterFor, type AcpModel, type EngineCapabilities, type EngineId, type EngineSession, type LoadOutcome, type StoreContext } from "./acp/engine"
+import {
+  adapterFor, type EngineCapabilities, type EngineId, type EngineSession, type LoadOutcome, type ModelChoice, type ModelOption,
+  type StoreContext,
+} from "./acp/engine"
 import { isEngineId, readEngineConfig } from "./acp/engine-config"
+import { readModelCache, writeModelCache } from "./acp/model-cache"
 import type { InitializeResponse, PromptResponse } from "./acp/schema"
 import { AcpRequestError, METHOD_NOT_FOUND, spawnAcp, type AcpAnswer, type AcpConnection } from "./acp/transport"
 import { ConversationState } from "./conversation"
@@ -49,12 +60,12 @@ import { SteerRejectedError, steerEvent, type SteerState } from "./conversation/
 import { turnEnded, turnFailed } from "./conversation/turn"
 import type { ForkSessionPhase, ForkSessionPhaseDetail, SessionOrigin } from "./kiro-sessions.types"
 import { McpRecord, SDPM_MCP_SERVER, waitForMcp } from "./mcp-ready"
-import { ForkNotReadError, SessionBusyError, SessionLockedError } from "./sessionErrors"
+import { ForkNotReadError, ModelChoiceError, SessionBusyError, SessionLockedError } from "./sessionErrors"
 import type { LocalSessionNoticeCode } from "./sessionNotices"
 import { AgentStartError, AgentTimeoutError } from "./turnErrors"
 
 export { DECK_ROOT }
-export type { AcpModel, LoadOutcome }
+export type { LoadOutcome, ModelChoice, ModelOption }
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
 const MAX_PROCESSES = 3
 /** Matches the sdpm server's `timeout` in the ACP agent definitions. */
@@ -80,6 +91,8 @@ const INITIALIZE_PARAMS = {
 const LISTING_AGENT = "sdpm-orchestrator"
 /** What a deck's `.session` may hold: a kiro session id (V2 UUID, V3 `sess_<uuid>`). */
 const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,128}$/
+/** Model choices kept for chats without an idle process; the oldest is dropped beyond this. */
+const MAX_PENDING_MODEL_CHOICES = 100
 
 type EventListener = (entry: BufferedEvent) => void
 
@@ -129,15 +142,18 @@ interface ProcessState {
   steerClear: Promise<void> | null
   /** Stop was pressed during this turn: a turn that ends now is not continued with its steers. */
   stopRequested: boolean
+  /** A model change in flight; the next change and the next prompt wait for it. */
+  configChange: Promise<void> | null
 }
 
 /** Map keyed by client ids and kiro session ids (`register`). */
 const processes = new Map<string, ProcessState>()
 export const pendingOrigins = new Map<string, SessionOrigin>()
 
-// Model info (shared, populated from first process)
-let currentModelId = ""
-let availableModels: AcpModel[] = []
+/** The model list a session of each engine last reported in this server (also in acp-models.json). */
+const knownModels = new Map<EngineId, ModelOption[]>()
+/** Client id → the model choice its chat made while no idle process could take it. */
+const pendingModelChoices = new Map<string, ModelChoice>()
 
 // ── Per-process helpers ──
 
@@ -267,7 +283,7 @@ function startPrompt(ps: ProcessState, text: string): void {
 
 /**
  * Only the answer to this turn's session/prompt ends the turn (kiro-cli sends no turn end for
- * sub-agent sessions); an error answer to any other request (set_config_option, a steer) rejects
+ * sub-agent sessions); an error answer to any other request (a steer, a model change) rejects
  * that request alone. It is handled in line order, before the lines that follow it.
  */
 function promptAnswered(ps: ProcessState, answer: AcpAnswer): void {
@@ -327,18 +343,20 @@ async function spawnProcess(agentName: string, clientId: string | null, opts: Sp
   if (opts.signal?.aborted) throw new DOMException("Request cancelled", "AbortError")
   opts.onPhase?.("starting")
   const config = readEngineConfig()
+  const engine = adapterFor(config.engine)
   // Re-derive .kiro/agents/ from the acp-agents catalog + user selection on
   // every spawn (idempotent, all-or-nothing) — a `git pull` that updates the
   // catalog takes effect on the next spawn. If the derivation fails, the
   // spawn fails: launching from silently stale agent files is the exact bug
   // this re-derivation exists to prevent.
+  // An engine whose sub-agents follow the session's model gets no model in the composer's
+  // definition, so the composer runs on the chat's choice.
   try {
-    syncToAgentsDir()
+    syncToAgentsDir(undefined, undefined, { pinSubagentModel: !engine.subagentsFollowSessionModel })
   } catch (error) {
     console.error("[acp] agent definitions: %s", errorText(error))
     throw new AgentStartError("agent_start_failed", `agent definitions: ${errorText(error)}`)
   }
-  const engine = adapterFor(config.engine)
   const env = { ...process.env, ...config.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT }
   const conn = spawnAcp(config.command, [...config.commandArgs, ...engine.spawnArgs(agentName)], { cwd: MCP_LOCAL_DIR, env })
   /** The fork this start made (`opts.fork`), deleted again if the start fails. */
@@ -377,7 +395,7 @@ async function spawnProcess(agentName: string, clientId: string | null, opts: Sp
     agentName,
     listeners: new Set(),
     running: false, promptInFlight: false, promptRequestId: null, buffer: [], eventId: 0,
-    lastActivity: Date.now(), turnsEnded: 0, steerClear: null, stopRequested: false,
+    lastActivity: Date.now(), turnsEnded: 0, steerClear: null, stopRequested: false, configChange: null,
   }
   conn.onNotification((msg) => handleNotification(ps, msg))
   // The process is gone: end a running turn with an error the stream forwards (otherwise the
@@ -416,13 +434,7 @@ async function spawnProcess(agentName: string, clientId: string | null, opts: Sp
     }
     if (!ps.clientId) ps.clientId = ps.sessionId
 
-    // Extract model info from first process
-    const models = availableModels.length ? null : ps.session.models()
-    if (models) {
-      currentModelId = models.current
-      availableModels = models.available
-        .filter(o => !o.description?.startsWith("[Internal]") && !o.description?.startsWith("[Deprecated]"))
-    }
+    rememberModels(ps)
 
     opts.signal?.removeEventListener("abort", abortSpawn)
     return { ps, outcome }
@@ -558,14 +570,6 @@ export function getCapabilities(sessionId: string): EngineCapabilities | null {
   return processes.get(sessionId)?.caps ?? null
 }
 
-/** Spawn a brand-new process (no existing session), registered under its kiro session id. */
-export async function createNewProcess(agentName: string = "sdpm-orchestrator"): Promise<ProcessState> {
-  await evictIfNeeded()
-  const { ps } = await spawnProcess(agentName, null)
-  register(ps, ps.sessionId!)
-  return ps
-}
-
 /** Spawn a new process for a new chat and register it under the client's id and its kiro session id. */
 export async function createNewProcessFor(
   clientId: string,
@@ -665,7 +669,8 @@ export async function openForkedSession(
 
 /**
  * Send a prompt to a session's process. The turn's chat events are numbered from 1; a `notice`
- * about the turn's session (sessionNotices.ts) is the first of them.
+ * about the turn's session (sessionNotices.ts) is the first of them. The chat's pending model
+ * choice is applied first; one kiro-cli refuses is logged and the prompt goes on.
  * Throws SessionBusyError while the process is still answering an earlier prompt
  * (the same session open in two panels or tabs); prompts are not queued.
  */
@@ -680,6 +685,17 @@ export async function sendPrompt(
   if (ps.steerClear) await ps.steerClear
   if (ps.promptInFlight) throw new SessionBusyError()
   ps.promptInFlight = true
+  // The chat's model choice goes in before the prompt (a change made while idle has finished).
+  if (ps.configChange) await ps.configChange
+  const choice = pendingModelChoices.get(sessionId)
+  if (choice) {
+    pendingModelChoices.delete(sessionId)
+    try {
+      await applyModelChoice(ps, choice)
+    } catch (error) {
+      console.warn("[acp] sessionId=%s: could not apply the chat's model choice: %s", ps.sessionId, errorText(error))
+    }
+  }
   ps.running = true
   ps.stopRequested = false
   ps.session.beginTurn()
@@ -787,14 +803,103 @@ export function subscribeToSession(sessionId: string): { sessionId: string | nul
   }
 }
 
-export function getModels(): { current: string; available: AcpModel[] } {
-  return { current: currentModelId, available: availableModels }
+// ── Models ──
+
+/** Keep the engine's model list when a session reported a new one (in memory and acp-models.json). */
+function rememberModels(ps: ProcessState): void {
+  const available = ps.session.models()?.available
+  if (!available?.length) return
+  const known = knownModels.get(ps.engine) ?? readModelCache(ps.engine)
+  knownModels.set(ps.engine, available)
+  if (JSON.stringify(known) !== JSON.stringify(available)) writeModelCache(ps.engine, available)
 }
 
-export async function setConfigOption(sessionId: string, configId: string, value: string): Promise<void> {
-  const ps = processes.get(sessionId)
-  if (!ps?.sessionId) return
-  await ps.conn.request("session/set_config_option", { sessionId: ps.sessionId, configId, value })
+/** Change the session's model and effort, after any change still in flight; rejects with kiro-cli's error. */
+function applyModelChoice(ps: ProcessState, choice: ModelChoice): Promise<void> {
+  const previous = ps.configChange ?? Promise.resolve()
+  const run = previous.then(() => ps.session.setModel(choice))
+  const settled = run.then(() => {
+    rememberModels(ps)
+    console.log("[acp] sessionId=%s: model %s effort %s", ps.sessionId, choice.model ?? "(unchanged)", choice.effort ?? "(default)")
+  }, () => {})
+  ps.configChange = settled
+  void settled.then(() => { if (ps.configChange === settled) ps.configChange = null })
+  return run
+}
+
+/** A chat's models as the picker shows them. */
+export interface LocalSessionModels {
+  engine: EngineId
+  available: ModelOption[]
+  /** What the chat's live session runs (null without a live session that reported it). */
+  current: { model: string; effort: string | null; effortLevels: string[] } | null
+  /** A choice that applies from the chat's next message. */
+  pending: ModelChoice | null
+}
+
+/**
+ * The models of a chat (`clientId`): its live session's list and current model and effort, else
+ * the configured engine's last known list (never a new kiro-cli). `pending` is the chat's choice
+ * still to apply.
+ */
+export function getSessionModels(clientId?: string): LocalSessionModels {
+  const pending = (clientId && pendingModelChoices.get(clientId)) || null
+  const ps = clientId ? processes.get(clientId) : undefined
+  const live = ps && !ps.conn.exited ? ps.session.models() : null
+  if (ps && live) {
+    return {
+      engine: ps.engine,
+      available: live.available,
+      current: { model: live.current, effort: live.effort?.current ?? null, effortLevels: live.effort?.levels ?? [] },
+      pending,
+    }
+  }
+  const engine = readEngineConfig().engine
+  return { engine, available: knownModels.get(engine) ?? readModelCache(engine), current: null, pending }
+}
+
+function keepPendingChoice(clientId: string, choice: ModelChoice): void {
+  pendingModelChoices.delete(clientId)
+  pendingModelChoices.set(clientId, choice)
+  if (pendingModelChoices.size > MAX_PENDING_MODEL_CHOICES) pendingModelChoices.delete(pendingModelChoices.keys().next().value!)
+}
+
+/**
+ * A chat chose a model and/or effort. Checked against the models it is offered (kiro-cli would
+ * take any value): a known model; an effort only for a model with effort levels, one of them.
+ * Applied at once when the chat's process is live and idle (ModelChoiceError `model_not_changed`
+ * when kiro-cli refuses, and nothing is kept); otherwise kept for the chat's next message, where
+ * a new model drops an effort chosen for the previous one. Answers the chat's models after it.
+ */
+export async function chooseSessionModel(clientId: string, choice: ModelChoice): Promise<LocalSessionModels> {
+  const view = getSessionModels(clientId)
+  if (!view.available.length) throw new ModelChoiceError("models_unknown")
+  if (choice.model && !view.available.some((model) => model.modelId === choice.model)) throw new ModelChoiceError("unknown_model")
+  const pending = view.pending
+  if (choice.effort) {
+    const target = choice.model ?? pending?.model ?? view.current?.model
+    const levels = target && target === view.current?.model
+      ? view.current.effortLevels
+      : view.available.find((model) => model.modelId === target)?.effortLevels ?? []
+    if (!levels.length) throw new ModelChoiceError("effort_not_supported")
+    if (!levels.includes(choice.effort)) throw new ModelChoiceError("unknown_effort")
+  }
+  const merged: ModelChoice = choice.model && choice.model !== pending?.model
+    ? { model: choice.model, ...(choice.effort ? { effort: choice.effort } : {}) }
+    : { ...pending, ...choice }
+
+  const ps = processes.get(clientId)
+  if (ps && !ps.conn.exited && !ps.promptInFlight && ps.session.models()) {
+    try {
+      await applyModelChoice(ps, merged)
+    } catch (error) {
+      throw new ModelChoiceError("model_not_changed", errorText(error))
+    }
+    pendingModelChoices.delete(clientId)
+  } else {
+    keepPendingChoice(clientId, merged)
+  }
+  return getSessionModels(clientId)
 }
 
 // ── Deck files ──

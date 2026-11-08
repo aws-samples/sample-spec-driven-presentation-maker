@@ -22,6 +22,10 @@
  * `.session` (and a fork's origin) once, with or without a listener; a forgotten process drops
  * its pending origin. A fork cancelled once it exists is deleted before its kiro-cli is killed;
  * listing the stored sessions uses a live process of the engine, else a short-lived kiro-cli.
+ * A chat's model and effort change at once on an idle live session (V3
+ * set_config_option, V2 set_model), or are held and sent right before the next session/prompt;
+ * a choice outside the offered models and levels is refused; the reported list is kept in
+ * acp-models.json and listed without a process; V3 spawns leave the composer's model out.
  * kiro-cli is replaced by a fake child that answers the ACP requests.
  */
 
@@ -38,6 +42,9 @@ vi.mock("child_process", () => ({ spawn, default: { spawn } }))
 vi.mock("./agents-sync", () => ({ syncToAgentsDir: vi.fn() }))
 
 type Rpc = { id: number; method: string; params: Record<string, unknown> }
+
+/** The fake kiro-cli's models: `m-effort` has effort levels (V3 only). */
+const FAKE_MODELS = ["auto", "m-effort", "m-plain"]
 
 class FakeChild extends EventEmitter {
   pid = 4242
@@ -67,6 +74,9 @@ class FakeChild extends EventEmitter {
   mcpState: "connected" | "failed" = "connected"
   /** Forks made with session/fork (V3), by id: their source. */
   forks = new Map<string, string>()
+  /** The session's model and effort (set_config_option / set_model change them). */
+  model = "auto"
+  effort: string | null = null
   constructor(private readonly sessionId: string, private readonly lockedSessions: Set<string>, readonly args: string[] = ["acp", "--agent", "sdpm-orchestrator"]) { super() }
 
   get engine(): "v2" | "v3" { return this.args.includes("--agent-engine") ? "v3" : "v2" }
@@ -87,6 +97,20 @@ class FakeChild extends EventEmitter {
     return { currentModeId: current, availableModes: ["sdpm-orchestrator", "sdpm-style", "sdpm-translate"].map((id) => ({ id, name: id })) }
   }
 
+  /** V3's config options: the model list, and the effort option of a model with effort. */
+  configOptions() {
+    const options: Record<string, unknown>[] = [{
+      type: "select", id: "model", category: "model", currentValue: this.model,
+      options: FAKE_MODELS.map((value) => ({ value, name: value.toUpperCase(), _meta: { kiro: value === "m-effort" ? { hasEffort: true, effortLevels: ["low", "high"], defaultEffortLevel: "low", rateMultiplier: 2 } : { hasEffort: false } } })),
+    }]
+    if (this.model === "m-effort") options.push({ type: "select", id: "effortLevel", category: "thought_level", currentValue: this.effort ?? "low", options: [{ value: "low" }, { value: "high" }] })
+    return options
+  }
+
+  private configUpdate(sessionId: string) {
+    this.update(sessionId, { sessionUpdate: "config_option_update", configOptions: this.configOptions() })
+  }
+
   send(msg: Record<string, unknown>) {
     // Answer after rpcRequestTo has registered the pending request.
     setImmediate(() => this.stdout.emit("data", JSON.stringify({ jsonrpc: "2.0", ...msg }) + "\n"))
@@ -102,7 +126,13 @@ class FakeChild extends EventEmitter {
     if (req.method === "session/new") {
       const requested = this.engine === "v3" ? ((req.params._meta as { kiro?: { modeId?: string } } | undefined)?.kiro?.modeId ?? "") : this.agent
       this.mcpReady(this.sessionId)
-      this.send({ id: req.id, result: { sessionId: this.sessionId, modes: this.modes(this.newMode ?? requested) } })
+      if (this.engine === "v3") this.configUpdate(this.sessionId)
+      this.send({ id: req.id, result: {
+        sessionId: this.sessionId, modes: this.modes(this.newMode ?? requested),
+        ...(this.engine === "v3"
+          ? { configOptions: this.configOptions() }
+          : { models: { currentModelId: this.model, availableModels: FAKE_MODELS.map((modelId) => ({ modelId, name: modelId })) } }),
+      } })
     } else if (req.method === "session/load" && this.lockedSessions.has(req.params.sessionId as string)) {
       this.send({ id: req.id, error: { message: "Internal error", data: "Failed to start session: Session is active in another process (PID 1)" } })
     } else if (req.method === "session/load" && this.engine === "v2" && this.missing.has(req.params.sessionId as string)) {
@@ -120,12 +150,23 @@ class FakeChild extends EventEmitter {
           ...(this.forks.has(sessionId) ? { parentSessionId: this.forks.get(sessionId) } : {}),
         } } : {}),
       } })
+      if (this.engine === "v3") this.configUpdate(sessionId)
     } else if (req.method === "session/fork") {
       const forkId = `F${this.forks.size + 1}`
       this.forks.set(forkId, req.params.sessionId as string)
       this.send({ id: req.id, result: { sessionId: forkId } })
     } else if (req.method === "session/set_mode") {
       this.mcpReady(req.params.sessionId as string)
+      this.send({ id: req.id, result: {} })
+    } else if (req.method === "session/set_config_option" && this.engine === "v3" && !this.failing.has(req.method)) {
+      if (req.params.configId === "model") {
+        this.model = req.params.value as string
+        this.effort = null
+      } else if (req.params.configId === "effortLevel") this.effort = req.params.value as string
+      this.configUpdate(req.params.sessionId as string)
+      this.send({ id: req.id, result: { configOptions: this.configOptions() } })
+    } else if (req.method === "session/set_model" && this.engine === "v2" && !this.failing.has(req.method)) {
+      this.model = req.params.modelId as string
       this.send({ id: req.id, result: {} })
     } else if (req.method === "session/prompt") this.prompts.push(req.id)
     else if (this.failing.has(req.method)) this.send({ id: req.id, error: { message: "Internal error", data: `${req.method} failed` } })
@@ -413,14 +454,15 @@ describe("turn state", () => {
   it("keeps the turn running when another request fails mid-turn, until the prompt is answered", async () => {
     await acp.createNewProcessFor("C1")
     const child = children[0]
-    child.failing.add("session/set_config_option")
+    child.failing.add("_session/steer")
     const prompted = await acp.sendPrompt("C1", "build the deck")
     const ends: BufferedEvent["event"][] = []
     prompted.subscribe((entry) => { if (isEnd(entry)) ends.push(entry.event) })
     prompted.send()
     await settle()
 
-    await expect(acp.setConfigOption("C1", "model", "unknown")).rejects.toThrow(/session\/set_config_option failed/)
+    const { SteerRejectedError } = await import("./conversation/steer")
+    await expect(acp.steerSession("C1", "m1", "also this")).rejects.toBeInstanceOf(SteerRejectedError)
     await settle()
     expect(acp.isSessionRunning("C1")).toBe(true)
     expect(ends).toEqual([])
@@ -1212,5 +1254,145 @@ describe("steer without kiro-cli support", () => {
     } finally {
       warn.mockRestore()
     }
+  })
+})
+
+describe("models", () => {
+  const methods = (child: FakeChild) => child.requests.map((r) => r.method)
+  const cacheFile = () => path.join(configDir, "acp-models.json") // nosemgrep: path-join-resolve-traversal — constant name in a tmpdir
+
+  it("changes an idle V3 session's model and effort at once", async () => {
+    useEngine("v3")
+    await acp.createNewProcessFor("C1")
+    expect(acp.getSessionModels("C1")).toMatchObject({ engine: "v3", current: { model: "auto", effort: null, effortLevels: [] }, pending: null })
+    expect(acp.getSessionModels("C1").available.map((m) => m.modelId)).toEqual(FAKE_MODELS)
+
+    const view = await acp.chooseSessionModel("C1", { model: "m-effort", effort: "high" })
+    expect(children[0].requests.filter((r) => r.method === "session/set_config_option").map((r) => r.params)).toEqual([
+      { sessionId: "K1", configId: "model", value: "m-effort" },
+      { sessionId: "K1", configId: "effortLevel", value: "high" },
+    ])
+    expect(view).toMatchObject({ current: { model: "m-effort", effort: "high", effortLevels: ["low", "high"] }, pending: null })
+  })
+
+  it("holds a choice made during a turn until the next prompt, and sends it first", async () => {
+    useEngine("v3")
+    await acp.createNewProcessFor("C1")
+    const child = children[0]
+    const prompted = await acp.sendPrompt("C1", "build")
+    prompted.send()
+    await settle()
+    expect(await acp.chooseSessionModel("C1", { model: "m-plain" })).toMatchObject({ current: { model: "auto" }, pending: { model: "m-plain" } })
+    expect(methods(child)).not.toContain("session/set_config_option")
+    child.endTurn()
+    await settle()
+
+    const next = await acp.sendPrompt("C1", "again")
+    next.send()
+    await settle()
+    expect(methods(child).slice(-2)).toEqual(["session/set_config_option", "session/prompt"])
+    expect(acp.getSessionModels("C1")).toMatchObject({ current: { model: "m-plain" }, pending: null })
+  })
+
+  it("keeps a new chat's choice until its process exists, and applies it before the first prompt", async () => {
+    useEngine("v3")
+    expect(await acp.chooseSessionModel("C0", {}).catch((e: unknown) => e)).toMatchObject({ code: "models_unknown" })
+    await acp.createNewProcessFor("C1")
+    acp.terminateProcess("C1")
+
+    // The list the first process reported is known without a process.
+    expect(await acp.chooseSessionModel("N1", { model: "m-effort" })).toMatchObject({ current: null, pending: { model: "m-effort" } })
+    expect(await acp.chooseSessionModel("N1", { effort: "high" })).toMatchObject({ pending: { model: "m-effort", effort: "high" } })
+    // A new model drops the effort chosen for the previous one.
+    expect((await acp.chooseSessionModel("N1", { model: "m-plain" })).pending).toEqual({ model: "m-plain" })
+    await acp.chooseSessionModel("N1", { model: "m-effort", effort: "low" })
+
+    await acp.createNewProcessFor("N1")
+    const child = children[1]
+    expect(methods(child)).not.toContain("session/set_config_option")
+    const prompted = await acp.sendPrompt("N1", "hello")
+    prompted.send()
+    await settle()
+    expect(child.requests.filter((r) => r.method !== "initialize" && r.method !== "session/new").map((r) => [r.method, r.params.value])).toEqual([
+      ["session/set_config_option", "m-effort"], ["session/set_config_option", "low"], ["session/prompt", undefined],
+    ])
+  })
+
+  it("changes a V2 session's model with session/set_model and offers no effort", async () => {
+    await acp.createNewProcessFor("C1")
+    expect(acp.getSessionModels("C1")).toMatchObject({ engine: "v2", current: { model: "auto", effort: null } })
+    expect(await acp.chooseSessionModel("C1", { model: "m-effort", effort: "low" }).catch((e: unknown) => e)).toMatchObject({ code: "effort_not_supported" })
+    const view = await acp.chooseSessionModel("C1", { model: "m-plain" })
+    expect(children[0].requests.find((r) => r.method === "session/set_model")?.params).toEqual({ sessionId: "K1", modelId: "m-plain" })
+    expect(view.current?.model).toBe("m-plain")
+  })
+
+  it.each([
+    ["unknown_model", { model: "no-such-model" }],
+    ["effort_not_supported", { effort: "low" }],
+    ["effort_not_supported", { model: "m-plain", effort: "low" }],
+    ["unknown_effort", { model: "m-effort", effort: "max" }],
+  ])("refuses %s (%j) and changes nothing", async (code, choice) => {
+    useEngine("v3")
+    await acp.createNewProcessFor("C1")
+    expect(await acp.chooseSessionModel("C1", choice).catch((e: unknown) => e)).toMatchObject({ name: "ModelChoiceError", code })
+    expect(methods(children[0])).not.toContain("session/set_config_option")
+    expect(acp.getSessionModels("C1").pending).toBeNull()
+  })
+
+  it("reports a change kiro-cli refuses and keeps nothing", async () => {
+    useEngine("v3")
+    await acp.createNewProcessFor("C1")
+    children[0].failing.add("session/set_config_option")
+    expect(await acp.chooseSessionModel("C1", { model: "m-plain" }).catch((e: unknown) => e)).toMatchObject({ code: "model_not_changed" })
+    expect(acp.getSessionModels("C1")).toMatchObject({ current: { model: "auto" }, pending: null })
+  })
+
+  it("warns and still prompts when the held choice cannot be applied", async () => {
+    useEngine("v3")
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
+    try {
+      await acp.createNewProcessFor("C1")
+      const child = children[0]
+      const first = await acp.sendPrompt("C1", "build")
+      first.send()
+      await settle()
+      await acp.chooseSessionModel("C1", { model: "m-plain" })
+      child.endTurn()
+      await settle()
+      child.failing.add("session/set_config_option")
+      const next = await acp.sendPrompt("C1", "again")
+      next.send()
+      await settle()
+      expect(methods(child).slice(-2)).toEqual(["session/set_config_option", "session/prompt"])
+      expect(warn).toHaveBeenCalledWith("[acp] sessionId=%s: could not apply the chat's model choice: %s", "K1", expect.stringContaining("failed"))
+      expect(acp.isSessionRunning("C1")).toBe(true)
+    } finally {
+      warn.mockRestore()
+    }
+  })
+
+  it("writes the list a session reported to acp-models.json and reads it without a process", async () => {
+    useEngine("v3")
+    expect(acp.getSessionModels()).toEqual({ engine: "v3", available: [], current: null, pending: null })
+    await acp.createNewProcessFor("C1")
+    expect(JSON.parse(fs.readFileSync(cacheFile(), "utf-8")).engines.v3.map((m: { modelId: string }) => m.modelId)).toEqual(FAKE_MODELS)
+    expect(JSON.parse(fs.readFileSync(cacheFile(), "utf-8")).engines.v3[1]).toEqual({ modelId: "m-effort", name: "M-EFFORT", effortLevels: ["low", "high"], defaultEffort: "low", rate: 2 })
+
+    vi.resetModules()
+    acp = await import("./acp-process")
+    expect(acp.getSessionModels("C9")).toMatchObject({ engine: "v3", current: null })
+    expect(acp.getSessionModels().available.map((m) => m.modelId)).toEqual(FAKE_MODELS)
+    useEngine("v2")
+    expect(acp.getSessionModels().available).toEqual([])
+  })
+
+  it("leaves the Settings model out of the composer's definition on V3 only", async () => {
+    const { syncToAgentsDir } = await import("./agents-sync")
+    useEngine("v3")
+    await acp.createNewProcessFor("C1")
+    useEngine("v2")
+    await acp.createNewProcessFor("C2")
+    expect(vi.mocked(syncToAgentsDir).mock.calls.map((call) => call[2])).toEqual([{ pinSubagentModel: false }, { pinSubagentModel: true }])
   })
 })

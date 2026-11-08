@@ -78,6 +78,13 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   permission requests are answered automatically only within the safe default: sdpm MCP
   tools and file reads on the deck folder and kiro-cli's `tool-outputs/`, always with the
   offered allow-once option. / See Upgrading from 0.12.
+- **Local Web UI: choose the model and effort in the chat.** A pill above the chat input
+  shows the chat's model and opens a menu of the models kiro-cli offers and, on V3, the
+  effort levels of the chosen model (V2 has no effort). The choice changes this chat's kiro
+  session at once when it is idle, otherwise from the next message, and kiro-cli keeps it
+  with the session. Settings → Model stays the default for new chats; on V3 the composer
+  follows the chat's choice. Settings → Model lists the models without starting kiro-cli. /
+  Nothing.
 
 ### Changed
 
@@ -153,6 +160,21 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   `…-<name>` (deck folders are `YYYYMMDD-HHMM-<name>`), newest first. / Code that filters
   `list_files()` by extension is unaffected; code that treats every entry as a file skips
   names ending with `/`.
+- **The Local Web UI finds decks in the folder the MCP server writes to.** The Web UI and
+  its MCP server (`server_acp.py`) read only `SDPM_DECK_ROOT`, while the CLI and the local
+  MCP server (`server.py`) read `SDPM_OUTPUT_DIR` and `output_dir` in `config.json`, so a
+  deck made over MCP after changing `output_dir` did not appear in the Web UI. All of them
+  now use one order: `SDPM_DECK_ROOT` → `SDPM_OUTPUT_DIR` → `output_dir` in
+  `~/.config/sdpm/config.json` (`~` expanded; empty means the default, no longer the
+  current folder) → `~/Documents/SDPM-Presentations`. / If you
+  set `output_dir` and also made decks in the Web UI, those decks stay in
+  `~/Documents/SDPM-Presentations` and no longer show in the Web UI: move them into your
+  `output_dir`, or set `SDPM_DECK_ROOT` to that old folder to keep using it. Otherwise,
+  nothing; decks in your `output_dir` now show in the Web UI.
+- **The Web UI's MCP server installs the icon catalogs by itself.** `server_acp.py` now
+  fetches them in the background on first start when none is installed, as `server.py`
+  does, instead of the agent asking the Web UI user to run an install command.
+  `SDPM_AUTO_INSTALL_ASSETS=0` turns this off. / Nothing.
 - **Deploying `SdpmAuth` alone no longer removes the CloudFront URL from the Web UI's
   Cognito app client.** Each `SdpmAuth` deploy that changed the client reset its callback
   and logout URLs to `http://localhost:3000`, so nobody could sign in to the Web UI, and a
@@ -185,6 +207,16 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   a 2.x deny list, the file is left as it is and the message names the setting. / Nothing.
   Settings already dropped by an earlier rewrite have to be added again by the tool that
   added them.
+- **Registering with a Kiro CLI that is not signed in yet no longer fails.** `kiro-cli
+  agent validate` refuses to run before `kiro-cli login`, so `sdpm register`, the
+  installer's `--register` and `sdpm update` reported Kiro CLI as failed and exited with 1
+  although the agent file was written correctly. The `--full` installer always hit this,
+  having just installed kiro-cli. Registration now checks `kiro-cli whoami` first; when
+  kiro-cli is not signed in it skips the validation, reports the agent as registered and
+  says to run `kiro-cli login` first. / Nothing.
+- **Result marks are coloured only on a terminal.** `sdpm register`, `sdpm update` and
+  `sdpm doctor` printed ANSI colour codes into logs and agent output. They now colour the
+  ✓ / ✗ / ! marks only when the output is a terminal and `NO_COLOR` is not set. / Nothing.
 - **MCP runtime: OpenTelemetry ids no longer repeat across V2 restores.** Every microVM
   restored from the same snapshot started the `random` module from the same state, so
   OpenTelemetry trace and span ids (and botocore retry jitter) could be identical across
@@ -248,6 +280,17 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   sdpm` or `/agent sdpm`). When another agent delegates to `sdpm`, V3 asks you to approve
   each sdpm tool the sub-agent calls. / `sdpm update` rewrites the agent file (see
   Changed). Run `make register-dev` again for a development agent.
+- **Web UI: a reload or a direct link opens the deck with its conversation.** Reloading a
+  deck page, or opening `/decks/#<id>` from a link, put the chat on the empty "New" tab and
+  closed it, so the deck's saved conversation looked gone; only opening the deck from the
+  list showed it. Both now open the deck's chat tab (and the chat panel on a desktop
+  window), as the list does. The address is read once the page has loaded, which also stops
+  the hydration error React reported for direct links. / Nothing.
+- **Local Web UI: no wording for features that only the cloud Web UI has.** The search box
+  said "Search slides across the organization…", but the Local Web UI filters your decks by
+  name; it now says "Search decks…". The deck header no longer shows the Private / Internal
+  sharing button, since Local decks are never shared. The cloud Web UI is unchanged. /
+  Nothing.
 
 ### Security
 
@@ -259,9 +302,9 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   (`web-ui/src/proxy.ts`), so new routes are covered, and it has no mode check of its own, so
   it applies wherever the API routes are served; the cloud build leaves it out with the API
   routes. The agent selection and model `PUT`s now also refuse cross-site requests and
-  non-JSON bodies, and listing the models (which may start kiro-cli) is a `POST`, so a plain
-  `GET` has no side effects. Open the Web UI as `http://localhost:<port>` or
-  `http://127.0.0.1:<port>`; another host name pointing at the machine is refused.
+  non-JSON bodies, and listing the models is a `GET` that never starts kiro-cli. Open the
+  Web UI as `http://localhost:<port>` or `http://127.0.0.1:<port>`; another host name
+  pointing at the machine is refused.
 - **Cloud agent: `web_fetch` reaches public internet addresses only.** The agent's
   `web_fetch` tool now fetches through the same URL fetcher as the MCP attachment tools
   (`sdpm.tools.attachment.fetcher`). It rejects schemes other than http(s), ports other than

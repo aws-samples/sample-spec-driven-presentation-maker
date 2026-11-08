@@ -27,6 +27,22 @@ export function getUserStylesDir(): string {
   return path.join(getUserConfigDir(), "styles")
 }
 
+/**
+ * `output_dir` from the user's config.json with `~` expanded (sdpm.config.get_output_dir),
+ * or null when the file, the key or valid JSON is missing.
+ */
+export function getConfiguredOutputDir(): string | null {
+  try {
+    const config = JSON.parse(fs.readFileSync(path.join(getUserConfigDir(), "config.json"), "utf-8"))
+    const dir: unknown = config?.output_dir
+    if (typeof dir !== "string" || !dir) return null
+    if (dir === "~") return os.homedir()
+    return /^~[/\\]/.test(dir) ? path.join(os.homedir(), dir.slice(2)) : dir
+  } catch {
+    return null
+  }
+}
+
 /** State file path (~/.config/sdpm/state.json). */
 export function getStateJsonPath(): string {
   return path.join(getUserConfigDir(), "state.json")

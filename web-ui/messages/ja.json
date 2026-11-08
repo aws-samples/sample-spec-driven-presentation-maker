@@ -28,6 +28,7 @@
     "presentationCount": "{count, plural, other {# 件のプレゼンテーション}}",
     "newDeck": "新規デッキ",
     "searchPlaceholder": "組織全体のスライドを検索…",
+    "searchPlaceholderLocal": "デッキを検索…",
     "clearSearch": "検索をクリア",
     "tabs": {
       "mine": "マイデッキ",
@@ -384,6 +385,25 @@
   "htmlFormatPill": {
     "buildAsHtml": "HTML で作成",
     "hint": "ブラウザで発表する HTML を作ります。PowerPoint では編集できません"
+  },
+  "chatModel": {
+    "trigger": "モデル: {model}",
+    "triggerWithEffort": "モデル: {model}、思考の深さ: {effort}",
+    "modelHeading": "モデル",
+    "effortHeading": "思考の深さ",
+    "effortLevel": {
+      "none": "なし",
+      "low": "低",
+      "medium": "中",
+      "high": "高",
+      "xhigh": "さらに高",
+      "max": "最大"
+    },
+    "defaultModel": "既定のモデル",
+    "chatModel": "このチャットのモデル",
+    "appliesNextMessage": "次のメッセージから使われます。",
+    "credits": "クレジット {rate} 倍",
+    "errorChange": "モデルを変更できませんでした"
   },
   "tools": {
     "running": "実行中",

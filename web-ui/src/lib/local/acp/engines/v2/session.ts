@@ -14,25 +14,52 @@
  *
  * A fork is a copy of the stored session's files under a new UUID (stored-sessions.ts), opened
  * as above; `discardFork` removes only a copy this session made.
+ *
+ * The model is set with session/set_model; V2 has no effort. session/new and session/load
+ * answer the models and the session's model, which the session keeps.
  */
 import { AgentStartError } from "../../../turnErrors"
-import type { AcpModelList, EngineErrorKind, EngineSession, ForkSessionOptions, LoadOutcome, OpenSessionOptions, SessionContext } from "../../engine"
-import type { AcpNotification, LoadSessionResponse, SessionModeState } from "../../schema"
+import type {
+  EngineErrorKind, EngineSession, ForkSessionOptions, LoadOutcome, ModelChoice, OpenSessionOptions, SessionContext, SessionModels,
+} from "../../engine"
+import type { AcpNotification, SessionModeState } from "../../schema"
 import { AcpRequestError } from "../../transport"
 import { copyStoredSession, removeStoredSession, v2SessionsDir } from "./stored-sessions"
 import { V2Translator } from "./translate"
-import { SESSION_LOCKED_MARKER, SESSION_NOT_FOUND_MARKER, type V2NewSessionResponse } from "./types"
+import { SESSION_LOCKED_MARKER, SESSION_NOT_FOUND_MARKER, type V2LoadSessionResponse, type V2NewSessionResponse, type V2SessionModels } from "./types"
 
 /** ACP's "authentication required" error code. */
 const AUTH_REQUIRED = -32000
 /** How long a failed mode check waits for kiro-cli's `agent/not_found` (sent right after the answer). */
 const NOT_FOUND_GRACE_MS = 2000
+/** kiro-cli answers session/set_model at once. */
+const CONFIG_TIMEOUT_MS = 10_000
 
 const isNotFound = (error: unknown) => error instanceof Error && error.message.includes(SESSION_NOT_FOUND_MARKER)
 
+/** kiro-cli marks the models it does not offer to users in their description. */
+const listed = (description: unknown) =>
+  typeof description !== "string" || !(description.startsWith("[Internal]") || description.startsWith("[Deprecated]"))
+
+/** The answer's models, or null when it has none. */
+function readModels(models: V2SessionModels | undefined): SessionModels | null {
+  if (!models || !Array.isArray(models.availableModels)) return null
+  return {
+    current: typeof models.currentModelId === "string" ? models.currentModelId : "",
+    available: models.availableModels
+      .filter((model) => typeof model?.modelId === "string" && listed(model.description))
+      .map((model) => ({
+        modelId: model.modelId!,
+        name: model.name || model.modelId!,
+        ...(model.description ? { description: model.description } : {}),
+      })),
+    effort: null,
+  }
+}
+
 export class V2Session implements EngineSession {
   private readonly translator = new V2Translator()
-  private modelList: AcpModelList | null = null
+  private modelList: SessionModels | null = null
   private notFound: Promise<void>
   private notFoundSeen = () => {}
   /** Copies this session made (`forkSession`): the only ids `discardFork` removes. */
@@ -52,13 +79,13 @@ export class V2Session implements EngineSession {
   async openSession(sessionId: string, agentName: string, opts: OpenSessionOptions = {}): Promise<{ sessionId: string; outcome: LoadOutcome }> {
     const created = await this.createSession(agentName)
     this.translator.startLoad(sessionId, opts.onReplay)
-    let loaded: LoadSessionResponse
+    let loaded: V2LoadSessionResponse
     try {
       loaded = await this.ctx.request("session/load", { sessionId, cwd: this.ctx.cwd, mcpServers: [] }, {
         timeoutMs: this.ctx.setupTimeoutMs,
         signal: this.ctx.signal,
         onAnswer: (answer) => this.translator.finishLoad(answer.ok),
-      }) as LoadSessionResponse
+      }) as V2LoadSessionResponse
     } catch (error) {
       this.translator.finishLoad(false)
       if (!isNotFound(error)) throw error
@@ -66,6 +93,7 @@ export class V2Session implements EngineSession {
       await this.ctx.waitForMcp(created)
       return { sessionId: created, outcome: "created" }
     }
+    this.modelList = readModels(loaded?.models) ?? this.modelList
     if (loaded?.modes?.currentModeId !== agentName) await this.switchMode(sessionId, agentName, loaded?.modes, opts)
     await this.ctx.waitForMcp(sessionId)
     return { sessionId, outcome: "resumed" }
@@ -107,8 +135,17 @@ export class V2Session implements EngineSession {
     return main ? [main, ...this.translator.workingChildren()] : []
   }
 
-  models(): AcpModelList | null {
+  models(): SessionModels | null {
     return this.modelList
+  }
+
+  async setModel(choice: ModelChoice): Promise<void> {
+    if (choice.effort) throw new Error("V2 has no effort")
+    const sessionId = this.translator.mainSessionId
+    if (!sessionId) throw new Error("no session")
+    if (!choice.model) return
+    await this.ctx.request("session/set_model", { sessionId, modelId: choice.model }, { timeoutMs: CONFIG_TIMEOUT_MS })
+    if (this.modelList) this.modelList = { ...this.modelList, current: choice.model }
   }
 
   classifyError(error: unknown): EngineErrorKind | null {
@@ -123,9 +160,7 @@ export class V2Session implements EngineSession {
       timeoutMs: this.ctx.setupTimeoutMs, signal: this.ctx.signal,
     }) as V2NewSessionResponse
     this.translator.mainSessionId = result.sessionId
-    if (result.models) {
-      this.modelList = { current: result.models.currentModelId || "", available: result.models.availableModels || [] }
-    }
+    this.modelList = readModels(result.models)
     const mode = result.modes?.currentModeId
     if (mode !== agentName) await this.rejected(agentName, mode)
     return result.sessionId
