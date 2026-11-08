@@ -37,6 +37,7 @@ function context(answers: Record<string, unknown>) {
     cwd: "/workspace/sdpm/servers/local",
     env: {} as NodeJS.ProcessEnv,
     setupTimeoutMs: 1000,
+    hostAgent: "sdpm-orchestrator",
     waitForMcp: vi.fn(async (sessionId: string) => { order.push(`wait ${sessionId}`) }),
     clearMcp: vi.fn((sessionId: string) => { order.push(`clear ${sessionId}`) }),
   }
@@ -161,6 +162,22 @@ describe("V3Session", () => {
     await session.newSession("sdpm-orchestrator")
     await expect(session.setModel({ effort: "low" })).rejects.toThrow(/no effort option/)
     expect(calls.map((call) => call.method)).toEqual(["session/new"])
+  })
+
+  it("closes and deletes its session with session/close and session/delete, and sends nothing before it has one", async () => {
+    const { ctx, calls } = context({ "session/new": { sessionId: "sess_1", modes: MODES("sdpm-orchestrator") } })
+    const session = new V3Session(ctx)
+    await session.close()
+    await session.discard()
+    expect(calls).toEqual([])
+    await session.newSession("sdpm-orchestrator")
+    await session.close()
+    await session.discard()
+    expect(calls.slice(1)).toEqual([
+      { method: "session/close", params: { sessionId: "sess_1" } },
+      { method: "session/delete", params: { sessionId: "sess_1" } },
+    ])
+    expect(vi.mocked(ctx.request).mock.calls.slice(1).map((call) => call[2])).toEqual([{ timeoutMs: 10_000 }, { timeoutMs: 10_000 }])
   })
 
   it("recognises ACP's auth required", () => {

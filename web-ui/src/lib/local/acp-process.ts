@@ -167,13 +167,10 @@ function push(ps: ProcessState, event: ChatEvent): void {
 
 /** One kiro-cli notification: through the engine to the MCP record and the conversation model. */
 function handleNotification(ps: ProcessState, msg: Parameters<EngineSession["translate"]>[0]): void {
-  const events = ps.session.translate(msg)
-  if (!events.length) return
-  const chat: LocalEvent[] = []
-  for (const event of events) {
+  for (const event of adapterFor(ps.engine).translateMcp(msg)) {
     if (event.type === "mcp_status" || event.type === "mcp_snapshot") ps.mcp.apply(event)
-    else chat.push(event)
   }
+  const chat: LocalEvent[] = ps.session.translate(msg)
   if (!chat.length) return
   const { events: out, deckId } = ps.conversation.apply(chat)
   if (deckId) saveDeck(ps, deckId)
@@ -376,6 +373,7 @@ async function spawnProcess(agentName: string, clientId: string | null, opts: Sp
       env,
       setupTimeoutMs: SESSION_SETUP_TIMEOUT_MS,
       signal: opts.signal,
+      hostAgent: agentName,
       waitForMcp: async (sessionId) => {
         if (!(await waitForMcp(mcp, sessionId, SDPM_MCP_SERVER, MCP_READY_TIMEOUT_MS, opts.signal))) {
           console.warn("[acp] sdpm MCP server not connected after %dms (session %s); going on", MCP_READY_TIMEOUT_MS, sessionId)

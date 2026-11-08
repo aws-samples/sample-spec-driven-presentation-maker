@@ -5,8 +5,10 @@
  *
  * kiro-cli runs an agent on one of its engines, which differ in how kiro-cli is started, how
  * sessions are opened and what their notifications look like. Everything that depends on the
- * engine lives in its folder (`engines/<id>/`) behind this interface; the process manager talks
- * to the adapter, and the conversation model reads only the adapter's `LocalEvent`s. Dropping an
+ * engine lives in its folder (`engines/<id>/`) behind this interface; the host pool (hosts.ts)
+ * talks to the adapter, and the conversation model reads only the adapter's `LocalEvent`s. One
+ * kiro-cli may carry several sessions: the adapter reads each line's MCP state once
+ * (`translateMcp`), and each `EngineSession` (one kiro session) reads its own session's events. Dropping an
  * engine is removing its folder, its line in `ADAPTERS` and its id in `ENGINE_IDS`
  * (engine-config.ts) and Settings.
  *
@@ -27,7 +29,10 @@ import type { RequestOptions } from "./transport"
 export type { EngineId }
 
 export interface EngineCapabilities {
-  /** initialize's `agentCapabilities.sessionCapabilities` (V3: list, close, delete, fork; V2: none). For phase 3. */
+  /**
+   * initialize's `agentCapabilities.sessionCapabilities` (V3: list, close, delete, fork; V2: none).
+   * `close` makes a kiro-cli a shared host (hosts.ts): it carries every chat of its engine.
+   */
   session: { list: boolean; close: boolean; delete: boolean; fork: boolean }
   /** The engine marks replayed updates; without it, updates before the load's answer are the replay. */
   replayMarking: boolean
@@ -66,7 +71,7 @@ export interface ModelChoice {
   effort?: string
 }
 
-/** What a session gets from the process manager: its connection, the setup limits and the MCP record. */
+/** What a session gets from its host (hosts.ts): the host's connection, the setup limits and the host's MCP record. */
 export interface SessionContext {
   request(method: string, params?: Record<string, unknown>, opts?: RequestOptions): Promise<unknown>
   /** The session's working directory (servers/local). */
@@ -77,8 +82,10 @@ export interface SessionContext {
   setupTimeoutMs: number
   /** The caller's abort signal for the setup requests. */
   signal?: AbortSignal
+  /** The agent the kiro-cli was started with (V2's `--agent`; V3 ignores it). */
+  hostAgent: string
   /**
-   * Wait for the session's sdpm MCP server, as recorded since kiro-cli started (mcp-ready.ts):
+   * Wait for the session's sdpm MCP server, as recorded on the host since kiro-cli started (mcp-ready.ts):
    * resolves when it is connected or the wait timed out (logged), rejects with McpFailedError.
    */
   waitForMcp(sessionId: string): Promise<void>
@@ -122,13 +129,14 @@ export interface StoredSession {
 /** What an engine's store is read with: kiro-cli's environment and, when the store needs one, a connection. */
 export interface StoreContext {
   env: NodeJS.ProcessEnv
-  /** An initialized kiro-cli of this engine (the process manager's `withEngineConnection`). */
+  /** An initialized kiro-cli of this engine (the registry's `withEngineConnection`, over the host pool). */
   connect(): Promise<{ request: SessionContext["request"]; caps: EngineCapabilities }>
 }
 
 /**
- * One kiro-cli process's conversation, as its engine runs it. `newSession` and `openSession`
- * return once the session runs the requested agent's mode (else AgentStartError
+ * One kiro session, as its engine runs it (a kiro-cli may carry several). `newSession` and
+ * `openSession` open the requested agent's mode on any kiro-cli of the engine, whatever agent it
+ * was started with, and return once the session runs that mode (else AgentStartError
  * `agent_definition_rejected`) and its sdpm server is ready (`ctx.waitForMcp`).
  */
 export interface EngineSession {
@@ -143,7 +151,11 @@ export interface EngineSession {
   forkSession(sourceId: string, agentName: string, opts?: ForkSessionOptions): Promise<{ sessionId: string; outcome: LoadOutcome }>
   /** Delete a session this session forked (any other id is ignored with a warning). */
   discardFork(sessionId: string): Promise<void>
-  /** One kiro-cli notification as engine-independent events; replays and internal notifications are []. */
+  /**
+   * One kiro-cli notification as engine-independent events of this session (and of the sub-agent
+   * sessions it maps, V2); another session's lines, replays, internal notifications and MCP state
+   * (`EngineAdapter.translateMcp`) are [].
+   */
   translate(msg: AcpNotification): LocalEvent[]
   /** A prompt turn starts / ends (the process manager's turn, which steers may continue). */
   beginTurn(): void
@@ -161,6 +173,10 @@ export interface EngineSession {
    */
   setModel(choice: ModelChoice): Promise<void>
   classifyError(error: unknown): EngineErrorKind | null
+  /** End the session in kiro-cli (V3 `session/close`; V2 cannot, and resolves). No-op before it has an id. */
+  close(): Promise<void>
+  /** Delete the session from kiro-cli's store (V3 `session/delete`; V2 no-op). No-op before it has an id. */
+  discard(): Promise<void>
 }
 
 export interface EngineAdapter {
@@ -168,7 +184,13 @@ export interface EngineAdapter {
   /** kiro-cli's arguments after the configured command and commandArgs. */
   spawnArgs(agentName: string): string[]
   capabilities(init: InitializeResponse): EngineCapabilities
+  /** The `EngineSession` of one kiro session on a kiro-cli of this engine. */
   createSession(ctx: SessionContext): EngineSession
+  /**
+   * A line's MCP state (`mcp_status` / `mcp_snapshot`), whichever session it names, also one no
+   * session knows the id of yet; [] for any other line. The host applies it once per line.
+   */
+  translateMcp(msg: AcpNotification): LocalEvent[]
   /** The engines that can open (fork) the sessions in this engine's store. */
   readonly sessionsOpenableBy: readonly EngineId[]
   /** The sessions in this engine's store. */

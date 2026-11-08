@@ -294,12 +294,11 @@ describe("kiro-cli 3.0.0 V2, a turn that delegates to the composer", () => {
 
   it("keeps the composer session's MCP state apart from the main session's", async () => {
     const lines = readFixture(fixture("v2-compose"))
-    const { V2Translator } = await import("./acp/engines/v2/translate")
+    const { v2Adapter } = await import("./acp/engines/v2")
     const { McpRecord } = await import("./mcp-ready")
-    const translator = new V2Translator()
     const record = new McpRecord()
     for (const line of lines.filter((l) => typeof l.method === "string")) {
-      for (const event of translator.translate(line as { method: string; params?: unknown })) {
+      for (const event of v2Adapter.translateMcp(line as { method: string; params?: unknown })) {
         if (event.type === "mcp_status" || event.type === "mcp_snapshot") record.apply(event)
       }
     }

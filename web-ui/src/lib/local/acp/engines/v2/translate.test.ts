@@ -13,7 +13,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { V2Translator } from "./translate"
+import { V2Translator, v2McpEvents } from "./translate"
 
 const MAIN = "fa1545df"
 const CHILD = "621f8fd1"
@@ -44,11 +44,16 @@ beforeEach(() => {
 })
 
 describe("MCP readiness and the agent", () => {
-  it("reports server_initialized as connected and server_init_failure as failed, for any session", () => {
-    expect(t.translate({ method: "_kiro.dev/mcp/server_initialized", params: { sessionId: CHILD, serverName: "sdpm" } }))
-      .toEqual([{ type: "mcp_status", sessionId: CHILD, server: "sdpm", state: "connected" }])
-    expect(t.translate({ method: "_kiro.dev/mcp/server_init_failure", params: { sessionId: MAIN, serverName: "sdpm", error: "connection closed: initialize response" } }))
-      .toEqual([{ type: "mcp_status", sessionId: MAIN, server: "sdpm", state: "failed", error: "connection closed: initialize response" }])
+  it("reports server_initialized as connected and server_init_failure as failed, for any session, through v2McpEvents only", () => {
+    const initialized = { method: "_kiro.dev/mcp/server_initialized", params: { sessionId: CHILD, serverName: "sdpm" } }
+    const failed = { method: "_kiro.dev/mcp/server_init_failure", params: { sessionId: MAIN, serverName: "sdpm", error: "connection closed: initialize response" } }
+    expect(v2McpEvents(initialized)).toEqual([{ type: "mcp_status", sessionId: CHILD, server: "sdpm", state: "connected" }])
+    expect(v2McpEvents(failed)).toEqual([{ type: "mcp_status", sessionId: MAIN, server: "sdpm", state: "failed", error: "connection closed: initialize response" }])
+    // A session id no translator knows yet (V2 sends it before the session/new answer) still counts.
+    expect(v2McpEvents({ method: "_kiro.dev/mcp/server_initialized", params: { sessionId: "not-yet-known", serverName: "sdpm" } })).toHaveLength(1)
+    expect(t.translate(initialized)).toEqual([])
+    expect(t.translate(failed)).toEqual([])
+    expect(v2McpEvents(text(MAIN, "hi"))).toEqual([])
   })
 
   it("logs agent/not_found and reports it to the mode check", () => {

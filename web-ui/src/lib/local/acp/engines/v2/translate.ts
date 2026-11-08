@@ -1,7 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * V2's notifications as LocalEvents. One translator per kiro-cli process (one conversation).
+ * V2's notifications as LocalEvents. One translator per kiro session (a kiro-cli may carry
+ * several, each line reaches every one of them).
  *
  * Each `session/update` / `_kiro.dev/session/update` is read by the first rule that applies:
  * 1. An update of the session being loaded, before the load's answer: the replay → [] (counted
@@ -28,8 +29,10 @@
  * status is `terminated` ends its group (`composer_end success`), any other status but `working`
  * ends it failed. The sessions listed `working` are the ones Stop cancels besides the main one.
  * `AgentExecutionSteeringInjected` of the main session → `steer_injected`.
+ * MCP state is read once per line for the whole kiro-cli (`v2McpEvents`, the adapter's
+ * `translateMcp`, any session, also one whose session/new is not answered yet):
  * `_kiro.dev/mcp/server_initialized` → `mcp_status connected`, `server_init_failure` →
- * `mcp_status failed` (any session). `_kiro.dev/agent/not_found` is logged and reported to
+ * `mcp_status failed`; the translator returns [] for them. `_kiro.dev/agent/not_found` is logged and reported to
  * `onAgentNotFound` (the session's mode check waits for it to say why).
  */
 import type { LocalEvent } from "../../../conversation/events"
@@ -78,6 +81,16 @@ function toolResult(rawOutput: unknown): Record<string, unknown> {
   try { return objectOr(JSON.parse(text)) } catch { return {} }
 }
 
+/** A line's MCP state, whichever session it names: `server_initialized` → connected, `server_init_failure` → failed. */
+export function v2McpEvents(msg: AcpNotification): LocalEvent[] {
+  if (msg.method !== KIRO_MCP_SERVER_INITIALIZED && msg.method !== KIRO_MCP_SERVER_INIT_FAILURE) return []
+  const params = objectOr(msg.params)
+  if (typeof params.sessionId !== "string" || typeof params.serverName !== "string") return []
+  if (msg.method === KIRO_MCP_SERVER_INITIALIZED) return [{ type: "mcp_status", sessionId: params.sessionId, server: params.serverName, state: "connected" }]
+  const error = typeof params.error === "string" ? { error: params.error } : {}
+  return [{ type: "mcp_status", sessionId: params.sessionId, server: params.serverName, state: "failed", ...error }]
+}
+
 export class V2Translator {
   /** The session prompts go to. */
   mainSessionId: string | null = null
@@ -118,13 +131,7 @@ export class V2Translator {
   }
 
   translate(msg: AcpNotification): LocalEvent[] {
-    if (msg.method === KIRO_MCP_SERVER_INITIALIZED || msg.method === KIRO_MCP_SERVER_INIT_FAILURE) {
-      const params = objectOr(msg.params)
-      if (typeof params.sessionId !== "string" || typeof params.serverName !== "string") return []
-      if (msg.method === KIRO_MCP_SERVER_INITIALIZED) return [{ type: "mcp_status", sessionId: params.sessionId, server: params.serverName, state: "connected" }]
-      const error = typeof params.error === "string" ? { error: params.error } : {}
-      return [{ type: "mcp_status", sessionId: params.sessionId, server: params.serverName, state: "failed", ...error }]
-    }
+    if (msg.method === KIRO_MCP_SERVER_INITIALIZED || msg.method === KIRO_MCP_SERVER_INIT_FAILURE) return []
     if (msg.method === KIRO_SUBAGENT_LIST_UPDATE) return this.listUpdate(objectOr(msg.params) as V2SubagentListUpdate)
     if (msg.method === KIRO_AGENT_NOT_FOUND) {
       const params = objectOr(msg.params)
