@@ -169,6 +169,42 @@ export function withPermissions(agent: Record<string, unknown>, fileName: string
   return converted
 }
 
+const COMPOSE_TOOLS = ["@sdpm/compose_slides", "@sdpm/message_composer"]
+const COMPOSER_SUBAGENT = "sdpm-composer"
+
+/**
+ * The orchestrator as the Local Web UI runs it: it dispatches composers with `compose_slides` and
+ * reaches them with `message_composer` (both added to `tools` and `allowedTools`), and no longer
+ * has the composer as a sub-agent (`sdpm-composer` taken out of
+ * `toolsSettings.subagent.availableAgents` / `trustedAgents`; with no other sub-agent left,
+ * `toolsSettings.subagent` and `use_subagent` go too). A custom orchestrator that delegates to
+ * other agents keeps them.
+ */
+export function withAsyncCompose(agent: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...agent }
+  const settings = (agent.toolsSettings && typeof agent.toolsSettings === "object") ? { ...(agent.toolsSettings as Record<string, unknown>) } : null
+  const subagent = settings?.subagent && typeof settings.subagent === "object" ? { ...(settings.subagent as Record<string, unknown>) } : null
+  let noSubagents = !subagent
+  if (settings && subagent) {
+    for (const key of ["availableAgents", "trustedAgents"]) {
+      if (Array.isArray(subagent[key])) subagent[key] = (subagent[key] as unknown[]).filter((name) => name !== COMPOSER_SUBAGENT)
+    }
+    noSubagents = !Array.isArray(subagent.availableAgents) || subagent.availableAgents.length === 0
+    if (noSubagents) delete settings.subagent
+    else settings.subagent = subagent
+    if (Object.keys(settings).length) out.toolsSettings = settings
+    else delete out.toolsSettings
+  }
+  for (const key of ["tools", "allowedTools"]) {
+    const list = agent[key]
+    if (list !== undefined && !(Array.isArray(list) && list.every((t) => typeof t === "string"))) continue
+    const names = ((list as string[] | undefined) ?? []).filter((t) => !(noSubagents && t === V2_DELEGATION_TOOL))
+    for (const tool of COMPOSE_TOOLS) if (!names.includes(tool)) names.push(tool)
+    out[key] = names
+  }
+  return out
+}
+
 /**
  * Re-derive `.kiro/agents/` from the catalog + selection. Idempotent —
  * safe (and intended) to call on every spawn.
@@ -182,6 +218,10 @@ export function withPermissions(agent: Record<string, unknown>, fileName: string
  * backup and restored if the swap fails), so a failure can never leave a
  * mix of old and new generations — or no directory at all — and stale
  * files from removed catalog entries are swept away.
+ *
+ * The orchestrator gets `withAsyncCompose` (before the permission rules are
+ * derived); the composer, style and translate definitions are converted as
+ * they are.
  *
  * The Settings model goes into every definition, the composer's included: each
  * composer runs on a kiro-cli of its own, and the compose run then sets the
@@ -223,6 +263,7 @@ export function syncToAgentsDir(
     } else {
       delete agent.model
     }
+    if (role === "orchestrator") agent = withAsyncCompose(agent)
     staged.push({ fileName: fixedName, content: JSON.stringify(withPermissions(agent, fileName as string), null, 2) + "\n" })
   }
   staged.push({ fileName: README_FILE, content: README_MARKER })
