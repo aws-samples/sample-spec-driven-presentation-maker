@@ -36,188 +36,11 @@ import path from "path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 import type { BufferedEvent } from "./conversation/events"
 import type { SessionOrigin } from "./kiro-sessions.types"
+import { FAKE_MODELS, FakeChild, settle, tick } from "../../test/fakeKiro"
 
 const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
 vi.mock("child_process", () => ({ spawn, default: { spawn } }))
 vi.mock("./agents-sync", () => ({ syncToAgentsDir: vi.fn() }))
-
-type Rpc = { id: number; method: string; params: Record<string, unknown> }
-
-/** The fake kiro-cli's models: `m-effort` has effort levels (V3 only). */
-const FAKE_MODELS = ["auto", "m-effort", "m-plain"]
-
-class FakeChild extends EventEmitter {
-  pid = 4242
-  stdout = Object.assign(new EventEmitter(), { setEncoding: () => {} })
-  stderr = Object.assign(new EventEmitter(), { setEncoding: () => {} })
-  stdin = Object.assign(new EventEmitter(), { write: (line: string) => { this.handle(JSON.parse(line)); return true } })
-  killed = false
-  prompts: number[] = []
-  cancelled: string[] = []
-  /** What this client wrote back for kiro-cli's own requests. */
-  answers: Record<string, unknown>[] = []
-  /** Methods answered with a JSON-RPC error instead of a result. */
-  failing = new Set<string>()
-  /** Methods never answered (a kiro-cli that hangs). */
-  silent = new Set<string>()
-  /** Every request this client sent, in order. */
-  requests: Rpc[] = []
-  /** The answer to `_session/steer` (V2 shape; V3 adds a messageId). */
-  steerAnswer: Record<string, unknown> = { queued: true }
-  /** Sessions kiro-cli does not have: V2 answers their load with Session not found, V3 creates them empty. */
-  missing = new Set<string>()
-  /** The mode a loaded session is in (default: the requested agent's). */
-  loadedMode: string | null = null
-  /** The mode session/new answers (default: the requested agent's). */
-  newMode: string | null = null
-  /** The sdpm server's state kiro-cli reports for each session it opens. */
-  mcpState: "connected" | "failed" = "connected"
-  /** Forks made with session/fork (V3), by id: their source. */
-  forks = new Map<string, string>()
-  /** The session's model and effort (set_config_option / set_model change them). */
-  model = "auto"
-  effort: string | null = null
-  constructor(private readonly sessionId: string, private readonly lockedSessions: Set<string>, readonly args: string[] = ["acp", "--agent", "sdpm-orchestrator"]) { super() }
-
-  get engine(): "v2" | "v3" { return this.args.includes("--agent-engine") ? "v3" : "v2" }
-
-  private get agent(): string { return this.args[this.args.indexOf("--agent") + 1] ?? "" }
-
-  /** The sdpm server's state for a session, in the engine's shape, ahead of the answer (as V2 sends it). */
-  private mcpReady(sessionId: string) {
-    if (this.engine === "v2") {
-      const failed = this.mcpState === "failed"
-      this.send({ method: failed ? "_kiro.dev/mcp/server_init_failure" : "_kiro.dev/mcp/server_initialized", params: { sessionId, serverName: "sdpm", ...(failed ? { error: "connection closed" } : {}) } })
-    } else {
-      this.send({ method: "_kiro/mcp/status", params: { sessionId, servers: [{ name: "sdpm", status: this.mcpState, ...(this.mcpState === "failed" ? { errorMessage: "Connection closed" } : {}) }] } })
-    }
-  }
-
-  private modes(current: string) {
-    return { currentModeId: current, availableModes: ["sdpm-orchestrator", "sdpm-style", "sdpm-translate"].map((id) => ({ id, name: id })) }
-  }
-
-  /** V3's config options: the model list, and the effort option of a model with effort. */
-  configOptions() {
-    const options: Record<string, unknown>[] = [{
-      type: "select", id: "model", category: "model", currentValue: this.model,
-      options: FAKE_MODELS.map((value) => ({ value, name: value.toUpperCase(), _meta: { kiro: value === "m-effort" ? { hasEffort: true, effortLevels: ["low", "high"], defaultEffortLevel: "low", rateMultiplier: 2 } : { hasEffort: false } } })),
-    }]
-    if (this.model === "m-effort") options.push({ type: "select", id: "effortLevel", category: "thought_level", currentValue: this.effort ?? "low", options: [{ value: "low" }, { value: "high" }] })
-    return options
-  }
-
-  private configUpdate(sessionId: string) {
-    this.update(sessionId, { sessionUpdate: "config_option_update", configOptions: this.configOptions() })
-  }
-
-  send(msg: Record<string, unknown>) {
-    // Answer after rpcRequestTo has registered the pending request.
-    setImmediate(() => this.stdout.emit("data", JSON.stringify({ jsonrpc: "2.0", ...msg }) + "\n"))
-  }
-
-  private handle(req: Rpc) {
-    if (req.method === undefined) { this.answers.push(req as unknown as Record<string, unknown>); return }
-    if (req.method === "session/cancel") this.cancelled.push(req.params.sessionId as string)
-    if (req.id == null) return
-    this.requests.push(req)
-    if (this.silent.has(req.method)) return
-    if (req.method === "_session/steer" && !this.failing.has(req.method)) { this.send({ id: req.id, result: this.steerAnswer }); return }
-    if (req.method === "session/new") {
-      const requested = this.engine === "v3" ? ((req.params._meta as { kiro?: { modeId?: string } } | undefined)?.kiro?.modeId ?? "") : this.agent
-      this.mcpReady(this.sessionId)
-      if (this.engine === "v3") this.configUpdate(this.sessionId)
-      this.send({ id: req.id, result: {
-        sessionId: this.sessionId, modes: this.modes(this.newMode ?? requested),
-        ...(this.engine === "v3"
-          ? { configOptions: this.configOptions() }
-          : { models: { currentModelId: this.model, availableModels: FAKE_MODELS.map((modelId) => ({ modelId, name: modelId })) } }),
-      } })
-    } else if (req.method === "session/load" && this.lockedSessions.has(req.params.sessionId as string)) {
-      this.send({ id: req.id, error: { message: "Internal error", data: "Failed to start session: Session is active in another process (PID 1)" } })
-    } else if (req.method === "session/load" && this.engine === "v2" && this.missing.has(req.params.sessionId as string)) {
-      this.send({ id: req.id, error: { code: -32603, message: "Internal error", data: `Failed to start session: Session not found: ${req.params.sessionId}` } })
-    } else if (req.method === "session/load") {
-      const sessionId = req.params.sessionId as string
-      const created = this.missing.has(sessionId)
-      // kiro-cli replays the loaded session's history under its id before answering.
-      if (!created) this.update(sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "earlier" }, ...(this.engine === "v3" ? { _meta: { kiro: { replay: true } } } : {}) })
-      this.mcpReady(sessionId)
-      this.send({ id: req.id, result: {
-        modes: this.modes(this.loadedMode ?? (this.engine === "v3" ? "sdpm-orchestrator" : this.agent)),
-        ...(this.engine === "v3" ? { _meta: {
-          createdAt: created ? new Date().toISOString() : "2026-01-01T00:00:00.000Z",
-          ...(this.forks.has(sessionId) ? { parentSessionId: this.forks.get(sessionId) } : {}),
-        } } : {}),
-      } })
-      if (this.engine === "v3") this.configUpdate(sessionId)
-    } else if (req.method === "session/fork") {
-      const forkId = `F${this.forks.size + 1}`
-      this.forks.set(forkId, req.params.sessionId as string)
-      this.send({ id: req.id, result: { sessionId: forkId } })
-    } else if (req.method === "session/set_mode") {
-      this.mcpReady(req.params.sessionId as string)
-      this.send({ id: req.id, result: {} })
-    } else if (req.method === "session/set_config_option" && this.engine === "v3" && !this.failing.has(req.method)) {
-      if (req.params.configId === "model") {
-        this.model = req.params.value as string
-        this.effort = null
-      } else if (req.params.configId === "effortLevel") this.effort = req.params.value as string
-      this.configUpdate(req.params.sessionId as string)
-      this.send({ id: req.id, result: { configOptions: this.configOptions() } })
-    } else if (req.method === "session/set_model" && this.engine === "v2" && !this.failing.has(req.method)) {
-      this.model = req.params.modelId as string
-      this.send({ id: req.id, result: {} })
-    } else if (req.method === "session/prompt") this.prompts.push(req.id)
-    else if (this.failing.has(req.method)) this.send({ id: req.id, error: { message: "Internal error", data: `${req.method} failed` } })
-    else this.send({ id: req.id, result: {} })
-  }
-
-  update(sessionId: string, update: Record<string, unknown>) {
-    this.send({ method: "session/update", params: { sessionId, update } })
-  }
-
-  /**
-   * What kiro-cli 2.37 sends for a use_subagent call: sub-session updates and list_update, no
-   * turn_end. `finish: false` leaves the sub-agent working.
-   */
-  runSubagent(subSessionId: string, finish = true) {
-    this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [{ sessionId: subSessionId, status: { type: "working" } }] } })
-    this.update(subSessionId, { sessionUpdate: "tool_call", toolCallId: `${subSessionId}-t`, title: "Running: @sdpm/generate_pptx", _meta: { kiro: { toolName: "generate_pptx", mcpServerName: "sdpm" } } })
-    this.update(subSessionId, { sessionUpdate: "tool_call_update", toolCallId: `${subSessionId}-t`, status: "completed" })
-    if (!finish) return
-    this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [{ sessionId: subSessionId, status: { type: "terminated" } }] } })
-    this.send({ method: "_kiro.dev/subagent/list_update", params: { subagents: [] } })
-  }
-
-  /** A main-session MCP tool call whose result is `result` (the V2 shape). */
-  toolResult(sessionId: string, toolCallId: string, result: Record<string, unknown>) {
-    this.update(sessionId, { sessionUpdate: "tool_call", toolCallId, title: "Running: @sdpm/init_presentation", rawInput: {}, _meta: { kiro: { toolName: "init_presentation", mcpServerName: "sdpm" } } })
-    this.update(sessionId, {
-      sessionUpdate: "tool_call_update", toolCallId, status: "completed", title: "Running: @sdpm/init_presentation",
-      rawOutput: { items: [{ Json: { content: [{ type: "text", text: JSON.stringify(result) }] } }] },
-    })
-  }
-
-  endTurn(stopReason = "end_turn") {
-    this.send({ id: this.prompts.shift(), result: { stopReason } })
-  }
-
-  failPrompt() {
-    this.send({ id: this.prompts.shift(), error: { message: "Internal error", data: "model stream failed" } })
-  }
-
-  kill() {
-    if (!this.killed) {
-      this.killed = true
-      setImmediate(() => this.emit("close", null))
-    }
-    return true
-  }
-}
-
-const tick = () => new Promise((r) => setImmediate(r))
-const settle = async () => { for (let i = 0; i < 10; i++) await tick() }
 
 const isEnd = (e: BufferedEvent) => e.event.kind === "end"
 const payloadOf = (e: BufferedEvent) => e.event.payload as Record<string, unknown> | undefined
@@ -520,7 +343,7 @@ describe("requests from kiro-cli", () => {
     prompted.subscribe((entry) => { if (isEnd(entry)) ends.push(entry) })
     prompted.send()
     await settle()
-    return { child, ends, promptId: child.prompts[0] }
+    return { child, ends, promptId: child.prompts[0].id }
   }
 
   it("does not take a request whose id equals the prompt's for the prompt's answer", async () => {
