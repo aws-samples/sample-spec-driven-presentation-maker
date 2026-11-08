@@ -46,6 +46,8 @@ uv run python server.py
 | `read_guides` | Read guide documents (incl. `slide-json-spec`) |
 | `code_to_slide` | Generate code block elements JSON |
 | `grid` | CSS Grid coordinate calculation |
+| `compose_slides` | Web UI only (`server_acp.py` with `SDPM_LOCAL_COMPOSE=1`): dispatch composers in the background; the Local Web UI runs them and reports back |
+| `message_composer` | Web UI only (same condition): pass a message to a running composer |
 
 ## Requirements
 
