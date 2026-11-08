@@ -15,10 +15,19 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
 (Windows PowerShell: `irm …/scripts/install/dist/install.ps1 | iex` with `-McpOnly -NonInteractive -Register`.)
 `--mcp-only` skips the browser Web UI (needs Node.js 20+; use `--full` to include it);
 `--register` connects every MCP client found on the machine and cleans up leftovers of older
-setups without asking; `--agent-name NAME` renames the Kiro CLI agent (default `sdpm`).
-Then verify: `~/.local/bin/sdpm` prints status; `python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp`
+setups without asking; `--agent-name NAME` renames the Kiro CLI agent (default `sdpm`). It
+installs the latest release (`--channel main` / `SDPM_CHANNEL=main` follows `main` instead).
+Without a terminal nothing waits for input; if sudo needs a password, the installer prints
+the commands for the user to run and exits 1. Then verify: `~/.local/bin/sdpm` prints status; `python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp`
 must print `OK: … 20 tools`. Tell the user how to start: Kiro CLI `kiro-cli chat --agent sdpm`;
 other clients just ask for slides; browser `sdpm webui`.
+**Updating it for a user:** run `sdpm update` (`~/.local/bin/sdpm`; Windows
+`%USERPROFILE%\bin\sdpm.cmd`). It never prompts; read the exit code: 0 updated, up to date or
+stayed (an install ahead of the latest release stays until a release contains it, with one
+`Staying on …` line), 1 failed (the last lines say whether it went back and where the install
+is), 2 usage, 130 interrupted. `--channel main|release` (or `SDPM_CHANNEL`) switches what it
+follows and is remembered; `--with-webui` adds the browser Web UI. `sdpm register` without a
+terminal needs `--yes` (every detected client) or client names, otherwise it exits 2.
 **Migrating an older setup** (Claude Code / Codex plugin, Kiro Power, `make install-kiro`,
 `skills/`, `uvx … sdpm-mcp` entries): all of these are gone — follow
 [Migration: onboarding](docs/en/migration/onboarding.md); `sdpm register` detects and offers

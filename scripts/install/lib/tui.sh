@@ -70,31 +70,25 @@ fail_step() {
   fi
 }
 
+# The TTY rule: stdout is a terminal and /dev/tty opens. Without it the answer is the default
+# (yes), unasked, exactly as with --non-interactive; nothing waits for input.
+tty_prompt_allowed() { [[ "${NON_INTERACTIVE:-0}" != "1" && -t 1 ]] && { : </dev/tty; } 2>/dev/null; }
+
 show_confirm() {
   local prompt="$1" reply
-  if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then return 0; fi
   # Under `curl … | bash` stdin is the script itself; prompts must come from the terminal.
-  if [[ ! -r /dev/tty ]]; then
-    echo "" >&2
-    echo "No terminal available for prompts. Re-run with --non-interactive (add --mcp-only/--full" >&2
-    echo "and --register/--no-register to choose instead of accepting the defaults)." >&2
-    exit 2
-  fi
+  tty_prompt_allowed || return 0
   printf "\n  %s " "$prompt"
   read -r reply </dev/tty
   case "${reply:-y}" in [Yy]*|"") return 0 ;; *) return 1 ;; esac
 }
 
 # Two-row checklist matching the client picker in servers/local/client_config.py: the MCP
-# server row is always on; the Web UI row toggles. Sets SURFACE_WEBUI=1|0. Falls back to
-# show_confirm without a terminal.
+# server row is always on; the Web UI row toggles. Sets SURFACE_WEBUI=1|0; without a
+# terminal (the TTY rule) it keeps the default, both.
 show_surface_picker() {
   SURFACE_WEBUI=1
-  if [[ "${NON_INTERACTIVE:-0}" == "1" ]]; then return 0; fi
-  if [[ ! -r /dev/tty || ! -t 1 ]]; then
-    if show_confirm "Also install the browser Web UI? [Y/n]"; then SURFACE_WEBUI=1; else SURFACE_WEBUI=0; fi
-    return 0
-  fi
+  tty_prompt_allowed || return 0
   _render_surfaces() {
     printf "  What to install   ${C_DIM}space toggle · enter confirm${C_RESET}\n\n"
     printf "        ${C_DIM}[x] MCP server        for your AI agent — always installed${C_RESET}\n"

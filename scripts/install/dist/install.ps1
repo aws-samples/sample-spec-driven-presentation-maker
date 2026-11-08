@@ -8,6 +8,7 @@ param(
     [switch]$McpOnly,
     [switch]$Register,
     [string]$AgentName = "",
+    [string]$Channel = "",
     [switch]$NoRegister,
     [switch]$DepsOnly,
     [switch]$NonInteractive,
@@ -161,287 +162,24 @@ function Run-WithSpinner {
     }
 }
 
-$script:EmbeddedLauncher = @'
-# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
-# SPDX-License-Identifier: MIT-0
-#
-# sdpm — the one launcher for a local SDPM installation (%USERPROFILE%\.sdpm).
-#   sdpm webui      browser surface
-#   sdpm mcp        MCP surface (terminal check; clients get the uv command directly)
-#   sdpm register   wire the MCP server into the clients on this machine
-#   sdpm update     fetch, hand over to the fetched checkout_update.py (local changes go to
-#                   a git stash, then fast-forward), sync, rebuild, then client_config.py
-#                   refresh - which replaces this file with the checkout's launcher.ps1 and
-#                   re-registers the clients
-# Client detection, configuration rendering and registration commands live once in
-# servers/local/client_config.py; this file and launcher.sh only delegate to it.
-[CmdletBinding()]
-param(
-    [Parameter(Position = 0)][string]$Command = "",
-    [Parameter(ValueFromRemainingArguments = $true)][string[]]$Rest = @()
-)
-
-$ErrorActionPreference = "Stop"
-# This file, as installed (the copy `sdpm update` refreshes).
-$LauncherPath = $PSCommandPath
-$SdpmHome = if ($env:SDPM_HOME) { $env:SDPM_HOME } else { Join-Path $env:USERPROFILE ".sdpm" }
-$Checkout = Join-Path $SdpmHome "checkout"
-$ProfileFile = Join-Path $SdpmHome ".profile"
-$UvPathFile = Join-Path $SdpmHome ".uv-path"
-# Kiro agent name chosen at install time (-AgentName); SDPM_AGENT_NAME overrides per call.
-$agentNameFile = Join-Path $SdpmHome ".agent-name"
-if (-not $env:SDPM_AGENT_NAME -and (Test-Path $agentNameFile)) { $env:SDPM_AGENT_NAME = (Get-Content $agentNameFile -Raw).Trim() }
-if (-not $env:SDPM_AGENT_NAME) { $env:SDPM_AGENT_NAME = "sdpm" }
-$RepoUrl = "https://github.com/aws-samples/sample-spec-driven-presentation-maker.git"
-$WebUiPort = if ($env:SDPM_WEBUI_PORT) { [int]$env:SDPM_WEBUI_PORT } else { 3000 }
-$ServerDir = Join-Path $Checkout "servers\local"
-
-# ---------------------------------------------------------------------------
-# Resolution
-# ---------------------------------------------------------------------------
-
-function Assert-Checkout {
-    if (-not (Test-Path (Join-Path $Checkout ".git"))) { throw "SDPM is not installed at $Checkout. Re-run the installer." }
-}
-
-function Get-Profile {
-    if (Test-Path $ProfileFile) { return (Get-Content $ProfileFile -Raw).Trim() }
-    return "full"
-}
-
-function Test-WebUiInstalled {
-    return ((Get-Profile) -eq "full") -and (Test-Path (Join-Path $Checkout "web-ui\build"))
-}
-
-# Absolute path of uv, recorded by the installer; re-resolved and re-recorded if stale.
-function Resolve-Uv {
-    if (Test-Path $UvPathFile) {
-        $recorded = (Get-Content $UvPathFile -Raw).Trim()
-        if ($recorded -and (Test-Path $recorded)) { return $recorded }
-    }
-    $cmd = Get-Command uv -ErrorAction SilentlyContinue
-    $found = if ($cmd) { $cmd.Source } else { Join-Path $env:USERPROFILE ".local\bin\uv.exe" }
-    if (-not (Test-Path $found)) { throw "uv not found. Re-run the installer (it installs uv)." }
-    $found = [System.IO.Path]::GetFullPath($found)
-    New-Item -ItemType Directory -Force -Path $SdpmHome | Out-Null
-    $found | Set-Content -Path $UvPathFile -Encoding ASCII
-    return $found
-}
-
-# uv never rewrites the lockfile here (--frozen): a tracked file changed in the checkout
-# would stop the next `sdpm update`.
-
-# Run a Python entry point inside the local server's environment. The native command's
-# output flows straight through; the caller reads $LASTEXITCODE. Nothing of our own on stdout.
-function Invoke-Py {
-    param([string[]]$PyArgs)
-    $uv = Resolve-Uv
-    & $uv run --frozen --directory $ServerDir python @PyArgs
-}
-
-# client_config.py, told exactly which uv and checkout the clients must point at.
-function Invoke-Cfg {
-    param([string[]]$CfgArgs)
-    $uv = Resolve-Uv
-    & $uv run --frozen --directory $ServerDir python client_config.py --uv $uv --checkout $Checkout @CfgArgs
-}
-
-# ---------------------------------------------------------------------------
-# Surfaces
-# ---------------------------------------------------------------------------
-
-function Test-Port {
-    $client = New-Object Net.Sockets.TcpClient
-    try { $client.Connect("127.0.0.1", $WebUiPort); return $true } catch { return $false } finally { $client.Dispose() }
-}
-
-function Invoke-WebUi {
-    Assert-Checkout
-    if (-not (Test-WebUiInstalled)) {
-        Write-Host "The browser Web UI is not installed in this profile ($(Get-Profile))." -ForegroundColor Yellow
-        Write-Host "Add it with:  sdpm update --with-webui   (needs Node.js 20+)"
-        exit 1
-    }
-    if (Test-Port) { Start-Process "http://localhost:$WebUiPort"; return }
-    Start-Job -ScriptBlock {
-        param($Port)
-        for ($i = 0; $i -lt 240; $i++) {
-            $client = New-Object Net.Sockets.TcpClient
-            try { $client.Connect("127.0.0.1", $Port); $client.Dispose(); Start-Process "http://localhost:$Port"; return }
-            catch { $client.Dispose(); Start-Sleep -Milliseconds 500 }
-        }
-    } -ArgumentList $WebUiPort | Out-Null
-    Push-Location (Join-Path $Checkout "web-ui")
-    try {
-        $env:NEXT_PUBLIC_MODE = "local"
-        & npm run start -- --hostname 127.0.0.1 --port $WebUiPort
-        if ($LASTEXITCODE -ne 0) { throw "Next.js server exited with code $LASTEXITCODE" }
-    } finally { Pop-Location }
-}
-
-function Invoke-Mcp {
-    Assert-Checkout
-    # Foreground stdio server. The child inherits this process's stdin/stdout handles
-    # directly (no PowerShell pipeline in the byte path), so JSON-RPC framing survives.
-    $uv = Resolve-Uv
-    # -ArgumentList joins with spaces and drops PowerShell's quotes; quote each argument ourselves
-    # so a checkout under a path with spaces survives.
-    $quoted = @("run", "--directory", $ServerDir, "--frozen", "python", "server.py") | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }
-    $proc = Start-Process -FilePath $uv -ArgumentList ($quoted -join " ") -NoNewWindow -Wait -PassThru
-    exit $proc.ExitCode
-}
-
-# ---------------------------------------------------------------------------
-# Maintenance
-# ---------------------------------------------------------------------------
-
-function Invoke-Step {
-    param([string]$What, [scriptblock]$Action)
-    Write-Host "> $What..."
-    & $Action
-    if ($LASTEXITCODE -ne 0) {
-        throw "SDPM update failed while $What (exit $LASTEXITCODE). Review the output above and repair the checkout at $Checkout, then rerun 'sdpm update'."
-    }
-}
-
-function Build-Mcp {
-    $uv = Resolve-Uv
-    Invoke-Step "Syncing the MCP server environment" { & $uv sync --frozen --directory $ServerDir }
-}
-
-# checkout_update.py as of the fetched main, run before anything is checked out: it moves
-# local changes to a git stash (never discards them) and fast-forwards. The newest version
-# of that step runs even over an old checkout; this file only fetches and hands over.
-function Invoke-FastForward {
-    $uv = Resolve-Uv
-    $tmp = Join-Path ([IO.Path]::GetTempPath()) ("sdpm-update-" + [guid]::NewGuid())
-    New-Item -ItemType Directory -Path $tmp | Out-Null
-    try {
-        & git -C $Checkout "--work-tree=$tmp" restore --source=FETCH_HEAD --worktree -- servers/local/checkout_update.py
-        if ($LASTEXITCODE -ne 0) { return }
-        & $uv run --no-project python (Join-Path $tmp "servers\local\checkout_update.py") --checkout $Checkout pull
-    } finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
-}
-
-function Build-WebUi {
-    Push-Location (Join-Path $Checkout "web-ui")
-    try {
-        Invoke-Step "Installing Web UI dependencies" { & npm ci }
-        $env:NEXT_PUBLIC_MODE = "local"
-        Invoke-Step "Building the Web UI (Local mode)" { & npm run build }
-    } finally { Pop-Location }
-}
-
-function Invoke-Update {
-    Assert-Checkout
-    $withWebUi = $Rest -contains "--with-webui"
-    $before = (& git -C $Checkout rev-parse HEAD 2>$null)
-    Write-Host "> Fetching main from $RepoUrl"
-    Invoke-Step "Fetching main" { & git -C $Checkout fetch --tags --prune origin main }
-    Invoke-Step "Fast-forwarding main" { Invoke-FastForward }
-    Build-Mcp
-    if ($withWebUi) {
-        if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { throw "Node.js 20+ is required for the Web UI: https://nodejs.org/" }
-        "full" | Set-Content -Path $ProfileFile -Encoding ASCII
-    }
-    if ((Get-Profile) -eq "full") { Build-WebUi }
-    # The new checkout's code: this file, the clients that have the server, leftovers, notes.
-    $refreshArgs = @("refresh", "--launcher", $LauncherPath)
-    if ($before) { $refreshArgs += @("--since", "$before".Trim()) }
-    Invoke-Step "Refreshing the sdpm command and MCP clients" { Invoke-Cfg $refreshArgs }
-    Write-Host "Update complete." -ForegroundColor Green
-    if ((Get-Profile) -eq "full") { Write-Host "  sdpm webui     open the browser Web UI" }
-    else { Write-Host "  sdpm webui     (not installed - sdpm update --with-webui)" }
-}
-
-function Invoke-Uninstall {
-    Assert-Checkout
-    Write-Host "This removes $SdpmHome, the sdpm command and shortcuts."
-    $answer = Read-Host "Continue? [y/N]"
-    if ($answer -notmatch '^[Yy]$') { Write-Host "Aborted."; return }
-    try { Invoke-Cfg @("unregister") } catch { }
-    $launcherDir = if ($env:SDPM_LAUNCHER_DIR) { $env:SDPM_LAUNCHER_DIR } else { Join-Path $env:USERPROFILE "bin" }
-    Remove-Item (Join-Path $launcherDir "sdpm.cmd"), (Join-Path $launcherDir "sdpm.ps1") -ErrorAction SilentlyContinue
-    Remove-Item (Join-Path ([Environment]::GetFolderPath("Desktop")) "SDPM.lnk") -ErrorAction SilentlyContinue
-    Remove-Item -Recurse -Force $SdpmHome -ErrorAction SilentlyContinue
-    Write-Host "SDPM removed."
-}
-
-function Get-Version {
-    Assert-Checkout
-    $ref = (& git -C $Checkout describe --tags --always 2>$null)
-    $commit = (& git -C $Checkout rev-parse --short HEAD)
-    return "$ref ($commit)"
-}
-
-function Show-Status {
-    Assert-Checkout
-    Write-Host "SDPM $(Get-Version)"
-    Write-Host "  checkout   $Checkout"
-    Write-Host "  profile    $(Get-Profile)"
-    if (Test-WebUiInstalled) { Write-Host "  webui      installed        -> sdpm webui" }
-    else { Write-Host "  webui      not installed    -> sdpm update --with-webui" }
-    Write-Host "  mcp        installed        -> sdpm register  (connect your MCP clients)"
-    Write-Host ""
-    try { Invoke-Cfg @("status") } catch { }
-}
-
-function Show-Help {
-@"
-Usage: sdpm [COMMAND]
-
-Surfaces
-  webui                 Start the browser Web UI and open it
-  mcp                   Run the MCP server on stdio (terminal check)
-
-MCP clients
-  register [CLIENT..]   Register the server with detected (or named) clients
-  unregister [CLIENT..] Remove it again
-  mcp-config [CLIENT..] Print the configuration with this machine's paths (--json, --all)
-
-Maintenance
-  update [--with-webui] Pull main, sync, rebuild what is installed, refresh this
-                        command and the registered MCP clients
-  doctor                Check the local environment
-  uninstall             Remove SDPM from this machine
-  version | path | help
-
-No command: show status.
-"@ | Write-Host
-}
-
-switch ($Command.ToLowerInvariant()) {
-    "" { Show-Status }
-    "webui" { Invoke-WebUi }
-    "launch" { Invoke-WebUi }
-    "mcp" { Invoke-Mcp }
-    "register" { Assert-Checkout; Invoke-Cfg (@("register") + $Rest); exit $LASTEXITCODE }
-    "unregister" { Assert-Checkout; Invoke-Cfg (@("unregister") + $Rest); exit $LASTEXITCODE }
-    "mcp-config" { Assert-Checkout; Invoke-Cfg (@("print") + $Rest); exit $LASTEXITCODE }
-    "update" { Invoke-Update }
-    "doctor" { Assert-Checkout; $uv = Resolve-Uv; Push-Location $Checkout; try { & $uv run --frozen python scripts/doctor.py; exit $LASTEXITCODE } finally { Pop-Location } }
-    "uninstall" { Invoke-Uninstall }
-    "version" { Write-Output (Get-Version) }
-    "--version" { Write-Output (Get-Version) }
-    "-v" { Write-Output (Get-Version) }
-    "path" { Write-Output $Checkout }
-    "help" { Show-Help }
-    "--help" { Show-Help }
-    "-h" { Show-Help }
-    default { Write-Error "Unknown command: $Command"; Show-Help; exit 2 }
-}
-'@
-
 [Console]::OutputEncoding = [Text.Encoding]::UTF8
 $ErrorActionPreference = "Stop"
-$script:NonInteractive = $NonInteractive -or $env:SDPM_NON_INTERACTIVE -eq "1"
+# The one rule for asking anything: a console that is neither redirected in nor out. Without
+# it the installer runs exactly as with -NonInteractive and never waits for input.
+$script:NonInteractive = $NonInteractive -or $env:SDPM_NON_INTERACTIVE -eq "1" -or
+    -not [Environment]::UserInteractive -or [Console]::IsInputRedirected -or [Console]::IsOutputRedirected
 if ($env:SDPM_SKIP_LIBREOFFICE -eq "1") { $SkipLibreOffice = $true }
 if ($env:SDPM_SKIP_SHORTCUT -eq "1") { $SkipShortcut = $true }
 # Profile: full | mcp. Asked interactively when neither switch nor SDPM_PROFILE is given.
 $script:Profile = if ($Full) { "full" } elseif ($McpOnly) { "mcp" } elseif ($env:SDPM_PROFILE) { $env:SDPM_PROFILE } else { "" }
-if ($AgentName) { $env:SDPM_AGENT_NAME = $AgentName }
-# Registration: ask | yes | no
-$script:RegisterMode = if ($Register) { "yes" } elseif ($NoRegister) { "no" } elseif ($env:SDPM_REGISTER) { $env:SDPM_REGISTER } else { "ask" }
+if ($script:Profile -and $script:Profile -notin @("full", "mcp")) { Write-Host "SDPM_PROFILE must be full or mcp, not '$($script:Profile)'." -ForegroundColor Red; exit 2 }
+# The Kiro agent name and the channel go to the setup only when given; it keeps what the
+# install has otherwise.
+if (-not $AgentName -and $env:SDPM_AGENT_NAME) { $AgentName = $env:SDPM_AGENT_NAME }
+if (-not $Channel -and $env:SDPM_CHANNEL) { $Channel = $env:SDPM_CHANNEL }
+if ($Channel -and $Channel -notin @("release", "main")) { Write-Host "-Channel must be release or main, not '$Channel'." -ForegroundColor Red; exit 2 }
+# Registration: default | yes | no
+$script:RegisterMode = if ($Register) { "yes" } elseif ($NoRegister) { "no" } elseif ($env:SDPM_REGISTER -in @("yes", "no")) { $env:SDPM_REGISTER } else { "default" }
 $InstallerVersion = "0.1.0"
 $RepoUrl = if ($env:SDPM_REPO_URL) { $env:SDPM_REPO_URL } else { "https://github.com/aws-samples/sample-spec-driven-presentation-maker.git" }
 $RepoHelp = "https://github.com/aws-samples/sample-spec-driven-presentation-maker"
@@ -449,17 +187,23 @@ $SdpmHome = if ($env:SDPM_HOME) { $env:SDPM_HOME } else { Join-Path $env:USERPRO
 $Checkout = Join-Path $SdpmHome "checkout"
 $LauncherDir = if ($env:SDPM_LAUNCHER_DIR) { $env:SDPM_LAUNCHER_DIR } else { Join-Path $env:USERPROFILE "bin" }
 $ScriptDir = if ($PSScriptRoot) { $PSScriptRoot } else { (Get-Location).Path }
-# Over an existing install, keep what it was installed with unless told otherwise.
-$agentNameFile = Join-Path $SdpmHome ".agent-name"
-if (-not $env:SDPM_AGENT_NAME -and (Test-Path $agentNameFile)) { $env:SDPM_AGENT_NAME = (Get-Content $agentNameFile -Raw).Trim() }
-if (-not $env:SDPM_AGENT_NAME) { $env:SDPM_AGENT_NAME = "sdpm" }
-$profileFile = Join-Path $SdpmHome ".profile"
-if (-not $script:Profile -and (Test-Path $profileFile)) {
-    $previous = (Get-Content $profileFile -Raw).Trim()
-    if ($previous -in @("full", "mcp")) { $script:Profile = $previous }
+
+# Over an existing install, keep its profile unless told otherwise. An old sdpm command can
+# write .profile=full after state.json said mcp (`sdpm update --with-webui`); full wins.
+function Get-RecordedProfile {
+    $legacyFile = Join-Path $SdpmHome ".profile"
+    $legacy = if (Test-Path $legacyFile) { (Get-Content $legacyFile -Raw).Trim() } else { "" }
+    if ($legacy -eq "full") { return "full" }
+    $stateFile = Join-Path $SdpmHome "state.json"
+    if (Test-Path $stateFile) {
+        try { $recorded = (Get-Content $stateFile -Raw | ConvertFrom-Json).profile } catch { $recorded = "" }
+        if ($recorded -in @("full", "mcp")) { return $recorded }
+    }
+    if ($legacy -in @("full", "mcp")) { return $legacy }
+    return ""
 }
-$script:Existing = $false   # this run updates an install (its clients are refreshed, not asked for)
-$script:Before = ""         # the commit that install was on
+if (-not $script:Profile) { $script:Profile = Get-RecordedProfile }
+$script:Existing = $false   # this run is over an install that exists (its manifest counts as an update)
 
 if (-not (Get-Command Show-Header -ErrorAction SilentlyContinue)) {
     $tuiPath = Join-Path $ScriptDir "lib\tui.ps1"
@@ -558,34 +302,15 @@ function Install-MissingDependencies {
     }
 }
 
-# checkout_update.py as of the fetched main, run before anything is checked out: it moves
-# local changes to a git stash (never discards them) and fast-forwards. The same step as
-# `sdpm update`; the newest version of it runs even over an old checkout.
-function Invoke-FastForward {
-    $tmp = Join-Path ([IO.Path]::GetTempPath()) ("sdpm-update-" + [guid]::NewGuid())
-    New-Item -ItemType Directory -Path $tmp | Out-Null
-    try {
-        & git -C $Checkout "--work-tree=$tmp" restore --source=FETCH_HEAD --worktree -- servers/local/checkout_update.py
-        if ($LASTEXITCODE -ne 0) { return $false }
-        # Write-Host, not Out-Host: it keeps the lines out of the return value while leaving them
-        # on the information stream, so `install.ps1 *>&1 | Tee-Object` still records the notice.
-        & uv run --no-project python (Join-Path $tmp "servers\local\checkout_update.py") --checkout $Checkout pull | ForEach-Object { Write-Host $_ }
-        return ($LASTEXITCODE -eq 0)
-    } finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
-}
-
 function Setup-Checkout {
     Start-Step "Downloading SDPM" $Checkout
     New-Item -ItemType Directory -Force -Path $SdpmHome | Out-Null
     if (Test-Path (Join-Path $Checkout ".git")) {
         $script:Existing = $true
-        $script:Before = "$(& git -C $Checkout rev-parse HEAD 2>$null)".Trim()
-        $result = Run-WithSpinner -Exe "git" -Arguments @("-C", $Checkout, "fetch", "--tags", "--prune", "origin", "main")
+        # The sdpm command's fetch: origin's main and tags, local tags mirroring origin's.
+        $result = Run-WithSpinner -Exe "git" -Arguments @("-C", $Checkout, "fetch", "--quiet", "--prune", "origin", "+refs/heads/main:refs/remotes/origin/main", "+refs/tags/*:refs/tags/*")
         if (-not $result.Success) { Fail-Step "SDPM fetch failed" $result.Output $RepoHelp; exit 1 }
-        if (-not (Invoke-FastForward)) {
-            Fail-Step "SDPM update failed (see the message above; nothing was discarded)" "" "$RepoHelp/blob/main/docs/en/getting-started.md#sdpm-update-stops"; exit 1
-        }
-        Complete-Step "SDPM checkout updated ($($result.Elapsed))"
+        Complete-Step "SDPM fetched ($($result.Elapsed))"
     } elseif (Test-Path $Checkout) {
         Fail-Step "$Checkout exists but is not a git checkout" "Move it aside and retry." $RepoHelp; exit 1
     } else {
@@ -595,51 +320,40 @@ function Setup-Checkout {
     }
 }
 
-function Setup-Packages {
-    Start-Step "Syncing the MCP server environment" "servers/local"
-    $result = Run-WithSpinner -Exe "uv" -Arguments @("sync", "--frozen", "--directory", (Join-Path $Checkout "servers\local"))
-    if (-not $result.Success) { Fail-Step "uv sync failed" $result.Output "$RepoHelp/blob/main/docs/en/getting-started.md"; exit 1 }
-    Complete-Step "MCP server ready ($($result.Elapsed))"
-    $script:Profile | Set-Content -Path (Join-Path $SdpmHome ".profile") -Encoding ASCII
-    $env:SDPM_AGENT_NAME | Set-Content -Path (Join-Path $SdpmHome ".agent-name") -Encoding ASCII
-    (Get-Command uv).Source | Set-Content -Path (Join-Path $SdpmHome ".uv-path") -Encoding ASCII
-    if ($script:Profile -ne "full") { return }
-
-    Start-Step "Installing Web UI dependencies" "npm ci"
-    $result = Run-WithSpinner -Exe "npm" -Arguments @("ci") -WorkDir (Join-Path $Checkout "web-ui")
-    if (-not $result.Success) { Fail-Step "npm ci failed" $result.Output "$RepoHelp/tree/main/web-ui"; exit 1 }
-    Complete-Step "Web UI dependencies installed ($($result.Elapsed))"
-
-    Start-Step "Building Web UI" "NEXT_PUBLIC_MODE=local npm run build"
-    $result = Run-WithSpinner -Exe "npm" -Arguments @("run", "build") -WorkDir (Join-Path $Checkout "web-ui") -Env @{ NEXT_PUBLIC_MODE="local" }
-    if (-not $result.Success) { Fail-Step "Local Web UI build failed" $result.Output "$RepoHelp/tree/main/web-ui"; exit 1 }
-    Complete-Step "Local Web UI built ($($result.Elapsed))"
+# main's checkout_update.py (this installer is main's code too), run before anything is
+# checked out: it picks the latest release (or main), moves the checkout there, then hands
+# over to that version's own setup: Python environment, Web UI, icons, the sdpm command,
+# clients, state.json. Start-Process: the child gets this console as it is, so uv, npm and
+# the client picker show (and read keys) unwrapped.
+function Invoke-Setup {
+    $uv = (Get-Command uv).Source
+    $tmp = Join-Path ([IO.Path]::GetTempPath()) ("sdpm-install-" + [guid]::NewGuid())
+    New-Item -ItemType Directory -Path $tmp | Out-Null
+    try {
+        & git -C $Checkout "--work-tree=$tmp" restore --source=refs/remotes/origin/main --worktree -- servers/local/checkout_update.py | Out-Null
+        if ($LASTEXITCODE -ne 0) { return 1 }
+        $setupArgs = @("run", "--no-project", "--isolated", "--python", ">=3.11", "python",
+            (Join-Path $tmp "servers\local\checkout_update.py"), "--checkout", $Checkout, "--uv", $uv, "install",
+            "--launcher", (Join-Path $LauncherDir "sdpm.ps1"), "--register", $script:RegisterMode, "--profile", $script:Profile)
+        if (-not $script:Existing) { $setupArgs += "--new-checkout" }
+        if ($AgentName) { $setupArgs += @("--agent-name", $AgentName) }
+        if ($Channel) { $setupArgs += @("--channel", $Channel) }
+        if ($script:NonInteractive) { $setupArgs += "--non-interactive" }
+        $quoted = ($setupArgs | ForEach-Object { '"' + ($_ -replace '"', '\"') + '"' }) -join " "
+        Write-Host ""
+        $proc = Start-Process -FilePath $uv -ArgumentList $quoted -NoNewWindow -Wait -PassThru
+        return $proc.ExitCode
+    } finally { Remove-Item -Recurse -Force $tmp -ErrorAction SilentlyContinue }
 }
 
-function Setup-IconSet {
-    param([string]$Name, [string]$Manifest, [string]$Script)
-    if (Test-Path $Manifest) { Start-Step "$Name icons" "already available"; Complete-Step "$Name icons skipped"; return }
-    Start-Step "Downloading $Name icons" "official icon source"
-    $result = Run-WithSpinner -Exe "uv" -Arguments @("run", "--frozen", "--directory", (Join-Path $Checkout "sdpm"), "python", $Script)
-    if ($result.Success) { Complete-Step "$Name icons downloaded ($($result.Elapsed))" }
-    else { Fail-Step "$Name icon download failed; retry after installation" $result.Output $RepoHelp }
-}
-
-function Setup-Launcher {
-    Start-Step "Installing sdpm command" (Join-Path $LauncherDir "sdpm.cmd")
+# The command a new terminal finds: sdpm.cmd next to the sdpm.ps1 the setup wrote, and that
+# directory on the user's PATH.
+function Setup-CommandShim {
     New-Item -ItemType Directory -Force -Path $LauncherDir | Out-Null
-    $launcherPath = Join-Path $LauncherDir "sdpm.ps1"
-    if ($script:EmbeddedLauncher) { $script:EmbeddedLauncher | Set-Content -Path $launcherPath -Encoding UTF8 }
-    else {
-        $source = Join-Path $ScriptDir "launcher.ps1"
-        if (-not (Test-Path $source)) { Fail-Step "Launcher source is missing" "" $RepoHelp; exit 1 }
-        Copy-Item $source $launcherPath -Force
-    }
     '@powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0sdpm.ps1" %*' | Set-Content -Path (Join-Path $LauncherDir "sdpm.cmd") -Encoding ASCII
     $userPath = [Environment]::GetEnvironmentVariable("Path", "User")
     if (($userPath -split ';') -notcontains $LauncherDir) { [Environment]::SetEnvironmentVariable("Path", (($userPath.TrimEnd(';') + ";" + $LauncherDir).Trim(';')), "User") }
     Refresh-Path
-    Complete-Step "sdpm command installed"
 }
 
 function Setup-Shortcut {
@@ -664,44 +378,14 @@ function Choose-Profile {
     $script:Profile = if (Show-SurfacePicker) { "full" } else { "mcp" }
 }
 
-function Invoke-Launcher {
-    param([string[]]$LauncherArgs)
-    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File (Join-Path $LauncherDir "sdpm.ps1") @LauncherArgs
-}
-
-$script:RegisterFailed = $false
-
-# Over an existing install: register again the clients that have SDPM (as `sdpm update`
-# does), remove what earlier versions left, print the upgrading notes. -Register also adds
-# the detected clients that do not have it yet.
-function Invoke-RefreshClients {
-    param([string[]]$Extra = @())
-    $uv = (Get-Command uv).Source
-    $refreshArgs = @("refresh")
-    if ($script:Before) { $refreshArgs += @("--since", $script:Before) }
-    & $uv run --frozen --directory (Join-Path $Checkout "servers\local") python client_config.py --uv $uv --checkout $Checkout --agent-name $env:SDPM_AGENT_NAME @refreshArgs @Extra
-    if ($LASTEXITCODE -ne 0) { $script:RegisterFailed = $true }
-}
-
-function Register-Clients {
-    Write-Host ""
-    if ($script:RegisterMode -eq "no") { Write-Host "  Skipping client registration (-NoRegister). Later: sdpm register"; return }
-    if ($script:Existing) {
-        if ($script:RegisterMode -eq "yes") { Invoke-RefreshClients @("--register-missing") } else { Invoke-RefreshClients }
-        return
-    }
-    if ($script:RegisterMode -eq "yes") {
-        try { Invoke-Launcher @("register", "--yes"); if ($LASTEXITCODE -ne 0) { $script:RegisterFailed = $true } }
-        catch { $script:RegisterFailed = $true }
-        return
-    }
-    if ($script:NonInteractive) { Write-Host "  Non-interactive: clients were not registered. Later: sdpm register   (or re-run with -Register)"; return }
-    try { Invoke-Launcher @("register"); if ($LASTEXITCODE -ne 0) { $script:RegisterFailed = $true } } catch { $script:RegisterFailed = $true }
-}
-
+# The client table above is the part that matters; nothing here repeats it.
 function Show-Completion {
+    param([int]$SetupStatus)
+    $installedProfile = Get-RecordedProfile
+    if (-not $installedProfile) { $installedProfile = $script:Profile }
+    Write-Host ""
     Write-Host "  SDPM is installed" -ForegroundColor Green -NoNewline; Write-Host " in $Checkout`n"
-    if ($script:Profile -eq "full") {
+    if ($installedProfile -eq "full") {
         Write-Host "    Browser:   sdpm webui"
         & kiro-cli whoami *> $null
         if ($LASTEXITCODE -ne 0) { Write-Host "               (the Web UI uses Kiro CLI - run 'kiro-cli login' once first)" }
@@ -711,8 +395,8 @@ function Show-Completion {
     Write-Host "    Agents:    ask for slides in a registered client (table above)"
     Write-Host "    Later:     sdpm  |  sdpm register  |  sdpm update  |  sdpm uninstall"
     Write-Host "    Open a new terminal so 'sdpm' is on PATH."
-    if ($script:RegisterFailed) {
-        Write-Host "    Some client registrations failed (see above). Fix them with 'sdpm register <client>'." -ForegroundColor Yellow
+    if ($SetupStatus -eq 4) {
+        Write-Host "    Some steps did not finish (see above). Fix client registrations with 'sdpm register <client>'." -ForegroundColor Yellow
         exit 1
     }
 }
@@ -721,14 +405,16 @@ Show-Header -Title "SDPM Setup" -Version $InstallerVersion
 Refresh-Path
 if (-not $DepsOnly) { Choose-Profile }
 $dependencies = @(Get-Dependencies)
-$script:TotalSteps = if ($DepsOnly) { 0 } elseif ($script:Profile -eq "full") { 7 + $(if ($SkipShortcut) { 0 } else { 1 }) } else { 5 }
+$script:TotalSteps = if ($DepsOnly) { 0 } elseif ($script:Profile -eq "full" -and -not $SkipShortcut) { 2 } else { 1 }
 Install-MissingDependencies -Dependencies $dependencies
 if ($DepsOnly) { Write-Host "`n  Dependency setup complete." -ForegroundColor Green; & uv --version; return }
 Setup-Checkout
-Setup-Packages
-Setup-IconSet -Name "AWS Architecture" -Manifest (Join-Path $Checkout "sdpm\assets\aws\manifest.json") -Script (Join-Path $Checkout "sdpm\scripts\download_aws_icons.py")
-Setup-IconSet -Name "Material Symbols" -Manifest (Join-Path $Checkout "sdpm\assets\material\manifest.json") -Script (Join-Path $Checkout "sdpm\scripts\download_material_icons.py")
-Setup-Launcher
+$setupStatus = Invoke-Setup
+if ($setupStatus -ne 0 -and $setupStatus -ne 4) {
+    Write-Host ""
+    Fail-Step "SDPM setup failed (see above)" "" "$RepoHelp/blob/main/docs/en/getting-started.md#sdpm-update-stops"
+    exit $setupStatus
+}
+Setup-CommandShim
 if ($script:Profile -eq "full") { Setup-Shortcut }
-Register-Clients
-Show-Completion
+Show-Completion -SetupStatus $setupStatus

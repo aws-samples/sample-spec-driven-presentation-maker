@@ -128,6 +128,12 @@ stdio MCP + ACP server for local environments. Must be a **thin bind** of
 `sdpm.tools`. Local-transport specifics (session-scoped upload staging,
 browser style gallery, ACP hearing UI) are the only allowed additions.
 
+The installed `sdpm` command is a bootstrap (`scripts/install/launcher.*`, `sdpm-bootstrap 1`):
+it resolves uv, fetches, and hands `update` to `servers/local/checkout_update.py` and every
+other command to `servers/local/sdpm_command.py`. It changes only if that contract does. An
+update runs released code only: the installed version selects the target and moves the
+checkout, the target's own `finish` prepares it. Main's code runs only through the installer.
+
 `servers/local/client_config.py` is the one place that knows about MCP clients: one
 server template (absolute `uv` + absolute checkout, never a launcher or `PATH`), per-client
 registration through the client's own CLI, a dedicated agent for Kiro CLI, detection of the
