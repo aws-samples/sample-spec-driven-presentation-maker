@@ -89,6 +89,28 @@ def _read_text(path: Path) -> str | None:
     return path.read_text(encoding="utf-8") if path.is_file() else None
 
 
+_ART_DIRECTION = "specs/art-direction.html"
+
+
+def _art_direction_toc(deck_path: Path) -> dict[str, Any] | None:
+    """The composer's map of the deck's style; None when the deck has none.
+
+    The style is the largest input a composer has, so it gets a table of contents
+    instead of the file and reads the parts it needs. One line per ``style_toc``
+    block (the ``<style>`` block, each ``.slide`` with the comments that describe
+    it): ``"<start>-<end>: <comments>"``, 1-based and inclusive, the block's first
+    text where it has no comments. An empty ``toc`` means the file has no such
+    blocks; ``lines`` is its length either way.
+    """
+    html = _read_text(deck_path / _ART_DIRECTION)
+    if html is None:
+        return None
+    from sdpm.api import style_toc
+
+    toc = [f"{e['start']}-{e['end']}: {e.get('comment') or e['text']}" for e in style_toc(html)]
+    return {"path": _ART_DIRECTION, "lines": len(html.splitlines()), "toc": toc}
+
+
 def _styles_and_templates() -> tuple[list[dict], list[dict]]:
     from sdpm.api import (
         get_styles_dirs,
@@ -264,8 +286,11 @@ def start_composing(
     ``mode``). With a deck, validates the specs first; when they fail, returns
     ``{"specs_ok": False, "errors": [...]}`` and nothing else — a composer must
     not start from broken specs. Otherwise returns ``static`` plus ``deck``:
-    the specs, deck.json, template analysis, and the assigned slides' JSON
-    (with read-only override-group heads the assigned slides inherit from).
+    the specs (the style as ``art_direction_toc``, a table of contents of
+    specs/art-direction.html the composer reads parts of), deck.json, template
+    analysis, and the assigned slides' JSON (with read-only override-group heads
+    the assigned slides inherit from). ``static.slide_spec`` is the core of the
+    slide format; the rest is in guides it names.
 
     ``mode`` is the composer mode the spawner chose: ``"pptx"`` (slide JSON) or
     ``"html"`` (slide HTML). ``static`` depends only on the mode. A mode that does
@@ -321,7 +346,7 @@ def start_composing(
                 "deck": deck_json,
                 "brief": _read_text(specs / "brief.md"),
                 "outline": _read_text(specs / "outline.md"),
-                "art_direction": _read_text(specs / "art-direction.html"),
+                "art_direction_toc": _art_direction_toc(deck_path),
                 "deck_css": _read_text(deck_path / "deck.css"),
                 "template_html": template_html if template_html is not None else _template_html(deck_json, deck_path),
                 "assigned_slugs": assigned,
@@ -339,7 +364,7 @@ def start_composing(
             "deck": deck_json,
             "brief": _read_text(specs / "brief.md"),
             "outline": _read_text(specs / "outline.md"),
-            "art_direction": _read_text(specs / "art-direction.html"),
+            "art_direction_toc": _art_direction_toc(deck_path),
             "template_analysis": template_analysis if template_analysis is not None else _template_analysis(deck_json),
             "assigned_slugs": assigned,
             "slides_present": present,

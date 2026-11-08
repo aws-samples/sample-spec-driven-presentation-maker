@@ -93,7 +93,7 @@ component, and say in its comment what it is for; a decoration without a job doe
 the style.
 
 Define the optional roles the style is for and leave the rest out. Every style draws diagrams —
-the slide JSON spec's Visual forms are available to every deck — so what a style decides is how
+the forms of the `visual-forms` guide are available to every deck — so what a style decides is how
 they look here: the node, the connector, the icon, the marker.
 
 **Shape classes.** When a component uses a shape other than a rectangle, give it a class named

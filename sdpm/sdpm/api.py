@@ -368,8 +368,10 @@ def apply_style(
 
 def style_toc(html: str, snippet: int = 40) -> list[dict[str, Any]]:
     """Table of contents of a style HTML: one entry per ``<style>`` block and per
-    ``.slide`` element, with its 1-based line, class list, the HTML comments that
-    precede it (first line of each), and the first visible text inside it.
+    ``.slide`` element, with its 1-based opening ``line``, the ``start``–``end`` line
+    range that holds it (a slide's range begins at the comments right above it), its
+    class list, the HTML comments inside that range (first line of each), and the
+    first visible text inside it.
 
     Structural only — no assumption about how the style is organised beyond
     ``.slide`` blocks (which the gallery already relies on). A style without them
@@ -379,9 +381,6 @@ def style_toc(html: str, snippet: int = 40) -> list[dict[str, Any]]:
     import re
 
     lines = html.splitlines()
-    entries: list[dict[str, Any]] = []
-    pending_comments: list[str] = []
-    in_comment = False
     open_re = re.compile(r'<(?:div|section|article)\b[^>]*\bclass="([^"]*)"', re.I)
     tag_re = re.compile(r"<[^>]+>")
 
@@ -399,32 +398,64 @@ def style_toc(html: str, snippet: int = 40) -> list[dict[str, Any]]:
                 return text[:snippet]
         return ""
 
+    # 0-based: (line, first line of the comment), every line a comment covers, block openings
+    comments: list[tuple[int, str]] = []
+    comment_lines: set[int] = set()
+    opens: list[tuple[int, str, str]] = []
+    in_comment = False
     for i, line in enumerate(lines):
         stripped = line.strip()
         if in_comment:
+            comment_lines.add(i)
             if "-->" in stripped:
                 in_comment = False
             continue
         if stripped.startswith("<!--"):
-            head = stripped[4:].split("-->")[0].strip()
-            pending_comments.append(head[:60])
+            comment_lines.add(i)
+            comments.append((i, stripped[4:].split("-->")[0].strip()[:60]))
             in_comment = "-->" not in stripped
             continue
         if stripped.startswith("<style"):
-            entries.append({"line": i + 1, "kind": "style", "text": ":root tokens + CSS"})
-            pending_comments = []
+            opens.append((i, "style", ""))
             continue
         m = slide_open(line)
         if m:
-            entries.append({
-                "line": i + 1,
-                "kind": "slide",
-                "classes": m.group(1).strip(),
-                "comment": " | ".join(pending_comments) or None,
-                "text": first_text(i + 1),
-            })
-            pending_comments = []
-    return entries if any(e["kind"] == "slide" for e in entries) else []
+            opens.append((i, "slide", m.group(1).strip()))
+    if not any(kind == "slide" for _, kind, _ in opens):
+        return []
+
+    # A slide's block starts at the comment run (blank lines between included) above it.
+    starts: list[int] = []
+    for n, (i, kind, _) in enumerate(opens):
+        start = i
+        if kind == "slide":
+            floor = opens[n - 1][0] + 1 if n else 0
+            j = i - 1
+            while j >= floor and (j in comment_lines or not lines[j].strip()):
+                j -= 1
+            start = j + 1
+            while start < i and not lines[start].strip():
+                start += 1
+        starts.append(start)
+
+    entries: list[dict[str, Any]] = []
+    for n, (i, kind, classes) in enumerate(opens):
+        start, end = starts[n], (starts[n + 1] - 1 if n + 1 < len(opens) else len(lines) - 1)
+        if kind == "style":
+            entries.append({"line": i + 1, "start": start + 1, "end": end + 1, "kind": "style",
+                            "text": ":root tokens + CSS"})
+            continue
+        inside = [text for at, text in comments if start <= at <= end]
+        entries.append({
+            "line": i + 1,
+            "start": start + 1,
+            "end": end + 1,
+            "kind": "slide",
+            "classes": classes,
+            "comment": " | ".join(inside) or None,
+            "text": first_text(i + 1),
+        })
+    return entries
 
 
 def _find_style_in_dirs(name: str, styles_dirs: list[Path]) -> Path | None:

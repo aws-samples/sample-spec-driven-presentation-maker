@@ -248,6 +248,13 @@ def test_start_composing_html_materializes_html_slides_and_template(server, cach
     assert deck["existing_slides"] == {"cover": {"html": SLIDES["cover"]}}
     assert deck["deck_css"] == ".card { padding: 8px; }\n"
     assert deck["template_html"]["layouts"] and "template_analysis" not in deck
+    # The style arrives as a map of the materialised specs/art-direction.html; its ranges
+    # slice the copy run_python's sandbox gets from the same S3 key.
+    toc = deck["art_direction_toc"]
+    style_lines = server._storage.objects["decks/d1/specs/art-direction.html"].decode("utf-8").splitlines()
+    assert toc["path"] == "specs/art-direction.html" and toc["lines"] == len(style_lines)
+    first, last = (int(n) for n in toc["toc"][-1].split(":", 1)[0].split("-"))
+    assert last == len(style_lines) and 'class="slide' in "\n".join(style_lines[first - 1:last])
     # The conversion was persisted to S3 for the next microVM.
     assert any(k.startswith(TEMPLATE_CACHE_PREFIX) and k.endswith("/template.json") for k in server._storage.objects)
 

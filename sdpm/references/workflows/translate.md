@@ -29,6 +29,7 @@ shell access to it (CLI, or an agent whose tools include a shell).
 - Apply syncs text gradients only when one gradient run covered the whole paragraph; partial
   gradients need a manual fix in the slide JSON.
 - After applying, build with `generate_pptx(...)`, measure and preview; fix overflow in the
-  sibling's slide JSON (`slide_spec` came with this document; `read_guides(["slide-json-spec"])`
-  brings it back). Measurement does not catch
-  unnatural line breaks in the target language — check the previews for those.
+  sibling's slide JSON (`slide_spec` came with this document, and its **Elements** part names
+  the guide with each element's fields; `read_guides(["slide-json-spec"])` brings it back).
+  Measurement does not catch unnatural line breaks in the target language — check the
+  previews for those.
