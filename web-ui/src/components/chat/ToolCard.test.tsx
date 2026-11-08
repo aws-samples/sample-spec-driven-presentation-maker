@@ -119,6 +119,17 @@ describe("ToolCard", () => {
     expect(container.querySelector("[role='note']")?.textContent).toContain("Not delivered")
   })
 
+  it("marks the Local server's not-delivered message_composer (its toolResult as compose-run.ts sends it)", () => {
+    // Local: the run's toolResult for a message no composer took ({message: "Not delivered"}, status error).
+    const { container } = renderWithIntl(
+      <ToolCard name="message_composer" input={{ group: 1, text: "Use the title 'Steered title'." }} status="error" result={{ message: "Not delivered" }} />
+    )
+    const note = container.querySelector("[role='note']")
+    expect(note?.getAttribute("aria-label")).toBe("Message with composer 1")
+    expect(note?.textContent).toContain("Not delivered")
+    expect(note?.textContent).toContain("Steered title")
+  })
+
   it("does not set aria-live on active (not yet complete)", () => {
     const { container } = renderWithIntl(
       <ToolCard name="get_deck" input={{ deck_id: "x" }} isActive />

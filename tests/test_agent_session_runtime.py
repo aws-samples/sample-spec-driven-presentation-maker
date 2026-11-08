@@ -796,6 +796,26 @@ def test_compose_runs_between_turns_and_a_wake_delivers_its_report(rt, real):
     assert load("background").tasks(session.handle.agent) == []
 
 
+def test_work_and_task_events_have_the_key_sets_the_local_chat_streams(rt, real):
+    # The shared fixture: the Local Web UI's chat streams these shapes (compose-run.test.ts).
+    from pathlib import Path
+
+    fixture = json.loads((Path(__file__).resolve().parent.parent / "web-ui" / "src" / "test" / "fixtures"
+                          / "sessionEvents.json").read_text())["events"]
+    real.composer_seconds = 0.5
+    session = rt.session()
+    tail = rt.tail(session)
+    session.submit("Make the deck.", "ws", _jwt())
+    evs = tail.until(_idle, timeout=15)
+    for name, example in fixture.items():
+        (kind,) = example
+        state = example["work"]["state"] if kind == "work" else None
+        seen = [ev[kind] for ev in evs if kind in ev and (state is None or ev[kind].get("state") == state)]
+        assert seen, name
+        for payload in seen:
+            assert set(payload) == set(example[kind]), (name, payload)
+
+
 def test_a_steer_between_turns_starts_a_turn_at_once(rt, real):
     real.composers = "forever"
     session = rt.session()

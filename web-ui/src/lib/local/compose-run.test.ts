@@ -23,6 +23,7 @@ import os from "os"
 import path from "path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
+import sessionEvents from "../../test/fixtures/sessionEvents.json"
 import { FakeChild, settle } from "../../test/fakeKiro"
 import { installFakeProcesses } from "../../test/fakeProcesses"
 import type { ChatEvent } from "./conversation/events"
@@ -525,5 +526,25 @@ describe("a closed tab", () => {
     expect(replayed?.some((p) => "taskEnd" in p)).toBe(true)
     expect(replayed?.map((p) => p.event?.contentBlockDelta?.delta?.text).filter(Boolean)).toEqual(["Report seen."])
     expect(await stream("C1")).toBeNull()
+  })
+})
+
+describe("event shapes shared with Cloud", () => {
+  it("streams taskStart, taskEnd, turn, turnEnd and work with sessionEvents.json's key sets", async () => {
+    const { orch, composers } = await compose("v3", [["a"]])
+    composers()[0].endTurn()
+    await settle()
+    orch.endTurn("end_turn", "K1")
+    await settle()
+    const buffered = payloads(acp.getBufferedEvents("C1").map((e) => e.event))
+    const keys = (payload: Record<string, unknown>, kind: string) => Object.keys(payload[kind] as object).sort()
+    const fixture = sessionEvents.events as Record<string, Record<string, Record<string, unknown>>>
+    for (const [name, example] of Object.entries(fixture)) {
+      const kind = Object.keys(example)[0]
+      const state = kind === "work" ? (example.work as { state: string }).state : null
+      const seen = buffered.filter((p) => kind in p && (!state || (p.work as { state: string }).state === state))
+      expect(seen.length, name).toBeGreaterThan(0)
+      for (const payload of seen) expect(keys(payload, kind), name).toEqual(keys(example, kind))
+    }
   })
 })

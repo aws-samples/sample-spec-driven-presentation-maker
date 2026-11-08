@@ -360,3 +360,13 @@ def test_description_rules(acp_tools, name):
     assert not re.search(r"^\s*(Args|Returns):", desc, re.M)
     assert len(desc) <= _DESC_MAX[name], len(desc)
     assert not re.search(r"\b[Cc]all (it|this) (first|before)|[Cc]all first|Start here", desc)
+
+
+def test_the_group_limit_matches_the_local_compose_run(acp_tools):
+    # The docstring's number is the one the Local Web UI's compose run starts at once.
+    import re
+    from pathlib import Path
+
+    source = (Path(__file__).resolve().parent.parent / "web-ui" / "src" / "lib" / "local" / "compose-run.ts").read_text()
+    (limit,) = re.findall(r"export const MAX_PARALLEL_COMPOSERS = (\d+)", source)
+    assert f"Up to {limit} groups run concurrently." in _norm(acp_tools["compose_slides"].description)
