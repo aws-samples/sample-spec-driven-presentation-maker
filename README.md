@@ -132,7 +132,7 @@ to deploy, and [Cost Estimates](docs/en/cost.md) shows what it costs per month.
 
 ## Quick Start
 
-One command installs SDPM on your computer, into `~/.sdpm`:
+One command installs the latest SDPM release on your computer, into `~/.sdpm`:
 
 ```bash
 # macOS / Linux
@@ -159,8 +159,11 @@ The Web UI runs its agent through Kiro CLI, so `kiro-cli login` signs you in to 
 GitHub, Google, an AWS Builder ID or your organization's IAM Identity Center. No AWS account
 is needed, and Kiro has a free plan ([Kiro pricing](https://kiro.dev/pricing/)).
 
-`sdpm` shows what is installed and connected, `sdpm update` updates it, and `sdpm uninstall`
-removes it. The launcher goes into `~/.local/bin` (on Windows, `%USERPROFILE%\bin`, which
+`sdpm` shows what is installed and connected, `sdpm update` moves it to the latest release
+(never backwards; `sdpm update --channel main` follows every merged change instead), and
+`sdpm uninstall` removes it. Each install and update downloads one small manifest from the
+release that matches your OS and the kind of run; GitHub counts these downloads, and nothing
+else is sent. The launcher goes into `~/.local/bin` (on Windows, `%USERPROFILE%\bin`, which
 the installer adds to your `PATH`); if the installer says that directory is not on your
 `PATH`, add it and open a new terminal. Slide previews need LibreOffice and
 poppler; the installer offers them.

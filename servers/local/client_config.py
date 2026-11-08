@@ -26,14 +26,25 @@ import json
 import os
 import re
 import shutil
-import stat
 import subprocess
 import sys
-import tempfile
 import webbrowser
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Callable, Optional
+
+# The install lifecycle (sibling module, standard library only): the launcher markers and
+# refresh_launcher live there, next to the code that installs the launcher.
+from checkout_update import (  # noqa: E402
+    BOOTSTRAP_MARKER,
+    LAUNCHER_FINGERPRINT,
+    PY_ARGS,
+    child_env,
+    refresh_launcher,
+    same_path,
+    sdpm_home,
+    tty_allowed,
+)
 
 SERVER_NAME = "sdpm"
 
@@ -560,7 +571,10 @@ def config_document(clients: list[Client], target: Target, agent_name: str = DEF
 
 
 def _confirm(question: str) -> bool:
-    """Ask on the terminal. Under `curl … | bash` stdin is the script, so prefer /dev/tty."""
+    """Ask on the terminal. Under `curl … | bash` stdin is the script, so prefer /dev/tty.
+    Without a terminal (the TTY rule in checkout_update) the answer is no, unasked."""
+    if not tty_allowed():
+        return False
     prompt = f"{question} [y/N] "
     try:
         if sys.platform != "win32" and os.path.exists("/dev/tty"):
@@ -630,11 +644,13 @@ def register(
     agent_name: str = DEFAULT_KIRO_AGENT,
     chosen: Optional[list[Client]] = None,
     cleanup: bool = True,
+    record: Optional[dict] = None,
 ) -> int:
     """Pick clients, register with each, print one result table. Returns the number of failures.
 
     ``cleanup`` offers to remove what older setups left in the client (Kiro installer files,
-    the global Kiro entry, the Claude Code plugin); ``refresh`` turns it off.
+    the global Kiro entry, the Claude Code plugin); ``refresh`` turns it off. ``record``
+    collects the ids that were registered (``--record``).
     """
     if chosen is None:
         chosen = choose_clients(clients, agent_name=agent_name, assume_yes=assume_yes, dry_run=dry_run)
@@ -681,6 +697,9 @@ def register(
             else:
                 outcomes.append(Outcome(client, "failed", f"open the link from: sdpm mcp-config {client.id}"))
     print_outcomes(outcomes)
+    if record is not None and not dry_run:
+        record.setdefault("registered", []).extend(
+            o.client.id for o in outcomes if o.status in ("registered", "opened"))
     return sum(1 for o in outcomes if o.status == "failed")
 
 
@@ -769,14 +788,16 @@ def _offer_leftover_cleanup(*, dry_run: bool, assume_yes: bool, run: Callable[[l
 
 
 def unregister(clients: list[Client], *, dry_run: bool = False, run: Callable[[list[str]], int] = _run,
-               agent_name: str = DEFAULT_KIRO_AGENT) -> int:
+               agent_name: str = DEFAULT_KIRO_AGENT, record: Optional[dict] = None) -> int:
     failures = 0
+    removed = record.setdefault("unregistered", []) if record is not None and not dry_run else []
     for client in clients:
         if client.id == "kiro-cli":
             remove_kiro_agent(name=agent_name, dry_run=dry_run)
             leftovers = kiro_leftovers()
             if leftovers:
                 remove_leftovers(leftovers, dry_run=dry_run)
+            removed.append(client.id)
             continue
         if client.unregister is None:
             print(f"{client.label}: remove '{SERVER_NAME}' from {client.manual_target}")
@@ -785,6 +806,8 @@ def unregister(clients: list[Client], *, dry_run: bool = False, run: Callable[[l
         print(("[dry-run] " if dry_run else "") + _shell_join(argv))
         if not dry_run and run(argv) != 0:
             failures += 1
+        else:
+            removed.append(client.id)
     return failures
 
 
@@ -831,12 +854,9 @@ def entry_checkout(listing: str, target: Target) -> Optional[str]:
 # ---------------------------------------------------------------------------
 #
 # Both launchers end `sdpm update` with `client_config.py refresh`, after the pull, so this
-# runs the new checkout's code. Launchers from before this step reach it once through
-# sdpm._launcher_bridge.
-
-# Present in every launcher this project has shipped (header comment), absent from anything else.
-LAUNCHER_FINGERPRINT = "the one launcher for a local SDPM installation"
-_UTF8_BOM = b"\xef\xbb\xbf"
+# runs the new checkout's code. Since the bootstrap, `finish` (checkout_update.py) calls it;
+# launchers from before reach the new path through the hook below (or the #397 bridge).
+# LAUNCHER_FINGERPRINT and refresh_launcher are imported from checkout_update above.
 
 
 def _run_quiet(argv: list[str]) -> int:
@@ -846,39 +866,38 @@ def _run_quiet(argv: list[str]) -> int:
         return 127
 
 
-def refresh_launcher(installed: Path, checkout: Path) -> str:
-    """Replace the installed ``sdpm`` command with the checkout's launcher; say what happened.
+def old_launcher_adopt(launcher: Optional[Path], target: Target, since: Optional[str]) -> Optional[list[str]]:
+    """The ``adopt`` an old launcher's ``refresh`` hands over to, or None.
 
-    The new file is written next to the old one and renamed over it. A running bash keeps
-    reading the old file (its open inode), so the ``sdpm update`` that calls this is not
-    corrupted. Only a launcher we installed is replaced: a link (a developer pointing
-    ``sdpm`` at a working tree) or a foreign file is left alone.
+    The #529 and #532 launchers end `sdpm update` with this file's ``refresh --launcher
+    SELF``. When ``SELF`` is an SDPM launcher from before the bootstrap, this run is such an
+    update of the managed checkout: the new path (checkout_update.py adopt) takes over.
+    ``finish`` sets SDPM_UPDATER for its own refresh, which never comes back here.
     """
-    ps1 = installed.suffix.lower() == ".ps1"
-    source = checkout / "scripts" / "install" / ("launcher.ps1" if ps1 else "launcher.sh")
-    if installed.is_symlink():
-        return f"left alone ({installed} is a link)"
+    if launcher is None or os.environ.get("SDPM_UPDATER"):
+        return None
     try:
-        current = installed.read_bytes()
-        new = source.read_bytes()
-    except OSError as error:
-        return f"not refreshed ({error.strerror or error})"
-    if LAUNCHER_FINGERPRINT.encode() not in current:
-        return f"left alone ({installed} is not an SDPM launcher)"
-    if ps1 and not new.startswith(_UTF8_BOM):
-        new = _UTF8_BOM + new  # Windows PowerShell 5.1 reads a file without a BOM as ANSI
-    if current == new:
-        return "up to date"
-    fd, tmp = tempfile.mkstemp(prefix=".sdpm-", dir=str(installed.parent))
-    try:
-        with os.fdopen(fd, "wb") as handle:
-            handle.write(new)
-        os.chmod(tmp, stat.S_IMODE(installed.stat().st_mode))
-        os.replace(tmp, installed)
-    except OSError as error:
-        Path(tmp).unlink(missing_ok=True)
-        return f"not refreshed ({error.strerror or error}); the next `sdpm update` retries"
-    return "updated"
+        text = launcher.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    if LAUNCHER_FINGERPRINT not in text or BOOTSTRAP_MARKER in text:
+        return None
+    home = sdpm_home()
+    checkout = Path(target.checkout)
+    if not same_path(checkout, home / "checkout"):
+        return None
+    argv = [target.uv, *PY_ARGS, str(checkout / "servers" / "local" / "checkout_update.py"),
+            "--checkout", str(checkout), "--uv", target.uv, "adopt", "--launcher", str(launcher),
+            "--prepared", "all"]
+    if since and _REVISION.match(since):
+        argv[argv.index("adopt") + 1:argv.index("adopt") + 1] = ["--from", since]
+    return argv
+
+
+def run_adopt(argv: list[str], call: Callable[..., int] = subprocess.call) -> int:
+    """Run it outside the checkout's .venv: no VIRTUAL_ENV, from the home directory."""
+    sys.stdout.flush()
+    return call(argv, env=child_env(), cwd=str(sdpm_home()))  # nosec B603 - our interpreter line and script
 
 
 def update_leftovers(checkout: Path, agent_name: str = DEFAULT_KIRO_AGENT, root: Optional[Path] = None) -> list[Path]:
@@ -902,6 +921,7 @@ def refresh_registrations(
     clients: Optional[list[Client]] = None,
     run: Callable[[list[str]], int] = _run,
     run_quiet: Callable[[list[str]], int] = _run_quiet,
+    record: Optional[dict] = None,
 ) -> tuple[int, list[Client], list[Client]]:
     """Register again every client whose server runs this install; add none.
 
@@ -933,12 +953,14 @@ def refresh_registrations(
             elsewhere.append(client)
         elif _selectable(client):
             missing.append(client)
+    if record is not None:
+        record.setdefault("here", []).extend(c.id for c in ours)
     if not ours:
         return 0, missing, elsewhere
     for client in ours:
         if client.unregister is not None:
             run_quiet(client.unregister())
-    failures = register(ours, target, run=run, agent_name=agent_name, chosen=ours, cleanup=False)
+    failures = register(ours, target, run=run, agent_name=agent_name, chosen=ours, cleanup=False, record=record)
     return failures, missing, elsewhere
 
 
@@ -1030,6 +1052,7 @@ def refresh(
     run_quiet: Callable[[list[str]], int] = _run_quiet,
     clients: Optional[list[Client]] = None,
     register_missing: bool = False,
+    record: Optional[dict] = None,
 ) -> int:
     """The end of ``sdpm update``: launcher, registered clients, leftovers, upgrading notes.
 
@@ -1040,11 +1063,12 @@ def refresh(
     if launcher is not None:
         print(f"  sdpm command: {refresh_launcher(launcher, checkout)}")
     failures, missing, elsewhere = refresh_registrations(target, agent_name=agent_name, clients=clients,
-                                                         run=run, run_quiet=run_quiet)
+                                                         run=run, run_quiet=run_quiet, record=record)
     for client in elsewhere:
         print(f"  {client.label}: its {SERVER_NAME} server runs another checkout — left alone")
     if missing and register_missing:
-        failures += register(missing, target, run=run, agent_name=agent_name, chosen=missing, cleanup=False)
+        failures += register(missing, target, run=run, agent_name=agent_name, chosen=missing, cleanup=False,
+                             record=record)
     elif missing:
         print(f"  Also found {', '.join(c.label for c in missing)} — add with: "
               f"sdpm register {' '.join(c.id for c in missing)}")
@@ -1100,16 +1124,21 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--all", action="store_true", help="every supported client, detected or not")
     agent_name_option(p)
 
+    def record_option(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--record", help="write {here, registered, unregistered} client ids to this JSON file")
+
     p = sub.add_parser("register", help="register with detected (or named) clients")
     p.add_argument("clients", nargs="*", choices=[*CLIENT_IDS, []])
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--yes", "-y", action="store_true", help="do not ask per client")
     agent_name_option(p)
+    record_option(p)
 
     p = sub.add_parser("unregister", help="remove the server from detected (or named) clients")
     p.add_argument("clients", nargs="*", choices=[*CLIENT_IDS, []])
     p.add_argument("--dry-run", action="store_true")
     agent_name_option(p)
+    record_option(p)
 
     p = sub.add_parser("status", help="which detected clients have the server registered")
     p.add_argument("--json", action="store_true")
@@ -1120,6 +1149,7 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--register-missing", action="store_true",
                    help="also register the detected clients that do not have the server")
     agent_name_option(p)
+    record_option(p)
 
     args = parser.parse_args(argv)
     if not getattr(args, "agent_name", None):
@@ -1139,23 +1169,41 @@ def main(argv: Optional[list[str]] = None) -> int:
                 print()
         return 0
 
+    record: Optional[dict] = {} if getattr(args, "record", None) else None
+
+    def recorded(rc: int) -> int:
+        if record is not None:
+            Path(args.record).write_text(json.dumps(record), encoding="utf-8")
+        return rc
+
     if args.command == "register":
         clients = detect(args.clients or None)
         if not clients:
             print("No supported MCP client detected. Add this to your client's MCP configuration:")
             print(manual_json(target))
-            return 0
+            return recorded(0)
+        if not (args.clients or args.yes or args.dry_run) and not tty_allowed():
+            # Never wait on a pipe: without a terminal nothing is registered unasked.
+            print("Detected: " + ", ".join(c.label for c in clients))
+            print("No terminal to ask in. Run sdpm register --yes (all detected) or "
+                  "sdpm register <client>…  (" + " ".join(c.id for c in clients if _selectable(c)) + ")")
+            return recorded(2)
         # Named clients on the command line are the selection; no picker.
         chosen = clients if args.clients else None
-        return 1 if register(clients, target, dry_run=args.dry_run, assume_yes=args.yes,
-                             agent_name=args.agent_name, chosen=chosen) else 0
+        return recorded(1 if register(clients, target, dry_run=args.dry_run, assume_yes=args.yes,
+                                      agent_name=args.agent_name, chosen=chosen, record=record) else 0)
 
     if args.command == "unregister":
-        return 1 if unregister(detect(args.clients or None), dry_run=args.dry_run, agent_name=args.agent_name) else 0
+        return recorded(1 if unregister(detect(args.clients or None), dry_run=args.dry_run,
+                                        agent_name=args.agent_name, record=record) else 0)
 
     if args.command == "refresh":
-        return refresh(target, launcher=Path(args.launcher).absolute() if args.launcher else None,
-                       since=args.since, agent_name=args.agent_name, register_missing=args.register_missing)
+        launcher = Path(args.launcher).absolute() if args.launcher else None
+        adopt = old_launcher_adopt(launcher, target, args.since)
+        if adopt is not None:
+            return run_adopt(adopt)
+        return recorded(refresh(target, launcher=launcher, since=args.since, agent_name=args.agent_name,
+                                register_missing=args.register_missing, record=record))
 
     if args.command == "status":
         clients = detect()

@@ -132,7 +132,7 @@ Web UI やエージェントへの依頼で AI に新しいスタイルを作ら
 
 ## クイックスタート
 
-1 コマンドで、SDPM が手元のコンピューターの `~/.sdpm` に入ります。
+1 コマンドで、SDPM の最新のリリースが手元のコンピューターの `~/.sdpm` に入ります。
 
 ```bash
 # macOS / Linux
@@ -159,7 +159,9 @@ Web UI はエージェントを Kiro CLI で動かすので、`kiro-cli login` �
 GitHub、Google、AWS Builder ID、組織の IAM Identity Center のいずれかを使えます。AWS アカウントは不要で、
 Kiro には無料プランがあります（[Kiro の料金](https://kiro.dev/pricing/)）。
 
-`sdpm` で何が入っていて何に接続済みかを表示し、`sdpm update` で更新、`sdpm uninstall` で削除します。
+`sdpm` で何が入っていて何に接続済みかを表示し、`sdpm update` で最新のリリースに更新（版を下げることは
+なく、`sdpm update --channel main` なら `main` にマージされた変更をすべて追います）、`sdpm uninstall` で
+削除します。インストールと update のたびに、OS と用途に合ったリリースのマニフェストを 1 つダウンロードします。その回数は GitHub が数え、ほかには何も送りません。
 ランチャーは `~/.local/bin` に入ります（Windows では `%USERPROFILE%\bin` で、インストーラーが `PATH` に
 追加します）。このディレクトリが `PATH` にないとインストーラーが表示したら、`PATH` に追加して新しい
 ターミナルを開いてください。

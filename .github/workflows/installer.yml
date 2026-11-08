@@ -5,28 +5,44 @@ on:
     branches: [main, 'dev/**']
     paths:
       - "scripts/install/**"
+      - "scripts/release/**"
       - "servers/local/client_config.py"
       - "servers/local/checkout_update.py"
+      - "servers/local/sdpm_command.py"
+      - "servers/local/picker.py"
       - "web-ui/package.json"
       - "web-ui/scripts/**"
       - "sdpm/sdpm/_launcher_bridge.py"
       - "sdpm/sdpm/knowledge/assets/download.py"
       - "servers/local/pyproject.toml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "CHANGELOG.md"
+      - "tests/test_checkout_update.py"
       - ".gitignore"
       - ".github/workflows/installer.yml"
+      - ".github/workflows/release.yml"
   pull_request:
     branches: [main, 'dev/**']
     paths:
       - "scripts/install/**"
+      - "scripts/release/**"
       - "servers/local/client_config.py"
       - "servers/local/checkout_update.py"
+      - "servers/local/sdpm_command.py"
+      - "servers/local/picker.py"
       - "web-ui/package.json"
       - "web-ui/scripts/**"
       - "sdpm/sdpm/_launcher_bridge.py"
       - "sdpm/sdpm/knowledge/assets/download.py"
       - "servers/local/pyproject.toml"
+      - "pyproject.toml"
+      - "uv.lock"
+      - "CHANGELOG.md"
+      - "tests/test_checkout_update.py"
       - ".gitignore"
       - ".github/workflows/installer.yml"
+      - ".github/workflows/release.yml"
 
 permissions:
   contents: read
@@ -48,6 +64,9 @@ jobs:
         os: [ubuntu-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     timeout-minutes: 25
+    # These jobs test the PR head: the mirror's main. The release channel has its own job.
+    env:
+      SDPM_CHANNEL: main
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -74,7 +93,9 @@ jobs:
           export SDPM_REPO_URL="$MIRROR"
           echo "SDPM_HOME=$SDPM_HOME" >> "$GITHUB_ENV"; echo "SDPM_LAUNCHER_DIR=$SDPM_LAUNCHER_DIR" >> "$GITHUB_ENV"
           export PATH="$HOME/.local/bin:$PATH"
-          bash scripts/install/dist/install.sh --mcp-only --non-interactive --skip-libreoffice --no-register
+          bash scripts/install/dist/install.sh --mcp-only --non-interactive --skip-libreoffice --no-register | tee install.log
+          # The launcher directory is not on the PATH this ran with: the completion screen says so.
+          grep -qF "Add $SDPM_LAUNCHER_DIR to PATH" install.log
       - name: The install leaves the checkout's files as committed
         shell: bash
         run: |
@@ -113,8 +134,16 @@ jobs:
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           MIRROR="$(mktemp -d)/mirror.git"; git clone -q --bare . "$MIRROR"; git -C "$MIRROR" branch -f main HEAD
-          SDPM_REPO_URL="$MIRROR" bash scripts/install/dist/install.sh --mcp-only --non-interactive --skip-libreoffice --no-register
+          SDPM_REPO_URL="$MIRROR" bash scripts/install/dist/install.sh --mcp-only --non-interactive --skip-libreoffice --no-register | tee rerun.log
           "$SDPM_LAUNCHER_DIR/sdpm" version
+          agent() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["agent_name"])' "$SDPM_HOME/state.json"; }
+          # A custom agent name survives a re-run without the option; then the default again.
+          SDPM_REPO_URL="$MIRROR" bash scripts/install/dist/install.sh --non-interactive --skip-libreoffice --no-register --agent-name foo > /dev/null
+          test "$(agent)" = foo
+          SDPM_REPO_URL="$MIRROR" bash scripts/install/dist/install.sh --non-interactive --skip-libreoffice --no-register > /dev/null
+          test "$(agent)" = foo
+          SDPM_REPO_URL="$MIRROR" bash scripts/install/dist/install.sh --non-interactive --skip-libreoffice --no-register --agent-name sdpm > /dev/null
+          test "$(agent)" = sdpm
       # Every install made before the refresh step carries the #397 launcher, which never
       # replaced itself. Its `sdpm update` must leave the install as a new one would.
       - name: Update from the #397 launcher
@@ -124,14 +153,17 @@ jobs:
           export KIRO_HOME="$(mktemp -d)/kiro"
           checkout="$SDPM_HOME/checkout"
           git show 7c53267d:scripts/install/launcher.sh > "$SDPM_LAUNCHER_DIR/sdpm"
+          # As a real install of that launcher: .profile and .agent-name, no state.json.
+          echo mcp > "$SDPM_HOME/.profile"; echo sdpm > "$SDPM_HOME/.agent-name"; rm -f "$SDPM_HOME/state.json"
           # What such an install has: a Kiro agent in the 2.x-only format, the pre-0.12
           # environments, and a checkout behind main.
           mkdir -p "$KIRO_HOME/agents"
           echo '{"name": "sdpm", "description": "SDPM (managed by `sdpm register`)", "tools": ["@sdpm"]}' > "$KIRO_HOME/agents/sdpm.json"
           for venv in servers/local/.venv sdpm/.venv; do mkdir -p "$checkout/$venv"; echo "home = /usr/bin" > "$checkout/$venv/pyvenv.cfg"; done
-          git -C "$checkout" reset -q --hard HEAD~1
+          git -C "$checkout" checkout -q -f -B main HEAD~1
           "$SDPM_LAUNCHER_DIR/sdpm" update | tee update.log
           grep -q "Refreshing the sdpm command and MCP clients (once" update.log
+          test ! -e "$checkout/web-ui/node_modules"   # the #397 launcher did not take the install for full
           cmp "$SDPM_LAUNCHER_DIR/sdpm" scripts/install/launcher.sh
           test -x "$SDPM_LAUNCHER_DIR/sdpm"
           test ! -e "$checkout/servers/local/.venv" && test ! -e "$checkout/sdpm/.venv"
@@ -155,11 +187,13 @@ jobs:
           export KIRO_HOME="$(mktemp -d)/kiro"
           checkout="$SDPM_HOME/checkout"; sdpm="$SDPM_LAUNCHER_DIR/sdpm"; head="$(git rev-parse HEAD)"
           changed() {
-            git -C "$checkout" reset -q --hard 1c618b58
+            git -C "$checkout" checkout -q -f -B main 1c618b58
             echo "# rewritten by uv" >> "$checkout/sdpm/uv.lock"
             echo "// rewritten by next build" >> "$checkout/web-ui/next-env.d.ts"
             git show 7c53267d:scripts/install/launcher.sh > "$sdpm"
+            echo mcp > "$SDPM_HOME/.profile"; echo sdpm > "$SDPM_HOME/.agent-name"; rm -f "$SDPM_HOME/state.json"
           }
+          profile() { python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["profile"])' "$SDPM_HOME/state.json"; }
           updated() {
             test "$(git -C "$checkout" rev-parse HEAD)" = "$head"
             test -z "$(git -C "$checkout" status --porcelain)"
@@ -174,11 +208,12 @@ jobs:
           # Recovery 1: the documented line.
           git -C "$checkout" -c user.name=sdpm -c user.email=sdpm@localhost stash && "$sdpm" update
           updated
+          test ! -e "$checkout/web-ui/node_modules"
           # Recovery 2: the installer again, without a profile option (it keeps mcp-only).
           changed
           bash scripts/install/dist/install.sh --non-interactive --skip-libreoffice | tee reinstall.log
           updated
-          test "$(cat "$SDPM_HOME/.profile")" = mcp
+          test "$(profile)" = mcp
           grep -q "were set aside" reinstall.log
           # The new launcher needs neither.
           changed; cp scripts/install/launcher.sh "$sdpm"
@@ -190,6 +225,8 @@ jobs:
   full-profile:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      SDPM_CHANNEL: main
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -211,7 +248,7 @@ jobs:
         run: |
           export PATH="$HOME/.local/bin:$PATH"
           test -d "$SDPM_HOME/checkout/web-ui/build"
-          test "$(cat "$SDPM_HOME/.profile")" = full
+          test "$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["profile"])' "$SDPM_HOME/state.json")" = full
           "$SDPM_LAUNCHER_DIR/sdpm" | tee status.log
           grep -q "webui      installed" status.log
       # The Web UI build used to rewrite web-ui/next-env.d.ts, which stopped the next update.
@@ -229,7 +266,9 @@ jobs:
 
   windows:
     runs-on: windows-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
+    env:
+      SDPM_CHANNEL: main
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -276,6 +315,31 @@ jobs:
           $s = (Get-Content config.json -Raw | ConvertFrom-Json).server.sdpm
           python scripts/install/mcp_smoke.py $s.command @($s.args)
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+      # A client that cannot be registered: the install is complete (sdpm.cmd, PATH) and the
+      # installer says what did not finish, exit 1.
+      - name: Install with a failing client registration
+        shell: pwsh
+        run: |
+          # The installer rebuilds PATH from the registry plus %USERPROFILE%\bin (Refresh-Path),
+          # so the fake client goes there; removed again before the next steps.
+          $fakeDir = Join-Path $env:USERPROFILE "bin"
+          $fake = Join-Path $fakeDir "claude.cmd"
+          New-Item -ItemType Directory -Force -Path $fakeDir | Out-Null
+          "@echo off`r`nif ""%1 %2""==""mcp add"" exit /b 1`r`nexit /b 0" | Set-Content -Path $fake -Encoding ASCII
+          $env:SDPM_HOME = Join-Path ([IO.Path]::GetTempPath()) ("sdpm-reg-" + [guid]::NewGuid())
+          $env:SDPM_LAUNCHER_DIR = Join-Path ([IO.Path]::GetTempPath()) ("bin-reg-" + [guid]::NewGuid())
+          $mirror = Join-Path ([IO.Path]::GetTempPath()) ("mirror-" + [guid]::NewGuid() + ".git")
+          git clone -q --bare . $mirror; git -C $mirror branch -f main HEAD
+          $env:SDPM_REPO_URL = $mirror
+          try {
+            & powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/install/dist/install.ps1 -McpOnly -NonInteractive -SkipLibreOffice -Register *>&1 | Tee-Object -FilePath reg.log
+            $rc = $LASTEXITCODE
+          } finally { Remove-Item $fake -ErrorAction SilentlyContinue }
+          if (-not (Select-String -Path reg.log -SimpleMatch "Claude Code" -Quiet)) { throw "the fake client was not detected" }
+          if ($rc -ne 1) { throw "exit $rc, expected 1" }
+          if (-not (Test-Path (Join-Path $env:SDPM_LAUNCHER_DIR "sdpm.cmd"))) { throw "sdpm.cmd was not written" }
+          if (-not (Select-String -Path reg.log -SimpleMatch "Some steps did not finish" -Quiet)) { throw "no closing line" }
+          exit 0   # the expected exit 1 is still in $LASTEXITCODE, which the step would report
       - name: Update from the #397 launcher
         shell: pwsh
         run: |
@@ -285,16 +349,21 @@ jobs:
           $sdpm = Join-Path $env:SDPM_LAUNCHER_DIR "sdpm.cmd"
           # As the installer of that version wrote it.
           git show "7c53267d:scripts/install/launcher.ps1" | Set-Content -Path $launcher -Encoding UTF8
+          # As a real install of that launcher: .profile and .agent-name, no state.json.
+          "mcp" | Set-Content -Path (Join-Path $env:SDPM_HOME ".profile") -Encoding ASCII
+          "sdpm" | Set-Content -Path (Join-Path $env:SDPM_HOME ".agent-name") -Encoding ASCII
+          Remove-Item (Join-Path $env:SDPM_HOME "state.json") -ErrorAction SilentlyContinue
           New-Item -ItemType Directory -Force -Path (Join-Path $env:KIRO_HOME "agents") | Out-Null
           '{"name": "sdpm", "description": "SDPM (managed by `sdpm register`)", "tools": ["@sdpm"]}' | Set-Content -Path (Join-Path $env:KIRO_HOME "agents\sdpm.json") -Encoding UTF8
           foreach ($venv in @("servers\local\.venv", "sdpm\.venv")) {
             New-Item -ItemType Directory -Force -Path (Join-Path $checkout $venv) | Out-Null
             "home = C:\Python" | Set-Content -Path (Join-Path $checkout "$venv\pyvenv.cfg")
           }
-          git -C $checkout reset -q --hard HEAD~1
+          git -C $checkout checkout -q -f -B main HEAD~1
           & $sdpm update | Tee-Object -FilePath update.log
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           if (-not (Select-String -Path update.log -SimpleMatch "Refreshing the sdpm command and MCP clients (once" -Quiet)) { throw "the bridge did not run" }
+          if (Test-Path (Join-Path $checkout "web-ui\node_modules")) { throw "the #397 launcher built the Web UI" }
           if ((Get-Content $launcher -Raw) -ne (Get-Content (Join-Path $checkout "scripts\install\launcher.ps1") -Raw)) { throw "launcher not refreshed" }
           if ((Test-Path (Join-Path $checkout "servers\local\.venv")) -or (Test-Path (Join-Path $checkout "sdpm\.venv"))) { throw "leftovers remain" }
           $agent = Get-Content (Join-Path $env:KIRO_HOME "agents\sdpm.json") -Raw | ConvertFrom-Json
@@ -316,10 +385,13 @@ jobs:
           $sdpm = Join-Path $env:SDPM_LAUNCHER_DIR "sdpm.cmd"
           $head = (git rev-parse HEAD).Trim()
           function Set-Changed {
-            git -C $checkout reset -q --hard 1c618b58
+            git -C $checkout checkout -q -f -B main 1c618b58
             Add-Content -Path (Join-Path $checkout "sdpm\uv.lock") -Value "# rewritten by uv"
             Add-Content -Path (Join-Path $checkout "web-ui\next-env.d.ts") -Value "// rewritten by next build"
             git show "7c53267d:scripts/install/launcher.ps1" | Set-Content -Path $launcher -Encoding UTF8
+            "mcp" | Set-Content -Path (Join-Path $env:SDPM_HOME ".profile") -Encoding ASCII
+            "sdpm" | Set-Content -Path (Join-Path $env:SDPM_HOME ".agent-name") -Encoding ASCII
+            Remove-Item (Join-Path $env:SDPM_HOME "state.json") -ErrorAction SilentlyContinue
           }
           function Assert-Updated {
             if ((git -C $checkout rev-parse HEAD).Trim() -ne $head) { throw "not at main" }
@@ -337,11 +409,13 @@ jobs:
           git -C $checkout -c user.name=sdpm -c user.email=sdpm@localhost stash; & $sdpm update
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
           Assert-Updated
-          # Recovery 2: the installer again, without a profile switch (it keeps mcp-only).
+          if (Test-Path (Join-Path $checkout "web-ui\node_modules")) { throw "the #397 launcher built the Web UI" }
+          # Recovery 2: the installer again, without a profile switch (it keeps mcp-only). In its
+          # own Windows PowerShell process: the setup it starts writes to that process's output.
           Set-Changed
-          & ./scripts/install/dist/install.ps1 -NonInteractive -SkipLibreOffice *>&1 | Tee-Object -FilePath reinstall.log
+          & powershell.exe -NoProfile -ExecutionPolicy Bypass -File ./scripts/install/dist/install.ps1 -NonInteractive -SkipLibreOffice *>&1 | Tee-Object -FilePath reinstall.log
           Assert-Updated
-          if ((Get-Content (Join-Path $env:SDPM_HOME ".profile") -Raw).Trim() -ne "mcp") { throw "profile not kept" }
+          if ((Get-Content (Join-Path $env:SDPM_HOME "state.json") -Raw | ConvertFrom-Json).profile -ne "mcp") { throw "profile not kept" }
           if (-not (Select-String -Path reinstall.log -SimpleMatch "were set aside" -Quiet)) { throw "no stash notice" }
           # The new launcher needs neither.
           Set-Changed
@@ -352,3 +426,67 @@ jobs:
           if (-not (Select-String -Path new.log -SimpleMatch "stash apply" -Quiet)) { throw "no stash notice" }
           python scripts/install/mcp_smoke.py $sdpm mcp
           if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }
+
+  # The release channel (R8): v99 test tags on the mirror's main, manifests served from files.
+  # The scenarios are scripts/install/release_channel_smoke.py (one driver for all three OS;
+  # it also runs locally). The full entry runs the subset that rebuilds the Web UI.
+  release-channel:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, profile: mcp }
+          - { os: macos-latest, profile: mcp }
+          - { os: windows-latest, profile: mcp }
+          - { os: ubuntu-latest, profile: full }
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
+    env:
+      GIT_AUTHOR_NAME: ci
+      GIT_AUTHOR_EMAIL: ci@localhost
+      GIT_COMMITTER_NAME: ci
+      GIT_COMMITTER_EMAIL: ci@localhost
+      SDPM_SKIP_KIRO_CLI: "1"
+      SDPM_SKIP_LIBREOFFICE: "1"
+      SDPM_SKIP_SHORTCUT: "1"
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        if: matrix.profile == 'full'
+        with:
+          node-version: 20
+      - name: Scenarios
+        shell: bash
+        run: uv run --no-project --python ">=3.11" python scripts/install/release_channel_smoke.py --work "$RUNNER_TEMP/rc" --profile "${{ matrix.profile }}"
+      - name: checkout_update.py on Python 3.8
+        if: matrix.os == 'ubuntu-latest' && matrix.profile == 'mcp'
+        shell: bash
+        run: |
+          uv run --no-project --python 3.8 --with pytest pytest --noconftest -p no:cacheprovider \
+            -o addopts= tests/test_checkout_update.py
+      # GitHub runners have passwordless sudo, so the no-terminal sudo branch runs in a
+      # container: a user whose sudo needs a password, no TTY, no --non-interactive.
+      - name: sudo without a terminal
+        if: matrix.os == 'ubuntu-latest' && matrix.profile == 'mcp'
+        timeout-minutes: 5
+        shell: bash
+        run: |
+          docker run --rm -v "$GITHUB_WORKSPACE:/src:ro" ubuntu:24.04 bash -c '
+            set -u
+            useradd -m u
+            mkdir -p /tmp/fake
+            printf "#!/bin/sh\nexit 1\n" > /tmp/fake/sudo
+            printf "#!/bin/sh\necho \"\$@\" >> /tmp/apt.log\n" > /tmp/fake/apt-get
+            chmod +x /tmp/fake/sudo /tmp/fake/apt-get
+            runuser -u u -- env PATH="/tmp/fake:$PATH" HOME=/home/u bash /src/scripts/install/dist/install.sh \
+              --mcp-only --skip-libreoffice < /dev/null > /tmp/out.log 2>&1
+            rc=$?
+            cat /tmp/out.log
+            test "$rc" = 1 || { echo "exit $rc, expected 1"; exit 1; }
+            grep -q "sudo needs a password" /tmp/out.log
+            grep -E "sudo apt-get update && sudo apt-get install -y .*git" /tmp/out.log | grep -q poppler-utils
+            test ! -e /tmp/apt.log || { echo "apt-get ran"; exit 1; }
+            echo "sudo rule OK"'

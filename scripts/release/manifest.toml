@@ -1,0 +1,38 @@
+# The one source of the release manifests (release-{macos,linux,windows}-{install,update}.json).
+# release.yml generates them with manifest.py and uploads them to each stable release; the
+# installer and `sdpm update` download exactly one per run (see README.md). Never edit the
+# generated files by hand: change this file and re-run the workflow.
+
+# The lowest `sdpm-bootstrap <n>` (scripts/install/launcher.*) a release works with. An older
+# launcher is replaced during the update; only one that cannot be replaced (a link, a file
+# that is not ours) stops the update.
+min_launcher = 1
+
+[requires.git]
+min = "2.23"
+profiles = ["full", "mcp"]
+help.macos = "xcode-select --install, or brew install git"
+help.linux = "sudo apt-get install git"
+help.windows = "winget install --id Git.Git"
+
+[requires.uv]
+min = "0.5.0"
+profiles = ["full", "mcp"]
+help.macos = "https://docs.astral.sh/uv/ (or: uv self update)"
+help.linux = "https://docs.astral.sh/uv/ (or: uv self update)"
+help.windows = "https://docs.astral.sh/uv/ (or: uv self update)"
+
+# Listed for the record: uv provides a managed Python when none matches, so it never stops
+# an update. The minimum comes from servers/local/pyproject.toml (requires-python).
+[requires.python]
+profiles = ["full", "mcp"]
+help.macos = "uv installs it as a managed Python"
+help.linux = "uv installs it as a managed Python"
+help.windows = "uv installs it as a managed Python"
+
+[requires.node]
+min = "20"
+profiles = ["full"]
+help.macos = "brew install node"
+help.linux = "https://nodejs.org/ (Node.js 20 LTS or newer)"
+help.windows = "winget install --id OpenJS.NodeJS.LTS"
