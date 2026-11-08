@@ -1102,3 +1102,87 @@ describe("unseen periods", () => {
     }
   })
 })
+
+describe("Stop during start", () => {
+  const promptsSent = (child: FakeChild) => child.requests.filter((r) => r.method === "session/prompt")
+
+  it.each(["v2", "v3"] as const)("kills a cold %s kiro-cli no other chat waits for, and sends no prompt", async (engine) => {
+    useEngine(engine)
+    spawn.mockImplementationOnce((_command: string, args: string[]) => {
+      const child = new FakeChild("K1", locked, args)
+      child.silent.add("initialize")
+      children.push(child)
+      return child
+    })
+    const start = acp.beginStart("C1")
+    const pending = acp.createNewProcessFor("C1", "sdpm-orchestrator", { signal: start.signal }).catch((e: unknown) => e)
+    await settle()
+    acp.cancelSession("C1")
+    expect(await pending).toMatchObject({ name: "AbortError" })
+    expect(start.stoppedByUser()).toBe(true)
+    start.end()
+    await settle()
+    expect(children[0].killed).toBe(true)
+    expect(promptsSent(children[0])).toEqual([])
+    expect(acp.hasProcess("C1")).toBe(false)
+  })
+
+  it("deletes a session a warm V3 kiro-cli opened for a stopped start once kiro-cli answered, and keeps the other chat", async () => {
+    const restore = vi.spyOn(console, "log").mockImplementation(() => {})
+    try {
+      useEngine("v3")
+      await acp.createNewProcessFor("C0")
+      const child = children[0]
+      child.silent.add("session/new")
+      const start = acp.beginStart("C1")
+      const pending = acp.createNewProcessFor("C1", "sdpm-orchestrator", { signal: start.signal }).catch((e: unknown) => e)
+      await settle()
+      acp.cancelSession("C1")
+      await settle()
+      const request = child.requests.filter((r) => r.method === "session/new").at(-1)!
+      child.send({ method: "_kiro/mcp/status", params: { sessionId: "K1-2", servers: [{ name: "sdpm", status: "connected" }] } })
+      child.send({ id: request.id, result: { sessionId: "K1-2", modes: { currentModeId: "sdpm-orchestrator", availableModes: [] } } })
+      expect(await pending).toMatchObject({ name: "AbortError" })
+      start.end()
+      await settle()
+      expect(child.deleted).toEqual(["K1-2"])
+      expect(child.killed).toBe(false)
+      expect(acp.hasProcess("C0")).toBe(true)
+      expect(acp.hasProcess("C1")).toBe(false)
+      expect(promptsSent(child)).toEqual([])
+    } finally {
+      restore.mockRestore()
+    }
+  })
+
+  it("sends no prompt when Stop comes after the chat opened, before its period", async () => {
+    await acp.createNewProcessFor("C1")
+    const start = acp.beginStart("C1")
+    acp.cancelSession("C1")
+    await expect(acp.sendPrompt("C1", "hello", { signal: start.signal })).rejects.toMatchObject({ name: "AbortError" })
+    start.end()
+    expect(promptsSent(children[0])).toEqual([])
+    expect(acp.isSessionRunning("C1")).toBe(false)
+  })
+
+  it("tells Stop from a client that went away, and Stop of all chats aborts every start", async () => {
+    const outer = new AbortController()
+    const gone = acp.beginStart("C1", outer.signal)
+    outer.abort()
+    expect(gone.signal.aborted).toBe(true)
+    expect(gone.stoppedByUser()).toBe(false)
+    gone.end()
+
+    const a = acp.beginStart("A")
+    const b = acp.beginStart("B")
+    acp.cancelAll()
+    expect([a.signal.aborted, b.signal.aborted, a.stoppedByUser(), b.stoppedByUser()]).toEqual([true, true, true, true])
+    a.end()
+    b.end()
+    // An ended start is not aborted by a later Stop.
+    const c = acp.beginStart("C")
+    c.end()
+    acp.cancelSession("C")
+    expect(c.signal.aborted).toBe(false)
+  })
+})

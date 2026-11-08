@@ -13,7 +13,8 @@
  * session's first prompt, which names the deck (`Current deck: <dir>`), and opens the stream
  * with the `context_not_carried_over` notice, a resumed session that also ran on the other engine with `context_from_other_engine`. A fork's
  * first message after its process was evicted reopens the copy (openForkedSession); a copy
- * kiro-cli could not read gets the notice instead of failing. A new chat whose client id had a
+ * kiro-cli could not read gets the notice instead of failing. Stop while the chat starts answers a
+ * stream that ends at once (no data); a client that went away gets 499. A new chat whose client id had a
  * chat that was released or whose kiro-cli exited reopens its kiro session (createNewProcessFor):
  * `resumed` runs the turn as a later prompt, a session kiro-cli no longer has as a first prompt
  * with the notice. The route hands the notice and the user's own text to sendPrompt (the chat
@@ -29,6 +30,7 @@ import { SessionBusyError, SessionLockedError } from "@/lib/local/sessionErrors"
 import { AgentStartError, AgentTimeoutError, type AgentStartErrorCode } from "@/lib/local/turnErrors"
 
 const acp = vi.hoisted(() => ({
+  beginStart: vi.fn(),
   hasProcess: vi.fn(),
   openDeckSession: vi.fn(),
   openForkedSession: vi.fn(),
@@ -56,8 +58,18 @@ function invoke(body: Record<string, unknown>) {
   }))
 }
 
+/** The start the route registers: its signal follows the request and `stop()` (Stop for the session). */
+let stopStart: () => void
+
 beforeEach(() => {
   for (const fn of Object.values(acp)) fn.mockReset()
+  acp.beginStart.mockImplementation((_clientId: string, outer: AbortSignal) => {
+    const controller = new AbortController()
+    let stopped = false
+    outer.addEventListener("abort", () => controller.abort(), { once: true })
+    stopStart = () => { stopped = true; controller.abort() }
+    return { signal: controller.signal, stoppedByUser: () => stopped, end: vi.fn() }
+  })
 })
 
 describe("POST /api/agent/invoke session conflicts and start-up failures", () => {
@@ -146,7 +158,7 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
     expect(res.status).toBe(200)
     expect(acp.openDeckSession).toHaveBeenCalledWith(DECK_FALLBACK_ID, "mcp-made-deck", "K1", "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
     expect(acp.createNewProcessFor).not.toHaveBeenCalled()
-    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "hi", { notice: undefined, displayText: "hi" })
+    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "hi", { notice: undefined, displayText: "hi", signal: expect.any(AbortSignal) })
     expect(acp.getBufferedEvents).toHaveBeenCalledWith(DECK_FALLBACK_ID, 0)
     expect((await events(res)).some((e) => "notice" in e)).toBe(false)
   })
@@ -165,7 +177,7 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
       expect(acp.sendPrompt).toHaveBeenCalledWith(
         DECK_FALLBACK_ID,
         "Interaction mode: fast\n\nCurrent deck: /home/u/Documents/SDPM-Presentations/mcp-made-deck\n\nhi",
-        { notice: "context_not_carried_over", displayText: "hi" },
+        { notice: "context_not_carried_over", displayText: "hi", signal: expect.any(AbortSignal) },
       )
       expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
     },
@@ -185,7 +197,7 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
     acp.openDeckSession.mockResolvedValue({ chat: {}, outcome: "resumed", otherEngine: true })
     acp.sendPrompt.mockImplementation(promptEndingAt("K1"))
     const res = await invoke({ sessionId: "C1", deckId: "d1" })
-    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "hi", { notice: "context_from_other_engine", displayText: "hi" })
+    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "hi", { notice: "context_from_other_engine", displayText: "hi", signal: expect.any(AbortSignal) })
     expect((await events(res))[0]).toEqual({ notice: { code: "context_from_other_engine" } })
   })
 })
@@ -199,7 +211,7 @@ describe("POST /api/agent/invoke on a forked chat", () => {
     const res = await invoke({ sessionId: "F1", continuedFrom: ORIGIN })
     expect(res.status).toBe(200)
     expect(acp.openForkedSession).toHaveBeenCalledWith("F1", "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
-    expect(acp.sendPrompt.mock.calls[0][2]).toEqual({ notice: undefined, displayText: "hi" })
+    expect(acp.sendPrompt.mock.calls[0][2]).toEqual({ notice: undefined, displayText: "hi", signal: expect.any(AbortSignal) })
     expect(acp.sendPrompt.mock.calls[0][1]).toContain("hi")
   })
 
@@ -208,7 +220,7 @@ describe("POST /api/agent/invoke on a forked chat", () => {
     acp.sendPrompt.mockImplementation(promptEndingAt("F1"))
     const res = await invoke({ sessionId: "F1", continuedFrom: ORIGIN })
     expect(res.status).toBe(200)
-    expect(acp.sendPrompt.mock.calls[0][2]).toEqual({ notice: "context_not_carried_over", displayText: "hi" })
+    expect(acp.sendPrompt.mock.calls[0][2]).toEqual({ notice: "context_not_carried_over", displayText: "hi", signal: expect.any(AbortSignal) })
     expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
   })
 })
@@ -221,14 +233,14 @@ describe("POST /api/agent/invoke for a chat whose kiro-cli is gone", () => {
     acp.sendPrompt.mockImplementation(promptEndingAt("K1"))
     const res = await invoke({ sessionId: "C1" })
     expect(res.status).toBe(200)
-    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "hi", { notice: undefined, displayText: "hi" })
+    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "hi", { notice: undefined, displayText: "hi", signal: expect.any(AbortSignal) })
   })
 
   it("runs a session kiro-cli no longer has as a first prompt, with the notice", async () => {
     acp.createNewProcessFor.mockResolvedValue({ chat: {}, resumed: false, notice: "context_not_carried_over" })
     acp.sendPrompt.mockImplementation(promptEndingAt("K2"))
     const res = await invoke({ sessionId: "C1" })
-    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "Interaction mode: fast\n\nhi", { notice: "context_not_carried_over", displayText: "hi" })
+    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "Interaction mode: fast\n\nhi", { notice: "context_not_carried_over", displayText: "hi", signal: expect.any(AbortSignal) })
     expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
   })
 
@@ -236,6 +248,43 @@ describe("POST /api/agent/invoke for a chat whose kiro-cli is gone", () => {
     acp.createNewProcessFor.mockResolvedValue({ chat: {}, resumed: false })
     acp.sendPrompt.mockImplementation(promptEndingAt("K3"))
     await invoke({ sessionId: "C1" })
-    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "Interaction mode: fast\n\nhi", { notice: undefined, displayText: "hi" })
+    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "Interaction mode: fast\n\nhi", { notice: undefined, displayText: "hi", signal: expect.any(AbortSignal) })
+  })
+})
+
+describe("POST /api/agent/invoke stopped while its chat starts", () => {
+  beforeEach(() => acp.hasProcess.mockReturnValue(false))
+
+  /** createNewProcessFor that waits for its signal, as the pool does, and rejects with AbortError. */
+  function startUntilAborted() {
+    acp.createNewProcessFor.mockImplementation((_id: string, _agent: string, opts: { signal: AbortSignal }) => new Promise((_, reject) => {
+      opts.signal.addEventListener("abort", () => reject(new DOMException("Request cancelled", "AbortError")), { once: true })
+    }))
+  }
+
+  it("answers 200 with a stream that ends at once, and sends no prompt", async () => {
+    startUntilAborted()
+    const pending = invoke({ sessionId: "C1" })
+    await new Promise((r) => setImmediate(r))
+    stopStart()
+    const res = await pending
+    expect(res.status).toBe(200)
+    expect(res.headers.get("content-type")).toBe("text/event-stream")
+    expect(await res.text()).toBe("")
+    expect(acp.sendPrompt).not.toHaveBeenCalled()
+  })
+
+  it("answers 499 when the client went away", async () => {
+    startUntilAborted()
+    const controller = new AbortController()
+    const pending = POST(new Request("http://127.0.0.1:3000/api/agent/invoke", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ query: "hi", mode: "vibe", sessionId: "C1" }),
+      signal: controller.signal,
+    }))
+    await new Promise((r) => setImmediate(r))
+    controller.abort()
+    expect((await pending).status).toBe(499)
   })
 })

@@ -22,6 +22,10 @@
  *   of its client id opens its kiro session again.
  * - **Carry-over.** Texts for the agent a chat could not deliver (after Stop, after an exit) wait
  *   under the kiro session and go before the user's text of its next prompt.
+ * - **Stop during start.** A start (an invoke opening its chat and sending its prompt) registers
+ *   under its client id (`beginStart`) before anything is opened, so Stop (`cancelSession`, also a
+ *   POST from another tab) aborts it: the pool kills a kiro-cli no other chat waits for, a session
+ *   opened on a kiro-cli other chats use is ended once kiro-cli answered, and no prompt is sent.
  * - **Unseen periods.** A work period whose end no stream wrote (its tab was closed) is replayed
  *   once by `/api/agent/stream` (`openStream`), also after its chat was released: `releaseChat`
  *   keeps it under every id of the chat (at most MAX_UNSEEN_PERIODS). It counts as seen once a
@@ -79,6 +83,8 @@ const carryOver = new Map<string, string[]>()
 const MAX_UNSEEN_PERIODS = 50
 const unseen = new Map<Period, Set<string>>()
 const unseenById = new Map<string, Period>()
+/** Client id → the starts in progress for it (`beginStart`), which Stop aborts. */
+const pendingStarts = new Map<string, Set<AbortController>>()
 
 /** The model list a session of each engine last reported in this server (also in acp-models.json). */
 const knownModels = new Map<EngineId, ModelOption[]>()
@@ -86,6 +92,9 @@ const knownModels = new Map<EngineId, ModelOption[]>()
 const pendingModelChoices = new Map<string, ModelChoice>()
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
+const throwIfAborted = (signal: AbortSignal | undefined) => {
+  if (signal?.aborted) throw new DOMException("Request cancelled", "AbortError")
+}
 
 /** Map insertion order as LRU: (re)insert `key` last and drop the oldest beyond `max`. */
 function keepNewest<V>(map: Map<string, V>, key: string, value: V, max: number): void {
@@ -272,6 +281,38 @@ export async function withEngineConnection<T>(engine: EngineId, fn: (connect: St
 
 // ── Public API ──
 
+/**
+ * A start for `clientId` (opening its chat, preparing its prompt): its `signal` follows `outer`
+ * (the request) and Stop for the client id (`cancelSession`, `cancelAll`). `stoppedByUser` tells
+ * Stop from a client that went away; `end` once the prompt's period started (or the start failed).
+ */
+export function beginStart(clientId: string, outer?: AbortSignal): { signal: AbortSignal; stoppedByUser: () => boolean; end: () => void } {
+  const controller = new AbortController()
+  let stopped = false
+  const follow = () => controller.abort()
+  if (outer?.aborted) controller.abort()
+  else outer?.addEventListener("abort", follow, { once: true })
+  const starts = pendingStarts.get(clientId) ?? new Set<AbortController>()
+  starts.add(controller)
+  pendingStarts.set(clientId, starts)
+  controller.signal.addEventListener("abort", () => { if (!outer?.aborted) stopped = true }, { once: true })
+  return {
+    signal: controller.signal,
+    stoppedByUser: () => stopped,
+    end: () => {
+      outer?.removeEventListener("abort", follow)
+      starts.delete(controller)
+      if (!starts.size && pendingStarts.get(clientId) === starts) pendingStarts.delete(clientId)
+    },
+  }
+}
+
+/** Abort the starts in progress for a client id (all of them without one). */
+function abortStarts(clientId?: string): void {
+  const groups = clientId ? [pendingStarts.get(clientId)] : [...pendingStarts.values()]
+  for (const starts of groups) for (const controller of starts ?? []) controller.abort()
+}
+
 /** Whether a chat is known by this id (a client id or its kiro session id). */
 export function hasProcess(sessionId: string): boolean {
   return aliases.has(sessionId)
@@ -412,22 +453,26 @@ export async function openForkedSession(
  * user's own text). The chat's pending model choice is applied first (one kiro-cli refuses is
  * logged and the prompt goes on), then the texts kept for the session go before `text`.
  * Throws SessionBusyError while the chat's turn runs or its stopped period settles (the same chat
- * open in two panels or tabs); prompts are not queued.
+ * open in two panels or tabs); prompts are not queued. Throws AbortError when `signal` (the
+ * start's, `beginStart`) aborts before the turn started.
  */
 export async function sendPrompt(
   sessionId: string,
   text: string,
-  opts: { notice?: LocalSessionNoticeCode; displayText?: string } = {},
+  opts: { notice?: LocalSessionNoticeCode; displayText?: string; signal?: AbortSignal } = {},
 ): Promise<{ sessionId: string; replayFrom: number; subscribe: (fn: EventListener) => () => void; send: () => void; onEnd: () => void }> {
   const chat = aliases.get(sessionId)
   if (!chat) throw new Error(`no chat for session ${sessionId}`)
+  throwIfAborted(opts.signal)
   // Steers the last turn left must be out of kiro-cli's queue before this prompt.
   if (chat.steerClear) await chat.steerClear
+  throwIfAborted(opts.signal)
   if (chat.turn || chat.reserved || chat.period?.stopped) throw new SessionBusyError()
   chat.reserved = true
   try {
     // The chat's model choice goes in before the prompt (a change made while idle has finished).
     if (chat.configChange) await chat.configChange
+    throwIfAborted(opts.signal)
     const choice = pendingModelChoices.get(sessionId)
     if (choice) {
       pendingModelChoices.delete(sessionId)
@@ -436,6 +481,7 @@ export async function sendPrompt(
       } catch (error) {
         console.warn("[acp] sessionId=%s: could not apply the chat's model choice: %s", chat.sessionId, errorText(error))
       }
+      throwIfAborted(opts.signal)
     }
   } finally {
     chat.reserved = false
@@ -468,13 +514,18 @@ export async function steerSession(sessionId: string, id: string, text: string):
   await chat.steer(id, text)
 }
 
-/** Stop a chat: its period's turn and work are cancelled, and nothing starts model work in it any more. */
+/**
+ * Stop a chat: a start in progress for the id is aborted (no prompt is sent), and the chat's
+ * period's turn and work are cancelled, and nothing starts model work in it any more.
+ */
 export function cancelSession(sessionId: string): void {
+  abortStarts(sessionId)
   aliases.get(sessionId)?.stop()
 }
 
-/** Stop every busy chat (stop button with no specific session). */
+/** Stop every start and every busy chat (stop button with no specific session). */
 export function cancelAll(): void {
+  abortStarts()
   for (const chat of chats()) if (chat.period) chat.stop()
 }
 
