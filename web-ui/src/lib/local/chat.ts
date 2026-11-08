@@ -7,7 +7,7 @@
  *
  * - **Work period.** What the SSE stream follows and what Stop ends: it starts with the first turn
  *   (`work {state: "busy"}`, the buffer numbered from 1, the SSE `id:`), lasts while a turn runs or
- *   a work hold is open (web-2's compose task), and ends with `work {state: "idle", how}` and the
+ *   a work hold is open (a compose task, compose-run.ts), and ends with `work {state: "idle", how}` and the
  *   `end` event (the last turn's stop reason and error, `cancelled` after Stop). The chat is busy
  *   while a period runs or a prompt is being prepared; the pool never releases a busy chat.
  * - **Turns.** `turn {id, why, text}` when one starts (`text` "" for a hidden turn), `turnEnd`
@@ -24,12 +24,16 @@
  * - **Stop** (`stop`) discards the steers, cancels the turn and every hold, and from then on
  *   nothing that can start model work is sent in that period (`maySend`); holds that do not
  *   release within STOP_SETTLE_MS are dropped and the period ends without them.
+ * - **Compose.** The orchestrator's compose_slides and message_composer calls and ends go to the
+ *   chat's compose runner (compose-run.ts), which answers them and holds the period while its
+ *   composers run.
  * - **Decks.** A deck a tool result names gets the session's `.session` (and a fork's origin) and
  *   a new engine mark once; each turn adds its engine to the marks of the chat's decks.
  */
 import { randomUUID } from "crypto"
 import type { EngineId } from "./acp/engine"
 import type { AcpAnswer } from "./acp/transport"
+import { ComposeRunner } from "./compose-run"
 import { ConversationState } from "./conversation"
 import { data, type BufferedEvent, type ChatEvent, type LocalEvent, type TurnHow, type TurnWhy } from "./conversation/events"
 import { SteerRejectedError, steerEvent, type SteerState } from "./conversation/steer"
@@ -47,7 +51,7 @@ export const STOP_SETTLE_MS = 5000
 
 export type EventListener = (entry: BufferedEvent) => void
 
-/** Work that keeps a chat's period open after its turn (web-2's compose task). */
+/** Work that keeps a chat's period open after its turn (a compose task). */
 export interface WorkHold {
   /** Stop: cancel what the hold runs; it releases itself when its sessions answered. */
   cancel(): void
@@ -140,6 +144,8 @@ export class Chat implements SessionSink {
   readonly pendingHarness: string[] = []
   /** Turns ended so far; a steer whose turn ended while kiro-cli queued it is taken back. */
   turnsEnded = 0
+  /** The compose runner, made on the first compose_slides or message_composer call. */
+  compose: ComposeRunner | null = null
   private lastActive = Date.now()
   private periods = 0
   private settleTimer: ReturnType<typeof setTimeout> | null = null
@@ -173,16 +179,22 @@ export class Chat implements SessionSink {
   }
 
   onEvents(events: LocalEvent[]): void {
-    const { events: out, deckId } = this.conversation.apply(events)
+    this.compose?.observe(events)
+    const { events: out, deckId, runToolUses, runToolEnds } = this.conversation.apply(events)
     if (deckId) this.saveDeck(deckId)
-    if (!this.period) return
-    for (const event of out) {
-      if (this.turn?.messageStart && !(event.kind === "data" && "steer" in event.payload)) {
-        this.turn.messageStart = false
-        this.push(data({ event: { messageStart: { role: "assistant" } } }))
+    if (this.period) {
+      for (const event of out) {
+        if (this.turn?.messageStart && !(event.kind === "data" && "steer" in event.payload)) {
+          this.turn.messageStart = false
+          this.push(data({ event: { messageStart: { role: "assistant" } } }))
+        }
+        this.push(event)
       }
-      this.push(event)
     }
+    if (!runToolUses.length && !runToolEnds.length) return
+    this.compose ??= new ComposeRunner(this)
+    for (const use of runToolUses) this.compose.toolUse(use)
+    for (const end of runToolEnds) this.compose.toolEnded(end)
   }
 
   /** The kiro-cli is gone: a running turn ends with agent_exited and the period at once. */
@@ -274,19 +286,20 @@ export class Chat implements SessionSink {
     }
   }
 
-  /** Hand the Local server's text to the agent (see the header). */
-  deliver(text: string, why: "wake" | "report"): void {
+  /** Hand the Local server's text to the agent (see the header); returns where it went. */
+  deliver(text: string, why: "wake" | "report"): "turn" | "steer" | "later" {
     const period = this.period
     if (!period || period.stopped || this.released || this.hs.host.exited) {
       this.keepForLater(text)
-      return
+      return "later"
     }
     if (this.turn) {
       void this.harnessSteer(text, why)
-      return
+      return "steer"
     }
     this.beginTurn(why, "", true)
     this.startPrompt(text)
+    return "turn"
   }
 
   /**

@@ -69,6 +69,7 @@ function localAcpLayers() {
     // The registry and the chats reach kiro-cli only through hosts.ts (types excepted).
     restrict([`${L}/acp-process.ts`], [engines, { ...registry, allowTypeImports: true }, { ...transport, allowTypeImports: true }, bridge, routes], TESTS),
     restrict([`${L}/chat.ts`], [engines, { ...registry, allowTypeImports: true }, { ...transport, allowTypeImports: true }, bridge, routes, processManager], TESTS),
+    restrict([`${L}/compose-run.ts`], [engines, { ...registry, allowTypeImports: true }, { ...transport, allowTypeImports: true }, bridge, routes, processManager], TESTS),
     restrict([`${L}/acp/engines/v2/**/*.ts`], [
       { regex: "(^|/)v3(/|$)", message: "An engine adapter does not depend on another engine." },
       processManager, bridge, routes, conversation, conversationEvents,

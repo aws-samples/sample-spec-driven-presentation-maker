@@ -58,9 +58,9 @@ export class ConversationState {
     return this.tools.usedName(id)
   }
 
-  /** A tool card's result (the compose run answers its tools' calls with it). */
-  toolResult(id: string, status: ToolEndStatus, result: Record<string, unknown>): { events: ChatEvent[]; deckId?: string } {
-    return this.tools.end(id, status, result)
+  /** A tool card's result (the compose run answers its tools' calls with it); `name` when the turn's tracker no longer knows the call. */
+  toolResult(id: string, status: ToolEndStatus, result: Record<string, unknown>, name = ""): { events: ChatEvent[]; deckId?: string } {
+    return this.tools.end(id, status, result, name)
   }
 
   /**
