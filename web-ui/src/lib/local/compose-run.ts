@@ -544,8 +544,8 @@ function composerPrompt(dispatch: Dispatch, g: Group): string {
 export class ComposeRunner {
   private current: ComposeTask | null = null
   private readonly queue: ComposeTask[] = []
-  /** message_composer calls by tool id: whether each reached its group. */
-  private readonly messages = new Map<string, { input: Record<string, unknown>; outcome: Promise<boolean> | null }>()
+  /** message_composer calls by tool id: whether each reached its group (a promise while its steer is in flight). */
+  private readonly messages = new Map<string, { input: Record<string, unknown>; outcome: Promise<boolean> | boolean }>()
   /** The orchestrator's MCP tool calls while a task runs: name and start. */
   private readonly toolStarts = new Map<string, { name: string; at: number }>()
 
@@ -570,20 +570,29 @@ export class ComposeRunner {
   toolUse(use: RunToolUse): void {
     if (use.name !== MESSAGE_TOOL) return
     const entry = this.messages.get(use.id)
-    if (entry?.outcome) return
+    if (entry && entry.outcome !== false) return
     const { group, text } = use.input as { group?: unknown; text?: unknown }
     const complete = Number.isInteger(group) && typeof text === "string"
     const task = this.current
-    this.messages.set(use.id, {
-      input: use.input,
-      outcome: complete ? (task ? task.message(group as number, text as string, Date.now()) : Promise.resolve(false)) : null,
-    })
+    this.messages.set(use.id, { input: use.input, outcome: complete && task ? task.message(group as number, text as string, Date.now()) : false })
   }
 
   /** Its end (the run answers it). */
   toolEnded(end: RunToolEnd): void {
-    if (end.name === COMPOSE_TOOL) this.dispatched(end)
-    else void this.messageEnded(end)
+    if (end.name === COMPOSE_TOOL) {
+      this.dispatched(end)
+      return
+    }
+    const entry = this.messages.get(end.id)
+    this.messages.delete(end.id)
+    const outcome = entry?.outcome ?? false
+    if (typeof outcome === "boolean") {
+      this.messageEnded(end, entry?.input, outcome)
+      return
+    }
+    // The steer is still in flight: the period stays open until the card has its result.
+    const release = this.chat.period ? this.chat.hold({ cancel: () => {}, dropped: () => {} }) : () => {}
+    void outcome.then((delivered) => this.messageEnded(end, entry?.input, delivered)).finally(release)
   }
 
   /** A task ended (also one that never started: a Stop ends the waiting ones too); the next waiting one starts. */
@@ -636,11 +645,8 @@ export class ComposeRunner {
     } else this.begin(task)
   }
 
-  private async messageEnded(end: RunToolEnd): Promise<void> {
-    const entry = this.messages.get(end.id)
-    this.messages.delete(end.id)
-    const delivered = entry?.outcome ? await entry.outcome : false
-    const group = Number((entry?.input as { group?: unknown } | undefined)?.group) || 0
+  private messageEnded(end: RunToolEnd, input: Record<string, unknown> | undefined, delivered: boolean): void {
+    const group = Number((input as { group?: unknown } | undefined)?.group) || 0
     if (delivered) {
       this.push(this.chat.conversation.toolResult(end.id, "success", end.result, MESSAGE_TOOL).events)
       return

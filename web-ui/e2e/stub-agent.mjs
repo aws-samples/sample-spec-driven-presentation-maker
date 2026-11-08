@@ -37,6 +37,24 @@
  * other sessions' prompts run meanwhile. When a slow prompt answers, the stub writes
  * `<deck dir>/.stub-prompt-done`, so a test sees the turn end while no tab is open. While
  * `<SDPM_DECK_ROOT>/.stub-slow-start` exists, session/new answers after 3 s.
+ *
+ * Compose in the background (the Local server runs the composers, compose-run.ts):
+ * - A process started for `sdpm-composer` (V2 `--agent sdpm-composer`) or a session opened in that
+ *   mode (V3 `modeId`) is a composer. Its prompt (`deck_id:` path, `assigned_slugs:`) gets two sdpm
+ *   tool calls, then `slides/<slug>.json` is written every 500 ms until the `[hold=<ms>]` of the
+ *   instruction (default 3000) has passed, or the session is cancelled (`cancelled`); then
+ *   `output.pptx` is touched (not with `[stale]`) and the prompt ends `end_turn`. A
+ *   `_session/steer` to a running composer answers `{queued: true}` (V3 with a messageId), is
+ *   injected at its next step (V3 `steering_injected`, V2 `AgentExecutionSteeringInjected`) and
+ *   lands in every slide file's `messages`, as messages in its prompt do.
+ * - The orchestrator: `[compose]` (one group) or `[groups N]` makes the deck and calls
+ *   `compose_slides`, whose result is the dispatched shape (groups `s1`…`sN`, the prompt's
+ *   `[hold=…]` and `[stale]` copied into each instruction), then ends its turn; `[message N]` calls
+ *   `message_composer(N, "Use the title 'Steered title'.")`; `[chat]` answers "51"; a prompt with a
+ *   `<compose_result>` answers "Report seen: <status>." and, for `"build": "stale"`, calls
+ *   `generate_pptx` and touches the deck's `output.pptx`. Without a tag, the turn is as above.
+ * - Every process appends `{pid, sessionId, role, event: "prompt" | "answer", wake, text, t}` to
+ *   `SDPM_STUB_TRACE` when it is set (`text`: the prompt's first 200 characters).
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -57,6 +75,25 @@ const sessionModels = new Map()
 let sessionCount = 0
 /** sessionId → how to end its running `[slow]` prompt (on session/cancel). */
 const slowPrompts = new Map()
+/** sessionId → its running composer turn: `cancel()` and `steer({text, messageId})`. */
+const composerTurns = new Map()
+/** sessionId → the deck and slugs of its composer prompt (a follow-up prompt names none). */
+const composerWork = new Map()
+/** The deck the orchestrator's last compose_slides named. */
+let lastComposeDeck = null
+let callCount = 0
+let steerCount = 0
+const STUB_TRACE = process.env.SDPM_STUB_TRACE
+const MESSAGE_PREFIX = "Message from the orchestrator while you work: "
+
+function trace(sessionId, role, event, extra = {}) {
+  if (STUB_TRACE) fs.appendFileSync(STUB_TRACE, JSON.stringify({ pid: process.pid, sessionId, role, event, t: Date.now(), ...extra }) + "\n")
+}
+
+function isComposer(sessionId) {
+  return ENGINE === "v3" ? sessions.get(sessionId) === "sdpm-composer" : AGENT === "sdpm-composer"
+}
+
 /** V3 fork id → its source. */
 const forks = new Map()
 const V3_SOURCE = { sessionId: "sess_e2e-v3-source", cwd: "/tmp/e2e-project", title: "E2E V3 source" }
@@ -228,9 +265,105 @@ function crewV2(sessionId, deckId) {
   update(sessionId, { sessionUpdate: "tool_call_update", toolCallId, status: "completed", title: "Spawning agent crew" })
 }
 
+/** A composer's prompt (see the header). */
+function composerPrompt(sessionId, promptText, done) {
+  const deckLine = /^deck_id:\s*(.+)$/m.exec(promptText)
+  const slugLine = /^assigned_slugs:\s*(.+)$/m.exec(promptText)
+  const work = deckLine
+    ? { deckDir: deckLine[1].trim(), slugs: (slugLine?.[1] ?? "").split(",").map((slug) => slug.trim()).filter(Boolean) }
+    : composerWork.get(sessionId) ?? { deckDir: null, slugs: [] }
+  composerWork.set(sessionId, work)
+  const hold = deckLine ? Number(/\[hold=(\d+)\]/.exec(promptText)?.[1] ?? 3000) : 500
+  const stale = promptText.includes("[stale]")
+  const messages = promptText.split("\n").filter((line) => line.startsWith(MESSAGE_PREFIX))
+  const pending = []
+  let step = 0
+  sdpmTool(sessionId, `stub-composer-${process.pid}-${++callCount}`, "start_composing", { deck_id: work.deckDir, assigned_slugs: work.slugs }, { specs_ok: true })
+  sdpmTool(sessionId, `stub-composer-${process.pid}-${++callCount}`, "read_guides", {}, { guides: [] })
+  const write = () => {
+    if (!work.deckDir) return
+    for (const slug of work.slugs) {
+      fs.mkdirSync(path.join(work.deckDir, "slides"), { recursive: true })
+      fs.writeFileSync(path.join(work.deckDir, "slides", `${slug}.json`), JSON.stringify({ slug, step, messages }))
+    }
+  }
+  write()
+  const started = Date.now()
+  const finish = (stopReason) => {
+    clearInterval(timer)
+    composerTurns.delete(sessionId)
+    if (stopReason === "end_turn" && !stale && work.deckDir) fs.writeFileSync(path.join(work.deckDir, "output.pptx"), `stub ${Date.now()}`)
+    text(sessionId, `Composed ${work.slugs.join(", ")}.`)
+    done(stopReason)
+  }
+  const timer = setInterval(() => {
+    step++
+    for (const steer of pending.splice(0)) {
+      messages.push(steer.text)
+      if (ENGINE === "v3") update(sessionId, { sessionUpdate: "session_info_update", _meta: { kiro: { kind: "steering_injected", messageId: steer.messageId, content: steer.text } } })
+      else send({ method: "_kiro.dev/session/update", params: { sessionId, update: { sessionUpdate: "AgentExecutionSteeringInjected", content: steer.text } } })
+    }
+    write()
+    if (Date.now() - started >= hold) finish("end_turn")
+  }, 500)
+  composerTurns.set(sessionId, { cancel: () => finish("cancelled"), steer: (steer) => pending.push(steer) })
+}
+
+/** The orchestrator's tags (see the header); false when the prompt has none. */
+function orchestratorPrompt(sessionId, promptText, done) {
+  const report = /<compose_result task="[^"]*" status="([a-z]+)">/.exec(promptText)
+  const groups = /\[groups (\d+)\]/.exec(promptText) ? Number(/\[groups (\d+)\]/.exec(promptText)[1]) : promptText.includes("[compose]") ? 1 : 0
+  const message = /\[message (\d+)\]/.exec(promptText)
+  const chat = promptText.includes("[chat]")
+  if (!report && !groups && !message && !chat) return false
+  if (report) {
+    text(sessionId, `Report seen: ${report[1]}. `)
+    if (/&quot;build&quot;|"build": ?"stale"/.test(promptText) && lastComposeDeck) {
+      sdpmTool(sessionId, `stub-build-${process.pid}-${++callCount}`, "generate_pptx", { deck_id: lastComposeDeck }, { output_path: path.join(lastComposeDeck, "output.pptx") })
+      fs.writeFileSync(path.join(lastComposeDeck, "output.pptx"), `stub rebuilt ${Date.now()}`)
+    }
+  }
+  if (groups) {
+    const deckId = deckIdOf(promptText)
+    const outputDir = createDeckOnDisk(deckId)
+    const deckDir = fs.realpathSync(outputDir)
+    lastComposeDeck = deckDir
+    text(sessionId, "Composing in the background… ")
+    sdpmTool(sessionId, `stub-tool-${process.pid}-${++callCount}`, "init_deck_workspace", { template: "e2e" }, { deckId, output_dir: outputDir })
+    const tags = (promptText.match(/\[hold=\d+\]|\[stale\]/g) ?? []).join(" ")
+    const slideGroups = Array.from({ length: groups }, (_, i) => ({ slugs: [`s${i + 1}`], instruction: `Compose s${i + 1}. ${tags}`.trim() }))
+    const taskId = Array.from({ length: 12 }, () => "0123456789abcdef"[Math.floor(Math.random() * 16)]).join("")
+    sdpmTool(sessionId, `stub-compose-${process.pid}-${++callCount}`, "compose_slides", { deck_id: deckDir, slide_groups: slideGroups }, {
+      status: "dispatched", task_id: taskId, deck_id: deckDir, output_format: "pptx",
+      slide_groups: slideGroups.map((g, i) => ({ group: i + 1, ...g })), outline_slugs: slideGroups.flatMap((g) => g.slugs),
+      notice: `Running in the background.\nTask ID: ${taskId}`,
+    })
+    text(sessionId, "The composers are on it.")
+  }
+  if (message) {
+    const group = Number(message[1])
+    sdpmTool(sessionId, `stub-message-${process.pid}-${++callCount}`, "message_composer", { group, text: "Use the title 'Steered title'." }, `Sent to composer ${group}; it reads the message at its next step.`)
+    text(sessionId, `Told composer ${group}.`)
+  }
+  if (chat) text(sessionId, "51")
+  done("end_turn")
+  return true
+}
+
 function handlePrompt(msg) {
   const sessionId = msg.params.sessionId
   const promptText = (msg.params.prompt ?? []).map((block) => block?.text ?? "").join("")
+  const role = isComposer(sessionId) ? "composer" : "orchestrator"
+  trace(sessionId, role, "prompt", { wake: promptText.startsWith("<compose_result"), text: promptText.slice(0, 200) })
+  const done = (stopReason) => {
+    trace(sessionId, role, "answer", { stopReason })
+    answer(msg, { stopReason })
+  }
+  if (role === "composer") {
+    composerPrompt(sessionId, promptText, done)
+    return
+  }
+  if (orchestratorPrompt(sessionId, promptText, done)) return
   const deckId = deckIdOf(promptText)
   text(sessionId, "Creating your deck… ")
   const outputDir = createDeckOnDisk(deckId)
@@ -242,7 +375,7 @@ function handlePrompt(msg) {
   text(sessionId, ` (model: ${model}${ENGINE === "v3" && effort ? `, effort: ${effort}` : ""})`)
   const slow = /\[slow(?:=(\d+))?\]/.exec(promptText)
   if (!slow) {
-    answer(msg, { stopReason: "end_turn" })
+    done("end_turn")
     return
   }
   // A long turn: a chunk every 200 ms, until it is cancelled or its chunks are sent.
@@ -252,7 +385,7 @@ function handlePrompt(msg) {
     clearInterval(timer)
     slowPrompts.delete(sessionId)
     fs.writeFileSync(path.join(outputDir, ".stub-prompt-done"), stopReason)
-    answer(msg, { stopReason })
+    done(stopReason)
   }
   const timer = setInterval(() => {
     text(sessionId, ` ${++chunks}`)
@@ -355,6 +488,19 @@ rl.on("line", (line) => {
       break
     case "session/cancel":
       slowPrompts.get(msg.params?.sessionId)?.()
+      composerTurns.get(msg.params?.sessionId)?.cancel()
+      break
+    case "_session/steer": {
+      const turn = composerTurns.get(msg.params?.sessionId)
+      if (!turn) { methodNotFound(msg); break }
+      const messageId = `steer-${process.pid}-${++steerCount}`
+      turn.steer({ text: msg.params.message, messageId })
+      answer(msg, ENGINE === "v3" ? { queued: true, messageId } : { queued: true })
+      break
+    }
+    case "_session/steer/clear":
+      if (isComposer(msg.params?.sessionId)) answer(msg, {})
+      else methodNotFound(msg)
       break
     default:
       // Another request (a steer): Method not found, as kiro-cli answers what it does not implement.

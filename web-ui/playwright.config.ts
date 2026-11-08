@@ -36,6 +36,8 @@ export default defineConfig({
       SDPM_DECK_ROOT: path.join(TMP, "decks"),
       SDPM_ACP_CONFIG_DIR: path.join(TMP, "config"),
       SDPM_KIRO_SESSIONS_DIR: path.join(TMP, "kiro-sessions"),
+      // The stub agent's prompt / answer lines (compose-async.spec.ts reads them).
+      SDPM_STUB_TRACE: path.join(TMP, "stub-trace.jsonl"),
     },
   },
 })
