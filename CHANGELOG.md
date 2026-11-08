@@ -190,6 +190,14 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
 
 ### Fixed
 
+- **Kiro CLI 3.x: the `sdpm` agent no longer hands your request to a copy of itself.** On
+  the V3 engine the first turn went out before the sdpm server had connected, so the only
+  slide tool the agent could see was the sub-agent that starts another `sdpm`; it passed the
+  whole request down, sometimes several levels, before any slide work began, and the
+  innermost copy then wrote every slide alone. The agent now waits for the sdpm server
+  (`waitForReady`) and its description says a sub-agent runs only the role its prompt names.
+  The first sdpm tool now starts in 7–10 s instead of 16–41 s, and composers run in parallel
+  again. Still one agent; `sdpm update` brings an existing `sdpm` agent up to date.
 - **The Local Web UI continues a deck made elsewhere on that deck.** A deck with no kiro
   session to resume (made by an MCP client or Kiro CLI, or whose session kiro-cli no longer
   has) started a new session whose first prompt did not say which deck it was, so the agent

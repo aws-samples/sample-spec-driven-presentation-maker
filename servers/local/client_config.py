@@ -162,9 +162,15 @@ def kiro_agent_definition(t: Target, name: str = DEFAULT_KIRO_AGENT) -> dict:
         "name": name,
         "description": (
             "Spec-Driven Presentation Maker — slides from material or dialogue. "
-            "Prompts: /sdpm-vibe /sdpm-spec /sdpm-style /sdpm-translate. " + KIRO_AGENT_MARKER
+            "Prompts: /sdpm-vibe /sdpm-spec /sdpm-style /sdpm-translate. "
+            # Kiro CLI 3.x shows this text as the subagent tool's description. Without this
+            # sentence the first turn hands the whole request to a copy of this agent.
+            "As a sub-agent it runs only the sdpm role its prompt names: spawn it with the composer "
+            "prompt from start_presentation, not with the user's request. " + KIRO_AGENT_MARKER
         ),
-        "mcpServers": {SERVER_NAME: {**cfg, "timeout": 120000}},
+        # Kiro CLI 3.x sends the first model request before an MCP server connects unless the
+        # server has waitForReady; without it the first turn sees no sdpm tool and delegates.
+        "mcpServers": {SERVER_NAME: {**cfg, "timeout": 120000, "waitForReady": True}},
         # @sdpm is trusted: composing a deck is dozens of run_python calls, and run_python
         # is a local sandbox confined to the deck directory. Nothing here writes files or
         # runs shell commands outside that sandbox.
