@@ -85,6 +85,29 @@ def test_kiro_agent_loads_in_v2_and_v3_without_conversion(name):
     assert not {"fs_write", "shell", "skill"} & set(by_cap)
 
 
+def test_kiro_agent_does_not_hand_the_first_turn_to_a_copy_of_itself():
+    """Kiro CLI 3.x defers MCP tools and shows each sub-agent as a tool described by the
+    agent's description. Both levers are needed: without waitForReady the first request
+    goes out before the sdpm server connects; without the sentence the subagent tool reads
+    as taking the whole job (measured: each alone still delegated, both together never)."""
+    agent = cc.kiro_agent_definition(POSIX)
+    assert agent["mcpServers"]["sdpm"]["waitForReady"] is True
+    assert "As a sub-agent it runs only the sdpm role its prompt names" in agent["description"]
+    assert agent["description"].endswith(cc.KIRO_AGENT_MARKER)
+
+
+def test_refresh_brings_an_older_kiro_agent_up_to_date(tmp_path):
+    old = cc.kiro_agent_definition(POSIX)
+    old["description"] = "Spec-Driven Presentation Maker — slides from material or dialogue. " + cc.KIRO_AGENT_MARKER
+    del old["mcpServers"]["sdpm"]["waitForReady"]
+    old["mcpServers"]["other"] = {"command": "other-server"}
+    merged, unmatched = cc.merged_kiro_agent(old, POSIX)
+    assert unmatched == [] and merged is not None
+    assert merged["mcpServers"]["sdpm"]["waitForReady"] is True
+    assert merged["description"] == cc.kiro_agent_definition(POSIX)["description"]
+    assert merged["mcpServers"]["other"] == {"command": "other-server"}
+
+
 def test_unregister_kiro_removes_our_upgrade_backups_only(tmp_path, monkeypatch, capsys):
     monkeypatch.setattr(cc.shutil, "which", lambda _n: None)
     cc.write_kiro_agent(POSIX, root=tmp_path)
