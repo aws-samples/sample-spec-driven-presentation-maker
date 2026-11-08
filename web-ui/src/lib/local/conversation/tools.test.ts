@@ -4,14 +4,15 @@
  * Tool cards: a result is shown under its call's name, else under the name its own update gave;
  * the deck a result names is its `deckId`,
  * else the last segment of an `output_dir` under the deck root (the root itself is no deck), and
- * the shown result carries it.
+ * the shown result carries it. `usedName` is the name a call's `tool_use` gave, never a
+ * `tool_start`'s or a result's.
  */
 
 import path from "path"
 import { describe, expect, it } from "vitest"
 
 import { DECK_ROOT } from "../deck-paths"
-import { ToolTracker, withDeckId } from "./tools"
+import { RUN_TOOLS, ToolTracker, withDeckId } from "./tools"
 
 const DECK_DIR = path.resolve(DECK_ROOT, "20261101-1648-review")
 
@@ -55,5 +56,18 @@ describe("ToolTracker", () => {
     const ended = tools.end("t1", "success", { output_dir: DECK_DIR })
     expect(ended.deckId).toBe("20261101-1648-review")
     expect(JSON.parse((ended.events[0] as { payload: { toolResult: { content: string } } }).payload.toolResult.content)).toMatchObject({ deckId: "20261101-1648-review" })
+  })
+})
+
+describe("usedName", () => {
+  it("is the tool_use's name only", () => {
+    const tools = new ToolTracker()
+    tools.start("t1", "Running: @sdpm/compose_slides")
+    expect(tools.usedName("t1")).toBeUndefined()
+    tools.end("t2", "success", {}, "compose_slides")
+    expect(tools.usedName("t2")).toBeUndefined()
+    tools.use("t1", "compose_slides", {})
+    expect(tools.usedName("t1")).toBe("compose_slides")
+    expect([...RUN_TOOLS].sort()).toEqual(["compose_slides", "message_composer"])
   })
 })

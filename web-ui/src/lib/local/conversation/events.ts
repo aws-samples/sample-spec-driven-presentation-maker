@@ -42,6 +42,8 @@ export type SteerState = "accepted" | "delivered" | "discarded"
 
 /** Why a turn of a chat's work period started (Cloud's `turn.why`). */
 export type TurnWhy = "prompt" | "steer" | "wake" | "report"
+/** How a background task ended (the `<compose_result>` status). */
+export type TaskStatus = "completed" | "failed" | "cancelled"
 /** How a turn or a work period ended. */
 export type TurnHow = "finished" | "cancelled" | "error"
 
@@ -71,6 +73,10 @@ export type SsePayload =
   | { toolUse: { toolUseId: string; name: string; input: Record<string, unknown> } }
   | { toolResult: { toolUseId: string; name: string; status: ToolEndStatus; content: string } }
   | { toolStream: { toolUseId: string; name: string; data: ComposeStreamData } }
+  /** A background task started in place of its tool's result (Cloud's agent/streaming.py). */
+  | { taskStart: { toolUseId: string; name: string; taskId: string } }
+  /** It settled; `content` is its report (Cloud's agent/session_runtime.py). */
+  | { taskEnd: { toolUseId: string; taskId: string; name: string; status: TaskStatus; content: string } }
   | { steer: { id: string; text?: string; state: SteerState } }
   | { notice: { code: LocalSessionNoticeCode } }
   | { status: "error"; code?: LocalTurnErrorCode; error: string }

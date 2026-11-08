@@ -8,12 +8,14 @@
  * new one; the delegation's own tool end adds nothing; the end of the turn (any stopReason, a
  * Stop, an error) closes an open card with its unfinished groups failed. Slugs come from the
  * prompt's `assigned_slugs:` line (JSON list or comma-separated) or a legacy `slides:`, "group N"
- * without any.
+ * without any. A compose task's card (`TaskCards`, the background run's) survives the turn's
+ * begin and end; the conversation hands the run's tool calls and ends over (by the `tool_use`
+ * name) and shows no tool result for those ends.
  */
 
 import { describe, expect, it } from "vitest"
 
-import { ComposeTracker, promptSlugs } from "./compose"
+import { ComposeTracker, promptSlugs, TaskCards } from "./compose"
 import type { ChatEvent, LocalEvent } from "./events"
 import { ConversationState } from "./index"
 
@@ -161,5 +163,59 @@ describe("ConversationState", () => {
     conversation.beginTurn()
     expect(conversation.apply([{ type: "composer_tool", group: "a", id: "t1", name: "x" }]).events).toEqual([])
     expect(conversation.endTurn()).toEqual([])
+  })
+})
+
+describe("task cards", () => {
+  it("stream under the dispatch's id and survive the turn's begin and end", () => {
+    const state = new ConversationState()
+    state.tasks.open("disp", [{ slugs: ["a", "b"] }, { slugs: ["c"] }])
+    state.beginTurn()
+    expect(state.endTurn()).toEqual([])
+    expect(payloads(state.tasks.starting("disp", 2))).toEqual([stream({ group: 2, total_groups: 2, slugs: "c", status: "starting" }, "disp")])
+    expect(payloads(state.tasks.tool("disp", 1, "t1", "run_python"))).toEqual([stream({ group: 1, slugs: "a, b", tool: "run_python", toolUseId: "t1" }, "disp")])
+    expect(payloads(state.tasks.toolEnd("disp", 1, "t1", "success"))).toEqual([stream({ group: 1, slugs: "a, b", toolResult: "t1", toolStatus: "success" }, "disp")])
+    expect(payloads(state.tasks.groupEnd("disp", 1, "done"))).toEqual([stream({ group: 1, slugs: "a, b", status: "done" }, "disp")])
+    state.tasks.close("disp")
+    expect(state.tasks.groupEnd("disp", 2, "error")).toEqual([])
+    expect(new TaskCards().starting("none", 1)).toEqual([])
+  })
+
+  it("leaves a delegation card's turn-end close as it was", () => {
+    const state = new ConversationState()
+    state.tasks.open("disp", [{ slugs: ["a"] }])
+    state.apply([start("g1", "assigned_slugs: x")])
+    expect(payloads(state.endTurn())).toEqual([stream({ group: 1, slugs: "x", status: "error" }), closed("error")])
+    expect(state.tasks.has("disp")).toBe(true)
+  })
+})
+
+describe("the compose run's tools", () => {
+  const use = (id: string, name: string, input: Record<string, unknown> = {}): LocalEvent => ({ type: "tool_use", id, name, input })
+  const end = (id: string, name?: string): LocalEvent => ({ type: "tool_end", id, status: "success", result: { status: "dispatched" }, ...(name ? { name } : {}) })
+
+  it("hands compose_slides and message_composer ends over without a tool result, by the tool_use's name", () => {
+    const state = new ConversationState()
+    // tool_use and tool_end in one notification (V3 announces a call at its end); a nameless V3 end; a titled V2 end.
+    const out = state.apply([use("c1", "compose_slides", { deck_id: "/d" }), end("c1"), use("m1", "message_composer", { group: 1, text: "hi" }), end("m1", "Running: @sdpm/message_composer")])
+    expect(payloads(out.events)).toEqual([
+      { toolUse: { toolUseId: "c1", name: "compose_slides", input: { deck_id: "/d" } } },
+      { toolUse: { toolUseId: "m1", name: "message_composer", input: { group: 1, text: "hi" } } },
+    ])
+    expect(out.runToolUses.map((u) => u.id)).toEqual(["c1", "m1"])
+    expect(out.runToolEnds).toEqual([
+      { id: "c1", name: "compose_slides", status: "success", result: { status: "dispatched" } },
+      { id: "m1", name: "message_composer", status: "success", result: { status: "dispatched" } },
+    ])
+    expect(state.toolNameOf("c1")).toBe("compose_slides")
+    expect(payloads(state.toolResult("c1", "error", { message: "no" }).events)).toEqual([{ toolResult: { toolUseId: "c1", name: "compose_slides", status: "error", content: JSON.stringify({ message: "no" }) } }])
+  })
+
+  it("shows other tools as before, also a tool_end named compose_slides whose tool_use had another name", () => {
+    const state = new ConversationState()
+    const out = state.apply([use("x1", "list_styles"), end("x1", "compose_slides"), end("x2", "compose_slides")])
+    expect(out.runToolUses).toEqual([])
+    expect(out.runToolEnds).toEqual([])
+    expect(payloads(out.events).map((p) => Object.keys(p ?? {})[0])).toEqual(["toolUse", "toolResult", "toolResult"])
   })
 })

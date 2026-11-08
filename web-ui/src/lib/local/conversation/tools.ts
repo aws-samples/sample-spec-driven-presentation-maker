@@ -3,7 +3,9 @@
 /**
  * The main session's tool cards: each tool call's name by its toolCallId, and the deck a tool
  * result names. The names come from `tool_start` / `tool_use`; a result is shown under the name
- * its call was given, else under the name the result's own update gave.
+ * its call was given, else under the name the result's own update gave. The name a call's
+ * `tool_use` gave is kept apart (`usedName`): it is the only reliable one (V2's `tool_start` and
+ * result names are titles, V3's MCP results have none), and it tells the compose run's tools.
  */
 import path from "path"
 
@@ -27,8 +29,13 @@ export function withDeckId(result: Record<string, unknown>): { result: Record<st
   return shown.deckId ? { result: shown, deckId: String(shown.deckId) } : { result: shown }
 }
 
+/** The tools whose results the compose run (compose-run.ts) answers instead of the tool card. */
+export const RUN_TOOLS: ReadonlySet<string> = new Set(["compose_slides", "message_composer"])
+
 export class ToolTracker {
   private readonly names = new Map<string, string>()
+  /** The name each call's `tool_use` gave (only `use` writes it). */
+  private readonly used = new Map<string, string>()
 
   start(id: string, name: string): ChatEvent[] {
     this.names.set(id, name)
@@ -37,7 +44,13 @@ export class ToolTracker {
 
   use(id: string, name: string, input: Record<string, unknown>): ChatEvent[] {
     this.names.set(id, name)
+    this.used.set(id, name)
     return [data({ toolUse: { toolUseId: id, name, input } })]
+  }
+
+  /** The name the call's `tool_use` gave, if it had one. */
+  usedName(id: string): string | undefined {
+    return this.used.get(id)
   }
 
   end(id: string, status: ToolEndStatus, result: Record<string, unknown>, fallbackName = ""): { events: ChatEvent[]; deckId?: string } {
