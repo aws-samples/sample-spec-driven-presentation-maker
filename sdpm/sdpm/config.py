@@ -116,8 +116,8 @@ def get_config() -> dict:
 
 
 def get_output_dir() -> Path:
-    """Resolved output base directory with tilde expansion."""
-    return Path(get_config()["output_dir"]).expanduser()
+    """Resolved output base directory with tilde expansion; an empty value means the default."""
+    return Path(get_config()["output_dir"] or _DEFAULTS["output_dir"]).expanduser()
 
 
 def get_extra_sources() -> list[dict]:

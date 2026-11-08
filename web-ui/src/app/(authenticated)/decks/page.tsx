@@ -38,7 +38,7 @@ import { toast } from "sonner"
 import { useWorkspace } from "@/hooks/useWorkspace"
 import { Plus, MessageSquare, Image as ImageIcon, Star } from "lucide-react"
 import { useTranslations } from "next-intl"
-import { IS_LOCAL } from "@/lib/mode"
+import { IS_LOCAL, CloudOnly } from "@/lib/mode"
 import { buildToken } from "@/lib/slashToken"
 import { OutlineChatContext } from "@/components/deck/OutlineChatContext"
 import { ReviewProvider } from "@/components/review/ReviewProvider"
@@ -227,6 +227,8 @@ export default function DecksPage() {
                           >
                             <Star className={`h-4 w-4 ${list.favoriteIds.has(ws.activeDeckId!) ? "fill-current" : ""}`} />
                           </button>
+                          {/* Visibility (private / internal) is a Cloud feature: Local decks are never shared */}
+                          <CloudOnly>
                           {ws.isOwner && (
                             <DeckActions
                               visibility={ws.deck?.visibility}
@@ -237,6 +239,7 @@ export default function DecksPage() {
                               }}
                             />
                           )}
+                          </CloudOnly>
                         </div>
                       ) : undefined
                     }

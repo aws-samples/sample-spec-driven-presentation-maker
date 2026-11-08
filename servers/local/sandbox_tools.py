@@ -24,8 +24,24 @@ def _rejection_message(violations: list[str]) -> str:
     lines.append("Use sandbox functions instead:")
     lines.append("  read_json(path) → dict    write_json(path, data)")
     lines.append("  read_text(path) → str     write_text(path, text)")
-    lines.append('  list_files(subdir=".") → list[str]')
+    lines.append('  list_files(subdir=".") → list[str]  (folders end with "/")')
     return "\n".join(lines)
+
+
+def _similar_decks(deck_id: str, limit: int = 5) -> list[str]:
+    """Deck folders in the output directory named ``<name>`` or ``…-<name>`` (deck folders are
+    ``YYYYMMDD-HHMM-<name>``), where ``<name>`` is the last part of *deck_id*; newest first."""
+    name = Path(deck_id).name if deck_id else ""
+    if not name:
+        return []
+    from sdpm.api import _get_output_base_dir
+
+    try:
+        root = _get_output_base_dir()
+        found = [p for p in root.iterdir() if p.is_dir() and (p.name == name or p.name.endswith(f"-{name}"))]
+    except OSError:
+        return []
+    return [str(p) for p in sorted(found, key=lambda p: p.name, reverse=True)[:limit]]
 
 
 def _build_snapshot(deck_dir: Path) -> dict[str, tuple[int, int]]:
@@ -103,7 +119,7 @@ def run_python(
     """Run Python inside the deck directory — the way to read and write deck files
     (deck.json, specs/, slides/, includes/). No import or open(); helpers:
     read_json(path), write_json(path, data), read_text(path), write_text(path, text),
-    list_files(subdir="."). Writes persist; output.pptx (output.html for HTML decks)
+    list_files(subdir=".") (folders end with "/"). Writes persist; output.pptx (output.html for HTML decks)
     rebuilds and changed slides are re-rendered and previewed when deck.json, slides/,
     includes/ or specs/outline.md changed. measure_slides measures text overflow on those
     slugs and previews them; HTML decks get static checks plus browser layout / JS checks
@@ -115,6 +131,9 @@ def run_python(
             f"deck directory not found: {deck_id!r}. run_python runs inside a deck "
             "workspace — pass the output_dir returned by init_deck_workspace."
         )
+        similar = _similar_decks(deck_id)
+        if similar:
+            result["error"] += " Decks with that name: " + ", ".join(similar)
         return json.dumps(result, ensure_ascii=False)
     cwd = deck_id
 
