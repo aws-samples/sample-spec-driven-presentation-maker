@@ -185,11 +185,11 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
 
   it("leaves the deck line out when the deck directory does not resolve", async () => {
     acp.readSessionFromDeck.mockReturnValue(null)
-    acp.openDeckSession.mockResolvedValue({ ps: {}, outcome: "created", otherEngine: false })
+    acp.openDeckSession.mockResolvedValue({ chat: {}, outcome: "created", otherEngine: false })
     acp.sendPrompt.mockImplementation(promptEndingAt("NEW1"))
     resolveDeckDir.mockReturnValueOnce(null)
     await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
-    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "Interaction mode: fast\n\nhi", { notice: "context_not_carried_over" })
+    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "Interaction mode: fast\n\nhi", { notice: "context_not_carried_over", displayText: "hi", signal: expect.any(AbortSignal) })
   })
 
   it("says so when the deck's session also ran on the other engine", async () => {
