@@ -135,6 +135,8 @@ export class V2Translator {
     if (msg.method === KIRO_SUBAGENT_LIST_UPDATE) return this.listUpdate(objectOr(msg.params) as V2SubagentListUpdate)
     if (msg.method === KIRO_AGENT_NOT_FOUND) {
       const params = objectOr(msg.params)
+      // Another session's (one kiro-cli may carry several).
+      if (typeof params.sessionId === "string" && this.mainSessionId !== null && params.sessionId !== this.mainSessionId) return []
       console.warn("[acp] kiro-cli did not find the agent: %j", params)
       this.onAgentNotFound?.(params)
       return []

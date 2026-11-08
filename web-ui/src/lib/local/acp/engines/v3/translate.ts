@@ -158,6 +158,11 @@ export class V3Translator {
     return this.modelList
   }
 
+  /** A notification that names another session than this one (once this one has an id). */
+  private otherSession(params: Record<string, unknown>): boolean {
+    return typeof params.sessionId === "string" && this.mainSessionId !== null && params.sessionId !== this.mainSessionId
+  }
+
   /** The config option ids set_config_option takes for the model and the effort (null: the model has none). */
   configIds(): { model: string; effort: string | null } {
     return this.optionIds
@@ -169,6 +174,7 @@ export class V3Translator {
       case KIRO_MCP_STATUS:
         return []
       case KIRO_CUSTOM_AGENT_NOT_FOUND:
+        if (this.otherSession(params)) return []
         console.warn("[acp] kiro-cli did not start the custom agent: %j", params)
         this.onAgentNotFound?.(params)
         return []
