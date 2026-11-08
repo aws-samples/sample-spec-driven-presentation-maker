@@ -159,6 +159,21 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   yourself is left alone, and `sdpm` is then written without delegation (no parallel
   composers). `sdpm unregister` removes both. / Run `sdpm update`: it rewrites the agent and
   removes the self-delegation, keeping what other tools added.
+- **The Local Web UI finds decks in the folder the MCP server writes to.** The Web UI and
+  its MCP server (`server_acp.py`) read only `SDPM_DECK_ROOT`, while the CLI and the local
+  MCP server (`server.py`) read `SDPM_OUTPUT_DIR` and `output_dir` in `config.json`, so a
+  deck made over MCP after changing `output_dir` did not appear in the Web UI. All of them
+  now use one order: `SDPM_DECK_ROOT` → `SDPM_OUTPUT_DIR` → `output_dir` in
+  `~/.config/sdpm/config.json` (`~` expanded; empty means the default, no longer the
+  current folder) → `~/Documents/SDPM-Presentations`. / If you
+  set `output_dir` and also made decks in the Web UI, those decks stay in
+  `~/Documents/SDPM-Presentations` and no longer show in the Web UI: move them into your
+  `output_dir`, or set `SDPM_DECK_ROOT` to that old folder to keep using it. Otherwise,
+  nothing; decks in your `output_dir` now show in the Web UI.
+- **The Web UI's MCP server installs the icon catalogs by itself.** `server_acp.py` now
+  fetches them in the background on first start when none is installed, as `server.py`
+  does, instead of the agent asking the Web UI user to run an install command.
+  `SDPM_AUTO_INSTALL_ASSETS=0` turns this off. / Nothing.
 - **Deploying `SdpmAuth` alone no longer removes the CloudFront URL from the Web UI's
   Cognito app client.** Each `SdpmAuth` deploy that changed the client reset its callback
   and logout URLs to `http://localhost:3000`, so nobody could sign in to the Web UI, and a
@@ -264,6 +279,17 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   sdpm` or `/agent sdpm`). When another agent delegates to `sdpm`, V3 asks you to approve
   each sdpm tool the sub-agent calls. / `sdpm update` rewrites the agent file (see
   Changed). Run `make register-dev` again for a development agent.
+- **Web UI: a reload or a direct link opens the deck with its conversation.** Reloading a
+  deck page, or opening `/decks/#<id>` from a link, put the chat on the empty "New" tab and
+  closed it, so the deck's saved conversation looked gone; only opening the deck from the
+  list showed it. Both now open the deck's chat tab (and the chat panel on a desktop
+  window), as the list does. The address is read once the page has loaded, which also stops
+  the hydration error React reported for direct links. / Nothing.
+- **Local Web UI: no wording for features that only the cloud Web UI has.** The search box
+  said "Search slides across the organization…", but the Local Web UI filters your decks by
+  name; it now says "Search decks…". The deck header no longer shows the Private / Internal
+  sharing button, since Local decks are never shared. The cloud Web UI is unchanged. /
+  Nothing.
 
 ### Security
 

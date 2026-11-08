@@ -28,6 +28,7 @@
     "presentationCount": "{count, plural, one {# presentation} other {# presentations}}",
     "newDeck": "New Deck",
     "searchPlaceholder": "Search slides across the organization…",
+    "searchPlaceholderLocal": "Search decks…",
     "clearSearch": "Clear search",
     "tabs": {
       "mine": "My Decks",

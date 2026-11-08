@@ -30,6 +30,7 @@ if (_SKILL_DIR / "sdpm" / "config.py").is_file():
 import os  # noqa: E402
 import sandbox_tools  # noqa: E402
 from sdpm import tools  # noqa: E402
+from sdpm.api import _get_output_base_dir  # noqa: E402
 from sdpm.tools.attachment.contracts import (  # noqa: E402
     import_attachment as _import_attachment,
     read_attachment as _read_attachment,
@@ -38,7 +39,8 @@ from sdpm.tools.attachment.source import classify_source, validate_local_source 
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 
-_DECK_ROOT = Path(os.environ.get("SDPM_DECK_ROOT", Path.home() / "Documents" / "SDPM-Presentations")).resolve()
+# Same deck root as the CLI, server.py and the Local Web UI (order in _get_output_base_dir).
+_DECK_ROOT = _get_output_base_dir().resolve()
 _RAW_ATTACHMENT_ROOT = _DECK_ROOT / ".attachments"
 
 
@@ -148,6 +150,12 @@ def hearing(
 
 def main() -> None:
     """Run the ACP-specific MCP server over stdio."""
+    # Same as server.py: fetch the icon catalogs in the background when none is installed,
+    # so a Web UI user never has to run an install command. SDPM_AUTO_INSTALL_ASSETS=0 opts out.
+    if os.environ.get("SDPM_AUTO_INSTALL_ASSETS", "1") != "0":
+        from sdpm.knowledge.assets.download import ensure_assets_installed_async
+
+        ensure_assets_installed_async()
     mcp.run(transport="stdio")
 
 
