@@ -409,6 +409,26 @@ def test_a_new_install_whose_finish_fails_stays_at_the_target_and_retries_fresh(
     assert "Installing v0.13.0" in capfd.readouterr().out
 
 
+@POSIX_ONLY
+@pytest.mark.parametrize("channel,tagged", [("main", False), ("main", True), ("release", False)])
+def test_a_new_install_names_what_it_installs_on_each_channel(world, capfd, channel, tagged):
+    if tagged:
+        world.tag("v0.13.0", world.base)
+    tip = world.commit("main ahead")
+    world.home.mkdir()
+    git(world.tmp, "clone", "-q", "--branch", "main", str(world.upstream), str(world.checkout))
+    assert world.run("install", "--launcher", str(world.launcher), "--profile", "mcp", "--register", "no",
+                     "--new-checkout", "--channel", channel) == 0
+    assert world.head() == tip and world.state()["channel"] == channel
+    out = capfd.readouterr().out
+    no_release = "No release can be installed yet"
+    if channel == "main":
+        assert "Following main" in out and no_release not in out
+        assert f"Installing {cu.labelled(str(world.checkout), tip)}." in out
+    else:
+        assert f"{no_release}; installing main {cu.short(tip)}." in out
+
+
 def test_install_without_profile_is_a_usage_error(tmp_path):
     with pytest.raises(SystemExit) as stop:
         cu.main(["--checkout", str(tmp_path), "--uv", "uv", "install", "--launcher", "/x"])

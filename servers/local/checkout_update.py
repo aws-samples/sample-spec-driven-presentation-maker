@@ -1260,10 +1260,10 @@ def _stay_line(run: Run, selection: Selection, latest: Optional[Release]) -> str
 
 
 def _version_line(run: Run, entry: str, base: Optional[str], current: str, selection: Selection,
-                  latest: Optional[Release]) -> str:
+                  latest: Optional[Release], channel: str) -> str:
     target = selection.target
     if base is None:
-        if latest is None and selection.kind == "main":
+        if channel == "release" and latest is None and selection.kind == "main":
             return (f"No release can be installed yet; installing main {short(target)}. "
                     "sdpm update moves to the first release that contains it.")
         return f"Installing {labelled(run.checkout, target)}."
@@ -1360,7 +1360,7 @@ def stage1(run: Run, entry: str, *, channel_option: Optional[str] = None, with_w
             _move_to(run, target)
         return 0
 
-    out(_version_line(run, entry, base, current, selection, latest))
+    out(_version_line(run, entry, base, current, selection, latest, channel))
 
     # Before anything moves: what the target asks of this machine.
     if manifest is not None and latest is not None and target == latest.sha and \
