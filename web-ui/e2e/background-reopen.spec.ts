@@ -31,7 +31,7 @@ async function startDeck(context: BrowserContext, message: string, deckId: strin
   await page.getByRole("textbox", { name: "Chat message input" }).fill(message)
   await page.getByRole("button", { name: "Send message" }).click()
   await expect(page.getByRole("log", { name: "Chat messages" })).toContainText("Creating your deck", { timeout: 15_000 })
-  await expect(page).toHaveURL(new RegExp(`#${deckId}$`), { timeout: 15_000 })
+  await expect(page).toHaveURL((url) => url.hash === `#${deckId}`, { timeout: 15_000 })
   return page
 }
 
