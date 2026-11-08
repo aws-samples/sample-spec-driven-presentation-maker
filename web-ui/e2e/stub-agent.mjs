@@ -15,9 +15,8 @@
  * V3 also lists its sessions (`session/list`: one session, "E2E V3 source", in /tmp/e2e-project),
  * forks one (`session/fork` → `sess_e2e-fork-<n>` in the mode of `_meta.kiro.modeId`; its load
  * names the source in `_meta.parentSessionId`), closes and deletes any session (`session/close`,
- * `session/delete`), as kiro-cli 3.1 does; it advertises them in initialize, so the Local server
- * runs every V3 chat as a session of one stub process. V2 answers them with Method not found (one
- * stub process per chat).
+ * `session/delete`), as kiro-cli 3.1 does, and advertises them in initialize. V2 answers them with
+ * Method not found. The Local server starts one stub process per chat on either engine.
  *
  * Models: `auto` (no effort), `stub-effort` (effort low / medium / high, default medium) and
  * `stub-plain`, kept per session. V3 reports them as config options, in session/new's answer and

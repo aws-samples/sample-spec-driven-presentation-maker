@@ -6,25 +6,24 @@
  * through its engine's `EngineSession` (acp/engine.ts). Hosts know the chats that use their
  * sessions only as `SessionSink`s (chat.ts implements one; web-2's compose runs another).
  *
- * - Placement (`acquireForChat`) is decided by what kiro-cli advertises, never by the engine id:
- *   a host whose initialize answer has `sessionCapabilities.close` (V3) is *shared* and carries
- *   every new chat of its engine, at most MAX_CHATS_PER_SHARED_HOST open (the least recently
- *   active idle one is released for a new one); a host without it (V2) carries one chat, at most
- *   MAX_SINGLE_CHAT_HOSTS of them (the least recently active idle one is released). A busy sink is
- *   never released here: when every candidate is busy, the cap is exceeded with one warning.
- * - Every kiro-cli is started by `spawnHost`: the agent definitions are synced first (agents-sync,
- *   whose digest the host keeps), the chat environment (deck root included), initialize. A host
- *   started with other definitions than the current ones is retired: no new chat goes to it, and
- *   it ends when it has no chat left (or at the next spawn, once its chats are all idle).
- * - A start that every waiting chat gave up (their abort signals) is killed while no session is
- *   open on it yet. An open aborted on a shared host that carries other sessions is not cut off
- *   mid-request (kiro-cli would keep the session): it is deleted (new), closed (loaded) or
- *   discarded (fork) once kiro-cli answered.
+ * - Placement (`acquireForChat`): every chat gets a kiro-cli of its own, on V3 as on V2. kiro-cli's
+ *   V3 agent server runs one sdpm turn at a time per process (the turns of other sessions wait in
+ *   its queue: KAS 0.66.70 `agent-controller`, measured in the lane Y E2E), so chats that share one
+ *   would wait for each other's whole turn. Sessions other than the chat's (`aux`, a compose run's
+ *   composers) may join the chat's kiro-cli. At most MAX_CHAT_HOSTS kiro-cli processes carry a
+ *   chat; a new one releases the least recently active one whose chat is idle. A busy sink is never
+ *   released here: when every candidate is busy, the cap is exceeded with a warning.
+ * - Every kiro-cli is started by `spawnHost`: the agent definitions are synced first
+ *   (agents-sync, which leaves an unchanged directory alone), the chat environment (deck root
+ *   included), initialize.
+ * - A start its chat gave up (its abort signal) is killed. An open given up on a kiro-cli that
+ *   carries other sessions is not cut off mid-request (kiro-cli would keep the session): it is
+ *   deleted (new) or closed (loaded) once kiro-cli answered; a fork it made is discarded.
  * - Routing: each line goes once through the adapter's `translateMcp` into the host's MCP record
  *   (mcp-ready.ts, keyed by session id, so a line from before any session knew its id counts),
  *   then to every host session's `translate`, whose events go to its sink.
- * - Listings (`acquireForListing`) use a live host of the engine; without one they start one,
- *   which stays in the pool when it is shared (the next chat uses it) and is killed otherwise.
+ * - Listings (`acquireForListing`) use a live kiro-cli of the engine; without one they start one,
+ *   killed once the listing is done.
  */
 import path from "path"
 import { syncToAgentsDir } from "./agents-sync"
@@ -60,10 +59,8 @@ export const INITIALIZE_PARAMS = {
 }
 /** The agent a listing kiro-cli is started with (V3 ignores it; V2's store is read without kiro-cli). */
 export const LISTING_AGENT = "sdpm-orchestrator"
-/** Open chats on one shared host; a new one releases the least recently active idle chat. */
-export const MAX_CHATS_PER_SHARED_HOST = 8
-/** Single-chat hosts alive at once; a new one releases the least recently active idle one. */
-export const MAX_SINGLE_CHAT_HOSTS = 3
+/** kiro-cli processes with a chat alive at once; a new one releases the least recently active idle one. */
+export const MAX_CHAT_HOSTS = 3
 
 /** What uses a host session: a chat (chat.ts) or a compose run's composer session (`aux`, web-2). */
 export interface SessionSink {
@@ -163,13 +160,14 @@ export class HostSession {
   }
 
   /**
-   * Leave the host: on a shared host the session is closed in kiro-cli (and deleted with
-   * `discard`); a single-chat host keeps it until it ends. Lines that arrive afterwards are not
-   * routed to the sink any more. Rejects with kiro-cli's error (the session is gone here anyway).
+   * Leave the host: the session is closed in kiro-cli (and deleted with `discard`) when kiro-cli
+   * can close sessions (V3); otherwise it lives until its kiro-cli ends (V2). Lines that arrive
+   * afterwards are not routed to the sink any more. Rejects with kiro-cli's error (the session is
+   * gone here anyway).
    */
   async close(opts: { discard?: boolean } = {}): Promise<void> {
     this.drop()
-    if (!this.host.shared() || this.host.exited) return
+    if (!this.host.canClose() || this.host.exited) return
     await this.engine.close()
     if (opts.discard) await this.engine.discard()
   }
@@ -180,30 +178,24 @@ export class HostSession {
   }
 }
 
-/** One kiro-cli. */
+/** One kiro-cli: one chat's session, and the sessions other work opened next to it. */
 export class Host {
   readonly adapter: EngineAdapter
   /** What the engine advertised in its initialize answer (null until it answered). */
   caps: EngineCapabilities | null = null
   /** Its sessions' MCP servers, recorded since kiro-cli started. */
   readonly mcp = new McpRecord()
-  /** No new chat is placed here; it ends when it has no chat left. */
-  retired = false
   readonly sessions = new Set<HostSession>()
   /** Composer (non-chat) sessions ever opened here; drives recycling on hosts without close. */
   auxOpened = 0
   lastActivity = Date.now()
   /** Initialize answered (rejects with the start's failure; the host is then killed). */
   readonly ready: Promise<void>
-  /** Chats (and listings) waiting for this start. */
-  waiters = 0
-  private warnedFull = false
 
   constructor(
     readonly engine: EngineId,
     readonly conn: AcpConnection,
     readonly hostAgent: string,
-    readonly agentsDigest: string,
     private readonly env: NodeJS.ProcessEnv,
     private readonly pool: HostPool,
   ) {
@@ -231,8 +223,8 @@ export class Host {
     return this.conn.exited
   }
 
-  /** The host can close sessions, so it carries every chat of its engine. */
-  shared(): boolean {
+  /** kiro-cli can end one session and keep the others (session/close: V3). */
+  canClose(): boolean {
     return this.caps?.session.close === true
   }
 
@@ -251,27 +243,15 @@ export class Host {
     this.conn.kill()
   }
 
-  /** Warn once that every chat on this full host is busy. */
-  warnFull(): void {
-    if (this.warnedFull) return
-    this.warnedFull = true
-    console.warn("[acp] the %s kiro-cli (pid %s) carries %d busy chats; opening one more", this.engine, this.conn.pid, this.chatSessions().length)
-  }
-
-  /** A session left: a host that may not carry new chats ends with its last one. */
   remove(hs: HostSession): void {
-    if (!this.sessions.delete(hs)) return
-    if (this.sessions.size === 0 && this.retired && !this.exited) {
-      console.log("[acp] the retired %s kiro-cli (pid %s) has no session left; ending it", this.engine, this.conn.pid)
-      this.kill()
-    }
+    this.sessions.delete(hs)
   }
 
   private async initialize(): Promise<void> {
     try {
       const init = await this.conn.request("initialize", INITIALIZE_PARAMS, { timeoutMs: INITIALIZE_TIMEOUT_MS }) as InitializeResponse
       this.caps = this.adapter.capabilities(init)
-      console.log("[acp] started a %s kiro-cli (pid %s)%s", this.engine, this.conn.pid, this.shared() ? " that carries every chat" : "")
+      console.log("[acp] started a %s kiro-cli (pid %s)", this.engine, this.conn.pid)
     } catch (error) {
       this.kill()
       if (error instanceof AgentTimeoutError) throw error
@@ -294,8 +274,7 @@ export class Host {
     const { signal } = opts
     if (signal?.aborted) throw abortError()
     if (this.exited) throw new AgentStartError("agent_start_failed", "kiro-cli exited")
-    const shared = this.shared()
-    /** Aborts the setup requests: only when nothing else uses this host (else kiro-cli would keep the session). */
+    /** Aborts the setup requests: only when nothing else uses this kiro-cli (else kiro-cli would keep the session). */
     const requests = new AbortController()
     /** The fork this open made, deleted again if the open fails. */
     let forkId: string | null = null
@@ -317,8 +296,8 @@ export class Host {
     this.sessions.add(hs)
     if (opts.sink.kind === "aux") this.auxOpened++
     this.lastActivity = Date.now()
-    /** Nothing else uses this kiro-cli (a single-chat host is its chat's). */
-    const alone = () => (this.sessions.size === 1 && this.waiters === 0) || (!shared && opts.sink.kind === "chat")
+    /** Nothing else uses this kiro-cli. */
+    const alone = () => this.sessions.size === 1
     // Alone on the host: cut the setup off at once, and end a kiro-cli that has no fork yet.
     const onAbort = () => {
       if (!alone()) return
@@ -364,7 +343,7 @@ export class Host {
 
   /** A session this host opened for a caller that gave up: deleted when it was new, closed when it was loaded. */
   private async endAbandoned(hs: HostSession, how: Open): Promise<void> {
-    if (!this.shared() || this.exited) return
+    if (!this.canClose() || this.exited) return
     try {
       if (how.kind === "new") await hs.engine.discard()
       else await hs.engine.close()
@@ -409,8 +388,6 @@ export async function discardFork(engine: EngineSession, forkId: string): Promis
 /** The kiro-cli processes of this server. */
 export class HostPool {
   private readonly hosts = new Set<Host>()
-  /** Engines whose last started host was shared (a new host of theirs is expected to be one). */
-  private readonly sharedEngines = new Set<EngineId>()
 
   hostsOf(engine: EngineId): Host[] {
     return [...this.hosts].filter((host) => host.engine === engine && !host.exited)
@@ -423,63 +400,52 @@ export class HostPool {
 
   /**
    * Start kiro-cli on `engine` with the current agent definitions and the chat environment, and
-   * initialize it. The only way a kiro-cli is started. Retired hosts whose chats are all idle end first.
+   * initialize it. The only way a kiro-cli is started.
    */
   async spawnHost(engine: EngineId, agentName: string): Promise<Host> {
     const host = this.start(engine, agentName)
-    host.waiters++
-    try {
-      await host.ready
-    } finally {
-      host.waiters--
-    }
+    await host.ready
     return host
   }
 
   /**
-   * The host for a new chat (or a reopened deck, a fork) of `engine`: the live shared host with
-   * the current definitions, after it made room; else a new kiro-cli, after the single-chat cap
-   * made room. A start this chat waits for is killed when every chat waiting for it gave up.
+   * A kiro-cli of its own for a new chat (or a reopened deck, a fork) of `engine`, after the cap
+   * made room. A start the chat gives up (`signal`) is killed.
    */
   async acquireForChat(engine: EngineId, agentName: string, opts: { signal?: AbortSignal } = {}): Promise<Host> {
     const { signal } = opts
     if (signal?.aborted) throw abortError()
-    const digest = syncDefinitions(adapterFor(engine))
-    for (const host of this.hostsOf(engine)) {
-      if (!host.retired && host.agentsDigest !== digest) this.retire(host, "its agent definitions changed")
-    }
-    for (;;) {
-      const candidates = this.hostsOf(engine).filter((host) => !host.retired && host.agentsDigest === digest)
-      const shared = candidates.find((host) => host.shared())
-      if (shared) {
-        this.makeRoom(shared)
-        return shared
+    this.makeRoom()
+    const host = this.start(engine, agentName)
+    let onAbort = () => {}
+    const aborted = new Promise<never>((_, reject) => {
+      onAbort = () => reject(abortError())
+      signal?.addEventListener("abort", onAbort, { once: true })
+    })
+    aborted.catch(() => {})
+    try {
+      await Promise.race([host.ready, aborted])
+    } catch (error) {
+      if (isAbort(error) && !host.exited) {
+        console.log("[acp] the chat gave up the starting %s kiro-cli (pid %s); ending it", host.engine, host.conn.pid)
+        host.kill()
       }
-      const starting = candidates.find((host) => host.caps === null)
-      if (!starting) break
-      // A start of this engine is under way: it may turn out shared.
-      await this.wait(starting, signal)
+      throw error
+    } finally {
+      signal?.removeEventListener("abort", onAbort)
     }
-    if (!this.sharedEngines.has(engine)) this.makeSingleChatRoom()
-    const host = this.start(engine, agentName, { digest })
-    await this.wait(host, signal)
     return host
   }
 
   /**
-   * A connection for listing `engine`'s stored sessions: a live host of the engine (any
-   * definitions), else a new one. `release` kills a new host that cannot carry chats.
+   * A connection for listing `engine`'s stored sessions: a live kiro-cli of the engine, else a new
+   * one, which `release` kills once the listing is done.
    */
   async acquireForListing(engine: EngineId): Promise<{ request: SessionContext["request"]; caps: EngineCapabilities; release: () => void }> {
     const request = (host: Host): SessionContext["request"] => (method, params, requestOpts) => host.conn.request(method, params, requestOpts)
     const live = this.hostsOf(engine).find((host) => host.caps) ?? this.hostsOf(engine)[0]
     if (live) {
-      live.waiters++
-      try {
-        await live.ready
-      } finally {
-        live.waiters--
-      }
+      await live.ready
       return { request: request(live), caps: live.caps!, release: () => {} }
     }
     const host = await this.spawnHost(engine, LISTING_AGENT)
@@ -487,88 +453,33 @@ export class HostPool {
     return {
       request: request(host),
       caps: host.caps!,
-      release: () => { if (!host.shared() && host.sessions.size === 0) host.kill() },
+      release: () => { if (host.sessions.size === 0) host.kill() },
     }
-  }
-
-  /** A Settings switch: the hosts of `engine` take no new chats and end once they have none. */
-  retireEngine(engine: EngineId): void {
-    for (const host of this.hostsOf(engine)) this.retire(host, "the agent engine changed")
   }
 
   killAll(): void {
     for (const host of [...this.hosts]) host.kill()
   }
 
-  private retire(host: Host, why: string): void {
-    if (host.retired) return
-    host.retired = true
-    console.log("[acp] %s: the %s kiro-cli (pid %s) takes no new chats", why, host.engine, host.conn.pid)
-    if (host.sessions.size === 0 && host.waiters === 0) host.kill()
-  }
-
-  /** Start a kiro-cli; `synced`: the definitions were just synced, with this digest. */
-  private start(engine: EngineId, agentName: string, synced?: { digest: string }): Host {
-    this.endIdleRetired()
+  private start(engine: EngineId, agentName: string): Host {
     const adapter = adapterFor(engine)
-    const agentsDigest = synced ? synced.digest : syncDefinitions(adapter)
+    syncDefinitions(adapter)
     const config = readEngineConfig()
     const env = { ...process.env, ...config.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT }
     const conn = spawnAcp(config.command, [...config.commandArgs, ...adapter.spawnArgs(agentName)], { cwd: MCP_LOCAL_DIR, env })
-    const host = new Host(engine, conn, agentName, agentsDigest, env, this)
+    const host = new Host(engine, conn, agentName, env, this)
     this.hosts.add(host)
-    host.ready.then(() => {
-      if (host.shared()) this.sharedEngines.add(engine)
-      else this.sharedEngines.delete(engine)
-    }, () => {})
     return host
   }
 
-  /** Wait for a host's initialize as one of its waiters; the last waiter to give up kills a start with no session. */
-  private async wait(host: Host, signal: AbortSignal | undefined): Promise<void> {
-    if (signal?.aborted) throw abortError()
-    host.waiters++
-    let onAbort = () => {}
-    const aborted = new Promise<never>((_, reject) => {
-      onAbort = () => {
-        reject(abortError())
-      }
-      signal?.addEventListener("abort", onAbort, { once: true })
-    })
-    aborted.catch(() => {})
-    try {
-      await Promise.race([host.ready, aborted])
-    } finally {
-      signal?.removeEventListener("abort", onAbort)
-      host.waiters--
-      if (signal?.aborted && host.waiters === 0 && host.sessions.size === 0 && !host.exited) {
-        console.log("[acp] no chat waits for the starting %s kiro-cli (pid %s) any more; ending it", host.engine, host.conn.pid)
-        host.kill()
-      }
-    }
-  }
-
-  /** A shared host with MAX_CHATS_PER_SHARED_HOST chats: release the least recently active idle one. */
-  private makeRoom(host: Host): void {
-    const chats = host.chatSessions()
-    if (chats.length < MAX_CHATS_PER_SHARED_HOST) return
-    const idle = chats.filter((hs) => !hs.sink.busy()).sort((a, b) => a.sink.lastActivity() - b.sink.lastActivity())[0]
-    if (!idle) {
-      host.warnFull()
-      return
-    }
-    console.log("[acp] the %s kiro-cli carries %d chats; closing the least recently used idle one (session %s)", host.engine, chats.length, idle.sessionId)
-    void Promise.resolve(idle.sink.release()).catch((error: unknown) => console.warn("[acp] could not release session %s: %s", idle.sessionId, errorText(error)))
-  }
-
-  /** MAX_SINGLE_CHAT_HOSTS single-chat hosts with a chat: release the least recently active one whose chats are idle. */
-  private makeSingleChatRoom(): void {
-    const single = [...this.hosts].filter((host) => !host.exited && host.caps && !host.shared() && host.chatSessions().length > 0)
-    if (single.length < MAX_SINGLE_CHAT_HOSTS) return
+  /** MAX_CHAT_HOSTS kiro-cli processes with a chat: release the least recently active one whose sessions are idle. */
+  private makeRoom(): void {
+    const withChat = [...this.hosts].filter((host) => !host.exited && host.chatSessions().length > 0)
+    if (withChat.length < MAX_CHAT_HOSTS) return
     const lastActivity = (host: Host) => Math.max(...host.chatSessions().map((hs) => hs.sink.lastActivity()))
-    const oldest = single.filter((host) => !host.busy()).sort((a, b) => lastActivity(a) - lastActivity(b))[0]
+    const oldest = withChat.filter((host) => !host.busy()).sort((a, b) => lastActivity(a) - lastActivity(b))[0]
     if (!oldest) {
-      console.warn("[acp] %d kiro-cli processes with one chat each are all busy; starting one more", single.length)
+      console.warn("[acp] %d kiro-cli processes with a chat each are all busy; starting one more", withChat.length)
       return
     }
     for (const hs of oldest.chatSessions()) {
@@ -576,26 +487,15 @@ export class HostPool {
     }
     if (!oldest.exited) oldest.kill()
   }
-
-  /** Retired hosts whose chats are all idle end now (each chat released first). */
-  private endIdleRetired(): void {
-    for (const host of [...this.hosts]) {
-      if (!host.retired || host.exited || host.busy()) continue
-      for (const hs of host.chatSessions()) {
-        void Promise.resolve(hs.sink.release()).catch((error: unknown) => console.warn("[acp] could not release session %s: %s", hs.sessionId, errorText(error)))
-      }
-      if (!host.exited) host.kill()
-    }
-  }
 }
 
-/** Re-derive `.kiro/agents/` for `adapter`'s engine and return its digest (AgentStartError when it cannot). */
-function syncDefinitions(adapter: EngineAdapter): string {
-  // Re-derived before every placement (idempotent, all-or-nothing): a `git pull` that updates the
-  // catalog takes effect on the next new chat. An engine whose sub-agents follow the session's
+/** Re-derive `.kiro/agents/` for `adapter`'s engine (AgentStartError when it cannot). */
+function syncDefinitions(adapter: EngineAdapter): void {
+  // Re-derived before every kiro-cli start (idempotent, all-or-nothing): a `git pull` that updates
+  // the catalog takes effect on the next new chat. An engine whose sub-agents follow the session's
   // model gets no model in the composer's definition, so the composer runs on the chat's choice.
   try {
-    return syncToAgentsDir(undefined, undefined, { pinSubagentModel: !adapter.subagentsFollowSessionModel })
+    syncToAgentsDir(undefined, undefined, { pinSubagentModel: !adapter.subagentsFollowSessionModel })
   } catch (error) {
     console.error("[acp] agent definitions: %s", errorText(error))
     throw new AgentStartError("agent_start_failed", `agent definitions: ${errorText(error)}`)

@@ -2,30 +2,30 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * The Local chat registry: the API the routes use to reach chats (chat.ts), which run on the
- * kiro-cli processes of the host pool (hosts.ts). Switching decks does not interrupt a running
- * chat; a V3 kiro-cli carries every chat of its engine, a V2 kiro-cli one chat.
+ * kiro-cli processes of the host pool (hosts.ts), one kiro-cli per chat. Switching decks does not
+ * interrupt a running chat.
  *
  * - **Ids.** `aliases` holds every id a client may use for a chat: its client ids (the invoke's
  *   `sessionId`, a deck's fallback id, a fork's id) and its current kiro session id (the one saved
  *   to a deck's `.session`). A chat for a kiro session is found by either before anything is
  *   opened, so a kiro session is open in at most one chat (a second tab or a reopened deck reuses
  *   it). `register` is the only writer, `releaseChat` the only remover.
- * - **Placement.** A new chat, a reopened deck, a fork: the pool places the chat on a host of the
- *   configured engine (`acquireForChat`) and opens its session there. An open that fails reports
+ * - **Placement.** A new chat, a reopened deck, a fork: the pool starts a kiro-cli of the configured
+ *   engine for it (`acquireForChat`) and the chat opens its session there. An open that fails reports
  *   AgentStartError, AgentTimeoutError or SessionLockedError (a session another kiro-cli outside
  *   this server holds), and registers nothing.
- * - **Release.** `releaseChat` is the one way out: the chat's ids are forgotten, its session is
- *   closed on a shared host, its single-chat host is killed. The pool releases idle chats for its
- *   caps; an engine switch releases idle deck-bound chats of the other engine (a busy one when its
- *   period ends); a single-chat host that opened composer sessions ends once its chat is idle. A
+ * - **Release.** `releaseChat` is the one way out: the chat's ids are forgotten and its kiro-cli
+ *   is killed. The pool releases the least recently active idle chat for its cap; an engine switch
+ *   releases idle deck-bound chats of the other engine (a busy one when its period ends); a
+ *   kiro-cli that opened composer sessions it cannot close ends once its chat is idle. A busy chat
+ *   is never released. A
  *   chat that is released, or whose kiro-cli exited, is remembered as an orphan: the next message
  *   of its client id opens its kiro session again.
  * - **Carry-over.** Texts for the agent a chat could not deliver (after Stop, after an exit) wait
  *   under the kiro session and go before the user's text of its next prompt.
  * - **Stop during start.** A start (an invoke opening its chat and sending its prompt) registers
  *   under its client id (`beginStart`) before anything is opened, so Stop (`cancelSession`, also a
- *   POST from another tab) aborts it: the pool kills a kiro-cli no other chat waits for, a session
- *   opened on a kiro-cli other chats use is ended once kiro-cli answered, and no prompt is sent.
+ *   POST from another tab) aborts it: the pool kills the starting kiro-cli, and no prompt is sent.
  * - **Unseen periods.** A work period whose end no stream wrote (its tab was closed) is replayed
  *   once by `/api/agent/stream` (`openStream`), also after its chat was released: `releaseChat`
  *   keeps it under every id of the chat (at most MAX_UNSEEN_PERIODS). It counts as seen once a
@@ -36,7 +36,7 @@
  *   kiro-cli could not read, or an open that fails or is cancelled once the fork exists, is deleted
  *   through that session (`discardFork`), never anything else.
  * - **Listing** the stored sessions (`withEngineConnection`) uses a live kiro-cli of the engine,
- *   else the pool starts one (kept when it can carry chats).
+ *   else the pool starts one for the listing.
  * - **Models.** Each chat chooses its kiro session's model and effort (`chooseSessionModel`). An
  *   idle chat changes them at once (the engine's setModel, one change at a time); otherwise the
  *   choice waits under the chat's client id and is applied right before its next session/prompt,
@@ -46,7 +46,7 @@
  */
 import { DECK_ROOT } from "./deck-paths"
 import type { EngineCapabilities, EngineId, LoadOutcome, ModelChoice, ModelOption, StoreContext } from "./acp/engine"
-import { ENGINE_IDS, readEngineConfig } from "./acp/engine-config"
+import { readEngineConfig } from "./acp/engine-config"
 import { readModelCache, writeModelCache } from "./acp/model-cache"
 import { Chat, type ChatHooks, type EventListener, type Period } from "./chat"
 import type { BufferedEvent } from "./conversation/events"
@@ -176,9 +176,8 @@ function register(chat: Chat, clientId: string): void {
 }
 
 /**
- * The only way out of the registry: forget every id of the chat and its pending origin, close
- * its session on a shared host, kill its single-chat host. `remember`: its client ids reopen its
- * kiro session on their next message.
+ * The only way out of the registry: forget every id of the chat and its pending origin, and kill
+ * its kiro-cli. `remember`: its client ids reopen its kiro session on their next message.
  */
 function releaseChat(chat: Chat, opts: { remember: boolean }): void {
   if (chat.released) return
@@ -189,23 +188,21 @@ function releaseChat(chat: Chat, opts: { remember: boolean }): void {
   if (chat.lastPeriod && !chat.lastPeriod.seen) keepUnseen(chat.lastPeriod, idsOf(chat))
   for (const [id, candidate] of aliases) if (candidate === chat) aliases.delete(id)
   pendingOrigins.delete(chat.clientId)
-  const host = chat.hs.host
-  if (host.shared() && !host.exited) {
-    void chat.hs.close().catch((error: unknown) => console.warn("[acp] could not close session %s: %s", chat.sessionId, errorText(error)))
-  } else {
-    chat.hs.drop()
-    if (!host.exited) host.kill()
-  }
+  endHost(chat)
 }
 
-/** A chat whose fork is deleted: forgotten, its session dropped, its kiro-cli killed when nothing else uses it. */
+/** A chat whose fork is deleted: forgotten, and its kiro-cli killed. */
 function dropChat(chat: Chat): void {
   chat.released = true
   for (const [id, candidate] of aliases) if (candidate === chat) aliases.delete(id)
   pendingOrigins.delete(chat.clientId)
+  endHost(chat)
+}
+
+function endHost(chat: Chat): void {
   const host = chat.hs.host
   chat.hs.drop()
-  if (!host.exited && (!host.shared() || host.sessions.size === 0)) host.kill()
+  if (!host.exited) host.kill()
 }
 
 /** The release checks once a period's end was written to its listeners. */
@@ -220,7 +217,7 @@ function onPeriodEnd(chat: Chat): void {
     return
   }
   // A kiro-cli that cannot close sessions keeps the composer sessions it opened: end it once idle.
-  if (!host.shared() && host.auxOpened > 0 && !chat.busy()) {
+  if (!host.canClose() && host.auxOpened > 0 && !chat.busy()) {
     console.log("[acp] sessionId=%s: ending its kiro-cli, which holds composer sessions it cannot close", chat.sessionId)
     releaseChat(chat, { remember: true })
   }
@@ -325,12 +322,10 @@ export function terminateProcess(sessionId: string): void {
 }
 
 /**
- * A Settings switch to `engine`: the kiro-cli processes of the other engines take no new chats,
- * and their idle deck-bound chats are released now (the deck's next message opens its session on
- * `engine`); a busy one is released when its period ends.
+ * A Settings switch to `engine`: the idle deck-bound chats of other engines are released now (the
+ * deck's next message opens its session on `engine`); a busy one is released when its period ends.
  */
 export function terminateIdleProcesses(engine: EngineId): void {
-  for (const other of ENGINE_IDS) if (other !== engine) pool.retireEngine(other)
   for (const chat of chats()) {
     if (chat.engine === engine || !chat.deckBound || chat.busy()) continue
     console.log("[acp] sessionId=%s: the agent engine is now %s; ending the deck's %s chat", chat.sessionId, engine, chat.engine)

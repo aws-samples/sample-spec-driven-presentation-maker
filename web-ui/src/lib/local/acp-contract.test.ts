@@ -546,7 +546,7 @@ describe("kiro-cli 3.1.0 V3, list and fork", () => {
   const V2_SOURCE = "ad46389c-6f86-48b2-a234-ebb9b023bd11"
   const V2_FORK = "sess_96ed2eff-562a-4aad-ac31-73e2202d860f"
 
-  it("lists V3's sessions through a kiro-cli the pool starts, which stays (it can carry chats)", async () => {
+  it("lists V3's sessions through a short-lived kiro-cli, killed afterwards", async () => {
     replay("v3", fixture31("v3-list"))
     const { adapterFor } = await import("./acp/engine")
     const sessions = await acp.withEngineConnection("v3", (connect) => adapterFor("v3").listStoredSessions({ env: process.env, connect }))
@@ -556,7 +556,7 @@ describe("kiro-cli 3.1.0 V3, list and fork", () => {
     }])
     await new Promise((r) => setImmediate(r))
     expect(children[0].requests).toEqual(["initialize", "session/list"])
-    expect(children[0].killed).toBe(false)
+    expect(children[0].killed).toBe(true)
     expect(acp.hasProcess(V3_SOURCE)).toBe(false)
   })
 
@@ -680,7 +680,8 @@ describe("kiro-cli 3.1.0 several sessions in one process", () => {
     try {
       const hosts = await import("./hosts")
       const host = await hosts.pool.acquireForChat(engine, "sdpm-orchestrator")
-      const sinks = [recordingSink("chat"), recordingSink("chat"), recordingSink("aux")]
+      // One chat and two sessions next to it (as a compose run's would be) on the chat's kiro-cli.
+      const sinks = [recordingSink("chat"), recordingSink("aux"), recordingSink("aux")]
       const opened = []
       for (const [i, agent] of ["sdpm-orchestrator", "sdpm-orchestrator", "sdpm-composer"].entries()) {
         opened.push((await host.openSession(agent, { kind: "new" }, { sink: sinks[i].sink })).hs)

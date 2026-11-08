@@ -82,7 +82,7 @@ npm run dev:local
 
 ### 動作の仕組み
 
-`NEXT_PUBLIC_MODE=local` が設定されると、`src/app/api/` 以下の Next.js API Routes が有効になり、`kiro-cli acp --agent-engine v3` を 1 つ子プロセスとして起動し、すべてのチャットをその中のセッションとして、それぞれのエージェントのモード（デッキは `sdpm-orchestrator`）で動かします（kiro-cli 3.0 以降）。V2 エンジンではチャットごとに kiro-cli を 1 つ起動します。正規の Agent 定義は [`servers/local/.kiro/acp-agents/`](../servers/local/.kiro/acp-agents/) に、MCP ツールは [`servers/local/server_acp.py`](../servers/local/server_acp.py) に格納されています。新しいチャットを始めるたびに、これらから `servers/local/.kiro/agents/` を kiro-cli の両方のエンジンが読める形で生成し直し、変更がなければそのままにします。
+`NEXT_PUBLIC_MODE=local` が設定されると、`src/app/api/` 以下の Next.js API Routes が有効になり、アクティブなチャットごとに `kiro-cli acp --agent-engine v3` を子プロセスとして起動し、セッションをそのエージェントのモード（デッキは `sdpm-orchestrator`）で始めます（kiro-cli 3.0 以降）。正規の Agent 定義は [`servers/local/.kiro/acp-agents/`](../servers/local/.kiro/acp-agents/) に、MCP ツールは [`servers/local/server_acp.py`](../servers/local/server_acp.py) に格納されています。新しいチャットを始めるたびに、これらから `servers/local/.kiro/agents/` を kiro-cli の両方のエンジンが読める形で生成し直し、変更がなければそのままにします。
 
 kiro-cli の V2 エンジン（`kiro-cli acp --agent sdpm-orchestrator`）で動かすには、Settings → **エージェントエンジン** で V2 を選ぶか、`servers/local/.sdpm/acp-config.json` に `{"version": 2, "engine": "v2"}` と書きます。選択は次のメッセージから反映されます。
 

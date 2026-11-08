@@ -5,23 +5,22 @@
  * The chat registry: a new chat is reachable under the client id (C) and its kiro session id (K,
  * what the deck's `.session` stores); a release drops every id of a chat; a deck's saved kiro
  * session is opened (or its live chat reused) under the client's id too, and only ids the chat
- * holds are kept; V3 chats are sessions of one kiro-cli (the ninth closes the least recently
- * active idle one, never a busy one, and it reopens its session on its next message), V2 chats
- * get one kiro-cli each (the fourth ends the least recently active idle one); a start that fails
+ * holds are kept; every chat gets a kiro-cli of its own, on V3 as on V2 (the fourth ends the least
+ * recently active idle one, never a busy one, and it reopens its session on its next message); a
+ * start that fails
  * (another mode, a failed sdpm server, no sign-in, an early exit) registers nothing; the
  * configured engine starts kiro-cli (V3 without acp-config.json), and an engine switch ends the
  * idle deck chats of the other engine (a busy one at the end of its period) and keeps chats
- * without a deck; a V2 kiro-cli that opened a composer session ends once its chat is idle; changed
- * agent definitions give the next chat a new kiro-cli; a deck's `.session-engine` tells when its
+ * without a deck; a V2 kiro-cli that opened a composer session ends once its chat is idle; a deck's
+ * `.session-engine` tells when its
  * session also ran on the other engine; a prompt to a chat still answering is refused; kiro-cli's
  * own requests are answered (permissions by option kind, the rest with Method not found) and
  * never taken for answers; setup requests time out and follow the caller's abort. A deck a tool
  * result names gets the session's `.session` (and a fork's origin) once, with or without a
  * listener; a released chat drops its pending origin. A fork cancelled once it exists is deleted
- * before its kiro-cli is killed, and a V3 fork is made and discarded on the shared kiro-cli;
- * listing the stored sessions uses a live kiro-cli of the engine, else one the pool starts (V3's
- * stays for the next chat; V2 needs none). A chat's model and effort change at once on an idle
- * chat (V3 set_config_option, V2 set_model), per session on a shared kiro-cli, or are held and
+ * before its kiro-cli is killed; listing the stored sessions uses a live kiro-cli of the engine,
+ * else a short-lived one (V2 needs none). A chat's model and effort change at once on an idle
+ * chat (V3 set_config_option, V2 set_model), or are held and
  * sent right before the next session/prompt; a choice outside the offered models and levels is
  * refused; the reported list is kept in acp-models.json and listed without a kiro-cli; V3 leaves
  * the composer's model out of its definition. The work period, turns and steers are chat.test.ts's.
@@ -646,7 +645,7 @@ describe("forks and listing", () => {
     expect(children[0].requests.at(-1)?.method).toBe("session/list")
   })
 
-  it("otherwise starts a V3 kiro-cli in servers/local for the listing and keeps it for the next chat, and none when not asked", async () => {
+  it("otherwise lists through a short-lived kiro-cli in servers/local that is killed afterwards, and none when not asked", async () => {
     useEngine("v2")
     await acp.createNewProcessFor("C1")
     const log = vi.spyOn(console, "log").mockImplementation(() => {})
@@ -659,13 +658,8 @@ describe("forks and listing", () => {
       expect(spawn.mock.calls[1][1]).toEqual(["acp", "--agent-engine", "v3"])
       expect(spawn.mock.calls[1][2]).toMatchObject({ cwd: expect.stringMatching(/servers[\\/]local$/) })
       expect(children[1].requests.map((r) => r.method)).toEqual(["initialize", "session/list"])
-      // It can carry chats (session/close), so it stays: the next V3 chat starts nothing.
-      expect(children[1].killed).toBe(false)
+      expect(children[1].killed).toBe(true)
       expect(children[0].killed).toBe(false)
-      useEngine("v3")
-      await acp.createNewProcessFor("C2")
-      expect(spawn).toHaveBeenCalledTimes(2)
-      expect(children[1].requests.at(-1)?.method).toBe("session/new")
     } finally {
       log.mockRestore()
     }
@@ -722,10 +716,8 @@ describe("models", () => {
     expect((await acp.chooseSessionModel("N1", { model: "m-plain" })).pending).toEqual({ model: "m-plain" })
     await acp.chooseSessionModel("N1", { model: "m-effort", effort: "low" })
 
-    // The new chat is a second session on the same V3 kiro-cli.
     await acp.createNewProcessFor("N1")
-    const child = children[0]
-    expect(spawn).toHaveBeenCalledTimes(1)
+    const child = children[1]
     const opened = child.requests.length
     expect(methods(child)).not.toContain("session/set_config_option")
     const prompted = await acp.sendPrompt("N1", "hello")
@@ -815,41 +807,26 @@ describe("models", () => {
   })
 })
 
-describe("one kiro-cli for every V3 chat", () => {
+describe("one kiro-cli per chat", () => {
   const log = () => vi.spyOn(console, "log").mockImplementation(() => {})
-  const makeDeck = (deckId: string) => fs.mkdirSync(path.join(deckRoot, deckId)) // nosemgrep: path-join-resolve-traversal — constant deck id in a tmpdir
-
-  /** One turn of a chat on `child`'s session `sessionId`, answered. */
-  async function turn(clientId: string, child: FakeChild, sessionId: string) {
-    const prompted = await acp.sendPrompt(clientId, "hello")
-    prompted.send()
-    await settle()
-    child.endTurn("end_turn", sessionId)
-    await settle()
-  }
 
   beforeEach(() => useEngine("v3"))
 
-  it("opens V3 chats as sessions of one kiro-cli, V2 chats in one kiro-cli each", async () => {
+  it("gives V3 chats a kiro-cli each, as V2's", async () => {
     const a = await acp.createNewProcessFor("C1")
     const b = await acp.createNewProcessFor("C2")
-    expect(spawn).toHaveBeenCalledTimes(1)
-    expect([a.chat.sessionId, b.chat.sessionId]).toEqual(["K1", "K1-2"])
-    expect(children[0].requests.filter((r) => r.method === "session/new")).toHaveLength(2)
-    expect(acp.getCapabilities("C2")?.session.close).toBe(true)
-    useEngine("v2")
-    await acp.createNewProcessFor("C3")
-    await acp.createNewProcessFor("C4")
-    expect(spawn).toHaveBeenCalledTimes(3)
+    expect(spawn).toHaveBeenCalledTimes(2)
+    expect(a.chat.hs.host).not.toBe(b.chat.hs.host)
+    expect([a.chat.sessionId, b.chat.sessionId]).toEqual(["K1", "K2"])
   })
 
-  it("closes the least recently active idle chat for the ninth, never a busy one", async () => {
+  it("ends the least recently active idle V3 chat for a fourth, never a busy one, and reopens its session on its next message", async () => {
     const restore = log()
     vi.useFakeTimers({ toFake: ["Date"] })
     try {
       // After the fake kiro-cli's sessions were created (2026-01-01), so a load counts as resumed.
       const at = Date.parse("2026-11-08T00:00:00.000Z")
-      for (let i = 1; i <= 8; i++) {
+      for (let i = 1; i <= 3; i++) {
         vi.setSystemTime(at + 1000 * i)
         await acp.createNewProcessFor(`C${i}`)
       }
@@ -858,52 +835,20 @@ describe("one kiro-cli for every V3 chat", () => {
       busy.send()
       await settle()
       vi.setSystemTime(at + 10_000)
-      await acp.createNewProcessFor("C9")
-      await settle()
-      expect(children[0].closed).toEqual(["K1-2"])
+      await acp.createNewProcessFor("C4")
+      expect(children.map((c) => c.killed)).toEqual([false, true, false, false])
       expect(acp.hasProcess("C2")).toBe(false)
-      expect(acp.hasProcess("K1-2")).toBe(false)
       expect(acp.isSessionRunning("C1")).toBe(true)
-      children[0].endTurn("end_turn", "K1")
+      children[0].endTurn()
       await settle()
       expect(acp.getBufferedEvents("C1").at(-1)?.event).toMatchObject({ kind: "end", stopReason: "end_turn" })
 
-      // C2's next message opens its kiro session again on the same kiro-cli.
+      // C2's next message opens its kiro session again in a new kiro-cli.
       const reopened = await acp.createNewProcessFor("C2")
       expect(reopened).toMatchObject({ resumed: true })
-      expect(children[0].requests.at(-1)).toMatchObject({ method: "session/load", params: { sessionId: "K1-2" } })
-      expect(spawn).toHaveBeenCalledTimes(1)
+      expect(children.at(-1)!.requests.at(-1)).toMatchObject({ method: "session/load", params: { sessionId: "K2" } })
     } finally {
       vi.useRealTimers()
-      restore.mockRestore()
-    }
-  })
-
-  it("after an engine switch, closes the idle deck chats of the other engine at once and a busy one at its period end, and keeps a chat without a deck", async () => {
-    const restore = log()
-    try {
-      makeDeck("d1")
-      makeDeck("d2")
-      await acp.openDeckSession("C1", "d1", "K9", "sdpm-orchestrator")
-      await acp.openDeckSession("C2", "d2", "K8", "sdpm-orchestrator")
-      await acp.createNewProcessFor("C3")
-      const running = await acp.sendPrompt("C1", "build")
-      running.send()
-      await settle()
-      useEngine("v2")
-      acp.terminateIdleProcesses("v2")
-      expect(children[0].closed).toEqual(["K8"])
-      expect(acp.hasProcess("C1")).toBe(true)
-      children[0].endTurn("end_turn", "K9")
-      await settle()
-      expect(children[0].closed).toEqual(["K8", "K9"])
-      expect(acp.hasProcess("C1")).toBe(false)
-      expect(acp.hasProcess("C3")).toBe(true)
-      expect(children[0].killed).toBe(false)
-      // The deck's next message opens its session on V2.
-      expect((await acp.openDeckSession("C1", "d1", "K9", "sdpm-orchestrator")).chat.engine).toBe("v2")
-      expect(spawn).toHaveBeenCalledTimes(2)
-    } finally {
       restore.mockRestore()
     }
   })
@@ -923,53 +868,6 @@ describe("one kiro-cli for every V3 chat", () => {
       await settle()
       expect(children[0].killed).toBe(true)
       expect(acp.hasProcess("C1")).toBe(false)
-    } finally {
-      restore.mockRestore()
-    }
-  })
-
-  it("keeps each chat's own model on one kiro-cli", async () => {
-    await acp.createNewProcessFor("C1")
-    await acp.createNewProcessFor("C2")
-    await acp.chooseSessionModel("C1", { model: "m-plain" })
-    await acp.chooseSessionModel("C2", { model: "m-effort", effort: "high" })
-    expect(acp.getSessionModels("C1").current).toMatchObject({ model: "m-plain", effort: null })
-    expect(acp.getSessionModels("C2").current).toMatchObject({ model: "m-effort", effort: "high" })
-    expect(children[0].model("K1")).toBe("m-plain")
-    expect(children[0].model("K1-2")).toBe("m-effort")
-    await turn("C1", children[0], "K1")
-    expect(acp.getSessionModels("C1").current?.model).toBe("m-plain")
-  })
-
-  it("starts a new kiro-cli once the agent definitions changed, and ends the old idle one at that start", async () => {
-    const restore = log()
-    try {
-      const { syncToAgentsDir } = await import("./agents-sync")
-      await acp.createNewProcessFor("C1")
-      vi.mocked(syncToAgentsDir).mockReturnValue("d1")
-      await acp.createNewProcessFor("C2")
-      expect(spawn).toHaveBeenCalledTimes(2)
-      expect(children[0].killed).toBe(true)
-      expect(acp.hasProcess("C1")).toBe(false)
-      // C1's next message opens its kiro session on the new kiro-cli.
-      expect(await acp.createNewProcessFor("C1")).toMatchObject({ resumed: true })
-      expect(children[1].requests.at(-1)).toMatchObject({ method: "session/load", params: { sessionId: "K1" } })
-    } finally {
-      restore.mockRestore()
-    }
-  })
-
-  it("forks on the shared kiro-cli and discards a fork there without ending it", async () => {
-    const restore = log()
-    try {
-      await acp.createNewProcessFor("C1")
-      const { sessionId } = await acp.forkSession("sess_src", "sdpm-orchestrator")
-      expect(spawn).toHaveBeenCalledTimes(1)
-      expect(children[0].requests.map((r) => r.method).slice(-2)).toEqual(["session/fork", "session/load"])
-      await acp.discardForkedSession(sessionId)
-      expect(children[0].deleted).toEqual(["F1"])
-      expect(children[0].killed).toBe(false)
-      expect(acp.hasProcess("C1")).toBe(true)
     } finally {
       restore.mockRestore()
     }
@@ -1043,7 +941,7 @@ describe("unseen periods", () => {
     expect(await stream("C1")).toBeNull()
   })
 
-  it("replays it after the chat was released: V2 recycling, an LRU close on V3, a kiro-cli exit", async () => {
+  it("replays it after the chat was released: V2 recycling, the cap on V3, a kiro-cli exit", async () => {
     const restore = quiet()
     try {
       // V2: the kiro-cli that opened a composer session ends at the period's end.
@@ -1055,21 +953,21 @@ describe("unseen periods", () => {
       expect(texts(await stream("C1"))).toEqual(["recycled"])
       expect(await stream("K1")).toBeNull()
 
-      // V3: the ninth chat closes the least recently active idle one.
+      // V3: the fourth chat ends the least recently active idle one.
       useEngine("v3")
       await acp.createNewProcessFor("L1")
-      const shared = children[1]
-      await unreadPeriod("L1", shared, "K2", "closed by LRU")
-      for (let i = 2; i <= 9; i++) await acp.createNewProcessFor(`L${i}`)
+      await unreadPeriod("L1", children[1], "K2", "ended by the cap")
+      for (let i = 2; i <= 4; i++) await acp.createNewProcessFor(`L${i}`)
       await settle()
-      expect(shared.closed).toContain("K2")
-      expect(texts(await stream("K2"))).toEqual(["closed by LRU"])
+      expect(children[1].killed).toBe(true)
+      expect(texts(await stream("K2"))).toEqual(["ended by the cap"])
 
       // An exit.
-      await unreadPeriod("L9", shared, "K2-9", "before the exit")
-      shared.kill()
+      const last = children.at(-1)!
+      await unreadPeriod("L4", last, "K5", "before the exit")
+      last.kill()
       await settle()
-      expect(texts(await stream("L9"))).toEqual(["before the exit"])
+      expect(texts(await stream("L4"))).toEqual(["before the exit"])
     } finally {
       restore.mockRestore()
     }
@@ -1125,34 +1023,6 @@ describe("Stop during start", () => {
     expect(children[0].killed).toBe(true)
     expect(promptsSent(children[0])).toEqual([])
     expect(acp.hasProcess("C1")).toBe(false)
-  })
-
-  it("deletes a session a warm V3 kiro-cli opened for a stopped start once kiro-cli answered, and keeps the other chat", async () => {
-    const restore = vi.spyOn(console, "log").mockImplementation(() => {})
-    try {
-      useEngine("v3")
-      await acp.createNewProcessFor("C0")
-      const child = children[0]
-      child.silent.add("session/new")
-      const start = acp.beginStart("C1")
-      const pending = acp.createNewProcessFor("C1", "sdpm-orchestrator", { signal: start.signal }).catch((e: unknown) => e)
-      await settle()
-      acp.cancelSession("C1")
-      await settle()
-      const request = child.requests.filter((r) => r.method === "session/new").at(-1)!
-      child.send({ method: "_kiro/mcp/status", params: { sessionId: "K1-2", servers: [{ name: "sdpm", status: "connected" }] } })
-      child.send({ id: request.id, result: { sessionId: "K1-2", modes: { currentModeId: "sdpm-orchestrator", availableModes: [] } } })
-      expect(await pending).toMatchObject({ name: "AbortError" })
-      start.end()
-      await settle()
-      expect(child.deleted).toEqual(["K1-2"])
-      expect(child.killed).toBe(false)
-      expect(acp.hasProcess("C0")).toBe(true)
-      expect(acp.hasProcess("C1")).toBe(false)
-      expect(promptsSent(child)).toEqual([])
-    } finally {
-      restore.mockRestore()
-    }
   })
 
   it("sends no prompt when Stop comes after the chat opened, before its period", async () => {

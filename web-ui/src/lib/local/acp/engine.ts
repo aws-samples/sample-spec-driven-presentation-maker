@@ -31,7 +31,7 @@ export type { EngineId }
 export interface EngineCapabilities {
   /**
    * initialize's `agentCapabilities.sessionCapabilities` (V3: list, close, delete, fork; V2: none).
-   * `close` makes a kiro-cli a shared host (hosts.ts): it carries every chat of its engine.
+   * `close`: one session can be ended and the kiro-cli's others kept (hosts.ts `HostSession.close`).
    */
   session: { list: boolean; close: boolean; delete: boolean; fork: boolean }
   /** The engine marks replayed updates; without it, updates before the load's answer are the replay. */

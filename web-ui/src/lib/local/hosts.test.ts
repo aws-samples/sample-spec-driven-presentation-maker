@@ -2,14 +2,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * The host pool: V3 chats share one kiro-cli (its initialize advertises session/close), V2 chats
- * get one each; each line reaches only its own session's sink, and its MCP state is recorded once
- * per line, also before a session knows its id (V2); a V2 session of another agent is switched to
- * its mode; the caps release the least recently active idle chat and never a busy one; a start
- * every waiting chat gave up is killed, a warm open given up ends its session after kiro-cli
- * answered; changed definitions retire a host; a listing's shared host stays for the next chat
- * and carries the chat environment, a V2 one is killed; a host exit reaches every sink; a steer
- * kiro-cli does not implement is refused once and never sent again.
+ * The host pool: every chat gets a kiro-cli of its own, on V3 and V2 (kiro-cli's V3 agent server
+ * runs one turn at a time per process); a composer session joins its chat's kiro-cli; each line
+ * reaches only its own session's sink, and its MCP state is recorded once per line, also before a
+ * session knows its id (V2); a V2 session of another agent is switched to its mode; the cap
+ * releases the least recently active idle chat and never a busy one; a start its chat gave up is
+ * killed, an open given up next to another session ends that session after kiro-cli answered; a
+ * listing's kiro-cli carries the chat environment and is killed when the listing is done; a host
+ * exit reaches every sink; a steer kiro-cli does not implement is refused once and never sent again.
  * kiro-cli is replaced by the fake child (src/test/fakeKiro.ts).
  */
 
@@ -47,9 +47,7 @@ class Sink implements SessionSink {
   lastActivity() { return this.at }
   release() {
     this.released++
-    const hs = this.hs!
-    void hs.close().catch(() => {})
-    if (!hs.host.shared()) hs.host.kill()
+    this.hs!.drop()
   }
   texts() { return this.events.flatMap((e) => (e.type === "text" ? [e.text] : [])) }
 }
@@ -89,42 +87,23 @@ async function open(engine: "v2" | "v3", sink: Sink = new Sink(), agentName = "s
   return { host, hs, sink }
 }
 
-/** The initialize answer a fake child of `engine` would give. */
-function initializeAnswer(child: FakeChild) {
-  const id = child.requests.find((r) => r.method === "initialize")!.id
-  child.send({ id, result: { protocolVersion: 1, agentCapabilities: { sessionCapabilities: child.engine === "v3" ? { list: {}, close: {}, delete: {}, fork: {} } : {} } } })
-}
-
 describe("placement", () => {
-  it("places two V3 chats on one kiro-cli, two sessions", async () => {
-    const a = await open("v3")
-    const b = await open("v3")
-    expect(spawn).toHaveBeenCalledTimes(1)
-    expect(a.host).toBe(b.host)
-    expect(a.host.shared()).toBe(true)
-    expect([a.hs.sessionId, b.hs.sessionId]).toEqual(["K1", "K1-2"])
-    expect(children[0].requests.filter((r) => r.method === "session/new")).toHaveLength(2)
-  })
-
-  it("gives each V2 chat its own kiro-cli", async () => {
-    const a = await open("v2")
-    const b = await open("v2")
+  it.each(["v3", "v2"] as const)("gives each %s chat its own kiro-cli", async (engine) => {
+    const a = await open(engine)
+    const b = await open(engine)
     expect(spawn).toHaveBeenCalledTimes(2)
     expect(a.host).not.toBe(b.host)
-    expect(a.host.shared()).toBe(false)
-  })
-
-  it("waits for a start of the engine and then places the chat on it when it is shared", async () => {
-    const [a, b] = await Promise.all([open("v3"), open("v3")])
-    expect(spawn).toHaveBeenCalledTimes(1)
-    expect(a.host).toBe(b.host)
+    expect([a.hs.sessionId, b.hs.sessionId]).toEqual(["K1", "K2"])
+    expect(a.host.canClose()).toBe(engine === "v3")
   })
 })
 
 describe("routing", () => {
   it("hands each session's lines only to its own sink, and records each MCP line once", async () => {
     const a = await open("v3")
-    const b = await open("v3")
+    const composer = new Sink("aux")
+    const { hs } = await a.host.openSession("sdpm-composer", { kind: "new" }, { sink: composer })
+    expect(hs.sessionId).toBe("K1-2")
     const apply = vi.spyOn(a.host.mcp, "apply")
     const child = children[0]
     child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "to A" } })
@@ -133,19 +112,19 @@ describe("routing", () => {
     child.send({ method: "_kiro/mcp/status", params: { sessionId: "K1-2", servers: [{ name: "sdpm", status: "connected" }] } })
     await settle()
     expect(a.sink.texts()).toEqual(["to A", " again"])
-    expect(b.sink.texts()).toEqual(["to B"])
+    expect(composer.texts()).toEqual(["to B"])
     expect(apply.mock.calls.map((call) => call[0])).toEqual([
       { type: "mcp_snapshot", sessionId: "K1-2" },
       { type: "mcp_status", sessionId: "K1-2", server: "sdpm", state: "connected" },
     ])
-    expect([...a.sink.events, ...b.sink.events].some((e) => e.type === "mcp_status" || e.type === "mcp_snapshot")).toBe(false)
+    expect([...a.sink.events, ...composer.events].some((e) => e.type === "mcp_status" || e.type === "mcp_snapshot")).toBe(false)
+    expect(spawn).toHaveBeenCalledTimes(1)
   })
 
   it("V2: counts server_initialized sent before the session/new answer, without waiting for the MCP timeout", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout"] })
-    const opened = open("v2")
     // The fake sends server_initialized ahead of the answer; no timer has to fire.
-    const { hs } = await opened
+    const { hs } = await open("v2")
     expect(hs.sessionId).toBe("K1")
   })
 
@@ -161,81 +140,58 @@ describe("routing", () => {
   })
 })
 
-describe("caps", () => {
-  it("releases the least recently active idle chat for the ninth on a V3 kiro-cli, never a busy one", async () => {
-    const sinks: Sink[] = []
-    for (let i = 0; i < 8; i++) {
-      const sink = new Sink()
-      sink.at = 100 + i
-      sinks.push(sink)
-      await open("v3", sink)
-    }
+describe("cap", () => {
+  it.each(["v3", "v2"] as const)("kills the least recently active idle %s kiro-cli for a fourth chat, never a busy one", async (engine) => {
+    const sinks = [new Sink(), new Sink(), new Sink()]
+    sinks.forEach((sink, i) => { sink.at = 100 + i })
+    for (const sink of sinks) await open(engine, sink)
     sinks[0].isBusy = true
-    await open("v3")
-    await settle()
-    expect(sinks.map((s) => s.released)).toEqual([0, 1, 0, 0, 0, 0, 0, 0])
-    expect(children[0].closed).toEqual(["K1-2"])
-    expect(spawn).toHaveBeenCalledTimes(1)
+    await open(engine)
+    expect(children.map((c) => c.killed)).toEqual([false, true, false, false])
+    expect(sinks.map((s) => s.released)).toEqual([0, 1, 0])
   })
 
-  it("goes over the cap with one warning when every chat on the V3 kiro-cli is busy", async () => {
+  it("goes over the cap with a warning when every chat is busy", async () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
     try {
-      const sinks: Sink[] = []
-      for (let i = 0; i < 8; i++) {
+      for (let i = 0; i < 3; i++) {
         const sink = new Sink()
         sink.isBusy = true
-        sinks.push(sink)
         await open("v3", sink)
       }
-      const ninth = new Sink()
-      ninth.isBusy = true
-      await open("v3", ninth)
       await open("v3")
-      expect(sinks.every((s) => s.released === 0)).toBe(true)
-      expect(children[0].closed).toEqual([])
-      expect(warn.mock.calls.filter((call) => String(call[0]).includes("busy chats"))).toHaveLength(1)
+      expect(children.map((c) => c.killed)).toEqual([false, false, false, false])
+      expect(warn.mock.calls.filter((call) => String(call[0]).includes("all busy"))).toHaveLength(1)
     } finally {
       warn.mockRestore()
     }
   })
 
-  it("kills the least recently active idle V2 kiro-cli for a fourth chat, never a busy one", async () => {
-    const sinks = [new Sink(), new Sink(), new Sink()]
-    sinks.forEach((sink, i) => { sink.at = 100 + i })
-    for (const sink of sinks) await open("v2", sink)
-    sinks[0].isBusy = true
-    await open("v2")
-    expect(children.map((c) => c.killed)).toEqual([false, true, false, false])
-    expect(sinks.map((s) => s.released)).toEqual([0, 1, 0])
+  it("does not count a listing's kiro-cli, which has no chat", async () => {
+    const log = vi.spyOn(console, "log").mockImplementation(() => {})
+    try {
+      nextSetup = null
+      await hosts.pool.acquireForListing("v2")
+      for (let i = 0; i < 3; i++) await open("v2")
+      expect(children.slice(1).map((c) => c.killed)).toEqual([false, false, false])
+    } finally {
+      log.mockRestore()
+    }
   })
 })
 
 describe("aborts", () => {
-  it("kills a cold start when its only waiting chat gives up, and keeps one a second chat waits for", async () => {
+  it.each(["v3", "v2"] as const)("kills a cold %s start when its chat gives up", async (engine) => {
     nextSetup = (child) => { child.silent.add("initialize") }
-    const first = new AbortController()
-    const pending = hosts.pool.acquireForChat("v3", "sdpm-orchestrator", { signal: first.signal }).catch((e: unknown) => e)
+    const controller = new AbortController()
+    const pending = hosts.pool.acquireForChat(engine, "sdpm-orchestrator", { signal: controller.signal }).catch((e: unknown) => e)
     await tick()
-    const second = hosts.pool.acquireForChat("v3", "sdpm-orchestrator")
-    await tick()
-    first.abort()
+    controller.abort()
     expect(await pending).toMatchObject({ name: "AbortError" })
-    expect(children[0].killed).toBe(false)
-    initializeAnswer(children[0])
-    expect((await second).conn.pid).toBe(4242)
-    expect(spawn).toHaveBeenCalledTimes(1)
-
-    nextSetup = (child) => { child.silent.add("initialize") }
-    const alone = new AbortController()
-    const lonely = hosts.pool.acquireForChat("v2", "sdpm-orchestrator", { signal: alone.signal }).catch((e: unknown) => e)
-    await tick()
-    alone.abort()
-    expect(await lonely).toMatchObject({ name: "AbortError" })
-    expect(children[1].killed).toBe(true)
+    expect(children[0].killed).toBe(true)
   })
 
-  it("kills a cold V3 kiro-cli when the open of its only session is given up", async () => {
+  it("kills the kiro-cli when the open of its only session is given up", async () => {
     const host = await hosts.pool.acquireForChat("v3", "sdpm-orchestrator")
     children[0].silent.add("session/new")
     const controller = new AbortController()
@@ -246,109 +202,68 @@ describe("aborts", () => {
     expect(children[0].killed).toBe(true)
   })
 
-  it("deletes a session opened on a warm V3 kiro-cli for a chat that gave up, once kiro-cli answered, and keeps the host", async () => {
+  it("deletes a session opened next to a chat's session and given up, once kiro-cli answered, and keeps the kiro-cli", async () => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {})
     try {
-      const other = await open("v3")
+      const chat = await open("v3")
       const child = children[0]
       child.silent.add("session/new")
       const controller = new AbortController()
-      const pending = other.host.openSession("sdpm-orchestrator", { kind: "new" }, { sink: new Sink(), signal: controller.signal }).catch((e: unknown) => e)
+      const pending = chat.host.openSession("sdpm-composer", { kind: "new" }, { sink: new Sink("aux"), signal: controller.signal }).catch((e: unknown) => e)
       await settle()
       controller.abort()
       await settle()
       expect(child.deleted).toEqual([])
-      // kiro-cli answers the session/new the chat gave up.
-      child.silent.delete("session/new")
       const request = child.requests.filter((r) => r.method === "session/new").at(-1)!
       child.send({ method: "_kiro/mcp/status", params: { sessionId: "K1-2", servers: [{ name: "sdpm", status: "connected" }] } })
-      child.send({ id: request.id, result: { sessionId: "K1-2", modes: { currentModeId: "sdpm-orchestrator", availableModes: [] } } })
+      child.send({ id: request.id, result: { sessionId: "K1-2", modes: { currentModeId: "sdpm-composer", availableModes: [] } } })
       expect(await pending).toMatchObject({ name: "AbortError" })
       await settle()
       expect(child.deleted).toEqual(["K1-2"])
       expect(child.killed).toBe(false)
-      expect(other.host.sessions.size).toBe(1)
+      expect(chat.host.sessions.size).toBe(1)
     } finally {
       log.mockRestore()
     }
   })
 })
 
-describe("definitions and listings", () => {
-  it("retires a host whose agent definitions changed: the next chat gets a new kiro-cli, and the old idle one ends at that start", async () => {
+describe("listings", () => {
+  it.each(["v3", "v2"] as const)("starts a %s kiro-cli with the chat environment for a listing and kills it afterwards", async (engine) => {
     const log = vi.spyOn(console, "log").mockImplementation(() => {})
     try {
-      const first = await open("v3")
-      sync.mockReturnValue("d1")
-      const second = await open("v3")
-      expect(spawn).toHaveBeenCalledTimes(2)
-      expect(second.host).not.toBe(first.host)
-      expect(first.host.retired).toBe(true)
-      expect(first.sink.released).toBe(1)
-      expect(children[0].killed).toBe(true)
-    } finally {
-      log.mockRestore()
-    }
-  })
-
-  it("keeps a retired host while its chat is busy", async () => {
-    const log = vi.spyOn(console, "log").mockImplementation(() => {})
-    try {
-      const first = await open("v3")
-      first.sink.isBusy = true
-      sync.mockReturnValue("d1")
-      await open("v3")
-      expect(first.sink.released).toBe(0)
-      expect(children[0].killed).toBe(false)
-      // Its last session leaves: the retired host ends.
-      first.hs.drop()
-      expect(children[0].killed).toBe(true)
-    } finally {
-      log.mockRestore()
-    }
-  })
-
-  it("keeps a V3 listing's kiro-cli for the next chat, started with the chat environment", async () => {
-    const log = vi.spyOn(console, "log").mockImplementation(() => {})
-    try {
-      const listing = await hosts.pool.acquireForListing("v3")
+      const listing = await hosts.pool.acquireForListing(engine)
       expect(await listing.request("session/list", {})).toEqual({})
-      listing.release()
-      expect(children[0].killed).toBe(false)
       const env = spawn.mock.calls[0][2].env as NodeJS.ProcessEnv
       expect(env.SDPM_DECK_ROOT).toBeTruthy()
       expect(env.SDPM_OUTPUT_DIR).toBe(env.SDPM_DECK_ROOT)
       expect(sync).toHaveBeenCalledTimes(1)
-      await open("v3")
-      expect(spawn).toHaveBeenCalledTimes(1)
-      // A listing with a live host starts nothing.
-      await hosts.pool.acquireForListing("v3")
-      expect(spawn).toHaveBeenCalledTimes(1)
-    } finally {
-      log.mockRestore()
-    }
-  })
-
-  it("kills a V2 listing's kiro-cli when the listing is done", async () => {
-    const log = vi.spyOn(console, "log").mockImplementation(() => {})
-    try {
-      const listing = await hosts.pool.acquireForListing("v2")
       listing.release()
       expect(children[0].killed).toBe(true)
     } finally {
       log.mockRestore()
     }
+  })
+
+  it("lists through a live kiro-cli of the engine without starting one", async () => {
+    await open("v3")
+    const listing = await hosts.pool.acquireForListing("v3")
+    await listing.request("session/list", {})
+    listing.release()
+    expect(spawn).toHaveBeenCalledTimes(1)
+    expect(children[0].killed).toBe(false)
   })
 })
 
 describe("exit and steer", () => {
   it("tells every sink when the kiro-cli exits", async () => {
     const a = await open("v3")
-    const b = await open("v3")
+    const composer = new Sink("aux")
+    await a.host.openSession("sdpm-composer", { kind: "new" }, { sink: composer })
     children[0].kill()
     await settle()
     expect(a.sink.exits).toEqual([null])
-    expect(b.sink.exits).toEqual([null])
+    expect(composer.exits).toEqual([null])
     expect(hosts.pool.hostsOf("v3")).toEqual([])
   })
 

@@ -5,8 +5,8 @@
  *
  * Two decks are made at once from two pages, one of them in a long turn: both decks appear, and
  * their `.session` files show where the chats run (the stub's session ids are
- * `stub-<engine>-<pid>-<n>`): one stub process for both on V3 (it advertises session/close), one
- * each on V2. Stop for a chat while its kiro-cli starts, sent alone (`POST /api/agent/stop`, as
+ * `stub-<engine>-<pid>-<n>`): one stub process each, on both engines (kiro-cli's V3 agent server
+ * runs one turn at a time per process, so chats do not share one). Stop for a chat while its kiro-cli starts, sent alone (`POST /api/agent/stop`, as
  * another tab would): the invoke answers a stream that ends with no data, and no prompt ran (its
  * deck is never made). Runs on V3, then V2; ends on V3, the sandbox's engine.
  */
@@ -50,15 +50,14 @@ for (const engine of ["v3", "v2"] as const) {
       if (engine === "v2") await request.put("/api/agent/engine", { data: { engine: "v3" }, headers: { Origin: baseURL! } })
     })
 
-    test("makes two decks at once, in one kiro-cli on V3 and one each on V2", async ({ context, baseURL }) => {
+    test("makes two decks at once, each in its own kiro-cli", async ({ context, baseURL }) => {
       const slow = await context.newPage()
       const quick = await context.newPage()
       await startChat(slow, "Make a deck deck=ma [slow]")
       await startChat(quick, "Make a deck deck=mb")
       await expect(quick.getByRole("log", { name: "Chat messages" })).toContainText("Done! Your deck is ready.", { timeout: 30_000 })
       const [a, b] = [await stubPid(`e2e-${engine}-ma`), await stubPid(`e2e-${engine}-mb`)]
-      if (engine === "v3") expect(a).toBe(b)
-      else expect(a).not.toBe(b)
+      expect(a).not.toBe(b)
       // The long turn is still running in the other chat; Stop ends it.
       const stopped = await slow.request.post("/api/agent/stop", { data: {}, headers: { Origin: baseURL! } })
       expect(stopped.status()).toBe(200)
