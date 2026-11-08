@@ -151,6 +151,15 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   client. / Nothing.
 - **Local Web UI runs kiro-cli on its V3 engine by default.** V2 stays selectable in
   Settings → Agent engine. / See Upgrading from 0.12.
+- **Local Web UI: chats share one kiro-cli on V3.** New chats, reopened decks, forks and the
+  session picker on the V3 engine use one `kiro-cli acp --agent-engine v3`, each chat a
+  session in it: three open decks take about 0.3 GB instead of 1.0 GB, and once kiro-cli runs,
+  a new chat or a reopened deck is ready in well under a second instead of about 2.5 s. Up to
+  8 chats stay open in it; beyond that the least recently used idle one is closed and reopens
+  its session on its next message. V2 keeps one kiro-cli per chat (up to 3). A chat that is
+  working is never ended by these limits, by an engine switch or by a change of the agent
+  definitions; a Settings change applies to new chats. `servers/local/.kiro/agents/` is left
+  as it is when nothing changed. / Nothing.
 - **The bundled `aws-light` and `aws-dark` styles have a new content-slide frame.** Every
   content slide now pairs a one-line topic title (a noun phrase) with a lead of up to two
   lines that states the slide's finding, in dark orange (`aws-light`) or amber (`aws-dark`).
@@ -280,6 +289,11 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   answer at start-up gives a "did not respond in time" message after 30 s (initialize) or
   3 minutes (session start or load) instead of waiting forever. kiro-cli's permission
   requests are answered with an option it offered, which kiro-cli V3 needs. (#518) / Nothing.
+- **Local Web UI: Stop works while kiro-cli starts**, also when only `POST /api/agent/stop`
+  is sent (another tab): no message is sent to the agent, and the reply's stream ends as
+  stopped. / Nothing.
+- **Local Web UI: a kiro-cli that exits no longer loses a new chat's conversation.** The
+  chat's next message reopens its session. / Nothing.
 - **Local Web UI: decks without a saved Kiro session can be chatted with.** A deck made by
   an MCP client or Kiro CLI has no `.session` file, and sending a message in it answered
   HTTP 500 every time; so did a deck whose kiro session no longer exists (kiro-cli V2). The
