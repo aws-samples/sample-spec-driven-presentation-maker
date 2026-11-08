@@ -1,7 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * V3's notifications as LocalEvents. One translator per kiro-cli process (one conversation).
+ * V3's notifications as LocalEvents. One translator per kiro session (a kiro-cli may carry
+ * several, each line reaches every one of them).
  *
  * V3 has no sub-agent sessions: a sub-agent's updates arrive in the main session with
  * `_meta.kiro.agentSubtaskId`. Updates of another session are dropped.
@@ -29,8 +30,11 @@
  *    text, parsed as JSON; a failure's is `{message: rawOutput.message}`). An update that ends a
  *    tool no call announced gets its `tool_use` first, from the update itself.
  *
- * Other notifications: `_kiro/mcp/status` (a full snapshot) → `mcp_snapshot` then one
- * `mcp_status` per server; `session_info_update` with `kind: "steering_injected"` →
+ * MCP state is read once per line for the whole kiro-cli (`v3McpEvents`, the adapter's
+ * `translateMcp`): `_kiro/mcp/status` (a full snapshot) → `mcp_snapshot` then one `mcp_status` per
+ * server; the translator returns [] for it.
+ *
+ * Other notifications: `session_info_update` with `kind: "steering_injected"` →
  * `steer_injected`; `config_option_update` keeps the session's model, effort and model list
 (kiro-cli sends one before it answers set_config_option and after a load's answer, whose own
 `configOptions` list only the current values; a new session's first one comes before session/new
@@ -105,6 +109,22 @@ function isInternal(update: Update, meta: V3UpdateMeta): boolean {
   return !meta.serverName && Array.isArray((update.rawInput as V3ToolInput | undefined)?.tool_ids)
 }
 
+/** A line's MCP state, whichever session it names: `_kiro/mcp/status` → `mcp_snapshot` and one `mcp_status` per server. */
+export function v3McpEvents(msg: AcpNotification): LocalEvent[] {
+  if (msg.method !== KIRO_MCP_STATUS) return []
+  const params = objectOr(msg.params) as V3McpStatusParams
+  if (typeof params.sessionId !== "string") return []
+  const sessionId = params.sessionId
+  const events: LocalEvent[] = [{ type: "mcp_snapshot", sessionId }]
+  for (const server of Array.isArray(params.servers) ? params.servers : []) {
+    if (typeof server?.name !== "string") continue
+    const state = server.status === "connected" ? "connected" : server.status === "failed" ? "failed" : "connecting"
+    const error = typeof server.errorMessage === "string" ? { error: server.errorMessage } : {}
+    events.push({ type: "mcp_status", sessionId, server: server.name, state, ...error })
+  }
+  return events
+}
+
 export class V3Translator {
   /** The session prompts go to. */
   mainSessionId: string | null = null
@@ -138,6 +158,11 @@ export class V3Translator {
     return this.modelList
   }
 
+  /** A notification that names another session than this one (once this one has an id). */
+  private otherSession(params: Record<string, unknown>): boolean {
+    return typeof params.sessionId === "string" && this.mainSessionId !== null && params.sessionId !== this.mainSessionId
+  }
+
   /** The config option ids set_config_option takes for the model and the effort (null: the model has none). */
   configIds(): { model: string; effort: string | null } {
     return this.optionIds
@@ -147,8 +172,9 @@ export class V3Translator {
     const params = objectOr(msg.params)
     switch (msg.method) {
       case KIRO_MCP_STATUS:
-        return this.mcpStatus(params as V3McpStatusParams)
+        return []
       case KIRO_CUSTOM_AGENT_NOT_FOUND:
+        if (this.otherSession(params)) return []
         console.warn("[acp] kiro-cli did not start the custom agent: %j", params)
         this.onAgentNotFound?.(params)
         return []
@@ -191,19 +217,6 @@ export class V3Translator {
         // agent_thought_chunk, plan, usage, user_message_chunk, ... (shown from phase 3 on, if at all)
         return []
     }
-  }
-
-  private mcpStatus(params: V3McpStatusParams): LocalEvent[] {
-    if (typeof params.sessionId !== "string") return []
-    const sessionId = params.sessionId
-    const events: LocalEvent[] = [{ type: "mcp_snapshot", sessionId }]
-    for (const server of Array.isArray(params.servers) ? params.servers : []) {
-      if (typeof server?.name !== "string") continue
-      const state = server.status === "connected" ? "connected" : server.status === "failed" ? "failed" : "connecting"
-      const error = typeof server.errorMessage === "string" ? { error: server.errorMessage } : {}
-      events.push({ type: "mcp_status", sessionId, server: server.name, state, ...error })
-    }
-    return events
   }
 
   private tool(update: Update, meta: V3UpdateMeta): LocalEvent[] {

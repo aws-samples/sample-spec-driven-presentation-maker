@@ -14,8 +14,9 @@
  *
  * V3 also lists its sessions (`session/list`: one session, "E2E V3 source", in /tmp/e2e-project),
  * forks one (`session/fork` → `sess_e2e-fork-<n>` in the mode of `_meta.kiro.modeId`; its load
- * names the source in `_meta.parentSessionId`) and deletes a fork (`session/delete`), as
- * kiro-cli 3.1 does; it advertises them in initialize. V2 answers them with Method not found.
+ * names the source in `_meta.parentSessionId`), closes and deletes any session (`session/close`,
+ * `session/delete`), as kiro-cli 3.1 does, and advertises them in initialize. V2 answers them with
+ * Method not found. The Local server starts one stub process per chat on either engine.
  *
  * Models: `auto` (no effort), `stub-effort` (effort low / medium / high, default medium) and
  * `stub-plain`, kept per session. V3 reports them as config options, in session/new's answer and
@@ -29,8 +30,11 @@
  * parallel, each with one tool of its own (V3: two `agent-subtask` delegations whose tools carry
  * their `agentSubtaskId`; V2: one crew with two stages, each run in a sub-agent session that
  * `_kiro.dev/subagent/list_update` names after its stage) → text → end_turn. The deck and session
- * ids carry the engine (`e2e-<engine>-deck`, `stub-<engine>-<pid>`), so one sandbox serves both
- * engines.
+ * ids carry the engine (`e2e-<engine>-deck`, `stub-<engine>-<pid>-<n>`), so one sandbox serves
+ * both engines. A prompt that contains `deck=<slug>` names its deck `e2e-<engine>-<slug>` instead.
+ * A prompt that contains `[slow]` then streams a text chunk every 200 ms for up to 30 s, and
+ * answers `cancelled` when its session is cancelled (else end_turn); other sessions' prompts run
+ * meanwhile. While `<SDPM_DECK_ROOT>/.stub-slow-start` exists, session/new answers after 3 s.
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -40,7 +44,7 @@ const ARGS = process.argv.slice(2)
 const ENGINE = ARGS.includes("--agent-engine") ? ARGS[ARGS.indexOf("--agent-engine") + 1] : "v2"
 const AGENT = ARGS.includes("--agent") ? ARGS[ARGS.indexOf("--agent") + 1] : ""
 const DECK_ROOT = process.env.SDPM_DECK_ROOT
-const DECK_ID = `e2e-${ENGINE}-deck`
+const DEFAULT_DECK_ID = `e2e-${ENGINE}-deck`
 const STARTED_AT = new Date(Date.now() - 60_000).toISOString()
 const MODES = ["sdpm-orchestrator", "sdpm-composer", "sdpm-style", "sdpm-translate"]
 
@@ -49,6 +53,8 @@ const sessions = new Map()
 /** sessionId → its model and effort. */
 const sessionModels = new Map()
 let sessionCount = 0
+/** sessionId → how to end its running `[slow]` prompt (on session/cancel). */
+const slowPrompts = new Map()
 /** V3 fork id → its source. */
 const forks = new Map()
 const V3_SOURCE = { sessionId: "sess_e2e-v3-source", cwd: "/tmp/e2e-project", title: "E2E V3 source" }
@@ -134,8 +140,14 @@ function answerReady(msg, sessionId, result, { before = () => {}, after = () => 
   }
 }
 
-function createDeckOnDisk() {
-  const dir = path.join(DECK_ROOT, DECK_ID)
+/** The deck a prompt names (`deck=<slug>`), else the default one. */
+function deckIdOf(promptText) {
+  const named = /deck=([a-z0-9-]+)/.exec(promptText)
+  return named ? `e2e-${ENGINE}-${named[1]}` : DEFAULT_DECK_ID
+}
+
+function createDeckOnDisk(deckId) {
+  const dir = path.join(DECK_ROOT, deckId)
   fs.mkdirSync(path.join(dir, "slides"), { recursive: true })
   fs.mkdirSync(path.join(dir, "preview"), { recursive: true })
   fs.writeFileSync(path.join(dir, "deck.json"), JSON.stringify({ name: `E2E Test Deck (${ENGINE})` }))
@@ -151,11 +163,13 @@ function text(sessionId, t) {
   update(sessionId, { sessionUpdate: "agent_message_chunk", content: { type: "text", text: t } })
 }
 
-/** The two composer groups: their slugs, in the orchestrator's delegation template. */
-const GROUPS = [
-  { name: "intro", prompt: `deck_id: ${DECK_ID}\nassigned_slugs: ["intro"]\nmode: pptx` },
-  { name: "outro", prompt: `deck_id: ${DECK_ID}\nassigned_slugs: ["outro"]\nmode: pptx` },
-]
+/** The two composer groups of a deck: their slugs, in the orchestrator's delegation template. */
+function groupsOf(deckId) {
+  return [
+    { name: "intro", prompt: `deck_id: ${deckId}\nassigned_slugs: ["intro"]\nmode: pptx` },
+    { name: "outro", prompt: `deck_id: ${deckId}\nassigned_slugs: ["outro"]\nmode: pptx` },
+  ]
+}
 
 /** An sdpm tool call that completes with `result`, in the engine's shape. */
 function sdpmTool(sessionId, toolCallId, tool, input, result, extraMeta = {}) {
@@ -174,8 +188,8 @@ function sdpmTool(sessionId, toolCallId, tool, input, result, extraMeta = {}) {
 }
 
 /** V3: one delegation to the composer per group, in parallel: all calls, then each one's tool, then their ends. */
-function delegationsV3(sessionId) {
-  const delegations = GROUPS.map((group, i) => ({
+function delegationsV3(sessionId, deckId) {
+  const delegations = groupsOf(deckId).map((group, i) => ({
     toolCallId: `invoke_subagent_stub-${i + 1}`,
     agentSubtaskId: `stub-subtask-${i + 1}`,
     rawInput: { name: "sdpm-composer", prompt: group.prompt },
@@ -195,7 +209,8 @@ function subagentList(children, status) {
 }
 
 /** V2: one crew with a stage per group; each stage runs in its own sub-agent session, then the crew completes. */
-function crewV2(sessionId) {
+function crewV2(sessionId, deckId) {
+  const GROUPS = groupsOf(deckId)
   const toolCallId = "stub-crew-1"
   send({ method: "_kiro.dev/session/update", params: { sessionId, update: { sessionUpdate: "tool_call_chunk", toolCallId, title: "subagent", kind: "other" } } })
   update(sessionId, {
@@ -213,15 +228,41 @@ function crewV2(sessionId) {
 
 function handlePrompt(msg) {
   const sessionId = msg.params.sessionId
+  const promptText = (msg.params.prompt ?? []).map((block) => block?.text ?? "").join("")
+  const deckId = deckIdOf(promptText)
   text(sessionId, "Creating your deck… ")
-  const outputDir = createDeckOnDisk()
-  sdpmTool(sessionId, "stub-tool-1", "init_deck_workspace", { template: "e2e" }, { deckId: DECK_ID, output_dir: outputDir })
-  if (ENGINE === "v3") delegationsV3(sessionId)
-  else crewV2(sessionId)
+  const outputDir = createDeckOnDisk(deckId)
+  sdpmTool(sessionId, "stub-tool-1", "init_deck_workspace", { template: "e2e" }, { deckId, output_dir: outputDir })
+  if (ENGINE === "v3") delegationsV3(sessionId, deckId)
+  else crewV2(sessionId, deckId)
   text(sessionId, "Done! Your deck is ready.")
   const { model, effort } = modelOf(sessionId)
   text(sessionId, ` (model: ${model}${ENGINE === "v3" && effort ? `, effort: ${effort}` : ""})`)
-  answer(msg, { stopReason: "end_turn" })
+  if (!promptText.includes("[slow]")) {
+    answer(msg, { stopReason: "end_turn" })
+    return
+  }
+  // A long turn: a chunk every 200 ms, until it is cancelled or 30 s passed.
+  let chunks = 0
+  const finish = (stopReason) => {
+    clearInterval(timer)
+    slowPrompts.delete(sessionId)
+    answer(msg, { stopReason })
+  }
+  const timer = setInterval(() => {
+    text(sessionId, ` ${++chunks}`)
+    if (chunks >= 150) finish("end_turn")
+  }, 200)
+  slowPrompts.set(sessionId, () => finish("cancelled"))
+}
+
+/** Answer `msg` once the slow-start marker is gone, or 3 s after it was seen. */
+function afterSlowStart(answerNow) {
+  if (!DECK_ROOT || !fs.existsSync(path.join(DECK_ROOT, ".stub-slow-start"))) {
+    answerNow()
+    return
+  }
+  setTimeout(answerNow, 3000)
 }
 
 function methodNotFound(msg) {
@@ -240,7 +281,7 @@ rl.on("line", (line) => {
     case "initialize":
       answer(msg, { protocolVersion: 1, agentCapabilities: {
         loadSession: true,
-        ...(ENGINE === "v3" ? { sessionCapabilities: { list: {}, fork: {}, delete: {} } } : {}),
+        ...(ENGINE === "v3" ? { sessionCapabilities: { list: {}, close: {}, fork: {}, delete: {} } } : {}),
       } })
       break
     case "session/list":
@@ -255,16 +296,21 @@ rl.on("line", (line) => {
       answer(msg, { sessionId })
       break
     }
+    case "session/close":
     case "session/delete":
       if (ENGINE !== "v3") { methodNotFound(msg); break }
       forks.delete(msg.params.sessionId)
+      sessions.delete(msg.params.sessionId)
+      sessionModels.delete(msg.params.sessionId)
       answer(msg, {})
       break
     case "session/new": {
       const sessionId = `stub-${ENGINE}-${process.pid}-${++sessionCount}`
       sessions.set(sessionId, ENGINE === "v3" ? msg.params?._meta?.kiro?.modeId ?? "vibe" : AGENT)
-      if (ENGINE === "v3") answerReady(msg, sessionId, { sessionId, modes: modes(sessionId), configOptions: configOptions(sessionId) }, { before: () => configUpdate(sessionId) })
-      else answerReady(msg, sessionId, { sessionId, modes: modes(sessionId), models: v2Models(sessionId) })
+      afterSlowStart(() => {
+        if (ENGINE === "v3") answerReady(msg, sessionId, { sessionId, modes: modes(sessionId), configOptions: configOptions(sessionId) }, { before: () => configUpdate(sessionId) })
+        else answerReady(msg, sessionId, { sessionId, modes: modes(sessionId), models: v2Models(sessionId) })
+      })
       break
     }
     case "session/load": {
@@ -302,9 +348,12 @@ rl.on("line", (line) => {
     case "session/prompt":
       handlePrompt(msg)
       break
+    case "session/cancel":
+      slowPrompts.get(msg.params?.sessionId)?.()
+      break
     default:
       // Another request (a steer): Method not found, as kiro-cli answers what it does not implement.
-      // Notifications (session/cancel etc.) are ignored.
+      // Other notifications are ignored.
       methodNotFound(msg)
       break
   }

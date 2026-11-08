@@ -20,6 +20,9 @@
  * (`created`); none is taken as resumed. `createdAt` is the fork's time and says nothing here.
  * `discardFork` deletes (session/delete) only a fork this session made.
  *
+ * One kiro-cli carries any number of these sessions. `close` ends this one (session/close), and
+ * `discard` deletes it from the store (session/delete: an aborted new session, a composer's).
+ *
  * The model and the effort are config options (session/set_config_option): the model first,
  * then the effort option the new model brought. V3 accepts any value, so the process manager
  * validates the choice first. The session keeps both; a load reports them again.
@@ -41,6 +44,8 @@ const NOT_FOUND_GRACE_MS = 2000
 const CREATED_MARGIN_MS = 1000
 /** kiro-cli answers set_config_option at once. */
 const CONFIG_TIMEOUT_MS = 10_000
+/** session/close and session/delete answer at once (6 ms measured). */
+const END_TIMEOUT_MS = 10_000
 
 export class V3Session implements EngineSession {
   private readonly translator = new V3Translator()
@@ -128,6 +133,18 @@ export class V3Session implements EngineSession {
   classifyError(error: unknown): EngineErrorKind | null {
     if (error instanceof AcpRequestError && error.code === AUTH_REQUIRED) return "auth_required"
     return null
+  }
+
+  async close(): Promise<void> {
+    const sessionId = this.translator.mainSessionId
+    if (!sessionId) return
+    await this.ctx.request("session/close", { sessionId }, { timeoutMs: END_TIMEOUT_MS })
+  }
+
+  async discard(): Promise<void> {
+    const sessionId = this.translator.mainSessionId
+    if (!sessionId) return
+    await this.ctx.request("session/delete", { sessionId }, { timeoutMs: END_TIMEOUT_MS })
   }
 
   /** session/load (the replay reported), then the agent's mode and the sdpm server. */

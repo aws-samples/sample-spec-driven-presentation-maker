@@ -83,7 +83,7 @@ Open [http://localhost:3000](http://localhost:3000) (Next.js picks the next free
 
 ### How it works
 
-Setting `NEXT_PUBLIC_MODE=local` enables the Next.js API Routes under `src/app/api/` and spawns `kiro-cli acp --agent-engine v3` per active deck, with the session in the `sdpm-orchestrator` mode (kiro-cli 3.0 or later). The canonical agent definitions live under [`servers/local/.kiro/acp-agents/`](../servers/local/.kiro/acp-agents/) and share the MCP toolset from [`servers/local/server_acp.py`](../servers/local/server_acp.py). Each kiro-cli start regenerates `servers/local/.kiro/agents/` from them, in a form both kiro-cli engines read.
+Setting `NEXT_PUBLIC_MODE=local` enables the Next.js API Routes under `src/app/api/` and spawns `kiro-cli acp --agent-engine v3` per active chat, with the session in its agent's mode (`sdpm-orchestrator` for decks; kiro-cli 3.0 or later). The canonical agent definitions live under [`servers/local/.kiro/acp-agents/`](../servers/local/.kiro/acp-agents/) and share the MCP toolset from [`servers/local/server_acp.py`](../servers/local/server_acp.py). Before each new chat, `servers/local/.kiro/agents/` is regenerated from them, in a form both kiro-cli engines read, and left as it is when nothing changed.
 
 To run on kiro-cli's V2 engine instead (`kiro-cli acp --agent sdpm-orchestrator`), open Settings → **Agent engine** and pick V2, or write `{"version": 2, "engine": "v2"}` to `servers/local/.sdpm/acp-config.json`. The choice takes effect from the next message.
 

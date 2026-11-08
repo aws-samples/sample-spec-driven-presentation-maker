@@ -45,6 +45,7 @@ function context(answers: Record<string, unknown | ((params: Record<string, unkn
     cwd: "/workspace/sdpm/servers/local",
     env: env as unknown as NodeJS.ProcessEnv,
     setupTimeoutMs: 1000,
+    hostAgent: "sdpm-orchestrator",
     waitForMcp: vi.fn(async (sessionId: string) => { order.push(`wait ${sessionId}`) }),
     clearMcp: vi.fn((sessionId: string) => { order.push(`clear ${sessionId}`) }),
   }
@@ -97,10 +98,41 @@ describe("V2Session", () => {
     expect(calls).toHaveLength(2)
   })
 
+  it("opens another agent's session on a kiro-cli started for the orchestrator: set_mode, then the MCP wait", async () => {
+    const { ctx, calls, order } = context({ "session/new": { sessionId: "K2", modes: { currentModeId: "sdpm-orchestrator", availableModes: [{ id: "sdpm-orchestrator", name: "o" }, { id: "sdpm-composer", name: "c" }] } } })
+    await expect(new V2Session(ctx).newSession("sdpm-composer")).resolves.toEqual({ sessionId: "K2" })
+    expect(calls.map((c) => c.method)).toEqual(["session/new", "session/set_mode"])
+    expect(calls[1].params).toEqual({ sessionId: "K2", modeId: "sdpm-composer" })
+    expect(order).toEqual(["session/new", "clear K2", "session/set_mode", "wait K2"])
+  })
+
+  it("refuses another agent's session when its kiro-cli does not list that agent", async () => {
+    vi.useFakeTimers()
+    try {
+      const { ctx } = context({ "session/new": { sessionId: "K2", modes: MODES("sdpm-orchestrator") } })
+      const pending = new V2Session(ctx).newSession("sdpm-composer").catch((e: unknown) => e)
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(await pending).toMatchObject({ code: "agent_definition_rejected" })
+      expect(ctx.waitForMcp).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("sends nothing to close or discard a session (V2 has neither)", async () => {
+    const { ctx, calls } = context({ "session/new": NEW })
+    const session = new V2Session(ctx)
+    await session.newSession("sdpm-orchestrator")
+    await session.close()
+    await session.discard()
+    expect(calls.map((c) => c.method)).toEqual(["session/new"])
+  })
+
   it("refuses a session in another mode (kiro_default for an agent V2 did not find)", async () => {
     vi.useFakeTimers()
     try {
-      const { ctx } = context({ "session/new": { sessionId: "K1", modes: MODES("kiro_default") } })
+      // kiro_default is not the kiro-cli's own agent, even though every sdpm mode is listed.
+      const { ctx } = context({ "session/new": { sessionId: "K1", modes: { currentModeId: "kiro_default", availableModes: [{ id: "sdpm-orchestrator", name: "o" }] } } })
       const pending = new V2Session(ctx).newSession("sdpm-orchestrator").catch((e: unknown) => e)
       await vi.advanceTimersByTimeAsync(2000)
       const error = await pending

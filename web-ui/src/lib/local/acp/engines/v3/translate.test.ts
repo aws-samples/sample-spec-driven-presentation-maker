@@ -11,7 +11,7 @@
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 
-import { V3Translator } from "./translate"
+import { V3Translator, v3McpEvents } from "./translate"
 
 const MAIN = "sess_main"
 const COMPOSER = "sub-composer"
@@ -152,8 +152,11 @@ describe("tools", () => {
 })
 
 describe("other notifications", () => {
-  it("turns an MCP status into a snapshot of the session's servers", () => {
-    const status = (servers: unknown[]) => t.translate({ method: "_kiro/mcp/status", params: { sessionId: MAIN, servers } })
+  it("turns an MCP status into a snapshot of the session's servers, through v3McpEvents only", () => {
+    expect(t.translate({ method: "_kiro/mcp/status", params: { sessionId: MAIN, servers: [{ name: "sdpm", status: "connected" }] } })).toEqual([])
+    expect(v3McpEvents({ method: "_kiro/mcp/status", params: { sessionId: "sess_other", servers: [] } })).toEqual([{ type: "mcp_snapshot", sessionId: "sess_other" }])
+    expect(v3McpEvents(update({ sessionUpdate: "agent_message_chunk", content: { type: "text", text: "hi" } }))).toEqual([])
+    const status = (servers: unknown[]) => v3McpEvents({ method: "_kiro/mcp/status", params: { sessionId: MAIN, servers } })
     expect(status([{ name: "sdpm", status: "connecting" }])).toEqual([
       { type: "mcp_snapshot", sessionId: MAIN },
       { type: "mcp_status", sessionId: MAIN, server: "sdpm", state: "connecting" },

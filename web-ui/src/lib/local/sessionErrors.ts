@@ -3,11 +3,22 @@
 /**
  * Session conflicts on the Local invoke route (HTTP 409), shared by the route and the chat UI.
  *
- * - `session_busy`: this server's process for the session is still answering a prompt
- *   (the same chat open in two panels or tabs).
- * - `session_locked`: kiro-cli refused to load the session because another process holds its
- *   lock (for example `kiro-cli chat --resume` in a terminal). The engine adapter recognises
- *   kiro-cli's error (`EngineSession.classifyError`); the process manager throws SessionLockedError.
+ * - `session_busy`: this server's chat for the session is still answering a prompt, or its
+ *   stopped work is settling (the same chat open in two panels or tabs).
+ * - `session_locked`: kiro-cli refused to load the session because a kiro-cli outside this server
+ *   holds its lock (for example `kiro-cli chat --resume` in a terminal); this server opens a kiro
+ *   session in one chat at most, so it never locks itself out. The engine adapter recognises
+ *   kiro-cli's error (`EngineSession.classifyError`, only V2's does), the host reports it as
+ *   HostOpenError `session_locked`, and the registry throws SessionLockedError.
+ *
+ * When the V2 engine is removed (its folder `acp/engines/v2/`), this goes with it, unless V3's
+ * adapter reports a lock of its own by then: SessionLockedError and the `session_locked` member of
+ * SessionConflictCode / `sessionConflict` here; the `"session_locked"` member of EngineErrorKind
+ * (acp/engine.ts); HostOpenError and its mapping (hosts.ts, acp-process.ts `openChat`); the
+ * `session_locked` case in `app/api/agent/invoke/route.test.ts` and in `chat.test.ts` ("session
+ * held by another process"); the `sessionLocked` branch in `hooks/useChatStream.ts` and its
+ * `session_locked` row in `hooks/useChatStream.test.tsx`; the `sessionLocked` keys in
+ * `messages/en.json` / `ja.json`.
  */
 
 export type SessionConflictCode = "session_busy" | "session_locked"
@@ -17,7 +28,7 @@ export interface SessionConflict {
   error: string
 }
 
-/** Thrown by sendPrompt when the session's previous prompt has not finished. */
+/** Thrown by sendPrompt while the chat's turn runs or its stopped work settles. */
 export class SessionBusyError extends Error {
   constructor() {
     super("This chat is still answering a previous message.")

@@ -1,7 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Local ACP Agent Invoke — sends prompt to sessionId-keyed kiro-cli process.
+ * Local ACP Agent Invoke — sends a prompt to the sessionId-keyed chat (lib/local/acp-process.ts)
+ * and streams its work period from this turn on.
  * A session conflict (turn still running, or the session locked by another
  * kiro-cli process) is answered with 409 and a SessionConflict body; a kiro-cli
  * that does not answer its setup requests in time with 504 and code `agent_timeout`;
@@ -9,10 +10,13 @@
  * A reopened deck whose session kiro-cli does not have, or that has none, gets a new one whose
  * first prompt names the deck (`Current deck: <dir>`); a deck
  * whose session also ran on the other agent engine says so (lib/local/sessionNotices.ts).
- * The process manager saves the session to a deck the turn creates (and a fork's origin with it),
- * whether or not this stream is still read.
+ * The chat saves the session to a deck the turn creates (and a fork's origin with it),
+ * whether or not this stream is still read. Stop for the session while its chat starts
+ * (POST /api/agent/stop, from any tab) aborts the start: no prompt is sent, and the answer is a
+ * stream that ends at once as stopped; a client that went away gets 499.
  */
 import {
+  beginStart,
   sendPrompt,
   createNewProcessFor,
   getBufferedEvents,
@@ -39,6 +43,12 @@ const MODE_TO_AGENT: Record<string, string> = {
 }
 
 export const dynamic = 'force-dynamic'
+
+const SSE_HEADERS = {
+  "Content-Type": "text/event-stream",
+  "Cache-Control": "no-cache",
+  Connection: "keep-alive",
+}
 
 export async function POST(req: Request) {
   const refused = rejectCrossSite(req)
@@ -72,10 +82,11 @@ export async function POST(req: Request) {
   if (clientSessionId && continuedFrom) pendingOrigins.set(clientSessionId, continuedFrom)
 
   let prompted: Awaited<ReturnType<typeof sendPrompt>>
+  // A client that goes away while kiro-cli starts, or Stop for this session, stops the start.
+  const start = beginStart(clientSessionId, req.signal)
   try {
-    // Ensure a process exists for this clientSessionId. A client that goes away while
-    // kiro-cli starts (or a kiro-cli that never answers) stops the spawn.
-    const signal = req.signal
+    // Ensure a chat exists for this clientSessionId.
+    const signal = start.signal
     if (clientSessionId && !hasProcess(clientSessionId)) {
       if (continuedFrom) {
         // A fork must restore the copied history even if its preloaded process was evicted. The
@@ -97,9 +108,11 @@ export async function POST(req: Request) {
           notice = "context_from_other_engine"
         }
       } else {
-        // Fresh session — spawn new process, register under client's sessionId
-        await createNewProcessFor(clientSessionId, agentName, { signal })
-        isFirstPrompt = true
+        // A new chat, or one whose chat was released or whose kiro-cli exited: its kiro session is
+        // opened again (`resumed`), and one kiro-cli no longer has starts over with the notice.
+        const created = await createNewProcessFor(clientSessionId, agentName, { signal })
+        if (!created.resumed) isFirstPrompt = true
+        if (created.notice) notice = created.notice
       }
     }
 
@@ -107,10 +120,14 @@ export async function POST(req: Request) {
     const continuedPrompt = withContinuedFrom(query, continuedFrom, isFirstPrompt)
     const deckPrompt = withCurrentDeck(continuedPrompt, currentDeck, isFirstPrompt)
     const prompt = withInteractionMode(deckPrompt, mode, isFirstPrompt)
-    prompted = await sendPrompt(clientSessionId, prompt, { notice })
+    prompted = await sendPrompt(clientSessionId, prompt, { notice, displayText: query, signal })
   } catch (error) {
     const conflict = sessionConflict(error)
     if (conflict) return Response.json(conflict, { status: 409 })
+    // Stopped while starting: nothing was sent, the reply ends as stopped.
+    if (start.stoppedByUser() && !req.signal.aborted) {
+      return new Response(createSSEStream({ replay: [{ id: 1, event: { kind: "end", stopReason: "cancelled" } }] }), { headers: SSE_HEADERS })
+    }
     if (error instanceof AgentTimeoutError) {
       console.warn("[invoke] %s", error.message)
       return Response.json(localTurnError(error.code), { status: 504 })
@@ -119,19 +136,16 @@ export async function POST(req: Request) {
     // The client is gone; nobody reads this answer.
     if (req.signal.aborted) return new Response(null, { status: 499 })
     throw error
+  } finally {
+    start.end()
   }
-  const { subscribe, send } = prompted
+  const { subscribe, send, replayFrom, onEnd } = prompted
 
-  // The turn's buffered events (its notice) first, then the live ones.
-  const stream = createSSEStream({ subscribe, replay: getBufferedEvents(clientSessionId) })
+  // The period's events from this turn on (its notice among them), then the live ones; a stream
+  // that writes the period's end has delivered it (a closed tab's period is replayed by /stream).
+  const stream = createSSEStream({ subscribe, replay: getBufferedEvents(clientSessionId, replayFrom - 1), onEnd })
 
   send()
 
-  return new Response(stream, {
-    headers: {
-      "Content-Type": "text/event-stream",
-      "Cache-Control": "no-cache",
-      Connection: "keep-alive",
-    },
-  })
+  return new Response(stream, { headers: SSE_HEADERS })
 }

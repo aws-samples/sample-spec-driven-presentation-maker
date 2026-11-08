@@ -1,10 +1,13 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * A V2 conversation: kiro-cli started with `--agent <name>` runs that agent, so session/new
+ * A V2 session: kiro-cli started with `--agent <name>` runs that agent, so session/new
  * needs no agent field. The session runs the agent's mode when session/new answers
  * `modes.currentModeId` = the agent (V2 falls back to `kiro_default` for an agent it does not
- * find, and says why in `_kiro.dev/agent/not_found`).
+ * find, and says why in `_kiro.dev/agent/not_found`). A session of another agent on that kiro-cli
+ * (a composer's on the orchestrator's) answers the kiro-cli's own agent: it is switched with
+ * session/set_mode when V2 lists the requested agent among its modes; any other mode is rejected.
+ * V2 cannot close or delete a session (`close` / `discard` send nothing).
  *
  * An existing session is opened as session/new, then session/load of the saved id; the prompts
  * then go to the loaded id. A load answered `Session not found` keeps the new session instead
@@ -154,7 +157,16 @@ export class V2Session implements EngineSession {
     return null
   }
 
-  /** session/new, checked to run the agent's mode. */
+  /** V2 advertises no session/close: the session lives as long as its kiro-cli. */
+  async close(): Promise<void> {}
+
+  /** V2 advertises no session/delete. */
+  async discard(): Promise<void> {}
+
+  /**
+   * session/new, checked to run the agent's mode: on a kiro-cli started for another agent, the
+   * new session answers that agent and is switched to the requested one.
+   */
   private async createSession(agentName: string): Promise<string> {
     const result = await this.ctx.request("session/new", { cwd: this.ctx.cwd, mcpServers: [] }, {
       timeoutMs: this.ctx.setupTimeoutMs, signal: this.ctx.signal,
@@ -162,7 +174,9 @@ export class V2Session implements EngineSession {
     this.translator.mainSessionId = result.sessionId
     this.modelList = readModels(result.models)
     const mode = result.modes?.currentModeId
-    if (mode !== agentName) await this.rejected(agentName, mode)
+    if (mode === agentName) return result.sessionId
+    if (mode !== this.ctx.hostAgent || !result.modes?.availableModes?.some((m) => m.id === agentName)) await this.rejected(agentName, mode)
+    await this.switchMode(result.sessionId, agentName, result.modes, {})
     return result.sessionId
   }
 
