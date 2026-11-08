@@ -263,10 +263,19 @@ def merged_kiro_agent(current: object, t: Target, name: str = DEFAULT_KIRO_AGENT
     return merged, []
 
 
+KIRO_LOGIN_FIRST = "kiro-cli login first"
+
+
 def write_kiro_agent(t: Target, *, name: str = DEFAULT_KIRO_AGENT, dry_run: bool = False,
-                     root: Optional[Path] = None) -> int:
+                     root: Optional[Path] = None, notes: Optional[list[str]] = None) -> int:
     """Create or refresh the agent file we own. A user's own agent of that name is left alone;
-    in ours, what other tools added is kept (:func:`merged_kiro_agent`)."""
+    in ours, what other tools added is kept (:func:`merged_kiro_agent`).
+
+    ``kiro-cli agent validate`` needs a signed-in kiro-cli. When ``kiro-cli whoami`` says it
+    is not (its exit code; the output is not parsed), the written file is the registration:
+    validation is skipped, one line says to sign in, and :data:`KIRO_LOGIN_FIRST` is added
+    to ``notes`` for the result table.
+    """
     path = kiro_agent_path(name, root)
     if path.exists() and not _is_our_agent_file(path):
         print(f"{path} exists and is not managed by sdpm — leaving it alone.")
@@ -293,6 +302,11 @@ def write_kiro_agent(t: Target, *, name: str = DEFAULT_KIRO_AGENT, dry_run: bool
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     if shutil.which("kiro-cli"):
+        if _run_quiet(["kiro-cli", "whoami"]) != 0:
+            print(f"  Kiro CLI is not signed in yet: run `kiro-cli login`, then `kiro-cli chat --agent {name}`.")
+            if notes is not None:
+                notes.append(KIRO_LOGIN_FIRST)
+            return 0
         rc = _run(["kiro-cli", "agent", "validate", "--path", str(path)])
         if rc != 0:
             print(f"  kiro-cli agent validate rejected {path}", file=sys.stderr)
@@ -634,8 +648,12 @@ def register(
             outcomes.append(Outcome(client, "skipped", f"sdpm register {client.id}"))
             continue
         if client.id == "kiro-cli":
-            if write_kiro_agent(target, name=agent_name, dry_run=dry_run) == 0:
-                outcomes.append(Outcome(client, "registered", f"agent `{agent_name}`  {next_step(client, agent_name)}"))
+            notes: list[str] = []
+            if write_kiro_agent(target, name=agent_name, dry_run=dry_run, notes=notes) == 0:
+                step = next_step(client, agent_name)
+                if notes:  # not signed in: "→ kiro-cli login first, then kiro-cli chat --agent …"
+                    step = f"→ {', '.join(notes)}, then {step.removeprefix('→ ')}"
+                outcomes.append(Outcome(client, "registered", f"agent `{agent_name}`  {step}"))
             else:
                 outcomes.append(Outcome(client, "failed", "sdpm mcp-config kiro-cli"))
             if cleanup:
@@ -666,9 +684,19 @@ def register(
     return sum(1 for o in outcomes if o.status == "failed")
 
 
-_MARK = {"registered": "\x1b[32m✓\x1b[0m", "opened": "\x1b[32m✓\x1b[0m", "skipped": "–",
-         "failed": "\x1b[31m✗\x1b[0m", "manual": " "}
+_MARK = {"registered": ("32", "✓"), "opened": ("32", "✓"), "skipped": ("", "–"),
+         "failed": ("31", "✗"), "manual": ("", " ")}
 _WORD = {"registered": "registered", "opened": "link opened", "skipped": "skipped", "failed": "failed", "manual": ""}
+
+
+def use_color() -> bool:
+    """Colour only on a terminal, and not when NO_COLOR is set (https://no-color.org)."""
+    return sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+
+
+def _mark(status: str, color: bool) -> str:
+    code, mark = _MARK[status]
+    return f"\x1b[{code}m{mark}\x1b[0m" if color and code else mark
 
 
 def print_outcomes(outcomes: list[Outcome]) -> None:
@@ -676,8 +704,9 @@ def print_outcomes(outcomes: list[Outcome]) -> None:
         return
     print()
     width = max(len(o.client.label) for o in outcomes) + 2
+    color = use_color()
     for o in outcomes:
-        print(f"  {_MARK[o.status]} {o.client.label:<{width}}{_WORD[o.status]:<12} {o.detail}")
+        print(f"  {_mark(o.status, color)} {o.client.label:<{width}}{_WORD[o.status]:<12} {o.detail}")
     print()
 
 

@@ -28,6 +28,7 @@
     "presentationCount": "{count, plural, one {# presentation} other {# presentations}}",
     "newDeck": "New Deck",
     "searchPlaceholder": "Search slides across the organization…",
+    "searchPlaceholderLocal": "Search decks…",
     "clearSearch": "Clear search",
     "tabs": {
       "mine": "My Decks",
@@ -384,6 +385,25 @@
   "htmlFormatPill": {
     "buildAsHtml": "Build as HTML",
     "hint": "Creates an HTML deck to present in a browser. It can't be edited in PowerPoint."
+  },
+  "chatModel": {
+    "trigger": "Model: {model}",
+    "triggerWithEffort": "Model: {model}, effort: {effort}",
+    "modelHeading": "Model",
+    "effortHeading": "Effort",
+    "effortLevel": {
+      "none": "None",
+      "low": "Low",
+      "medium": "Medium",
+      "high": "High",
+      "xhigh": "Extra high",
+      "max": "Max"
+    },
+    "defaultModel": "Default model",
+    "chatModel": "This chat's model",
+    "appliesNextMessage": "Applies from your next message.",
+    "credits": "{rate}× credits",
+    "errorChange": "Couldn't change the model"
   },
   "tools": {
     "running": "Running",

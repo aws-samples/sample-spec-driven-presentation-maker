@@ -142,7 +142,7 @@ export function DeckListView({
           value={searchQuery}
           onChange={(e) => onSearchChange(e.target.value)}
           onKeyDown={(e) => { if (e.key === "Escape") onSearchChange("") }}
-          placeholder={t("searchPlaceholder")}
+          placeholder={IS_LOCAL ? t("searchPlaceholderLocal") : t("searchPlaceholder")}
           className="w-full pl-11 pr-10 py-3 text-sm bg-transparent focus:outline-none placeholder:text-foreground-muted tracking-[-0.01em]"
         />
         {searchQuery && (

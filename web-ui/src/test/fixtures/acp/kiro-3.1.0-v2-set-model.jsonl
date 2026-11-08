@@ -1,0 +1,16 @@
+{"client": {"id": 1, "method": "initialize"}}
+{"jsonrpc": "2.0", "result": {"protocolVersion": 1, "agentCapabilities": {"loadSession": true, "promptCapabilities": {"image": true, "audio": false, "embeddedContext": false}, "mcpCapabilities": {"http": true, "sse": false}, "sessionCapabilities": {}, "auth": {}}, "authMethods": [], "agentInfo": {"name": "Kiro CLI Agent", "title": "Kiro CLI Agent", "version": "3.1.0"}}, "id": 1}
+{"client": {"id": 2, "method": "session/new"}}
+{"jsonrpc": "2.0", "method": "_kiro.dev/mcp/server_initialized", "params": {"sessionId": "07448430-b73e-482c-9ca3-7b740cd82369", "serverName": "sdpm"}}
+{"jsonrpc": "2.0", "method": "_kiro.dev/mcp/server_initialized", "params": {"sessionId": "07448430-b73e-482c-9ca3-7b740cd82369", "serverName": "sdpm"}}
+{"jsonrpc": "2.0", "result": {"sessionId": "07448430-b73e-482c-9ca3-7b740cd82369", "modes": {"currentModeId": "sdpm-orchestrator", "availableModes": [{"id": "sdpm-composer", "name": "sdpm-composer"}, {"id": "sdpm-orchestrator", "name": "sdpm-orchestrator"}, {"id": "sdpm-style", "name": "sdpm-style"}, {"id": "sdpm-translate", "name": "sdpm-translate"}]}, "models": {"currentModelId": "auto", "availableModels": [{"modelId": "auto", "name": "auto", "description": "Models chosen by task for optimal usage and consistent quality"}, {"modelId": "claude-haiku-5.5", "name": "claude-haiku-5.5", "description": "Claude Haiku 5.5 model with 1M context window"}, {"modelId": "claude-haiku-4.5", "name": "claude-haiku-4.5", "description": "The latest Claude Haiku model"}]}}, "id": 2}
+{"client": {"id": 3, "method": "session/set_model"}}
+{"jsonrpc": "2.0", "method": "_kiro.dev/subagent/list_update", "params": {"subagents": [], "pendingStages": []}}
+{"jsonrpc": "2.0", "method": "_kiro.dev/metadata", "params": {"sessionId": "07448430-b73e-482c-9ca3-7b740cd82369", "contextUsagePercentage": 3.1624999046325684, "reasoning": {"support": "unavailable", "effortLevels": []}}}
+{"jsonrpc": "2.0", "method": "_kiro.dev/metadata", "params": {"sessionId": "07448430-b73e-482c-9ca3-7b740cd82369", "contextUsagePercentage": 3.1624999046325684, "reasoning": {"support": "unavailable", "effortLevels": []}}}
+{"jsonrpc": "2.0", "result": {}, "id": 3}
+{"client": {"id": 4, "method": "session/prompt"}}
+{"jsonrpc": "2.0", "method": "session/update", "params": {"sessionId": "07448430-b73e-482c-9ca3-7b740cd82369", "update": {"sessionUpdate": "agent_message_chunk", "content": {"type": "text", "text": "OK"}}}}
+{"jsonrpc": "2.0", "method": "_kiro.dev/metadata", "params": {"sessionId": "07448430-b73e-482c-9ca3-7b740cd82369", "contextUsagePercentage": 6.16949987411499, "reasoning": {"support": "unavailable", "effortLevels": []}}}
+{"jsonrpc": "2.0", "method": "_kiro.dev/metadata", "params": {"sessionId": "07448430-b73e-482c-9ca3-7b740cd82369", "contextUsagePercentage": 6.16949987411499, "meteringUsage": [{"value": 0.015723369021558874, "unit": "credit", "unitPlural": "credits"}], "turnDurationMs": 1320, "reasoning": {"support": "unavailable", "effortLevels": []}}}
+{"jsonrpc": "2.0", "result": {"stopReason": "end_turn"}, "id": 4}

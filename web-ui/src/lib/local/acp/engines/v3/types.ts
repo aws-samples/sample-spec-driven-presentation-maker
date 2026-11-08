@@ -96,10 +96,22 @@ export interface V3ToolOutput {
   message?: string
 }
 
-/** A `config_option_update` option of type select (the model list is the one with category `model`). */
+/** A model's `_meta.kiro` in the model option: its credit multiplier and, with `hasEffort`, its effort levels. */
+export interface V3ModelMeta {
+  rateMultiplier?: number
+  hasEffort?: boolean
+  effortLevels?: string[]
+  defaultEffortLevel?: string
+}
+
+/**
+ * A `config_option_update` option of type select. The model list is the one with category
+ * `model`; a model with effort adds one with category `thought_level` (its levels, current = the
+ * model's default) and one with category `thinking`, which a model without effort removes.
+ */
 export interface V3SelectOption {
   id?: string
   category?: string
   currentValue?: string
-  options?: { value?: string; name?: string; description?: string }[]
+  options?: { value?: string; name?: string; description?: string; _meta?: { kiro?: V3ModelMeta } | null }[]
 }

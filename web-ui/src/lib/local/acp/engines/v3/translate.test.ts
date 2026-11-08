@@ -172,17 +172,36 @@ describe("other notifications", () => {
     expect(t.translate(update({ sessionUpdate: "session_info_update", title: "New title" }))).toEqual([])
   })
 
-  it("keeps the models of the last config_option_update", () => {
+  it("keeps the model, effort and models of the last config_option_update", () => {
     expect(t.models()).toBeNull()
-    t.translate(update({ sessionUpdate: "config_option_update", configOptions: [
-      { type: "select", id: "mode", category: "mode", currentValue: "sdpm-orchestrator", options: [{ value: "vibe", name: "Default" }] },
-      { type: "select", id: "model", category: "model", currentValue: "auto", options: [
-        { value: "auto", name: "Auto", description: "Models chosen by task" }, { value: "claude-sonnet-5.5", name: "Claude Sonnet 5.5" },
-      ] },
-    ] }))
-    expect(t.models()).toEqual({ current: "auto", available: [
-      { modelId: "auto", name: "Auto", description: "Models chosen by task" }, { modelId: "claude-sonnet-5.5", name: "Claude Sonnet 5.5" },
+    const model = (current: string) => ({ type: "select", id: "model", category: "model", currentValue: current, options: [
+      { value: "auto", name: "Auto", description: "Models chosen by task", _meta: { kiro: { rateMultiplier: 1, hasEffort: false } } },
+      { value: "claude-haiku-5.5", name: "Claude Haiku 5.5", _meta: { kiro: { rateMultiplier: 0.06, hasEffort: true, effortLevels: ["low", "medium", "max"], defaultEffortLevel: "medium" } } },
+      { value: "grok-4.7", name: "Grok 4.7", description: "[Internal] Experimental", _meta: { kiro: { hasEffort: true, effortLevels: ["low"] } } },
+      { value: "old", name: "Old", description: "[Deprecated] Gone" },
+      { value: "odd", name: "Odd", _meta: { kiro: { rateMultiplier: "2", hasEffort: true, effortLevels: [] } } },
     ] })
+    const mode = { type: "select", id: "mode", category: "mode", currentValue: "sdpm-orchestrator", options: [{ value: "vibe", name: "Default" }] }
+    const available = [
+      { modelId: "auto", name: "Auto", description: "Models chosen by task", rate: 1 },
+      { modelId: "claude-haiku-5.5", name: "Claude Haiku 5.5", effortLevels: ["low", "medium", "max"], defaultEffort: "medium", rate: 0.06 },
+      { modelId: "odd", name: "Odd" },
+    ]
+    t.translate(update({ sessionUpdate: "config_option_update", configOptions: [mode, model("auto")] }))
+    expect(t.models()).toEqual({ current: "auto", available, effort: null })
+    expect(t.configIds()).toEqual({ model: "model", effort: null })
+
+    t.translate(update({ sessionUpdate: "config_option_update", configOptions: [mode, model("claude-haiku-5.5"),
+      { type: "select", id: "effortLevel", category: "thought_level", currentValue: "medium", options: [{ value: "low" }, { value: "medium" }, { value: "max" }] },
+      { type: "select", id: "thinking", category: "thinking", currentValue: "on", options: [{ value: "on" }, { value: "off" }] },
+    ] }))
+    expect(t.models()).toEqual({ current: "claude-haiku-5.5", available, effort: { current: "medium", levels: ["low", "medium", "max"] } })
+    expect(t.configIds()).toEqual({ model: "model", effort: "effortLevel" })
+
+    // A model without effort: kiro-cli drops the effort option.
+    t.translate(update({ sessionUpdate: "config_option_update", configOptions: [mode, model("auto")] }))
+    expect(t.models()?.effort).toBeNull()
+    expect(t.configIds().effort).toBeNull()
   })
 
   it("logs a custom agent that was not started or not readable, and reports the former", () => {
