@@ -1,7 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import { describe, it, expect } from "vitest"
-import { cutAtPrompt, isLocalHistoryFormat, parseLocalHistory, parseCloudHistory, userMessageFromText } from "./chatHistory"
+import { cutAtPrompt, cutLocalAtPrompt, isLocalHistoryFormat, parseLocalHistory, parseCloudHistory, settleStaleTasks, userMessageFromText } from "./chatHistory"
+import type { Message } from "@/hooks/useChatStream"
 import type { ChatMessage } from "@/services/deckService"
 import composerNote from "@/test/fixtures/composerNote.json"
 
@@ -31,6 +32,15 @@ describe("parseLocalHistory", () => {
     ]))
     expect(out[0].localNotice).toBe("context_not_carried_over")
     expect(out[1]).not.toHaveProperty("localNotice")
+  })
+
+  it("keeps a tool's task on toolUses and blocks", () => {
+    const tool = { toolUseId: "t1", name: "compose_slides", input: {}, task: { id: "k1", state: "running" } }
+    const out = parseLocalHistory(asHistory([
+      { role: "assistant", content: "", toolUses: [tool], blocks: [{ type: "tool", tool }] },
+    ]))
+    expect(out[0].toolUses[0].task).toEqual({ id: "k1", state: "running" })
+    expect(out[0].blocks?.[0]).toMatchObject({ type: "tool", tool: { task: { id: "k1", state: "running" } } })
   })
 })
 
@@ -230,5 +240,53 @@ describe("cutAtPrompt", () => {
 
   it("keeps the whole history when the prompt is not stored yet", () => {
     expect(cutAtPrompt(history, "not there")).toEqual(history)
+  })
+})
+
+describe("cutLocalAtPrompt", () => {
+  const msg = (role: "user" | "assistant", content: string): Message => ({ role, content, toolUses: [] })
+  const messages = [msg("user", "first"), msg("assistant", "ok"), msg("user", "make it"), msg("assistant", "partial")]
+
+  it("keeps the messages before the user message with the prompt's text", () => {
+    expect(cutLocalAtPrompt(messages, "make it")).toEqual(messages.slice(0, 2))
+  })
+
+  it("matches the typed text of a prompt with the image marker, attachments and a snippet", () => {
+    const prompt = '<!--sdpm:include_images=true-->\n[Attached:{"v":1,"name":"a.png"}]\n[Attached:{"v":1,"name":"b.pdf"}]\n\nmake it\n\n---snippet---\nquoted\n---/snippet---'
+    expect(cutLocalAtPrompt(messages, prompt)).toEqual(messages.slice(0, 2))
+  })
+
+  it("cuts at the last match when the same text was sent twice", () => {
+    const twice = [...messages, msg("user", "make it"), msg("assistant", "again")]
+    expect(cutLocalAtPrompt(twice, "make it")).toEqual(twice.slice(0, 4))
+  })
+
+  it("keeps the whole list when nothing matches, and for an empty prompt", () => {
+    expect(cutLocalAtPrompt(messages, "not there")).toBe(messages)
+    expect(cutLocalAtPrompt([...messages, msg("user", "")], "")).toHaveLength(5)
+  })
+})
+
+describe("settleStaleTasks", () => {
+  const tool = (state: "running" | "completed" | "failed") => ({ toolUseId: `t-${state}`, name: "compose_slides", input: {}, task: { id: `k-${state}`, state } })
+
+  it("marks a running task cancelled in toolUses and blocks", () => {
+    const running = tool("running")
+    const out = settleStaleTasks([{ role: "assistant", content: "", toolUses: [running], blocks: [{ type: "tool", tool: running }] }])
+    expect(out[0].toolUses[0].task?.state).toBe("cancelled")
+    expect(out[0].blocks?.[0]).toMatchObject({ type: "tool", tool: { task: { state: "cancelled" } } })
+    expect(running.task.state).toBe("running")
+  })
+
+  it("leaves completed and failed tasks alone", () => {
+    const out = settleStaleTasks([
+      { role: "assistant", content: "", toolUses: [tool("completed"), tool("failed"), tool("running")] },
+    ])
+    expect(out[0].toolUses.map((t) => t.task?.state)).toEqual(["completed", "failed", "cancelled"])
+  })
+
+  it("returns the same array when no task runs", () => {
+    const messages: Message[] = [{ role: "assistant", content: "", toolUses: [tool("completed")] }, { role: "user", content: "hi", toolUses: [] }]
+    expect(settleStaleTasks(messages)).toBe(messages)
   })
 })

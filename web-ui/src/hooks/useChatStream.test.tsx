@@ -4,7 +4,8 @@
  * A Local 409 session conflict is shown as its own translated message instead of the
  * generic "Sorry, something went wrong". A Local stream's session notice lands on the reply.
  * A send while the invoke runs is a steer into it, shown where the turn's stream reports it
- * accepted; Stop marks an unread one not delivered.
+ * accepted; Stop marks an unread one not delivered. Turn events drive `turnActive`; a resume
+ * follows the chat's work period (a send during it is a steer into it, Stop ends it).
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -13,15 +14,15 @@ import { NextIntlClientProvider } from "next-intl"
 import type { ReactNode } from "react"
 import en from "../../messages/en.json"
 
-const { invokeAgentCore, stopLocalAgent, steerLocalAgent, notifyError } = vi.hoisted(() => ({
-  invokeAgentCore: vi.fn(), stopLocalAgent: vi.fn(), steerLocalAgent: vi.fn(), notifyError: vi.fn(),
+const { invokeAgentCore, resumeLocalAgent, stopLocalAgent, steerLocalAgent, notifyError } = vi.hoisted(() => ({
+  invokeAgentCore: vi.fn(), resumeLocalAgent: vi.fn(), stopLocalAgent: vi.fn(), steerLocalAgent: vi.fn(), notifyError: vi.fn(),
 }))
 vi.mock("@/lib/mode", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/lib/mode")>()), IS_LOCAL: true }))
 vi.mock("@/hooks/useAuth", () => {
   const auth = { isAuthenticated: true, user: { access_token: "at", profile: { sub: "u1" } } }
   return { useAuth: () => auth }
 })
-vi.mock("@/services/agentCoreService", () => ({ invokeAgentCore, stopRuntimeSession: vi.fn() }))
+vi.mock("@/services/agentCoreService", () => ({ invokeAgentCore, resumeLocalAgent, stopRuntimeSession: vi.fn() }))
 vi.mock("@/services/localService", () => ({ stopLocalAgent, steerLocalAgent }))
 vi.mock("@/lib/errors", () => ({ notifyError }))
 
@@ -168,5 +169,210 @@ describe("useChatStream steer (local)", () => {
     expect(result.current.messages.find((m) => m.steerId === read)?.steerNotDelivered).toBeUndefined()
     expect(result.current.messages.find((m) => m.steerId === unread)?.steerNotDelivered).toBe(true)
     await act(async () => { run.finish!() })
+  })
+})
+
+type ResumeHandlers = Handlers & {
+  onResumeAck: (ack: { working: boolean }) => void
+  onToolUse: (name: string, data: Record<string, unknown>) => void
+}
+
+/** Capture the resume the hook starts; `finish` ends its stream, its signal's abort rejects it. */
+function captureResume() {
+  const run: { sessionId?: string; handlers?: ResumeHandlers; signal?: AbortSignal; finish?: (working?: boolean) => void } = {}
+  resumeLocalAgent.mockImplementationOnce((sessionId: string, handlers: ResumeHandlers, { signal }: { signal: AbortSignal }) =>
+    new Promise((resolve, reject) => {
+      Object.assign(run, { sessionId, handlers, signal })
+      run.finish = (working = true) => resolve({ working, completion: "" })
+      signal.addEventListener("abort", () => reject(new DOMException("Aborted", "AbortError")))
+    }))
+  return run
+}
+
+const render = (options: { onSendComplete?: () => void; onTurnEnd?: () => void } = {}) =>
+  renderHook(() => useChatStream({ sessionId: "K1", mode: "vibe", deckId: "d1", ...options }), { wrapper })
+
+describe("useChatStream turns (local)", () => {
+  it("drives turnActive from turn events while the period stays open, and calls onTurnEnd", async () => {
+    const run = captureInvoke()
+    const onTurnEnd = vi.fn()
+    const { result } = render({ onTurnEnd })
+    let done: Promise<boolean> | undefined
+    act(() => { done = result.current.sendMessage("make it") })
+    act(() => { run.handlers!.onSession.onEvent({ turn: { id: "t1", why: "prompt", text: "make it" } }, { own: true }) })
+    expect(result.current.turnActive).toBe(true)
+    act(() => { run.handlers!.onSession.onEvent({ turnEnd: { id: "t1", how: "finished" } }, { own: true }) })
+    expect(result.current.turnActive).toBe(false)
+    expect(result.current.isLoading).toBe(true)
+    expect(onTurnEnd).toHaveBeenCalledTimes(1)
+    act(() => { run.handlers!.onSession.onEvent({ turn: { id: "t2", why: "wake", text: "" } }, { own: true }) })
+    expect(result.current.turnActive).toBe(true)
+    act(() => { run.handlers!.onSession.onEvent({ work: { state: "idle", how: "finished" } }, { own: true }) })
+    expect(result.current.turnActive).toBe(false)
+    await act(async () => { run.finish!(); await done })
+    expect(result.current.isLoading).toBe(false)
+  })
+
+  it("keeps a task card running across turnEnd and a wake turn until taskEnd", async () => {
+    invokeAgentCore.mockImplementationOnce(async (...args: unknown[]) => {
+      const onToolUse = args[5] as (name: string, data: Record<string, unknown>) => void
+      const onSession = args[11] as Handlers["onSession"]
+      onSession.onEvent({ turn: { id: "t1", why: "prompt", text: "make it" } }, { own: true })
+      onToolUse("compose_slides", { toolUseId: "c1", input: {} })
+      onToolUse("compose_slides", { toolUseId: "c1", taskStarted: true, task: { id: "k1", state: "running" } })
+      onSession.onEvent({ turnEnd: { id: "t1", how: "finished" } }, { own: true })
+      onSession.onEvent({ turn: { id: "t2", why: "wake", text: "" } }, { own: true })
+      return ""
+    })
+    const { result } = render()
+    await act(async () => { await result.current.sendMessage("make it") })
+    const tool = () => result.current.messages.flatMap((m) => m.toolUses).find((t) => t.toolUseId === "c1")
+    expect(tool()?.task).toEqual({ id: "k1", state: "running" })
+  })
+})
+
+describe("useChatStream resume (local)", () => {
+  const history: Message[] = [
+    { role: "user", content: "earlier", toolUses: [] },
+    { role: "assistant", content: "earlier reply", toolUses: [] },
+    { role: "user", content: "make it", toolUses: [] },
+    { role: "assistant", content: "stale partial", toolUses: [] },
+  ]
+
+  it("rebuilds the replayed period from its prompt, once", async () => {
+    const run = captureResume()
+    const { result } = render()
+    act(() => { result.current.setMessages(history) })
+    const cut = vi.fn((prompt: string) => history.slice(0, history.findLastIndex((m) => m.role === "user" && m.content === prompt)))
+    let done: Promise<boolean | undefined> | undefined
+    act(() => { done = result.current.resume(cut) })
+    expect(run.sessionId).toBe("K1")
+    act(() => {
+      run.handlers!.onResumeAck({ working: true })
+      run.handlers!.onSession.onEvent({ work: { state: "busy" } }, { own: false })
+      run.handlers!.onSession.onEvent({ turn: { id: "t1", why: "prompt", text: "make it" } }, { own: false })
+      run.handlers!.onStreamUpdate("On it")
+    })
+    expect(cut).toHaveBeenCalledWith("make it")
+    expect(roles(result.current.messages)).toEqual(["user:earlier", "assistant:earlier reply", "user:make it", "assistant:On it"])
+    expect(result.current.isLoading).toBe(true)
+    await act(async () => { run.finish!(); await done })
+  })
+
+  it("turns a send during the followed period into a steer, and a send after it into an invoke", async () => {
+    const run = captureResume()
+    const onSendComplete = vi.fn()
+    const { result } = render({ onSendComplete })
+    let done: Promise<boolean | undefined> | undefined
+    act(() => { done = result.current.resume(() => []) })
+    act(() => { run.handlers!.onResumeAck({ working: true }) })
+    steerLocalAgent.mockResolvedValueOnce(undefined)
+    await act(async () => { await result.current.sendMessage("more") })
+    expect(steerLocalAgent).toHaveBeenCalledWith("K1", expect.any(String), "more")
+    expect(invokeAgentCore).not.toHaveBeenCalled()
+
+    let resolved: boolean | undefined
+    await act(async () => { run.finish!(); resolved = await done })
+    expect(resolved).toBe(true)
+    expect(result.current.isLoading).toBe(false)
+    expect(onSendComplete).toHaveBeenCalledTimes(1)
+    invokeAgentCore.mockResolvedValueOnce("")
+    await act(async () => { await result.current.sendMessage("next") })
+    expect(invokeAgentCore).toHaveBeenCalledTimes(1)
+  })
+
+  it("holds a send until the resume answers", async () => {
+    const run = captureResume()
+    const { result } = render()
+    act(() => { void result.current.resume(() => []) })
+    steerLocalAgent.mockResolvedValueOnce(undefined)
+    let sent: Promise<boolean> | undefined
+    act(() => { sent = result.current.sendMessage("waiting") })
+    await act(async () => { await Promise.resolve() })
+    expect(steerLocalAgent).not.toHaveBeenCalled()
+    expect(invokeAgentCore).not.toHaveBeenCalled()
+    await act(async () => { run.handlers!.onResumeAck({ working: true }); await sent })
+    expect(steerLocalAgent).toHaveBeenCalledWith("K1", expect.any(String), "waiting")
+    await act(async () => { run.finish!() })
+  })
+
+  it("ends the followed period on Stop", async () => {
+    const run = captureResume()
+    const { result } = render()
+    let done: Promise<boolean | undefined> | undefined
+    act(() => { done = result.current.resume(() => []) })
+    act(() => { run.handlers!.onResumeAck({ working: true }) })
+    stopLocalAgent.mockResolvedValueOnce(undefined)
+    let resolved: boolean | undefined = false
+    await act(async () => { result.current.stopGeneration(); resolved = await done })
+    expect(run.signal!.aborted).toBe(true)
+    expect(stopLocalAgent).toHaveBeenCalledWith({ sessionId: "K1" })
+    expect(resolved).toBeUndefined()
+    expect(result.current.isLoading).toBe(false)
+  })
+
+  it("lets a resume for another session id replace the one in flight", async () => {
+    const first = captureResume()
+    const second = captureResume()
+    const { result, rerender } = renderHook(({ sessionId }) => useChatStream({ sessionId, mode: "vibe", deckId: "d1" }), { wrapper, initialProps: { sessionId: "d1-padded" } })
+    let firstDone: Promise<boolean | undefined> | undefined
+    act(() => { firstDone = result.current.resume(() => []) })
+    act(() => { first.handlers!.onResumeAck({ working: true }) })
+    rerender({ sessionId: "K1" })
+    let secondDone: Promise<boolean | undefined> | undefined
+    act(() => { secondDone = result.current.resume(() => []) })
+    expect(first.signal!.aborted).toBe(true)
+    expect(second.sessionId).toBe("K1")
+    let firstResult: boolean | undefined = false
+    await act(async () => { firstResult = await firstDone })
+    expect(firstResult).toBeUndefined()
+    act(() => { second.handlers!.onResumeAck({ working: true }) })
+    expect(result.current.isLoading).toBe(true)
+    await act(async () => { second.finish!(); await secondDone })
+    expect(result.current.isLoading).toBe(false)
+  })
+
+  it("joins the resume in flight for the same session", async () => {
+    const run = captureResume()
+    const { result } = render()
+    let firstDone: Promise<boolean | undefined> | undefined
+    let secondDone: Promise<boolean | undefined> | undefined
+    act(() => { firstDone = result.current.resume(() => []) })
+    act(() => { secondDone = result.current.resume(() => []) })
+    expect(resumeLocalAgent).toHaveBeenCalledTimes(1)
+    expect(run.signal!.aborted).toBe(false)
+    act(() => { run.handlers!.onResumeAck({ working: true }) })
+    let results: (boolean | undefined)[] = []
+    await act(async () => { run.finish!(); results = await Promise.all([firstDone, secondDone]) })
+    expect(results).toEqual([true, true])
+  })
+
+  it("resolves false when nothing runs, and undefined while a send's invoke runs", async () => {
+    resumeLocalAgent.mockImplementationOnce(async (_sid: string, h: ResumeHandlers) => {
+      h.onResumeAck({ working: false })
+      return { working: false, completion: "" }
+    })
+    const { result } = render()
+    let resolved: boolean | undefined = true
+    await act(async () => { resolved = await result.current.resume(() => []) })
+    expect(resolved).toBe(false)
+    expect(result.current.isLoading).toBe(false)
+
+    const run = captureInvoke()
+    act(() => { void result.current.sendMessage("count") })
+    await act(async () => { resolved = await result.current.resume(() => []) })
+    expect(resolved).toBeUndefined()
+    expect(resumeLocalAgent).toHaveBeenCalledTimes(1)
+    await act(async () => { run.finish!() })
+  })
+
+  it("aborts the resume on unmount", async () => {
+    const run = captureResume()
+    const { result, unmount } = render()
+    let done: Promise<boolean | undefined> | undefined
+    act(() => { done = result.current.resume(() => []) })
+    unmount()
+    expect(run.signal!.aborted).toBe(true)
+    await expect(done).resolves.toBeUndefined()
   })
 })

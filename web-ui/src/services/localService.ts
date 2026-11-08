@@ -2,9 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * Local Service — client for the Local-only Next.js API routes (`src/app/api/`):
- * open in the OS, chat persistence, agent stop and steer, the agent engine, agent definitions,
- * models, and the reconnect stream. Every function returns early in cloud mode, where those routes
- * do not exist.
+ * open in the OS, chat persistence, agent stop and steer, the agent engine, agent definitions
+ * and models. Every function returns early in cloud mode, where those routes do not exist.
  */
 
 import { IS_LOCAL } from "@/lib/mode"
@@ -215,38 +214,4 @@ export async function setLocalSessionModel(sessionId: string, choice: LocalModel
   if (!IS_LOCAL) return null
   const response = await postJson("/api/agent/models", { sessionId, ...choice }, "PUT")
   return response.json()
-}
-
-function streamPath(sessionId: string): string {
-  return `/api/agent/stream?sessionId=${encodeURIComponent(sessionId)}`
-}
-
-/**
- * URL of a session's server-sent event stream (replay + live).
- *
- * @param sessionId - ACP session identifier
- * @returns The stream URL, or null in cloud mode
- */
-export function localStreamUrl(sessionId: string): string | null {
-  if (!IS_LOCAL) return null
-  return streamPath(sessionId)
-}
-
-/**
- * Whether a session is still running in the background (its stream answers with SSE).
- * The probe's body is cancelled right away; reconnect with an EventSource on localStreamUrl.
- *
- * @param sessionId - ACP session identifier
- * @returns True when the session streams; false otherwise, on error, and in cloud mode
- */
-export async function hasLocalStream(sessionId: string): Promise<boolean> {
-  if (!IS_LOCAL) return false
-  try {
-    const check = await fetch(streamPath(sessionId))
-    const ct = check.headers.get("content-type") || ""
-    try { check.body?.getReader()?.cancel() } catch {}
-    return ct.includes("text/event-stream")
-  } catch {
-    return false
-  }
 }

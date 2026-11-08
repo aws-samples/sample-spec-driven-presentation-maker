@@ -4,7 +4,8 @@
  * ChatPanel — Chat interface orchestrator.
  *
  * Delegates streaming to useChatStream, input to ChatInput.
- * Retains: history loading, reconnect, @mentions, Options, side effects.
+ * Retains: history loading, resume after a reload or on a reopened deck, @mentions, Options,
+ * side effects.
  */
 
 "use client"
@@ -22,7 +23,7 @@ import type { UploadedFile } from "@/services/uploadService"
 import { useChatStream, type Message, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { useSlashPickerItems } from "@/hooks/useSlashPickerItems"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
-import { ChatMessage, ToolUse } from "./ChatMessage"
+import { ChatMessage } from "./ChatMessage"
 import { ComposerNoteCard } from "./ComposerNoteCard"
 import { McpStatusBar } from "./McpStatusBar"
 import { FileDropZone } from "./FileDropZone"
@@ -38,7 +39,7 @@ import { LocalModelPicker } from "./LocalModelPicker"
 import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
 import { toast } from "sonner"
-import { cutAtPrompt, isLocalHistoryFormat, parseLocalHistory, parseCloudHistory } from "./chatHistory"
+import { cutAtPrompt, cutLocalAtPrompt, isLocalHistoryFormat, parseLocalHistory, parseCloudHistory, settleStaleTasks } from "./chatHistory"
 import { isResumable } from "@/lib/sessionState"
 import { useLocale, useTranslations } from "next-intl"
 import { forkKiroSession, listKiroSessions } from "@/services/kiroSessionsService"
@@ -119,8 +120,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // --- Config ---
   const [configLoaded, setConfigLoaded] = useState(false)
   const [historyLoading, setHistoryLoading] = useState(false)
-  const [reconnectLoading, setReconnectLoading] = useState(false)
-  // Cloud: set by the history load when the session was working; applied once the config is loaded.
+  // Set by the history load when the session may be working (Cloud: it was; Local: always, on a
+  // deck); applied once the config is loaded.
   const [resumeCut, setResumeCut] = useState<{ cut: (prompt: string) => Message[] } | null>(null)
 
   // --- Options ---
@@ -158,7 +159,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const shouldAutoScroll = useRef(true)
   const chatInputRef = useRef<ChatInputHandle>(null)
-  const reconnectingRef = useRef(false)
   const currentDeckId = useRef(deckId)
   currentDeckId.current = deckId
 
@@ -178,7 +178,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   /** Persist chat messages to disk (Local mode only). */
   const saveLocalChat = useCallback((overrideDeckId?: string) => {
     const did = overrideDeckId || currentDeckId.current
-    if (!IS_LOCAL || !did || reconnectingRef.current) return
+    if (!IS_LOCAL || !did) return
     localService.saveLocalChat(did, stream.messagesRef.current).catch((err) => notifyError(t("errorSaveHistory"), err))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
@@ -214,22 +214,29 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       }
     }
 
-    // Save after tool completed
+    // Save after tool completed (also a background task's end: `taskEnd` comes as `completed`)
     if (toolUseData?.completed) setTimeout(() => saveLocalChat(), 100)
 
-    // Save after tool started (ensures compose_slides is persisted)
+    // Save after tool started (ensures compose_slides is persisted; also a task's start, `taskStarted`)
     if (!toolUseData?.completed && !toolUseData?.stream) setTimeout(() => saveLocalChat(), 100)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, auth.user?.id_token, onDeckCreated, onPreviewInvalidated, onWorkflowPhase])
 
   // --- useChatStream ---
+  // A send's or a replay's end, and a turn's end, save the chat once the render that holds their
+  // messages is committed (saveLocalChat reads messagesRef, which follows the render): a replayed
+  // period arrives in one chunk, so its messages are not rendered yet when its stream ends.
+  const [saveRequest, setSaveRequest] = useState(0)
+  useEffect(() => { if (saveRequest) saveLocalChat() }, [saveRequest, saveLocalChat])
+  const requestSave = useCallback(() => { if (IS_LOCAL) setSaveRequest((n) => n + 1) }, [])
   const mode = agentMode === "vibe" ? "vibe" : "spec"
   const stream = useChatStream({
     sessionId,
     mode,
     deckId: currentDeckId.current !== "new" ? currentDeckId.current : undefined,
     onToolEvent: handleToolEvent,
-    onSendComplete: () => saveLocalChat(),
+    onSendComplete: requestSave,
+    onTurnEnd: requestSave,
   })
 
   const cancelFork = useCallback(() => {
@@ -317,12 +324,16 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   // --- Load chat history ---
   useEffect(() => {
+    // Local: a load the effect has re-run since (React's dev double run, a session id change)
+    // sets nothing, so it cannot put the saved history over a replay the newer load started.
+    let superseded = false
     async function loadHistory() {
       const idToken = auth.user?.id_token
       if (!IS_LOCAL && !idToken) return
       if (!sessionId) return
       setHistoryLoading(true)
       let raw: ChatHistoryMessage[] = []
+      let loaded: ReturnType<typeof parseLocalHistory> = []
       try {
         const { messages: history, truncated } = await getChatHistory(sessionId, idToken ?? "", deckId || undefined)
         raw = history
@@ -332,11 +343,13 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         if (history.length > 0) {
           // Local mode: .chat.json is already in ChatPanel's internal format
           if (IS_LOCAL && isLocalHistoryFormat(history)) {
-            stream.setMessages(parseLocalHistory(history))
-            return
+            if (superseded) return
+            loaded = parseLocalHistory(history)
+            stream.setMessages(loaded)
+          } else {
+            const parsed = parseCloudHistory(history)
+            if (parsed.length > 0) stream.setMessages(parsed)
           }
-          const parsed = parseCloudHistory(history)
-          if (parsed.length > 0) stream.setMessages(parsed)
         } else if (!IS_LOCAL && sub && deckId && deckId !== "new" && !isOwnerPrefixed(sessionId)) {
           // An earlier-format id with no history: continue under this user's own id.
           replacedLegacyIdRef.current = sessionId
@@ -345,22 +358,31 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       } finally {
         setHistoryLoading(false)
       }
-      // Cloud: the session was working when this page last saw it (reload, wake, reopened
-      // deck) — follow it once the agent config is loaded. The replay rebuilds the work
-      // from its opening prompt on.
-      if (!IS_LOCAL && deckId && deckId !== "new" && isResumable(sessionId)) {
+      // The session may be working (reload, wake, reopened deck): follow it once the agent
+      // config is loaded. The replay rebuilds the work from its opening prompt on. Cloud: when
+      // it was working as this page last saw it. Local: always (the server also replays a
+      // period that ended while no page followed it).
+      if (IS_LOCAL && deckId && deckId !== "new") {
+        if (superseded) return
+        setResumeCut({ cut: (prompt: string) => cutLocalAtPrompt(loaded, prompt) })
+      } else if (!IS_LOCAL && deckId && deckId !== "new" && isResumable(sessionId)) {
         setResumeCut({ cut: (prompt: string) => parseCloudHistory(cutAtPrompt(raw, prompt)) })
       }
     }
     if (auth.isAuthenticated) loadHistory()
+    return () => { superseded = true }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId, auth.isAuthenticated])
 
-  // --- Resume a working session (Cloud) ---
+  // --- Resume a working session ---
   useEffect(() => {
     if (!resumeCut || !configLoaded) return
     setResumeCut(null)
-    void stream.resume(resumeCut.cut)
+    const resumedId = sessionId
+    void stream.resume(resumeCut.cut).then((working) => {
+      // Nothing runs: a task the history shows running was stopped with its work.
+      if (working === false && sessionIdRef.current === resumedId) stream.setMessages(settleStaleTasks)
+    })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeCut, configLoaded])
 
@@ -378,156 +400,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     prepareAgentCore(sessionIdRef.current, token, mode).catch((err: unknown) => console.warn("Prepare failed:", err))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [deckId, visible, configLoaded, auth.user?.access_token])
-
-  // --- Reconnect to running background session (Local mode) ---
-  useEffect(() => {
-    if (!IS_LOCAL || !deckId || deckId === "new") return
-    // Skip reconnect when this ChatPanel is already streaming via
-    // /api/agent/invoke. Without this guard, the deckId prop swap from
-    // "new" → real deckId after init_deck_workspace triggers a second SSE
-    // consumer (EventSource), which reads the same stream alongside the
-    // in-flight fetch — every chunk lands in setMessages twice and the
-    // tool cards / text either get clobbered or duplicated mid-stream.
-    if (isLoadingRef.current) return
-    let es: EventSource | null = null
-    let completion = ""
-    const toolPositions = new Map<string, number>()
-    const toolOrder: string[] = []
-
-    function buildBlocks(text: string, toolUses: ToolUse[]) {
-      const blocks: ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[] = []
-      const toolMap = new Map(toolUses.map(t => [t.toolUseId, t]))
-      let textStart = 0
-      for (const id of toolOrder) {
-        const pos = toolPositions.get(id) ?? textStart
-        const tool = toolMap.get(id)
-        if (!tool) continue
-        const slice = text.slice(textStart, pos)
-        if (slice) blocks.push({ type: "text", text: slice })
-        blocks.push({ type: "tool", tool })
-        textStart = pos
-      }
-      const trailing = text.slice(textStart)
-      if (trailing) blocks.push({ type: "text", text: trailing })
-      return blocks
-    }
-
-    const timer = setTimeout(async () => {
-      const sid = sessionId
-      if (!sid) return
-      const streamUrl = localService.localStreamUrl(sid)
-      if (!streamUrl || !(await localService.hasLocalStream(sid))) return
-
-      setReconnectLoading(true)
-
-      const { parseStreamingChunk, resetParserState } = await import("@/services/strandsParser")
-      if (resetParserState) resetParserState()
-
-      reconnectingRef.current = true
-      es = new EventSource(streamUrl)
-
-      let receivedData = false
-      let replayDone = false
-      es.onmessage = (event) => {
-        if (!receivedData) { receivedData = true }
-        if (!replayDone && toolOrder.length > 0) {
-          replayDone = true
-          reconnectingRef.current = false
-          setTimeout(() => saveLocalChat(), 200)
-        }
-        const line = "data: " + event.data
-        completion = parseStreamingChunk(
-          line,
-          completion,
-          (streamed: string) => {
-            stream.setMessages((prev) => {
-              const updated = [...prev]
-              const last = updated[updated.length - 1]
-              if (last?.role === "assistant") {
-                const hasPositions = toolOrder.length > 0
-                const blocks = hasPositions ? buildBlocks(streamed, last.toolUses) : last.blocks
-                updated[updated.length - 1] = { ...last, content: streamed, ...(blocks ? { blocks } : {}) }
-                return updated
-              }
-              return [...prev, { role: "assistant" as const, content: streamed, blocks: [{ type: "text" as const, text: streamed }], toolUses: [] }]
-            })
-          },
-          (toolName: string, toolUseData: ToolUseCallbackData | undefined) => {
-            if (toolUseData && 'started' in toolUseData && (toolUseData as Record<string, unknown>).started) {
-              const tuId = toolUseData.toolUseId || ""
-              toolPositions.set(tuId, completion.length)
-              if (!toolOrder.includes(tuId)) toolOrder.push(tuId)
-              stream.setMessages((prev) => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                if (!last || last.role !== "assistant") return prev
-                if (last.toolUses.some((t: ToolUse) => t.toolUseId === tuId)) return prev
-                const newTool = { toolUseId: tuId, name: toolName, input: toolUseData.input || {} }
-                const newToolUses = [...last.toolUses, newTool]
-                const blocks = buildBlocks(last.content, newToolUses)
-                updated[updated.length - 1] = { ...last, toolUses: newToolUses, blocks }
-                return updated
-              })
-            }
-            if (toolUseData?.completed) {
-              stream.setMessages((prev) => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                if (!last || last.role !== "assistant") return prev
-                const newToolUses = last.toolUses.map((t: ToolUse) =>
-                  t.toolUseId === toolUseData.toolUseId ? { ...t, status: "success" as const, result: toolUseData.result } : t
-                )
-                updated[updated.length - 1] = { ...last, toolUses: newToolUses }
-                return updated
-              })
-              saveLocalChat()
-            }
-            if (toolUseData?.stream && toolUseData?.toolUseId) {
-              const d = (toolUseData as Record<string, unknown>).data as Record<string, unknown> || {}
-              stream.setMessages((prev) => {
-                const updated = [...prev]
-                const last = updated[updated.length - 1]
-                if (!last || last.role !== "assistant") return prev
-                const idx = last.toolUses.findIndex((t: ToolUse) => t.toolUseId === toolUseData.toolUseId)
-                if (idx < 0) return prev
-                const newToolUses = [...last.toolUses]
-                const existing = newToolUses[idx].streamMessages || []
-                let next: typeof existing
-                if (d.toolResult) {
-                  next = existing.map((e: Record<string, unknown>) =>
-                    e.toolUseId === d.toolResult ? { ...e, status: d.toolStatus || "success" } : e
-                  )
-                } else if (d.tool) {
-                  const existingIdx = existing.findIndex((e: Record<string, unknown>) => e.toolUseId === d.toolUseId)
-                  if (existingIdx < 0) {
-                    next = [...existing, { tool: d.tool, group: d.group, slugs: d.slugs, toolUseId: d.toolUseId }]
-                  } else { next = existing }
-                } else if (d.status) {
-                  next = [...existing, { status: d.status, group: d.group, slugs: d.slugs, total_groups: d.total_groups }]
-                } else { return prev }
-                newToolUses[idx] = { ...newToolUses[idx], streamMessages: next }
-                const blocks = buildBlocks(last.content, newToolUses)
-                updated[updated.length - 1] = { ...last, toolUses: newToolUses, blocks }
-                return updated
-              })
-              if (d.status === "starting" || d.status === "done") saveLocalChat()
-            }
-          },
-          stream.translateError,
-        )
-      }
-
-      es.onerror = () => {
-        if (es?.readyState === EventSource.CLOSED) {
-          reconnectingRef.current = false
-          setReconnectLoading(false)
-        }
-      }
-    }, 800)
-
-    return () => { clearTimeout(timer); es?.close(); reconnectingRef.current = false }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deckId])
 
   // --- Auto-scroll ---
   useEffect(() => {
@@ -602,17 +474,16 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     })
   }, [configLoaded, hasReviewDrafts, handleSend, tReview, stream.isLoading])
 
-  const isLoading = stream.isLoading || reconnectLoading || forkingSession !== null
-  // A send while the agent works is a steer. Local: only into this panel's own invoke (not a
-  // reconnect stream or a fork that is starting).
-  const canSendWhileLoading = !IS_LOCAL || (stream.isLoading && !reconnectLoading && forkingSession === null)
+  const isLoading = stream.isLoading || forkingSession !== null
+  // A send while the agent works is a steer. Local: only into this panel's own invoke or the
+  // period it follows (not a fork that is starting).
+  const canSendWhileLoading = !IS_LOCAL || (stream.isLoading && forkingSession === null)
 
   // Sync streaming flag and flush any deferred sessionId swap once
   // streaming finishes — at that point loadHistory can safely re-fetch
   // (the .chat.json server-side state is already complete).
-  // Uses the combined isLoading (not stream.isLoading alone): a Local
-  // reconnect stream (reconnectLoading) is also in-flight — flushing the
-  // swap during it would clobber the reconnecting messages the same way.
+  // Uses the combined isLoading (not stream.isLoading alone): a fork that
+  // is starting is also in flight.
   useEffect(() => {
     isLoadingRef.current = isLoading
     onLoadingChange?.(isLoading)
@@ -760,8 +631,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   blocks={msg.blocks}
                   snippets={msg.snippets}
                   attachments={msg.attachments}
-                  isStreaming={(IS_LOCAL ? stream.isLoading : stream.turnActive) && i === stream.messages.length - 1}
-                  sessionWorking={!IS_LOCAL && stream.isLoading}
+                  isStreaming={stream.turnActive && i === stream.messages.length - 1}
+                  sessionWorking={stream.isLoading}
                   idToken={auth.user?.id_token}
                   onSend={(text: string) => handleSend(text, [], [], [])}
                   hearingDisabled={i < lastUserIdx}
@@ -787,7 +658,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         <p role="status" className="flex-none px-4 pb-1 text-xs text-foreground-muted">
           {stream.stopping ? t("stopping") : t("reconnecting")}
         </p>
-      ) : !IS_LOCAL && stream.isLoading && !stream.turnActive
+      ) : stream.isLoading && !stream.turnActive
           && stream.messages.some((m) => m.toolUses.some((tool) => tool.task?.state === "running")) && (
         <p role="status" className="flex-none px-4 pb-1 text-xs text-foreground-muted">
           {t("backgroundWorking")}
@@ -801,7 +672,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           isLoading={isLoading}
           onStop={stream.stopGeneration}
           canSendWhileLoading={canSendWhileLoading}
-          disabled={!configLoaded || reconnectLoading}
+          disabled={!configLoaded}
           placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
           topSlot={reviewActive ? <ReviewDraftBar inputBlank={inputBlank} /> : undefined}
           sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading && !canSendWhileLoading, canSend: review.canSubmit } : undefined}
@@ -823,7 +694,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 sessionId={sessionId}
                 isNewChat={deckId === "new" && stream.messages.length === 0}
                 busy={isLoading}
-                disabled={forkingSession !== null || reconnectLoading}
+                disabled={forkingSession !== null}
               />
             </div>
           )}
