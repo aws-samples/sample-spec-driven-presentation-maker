@@ -488,6 +488,27 @@ describe("queue and timeout", () => {
     expect(prompts(composers()[1])[0]).toContain("assigned_slugs: b")
   })
 
+  it("the chat's exit with a task waiting: neither task leaves a composer kiro-cli, and every slot is free", async () => {
+    const { orch, events, composers } = await compose("v3", [["a"]], { keepTurn: true })
+    callTool(orch, "v3", "disp2", "compose_slides", {}, dispatched([["b"], ["c"]], "00000000000b"))
+    await settle()
+    expect(composers()).toHaveLength(1)
+    orch.exit(1)
+    await settle()
+    await settle()
+    expect(kinds(events, "taskEnd").map((e) => [e.taskId, e.status])).toEqual([["0123456789ab", "failed"], ["00000000000b", "failed"]])
+    // The waiting task never started a composer; the running one's tree got SIGKILL.
+    expect(composers()).toHaveLength(1)
+    expect(procs.sent()).toContainEqual([-composers()[0].pid, "SIGKILL"])
+    expect(procs.live().filter(({ child }) => child !== orch)).toEqual([])
+    // Its slot frees with the gone poll; then four composers start without waiting.
+    await wait(150)
+    const hosts = await import("./hosts")
+    const waited = vi.fn()
+    await Promise.all([0, 1, 2, 3].map(() => hosts.pool.acquireForComposer("v3", { onWait: waited })))
+    expect(waited).not.toHaveBeenCalled()
+  })
+
   it("fails the task after 60 minutes: composers cancelled, SIGKILL 1 s later, the orchestrator woken", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] })
     const { events, orch, composers } = await compose("v3", [["a"]])

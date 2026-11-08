@@ -43,9 +43,9 @@ See [Troubleshooting](docs/en/getting-started.md#sdpm-update-stops).
   `{"version": 2, "engine": "v2"}` to `servers/local/.sdpm/acp-config.json`. The setting
   takes effect from the next message.
 - **Agent definitions are generated in a form both engines read.**
-  `servers/local/.kiro/agents/` now carries `permissions` rules; the orchestrator dispatches
-  composers with `@sdpm/compose_slides` instead of the `sdpm-composer` sub-agent, and its
-  marker file is `README.txt` (V3 reads every `.md` there as an agent). / Nothing;
+  `servers/local/.kiro/agents/` now carries `permissions` rules, and its marker file is
+  `README.txt` (V3 reads every `.md` there as an agent). The orchestrator dispatches
+  composers with `@sdpm/compose_slides` instead of the `sdpm-composer` sub-agent. / Nothing;
   the directory is regenerated on the next chat. A definition you added to `acp-agents/`
   without `permissions` is converted the same way. One that has `permissions` is used as
   written.

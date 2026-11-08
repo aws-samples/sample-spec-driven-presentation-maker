@@ -398,6 +398,33 @@ describe("composer hosts", () => {
     expect(procs.sent()).toEqual([[children[0].pid, "SIGTERM"], [-children[1].pid, "SIGKILL"], [children[1].pid, "SIGKILL"]])
   })
 
+  it("starts nothing and frees the slot when the abort comes right after the slot was handed over", async () => {
+    quiet()
+    const controller = new AbortController()
+    const given = hosts.pool.acquireForComposer("v3", { signal: controller.signal }).catch((e: unknown) => e)
+    controller.abort()
+    expect(await given).toMatchObject({ name: "AbortError" })
+    expect(spawn).not.toHaveBeenCalled()
+    const waited = vi.fn()
+    await Promise.all([0, 1, 2, 3].map(() => hosts.pool.acquireForComposer("v3", { onWait: waited })))
+    expect(waited).not.toHaveBeenCalled()
+  })
+
+  it("killAll on Windows runs taskkill /T once per kiro-cli and reads no process table", async () => {
+    quiet()
+    const taskkill = vi.fn()
+    const pool = new hosts.HostPool({ platform: "win32", taskkill })
+    const chat = await pool.acquireForChat("v3", "sdpm-orchestrator")
+    await chat.openSession("sdpm-orchestrator", { kind: "new" }, { sink: new Sink() })
+    await pool.acquireForComposer("v3")
+    await settle()
+    const before = procs.psCalls()
+    pool.killAll()
+    expect(procs.psCalls()).toBe(before)
+    expect(taskkill.mock.calls).toEqual([[children[0].pid], [children[1].pid]])
+    expect(procs.sent()).toEqual([])
+  })
+
   it("fails a composer open at once with agent_start_failed when its kiro-cli exits before the sdpm server is ready", async () => {
     quiet()
     nextSetup = (child) => { child.mcpState = "none" }

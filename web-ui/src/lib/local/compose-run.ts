@@ -296,7 +296,7 @@ export class ComposeTask implements WorkHold {
         onWait: () => console.log("[compose] task %s group %d: waiting for a composer slot", this.id, g.index),
       })
       g.host = host
-      if (this.stopped) throw new DOMException("Request cancelled", "AbortError")
+      if (this.stopped || g.abort.signal.aborted) throw new DOMException("Request cancelled", "AbortError")
       // An abort during the open ends the tree with SIGKILL (the open then fails with kiro-cli's exit).
       const onAbort = () => { void host.end("SIGKILL") }
       g.abort.signal.addEventListener("abort", onAbort, { once: true })
@@ -314,8 +314,9 @@ export class ComposeTask implements WorkHold {
       const text = [composerPrompt(this.dispatch, g), ...g.pending.splice(0).map((m) => COMPOSER_MESSAGE_PREFIX + m)].join("\n\n")
       this.prompt(g, text)
     } catch (error) {
-      if (hasEnded(g)) return
+      // Also when the group already ended (the chat's exit ended it before its kiro-cli was handed over).
       if (g.host) void g.host.end("SIGKILL")
+      if (hasEnded(g)) return
       if (isAbort(error) || this.stopped) {
         this.groupEnded(g, "cancelled")
         return
@@ -617,12 +618,16 @@ export class ComposeRunner {
     void outcome.then((delivered) => this.messageEnded(end, entry?.input, delivered)).finally(release)
   }
 
-  /** A task ended (also one that never started: a Stop ends the waiting ones too); the next waiting one starts. */
+  /**
+   * A task ended (also one that never started: a Stop ends the waiting ones too); the next waiting
+   * one starts, unless the chat's kiro-cli exited (its exit ends the waiting ones next).
+   */
   taskEnded(task: ComposeTask): void {
     const at = this.queue.indexOf(task)
     if (at >= 0) this.queue.splice(at, 1)
     if (this.current !== task) return
     this.current = null
+    if (this.chat.hs.host.exited) return
     const next = this.queue.shift()
     if (next) this.begin(next)
   }

@@ -612,6 +612,11 @@ export class HostPool {
     if (signal?.aborted) throw abortError()
     if (this.slots.full()) opts.onWait?.()
     await this.slots.take(signal)
+    // Aborted while the slot was handed over: nothing is started.
+    if (signal?.aborted) {
+      this.slots.free()
+      throw abortError()
+    }
     let host: Host
     try {
       host = this.start(engine, COMPOSER_AGENT, "composer")
@@ -639,11 +644,15 @@ export class HostPool {
   /**
    * The Local server ends: every process tree is signalled now, synchronously, from one process
    * table (composer trees SIGKILL, chat and listing trees SIGTERM). Without a table, only the
-   * kiro-cli pids (and a composer's own group) are signalled.
+   * kiro-cli pids (and a composer's own group) are signalled. Windows: taskkill /T per tree.
    */
   killAll(): void {
     const hosts = [...this.hosts]
     if (!hosts.length) return
+    if (this.deps.platform === "win32") {
+      for (const host of hosts) host.tree.signal(host.role === "composer" ? "SIGKILL" : "SIGTERM")
+      return
+    }
     let table: ProcRow[] | null = null
     try {
       table = this.deps.tableSync()
