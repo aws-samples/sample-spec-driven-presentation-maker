@@ -224,6 +224,17 @@ def test_deck_rules(acp, root, tmp_path):
         assert acp.compose_dispatch.compose_slides(deck_id, _GROUPS) == _deck_error(deck_id, root), deck_id
 
 
+def test_deck_root_follows_the_shared_order(monkeypatch, tmp_path):
+    r = tmp_path / "output"
+    r.mkdir()
+    monkeypatch.delenv("SDPM_DECK_ROOT", raising=False)
+    monkeypatch.setenv("SDPM_OUTPUT_DIR", str(r))
+    module = _server(monkeypatch, "output_dir", "1")
+    assert module.compose_dispatch._deck_root() == module._DECK_ROOT == r.resolve()
+    deck = _write_deck(r / "deck1")
+    assert module.compose_dispatch.compose_slides(str(deck), _GROUPS)["status"] == "dispatched"
+
+
 def test_check_specs_errors_are_returned(acp, deck):
     from sdpm import tools
 

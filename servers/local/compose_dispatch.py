@@ -8,7 +8,6 @@ composers itself; this module only validates the call and answers at once. It ke
 state between calls: on V3 one MCP server serves every session of the kiro-cli.
 """
 
-import os
 import re
 import uuid
 from pathlib import Path
@@ -18,6 +17,7 @@ from pydantic import Field
 from typing_extensions import TypedDict
 
 from sdpm import tools
+from sdpm.api import _get_output_base_dir
 
 DECK_DESCRIPTION = "Deck directory path."
 SLIDE_GROUPS_DESCRIPTION = "Groups of slides to compose in parallel. Each group becomes one composer agent."
@@ -52,8 +52,9 @@ class SlideGroup(TypedDict):
 
 
 def _deck_root() -> Path:
-    # Read per call (same default as server_acp._DECK_ROOT): server_acp imports this module.
-    return Path(os.environ.get("SDPM_DECK_ROOT", Path.home() / "Documents" / "SDPM-Presentations")).resolve()
+    # The deck root of every local surface (order in _get_output_base_dir), the same as
+    # server_acp._DECK_ROOT; read per call because server_acp imports this module.
+    return _get_output_base_dir().resolve()
 
 
 def _error(errors: list[str], warnings: list[str] | None = None) -> dict:
