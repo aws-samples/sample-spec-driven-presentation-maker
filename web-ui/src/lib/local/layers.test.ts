@@ -34,4 +34,24 @@ describe("Local ACP layers", () => {
       .map((file) => path.relative(SRC, file))
     expect(outside).toEqual([])
   })
+
+  it("imports @agentclientprotocol/sdk only as types", () => {
+    const SDK = "@agentclientprotocol/sdk"
+    const offending: string[] = []
+    for (const file of sources(SRC)) {
+      const text = fs.readFileSync(file, "utf-8")
+      if (!text.includes(SDK)) continue
+      const relative = path.relative(SRC, file)
+      // Every import / export statement that names the SDK, from its keyword to its `from` clause.
+      const statements = text.match(/^\s*(?:import|export)\b[\s\S]*?\bfrom\s*["'][^"']+["']/gm) ?? []
+      for (const statement of statements) {
+        if (statement.includes(SDK) && !/^\s*(?:import|export)\s+type\b/.test(statement)) offending.push(`${relative}: ${statement.trim().split("\n")[0]}`)
+      }
+      if (new RegExp(`(?:require|import)\\s*\\(\\s*["']${SDK}`).test(text)) offending.push(`${relative}: dynamic import or require`)
+      const named = statements.filter((statement) => statement.includes(SDK)).length
+      const mentions = text.split("\n").filter((line) => line.includes(SDK) && /["']@agentclientprotocol\/sdk/.test(line)).length
+      if (mentions > named) offending.push(`${relative}: ${SDK} outside an import or export statement`)
+    }
+    expect(offending).toEqual([])
+  })
 })
