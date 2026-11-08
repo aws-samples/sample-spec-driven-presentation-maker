@@ -2,8 +2,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Contract tests: kiro-cli 3.0.0's and 3.1.0's own output (src/test/fixtures/acp) replayed through the ACP
- * process manager, on the engine adapter the capture's engine needs, and the SSE bridge.
+ * Contract tests: kiro-cli 3.0.0's and 3.1.0's own output (src/test/fixtures/acp) replayed through the
+ * chat registry, the host pool, the engine adapter the capture's engine needs, and the SSE bridge.
  *
  * - A turn: the main session's text arrives in order, the stream closes when session/prompt is
  *   answered, whatever stopReason it carries, and closes with an error when kiro-cli dies mid-turn.
@@ -35,7 +35,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 const { spawn } = vi.hoisted(() => ({ spawn: vi.fn() }))
 vi.mock("child_process", () => ({ spawn, default: { spawn } }))
-vi.mock("./agents-sync", () => ({ syncToAgentsDir: vi.fn() }))
+vi.mock("./agents-sync", () => ({ syncToAgentsDir: vi.fn(() => "d0") }))
 
 type Line = Record<string, unknown>
 type Engine = "v2" | "v3"
@@ -220,7 +220,7 @@ describe.each(Object.keys(TURNS))("kiro-cli 3.0.0 %s, a turn", (name) => {
 
   async function runTurn(setup: (child: ReplayChild) => void = () => {}) {
     const lines = replay(engine, file, setup)
-    const ps = await acp.createNewProcessFor("C1")
+    const { chat: ps } = await acp.createNewProcessFor("C1")
     const events = (await prompt("Call the sdpm list_styles tool once, then reply with only the number of styles.")).map((b) => b.data)
     return { lines, sessionId: ps.sessionId!, events }
   }
@@ -366,7 +366,7 @@ describe("kiro-cli 3.0.0 V3, turns that delegate", () => {
 
   it("streams only the main session's text on two delegations in parallel, and shows both as one Compose card that finishes", async () => {
     const lines = replay("v3", fixture("v3-parallel-compose"))
-    const ps = await acp.createNewProcessFor("C1")
+    const { chat: ps } = await acp.createNewProcessFor("C1")
     const events = (await prompt("Delegate to two sdpm-composer sub-agents in parallel.")).map((b) => b.data)
     expect(textOf(events)).toBe(capturedText(window(lines, 2), ps.sessionId!))
     expect(cardNames(events)).toEqual(["start_presentation", "compose_slides"])
@@ -475,7 +475,7 @@ describe("kiro-cli 3.0.0 start-up", () => {
     const warn = vi.spyOn(console, "warn").mockImplementation(() => {})
     try {
       const started = Date.now()
-      const { ps, outcome } = await acp.openDeckSession("C1", "d1", "sess_53fd2ae9-a657-4048-97da-38fb5cfed6df", "sdpm-orchestrator")
+      const { chat: ps, outcome } = await acp.openDeckSession("C1", "d1", "sess_53fd2ae9-a657-4048-97da-38fb5cfed6df", "sdpm-orchestrator")
       expect(Date.now() - started).toBeLessThan(1000)
       expect(outcome).toBe("created")
       expect(ps.sessionId).toBe("7f36556f-6963-42df-9224-6ff45a7a85ce")
@@ -505,7 +505,7 @@ describe("kiro-cli 3.0.0 start-up", () => {
     replay("v3", fixture("v3-load-created"))
     const info = vi.spyOn(console, "info").mockImplementation(() => {})
     try {
-      const { ps, outcome } = await acp.openDeckSession("C1", "d1", "11111111-2222-4333-8444-555555555555", "sdpm-orchestrator")
+      const { chat: ps, outcome } = await acp.openDeckSession("C1", "d1", "11111111-2222-4333-8444-555555555555", "sdpm-orchestrator")
       expect(outcome).toBe("created")
       expect(ps.sessionId).toBe("11111111-2222-4333-8444-555555555555")
     } finally {
@@ -546,7 +546,7 @@ describe("kiro-cli 3.1.0 V3, list and fork", () => {
   const V2_SOURCE = "ad46389c-6f86-48b2-a234-ebb9b023bd11"
   const V2_FORK = "sess_96ed2eff-562a-4aad-ac31-73e2202d860f"
 
-  it("lists V3's sessions through a short-lived kiro-cli, killed afterwards", async () => {
+  it("lists V3's sessions through a kiro-cli the pool starts, which stays (it can carry chats)", async () => {
     replay("v3", fixture31("v3-list"))
     const { adapterFor } = await import("./acp/engine")
     const sessions = await acp.withEngineConnection("v3", (connect) => adapterFor("v3").listStoredSessions({ env: process.env, connect }))
@@ -556,7 +556,7 @@ describe("kiro-cli 3.1.0 V3, list and fork", () => {
     }])
     await new Promise((r) => setImmediate(r))
     expect(children[0].requests).toEqual(["initialize", "session/list"])
-    expect(children[0].killed).toBe(true)
+    expect(children[0].killed).toBe(false)
     expect(acp.hasProcess(V3_SOURCE)).toBe(false)
   })
 

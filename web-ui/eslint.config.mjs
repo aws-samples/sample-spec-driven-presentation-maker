@@ -49,7 +49,7 @@ function localAcpLayers() {
   const TESTS = ["**/*.test.ts", "**/*.test.tsx", "src/test/**"]
   const engines = { regex: "(^|/)engines(/|$)", message: "Only acp/engine.ts (the registry) imports an engine adapter." }
   const registry = { regex: "(^|/)engine$", message: "The engine registry loads the engine adapters; only hosts.ts uses it." }
-  const processManager = { regex: "(^|/)acp-process$", message: "The process manager depends on this layer, not the other way round." }
+  const processManager = { regex: "(^|/)acp-process$", message: "The chat registry depends on this layer, not the other way round." }
   const transport = { regex: "(^|/)acp/transport$", message: "Only hosts.ts and the engine adapters speak to the transport." }
   const chat = { regex: "(^|/)chat$", message: "hosts.ts knows chats only as SessionSinks." }
   const bridge = { regex: "(^|/)sse-bridge$", message: "The SSE bridge is the outermost layer of lib/local." }
@@ -65,7 +65,10 @@ function localAcpLayers() {
       { regex: "(^|/)conversation(/|$)", message: "The transport knows JSON-RPC, not the conversation." },
       engines, registry, processManager, bridge,
     ]),
-    restrict([`${L}/hosts.ts`], [processManager, chat, bridge, routes, conversation], TESTS),
+    restrict([`${L}/hosts.ts`], [engines, processManager, chat, bridge, routes, conversation], TESTS),
+    // The registry and the chats reach kiro-cli only through hosts.ts (types excepted).
+    restrict([`${L}/acp-process.ts`], [engines, { ...registry, allowTypeImports: true }, { ...transport, allowTypeImports: true }, bridge, routes], TESTS),
+    restrict([`${L}/chat.ts`], [engines, { ...registry, allowTypeImports: true }, { ...transport, allowTypeImports: true }, bridge, routes, processManager], TESTS),
     restrict([`${L}/acp/engines/v2/**/*.ts`], [
       { regex: "(^|/)v3(/|$)", message: "An engine adapter does not depend on another engine." },
       processManager, bridge, routes, conversation, conversationEvents,

@@ -3,8 +3,9 @@
 /**
  * The conversation model of one Local chat, engine-independent: it turns the engine adapter's
  * `LocalEvent`s into the chat's `ChatEvent`s. It holds the turn's tool cards, its Compose cards
- * and the steers kiro-cli queued; the process manager numbers and buffers what it returns, ends
- * the turn through `endTurn` before its end event, and saves the deck a tool result names.
+ * and the steers kiro-cli queued (a hidden one, the Local server's own text, is never reported);
+ * the chat (chat.ts) numbers and buffers what it returns, ends the turn through `endTurn` before
+ * its end events, and saves the deck a tool result names.
  */
 import { ComposeTracker } from "./compose"
 import { data, type ChatEvent, type LocalEvent } from "./events"
@@ -75,10 +76,10 @@ export class ConversationState {
           break
         case "steer_injected": {
           const steer = this.steers.match(event)
-          if (steer) out.push(steerEvent({ id: steer.id, state: "delivered" }))
+          if (steer && !steer.hidden) out.push(steerEvent({ id: steer.id, state: "delivered" }))
           break
         }
-        // mcp_status / mcp_snapshot: the process manager's MCP readiness watch, not the chat.
+        // mcp_status / mcp_snapshot: the host's MCP readiness watch (hosts.ts), not the chat.
         default:
           break
       }

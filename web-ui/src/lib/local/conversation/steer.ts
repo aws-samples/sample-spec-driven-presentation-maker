@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * Local steer: a message sent while the agent works goes into the running turn with ACP
- * `_session/steer {sessionId, message}`. The process manager sends it; this module holds the
+ * `_session/steer {sessionId, message}`. The chat (chat.ts) sends it; this module holds the
  * steers kiro-cli queued and the chat events that report them.
  *
  * A steer's life is reported as `{steer: {id, text?, state}}`, the shape of the Cloud session's
@@ -39,6 +39,8 @@ export interface Steer {
   text: string
   /** kiro-cli's id for it, when its answer to `_session/steer` carries one. */
   messageId?: string
+  /** A text of the Local server for the agent (a harness steer): never reported in the chat. */
+  hidden?: true
 }
 
 /** The steers kiro-cli queued in the running turn and has not reported read. */

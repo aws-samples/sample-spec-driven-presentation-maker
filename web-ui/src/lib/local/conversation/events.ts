@@ -5,10 +5,10 @@
  *
  * - `LocalEvent`: what an engine adapter (`acp/engines/<id>/translate.ts`) makes of one kiro-cli
  *   notification. Notifications of the main session and of a sub-agent session keep the session
- *   they came in. `mcp_status` / `mcp_snapshot` go to the process manager's MCP readiness watch,
+ *   they came in. `mcp_status` / `mcp_snapshot` go to the host's MCP readiness watch (hosts.ts),
  *   everything else to the conversation model (`ConversationState`).
  * - `ChatEvent`: what the conversation model makes of them for the chat, buffered and numbered by
- *   the process manager and written by the SSE bridge as `id: <n>` + `data: <payload>`. `SsePayload`
+ *   the chat (chat.ts, per work period) and written by the SSE bridge as `id: <n>` + `data: <payload>`. `SsePayload`
  *   is the union of the payload shapes the chat UI reads (strandsParser, ComposeCard, the steer
  *   and notice handling); an `end` event closes the stream, after its payload if it has one.
  */
@@ -40,6 +40,11 @@ export type McpStatusEvent = Extract<LocalEvent, { type: "mcp_status" }>
 
 export type SteerState = "accepted" | "delivered" | "discarded"
 
+/** Why a turn of a chat's work period started (Cloud's `turn.why`). */
+export type TurnWhy = "prompt" | "steer" | "wake" | "report"
+/** How a turn or a work period ended. */
+export type TurnHow = "finished" | "cancelled" | "error"
+
 export interface ComposeStreamData {
   group: number
   slugs: string
@@ -51,9 +56,17 @@ export interface ComposeStreamData {
   toolStatus?: ToolEndStatus
 }
 
-/** The SSE `data:` shapes the chat UI reads. */
+/**
+ * The SSE `data:` shapes the chat UI reads. `work`, `turn`, `turnEnd` and `messageStart` are
+ * Cloud's shapes (agent/session_runtime.py) for a chat's work period: it starts busy, holds one or
+ * more turns (`text` is the user's message; "" for a hidden turn), and ends idle.
+ */
 export type SsePayload =
   | { event: { contentBlockDelta: { delta: { text: string } } } }
+  | { event: { messageStart: { role: "assistant" } } }
+  | { work: { state: "busy" } | { state: "idle"; how: TurnHow } }
+  | { turn: { id: string; why: TurnWhy; text: string } }
+  | { turnEnd: { id: string; how: TurnHow } }
   | { toolStart: { toolUseId: string; name: string } }
   | { toolUse: { toolUseId: string; name: string; input: Record<string, unknown> } }
   | { toolResult: { toolUseId: string; name: string; status: ToolEndStatus; content: string } }
@@ -64,10 +77,10 @@ export type SsePayload =
 
 export type ChatEvent =
   | { kind: "data"; payload: SsePayload }
-  /** The turn is over: the stream writes the payload (an error) if any, then closes. */
+  /** The work period is over: the stream writes the payload (an error) if any, then closes. */
   | { kind: "end"; stopReason?: string; payload?: SsePayload }
 
-/** A ChatEvent with the number the process manager gave it (the SSE `id:`). */
+/** A ChatEvent with the number the chat gave it within its work period (the SSE `id:`). */
 export interface BufferedEvent {
   id: number
   event: ChatEvent

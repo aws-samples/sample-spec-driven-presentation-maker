@@ -13,8 +13,12 @@
  * session's first prompt, which names the deck (`Current deck: <dir>`), and opens the stream
  * with the `context_not_carried_over` notice, a resumed session that also ran on the other engine with `context_from_other_engine`. A fork's
  * first message after its process was evicted reopens the copy (openForkedSession); a copy
- * kiro-cli could not read gets the notice instead of failing. The route hands the notice to
- * sendPrompt (the process manager buffers it as the turn's first event) and saves nothing itself.
+ * kiro-cli could not read gets the notice instead of failing. A new chat whose client id had a
+ * chat that was released or whose kiro-cli exited reopens its kiro session (createNewProcessFor):
+ * `resumed` runs the turn as a later prompt, a session kiro-cli no longer has as a first prompt
+ * with the notice. The route hands the notice and the user's own text to sendPrompt (the chat
+ * buffers the notice after the turn's `turn` event), replays the period from that turn's first
+ * event, and saves nothing itself.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
@@ -108,7 +112,7 @@ describe("POST /api/agent/invoke session conflicts and start-up failures", () =>
 
 /**
  * sendPrompt for a turn that ends at once, so the SSE body can be read to the end. Like the
- * process manager, it buffers the notice it is given as the turn's first event.
+ * chat, it buffers the notice it is given among the turn's first events.
  */
 function promptEndingAt(sessionId: string) {
   return (_clientId: string, _text: string, opts: { notice?: LocalSessionNoticeCode } = {}) => {
@@ -117,6 +121,7 @@ function promptEndingAt(sessionId: string) {
     let listener: ((entry: BufferedEvent) => void) | null = null
     return Promise.resolve({
       sessionId,
+      replayFrom: 1,
       subscribe: (fn: (entry: BufferedEvent) => void) => { listener = fn; return () => { listener = null } },
       send: () => listener?.({ id: buffered.length + 1, event: { kind: "end", stopReason: "end_turn" } }),
     })
@@ -135,14 +140,14 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
 
   it("opens the kiro session named in .session, under the client's id, without a notice", async () => {
     acp.readSessionFromDeck.mockReturnValue("K1")
-    acp.openDeckSession.mockResolvedValue({ ps: {}, outcome: "resumed", otherEngine: false })
+    acp.openDeckSession.mockResolvedValue({ chat: {}, outcome: "resumed", otherEngine: false })
     acp.sendPrompt.mockImplementation(promptEndingAt("K1"))
     const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
     expect(res.status).toBe(200)
     expect(acp.openDeckSession).toHaveBeenCalledWith(DECK_FALLBACK_ID, "mcp-made-deck", "K1", "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
     expect(acp.createNewProcessFor).not.toHaveBeenCalled()
-    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "hi", { notice: undefined })
-    expect(acp.getBufferedEvents).toHaveBeenCalledWith(DECK_FALLBACK_ID)
+    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "hi", { notice: undefined, displayText: "hi" })
+    expect(acp.getBufferedEvents).toHaveBeenCalledWith(DECK_FALLBACK_ID, 0)
     expect((await events(res)).some((e) => "notice" in e)).toBe(false)
   })
 
@@ -150,7 +155,7 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
     "runs a created session's first prompt with the notice first (%s)",
     async (_case, saved) => {
       acp.readSessionFromDeck.mockReturnValue(saved)
-      acp.openDeckSession.mockResolvedValue({ ps: {}, outcome: "created", otherEngine: false })
+      acp.openDeckSession.mockResolvedValue({ chat: {}, outcome: "created", otherEngine: false })
       acp.sendPrompt.mockImplementation(promptEndingAt("NEW1"))
       const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
       expect(res.status).toBe(200)
@@ -160,7 +165,7 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
       expect(acp.sendPrompt).toHaveBeenCalledWith(
         DECK_FALLBACK_ID,
         "Interaction mode: fast\n\nCurrent deck: /home/u/Documents/SDPM-Presentations/mcp-made-deck\n\nhi",
-        { notice: "context_not_carried_over" },
+        { notice: "context_not_carried_over", displayText: "hi" },
       )
       expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
     },
@@ -177,10 +182,10 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
 
   it("says so when the deck's session also ran on the other engine", async () => {
     acp.readSessionFromDeck.mockReturnValue("K1")
-    acp.openDeckSession.mockResolvedValue({ ps: {}, outcome: "resumed", otherEngine: true })
+    acp.openDeckSession.mockResolvedValue({ chat: {}, outcome: "resumed", otherEngine: true })
     acp.sendPrompt.mockImplementation(promptEndingAt("K1"))
     const res = await invoke({ sessionId: "C1", deckId: "d1" })
-    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "hi", { notice: "context_from_other_engine" })
+    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "hi", { notice: "context_from_other_engine", displayText: "hi" })
     expect((await events(res))[0]).toEqual({ notice: { code: "context_from_other_engine" } })
   })
 })
@@ -189,21 +194,48 @@ describe("POST /api/agent/invoke on a forked chat", () => {
   beforeEach(() => acp.hasProcess.mockReturnValue(false))
 
   it("reopens the copy of an evicted fork, with the continuation in the first prompt", async () => {
-    acp.openForkedSession.mockResolvedValue({ ps: {}, outcome: "resumed" })
+    acp.openForkedSession.mockResolvedValue({ chat: {}, outcome: "resumed" })
     acp.sendPrompt.mockImplementation(promptEndingAt("F1"))
     const res = await invoke({ sessionId: "F1", continuedFrom: ORIGIN })
     expect(res.status).toBe(200)
     expect(acp.openForkedSession).toHaveBeenCalledWith("F1", "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
-    expect(acp.sendPrompt.mock.calls[0][2]).toEqual({ notice: undefined })
+    expect(acp.sendPrompt.mock.calls[0][2]).toEqual({ notice: undefined, displayText: "hi" })
     expect(acp.sendPrompt.mock.calls[0][1]).toContain("hi")
   })
 
   it("goes on with the notice when kiro-cli could not read the copy", async () => {
-    acp.openForkedSession.mockResolvedValue({ ps: {}, outcome: "created" })
+    acp.openForkedSession.mockResolvedValue({ chat: {}, outcome: "created" })
     acp.sendPrompt.mockImplementation(promptEndingAt("F1"))
     const res = await invoke({ sessionId: "F1", continuedFrom: ORIGIN })
     expect(res.status).toBe(200)
-    expect(acp.sendPrompt.mock.calls[0][2]).toEqual({ notice: "context_not_carried_over" })
+    expect(acp.sendPrompt.mock.calls[0][2]).toEqual({ notice: "context_not_carried_over", displayText: "hi" })
     expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
+  })
+})
+
+describe("POST /api/agent/invoke for a chat whose kiro-cli is gone", () => {
+  beforeEach(() => acp.hasProcess.mockReturnValue(false))
+
+  it("runs a reopened session's prompt as a later one, without a notice", async () => {
+    acp.createNewProcessFor.mockResolvedValue({ chat: {}, resumed: true })
+    acp.sendPrompt.mockImplementation(promptEndingAt("K1"))
+    const res = await invoke({ sessionId: "C1" })
+    expect(res.status).toBe(200)
+    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "hi", { notice: undefined, displayText: "hi" })
+  })
+
+  it("runs a session kiro-cli no longer has as a first prompt, with the notice", async () => {
+    acp.createNewProcessFor.mockResolvedValue({ chat: {}, resumed: false, notice: "context_not_carried_over" })
+    acp.sendPrompt.mockImplementation(promptEndingAt("K2"))
+    const res = await invoke({ sessionId: "C1" })
+    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "Interaction mode: fast\n\nhi", { notice: "context_not_carried_over", displayText: "hi" })
+    expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
+  })
+
+  it("runs a new chat's prompt as its first", async () => {
+    acp.createNewProcessFor.mockResolvedValue({ chat: {}, resumed: false })
+    acp.sendPrompt.mockImplementation(promptEndingAt("K3"))
+    await invoke({ sessionId: "C1" })
+    expect(acp.sendPrompt).toHaveBeenCalledWith("C1", "Interaction mode: fast\n\nhi", { notice: undefined, displayText: "hi" })
   })
 })

@@ -461,7 +461,7 @@ export class HostPool {
       await this.wait(starting, signal)
     }
     if (!this.sharedEngines.has(engine)) this.makeSingleChatRoom()
-    const host = this.start(engine, agentName, digest)
+    const host = this.start(engine, agentName, { digest })
     await this.wait(host, signal)
     return host
   }
@@ -507,10 +507,11 @@ export class HostPool {
     if (host.sessions.size === 0 && host.waiters === 0) host.kill()
   }
 
-  private start(engine: EngineId, agentName: string, digest?: string): Host {
+  /** Start a kiro-cli; `synced`: the definitions were just synced, with this digest. */
+  private start(engine: EngineId, agentName: string, synced?: { digest: string }): Host {
     this.endIdleRetired()
     const adapter = adapterFor(engine)
-    const agentsDigest = digest ?? syncDefinitions(adapter)
+    const agentsDigest = synced ? synced.digest : syncDefinitions(adapter)
     const config = readEngineConfig()
     const env = { ...process.env, ...config.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT }
     const conn = spawnAcp(config.command, [...config.commandArgs, ...adapter.spawnArgs(agentName)], { cwd: MCP_LOCAL_DIR, env })

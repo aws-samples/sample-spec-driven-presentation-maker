@@ -1,7 +1,8 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * Local ACP Agent Invoke — sends prompt to sessionId-keyed kiro-cli process.
+ * Local ACP Agent Invoke — sends a prompt to the sessionId-keyed chat (lib/local/acp-process.ts)
+ * and streams its work period from this turn on.
  * A session conflict (turn still running, or the session locked by another
  * kiro-cli process) is answered with 409 and a SessionConflict body; a kiro-cli
  * that does not answer its setup requests in time with 504 and code `agent_timeout`;
@@ -97,9 +98,11 @@ export async function POST(req: Request) {
           notice = "context_from_other_engine"
         }
       } else {
-        // Fresh session — spawn new process, register under client's sessionId
-        await createNewProcessFor(clientSessionId, agentName, { signal })
-        isFirstPrompt = true
+        // A new chat, or one whose chat was released or whose kiro-cli exited: its kiro session is
+        // opened again (`resumed`), and one kiro-cli no longer has starts over with the notice.
+        const created = await createNewProcessFor(clientSessionId, agentName, { signal })
+        if (!created.resumed) isFirstPrompt = true
+        if (created.notice) notice = created.notice
       }
     }
 
@@ -107,7 +110,7 @@ export async function POST(req: Request) {
     const continuedPrompt = withContinuedFrom(query, continuedFrom, isFirstPrompt)
     const deckPrompt = withCurrentDeck(continuedPrompt, currentDeck, isFirstPrompt)
     const prompt = withInteractionMode(deckPrompt, mode, isFirstPrompt)
-    prompted = await sendPrompt(clientSessionId, prompt, { notice })
+    prompted = await sendPrompt(clientSessionId, prompt, { notice, displayText: query })
   } catch (error) {
     const conflict = sessionConflict(error)
     if (conflict) return Response.json(conflict, { status: 409 })
@@ -120,10 +123,10 @@ export async function POST(req: Request) {
     if (req.signal.aborted) return new Response(null, { status: 499 })
     throw error
   }
-  const { subscribe, send } = prompted
+  const { subscribe, send, replayFrom } = prompted
 
-  // The turn's buffered events (its notice) first, then the live ones.
-  const stream = createSSEStream({ subscribe, replay: getBufferedEvents(clientSessionId) })
+  // The period's events from this turn on (its notice among them), then the live ones.
+  const stream = createSSEStream({ subscribe, replay: getBufferedEvents(clientSessionId, replayFrom - 1) })
 
   send()
 
