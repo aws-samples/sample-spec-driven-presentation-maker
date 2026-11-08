@@ -3,9 +3,9 @@
 """The stdio tools of the Local Web UI's async compose: compose_slides and message_composer.
 
 server_acp.py registers them only when SDPM_LOCAL_COMPOSE == "1", which the Local Web UI
-sets for the kiro-cli it starts. The Local server watches the ACP stream and runs the
-composers itself; this module only validates the call and answers at once. It keeps no
-state between calls: on V3 one MCP server serves every session of the kiro-cli.
+sets for a chat's kiro-cli, never for a composer's. The Local server watches the ACP stream
+and runs the composers itself; this module only validates the call and answers at once. It
+keeps no state between calls: each kiro-cli carries one session, but the tools stay stateless.
 """
 
 import re
