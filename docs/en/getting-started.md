@@ -14,10 +14,10 @@ AWS server, see the [Deploy guide](deploy-cloudshell.md). To work on the code it
 
 ## Install
 
-One command installs SDPM into `~/.sdpm`. It sets up a git checkout, the MCP server
-environment, the icon catalogs and the `sdpm` launcher. The same checkout serves your AI
-agent and, if you want it, the browser Web UI. There is one thing to update and one thing
-to remove.
+One command installs the latest SDPM release into `~/.sdpm`. It sets up a git checkout, the
+MCP server environment, the icon catalogs and the `sdpm` launcher. The same checkout serves
+your AI agent and, if you want it, the browser Web UI. There is one thing to update and one
+thing to remove.
 
 ```bash
 # macOS / Linux
@@ -38,18 +38,22 @@ What happens:
    browser Web UI (ticked by default; press space to untick). With the Web UI, the installer
    also installs Node.js 20+ and Kiro CLI (the Web UI's agent backend) and builds the UI.
    Without it, nothing needs Node.js.
-3. The checkout is cloned to `~/.sdpm/checkout`, the server environment is synced, and the
-   AWS and Material icon catalogs are downloaded.
+3. The checkout is cloned to `~/.sdpm/checkout` and set to the latest release (the newest
+   `vX.Y.Z` tag; `--channel main` takes the tip of `main` instead). The server environment
+   is synced and the AWS and Material icon catalogs are downloaded.
 4. **Connect SDPM to your MCP clients** is a checklist of the clients found on the machine,
    all ticked. Untick what you do not want (space) and confirm (enter). A result table
    follows: ✓ registered, – skipped (with the `sdpm register <client>` command to do it
    later), ✗ failed. Nothing is written for an unticked client.
 
 Running the installer again repairs an existing installation. It never creates a second one.
-It keeps that installation's profile and Kiro agent name (unless you pass `--full`,
-`--mcp-only` or `--agent-name`), and instead of the client checklist it registers SDPM
-again with the clients that already have it, as `sdpm update` does; `--register` also adds
-the detected clients that do not.
+It keeps that installation's profile, Kiro agent name and channel (unless you pass `--full`,
+`--mcp-only`, `--agent-name` or `--channel`), updates it as `sdpm update` does, and instead
+of the client checklist it registers SDPM again with the clients that already have it;
+`--register` also adds the detected clients that do not.
+
+Each install and update downloads one small manifest from the release that matches your OS
+and the kind of run; GitHub counts these downloads, and nothing else is sent.
 
 ### Installer options
 
@@ -58,12 +62,14 @@ the detected clients that do not.
 | `--full` / `--mcp-only` | Skip the profile question |
 | `--register` / `--no-register` | Register with every detected client / only print the configuration |
 | `--agent-name NAME` | Name of the Kiro CLI agent (default `sdpm`; remembered for `sdpm register` / status) |
-| `--non-interactive` | Accept all prompts (profile defaults to full) |
+| `--channel release\|main` | Follow the latest release (default) or every change merged to `main`; remembered for `sdpm update` |
+| `--non-interactive` | Accept all prompts (profile defaults to full). Without a terminal the installer behaves this way by itself |
 | `--skip-libreoffice`, `--skip-shortcut` | Leave those out |
 | `--deps-only` | Install `git`, `uv`, LibreOffice and poppler only (for a developer checkout) |
 
 Environment equivalents: `SDPM_PROFILE=full|mcp`, `SDPM_REGISTER=yes|no`,
-`SDPM_NON_INTERACTIVE=1`, `SDPM_HOME` (install root, default `~/.sdpm`),
+`SDPM_CHANNEL=release|main`, `SDPM_AGENT_NAME`, `SDPM_NON_INTERACTIVE=1`, `SDPM_HOME`
+(install root, default `~/.sdpm`),
 `SDPM_LAUNCHER_DIR` (default `~/.local/bin`; `%USERPROFILE%\bin` on Windows).
 `bash -s -- --mcp-only` passes options through `curl … | bash`.
 
@@ -80,6 +86,9 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
   (needs Node.js 20+).
 - `--register` connects every MCP client found on the machine without asking.
   `--no-register` prints the configuration instead.
+- Nothing waits for input when there is no terminal: without one the installer runs as with
+  `--non-interactive`. When sudo needs a password there (apt on Linux, Homebrew on macOS),
+  it prints the commands a person has to run and exits 1 instead of waiting.
 
 Then check the result. `sdpm` prints the status, and
 `python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp` prints
@@ -88,14 +97,16 @@ Then check the result. `sdpm` prints the status, and
 ## The `sdpm` launcher
 
 ```
-sdpm                    status: version, profile, surfaces, which clients are connected
+sdpm                    status: version, channel, profile, surfaces, which clients are connected
 sdpm webui              start the browser Web UI and open it
 sdpm mcp                run the MCP server on stdio (to check it from a terminal)
 sdpm register [CLIENT]  connect MCP clients (checklist of detected clients; --yes, --dry-run)
 sdpm unregister         disconnect them again
 sdpm mcp-config [CLIENT]  print the client configuration with this machine's paths (--json, --all)
-sdpm update [--with-webui]  pull main, sync, rebuild what is installed (or add the Web UI), refresh
-                        this command and the registered clients (see Update and uninstall)
+sdpm update [--with-webui] [--channel release|main]
+                        move to the latest release (or main), sync, rebuild what is installed
+                        (or add the Web UI), refresh this command and the registered clients
+                        (see Update and uninstall)
 sdpm doctor             environment checks
 sdpm uninstall          remove ~/.sdpm, the launcher, shortcuts; offers to unregister
 ```
@@ -266,11 +277,27 @@ Public decks work as PPTX decks do: anyone who can view the deck can present and
 
 ## Update and uninstall
 
-- `sdpm update` pulls the latest `main` and rebuilds what is installed.
+- `sdpm update` moves the install to the latest release and rebuilds what is installed.
   `sdpm update --with-webui` also adds the Web UI to an MCP-only install.
-  Changes to tracked files in `~/.sdpm/checkout` (tools of earlier versions rewrote some)
-  are moved to a git stash before the pull, never discarded: the update lists the files and
-  prints the `git stash apply` command that brings them back.
+  - **It never moves backwards.** An install that is ahead of the latest release (it
+    followed `main`) stays where it is, with one line (`Staying on …: no release contains
+    it yet`), until a release contains its commit.
+  - **Channels.** `sdpm update --channel main` follows every change merged to `main`
+    instead; `sdpm update --channel release` goes back (the install stays until a release
+    contains it). The choice is kept in `~/.sdpm/state.json`, with the installed version,
+    the profile, the Kiro agent name and the registered clients.
+  - **Local changes.** Changes to tracked files in `~/.sdpm/checkout` (tools of earlier
+    versions rewrote some) are moved to a git stash before the checkout moves, never
+    discarded: the update lists the files and prints the `git stash apply` command that
+    brings them back.
+  - **A failed update changes nothing.** When the new version's Python environment or Web
+    UI cannot be prepared, the update goes back to the commit it was on and re-syncs that
+    environment (`Back on …, as before`). The Web UI is rebuilt only when the commit
+    changed.
+  - **Exit codes** (for scripts and agents; `sdpm update` never prompts): 0 updated, up to
+    date or stayed; 1 failed (the last lines say where the install is); 2 a usage error;
+    130 interrupted.
+
   It then brings the rest of the install up to date:
   - replaces the `sdpm` command with the new version
   - registers SDPM again with the clients that already have it (the Kiro CLI agent under
@@ -283,9 +310,12 @@ Public decks work as PPTX decks do: anyone who can view the deck can present and
   - prints what to do after this update, from the CHANGELOG's Upgrading notes for local
     installs, when there is anything
 
-  An install made before this behaviour has a `sdpm` command that does not replace itself;
-  its first `sdpm update` does the same once. If you installed with `SDPM_LAUNCHER_DIR`
-  and that directory is not on `PATH`, set it again for that update.
+  An install made before 0.13.0 has a `sdpm` command that follows `main`. Its first
+  `sdpm update` still pulls `main` with the old command, then hands over to the new code,
+  which moves the install to the latest release that contains the commit you had and
+  installs the new `sdpm` command. Before the first release with this behaviour exists,
+  that update stays on the `main` it pulled. If you installed with `SDPM_LAUNCHER_DIR` and
+  that directory is not on `PATH`, set it again for that update.
 - `sdpm uninstall` removes `~/.sdpm`, the launcher and the shortcuts, and offers to
   disconnect your MCP clients.
 
@@ -331,8 +361,25 @@ git -C $HOME\.sdpm\checkout -c user.name=sdpm -c user.email=sdpm@localhost stash
 
 Nothing is discarded either way; `git -C ~/.sdpm/checkout stash list` shows what was set
 aside. From 0.13.0 on, `sdpm update` sets such changes aside by itself. If it still stops
-("could not fast-forward main"), the checkout has commits of its own or an untracked file
-where `main` now has one; git's message above names them, and nothing was discarded.
+("could not check out"), an untracked file is where the new version has one; git's message
+above names it, and nothing was discarded.
+
+Other messages from 0.13.0 on:
+
+- **`Could not prepare v… (see above). Back on v…, as before.`** The new version's
+  environment could not be prepared (a network error, or on Windows an MCP client or
+  `sdpm webui` holding files). The install is as it was; close what holds the files and
+  run `sdpm update` again. If the line says the way back stopped, run the installer again.
+- **`… has commits origin/main does not have and cannot update itself`.** The checkout has
+  commits of its own and predates this update logic. Run the installer again.
+- **`v… needs <tool> <version>+`.** The release asks for a newer tool; install it and run
+  `sdpm update` again. Nothing was changed.
+- **`! [rejected] … (would clobber existing tag)` at "Fetching main".** The `sdpm` command
+  of an install from 0.12 fetches tags without replacing them, so a release tag that was
+  moved stops it (published tags are never moved, so this should not happen). Run the
+  installer again.
+- **The first update from a 0.12 `sdpm` command failed in its own sync or build.** That
+  command has no way back. Run `sdpm update` again: it retries at the same version.
 
 ## Next steps
 

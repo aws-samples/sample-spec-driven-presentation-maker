@@ -68,7 +68,11 @@ the lock back to npm-11 format (this exact mistake shipped once in #254).
 | Installer (source → generated `dist/`) | `scripts/install/install.{sh,ps1}`, `lib/tui.*`, `build.sh` |
 | `sdpm` launcher | `scripts/install/launcher.{sh,ps1}` |
 | Client detection / config / registration | `servers/local/client_config.py` (+ `tests/test_client_config.py`) |
-| End of `sdpm update` (launcher, re-registration, leftovers, notes) | `client_config.py refresh`; one-time bridge for launchers from before it: `sdpm/sdpm/_launcher_bridge.py` |
+| `sdpm update` and the installer's setup (target release, move, rollback, prepare, state, launcher) | `servers/local/checkout_update.py` (stdlib, one file, Python 3.8+; `UPDATER_CONTRACT`) |
+| Every other `sdpm` subcommand (status, webui, mcp, register, doctor, uninstall) | `servers/local/sdpm_command.py` |
+| Re-registration, leftovers, Upgrading notes (end of every update) | `client_config.py refresh`; old launchers reach the new path through its hook, `checkout_update.py pull` and `sdpm/sdpm/_launcher_bridge.py` |
+| Release manifests (one per OS × install/update) | `scripts/release/manifest.{toml,py}`, `release.yml`, counting: `scripts/release/README.md` |
+| Release-channel scenarios (CI on 3 OS, also local) | `scripts/install/release_channel_smoke.py` |
 | Terminal checklist widget (no deps, 3 OS) | `servers/local/picker.py` — used by `sdpm register`; falls back to line input without a TTY |
 | MCP handshake smoke used by CI | `scripts/install/mcp_smoke.py` |
 | Installer CI (3 OS, real install, handshake) | `.github/workflows/installer.yml` |
@@ -77,8 +81,12 @@ the lock back to npm-11 format (this exact mistake shipped once in #254).
 | Icon catalog auto-install | `sdpm/sdpm/knowledge/assets/download.py` (`ensure_assets_installed_async`) |
 | User-facing contract | `docs/en/getting-started.md`, `docs/en/migration/onboarding.md` |
 
-State the installer leaves in `~/.sdpm`: `checkout/`, `.profile` (full \| mcp), `.uv-path`,
-`.agent-name`. Local smoke: see `scripts/install/README.md` (isolated `SDPM_HOME`, local
+State in `~/.sdpm`: `checkout/` (detached at the installed release, or `main`), `state.json`
+(version, channel, profile, agent name, clients; written only after a successful prepare),
+`.uv-path` (read by the bootstrap). Transient: `update-prepared` (the rollback sentinel),
+`update-backup/` (the previous Web UI during a rebuild), `adopt-from` (an old launcher's
+update that has not finished). `.profile` / `.agent-name` are pre-0.13 and removed by the
+first update. Local smoke: see `scripts/install/README.md` (isolated `SDPM_HOME`, local
 git mirror as `SDPM_REPO_URL`).
 
 ## Security Scanning

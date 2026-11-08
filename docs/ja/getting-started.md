@@ -14,7 +14,7 @@ SDPM の使い方は 3 つあります。
 
 ## インストール
 
-1 コマンドで SDPM が `~/.sdpm` に入ります。git checkout、MCP サーバーの環境、アイコンカタログ、
+1 コマンドで SDPM の最新のリリースが `~/.sdpm` に入ります。git checkout、MCP サーバーの環境、アイコンカタログ、
 `sdpm` ランチャーをまとめて用意します。同じ checkout が AI エージェントと、必要ならブラウザ用の
 Web UI の両方に使われるので、更新するものも削除するものも 1 つです。
 
@@ -35,17 +35,20 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 2. **What to install** は 2 行のチェックリストです。MCP サーバー（常にオン）とブラウザ用 Web UI
    （既定でオン。space で外す）。Web UI を含めると、Node.js 20+ と Kiro CLI（Web UI のエージェント
    基盤）も入れて UI をビルドします。外せば Node.js は不要です。
-3. `~/.sdpm/checkout` に clone し、サーバーの環境を同期し、AWS と Material のアイコンカタログを取得します。
+3. `~/.sdpm/checkout` に clone し、最新のリリース（いちばん新しい `vX.Y.Z` のタグ。`--channel main`
+   なら `main` の先端）にそろえます。サーバーの環境を同期し、AWS と Material のアイコンカタログを取得します。
 4. **Connect SDPM to your MCP clients** は、マシン上で見つかったクライアントのチェックリストです
    （すべてオン）。不要なものを space で外し、enter で確定します。続けて結果が表で出ます:
    ✓ registered、– skipped（後で接続するための `sdpm register <client>` 付き）、✗ failed。
    外したクライアントには何も書き込みません。
 
 インストーラーをもう一度実行すると、既存のインストールを修復します。2 つ目は作りません。
-そのインストールのプロファイルと Kiro エージェントの名前を引き継ぎ（`--full`、`--mcp-only`、
-`--agent-name` を渡した場合を除く）、クライアントのチェックリストの代わりに、SDPM が登録済みの
-クライアントに `sdpm update` と同じく登録し直します。`--register` を付けると、未登録の検出済み
-クライアントにも登録します。
+そのインストールのプロファイル、Kiro エージェントの名前、追う先を引き継ぎ（`--full`、`--mcp-only`、
+`--agent-name`、`--channel` を渡した場合を除く）、`sdpm update` と同じく更新します。クライアントの
+チェックリストの代わりに、SDPM が登録済みのクライアントに登録し直します。`--register` を付けると、
+未登録の検出済みクライアントにも登録します。
+
+インストールと update のたびに、OS と用途に合ったリリースのマニフェストを 1 つダウンロードします。その回数は GitHub が数え、ほかには何も送りません。
 
 ### インストーラーのオプション
 
@@ -54,11 +57,13 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 | `--full` / `--mcp-only` | プロファイルの質問を省く |
 | `--register` / `--no-register` | 検出した全クライアントに登録 / 設定を表示するだけ |
 | `--agent-name NAME` | Kiro CLI エージェントの名前（既定 `sdpm`。`sdpm register` と状態表示でも使われる） |
-| `--non-interactive` | すべての質問に yes（プロファイルは full） |
+| `--channel release\|main` | 最新のリリースを追う（既定）か、`main` にマージされた変更をすべて追うか。`sdpm update` も引き継ぐ |
+| `--non-interactive` | すべての質問に yes（プロファイルは full）。端末が無いときは自動でこの動作になる |
 | `--skip-libreoffice`, `--skip-shortcut` | それらを省く |
 | `--deps-only` | `git`・`uv`・LibreOffice・poppler だけを入れる（開発者の checkout 向け） |
 
-環境変数版: `SDPM_PROFILE=full|mcp`、`SDPM_REGISTER=yes|no`、`SDPM_NON_INTERACTIVE=1`、
+環境変数版: `SDPM_PROFILE=full|mcp`、`SDPM_REGISTER=yes|no`、`SDPM_CHANNEL=release|main`、
+`SDPM_AGENT_NAME`、`SDPM_NON_INTERACTIVE=1`、
 `SDPM_HOME`（インストール先、既定 `~/.sdpm`）、`SDPM_LAUNCHER_DIR`（既定 `~/.local/bin`、Windows は
 `%USERPROFILE%\bin`）。`curl … | bash -s -- --mcp-only` のようにしてオプションを渡せます。
 
@@ -75,6 +80,8 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
   （Node.js 20+ が必要）。
 - `--register` は見つかった全 MCP クライアントに確認なしで接続します。`--no-register` なら設定を
   表示するだけです。
+- 端末が無いときは入力を待ちません。`--non-interactive` と同じ動作になります。sudo のパスワードが
+  要る場面（Linux の apt、macOS の Homebrew）では、人が打つコマンドを表示して 1 で終わります。
 
 終わったら結果を確認します。`sdpm` が状態を表示し、
 `python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp` は MCP サーバーが
@@ -83,14 +90,16 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
 ## `sdpm` ランチャー
 
 ```
-sdpm                    状態: 版、プロファイル、入っている面、接続済みクライアント
+sdpm                    状態: 版、追う先、プロファイル、入っている面、接続済みクライアント
 sdpm webui              ブラウザ用 Web UI を起動して開く
 sdpm mcp                MCP サーバーを stdio で起動（ターミナルでの動作確認用）
 sdpm register [CLIENT]  MCP クライアントに接続（検出クライアントのチェックリスト。--yes, --dry-run）
 sdpm unregister         接続を解除
 sdpm mcp-config [CLIENT]  このマシンのパス入りでクライアント設定を表示（--json, --all）
-sdpm update [--with-webui]  main を取得して同期し、入っているものを再ビルド（Web UI の追加も）。
-                        このコマンドと登録済みクライアントもそろえる（「更新とアンインストール」）
+sdpm update [--with-webui] [--channel release|main]
+                        最新のリリース（または main）に移り、同期して入っているものを再ビルド
+                        （Web UI の追加も）。このコマンドと登録済みクライアントもそろえる
+                        （「更新とアンインストール」）
 sdpm doctor             環境チェック
 sdpm uninstall          ~/.sdpm・ランチャー・ショートカットを削除。登録解除も提案
 ```
@@ -254,11 +263,24 @@ AWS 構成では見出しに 3 つのボタンがあります。
 
 ## 更新とアンインストール
 
-- `sdpm update` は最新の `main` を取得し、入っているものを再ビルドします。
+- `sdpm update` は最新のリリースに移り、入っているものを再ビルドします。
   `sdpm update --with-webui` は MCP のみの構成に Web UI も足します。
-  `~/.sdpm/checkout` の追跡ファイルに変更があれば（前の版のツールが書き換えたものもあります）、
-  取得の前に git stash に退避します。捨てることはしません。退避したファイルと、戻すための
-  `git stash apply` のコマンドを表示します。
+  - **版を下げません。** 最新のリリースより新しいところにいるインストール（`main` を追っていた
+    もの）は、そのコミットを含むリリースが出るまでその場にとどまり、その旨を 1 行で表示します
+    （`Staying on …: no release contains it yet`）。
+  - **追う先。** `sdpm update --channel main` で `main` にマージされた変更をすべて追います。
+    `sdpm update --channel release` で戻せます（リリースがそのコミットを含むまではその場に
+    とどまります）。選択は `~/.sdpm/state.json` に残ります。入っている版、プロファイル、
+    Kiro エージェントの名前、登録済みのクライアントも同じファイルにあります。
+  - **手元の変更。** `~/.sdpm/checkout` の追跡ファイルに変更があれば（前の版のツールが書き換えた
+    ものもあります）、チェックアウトを動かす前に git stash に退避します。捨てることはしません。
+    退避したファイルと、戻すための `git stash apply` のコマンドを表示します。
+  - **失敗しても環境を壊しません。** 新しい版の Python 環境や Web UI を用意できなかったときは、
+    元のコミットに戻してその環境を同期し直します（`Back on …, as before`）。Web UI はコミットが
+    変わったときだけビルドし直します。
+  - **終了コード**（スクリプトとエージェント向け。`sdpm update` は質問しません）: 0 更新した・最新・
+    とどまった、1 失敗（最後の行にインストールの状態が出ます）、2 使い方の誤り、130 中断。
+
   続けて、インストールの残りもそろえます:
   - `sdpm` コマンドを新しい版で置き換える
   - SDPM が登録済みのクライアントに登録し直す（Kiro CLI のエージェントはインストール時に
@@ -271,9 +293,11 @@ AWS 構成では見出しに 3 つのボタンがあります。
   - CHANGELOG の Upgrading にあるローカルインストール向けの注記から、この更新の後にすること
     があれば表示する
 
-  この動作より前に入れた環境の `sdpm` コマンドは自分を置き換えません。その環境で最初に打つ
-  `sdpm update` が、同じことを 1 回だけ行います。`SDPM_LAUNCHER_DIR` を指定してインストール
-  し、そのディレクトリが `PATH` にない場合は、その更新のときにもう一度指定してください。
+  0.13.0 より前に入れた環境の `sdpm` コマンドは `main` を追います。その環境で最初に打つ
+  `sdpm update` は、古いコマンドで `main` を取得したあと新しいコードに渡し、元のコミットを含む
+  最新のリリースに移って、新しい `sdpm` コマンドを入れます。この動作を含む最初のリリースが出る
+  までは、取得した `main` にとどまります。`SDPM_LAUNCHER_DIR` を指定してインストールし、その
+  ディレクトリが `PATH` にない場合は、その更新のときにもう一度指定してください。
 - `sdpm uninstall` は `~/.sdpm`、ランチャー、ショートカットを削除し、MCP クライアントの接続解除も提案します。
 
 AWS アカウントからデプロイを削除するには、[アンインストール（AWS）](uninstall.md)を参照してください。
@@ -318,9 +342,25 @@ git -C $HOME\.sdpm\checkout -c user.name=sdpm -c user.email=sdpm@localhost stash
 
 どちらでも捨てられるものはありません。退避したものは `git -C ~/.sdpm/checkout stash list` で
 確認できます。0.13.0 からは、`sdpm update` がこうした変更を自分で退避します。それでも止まる場合
-（「could not fast-forward main」）は、チェックアウトに独自のコミットがあるか、`main` に新しく
-入ったファイルと同じ場所に追跡されていないファイルがあります。git のメッセージにその名前が出ており、
-捨てられたものはありません。
+（「could not check out」）は、新しい版に入ったファイルと同じ場所に追跡されていないファイルが
+あります。git のメッセージにその名前が出ており、捨てられたものはありません。
+
+0.13.0 からのそのほかのメッセージ:
+
+- **`Could not prepare v… (see above). Back on v…, as before.`** 新しい版の環境を用意できません
+  でした（ネットワークのエラー、Windows では MCP クライアントや `sdpm webui` がファイルを開いて
+  いるなど）。インストールは元のままです。ファイルを開いているものを閉じて、もう一度
+  `sdpm update` を実行してください。戻る途中で止まったと表示された場合は、インストーラーを
+  もう一度実行してください。
+- **`… has commits origin/main does not have and cannot update itself`。** チェックアウトに独自の
+  コミットがあり、この更新の仕組みより前の版です。インストーラーをもう一度実行してください。
+- **`v… needs <tool> <version>+`。** そのリリースが新しいツールを求めています。入れてから
+  `sdpm update` を実行し直してください。何も変更していません。
+- **「Fetching main」での `! [rejected] … (would clobber existing tag)`。** 0.12 の環境の `sdpm`
+  コマンドはタグを置き換えずに取得するため、付け替えられたリリースのタグで止まります（公開した
+  タグは付け替えないので、起きないはずです）。インストーラーをもう一度実行してください。
+- **0.12 の `sdpm` コマンドでの最初の更新が、その同期かビルドで失敗した。** そのコマンドには
+  戻る手段がありません。もう一度 `sdpm update` を実行すると、同じ版で再試行します。
 
 ## 次のステップ
 

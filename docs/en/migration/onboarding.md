@@ -53,6 +53,25 @@ per-client removals in the table above for clients that have no CLI. Verify with
 - **No PyPI, no `uvx`.** The repository cannot publish to PyPI; `uvx --from git+https://…`
   followed `main` yet was frozen by uv's cache.
 
+## 0.13.0: the install follows releases
+
+- **Releases, not `main`.** The installer (same one-line command) and `sdpm update` move the
+  install to the latest release tag and never to an older commit than the one it is on. An
+  install that followed `main` stays until a release contains its commit. `sdpm update
+  --channel main` keeps following `main`.
+- **The `sdpm` command is a bootstrap.** It fetches and hands every command to the checkout
+  (`servers/local/checkout_update.py` for `update`, `servers/local/sdpm_command.py` for the
+  rest), so the update logic changes with the release, not with the launcher. The first
+  `sdpm update` with an older command replaces it (the #397 command through
+  `sdpm._launcher_bridge`, the #529 and #532 commands through `client_config.py refresh`
+  and `checkout_update.py pull`), and lands on the release that contains the commit you
+  had.
+- **`~/.sdpm/state.json` replaces `.profile` and `.agent-name`.** It records the installed
+  release and commit, the channel, the profile, the Kiro agent name and the registered
+  clients. The first update (or installer run) with the new command moves the old files into
+  it and deletes them; `.uv-path` stays, because the bootstrap reads it before any Python
+  runs.
+
 ## What did not change
 
 Tool names, the role documents, the `sdpm-*` prompts, deck layouts, the remote (AWS) MCP
