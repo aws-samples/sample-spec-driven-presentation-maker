@@ -21,6 +21,20 @@ updates:
     #   (typescript-eslint#10940)
     # - eslint >=10: until eslint-config-next ships an eslint-plugin-react
     #   with eslint 10 peer support (crashes on removed getFilename API)
+    #
+    # package.json `overrides` (not a cap; a security floor):
+    # - @tailwindcss/typography > postcss-selector-parser ^6.1.5: 0.5.20 pins
+    #   6.0.10 exactly (GHSA-rj75-hqrm-r3gf, fixed in 6.1.5), so the security
+    #   update could only downgrade the plugin. Built CSS is byte-identical.
+    #   Remove when a typography release drops the pin
+    #   (tailwindcss-typography#431 / #430).
+    #
+    # Security updates that still fail upstream, no fix on our side:
+    # - minimatch GHSA-g3hv-75wg-m249 is fixed only in 11.x; typescript-estree
+    #   and @ts-morph/common (dev) require ^10 (typescript-eslint#13125).
+    #   Same advisory in /infra, see below.
+    # - deepmerge GHSA-gcqx-w48m-w2h4 (via shadcn CLI, dev) has no patched
+    #   release.
     ignore:
       - dependency-name: "typescript"
         versions: [">=7"]
@@ -49,6 +63,12 @@ updates:
     #   with both @types/node 22 and 26, while TS 5.9 + @types/node 26 is
     #   clean — so the blocker is the compiler, not the types. Re-evaluate
     #   when the CDK toolchain supports TS >=6 (PR #258 / #298 CI logs).
+    #
+    # The minimatch security update (GHSA-g3hv-75wg-m249, fixed only in 11.x)
+    # fails here until aws-cdk-lib bundles minimatch >=11.0.1. It is in
+    # aws-cdk-lib's bundleDependencies, so `overrides` cannot reach it
+    # (aws/aws-cdk#39594, fix in aws/aws-cdk#39595). Picked up by the regular
+    # aws-cdk-lib bump once released.
     ignore:
       - dependency-name: "typescript"
         versions: [">=6"]
