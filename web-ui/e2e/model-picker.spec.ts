@@ -52,11 +52,13 @@ test("chooses the model and effort of a V3 chat; the next message and a reload k
 
   await send(page, "One more slide, please")
   await expect(chatLog).toContainText("model: stub-effort, effort: high", { timeout: 30_000 })
+  // The chat is saved when the turn ends; reload only once it is
+  await expect.poll(async () => (await page.request.get("/api/agent/chat?deckId=e2e-v3-deck")).text(), { timeout: 15_000 })
+    .toContain("model: stub-effort, effort: high")
 
   await page.reload()
-  // The reloaded page opens with the chat closed, on its new-chat tab; the deck's chat is the other one.
-  await page.getByRole("button", { name: "Open chat" }).click()
-  await page.getByRole("button", { name: "E2E Test Deck (v3)" }).last().click()
+  // The reloaded page reopens the deck's own chat.
+  await expect(page.getByRole("log", { name: "Chat messages" })).toContainText("model: stub-effort, effort: high", { timeout: 30_000 })
   await expect(pill(page)).toHaveText("Stub Effort · High", { timeout: 15_000 })
 })
 
