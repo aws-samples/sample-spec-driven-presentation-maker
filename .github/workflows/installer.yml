@@ -339,6 +339,7 @@ jobs:
           if ($rc -ne 1) { throw "exit $rc, expected 1" }
           if (-not (Test-Path (Join-Path $env:SDPM_LAUNCHER_DIR "sdpm.cmd"))) { throw "sdpm.cmd was not written" }
           if (-not (Select-String -Path reg.log -SimpleMatch "Some steps did not finish" -Quiet)) { throw "no closing line" }
+          exit 0   # the expected exit 1 is still in $LASTEXITCODE, which the step would report
       - name: Update from the #397 launcher
         shell: pwsh
         run: |
