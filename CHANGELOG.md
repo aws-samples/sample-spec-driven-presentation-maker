@@ -13,6 +13,21 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Fixed
+
+- **Cloud chat: a reply the model's content filter stopped now says so.** Strands ends such
+  a turn normally with no text, so the chat showed an empty reply. The agent now sends a
+  `content_filtered` error for a `content_filtered` or `guardrail_intervened` stop, and the
+  Web UI shows "The model stopped its reply because of its content filter".
+- **Cloud `run_python` and `run_style_python` stop user code after 120 seconds.** The tool
+  returns `Error: execution timed out (120s)…` as a normal result, so the composer can go
+  on. Before, a hung call blocked the composer for 10 minutes and then failed with
+  `ConflictException … Session already terminated`, which hid the real cause. Stopping a
+  session the sandbox already ended no longer replaces the result.
+- **Cloud chat: throttling names the cause.** The message now says the model's usage quota
+  or rate limit was reached and suggests waiting or choosing another model in Settings, in
+  English and Japanese.
+
 ## [0.13.0] - 2026-11-09
 
 The Local Web UI now runs kiro-cli on its V3 engine and composes slides in the background,

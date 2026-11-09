@@ -13,12 +13,18 @@ retry re-sends the request:
 
 - ``SHORT_API`` — for calls that answer promptly (S3, DynamoDB, SSM, Code
   Interpreter session start/stop, file writes, embeddings).
-- ``LONG_CALL`` — for ``invoke_code_interpreter`` running user code, which may
-  stay silent for minutes; it must never be retried (a retry would execute the
-  code twice) and needs a read timeout above the sandbox's own 300 s limit.
+- ``LONG_CALL`` — for ``invoke_code_interpreter`` running user code
+  (run_python / run_style_python). The call stays silent until the code ends,
+  so its read timeout is the execution limit: ``USER_CODE_TIMEOUT_S``, below
+  the sandbox's own 300 s session limit. It is never retried (a retry would
+  execute the code twice).
 """
 
 from botocore.config import Config
+
+# Execution limit for user code. Legitimate run_python calls on dev took at
+# most 17 s (p99 6 s); the same limit as Local's sandbox.
+USER_CODE_TIMEOUT_S = 120
 
 SHORT_API = Config(
     connect_timeout=5,
@@ -29,7 +35,7 @@ SHORT_API = Config(
 
 LONG_CALL = Config(
     connect_timeout=5,
-    read_timeout=600,
+    read_timeout=USER_CODE_TIMEOUT_S,
     retries={"mode": "standard", "max_attempts": 1},
     tcp_keepalive=True,
 )
