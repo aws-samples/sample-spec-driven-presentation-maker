@@ -26,11 +26,11 @@ const readTrace = (): TraceLine[] => (fs.existsSync(TRACE) ? fs.readFileSync(TRA
 function seedMcpDeck(deckId: string): string {
   const dir = path.join(DECKS, deckId) // nosemgrep: path-join-resolve-traversal — constant deck ids in the sandbox
   fs.rmSync(dir, { recursive: true, force: true })
-  fs.mkdirSync(path.join(dir, "specs"), { recursive: true })
-  fs.mkdirSync(path.join(dir, "slides"), { recursive: true })
-  fs.writeFileSync(path.join(dir, "deck.json"), JSON.stringify({ name: `MCP-made deck (${deckId})` }))
-  fs.writeFileSync(path.join(dir, "specs", "brief.md"), "# Brief\n")
-  fs.writeFileSync(path.join(dir, "specs", "outline.md"), "")
+  fs.mkdirSync(path.join(dir, "specs"), { recursive: true }) // nosemgrep: path-join-resolve-traversal — constant deck ids in the sandbox
+  fs.mkdirSync(path.join(dir, "slides"), { recursive: true }) // nosemgrep: path-join-resolve-traversal — constant deck ids in the sandbox
+  fs.writeFileSync(path.join(dir, "deck.json"), JSON.stringify({ name: `MCP-made deck (${deckId})` })) // nosemgrep: path-join-resolve-traversal — constant deck ids in the sandbox
+  fs.writeFileSync(path.join(dir, "specs", "brief.md"), "# Brief\n") // nosemgrep: path-join-resolve-traversal — constant deck ids in the sandbox
+  fs.writeFileSync(path.join(dir, "specs", "outline.md"), "") // nosemgrep: path-join-resolve-traversal — constant deck ids in the sandbox
   return fs.realpathSync(dir)
 }
 
