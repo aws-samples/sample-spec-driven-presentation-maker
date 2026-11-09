@@ -142,7 +142,10 @@ Place your .pptx file anywhere accessible and specify the path when initializing
 
 Or simply tell the agent: "Use my-template.pptx for this presentation."
 
-Place templates in `sdpm/templates/` to have them appear in `list_templates` automatically.
+Place templates in `<user-config>/templates/` (see **User-local templates** below) to have
+them appear in `list_templates` automatically. `sdpm/templates/` holds the bundled ones; in
+an installed SDPM it is part of `~/.sdpm/checkout`, which `sdpm update` manages, so keep your
+own templates out of it.
 
 Included sample templates:
 
