@@ -611,6 +611,18 @@ def test_local_open_file_needs_a_built_output(local, root_deck, launched) -> Non
     assert launched == []
 
 
+def test_local_deck_with_a_bad_format_still_loads_and_opens_its_folder(local, root_deck, launched) -> None:
+    (root_deck / "deck.json").write_text(json.dumps({**_DECK_JSON, "outputFormat": "pdf"}), encoding="utf-8")
+    (root_deck / "output.pptx").write_bytes(b"built")
+    deck_id = str(root_deck)
+    got = _ok(_act(local, {"action": "deck", "deck_id": deck_id}))
+    assert got["open"] == {"file": False, "folder": True}
+    assert got["check"]["ok"] is False and any("outputFormat" in e for e in got["check"]["errors"])
+    assert _act(local, {"action": "open", "deck_id": deck_id, "target": "file"}).isError
+    _ok(_act(local, {"action": "open", "deck_id": deck_id, "target": "folder"}))
+    assert [argv[-1] for argv in launched] == [_real(root_deck)]
+
+
 @pytest.fixture
 def outside_deck(root_deck: Path, tmp_path: Path) -> Path:
     """A built deck that is not in the deck root."""

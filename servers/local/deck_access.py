@@ -158,7 +158,11 @@ def _locate(deck_id: str, target: str) -> Path | None:
     deck = _deck_in_root(deck_id)
     if deck is None or target == "folder":
         return deck
-    output = deck / ("output.html" if read_deck_format(deck) == "html" else "output.pptx")
+    try:
+        fmt = read_deck_format(deck)
+    except ValueError:  # a bad outputFormat: deck_view's check names it; the folder still opens
+        return None
+    output = deck / ("output.html" if fmt == "html" else "output.pptx")
     real = Path(os.path.realpath(output))
     return real if real.is_file() and _same_dir(real.parent, deck) else None
 
