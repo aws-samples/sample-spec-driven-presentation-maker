@@ -975,7 +975,7 @@ describe("unseen periods", () => {
   })
 
   it("replays a finished period no stream delivered until the page saves its chat after reading it", async () => {
-    await acp.createNewProcessFor("C1")
+    (await acp.createNewProcessFor("C1")).chat.bindDeck("d1")
     await unreadPeriod("C1", children[0], "K1")
     const replayed = await stream("C1")
     expect(texts(replayed)).toEqual(["the reply"])
@@ -987,7 +987,7 @@ describe("unseen periods", () => {
   })
 
   it("delivers the period the invoke stream wrote the end of once the page saves", async () => {
-    await acp.createNewProcessFor("C1")
+    (await acp.createNewProcessFor("C1")).chat.bindDeck("d1")
     const prompted = await acp.sendPrompt("C1", "hello")
     const { createSSEStream } = await import("./sse-bridge")
     const body = new Response(createSSEStream({ subscribe: prompted.subscribe, replay: acp.getBufferedEvents("C1", prompted.replayFrom - 1), onEnd: prompted.onEnd })).text()
@@ -1001,7 +1001,7 @@ describe("unseen periods", () => {
   })
 
   it("does not deliver a period no stream wrote the end of, nor one that runs", async () => {
-    await acp.createNewProcessFor("C1")
+    (await acp.createNewProcessFor("C1")).chat.bindDeck("d1")
     const prompted = await acp.sendPrompt("C1", "hello")
     prompted.send()
     await settle()
@@ -1014,6 +1014,18 @@ describe("unseen periods", () => {
     acp.markDelivered("C1")
     expect((await stream("C1"))?.length).toBeGreaterThan(0)
     acp.markDelivered("C1")
+    expect(await stream("C1")).toBeNull()
+  })
+
+  it("delivers the period of a chat no deck holds (a style chat) once a stream wrote its end", async () => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "hello")
+    const { createSSEStream } = await import("./sse-bridge")
+    const body = new Response(createSSEStream({ subscribe: prompted.subscribe, replay: acp.getBufferedEvents("C1", prompted.replayFrom - 1), onEnd: prompted.onEnd })).text()
+    prompted.send()
+    await settle()
+    children[0].endTurn()
+    await body
     expect(await stream("C1")).toBeNull()
   })
 

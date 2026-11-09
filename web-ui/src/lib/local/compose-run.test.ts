@@ -14,7 +14,8 @@
  * - message_composer: a steer on that group's kiro-cli before the tool's own end; a message for a
  *   starting group goes into its first prompt; a late one into a follow-up prompt on the same
  *   kiro-cli; an ended or unknown group is not delivered and the orchestrator is told; input out of
- *   the tool's bounds sends nothing and shows the tool's refusal.
+ *   the tool's bounds sends nothing and shows the tool's refusal; input the tool coerces (a numeric
+ *   string group) is not delivered and the orchestrator is told.
  * - Stop, twice and then the chat's exit; the settle timeout, also after the task's timeout; a composer's exit and start
  *   failure; the chat's exit; the 60-minute timeout; a queued task; an invalid result; the
  *   output check; a compose period whose chat the cap released is replayed until the page saved it
@@ -398,6 +399,17 @@ describe("message_composer bounds", () => {
     callTool(orch, "v3", "m1", "message_composer", { group: 1, text: "🎨".repeat(10_000) }, "Sent")
     await settle()
     expect(methods(composers()[0])).toContain("_session/steer")
+  })
+
+  it("input the tool accepts but does not route (a numeric string group) is not delivered, and the orchestrator is told", async () => {
+    const { orch, events, composers } = await compose("v3", [["cover"]], { keepTurn: true })
+    callTool(orch, "v3", "m1", "message_composer", { group: "1", text: "x" }, "Sent to composer 1")
+    await settle()
+    expect(methods(composers()[0])).not.toContain("_session/steer")
+    expect(kinds(events, "toolResult").find((r) => r.toolUseId === "m1")).toMatchObject({ name: "message_composer", status: "error" })
+    expect(orch.requests.filter((r) => r.method === "_session/steer").map((r) => r.params.message as string)).toEqual([
+      expect.stringMatching(/^<message_composer_error group="1">/),
+    ])
   })
 })
 

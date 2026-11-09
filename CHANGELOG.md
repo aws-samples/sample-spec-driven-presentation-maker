@@ -38,11 +38,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   reopen; the server now replays a finished work period until the page has saved the chat
   after reading it. A long reply could show twice after a reopen, because the 2,000-event
   replay buffer dropped the period's prompt; the buffer now keeps a run of streamed text as
-  one event, and a replay that starts after its prompt rebuilds from the last user message.
-  A failed reconnect no longer shows a running compose task as stopped.
+  one event and never drops the period's prompt. A period with more than 2,000 other events
+  (tool calls, compose progress) is replayed from its prompt without its oldest events, so the
+  reopened chat shows that reply from the oldest part kept. A failed reconnect no longer shows
+  a running compose task as stopped.
 - **Local Web UI compose: `message_composer` input the tool refuses is not sent.** An empty
-  text, a text over 10,000 characters or group 0 used to reach the composer while the
-  orchestrator read an error; the card now shows the tool's error and nothing is sent. A task
+  text or a text over 10,000 characters used to reach the composer while the orchestrator read
+  an error; the card now shows the tool's error and nothing is sent. A task
   whose 60-minute timeout came before a Stop its composers did not answer ends cancelled, as
   Stop does, instead of failed.
 

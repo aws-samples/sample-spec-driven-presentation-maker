@@ -20,7 +20,7 @@ import { deckSessionId, isOwnerPrefixed } from "@/lib/sessionId"
 import { getChatHistory, patchDeck, type ChatMessage as ChatHistoryMessage } from "@/services/deckService"
 import * as localService from "@/services/localService"
 import type { UploadedFile } from "@/services/uploadService"
-import { useChatStream, type HistoryCut, type Message, type ToolUseCallbackData } from "@/hooks/useChatStream"
+import { useChatStream, type Message, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { useSlashPickerItems } from "@/hooks/useSlashPickerItems"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage } from "./ChatMessage"
@@ -122,7 +122,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const [historyLoading, setHistoryLoading] = useState(false)
   // Set by the history load when the session may be working (Cloud: it was; Local: always, on a
   // deck); applied once the config is loaded.
-  const [resumeCut, setResumeCut] = useState<{ cut: HistoryCut } | null>(null)
+  const [resumeCut, setResumeCut] = useState<{ cut: (prompt: string) => Message[] } | null>(null)
 
   // --- Options ---
   const [optionsOpen, setOptionsOpen] = useState(false)
@@ -375,9 +375,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       // period that ended before a page saved it).
       if (IS_LOCAL && deckId && deckId !== "new") {
         if (superseded) return
-        setResumeCut({ cut: (prompt) => cutLocalAtPrompt(loaded, prompt) })
+        setResumeCut({ cut: (prompt: string) => cutLocalAtPrompt(loaded, prompt) })
       } else if (!IS_LOCAL && deckId && deckId !== "new" && isResumable(sessionId)) {
-        setResumeCut({ cut: (prompt) => (prompt === null ? undefined : parseCloudHistory(cutAtPrompt(raw, prompt))) })
+        setResumeCut({ cut: (prompt: string) => parseCloudHistory(cutAtPrompt(raw, prompt)) })
       }
     }
     if (auth.isAuthenticated) loadHistory()

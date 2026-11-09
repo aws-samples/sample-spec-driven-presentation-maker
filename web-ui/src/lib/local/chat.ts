@@ -45,8 +45,10 @@ import type { LocalSessionNoticeCode } from "./sessionNotices"
 import { AgentTimeoutError } from "./turnErrors"
 
 /**
- * Chat events kept per work period for a reconnecting stream (the oldest go first). Consecutive
- * text deltas count as one: kiro-cli sends one per chunk, most of a turn's events.
+ * Chat events kept per work period for a reconnecting stream. Consecutive text deltas count as
+ * one: kiro-cli sends one per chunk, most of a turn's events. Past the cap the oldest event after
+ * the period's opening (its first events through its first turn, `Period.opening`) goes, so a
+ * replay always starts with the prompt the page cuts its history at; what went is not replayed.
  */
 export const MAX_BUFFERED_EVENTS = 2000
 /** How long Stop waits for the work holds to release before the period ends without them (Cloud's STOP_SETTLE_S). */
@@ -74,6 +76,8 @@ export interface Period {
   buffer: BufferedEvent[]
   /** The merged text deltas among `buffer`. */
   readonly runs: Map<BufferedEvent, TextRun>
+  /** How many of `buffer`'s first events are the period's opening, never dropped (0 before its first turn). */
+  opening: number
   eventId: number
   /** Stop was pressed: nothing that starts model work is sent any more. */
   stopped: boolean
@@ -144,7 +148,8 @@ function bufferEvent(period: Period, entry: BufferedEvent): void {
     return
   }
   period.buffer.push(entry)
-  if (period.buffer.length > MAX_BUFFERED_EVENTS) period.runs.delete(period.buffer.shift()!)
+  if (!period.opening && entry.event.kind === "data" && "turn" in entry.event.payload) period.opening = period.buffer.length
+  if (period.buffer.length > MAX_BUFFERED_EVENTS) period.runs.delete(period.buffer.splice(period.opening, 1)[0])
 }
 
 /**
@@ -417,7 +422,7 @@ export class Chat implements SessionSink {
 
   private beginPeriod(): void {
     this.period = {
-      number: ++this.periods, buffer: [], runs: new Map(), eventId: 0, stopped: false, holds: new Set(), endWritten: false, seen: false,
+      number: ++this.periods, buffer: [], runs: new Map(), opening: 0, eventId: 0, stopped: false, holds: new Set(), endWritten: false, seen: false,
       turns: 0, lastEnd: null, lastHow: "finished", errorShown: false, ended: false,
     }
     this.lastPeriod = null

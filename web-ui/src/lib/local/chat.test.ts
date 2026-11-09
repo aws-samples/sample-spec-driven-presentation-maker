@@ -453,6 +453,35 @@ describe("chat events", () => {
     ])
   })
 
+  it("past the cap drops the oldest event after the period's opening, never the opening", async () => {
+    const { MAX_BUFFERED_EVENTS } = await import("./chat")
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "hello")
+    prompted.send()
+    const child = children[0]
+    child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "the head" } })
+    for (let i = 0; i < MAX_BUFFERED_EVENTS; i++) {
+      child.update("K1", { sessionUpdate: "tool_call", toolCallId: `t${i}`, title: "Running: @sdpm/list_styles", rawInput: {}, _meta: { kiro: { toolName: "list_styles", mcpServerName: "sdpm" } } })
+    }
+    child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "the tail" } })
+    await settle()
+    const buffered = acp.getBufferedEvents("C1")
+    expect(buffered).toHaveLength(MAX_BUFFERED_EVENTS)
+    expect(buffered.slice(0, 2).map((e) => [e.id, e.event])).toEqual([
+      [1, { kind: "data", payload: { work: { state: "busy" } } }],
+      [2, { kind: "data", payload: { turn: { id: expect.any(String), why: "prompt", text: "hello" } } }],
+    ])
+    const texts = buffered.flatMap((e) => {
+      const payload = e.event.kind === "data" ? (e.event.payload as { event?: { contentBlockDelta?: { delta: { text: string } } } }) : undefined
+      return payload?.event?.contentBlockDelta ? [payload.event.contentBlockDelta.delta.text] : []
+    })
+    expect(texts).toEqual(["the tail"])
+    // After the opening the ids go on from the oldest event kept, in order.
+    const ids = buffered.slice(2).map((e) => e.id)
+    expect(ids[0]).toBeGreaterThan(3)
+    expect(ids).toEqual([...ids].sort((a, b) => a - b))
+  })
+
   it("buffers the turn's notice as its first payload after the turn event", async () => {
     await acp.createNewProcessFor("C1")
     const prompted = await acp.sendPrompt("C1", "hello", { notice: "context_not_carried_over" })

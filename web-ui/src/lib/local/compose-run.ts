@@ -25,7 +25,7 @@
  *   `_session/steer` to that group's own kiro-cli, prefixed as Cloud's; kept for the first prompt of
  *   a group that is waiting or starting; anything else is not delivered (the card's result is an
  *   error, and the orchestrator gets `<message_composer_error>`). The MCP tool's own result is shown
- *   only for input out of its bounds: the tool refuses it, nothing is sent, and the card is an error.
+ *   only when the tool refused input out of its bounds: nothing is sent, and the card is an error.
  * - **Task end.** Output check (the output is stale when two or more groups were prompted, or when
  *   it is older than the newest slide file), report (conversation/compose-report.ts), `taskEnd`, the
  *   `<compose_result>` delivered to the chat (a wake turn, a steer into a running turn, or kept for
@@ -685,8 +685,10 @@ export class ComposeRunner {
   }
 
   private messageEnded(end: RunToolEnd, input: Record<string, unknown> | undefined, delivered: boolean): void {
-    // Out of the tool's bounds: nothing was sent, and the tool's own answer says why.
-    if (input && !messageInBounds(input)) {
+    // The tool refused input out of its bounds: nothing was sent, and its own answer says why.
+    // Input it accepts (it coerces a numeric string group) and toolUse did not route goes on as
+    // not delivered.
+    if (input && !messageInBounds(input) && (end.status === "error" || end.result.status === "error")) {
       this.push(this.chat.conversation.toolResult(end.id, "error", end.result, MESSAGE_TOOL).events)
       return
     }

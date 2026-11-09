@@ -265,12 +265,6 @@ describe("cutLocalAtPrompt", () => {
     expect(cutLocalAtPrompt(messages, "not there")).toBe(messages)
     expect(cutLocalAtPrompt([...messages, msg("user", "")], "")).toHaveLength(5)
   })
-
-  it("keeps the messages through the last user message for a replay that starts after its prompt", () => {
-    expect(cutLocalAtPrompt(messages, null)).toEqual(messages.slice(0, 3))
-    const replies = [msg("assistant", "a fork's first reply")]
-    expect(cutLocalAtPrompt(replies, null)).toBe(replies)
-  })
 })
 
 describe("settleStaleTasks", () => {

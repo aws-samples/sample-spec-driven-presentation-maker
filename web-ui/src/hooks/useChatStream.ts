@@ -123,14 +123,13 @@ export interface UseChatStreamReturn {
   /**
    * Follow the session if it is working (after a reload or on a reopened deck; Local: also a
    * period that ended before a page saved it). `cutHistory(prompt)` returns the messages
-   * before the prompt that opened the work, which the replay then rebuilds; `cutHistory(null)`,
-   * when the replay starts after that prompt (the server dropped its oldest events), the messages
-   * to rebuild the rest on, or undefined to add the replay after the history. Local resolves
+   * before the prompt that opened the work, which the replay then rebuilds (Local's replay always
+   * starts with that prompt: chat.ts never drops a period's opening events). Local resolves
    * `true` when it followed a period, `false` when the server said nothing runs, and `undefined`
    * when it did not run, the request failed, or a newer resume or Stop ended it; Cloud resolves
    * `undefined`.
    */
-  resume: (cutHistory: HistoryCut) => Promise<boolean | undefined>
+  resume: (cutHistory: (prompt: string) => Message[]) => Promise<boolean | undefined>
   /** Cloud: the connection dropped while the session works and is being restored. */
   reconnecting: boolean
   /** Cloud: a stop was sent and the session has not stopped yet. */
@@ -144,9 +143,6 @@ export interface UseChatStreamReturn {
 }
 
 type Block = { type: "text"; text: string } | { type: "tool"; tool: ToolUse }
-
-/** A resume's cut of the history (`resume`): before `prompt`, or for `null` a replay that starts after its prompt. */
-export type HistoryCut = (prompt: string | null) => Message[] | undefined
 
 /**
  * Rebuild blocks array from cumulative text + tool positions.
@@ -217,15 +213,14 @@ function indexOfTool(messages: Message[], toolUseId: string | undefined): number
 
 /**
  * The handlers of one run: an invoke (its assistant placeholder already shown) or a resume
- * (`replayCut` set: the first prompt of the replay replaces the history after it; a replay whose
- * first message or output comes before any prompt cuts the history with `replayCut(null)`).
+ * (`replayCut` set: the first prompt of the replay replaces the history after it).
  */
 function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, setTurnActive, onTurnEnd }: {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   onToolEvent?: (toolName: string, data: ToolUseCallbackData | undefined) => void
   steers: Map<string, PendingSteer>
   segmentOpen: boolean
-  replayCut?: HistoryCut
+  replayCut?: (prompt: string) => Message[]
   setTurnActive?: (active: boolean) => void
   onTurnEnd?: () => void
 }) {
@@ -242,22 +237,11 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, s
     cutPending = false
   }
 
-  /**
-   * A replay's first message or output before any prompt: the server dropped the period's oldest
-   * events, its prompt among them. The history to rebuild on (undefined: add after it).
-   */
-  const cutWithoutPrompt = (): Message[] | undefined => {
-    if (!cutPending || !replayCut) return undefined
-    cutPending = false
-    return replayCut(null)
-  }
-
   /** Output with no message of its own yet (a replay that starts mid-work): open one. */
   const ensureSegment = () => {
     if (open) return
-    const base = cutWithoutPrompt()
     newSegment()
-    setMessages((prev) => [...(base ?? prev), emptyAssistant()])
+    setMessages((prev) => [...prev, emptyAssistant()])
   }
 
   /** A new assistant message with no user message before it (a hidden first prompt). */
@@ -464,7 +448,7 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, s
         pushUser({
           ...emptyAssistant(),
           composerNote: { group: note.group ?? 0, ...(note.slugs ? { slugs: note.slugs } : {}), text: note.text ?? "" },
-        }, cutWithoutPrompt())
+        })
         return
       }
       const turn = ev.turn
@@ -492,7 +476,7 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, s
         if (rendered.has(steer.id)) return
         rendered.add(steer.id)
         if (mine && !steers.has(steer.id)) return
-        pushUser({ ...userFor(steer.id, steer.text ?? "", true), steerState: "accepted" }, cutWithoutPrompt())
+        pushUser({ ...userFor(steer.id, steer.text ?? "", true), steerState: "accepted" })
       } else if (steer.state === "delivered") {
         const id = steer.id
         setMessages((prev) => prev.map((m) => (m.steerId === id ? { ...m, steerState: "delivered" } : m)))
@@ -697,7 +681,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent, onSendComplete, onTurnEnd, t, translateError])
 
   /** Local resume: follow the chat's work period over GET /api/agent/stream. */
-  const resumeLocal = useCallback(async (cutHistory: HistoryCut): Promise<boolean | undefined> => {
+  const resumeLocal = useCallback(async (cutHistory: (prompt: string) => Message[]): Promise<boolean | undefined> => {
     const previous = resumeControllerRef.current
     // A send's invoke runs: it already follows the period.
     if (isLoadingRef.current && !previous) return undefined
@@ -773,7 +757,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     return result
   }, [sessionId, onToolEvent, onSendComplete, onTurnEnd, translateError])
 
-  const resume = useCallback(async (cutHistory: HistoryCut): Promise<boolean | undefined> => {
+  const resume = useCallback(async (cutHistory: (prompt: string) => Message[]): Promise<boolean | undefined> => {
     if (IS_LOCAL) return resumeLocal(cutHistory)
     if (isLoadingRef.current || resumingRef.current) return
     const accessToken = auth.user?.access_token

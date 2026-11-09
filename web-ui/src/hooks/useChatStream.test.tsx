@@ -244,7 +244,7 @@ describe("useChatStream resume (local)", () => {
     const run = captureResume()
     const { result } = render()
     act(() => { result.current.setMessages(history) })
-    const cut = vi.fn((prompt: string | null) => history.slice(0, history.findLastIndex((m) => m.role === "user" && m.content === prompt)))
+    const cut = vi.fn((prompt: string) => history.slice(0, history.findLastIndex((m) => m.role === "user" && m.content === prompt)))
     let done: Promise<boolean | undefined> | undefined
     act(() => { done = result.current.resume(cut) })
     expect(run.sessionId).toBe("K1")
@@ -260,36 +260,32 @@ describe("useChatStream resume (local)", () => {
     await act(async () => { run.finish!(); await done })
   })
 
-  it("rebuilds after the last user message when the replay starts after its prompt", async () => {
+  it("a replay whose middle the server dropped rebuilds from its prompt: no copy of a saved reply or steer, the dropped part is gone", async () => {
+    // .chat.json holds the whole period: the reply, a steer and the reply after it.
+    const saved: Message[] = [
+      ...history.slice(0, 3),
+      { role: "assistant", content: "head and tail", toolUses: [] },
+      { role: "user", content: "also this", toolUses: [], steerId: "s1", steerState: "delivered" },
+      { role: "assistant", content: "More", toolUses: [] },
+    ]
     const run = captureResume()
     const { result } = render()
-    act(() => { result.current.setMessages(history) })
-    const cut = vi.fn((prompt: string | null) => cutLocalAtPrompt(history, prompt))
+    act(() => { result.current.setMessages(saved) })
+    const cut = vi.fn((prompt: string) => cutLocalAtPrompt(saved, prompt))
     let done: Promise<boolean | undefined> | undefined
     act(() => { done = result.current.resume(cut) })
+    // The buffer kept the period's opening (work, its prompt) and lost the reply's head.
     act(() => {
       run.handlers!.onResumeAck({ working: true })
-      run.handlers!.onStreamUpdate("partial and the rest")
+      run.handlers!.onSession.onEvent({ work: { state: "busy" } }, { own: false })
+      run.handlers!.onSession.onEvent({ turn: { id: "t1", why: "prompt", text: "make it" } }, { own: false })
+      run.handlers!.onStreamUpdate("tail")
       run.handlers!.onSession.onEvent({ steer: { id: "s1", text: "also this", state: "accepted" } }, { own: false })
-      run.handlers!.onStreamUpdate("partial and the rest. More")
+      run.handlers!.onStreamUpdate("tailMore")
     })
     expect(cut).toHaveBeenCalledTimes(1)
-    expect(cut).toHaveBeenCalledWith(null)
-    expect(roles(result.current.messages)).toEqual(["user:earlier", "assistant:earlier reply", "user:make it", "assistant:partial and the rest", "user:also this", "assistant:. More"])
-    await act(async () => { run.finish!(); await done })
-  })
-
-  it("keeps the history when the cut has nothing for a replay that starts after its prompt", async () => {
-    const run = captureResume()
-    const { result } = render()
-    act(() => { result.current.setMessages(history) })
-    let done: Promise<boolean | undefined> | undefined
-    act(() => { done = result.current.resume((prompt) => (prompt === null ? undefined : [])) })
-    act(() => {
-      run.handlers!.onResumeAck({ working: true })
-      run.handlers!.onStreamUpdate("more")
-    })
-    expect(roles(result.current.messages)).toEqual([...roles(history), "assistant:more"])
+    expect(cut).toHaveBeenCalledWith("make it")
+    expect(roles(result.current.messages)).toEqual(["user:earlier", "assistant:earlier reply", "user:make it", "assistant:tail", "user:also this", "assistant:More"])
     await act(async () => { run.finish!(); await done })
   })
 
