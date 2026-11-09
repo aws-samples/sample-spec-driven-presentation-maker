@@ -26,8 +26,7 @@ _SP_RE = re.compile(r"<p:(sp|cxnSp)>.*?</p:\1>", re.S)
 
 
 def _build_deck(tmp_path: Path, elements: list[dict]) -> Path:
-    r = tools.init_deck_workspace(str(tmp_path / "deck"))
-    deck = Path(r.get("output_dir", str(tmp_path / "deck")))
+    deck = Path(tools.init_deck_workspace("deck")["output_dir"])
     api.apply_style(deck, "report", "blank-light")
     (deck / "specs" / "outline.md").write_text(
         "# T\n\n## A\n- [one] Claim\n  - body: b\n  - visual: v\n  - evidence: e\n"

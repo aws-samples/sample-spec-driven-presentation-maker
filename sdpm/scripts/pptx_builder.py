@@ -413,11 +413,15 @@ def cmd_init(args):
     from sdpm.api import init
     from sdpm.entry import format_notes
     output_format = getattr(args, 'output_format', None) or "pptx"
-    result = init(
-        name=args.name or "",
-        output_dir=args.output if hasattr(args, 'output') and args.output else None,
-        output_format=output_format,
-    )
+    try:
+        result = init(
+            name=args.name or "",
+            output_dir=args.output if hasattr(args, 'output') and args.output else None,
+            output_format=output_format,
+        )
+    except ValueError as e:
+        print(f"Error: {e} To choose the folder, pass it with -o/--output.", file=sys.stderr)
+        sys.exit(1)
     print(f"output_dir:  {result['output_dir']}")
     print(f"deck_json:   {result['deck_json']}")
     for f in result["workspace"]:
