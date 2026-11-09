@@ -383,10 +383,17 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Attachments | `read_attachment`, `import_attachment` | Read an attached file (PDF, DOCX, XLSX, PPTX, text, images) with byte-offset paging; import it into the deck workspace |
 | Sandbox | `run_python`, `run_style_python` | Run Python against the deck workspace in a local process (edits, measuring, previews returned as `preview_files`); the style variant for the style workflow |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
-| References | `list_styles` | Bundled and user styles (the local server also opens the browser style gallery) |
+| References | `list_styles` | Bundled and user styles. For a client that declares MCP Apps, the result shows as a style gallery in the chat; the user's pick comes back as their message |
 | References | `read_guides` | Design rules, guides, and the slide JSON spec (`slide-json-spec`) |
 | Layout | `grid`, `arch_diagram` | CSS Grid coordinate calculation; architecture diagram layout |
 | Utility | `code_to_slide` | Code highlighting |
+
+**MCP Apps.** `sdpm.tools.apps` registers the style gallery view (`ui://sdpm/style-gallery-<hash>.html`,
+`text/html;profile=mcp-app`) on `list_styles`, and `app_action`, the app-only tool the view calls for
+previews. `app_action` is listed only for clients that declare `io.modelcontextprotocol/ui`, in
+initialize or in the request's `_meta`; the initialize result declares the extension too. Both servers
+register it; the remote reads the user's own styles from S3. A client without MCP Apps gets the same
+text result as before.
 
 ### Layer 3 Differences
 

@@ -281,8 +281,9 @@ Search order (first match wins on same file name):
 2. `<user-config>/styles/`
 3. `sdpm/references/examples/styles/` (package-bundled samples)
 
-The styles gallery (opened by `list_styles` or the CLI `examples styles` command)
-scans all three locations and displays them in a single list. User-local styles
+`list_styles` (the MCP tool and the CLI command) scans all three locations and
+returns them in a single list; in a client that shows MCP Apps, the tool's result
+appears as a style gallery in the chat. User-local styles
 shadow bundled ones of the same name so you can override samples without
 touching the repository.
 

@@ -940,6 +940,38 @@ from sdpm.tools import prompts as _prompts  # noqa: E402
 _prompts.register(mcp)
 
 
+# --- MCP Apps: the style gallery on list_styles (user styles from S3, then the bundled ones) ---
+
+
+def _read_style_htmls(names: list[str]) -> dict[str, str]:
+    """name → HTML of the caller's own style, or the bundled style of that name."""
+    from sdpm.knowledge.reference import BUNDLED_STYLES_DIR
+
+    user_id = _get_user_id()
+    found: dict[str, str] = {}
+    for name in names:
+        if not user_library.is_valid_style_name(name):
+            continue
+        try:
+            found[name] = _storage.download_file_from_pptx_bucket(key=user_library.user_style_key(user_id, name)).decode("utf-8")
+            continue
+        except Exception:  # noqa: BLE001 - no user style of this name: try the bundled one
+            pass
+        bundled = BUNDLED_STYLES_DIR / f"{name}.html"
+        if bundled.is_file():
+            found[name] = bundled.read_text(encoding="utf-8")
+    return found
+
+
+def _load_style_icons(ids) -> dict[str, bytes]:
+    return user_library.load_catalog_icons(_storage._s3, _resource_bucket, ids)
+
+
+from sdpm.tools import apps as _apps  # noqa: E402
+
+_apps.register(mcp, read_styles=_read_style_htmls, load_icons=_load_style_icons)
+
+
 # --- Utility Tools ---
 
 

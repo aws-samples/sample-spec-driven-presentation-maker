@@ -284,8 +284,8 @@ cp sdpm/references/examples/styles/report.html \
 2. `<user-config>/styles/`
 3. `sdpm/references/examples/styles/`（パッケージに同梱のサンプル）
 
-スタイルギャラリー（`list_styles` か CLI の `examples styles` コマンドで開く）は 3 か所すべてを読み、
-1 つの一覧に表示します。同じ名前なら、ユーザーローカルのスタイルが同梱のものより優先されるので、
+`list_styles`（MCP のツールと CLI のコマンド）は 3 か所すべてを読み、1 つの一覧で返します。
+MCP Apps に対応したクライアントでは、ツールの結果がチャットの中のスタイルギャラリーとして表示されます。同じ名前なら、ユーザーローカルのスタイルが同梱のものより優先されるので、
 リポジトリに触れずにサンプルを差し替えられます。
 
 ---

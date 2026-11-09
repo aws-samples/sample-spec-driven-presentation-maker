@@ -8,8 +8,8 @@ where the id is the ``search_assets`` name. This module makes a display copy of 
 by adding one hidden sprite after ``<body>`` with a ``<symbol>`` per referenced id, built
 from the asset catalog.
 
-Use it only where a style is shown to a person (Web UI gallery and previews, the local
-browser gallery). What agents read stays reference-only: MCP results, ``start_style``,
+Use it only where a style is shown to a person (Web UI gallery and previews, the MCP Apps
+style gallery). What agents read stays reference-only: MCP results, ``start_style``,
 and the ``specs/art-direction.html`` copy on disk.
 
 Ids already defined by a ``<symbol>`` in the document are used as-is (styles written

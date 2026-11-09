@@ -471,6 +471,25 @@ def _find_style_in_dirs(name: str, styles_dirs: list[Path]) -> Path | None:
     return None
 
 
+def read_style_htmls(names: Iterable[str], styles_dirs: list[Path] | None = None) -> dict[str, str]:
+    """Read style documents by name: name → HTML, first directory wins.
+
+    ``styles_dirs`` defaults to :func:`get_styles_dirs` (user styles shadow bundled ones).
+    Malformed names and names found in no directory are left out.
+    """
+    from sdpm.knowledge.reference import is_style_name
+
+    dirs = get_styles_dirs() if styles_dirs is None else styles_dirs
+    found: dict[str, str] = {}
+    for name in names:
+        if not is_style_name(name) or name in found:
+            continue
+        path = _find_style_in_dirs(name, dirs)
+        if path is not None:
+            found[name] = path.read_text(encoding="utf-8")
+    return found
+
+
 def _find_template_in_dirs(name: str, templates_dirs: list[Path]) -> Path | None:
     """Search for a template by name across the given directories.
 

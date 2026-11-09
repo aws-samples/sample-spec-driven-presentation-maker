@@ -350,11 +350,10 @@ def cmd_list_styles(args):
     """List design styles (user-local + bundled) with their HTML paths.
 
     Mirrors the ``list_styles`` tool: pinned + user styles by default,
-    ``--all`` for every bundled style. Opens the browser gallery unless
-    ``--no-browse``. Apply a style by copying its HTML to ``specs/art-direction.html``.
+    ``--all`` for every bundled style. Text only. Apply a style by copying its HTML to
+    ``specs/art-direction.html``.
     """
     from sdpm.api import _find_style_in_dirs, get_styles_dirs
-    from sdpm.knowledge.reference import open_styles_gallery
     from sdpm import tools
 
     styles_dirs = get_styles_dirs()
@@ -365,8 +364,6 @@ def cmd_list_styles(args):
         print(f"  {st['name']:<24} [{st['source']}]{pin}  {path}  — {st['description']}")
     if result.get("other_styles"):
         print(f"# Hidden by pins (pass --all): {', '.join(result['other_styles'])}", file=sys.stderr)
-    if not args.no_browse:
-        open_styles_gallery(styles_dirs)
 
 
 def cmd_start(args):
@@ -696,7 +693,6 @@ def main():
 
     p_ls = subparsers.add_parser("list_styles", help="List design styles (user-local + bundled)")
     p_ls.add_argument("--all", action="store_true", help="Include styles hidden by pins")
-    p_ls.add_argument("--no-browse", action="store_true", help="Don't open the browser gallery")
 
     p_start = subparsers.add_parser("start", help="Role entry payload: role document + what the role reads first")
     p_start.add_argument("role", choices=["presentation", "composing", "style", "translation"])
