@@ -398,7 +398,9 @@ text result as before.
 The deck viewer (`ui://sdpm/deck-viewer-<hash>.html`) hangs on `check_specs`, which opens it on the
 Outline tab, and on `show_deck(deck_id)`, which opens it on Slides; one view holds the Brief, Outline
 and Slides tabs and a **Refresh** button. It reads the deck through `app_action` (`deck`: brief,
-outline, check result and slide list; `slide_preview`: one preview as a JPEG), with each server's
+outline, check result and slide list; `slide_preview`: one slide as compose SVG parts, the newest
+`compose/<slug>_<epoch>.json` with only the defs it references, or a JPEG of the preview image when
+there is none), with each server's
 storage passed in as a `DeckAccess` (`servers/local/deck_access.py` reads the deck directory,
 `servers/remote/tools/deck_access.py` reads S3 after the caller's `read` permission check). Slide
 comments go through `submit_review`, which writes `reviews/<id>.json` with `shared/review.py` (the

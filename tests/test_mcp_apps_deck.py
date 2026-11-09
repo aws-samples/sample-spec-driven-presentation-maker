@@ -7,8 +7,10 @@ from __future__ import annotations
 import base64
 import io
 import json
+import re
 
 import pytest
+from compose_fixture import BULLET, MASTER_IMAGE_ID, SLUGS, UNUSED_BULLET, compose_files
 from PIL import Image
 
 from sdpm.engine.schema import validate_specs
@@ -51,6 +53,20 @@ class Fake:
         self.opened: list[tuple[str, bool]] = []
         self.reviews: list[tuple[str, dict]] = []
         self.environment: dict | None = {"status": "unavailable", "missing": ["soffice"], "install": "x", "note": "n"}
+        self.compose: dict[str, str] = {}
+        self.compose_data: dict[str, bytes] = {}
+        self.compose_reads: list[str] = []
+
+    def use_fixture(self) -> None:
+        """The compose payloads of tests/compose_fixture.py, under stamps like the remote's keys."""
+        for name, data in compose_files().items():
+            stamp = f"decks/d1/compose/{name}"
+            self.compose[name.rsplit("_", 1)[0]] = stamp
+            self.compose_data[stamp] = data
+
+    def read_compose(self, deck_id: str, stamp: str) -> bytes | None:
+        self.compose_reads.append(stamp)
+        return self.compose_data.get(stamp)
 
     def access(self, **over) -> deck.DeckAccess:
         def open_(deck_id, write):
@@ -66,6 +82,8 @@ class Fake:
             read_preview=lambda d, fmt, slug, stamp: self.images.get(slug),
             submit_review=lambda d, body: self.reviews.append((d, body)) or {"id": "r", "message": "m"},
             preview_environment=lambda fmt: self.environment,
+            compose=lambda d: dict(self.compose),
+            read_compose=self.read_compose,
         )
         kw.update(over)
         return deck.DeckAccess(**kw)
@@ -150,7 +168,8 @@ def test_slide_preview_refuses_a_bad_slug(slug) -> None:
 
 def test_slide_preview_is_a_downscaled_jpeg() -> None:
     got = deck.slide_preview("d1", "cover", Fake().access())
-    assert got["available"] and got["mimeType"] == "image/jpeg" and got["stamp"] == "stamp-cover"
+    assert got["available"] and got["kind"] == "image" and got["mimeType"] == "image/jpeg"
+    assert got["stamp"] == "stamp-cover"
     img = Image.open(io.BytesIO(base64.b64decode(got["data"])))
     assert img.format == "JPEG" and img.size == (1280, 720)
 
@@ -168,6 +187,91 @@ def test_slide_preview_without_an_image_or_with_garbage() -> None:
     assert deck.slide_preview("d1", "why", fake.access()) == {"slug": "why", "available": False}
     fake.images["cover"] = b"not an image"
     assert deck.slide_preview("d1", "cover", fake.access()) == {"slug": "cover", "available": False}
+
+
+# --- slide_preview: the compose SVG ------------------------------------------------------
+
+_DATA_IMAGE = re.compile(r"data:image/[a-z0-9.+-]+;base64,[A-Za-z0-9+/=]+")
+_BASE64_RUN = re.compile(r"[A-Za-z0-9+/=]{300,}")
+
+
+def test_slide_preview_is_the_compose_svg() -> None:
+    fake = Fake()
+    fake.use_fixture()
+    files = compose_files()
+    for slug in SLUGS:
+        got = deck.slide_preview("d1", slug, fake.access())
+        compose = json.loads(files[f"{slug}_100.json"])
+        assert got["kind"] == "svg" and got["available"] and got["stamp"] == f"decks/d1/compose/{slug}_100.json"
+        assert got["viewBox"] == "0 0 33867 19050" == compose["viewBox"]
+        assert got["bgFill"] == compose["bgFill"] and got["bgSvg"] == compose["bgSvg"]
+        assert got["components"] == [c["svg"] for c in compose["components"]]
+        assert "mimeType" not in got and "data" not in got
+    points = deck.slide_preview("d1", "points", fake.access())
+    assert f'id="{BULLET}"' in points["defs"] and UNUSED_BULLET not in points["defs"]
+    assert "Master_Slide" not in points["defs"]
+    assert deck.slide_preview("d1", "cover", fake.access())["defs"] == ""
+
+
+def test_the_svg_payload_carries_no_base64_outside_its_embedded_images() -> None:
+    fake = Fake()
+    fake.use_fixture()
+    defs = json.loads(compose_files()["defs_100.json"])["defs"]
+    assert _BASE64_RUN.search(defs)  # the master page's image: the deck's defs do carry one
+    images = 0
+    for slug in SLUGS:
+        text = json.dumps(deck.slide_preview("d1", slug, fake.access()), ensure_ascii=False)
+        images += len(_DATA_IMAGE.findall(text))
+        assert not _BASE64_RUN.search(_DATA_IMAGE.sub("", text)), slug
+        assert MASTER_IMAGE_ID not in text
+    assert images == 1  # the cover's own image
+
+
+def test_deck_view_lists_the_compose_stamp() -> None:
+    fake = Fake()
+    fake.use_fixture()
+    fake.compose["why"] = fake.compose.pop("cover")
+    got = deck.deck_view("d1", fake.access())
+    assert [(s["slug"], s["preview"]) for s in got["slides"]] == [
+        ("cover", "stamp-cover"), ("why", "decks/d1/compose/cover_100.json"), ("ask", None)]
+    assert got["preview_environment"] is None  # every built slide has a preview
+    assert fake.compose_reads == []  # listing only; the payloads are read per slide
+
+
+@pytest.mark.parametrize("payload", [
+    b"not json", b"[1]", json.dumps({"version": 2, "viewBox": "0 0 1 1", "bgFill": "#000", "bgSvg": None,
+                                     "components": [{"svg": "<g/>"}]}).encode(),
+    json.dumps({"version": 1, "viewBox": "0 0 1 1", "bgFill": "#000", "bgSvg": None, "components": []}).encode(),
+    json.dumps({"version": 1, "viewBox": "0 0 1 1", "bgFill": "#000", "bgSvg": None, "components": [{"svg": 3}]}).encode(),
+    json.dumps({"version": 1, "viewBox": "0 0 1 1", "bgFill": "#000", "bgSvg": None,
+                "components": [{"svg": "<g/>" * (deck.MAX_SVG_CHARS // 4 + 1)}]}).encode(),
+    b" " * (deck.MAX_COMPOSE_BYTES + 1),
+])
+def test_an_unusable_compose_payload_falls_back_to_the_jpeg(payload) -> None:
+    fake = Fake()
+    fake.compose = {"cover": "c"}
+    fake.compose_data = {"c": payload}
+    got = deck.slide_preview("d1", "cover", fake.access())
+    assert got["kind"] == "image" and got["stamp"] == "stamp-cover"
+
+
+def test_a_missing_defs_payload_still_draws_the_slide() -> None:
+    fake = Fake()
+    fake.use_fixture()
+    del fake.compose["defs"]
+    got = deck.slide_preview("d1", "points", fake.access())
+    assert got["kind"] == "svg" and got["defs"] == ""
+
+
+def test_an_html_deck_and_the_defs_slug_use_no_compose() -> None:
+    fake = Fake()
+    fake.use_fixture()
+    fake.compose["defs"] = fake.compose["cover"]
+    fake.images["defs"] = _png(10, 10)
+    assert deck.slide_preview("d1", "defs", fake.access())["kind"] == "image"
+    fake.files["deck.json"] = json.dumps({**_deck_json(), "outputFormat": "html"})
+    assert deck.slide_preview("d1", "cover", fake.access())["kind"] == "image"
+    assert deck.deck_view("d1", fake.access())["slides"][0]["preview"] == "stamp-cover"
 
 
 # --- outline_edit ------------------------------------------------------------------------

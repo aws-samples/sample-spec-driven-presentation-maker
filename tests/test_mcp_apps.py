@@ -134,6 +134,8 @@ def test_the_deck_viewer_carries_the_bridge_and_fetches_nothing() -> None:
                  'id="outline-edit"', 'id="outline-text"', 'id="outline-send"', 'id="outline-ok"',
                  '"slide-item"', 'id="stage"', '"frame"', "dataset.frame", 'id="note"',
                  'id="send-comments"', 'id="prev"', 'id="next"', "No preview yet",
+                 'setAttribute("sandbox", "")', "frame.srcdoc", '"text/html"', 'id="image-note"',
+                 "This host does not show embedded images",
                  "This host did not pass the deck to the view.", "sendMessage", "requestDisplayMode"):
         assert hook in html, hook
 

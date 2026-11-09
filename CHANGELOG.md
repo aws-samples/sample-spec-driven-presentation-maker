@@ -45,8 +45,11 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **A deck viewer in MCP Apps clients**, on the local and the remote server. `check_specs`
   opens it on the Outline tab with the check's errors and warnings, and the new
   `show_deck(deck_id)` opens it on the Slides tab; one view holds the Brief, Outline and Slides
-  tabs and a **Refresh** button. Slide previews show as images, and a machine that cannot make
-  previews says what to install. Frames drawn on a slide with a comment are saved as
+  tabs and a **Refresh** button. Slide previews are the compose SVG the Web UI's live preview
+  draws, shown in its final state (a JPEG of the preview image when a slide has none, as for
+  HTML decks), and a machine that cannot make previews says what to install. A host that
+  redacts long base64 strings in a view's data (Kiro Crew does) leaves embedded images empty,
+  and the view says so; text and shapes still show. Frames drawn on a slide with a comment are saved as
   `reviews/<id>.json` and sent as the Web UI's review message; outline edits come back as a
   diff for the agent to apply; **Outline looks good** confirms the outline. The slide view asks
   for full screen where the host offers it. Clients without MCP Apps see no new tool

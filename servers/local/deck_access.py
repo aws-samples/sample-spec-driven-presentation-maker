@@ -2,6 +2,9 @@
 # SPDX-License-Identifier: MIT-0
 """Local storage for the deck viewer (``sdpm.tools.apps.deck.DeckAccess``): the deck directory.
 
+Slide previews come from ``compose/<slug>_<epoch>.json`` (newest per slug, as the Web UI's
+Local deck route picks them) and ``preview/<slug>.png``.
+
 ``deck_id`` is the deck directory, as for every local deck tool. Reviews are written the way
 the Web UI's Local review route writes them (old files under ``reviews/`` removed, the new
 file created only if absent), through the shared contract in ``shared/review.py``.
@@ -14,6 +17,7 @@ from pathlib import Path
 
 from sdpm.engine.schema import SLUG_RE
 from sdpm.tools.apps.deck import DECK_FILES, DeckAccess
+from shared.artifact_keys import COMPOSE_NAME_RE, latest_compose_keys
 from shared.review import create_review
 
 
@@ -68,6 +72,23 @@ def _read_preview(deck_id: str, fmt: str, slug: str, stamp: str) -> bytes | None
         return None
 
 
+def _compose(deck_id: str) -> dict[str, str]:
+    folder = _deck(deck_id) / "compose"
+    if not folder.is_dir():
+        return {}
+    return latest_compose_keys(p.name for p in folder.iterdir() if p.is_file())
+
+
+def _read_compose(deck_id: str, name: str) -> bytes | None:
+    # ``name`` is a file name _compose() listed; nothing else under the deck is read.
+    if not COMPOSE_NAME_RE.fullmatch(name) or Path(name).name != name or "\\" in name:
+        return None
+    try:
+        return (_deck(deck_id) / "compose" / name).read_bytes()
+    except OSError:
+        return None
+
+
 def _submit_review(deck_id: str, body: dict) -> dict:
     deck = _deck(deck_id)
     try:
@@ -117,4 +138,6 @@ ACCESS = DeckAccess(
     read_preview=_read_preview,
     submit_review=_submit_review,
     preview_environment=_preview_environment,
+    compose=_compose,
+    read_compose=_read_compose,
 )

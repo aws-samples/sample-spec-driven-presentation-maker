@@ -25,6 +25,8 @@ import pytest
 from mcp import ClientSession, types
 from mcp.shared.memory import create_client_server_memory_streams
 
+from compose_fixture import BULLET, SLUGS, compose_files
+
 from sdpm import tools
 from sdpm.knowledge.reference import BUNDLED_STYLES_DIR
 from sdpm.tools import apps
@@ -440,10 +442,52 @@ def test_local_show_deck_and_the_deck_payload(local, local_deck, extensions) -> 
 def test_local_slide_preview_is_a_jpeg(local, local_deck) -> None:
     slug = _slugs()[0]
     got = _ok(_act(local, {"action": "slide_preview", "deck_id": str(local_deck), "slug": slug}))
-    assert got["available"] and got["mimeType"] == "image/jpeg" and _is_jpeg(got["data"])
+    assert got["available"] and got["kind"] == "image" and got["mimeType"] == "image/jpeg" and _is_jpeg(got["data"])
     assert _ok(_act(local, {"action": "slide_preview", "deck_id": str(local_deck), "slug": _slugs()[3]})) == {
         "slug": _slugs()[3], "available": False,
     }
+
+
+def _compose_into(folder: Path, slugs: list[str]) -> None:
+    """The fixture's compose payloads under the deck's slugs, plus an older payload that loses."""
+    folder.mkdir(parents=True, exist_ok=True)
+    for name, data in compose_files().items():
+        stem = name.rsplit("_", 1)[0]
+        target = stem if stem == "defs" else slugs[SLUGS.index(stem)]
+        (folder / f"{target}_100.json").write_bytes(data)
+    (folder / f"{slugs[0]}_99.json").write_text("stale", encoding="utf-8")
+
+
+def _assert_svg(got: dict, fixture_slug: str, stamp: str) -> None:
+    compose = json.loads(compose_files()[f"{fixture_slug}_100.json"])
+    assert got["available"] and got["kind"] == "svg" and got["stamp"] == stamp
+    assert got["components"] == [c["svg"] for c in compose["components"]]
+    assert got["bgSvg"] == compose["bgSvg"] and "data" not in got
+
+
+def test_local_slide_preview_is_the_compose_svg(local, local_deck) -> None:
+    slugs = _slugs()
+    _compose_into(local_deck / "compose", slugs)
+    deck_id = str(local_deck)
+    listed = _ok(_act(local, {"action": "deck", "deck_id": deck_id}))["slides"]
+    assert [s["preview"] for s in listed[:3]] == [f"{slugs[0]}_100.json", f"{slugs[1]}_100.json", None]
+    first = _ok(_act(local, {"action": "slide_preview", "deck_id": deck_id, "slug": slugs[0]}))
+    _assert_svg(first, "cover", f"{slugs[0]}_100.json")
+    second = _ok(_act(local, {"action": "slide_preview", "deck_id": deck_id, "slug": slugs[1]}))
+    _assert_svg(second, "points", f"{slugs[1]}_100.json")
+    assert f'id="{BULLET}"' in second["defs"]
+    # No compose for this slug, and no image either.
+    assert _ok(_act(local, {"action": "slide_preview", "deck_id": deck_id, "slug": slugs[2]}))["available"] is False
+
+
+def test_local_compose_reads_stay_in_the_compose_folder(local, local_deck) -> None:
+    access = local.deck_access.ACCESS
+    (local_deck / "compose").mkdir()
+    (local_deck / "compose" / "x_1.json").write_text("{}", encoding="utf-8")
+    assert access.read_compose(str(local_deck), "x_1.json") == b"{}"
+    for name in ("../deck_1.json", "..\\deck_1.json", "sub/x_1.json", "deck.json", "x_1.json.bak"):
+        assert access.read_compose(str(local_deck), name) is None, name
+    assert access.compose(str(local_deck / "nowhere")) == {}
 
 
 def test_local_submit_review_writes_the_review_file(local, local_deck) -> None:
@@ -580,7 +624,33 @@ def test_remote_show_deck_and_the_deck_payload(remote, remote_deck, extensions) 
 
 def test_remote_slide_preview_is_a_jpeg_of_the_webp(remote, remote_deck) -> None:
     got = _ok(_act(remote, {"action": "slide_preview", "deck_id": "d1", "slug": _slugs()[0]}))
-    assert got["available"] and _is_jpeg(got["data"])
+    assert got["available"] and got["kind"] == "image" and _is_jpeg(got["data"])
+
+
+def test_remote_slide_preview_is_the_compose_svg(remote, remote_deck, tmp_path) -> None:
+    storage, checks = remote_deck
+    slugs = _slugs()
+    _compose_into(tmp_path, slugs)
+    for p in tmp_path.iterdir():
+        storage.objects[f"decks/d1/compose/{p.name}"] = p.read_bytes()
+    storage.objects["decks/d2/compose/x_1.json"] = b"{}"
+    listed = _ok(_act(remote, {"action": "deck", "deck_id": "d1"}))["slides"]
+    assert listed[1]["preview"] == f"decks/d1/compose/{slugs[1]}_100.json"
+    got = _ok(_act(remote, {"action": "slide_preview", "deck_id": "d1", "slug": slugs[1]}))
+    _assert_svg(got, "points", f"decks/d1/compose/{slugs[1]}_100.json")
+    assert f'id="{BULLET}"' in got["defs"]
+    assert checks == [("d1", "read"), ("d1", "read")]
+
+
+def test_remote_compose_reads_stay_under_the_decks_prefix(remote, remote_deck) -> None:
+    storage, _ = remote_deck
+    storage.objects["decks/d2/compose/x_1.json"] = b"{}"
+    storage.objects["decks/d1/compose/sub/x_1.json"] = b"{}"
+    access = remote._deck_access.make(lambda: storage, lambda deck_id, action: None)
+    assert access.read_compose("d1", "decks/d2/compose/x_1.json") is None
+    assert access.read_compose("d1", "decks/d1/compose/sub/x_1.json") is None
+    assert access.read_compose("d1", "decks/d1/compose/missing_1.json") is None
+    assert access.compose("d1") == {}
 
 
 def test_remote_submit_review(remote, remote_deck) -> None:

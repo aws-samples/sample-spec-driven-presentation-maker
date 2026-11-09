@@ -9,6 +9,7 @@ from sdpm.engine.preview.compose import (
     extract_optimized_defs,
     load_svg,
     mark_changed,
+    referenced_defs,
     source_hash,
     split_slide_components,
 )
@@ -226,3 +227,36 @@ class TestMarkChanged:
 
     def test_source_hash_ignores_key_order(self):
         assert source_hash({"a": 1, "b": "é"}) == source_hash({"b": "é", "a": 1})
+
+
+_DEFS = (
+    '<defs xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">'
+    '<g id="bullet-a"><path d="M0,0"/></g><g id="bullet-b"><path d="M1,1"/></g>'
+    '<linearGradient id="base"><stop offset="0"/></linearGradient>'
+    '<linearGradient id="derived" xlink:href="#base"/>'
+    '<g id="outer"><clipPath id="inner"><rect/></clipPath></g>'
+    '<g id="master" class="Master_Slide"><image xlink:href="data:image/webp;base64,AAAA"/></g>'
+    "</defs>"
+)
+
+
+class TestReferencedDefs:
+    """The part of the deck's defs one slide draws from."""
+
+    def test_only_referenced_elements_in_document_order(self):
+        got = referenced_defs(_DEFS, ['<use xlink:href="#bullet-b"/>', '<path fill="url(#derived)"/>'])
+        assert got.startswith("<defs") and got.endswith("</defs>")
+        assert got.index('id="bullet-b"') < got.index('id="base"') < got.index('id="derived"')
+        assert "bullet-a" not in got and "master" not in got and "image" not in got
+
+    def test_a_nested_reference_comes_with_its_parent_once(self):
+        got = referenced_defs(_DEFS, ['<g clip-path="url(\'#inner\')"/>', '<use href="#outer"/>'])
+        assert got.count('id="inner"') == 1 and 'id="outer"' in got
+
+    def test_nothing_referenced_or_unknown(self):
+        assert referenced_defs(_DEFS, ['<path fill="url(#elsewhere)"/>', "<rect/>"]) == ""
+        assert referenced_defs(_DEFS, []) == ""
+        assert referenced_defs("", ['<use href="#bullet-a"/>']) == ""
+
+    def test_unparseable_defs_are_kept_whole(self):
+        assert referenced_defs("<defs><g id='a'>", ['<use href="#a"/>']) == "<defs><g id='a'>"

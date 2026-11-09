@@ -43,6 +43,7 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
 #stage-title{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 #stage{position:relative;width:100%;aspect-ratio:16/9;background:var(--thumb);border-radius:6px;overflow:hidden;user-select:none;touch-action:none;cursor:crosshair}
 #stage img{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+#stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;pointer-events:none;background:transparent}
 #stage .none{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted);font-size:12px;text-align:center;padding:12px}
 .frame{position:absolute;border:2px solid var(--human);background:rgba(232,89,12,.08);pointer-events:none}
 .frame b{position:absolute;top:-2px;left:-2px;background:var(--human);color:#fff;font-size:11px;padding:0 5px}
@@ -97,6 +98,7 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
           <button id="next" aria-label="Next slide">›</button>
         </div>
         <div id="stage"><div class="none">Select a slide</div></div>
+        <div class="hint" id="image-note" hidden></div>
         <div class="hint">Drag on the preview to mark a part of the slide, then write what to change.</div>
         <div id="comments"></div>
         <textarea id="note" rows="2" aria-label="Note for the whole request" placeholder="Note for the whole request (optional)"></textarea>
@@ -112,9 +114,10 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
 </script>
 <script>
 // The deck viewer: Brief / Outline / Slides of one deck. The deck comes from app_action
-// (action "deck"), each slide preview from action "slide_preview"; comments are saved with
-// "submit_review" and outline edits turned into a diff with "outline_edit", and both go back
-// to the conversation with ui/message. Everything is built with textContent.
+// (action "deck"), each slide preview from action "slide_preview" (compose SVG drawn in a
+// sandboxed srcdoc frame, or a JPEG); comments are saved with "submit_review" and outline
+// edits turned into a diff with "outline_edit", and both go back to the conversation with
+// ui/message. The view's own DOM is built with textContent.
 (function () {
   "use strict";
   var bridge = window.sdpmBridge;
@@ -304,21 +307,96 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
 
   // --- slides ------------------------------------------------------------------------
 
-  function stageMessage(lines) {
+  function stageClear(blanked) {
     var st = $("#stage");
     Array.prototype.slice.call(st.children).forEach(function (c) { if (!c.classList.contains("frame")) c.remove(); });
+    var note = $("#image-note");
+    note.hidden = !blanked;
+    note.textContent = blanked
+      ? "This host does not show embedded images, so " + blanked + (blanked === 1 ? " image is" : " images are") + " left empty on this slide."
+      : "";
+    return st;
+  }
+
+  function stageMessage(lines) {
+    var st = stageClear(0);
     var box = el("div", "none");
     lines.forEach(function (t) { if (t) box.appendChild(el("div", null, t)); });
     st.insertBefore(box, st.firstChild);
   }
 
   function stageImage(src, slug) {
-    var st = $("#stage");
-    Array.prototype.slice.call(st.children).forEach(function (c) { if (!c.classList.contains("frame")) c.remove(); });
+    var st = stageClear(0);
     var img = document.createElement("img");
     img.alt = slug;
     img.src = src;
     st.insertBefore(img, st.firstChild);
+  }
+
+  function stageSvg(shown, slug) {
+    var st = stageClear(shown.blanked);
+    var frame = document.createElement("iframe");
+    frame.setAttribute("sandbox", ""); // the slide is static SVG: no scripts, no same-origin
+    frame.setAttribute("title", slug);
+    frame.setAttribute("tabindex", "-1");
+    frame.srcdoc = shown.doc;
+    st.insertBefore(frame, st.firstChild);
+  }
+
+  // --- compose SVG -------------------------------------------------------------------
+
+  var DATA_IMAGE = /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+\/=\s]+$/i;
+  var LINKS = ["href", "xlink:href", "src"];
+  var SLIDE_CSS = "html,body{margin:0;height:100%;overflow:hidden;background:transparent}svg{display:block;width:100%;height:100%}";
+
+  // A slide's compose parts as one static SVG in its final state (what the Web UI's live
+  // preview ends on), parsed as HTML the way the Web UI parses them. An image whose data the
+  // host redacted (anything but a base64 data: URI) is left empty and counted; a reference
+  // outside the slide is dropped, so nothing is fetched. DOMParser documents run no scripts
+  // and load nothing.
+  function slideDoc(p) {
+    var vb = String(p.viewBox || "").trim().split(/[\s,]+/).map(Number);
+    if (vb.length !== 4 || !(vb[2] > 0 && vb[3] > 0)) return null;
+    var text = "<svg>" + (p.defs || "") + "<g>" + (p.bgSvg || "") + "</g>" +
+      (p.components || []).map(function (c) { return "<g>" + c + "</g>"; }).join("") + "</svg>";
+    var svg = new DOMParser().parseFromString(text, "text/html").body.firstElementChild;
+    if (!svg || svg.localName !== "svg") return null;
+    svg.setAttribute("viewBox", vb.join(" "));
+    svg.setAttribute("preserveAspectRatio", "xMidYMid");
+    if (!p.bgSvg) {
+      var rect = svg.ownerDocument.createElementNS(svg.namespaceURI, "rect");
+      rect.setAttribute("x", String(vb[0]));
+      rect.setAttribute("y", String(vb[1]));
+      rect.setAttribute("width", String(vb[2]));
+      rect.setAttribute("height", String(vb[3]));
+      rect.setAttribute("fill", p.bgFill || "#000");
+      svg.querySelector(":scope > g").appendChild(rect);
+    }
+    var blanked = 0;
+    Array.prototype.forEach.call(svg.querySelectorAll("*"), function (node) {
+      var emptied = false;
+      LINKS.forEach(function (name) {
+        var value = node.getAttribute(name);
+        if (value == null) return;
+        if (node.localName === "image") {
+          if (DATA_IMAGE.test(value)) return;
+          emptied = true;
+        } else if (value.charAt(0) === "#") {
+          return;
+        }
+        node.removeAttribute(name);
+      });
+      if (emptied) blanked++;
+    });
+    return {
+      doc: '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' + SLIDE_CSS + "</style></head><body>" + svg.outerHTML + "</body></html>",
+      blanked: blanked
+    };
+  }
+
+  function showCached(cached, slug) {
+    if (cached.kind === "svg") stageSvg(cached, slug);
+    else stageImage(cached.src, slug);
   }
 
   function noPreview(s) {
@@ -338,7 +416,7 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
   function showPreview(s) {
     if (!s.preview) return noPreview(s);
     var cached = previews[s.slug];
-    if (cached && cached.stamp === s.preview) return stageImage(cached.src, s.slug);
+    if (cached && cached.stamp === s.preview) return showCached(cached, s.slug);
     stageMessage(["Loading the preview…"]);
     if (!canCall()) return;
     bridge.callTool("app_action", { action: "slide_preview", deck_id: deckId, slug: s.slug }).then(function (r) {
@@ -346,8 +424,17 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
       if (!r || r.isError) { stageMessage(["Could not load the preview: " + errorText(r)]); return; }
       var p = r.structuredContent || {};
       if (!p.available) { stageMessage(["No preview yet"]); return; }
-      previews[s.slug] = { stamp: p.stamp, src: "data:" + p.mimeType + ";base64," + p.data };
-      stageImage(previews[s.slug].src, s.slug);
+      var shown;
+      if (p.kind === "svg") {
+        shown = slideDoc(p);
+        if (!shown) { stageMessage(["Could not draw this slide."]); return; }
+        shown.kind = "svg";
+      } else {
+        shown = { kind: "image", src: "data:" + p.mimeType + ";base64," + p.data };
+      }
+      shown.stamp = p.stamp;
+      previews[s.slug] = shown;
+      showCached(shown, s.slug);
       bridge.reportSize();
     }, function (e) {
       if (current === s.slug) stageMessage(["The host refused the call: " + e.message]);

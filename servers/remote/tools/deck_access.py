@@ -7,7 +7,8 @@ deck, ``edit_slide`` to comment on it, the same permissions the Web UI's API use
 are written the way the cloud API route writes them (old files under ``reviews/`` deleted, the
 new object created only if absent), through the shared contract in ``shared/review.py``.
 Previews are read as they are: a host gives a view's call about 20 seconds, so nothing here
-waits for a preview still being rendered.
+waits for a preview still being rendered. Compose payloads are read from
+``decks/{deck_id}/compose/`` (newest per slug, as ``api/index.py`` picks them for the Web UI).
 """
 
 from __future__ import annotations
@@ -16,7 +17,13 @@ import logging
 from typing import Any, Callable
 
 from sdpm.tools.apps.deck import DECK_FILES, DeckAccess
-from shared.artifact_keys import build_html_png_key_map, build_slide_key_map, png_prefix
+from shared.artifact_keys import (
+    build_html_png_key_map,
+    build_slide_key_map,
+    compose_prefix,
+    latest_compose_keys,
+    png_prefix,
+)
 from shared.review import create_review
 
 logger = logging.getLogger("sdpm.deck_access")
@@ -60,6 +67,23 @@ def make(get_storage: Callable[[], Any], check: Callable[[str, str], None]) -> D
             logger.warning("preview %s of %s unreadable: %s", slug, deck_id, e)
             return None
 
+    def compose(deck_id: str) -> dict[str, str]:
+        storage = get_storage()
+        prefix = compose_prefix(deck_id)
+        keys = [k for k in storage.list_files(prefix=prefix, bucket=storage.pptx_bucket) if "/" not in k[len(prefix):]]
+        return latest_compose_keys(keys, prefix)
+
+    def read_compose(deck_id: str, stamp: str) -> bytes | None:
+        # ``stamp`` is an S3 key compose() listed; only keys directly under this deck's prefix are read.
+        prefix = compose_prefix(deck_id)
+        if not stamp.startswith(prefix) or "/" in stamp[len(prefix):]:
+            return None
+        try:
+            return get_storage().download_file_from_pptx_bucket(key=stamp)
+        except Exception as e:  # noqa: BLE001 - a payload that cannot be read is "no compose"
+            logger.warning("compose %s of %s unreadable: %s", stamp, deck_id, e)
+            return None
+
     def submit_review(deck_id: str, body: dict) -> dict:
         storage = get_storage()
         try:
@@ -85,4 +109,6 @@ def make(get_storage: Callable[[], Any], check: Callable[[str, str], None]) -> D
         previews=previews,
         read_preview=read_preview,
         submit_review=submit_review,
+        compose=compose,
+        read_compose=read_compose,
     )

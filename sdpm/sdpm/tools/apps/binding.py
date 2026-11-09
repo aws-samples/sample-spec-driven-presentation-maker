@@ -146,7 +146,7 @@ def register(mcp: Any, *, read_styles: Any = None, load_icons: Any = None, deck:
         """Data for sdpm's MCP Apps views; only the views call it.
         style_previews: the named styles cut into slides, icons drawn in.
         deck: the deck's brief, outline, check result and slide list (no images).
-        slide_preview: one slide's preview image.
+        slide_preview: one slide's preview: compose SVG parts, or a JPEG when the slide has none.
         submit_review: save slide comments as reviews/<id>.json; returns the message for the chat.
         outline_edit: an outline edit as a diff message for the chat; writes nothing.
         """
