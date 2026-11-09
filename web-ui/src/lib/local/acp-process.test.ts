@@ -24,6 +24,10 @@
  * sent right before the next session/prompt; a choice outside the offered models and levels is
  * refused; the reported list is kept in acp-models.json and listed without a kiro-cli; V3 leaves
  * the composer's model out of its definition. The work period, turns and steers are chat.test.ts's.
+ * On V2 and V3, a user prompt that starts a period on a deck's session (live or reopened) begins
+ * with the deck files changed outside the chat since its last period, once, before the texts kept
+ * for the session; a created session, a deck without a turn mark, a prompt into a running period,
+ * a steer and a delivery get none.
  * kiro-cli is replaced by the fake child (src/test/fakeKiro.ts).
  */
 
@@ -669,6 +673,116 @@ describe("engines", () => {
     expect(ps.deckBound).toBe(false)
     expect(phases[0]).toBe("starting")
     expect(await acp.openForkedSession("F1", "sdpm-orchestrator")).toMatchObject({ chat: ps, outcome: "resumed" })
+  })
+})
+
+describe.each(["v2", "v3"] as const)("deck files changed outside the chat (%s)", (engine) => {
+  const deckDir = (deckId: string) => path.join(deckRoot, deckId) // nosemgrep: path-join-resolve-traversal — constant deck ids in a tmpdir
+  const prompts = (child: FakeChild) => child.requests.filter((r) => r.method === "session/prompt").map((r) => (r.params.prompt as { text: string }[])[0].text)
+  const turnText = (clientId: string) => acp.getBufferedEvents(clientId).map(payloadOf).find((p) => p?.turn)?.turn as { text: string } | undefined
+  /** Write `rel` in deck d1 with an mtime 5 s ahead, as an edit from outside the chat. */
+  const editOutside = (rel: string) => {
+    const file = path.join(deckDir("d1"), rel) // nosemgrep: path-join-resolve-traversal — constant names in a tmpdir
+    fs.mkdirSync(path.dirname(file), { recursive: true })
+    fs.writeFileSync(file, "x")
+    const at = (Date.now() + 5000) / 1000
+    fs.utimesSync(file, at, at)
+  }
+  const note = (...files: string[]) => [`Changed outside since your last turn: ${deckDir("d1")}`, ...files.map((f) => `- ${f}`)].join("\n")
+
+  let log: { mock: { calls: unknown[][] }; mockRestore: () => void }
+  beforeEach(() => {
+    useEngine(engine)
+    fs.mkdirSync(deckDir("d1"))
+    fs.writeFileSync(path.join(deckDir("d1"), ".session"), "K9") // nosemgrep: path-join-resolve-traversal — constant name in a tmpdir
+    log = vi.spyOn(console, "log").mockImplementation(() => {})
+  })
+  afterEach(() => { log.mockRestore() })
+
+  async function turn(clientId: string, child: FakeChild, text: string) {
+    const prompted = await acp.sendPrompt(clientId, text, { displayText: text })
+    prompted.send()
+    await settle()
+    child.endTurn()
+    await settle()
+  }
+
+  it("puts the changed files at the head of a live chat's next prompt, once; the chat shows the user's text", async () => {
+    await acp.openDeckSession("C1", "d1", "K9", "sdpm-orchestrator")
+    await turn("C1", children[0], "first")
+    editOutside("slides/intro.json")
+    editOutside("specs/outline.md")
+    editOutside(".chat.json")
+    editOutside("preview/intro.png")
+    await turn("C1", children[0], "second")
+    expect(prompts(children[0]).at(-1)).toBe(`${note("slides/intro.json", "specs/outline.md")}\n\nsecond`)
+    expect(turnText("C1")?.text).toBe("second")
+    expect(log.mock.calls.some((call) => String(call[0]).includes("changed outside since the last turn") && call[2] === "d1" && call[3] === 2)).toBe(true)
+    await turn("C1", children[0], "third")
+    expect(prompts(children[0]).at(-1)).toBe("third")
+  })
+
+  it("puts them into the first prompt of a deck reopened on its saved session", async () => {
+    await acp.openDeckSession("C1", "d1", "K9", "sdpm-orchestrator")
+    await turn("C1", children[0], "first")
+    acp.terminateProcess("C1")
+    editOutside("slides/intro.json")
+    const reopened = await acp.openDeckSession("C2", "d1", "K9", "sdpm-orchestrator")
+    expect(reopened.outcome).toBe("resumed")
+    await turn("C2", children[1], "again")
+    expect(prompts(children[1]).at(-1)).toBe(`${note("slides/intro.json")}\n\nagain`)
+  })
+
+  it("puts nothing into a session that was created for the deck, or for a deck without a turn mark", async () => {
+    fs.writeFileSync(path.join(deckDir("d1"), ".session-turn"), JSON.stringify({ version: 1, sessionId: "K9", endedAt: 1 })) // nosemgrep: path-join-resolve-traversal — constant name in a tmpdir
+    editOutside("slides/intro.json")
+    const created = await acp.openDeckSession("C1", "d1", null, "sdpm-orchestrator")
+    expect(created.outcome).toBe("created")
+    await turn("C1", children[0], "hello")
+    expect(prompts(children[0])).toEqual(["hello"])
+
+    fs.rmSync(path.join(deckDir("d1"), ".session-turn")) // nosemgrep: path-join-resolve-traversal — constant name in a tmpdir
+    editOutside("slides/other.json")
+    await acp.openDeckSession("C2", "d1", "K9", "sdpm-orchestrator")
+    await turn("C2", children[1], "plain")
+    expect(prompts(children[1])).toEqual(["plain"])
+  })
+
+  it("puts nothing into a prompt, a steer or a delivery during a running period", async () => {
+    const { chat } = await acp.openDeckSession("C1", "d1", "K9", "sdpm-orchestrator")
+    await turn("C1", children[0], "first")
+    // A turn whose work holds its period after it ends (a compose task).
+    const prompted = await acp.sendPrompt("C1", "second", { displayText: "second" })
+    prompted.send()
+    await settle()
+    const release = chat.hold({ cancel: () => {}, dropped: () => {} })
+    children[0].endTurn()
+    await settle()
+    editOutside("slides/intro.json")
+    // A prompt into the running period (the hold keeps it open), a steer and the Local server's turn.
+    await turn("C1", children[0], "during the hold")
+    await acp.steerSession("C1", "m1", "a steer")
+    await settle()
+    children[0].endTurn()
+    await settle()
+    chat.deliver("<compose_result/>", "wake")
+    await settle()
+    expect(prompts(children[0]).slice(-3)).toEqual(["during the hold", "a steer", "<compose_result/>"])
+    children[0].endTurn()
+    await settle()
+    release()
+    // The period's end covers the edit made during it.
+    await turn("C1", children[0], "after")
+    expect(prompts(children[0]).at(-1)).toBe("after")
+  })
+
+  it("goes before the texts kept for the session", async () => {
+    const { chat } = await acp.openDeckSession("C1", "d1", "K9", "sdpm-orchestrator")
+    await turn("C1", children[0], "first")
+    chat.deliver("kept for later", "report")
+    editOutside("slides/intro.json")
+    await turn("C1", children[0], "hello")
+    expect(prompts(children[0]).at(-1)).toBe(`${note("slides/intro.json")}\n\nkept for later\n\nhello`)
   })
 })
 

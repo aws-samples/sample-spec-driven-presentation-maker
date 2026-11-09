@@ -17,6 +17,8 @@
  * and every hold, sends nothing that starts model work afterwards, and ends the period without a
  * hold that did not release within 5 s (dropped first). A chat whose kiro-cli exited reopens its
  * session on its next message. A V2 session another kiro-cli holds is refused with session_locked.
+ * A period's end (also after Stop or an exit, not a turn's end while work holds it) writes a turn
+ * mark to each deck of the chat, no earlier than the deck's newest file.
  * kiro-cli is replaced by the fake child (src/test/fakeKiro.ts).
  */
 
@@ -752,6 +754,69 @@ describe("Stop", () => {
     next.send()
     await settle()
     expect(prompts(child).at(-1)).toBe("harness words\n\nnext")
+  })
+})
+
+describe("turn marks", () => {
+  const deckDir = () => path.join(deckRoot, "d1") // nosemgrep: path-join-resolve-traversal — constant deck id in a tmpdir
+  const turnMark = () => {
+    const file = path.join(deckDir(), ".session-turn") // nosemgrep: path-join-resolve-traversal — constant name in a tmpdir
+    return fs.existsSync(file) ? JSON.parse(fs.readFileSync(file, "utf-8")) as { version: number; sessionId: string; endedAt: number } : null
+  }
+  beforeEach(() => {
+    fs.mkdirSync(deckDir())
+    fs.mkdirSync(path.join(deckRoot, "d2")) // nosemgrep: path-join-resolve-traversal — constant deck id in a tmpdir
+  })
+
+  async function deckTurn() {
+    const { chat } = await acp.openDeckSession("C1", "d1", "K9", "sdpm-orchestrator")
+    const prompted = await acp.sendPrompt("C1", "build")
+    prompted.send()
+    await settle()
+    return { chat, child: children[0] }
+  }
+
+  it("are written to every deck of the chat when its period ends, not when a turn ends while work holds it", async () => {
+    const { chat, child } = await deckTurn()
+    chat.savedDecks.add("d2")
+    const release = chat.hold(fakeHold())
+    const before = Date.now()
+    child.endTurn()
+    await settle()
+    expect(turnMark()).toBeNull()
+    release()
+    expect(turnMark()).toEqual({ version: 1, sessionId: "K9", endedAt: expect.any(Number) })
+    expect(turnMark()!.endedAt).toBeGreaterThanOrEqual(before)
+    expect(JSON.parse(fs.readFileSync(path.join(deckRoot, "d2", ".session-turn"), "utf-8"))).toMatchObject({ sessionId: "K9" }) // nosemgrep: path-join-resolve-traversal — constant names in a tmpdir
+  })
+
+  it("are no earlier than the newest deck file the period wrote", async () => {
+    const { child } = await deckTurn()
+    const slide = path.join(deckDir(), "slides", "intro.json") // nosemgrep: path-join-resolve-traversal — constant names in a tmpdir
+    fs.mkdirSync(path.dirname(slide))
+    fs.writeFileSync(slide, "{}")
+    const ahead = Date.now() + 3000
+    fs.utimesSync(slide, ahead / 1000, ahead / 1000)
+    child.endTurn()
+    await settle()
+    expect(turnMark()!.endedAt).toBeGreaterThanOrEqual(fs.statSync(slide).mtimeMs)
+  })
+
+  it("are written after Stop and after kiro-cli exits", async () => {
+    let { child } = await deckTurn()
+    acp.cancelSession("C1")
+    child.endTurn("cancelled")
+    await settle()
+    expect(turnMark()).toMatchObject({ sessionId: "K9" })
+
+    fs.rmSync(path.join(deckDir(), ".session-turn")) // nosemgrep: path-join-resolve-traversal — constant name in a tmpdir
+    const prompted = await acp.sendPrompt("C1", "again")
+    prompted.send()
+    await settle()
+    child = children[0]
+    child.kill()
+    await settle()
+    expect(turnMark()).toMatchObject({ sessionId: "K9" })
   })
 })
 

@@ -10,6 +10,8 @@
  * A reopened deck whose session kiro-cli does not have, or that has none, gets a new one whose
  * first prompt names the deck (`Current deck: <dir>`); a deck
  * whose session also ran on the other agent engine says so (lib/local/sessionNotices.ts).
+ * A prompt that starts a work period names the deck files changed outside the chat since its
+ * last one (lib/local/chat.ts, put in by sendPrompt for a live chat and a reopened one alike).
  * The chat saves the session to a deck the turn creates (and a fork's origin with it),
  * whether or not this stream is still read. Stop for the session while its chat starts
  * (POST /api/agent/stop, from any tab) aborts the start: no prompt is sent, and the answer is a

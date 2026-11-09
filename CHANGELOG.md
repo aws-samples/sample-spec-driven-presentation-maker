@@ -13,6 +13,12 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Added
+
+- The Local Web UI tells the agent which deck files changed outside the chat (Kiro CLI or
+  another MCP client, or by hand) since its last turn, so the conversation continues on the
+  current files (V2 and V3).
+
 ## [0.13.0] - 2026-11-09
 
 The Local Web UI now runs kiro-cli on its V3 engine and composes slides in the background,

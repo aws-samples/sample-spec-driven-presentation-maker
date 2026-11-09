@@ -54,7 +54,7 @@
  *   `<compose_result>` answers "Report seen: <status>." and, for `"build": "stale"`, calls
  *   `generate_pptx` and touches the deck's `output.pptx`. Without a tag, the turn is as above.
  * - Every process appends `{pid, sessionId, role, event: "prompt" | "answer", wake, text, t}` to
- *   `SDPM_STUB_TRACE` when it is set (`text`: the prompt's first 200 characters).
+ *   `SDPM_STUB_TRACE` when it is set (`text`: the prompt's first 400 characters).
  */
 import fs from "node:fs"
 import path from "node:path"
@@ -354,7 +354,7 @@ function handlePrompt(msg) {
   const sessionId = msg.params.sessionId
   const promptText = (msg.params.prompt ?? []).map((block) => block?.text ?? "").join("")
   const role = isComposer(sessionId) ? "composer" : "orchestrator"
-  trace(sessionId, role, "prompt", { wake: promptText.startsWith("<compose_result"), text: promptText.slice(0, 200) })
+  trace(sessionId, role, "prompt", { wake: promptText.startsWith("<compose_result"), text: promptText.slice(0, 400) })
   const done = (stopReason) => {
     trace(sessionId, role, "answer", { stopReason })
     answer(msg, { stopReason })

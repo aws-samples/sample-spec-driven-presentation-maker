@@ -28,7 +28,9 @@
  *   chat's compose runner (compose-run.ts), which answers them and holds the period while its
  *   composers run.
  * - **Decks.** A deck a tool result names gets the session's `.session` (and a fork's origin) and
- *   a new engine mark once; each turn adds its engine to the marks of the chat's decks.
+ *   a new engine mark once; each turn adds its engine to the marks of the chat's decks. Each
+ *   period's end writes a turn mark to the chat's decks (`.session-turn`); the next user prompt
+ *   that starts a period names the deck files changed after it (`outsideChanges`, deck-changes.ts).
  */
 import { randomUUID } from "crypto"
 import type { EngineId } from "./acp/engine"
@@ -38,8 +40,11 @@ import { ConversationState } from "./conversation"
 import { data, type BufferedEvent, type ChatEvent, type LocalEvent, type TurnHow, type TurnWhy } from "./conversation/events"
 import { SteerRejectedError, steerEvent, type SteerState } from "./conversation/steer"
 import { turnEnded, turnFailed, type EndEvent } from "./conversation/turn"
-import { readEngineMark, saveOriginToDeck, saveSessionToDeck, writeEngineMark } from "./deck-files"
+import { changedDeckFiles, newestDeckFileMtime } from "./deck-changes"
+import { readEngineMark, readTurnMark, saveOriginToDeck, saveSessionToDeck, writeEngineMark, writeTurnMark } from "./deck-files"
+import { resolveDeckDir } from "./deck-paths"
 import type { HostSession, SessionSink } from "./hosts"
+import { changedOutsideToken } from "./interaction-mode"
 import type { SessionOrigin } from "./kiro-sessions.types"
 import type { LocalSessionNoticeCode } from "./sessionNotices"
 import { AgentTimeoutError } from "./turnErrors"
@@ -360,6 +365,39 @@ export class Chat implements SessionSink {
     this.deckBound = true
   }
 
+  /**
+   * For a user prompt that starts a period: the deck files changed outside the chat since its
+   * last period ended, one `Changed outside since your last turn:` block per deck, or null (a
+   * period runs, no deck's turn mark is this session's, nothing changed).
+   */
+  outsideChanges(): string | null {
+    const sessionId = this.sessionId
+    if (this.period || !sessionId) return null
+    const blocks: string[] = []
+    for (const deckId of this.savedDecks) {
+      const mark = readTurnMark(deckId)
+      if (!mark || mark.sessionId !== sessionId) continue
+      const dir = resolveDeckDir(deckId)
+      if (!dir) continue
+      const { files, more } = changedDeckFiles(dir, mark.endedAt)
+      if (!files.length) continue
+      console.log("[acp] sessionId=%s: deck %s changed outside since the last turn (%d files)", sessionId, deckId, files.length + more)
+      blocks.push(changedOutsideToken(dir, files, more))
+    }
+    return blocks.length ? blocks.join("\n\n") : null
+  }
+
+  /** The period ended: each deck of the chat gets a turn mark no earlier than its newest file. */
+  private markTurnEnd(): void {
+    const sessionId = this.sessionId
+    if (!sessionId) return
+    for (const deckId of this.savedDecks) {
+      const dir = resolveDeckDir(deckId)
+      if (!dir) continue
+      writeTurnMark(deckId, { sessionId, endedAt: Math.max(Date.now(), newestDeckFileMtime(dir)) })
+    }
+  }
+
   private beginPeriod(): void {
     this.period = {
       number: ++this.periods, buffer: [], eventId: 0, stopped: false, holds: new Set(), seen: false,
@@ -476,6 +514,7 @@ export class Chat implements SessionSink {
     this.push(end)
     this.period = null
     this.lastPeriod = period
+    this.markTurnEnd()
     this.hooks.periodEnded(this)
   }
 

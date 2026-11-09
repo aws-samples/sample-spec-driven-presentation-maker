@@ -24,6 +24,10 @@ at length; the history is already yours. Then proceed as usual with the interact
 When the client states `Current deck: <path>`, that deck is the work target: pass the path as
 `deck_id`, read its `deck.json` and `specs/` first, and continue that deck instead of creating
 a new one.
+When the client states `Changed outside since your last turn: <path>` followed by a list of
+files, those files of that deck were changed outside this conversation after your last turn,
+by the user or another agent; re-read the ones your next step depends on and continue from
+them as they are now.
 
 Related work: editing an existing PPTX → `read_guides(["import-pptx"])`; syncing the user's
 hand edits back → `read_guides(["hand-edit-sync"])`; translating a deck →

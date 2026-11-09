@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest"
 import {
+  changedOutsideToken,
   continuedFromToken,
   currentDeckToken,
   interactionToken,
@@ -53,5 +54,12 @@ describe("interaction-mode", () => {
     expect(withCurrentDeck("continue", "/decks/d1", true)).toBe("Current deck: /decks/d1\n\ncontinue")
     expect(withCurrentDeck("continue", "/decks/d1", false)).toBe("continue")
     expect(withCurrentDeck("continue", null, true)).toBe("continue")
+  })
+
+  it("names the deck files changed outside, one per line, and counts the ones not listed", () => {
+    expect(changedOutsideToken("/decks/d1", ["slides/intro.json", "specs/outline.md"], 0))
+      .toBe("Changed outside since your last turn: /decks/d1\n- slides/intro.json\n- specs/outline.md")
+    expect(changedOutsideToken("/decks/d1", ["a.json"], 1)).toBe("Changed outside since your last turn: /decks/d1\n- a.json\n- … and 1 more file")
+    expect(changedOutsideToken("/decks/d1", ["a.json"], 4)).toBe("Changed outside since your last turn: /decks/d1\n- a.json\n- … and 4 more files")
   })
 })

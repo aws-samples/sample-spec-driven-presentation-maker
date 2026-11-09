@@ -8,7 +8,8 @@
  * (agent/prompts/wiring/interaction_*.md); ACP agents have a single prompt file,
  * so here the same token is prepended to the first prompt of a fresh session.
  * The meaning of `dialogue` / `fast` is defined in the orchestrator workflow only,
- * as is the meaning of the `Current deck:` and `Continued from:` lines.
+ * as is the meaning of the `Current deck:`, `Continued from:` and
+ * `Changed outside since your last turn:` lines.
  */
 import type { SessionOrigin } from "./kiro-sessions.types"
 
@@ -54,4 +55,14 @@ export function currentDeckToken(deckDir: string): string {
 export function withCurrentDeck(query: string, deckDir: string | null | undefined, isFirst: boolean): string {
   if (!deckDir || !isFirst) return query
   return `${currentDeckToken(deckDir)}\n\n${query}`
+}
+
+/**
+ * The deck files changed outside the chat since its last work period: the deck's absolute
+ * directory, then one line per file (relative, `/`-separated) and the count of the ones not listed.
+ */
+export function changedOutsideToken(deckDir: string, files: string[], more: number): string {
+  const lines = [`Changed outside since your last turn: ${deckDir}`, ...files.map((file) => `- ${file}`)]
+  if (more > 0) lines.push(`- … and ${more} more ${more === 1 ? "file" : "files"}`)
+  return lines.join("\n")
 }

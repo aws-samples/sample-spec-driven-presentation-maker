@@ -2,9 +2,10 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * A deck's Local chat files, next to its slides: `.session` (the kiro session the deck's chat
- * continues), `.session-engine` (the engines that ran that session's turns), `.session-origin.json`
- * (a fork's source) and `.chat.json` (the chat as the UI shows it). Every path is resolved inside
- * the deck root (deck-paths.ts).
+ * continues), `.session-engine` (the engines that ran that session's turns), `.session-turn` (when
+ * that session's last work period in the Web UI ended), `.session-origin.json` (a fork's source)
+ * and `.chat.json` (the chat as the UI shows it). Every path is resolved inside the deck root
+ * (deck-paths.ts).
  */
 import path from "path"
 import { isEngineId, type EngineId } from "./acp/engine-config"
@@ -86,6 +87,53 @@ export function writeEngineMark(deckId: string, mark: EngineMark): void {
     fs.renameSync(tmp, file)
   } catch (error) {
     console.warn("[acp] deck %s: could not write %s: %s", deckId, ENGINE_MARK_FILE, errorText(error))
+    try { fs.rmSync(tmp, { force: true }) } catch { /* nothing to clean */ }
+  }
+}
+
+/** When a kiro session's last work period in the Web UI ended on a deck (`.session-turn`). */
+export interface TurnMark {
+  sessionId: string
+  /** ms since the epoch; no later than the deck's own writes in that period. */
+  endedAt: number
+}
+
+const TURN_MARK_FILE = ".session-turn"
+const brokenTurnMarksWarned = new Set<string>()
+
+/** A deck's turn mark; null without one (or with a broken one, warned once). */
+export function readTurnMark(deckId: string): TurnMark | null {
+  const fs = require("fs") as typeof import("fs")
+  const dir = resolveDeckDir(deckId)
+  if (!dir) return null
+  let text: string
+  try { text = fs.readFileSync(path.join(dir, TURN_MARK_FILE), "utf-8") } catch { return null } // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
+  try {
+    const raw = JSON.parse(text) as { version?: unknown; sessionId?: unknown; endedAt?: unknown }
+    if (raw?.version === 1 && typeof raw.sessionId === "string" && SESSION_ID_PATTERN.test(raw.sessionId)
+      && typeof raw.endedAt === "number" && Number.isFinite(raw.endedAt) && raw.endedAt > 0) {
+      return { sessionId: raw.sessionId, endedAt: raw.endedAt }
+    }
+  } catch { /* reported below */ }
+  if (!brokenTurnMarksWarned.has(deckId)) {
+    brokenTurnMarksWarned.add(deckId)
+    console.warn("[acp] deck %s: %s is not readable; treating the deck as having none", deckId, TURN_MARK_FILE)
+  }
+  return null
+}
+
+/** Replace a deck's turn mark (temp file + rename). A failure is logged: only a later note is lost or late. */
+export function writeTurnMark(deckId: string, mark: TurnMark): void {
+  const fs = require("fs") as typeof import("fs")
+  const dir = resolveDeckDir(deckId)
+  if (!dir) return
+  const file = path.join(dir, TURN_MARK_FILE) // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
+  const tmp = `${file}.tmp-${process.pid}`
+  try {
+    fs.writeFileSync(tmp, JSON.stringify({ version: 1, sessionId: mark.sessionId, endedAt: mark.endedAt }), "utf-8")
+    fs.renameSync(tmp, file)
+  } catch (error) {
+    console.warn("[acp] deck %s: could not write %s: %s", deckId, TURN_MARK_FILE, errorText(error))
     try { fs.rmSync(tmp, { force: true }) } catch { /* nothing to clean */ }
   }
 }

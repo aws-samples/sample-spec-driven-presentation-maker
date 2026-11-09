@@ -21,7 +21,8 @@
  *   that is released, or whose kiro-cli exited, is remembered as an orphan: the next message of its
  *   client id opens its kiro session again.
  * - **Carry-over.** Texts for the agent a chat could not deliver (after Stop, after an exit) wait
- *   under the kiro session and go before the user's text of its next prompt.
+ *   under the kiro session and go before the user's text of its next prompt; a note of the deck
+ *   files changed outside the chat since its last period goes before them (chat.ts).
  * - **Stop during start.** A start (an invoke opening its chat and sending its prompt) registers
  *   under its client id (`beginStart`) before anything is opened, so Stop (`cancelSession`, also a
  *   POST from another tab) aborts it: the pool kills the starting kiro-cli, and no prompt is sent.
@@ -440,7 +441,9 @@ export async function openForkedSession(
  * (the period's events are numbered from 1), and a `notice` about the chat's session
  * (sessionNotices.ts) follows the `turn` event. `displayText` is what the `turn` event shows (the
  * user's own text). The chat's pending model choice is applied first (one kiro-cli refuses is
- * logged and the prompt goes on), then the texts kept for the session go before `text`.
+ * logged and the prompt goes on), then the prompt is put together: the deck files changed outside
+ * the chat since its last period (a prompt that starts a period, `Chat.outsideChanges`), the texts
+ * kept for the session, and `text`.
  * Throws SessionBusyError while the chat's turn runs or its stopped period settles (the same chat
  * open in two panels or tabs); prompts are not queued. Throws AbortError when `signal` (the
  * start's, `beginStart`) aborts before the turn started.
@@ -482,7 +485,10 @@ export async function sendPrompt(
   }
   const carried = chat.sessionId ? carryOver.get(chat.sessionId) : undefined
   if (carried) carryOver.delete(chat.sessionId!)
-  const prompt = carried?.length ? [...carried, text].join("\n\n") : text
+  // Read before the period starts: what changed in the chat's decks since its last period ended.
+  const outside = chat.outsideChanges()
+  const parts = [...(outside ? [outside] : []), ...(carried ?? []), text]
+  const prompt = parts.join("\n\n")
   const replayFrom = chat.beginPrompt(opts.displayText ?? text, opts.notice)
   const period = chat.period!
   return {
