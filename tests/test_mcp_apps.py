@@ -114,8 +114,8 @@ def _style(body: str) -> str:
     return f"<html><head><style>.slide{{}}</style></head><body>\n{body}\n</body></html>"
 
 
-@pytest.mark.parametrize("names", [[], ["a"] * 7, ["../x"], ["a", "b/c"], "a", None, [3]])
-def test_style_previews_refuses_bad_names(names) -> None:
+@pytest.mark.parametrize("names", [[], ["a"] * 7, "a", None, [3], ["a", None]])
+def test_style_previews_refuses_bad_arguments(names) -> None:
     read, calls = _reader({})
     with pytest.raises(ValueError):
         gallery.style_previews(names, read)
@@ -128,6 +128,17 @@ def test_style_previews_reads_once_and_names_what_is_missing() -> None:
     assert calls == [["a", "nope"]]
     assert got["missing"] == ["nope"]
     assert len(got["previews"]["a"]["slides"]) == 2
+
+
+def test_one_odd_name_costs_only_itself_its_preview(tmp_path) -> None:
+    from sdpm.api import read_style_htmls
+
+    (tmp_path / "a.html").write_text(_style('<div class="slide">a</div>'))
+    (tmp_path / "社内標準.html").write_text(_style('<div class="slide">ours</div>'))
+    (tmp_path.parent / "secret.html").write_text("outside")
+    got = gallery.style_previews(["a", "../secret", "社内標準"], lambda n: read_style_htmls(n, [tmp_path]))
+    assert set(got["previews"]) == {"a", "社内標準"}
+    assert got["missing"] == ["../secret"]
 
 
 def test_style_previews_draw_icons_through_the_given_loader() -> None:

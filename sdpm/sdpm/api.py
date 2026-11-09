@@ -475,7 +475,8 @@ def read_style_htmls(names: Iterable[str], styles_dirs: list[Path] | None = None
     """Read style documents by name: name → HTML, first directory wins.
 
     ``styles_dirs`` defaults to :func:`get_styles_dirs` (user styles shadow bundled ones).
-    Malformed names and names found in no directory are left out.
+    Any name the local store can save is read (see :func:`is_style_name`); names that would
+    leave a styles directory and names found in no directory are left out.
     """
     from sdpm.knowledge.reference import is_style_name
 

@@ -8,7 +8,7 @@ See docs/internal/DATASET_COMPLIANCE.md for dataset provenance.
 Reference: unified access to design patterns, components, schemas, rules, and reviews."""
 import re
 from collections.abc import Iterable
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from sdpm.config import REFERENCES_DIR
@@ -30,7 +30,6 @@ def html_title(html: str) -> str:
     return m.group(1).strip() if m else ""
 
 
-_STYLE_NAME_RE = re.compile(r"[A-Za-z0-9_-]+")
 _SLIDE_START_RE = re.compile(r'<div class="slide[\s"]')
 _HEAD_RE = re.compile(r"<head[^>]*>([\s\S]*?)</head>", re.IGNORECASE)
 _BODY_OPEN_RE = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
@@ -40,12 +39,18 @@ _SYMBOL_RE = re.compile(r"<symbol\b", re.IGNORECASE)
 
 
 def is_style_name(name: Any) -> bool:
-    """Whether ``name`` is a well-formed style name (a file stem: letters, digits, ``_``, ``-``).
+    """Whether ``name`` names a file directly inside a styles directory.
 
-    The same rule as ``shared.user_library.is_valid_style_name``, so a name never walks out
-    of a styles directory.
+    The local store's rule: any single path component (``社内標準`` and ``acme.v2`` too),
+    never a separator, a drive, ``.`` or ``..``, so a name never walks out of the directory.
+    The remote's S3 keys keep the narrower ``shared.user_library.is_valid_style_name``.
     """
-    return isinstance(name, str) and bool(_STYLE_NAME_RE.fullmatch(name))
+    return (
+        isinstance(name, str)
+        and name not in ("", ".", "..")
+        and "\x00" not in name
+        and PureWindowsPath(name).name == name  # Windows rules also catch "/" and "C:"
+    )
 
 
 def style_display_parts(html: str) -> dict[str, Any]:

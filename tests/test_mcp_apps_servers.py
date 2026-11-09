@@ -275,7 +275,6 @@ def test_style_previews(server, extensions, request) -> None:
 @pytest.mark.parametrize("arguments", [
     {"action": "nope", "names": ["report"]},
     {"action": "style_previews", "names": ["report"] * 7},
-    {"action": "style_previews", "names": ["../x"]},
     {"action": "style_previews"},
     {"names": ["report"]},
 ])
@@ -283,6 +282,14 @@ def test_app_action_refuses_bad_arguments(server, arguments, request) -> None:
     if server is request.getfixturevalue("remote"):
         request.getfixturevalue("remote_user")
     assert _call(server, apps.APP_TOOL, arguments).isError
+
+
+def test_an_odd_name_goes_to_missing_and_the_batch_still_renders(server, request) -> None:
+    if server is request.getfixturevalue("remote"):
+        request.getfixturevalue("remote_user")
+    got = _previews(_call(server, apps.APP_TOOL, {"action": "style_previews", "names": ["../x", "report", "社内標準"]}))
+    assert set(got["previews"]) == {"report"}
+    assert got["missing"] == ["../x", "社内標準"]
 
 
 def test_remote_previews_read_the_users_style_first(remote, remote_user) -> None:

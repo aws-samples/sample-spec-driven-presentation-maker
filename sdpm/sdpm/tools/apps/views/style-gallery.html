@@ -165,6 +165,7 @@ button:disabled{opacity:.5;cursor:default}
         if (!r || r.isError) { failed += batch.length; return; }
         var got = (r.structuredContent && r.structuredContent.previews) || {};
         Object.keys(got).forEach(function (k) { previews[k] = got[k]; showPreview(k); });
+        failed += ((r.structuredContent && r.structuredContent.missing) || []).length;
       }, function () { failed += batch.length; });
     })).then(function () {
       status(failed ? "Previews could not be loaded for " + failed + " styles." : "");

@@ -75,9 +75,10 @@ def test_a_document_without_slides_comes_back_whole() -> None:
     assert style_display_parts(html) == {"head": "", "prelude": "", "slides": [html], "whole": True}
 
 
-def test_style_names() -> None:
-    assert is_style_name("aws-light") and is_style_name("my_style2")
-    for bad in ("", "../x", "a/b", "a.html", "a b", None, 3):
+def test_style_names_are_what_the_local_store_saves() -> None:
+    for good in ("aws-light", "my_style2", "社内標準", "acme.v2", "acme v2"):
+        assert is_style_name(good)
+    for bad in ("", ".", "..", "../x", "a/b", "a\\b", "C:x", "/x", "a\x00", None, 3):
         assert not is_style_name(bad)
 
 
@@ -88,12 +89,14 @@ def test_read_style_htmls_user_first_and_leaves_out_the_rest(env: Path) -> None:
     (user / "a.html").write_text(_style("a — mine", ""))
     (bundled / "a.html").write_text(_style("a — shadowed", ""))
     (bundled / "b.html").write_text(_style("b — bundled", ""))
+    (user / "社内標準.html").write_text(_style("社内標準 — ours", ""))
+    (user / "acme.v2.html").write_text(_style("acme.v2 — dotted", ""))
     (env / "secret.html").write_text("outside")
 
-    got = read_style_htmls(["a", "b", "../secret", "nope", "a"], [user, bundled])
+    got = read_style_htmls(["a", "b", "社内標準", "acme.v2", "../secret", "nope", "a"], [user, bundled])
 
-    assert set(got) == {"a", "b"}
-    assert "mine" in got["a"] and "bundled" in got["b"]
+    assert set(got) == {"a", "b", "社内標準", "acme.v2"}
+    assert "mine" in got["a"] and "bundled" in got["b"] and "ours" in got["社内標準"]
 
 
 def test_read_style_htmls_defaults_to_the_styles_dirs(env: Path) -> None:
