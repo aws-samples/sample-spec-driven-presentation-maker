@@ -1,7 +1,9 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Test configuration — add servers/remote/ and sdpm/ to sys.path."""
+"""Test configuration — add servers/remote/ and sdpm/ to sys.path, and keep every test away
+from the user's real deck root."""
 
+import os
 import sys
 from pathlib import Path
 
@@ -19,6 +21,72 @@ _W_16X9 = 12192000
 _H_16X9 = 6858000
 _W_4X3 = 9144000
 _H_4X3 = 6858000
+
+
+# The deck roots a test must never write to: the default, and the one this environment
+# resolves to before any fixture runs (SDPM_DECK_ROOT / SDPM_OUTPUT_DIR / output_dir in
+# config.json). Snapshotted at session start, compared at session end.
+_guarded_deck_roots: dict[Path, dict[str, int] | None] = {}
+
+
+def _snapshot(root: Path) -> dict[str, int] | None:
+    """Every entry under root (relative path → mtime_ns); None when root does not exist."""
+    if not root.is_dir():
+        return None
+    entries: dict[str, int] = {}
+    for dirpath, dirnames, filenames in os.walk(root):
+        for name in dirnames + filenames:
+            path = Path(dirpath) / name
+            try:
+                entries[str(path.relative_to(root))] = path.lstat().st_mtime_ns
+            except OSError:
+                pass
+    return entries
+
+
+def pytest_sessionstart(session):
+    from sdpm.api import _get_output_base_dir
+
+    for root in (Path.home() / "Documents" / "SDPM-Presentations", _get_output_base_dir()):
+        root = root.expanduser().resolve()
+        _guarded_deck_roots[root] = _snapshot(root)
+
+
+def pytest_sessionfinish(session, exitstatus):
+    """Fail the run when a test created or changed anything under a real deck root."""
+    found: list[str] = []
+    for root, before in _guarded_deck_roots.items():
+        after = _snapshot(root)
+        if after is None:
+            continue
+        if before is None:
+            found.append(f"{root} (created)")
+            before = {}
+        changed = sorted(p for p, mtime in after.items() if before.get(p) != mtime)
+        found += [str(root / p) for p in changed[:20]]
+        if len(changed) > 20:
+            found.append(f"… and {len(changed) - 20} more under {root}")
+    if found:
+        lines = ["Tests wrote under the real deck root (see _isolated_deck_root in tests/conftest.py):", *found]
+        reporter = session.config.pluginmanager.get_plugin("terminalreporter")
+        if reporter:
+            reporter.ensure_newline()
+            reporter.write_line("\n".join(lines), red=True, bold=True)
+        else:
+            print("\n".join(lines), file=sys.stderr)
+        session.exitstatus = pytest.ExitCode.TESTS_FAILED
+
+
+@pytest.fixture(autouse=True)
+def _isolated_deck_root(tmp_path_factory, monkeypatch):
+    """Each test gets its own deck root and user config dir, so nothing it creates through
+    the deck-root order (sdpm.api._get_output_base_dir, web-ui deck-paths.ts resolveDeckRoot)
+    lands in ~/Documents/SDPM-Presentations or the user's configured output_dir."""
+    monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path_factory.mktemp("deck-root")))
+    monkeypatch.delenv("SDPM_OUTPUT_DIR", raising=False)
+    config = tmp_path_factory.mktemp("user-config")
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(config))
+    monkeypatch.setenv("APPDATA", str(config))
 
 
 @pytest.fixture(autouse=True)

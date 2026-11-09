@@ -37,6 +37,7 @@ def test_local_run_python_names_decks_that_end_with_the_name(tmp_path: Path, mon
         (root / name).mkdir(parents=True)
     for i in range(6):
         (root / f"2026100{i}-0000-many").mkdir()
+    monkeypatch.delenv("SDPM_DECK_ROOT", raising=False)
     monkeypatch.setenv("SDPM_OUTPUT_DIR", str(root))
 
     error = json.loads(tools.run_python("calc", "print(1)", "decks/zt-intro"))["error"]

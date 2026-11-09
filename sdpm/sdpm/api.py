@@ -590,6 +590,11 @@ def init(
 
     Returns:
         Dict with output_dir, deck_json, workspace.
+
+    Raises:
+        ValueError: output_format is neither "pptx" nor "html", or ``name`` contains a path
+            separator while ``output_dir`` is None (nothing is created). The deck folder is
+            ``<deck root>/<timestamp>-<name>``, one level under the deck root.
     """
     from sdpm.engine.schema import new_deck_json
     from sdpm.utils.io import write_json
@@ -599,6 +604,11 @@ def init(
     if output_dir:
         out_dir = Path(output_dir).expanduser()
     else:
+        if "/" in name or "\\" in name:
+            raise ValueError(
+                f"name is the deck's folder name, without a path: {name!r}. "
+                f"The deck is created as <timestamp>-<name> in {_get_output_base_dir()}."
+            )
         ts = datetime.now().strftime("%Y%m%d-%H%M")
         dir_name = f"{ts}-{name}" if name else ts
         out_dir = _get_output_base_dir() / dir_name

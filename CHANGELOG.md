@@ -27,6 +27,12 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **Cloud chat: throttling names the cause.** The message now says the model's usage quota
   or rate limit was reached and suggests waiting or choosing another model in Settings, in
   English and Japanese.
+- **Local: `init_deck_workspace` refuses a path as the deck name.** Given a name such as
+  `/Users/me/decks/q3`, it used to create `<deck root>/<timestamp>-/Users/me/decks/q3`, a
+  folder nested under a date-only folder that the Web UI does not list. The tool (and the
+  CLI `init_deck_workspace` without `-o`) now returns an error saying the name is a folder
+  name without a path, and creates nothing; decks always go to `<deck root>/<timestamp>-<name>`.
+  `make test` no longer leaves such folders in `~/Documents/SDPM-Presentations`.
 ### Added
 
 - `sdpm open <deck>` opens a deck in the browser Web UI and starts the Web UI if it is not
