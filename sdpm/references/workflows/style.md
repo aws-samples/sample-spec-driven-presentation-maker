@@ -210,9 +210,10 @@ The demo slides are read as coordinates, so the format is constrained:
 ## Working procedure
 
 - If the request starts with `[Style: <name>]`, the user has that style open: save under that
-  name. Otherwise name the style yourself before the first write: a short kebab-case name for
-  what the style is for, one no style in the catalogue already has. Keep that name for the
-  whole session.
+  name. When the user asks to change one of their own styles, save under that style's name.
+  For a new style, name it yourself before the first write: a short kebab-case name for what
+  the style is for, one no style in the catalogue already has. Keep that name for the whole
+  session.
 - The first write already carries the final `<title>` (the name and its paragraph), and each
   later write keeps the paragraph true to the style as it grows: `list_styles()` and the
   gallery show the style by both from the moment it is saved.
