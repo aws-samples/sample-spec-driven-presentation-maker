@@ -36,7 +36,6 @@ import sdpm_command  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from sdpm import tools  # noqa: E402
-from sdpm.api import _get_output_base_dir  # noqa: E402
 from sdpm.tools.apps import ui_capable  # noqa: E402
 from sdpm.tools.attachment.contracts import read_attachment, import_attachment  # noqa: E402
 from sdpm.tools.instructions import instructions  # noqa: E402
@@ -65,21 +64,32 @@ def _client_params():
         return None
 
 
+def _result_deck(result: dict) -> Path | None:
+    """The deck a result created (``output_dir``) or built into (``output_path``); None for a
+    result that did neither, such as generate_pptx declining an HTML deck."""
+    if result.get("output_dir"):
+        return Path(result["output_dir"])
+    if result.get("output_path"):
+        return Path(result["output_path"]).parent
+    return None
+
+
 def _with_open_hint(fn):
     """``fn`` with ``note_for_user`` (how to open the deck with ``sdpm open``) added to its
-    result when the Web UI is installed here and the client did not declare MCP Apps (it would
-    show the deck itself). Same name, docstring and signature, so the tool's schema is the
-    contract's."""
+    result when it created or built a deck, the Web UI is installed here and the client did
+    not declare MCP Apps (it would show the deck itself). The deck must sit in the root
+    ``sdpm open`` searches (``sdpm_command.deck_root``). Same name, docstring and signature,
+    so the tool's schema is the contract's."""
 
     @functools.wraps(fn)
     def bound(*args, **kwargs):
         result = fn(*args, **kwargs)
         if not isinstance(result, dict) or "error" in result:
             return result
-        deck = result.get("output_dir") or kwargs.get("deck_id") or (args[0] if args else None)
+        deck = _result_deck(result)
         if not deck or ui_capable(_client_params()) or not sdpm_command.webui_installed_at(_CHECKOUT):
             return result
-        hint = sdpm_command.open_hint(Path(deck), _get_output_base_dir())
+        hint = sdpm_command.open_hint(deck, sdpm_command.deck_root())
         if hint:
             result[OPEN_HINT_FIELD] = f"To open this deck in the browser Web UI, run `{hint}` in a terminal."
         return result

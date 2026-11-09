@@ -283,7 +283,8 @@ def _same_dir(a: Path, b: Path) -> bool:
 
 def open_hint(deck_dir: Path, root: Path) -> str | None:
     """``sdpm open <id>`` for a deck the Web UI can open (it has deck.json, sits directly in
-    ``root`` and has a valid id); None otherwise, so a hint never names a command that fails."""
+    ``root`` and has a valid id); None otherwise. ``sdpm open`` itself resolves against
+    ``deck_root()`` in the user's terminal, whose environment can differ from the caller's."""
     real = Path(os.path.realpath(deck_dir))
     if not (real / "deck.json").is_file() or not _same_dir(real.parent, root) or not _valid_deck_id(real.name):
         return None
