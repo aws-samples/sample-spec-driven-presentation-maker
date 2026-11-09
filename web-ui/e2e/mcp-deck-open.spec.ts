@@ -35,7 +35,9 @@ function seedMcpDeck(deckId: string): string {
 }
 
 async function send(page: Page, message: string) {
-  await page.getByRole("textbox", { name: "Chat message input" }).fill(message)
+  const input = page.getByRole("textbox", { name: "Chat message input" })
+  await input.fill(message)
+  await expect(input).toHaveValue(message)
   await page.getByRole("button", { name: "Send message" }).click()
 }
 
@@ -48,7 +50,10 @@ for (const engine of ["v3", "v2"] as const) {
 
     await page.goto(`/decks/#${deckId}`)
     const chatLog = page.getByRole("log", { name: "Chat messages" })
-    await expect(page.getByRole("textbox", { name: "Chat message input" })).toBeVisible({ timeout: 30_000 })
+    // The prerendered page shows the New chat's input until the hash is read after hydration;
+    // type only once the deck's own chat tab (labelled with the loaded deck's name) is there.
+    await expect(page.getByRole("button", { name: `MCP-made deck (${deckId})`, exact: true })).toBeVisible({ timeout: 30_000 })
+    await expect(page.getByRole("textbox", { name: "Chat message input" })).toBeVisible()
     await expect(chatLog).not.toContainText("51")
 
     await send(page, "[chat] what is this deck?")
