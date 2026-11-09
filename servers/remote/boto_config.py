@@ -36,6 +36,8 @@ SHORT_API = Config(
 LONG_CALL = Config(
     connect_timeout=5,
     read_timeout=USER_CODE_TIMEOUT_S,
-    retries={"mode": "standard", "max_attempts": 1},
+    # total_max_attempts counts the first request; max_attempts counts only
+    # retries, so max_attempts=1 would re-send the code once (240 s, two runs).
+    retries={"mode": "standard", "total_max_attempts": 1},
     tcp_keepalive=True,
 )

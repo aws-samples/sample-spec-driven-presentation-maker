@@ -488,7 +488,8 @@ class TestRemoteUserCodeTimeout:
         from boto_config import LONG_CALL
 
         assert LONG_CALL.read_timeout == 120
-        assert LONG_CALL.retries["max_attempts"] == 1
+        assert LONG_CALL.retries["total_max_attempts"] == 1
+        assert "max_attempts" not in LONG_CALL.retries
         assert remote_sandbox.TIMED_OUT.startswith("Error: execution timed out (120s)")
 
     def test_timeout_on_invoke_returns_timed_out(self, clients):
