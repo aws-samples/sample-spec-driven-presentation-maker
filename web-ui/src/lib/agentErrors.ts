@@ -18,10 +18,11 @@ export type AgentErrorCode =
   | "max_output"
   | "internal"
   | "session_reload_required"
+  | "content_filtered"
 
 const MESSAGES: Record<AgentErrorCode, string> = {
   conversation_too_long: "This conversation is too long for the model to process. Please start a new chat to continue.",
-  throttled: "The service is temporarily busy. Please wait a moment and try again.",
+  throttled: "The model's usage quota or rate limit was reached. Wait a minute and try again, or choose another model in Settings.",
   timeout: "The model took too long to respond. Please try again.",
   model_not_ready: "The model is not ready yet. Please wait a moment and try again.",
   service_unavailable: "The service is temporarily unavailable. Please try again later.",
@@ -30,6 +31,7 @@ const MESSAGES: Record<AgentErrorCode, string> = {
   max_output: "The response hit the model's output limit. Ask for a smaller step and try again.",
   internal: "Sorry, something went wrong. Please try again.",
   session_reload_required: "This page is out of date. Reload the page, then send again.",
+  content_filtered: "The model stopped its reply because of its content filter. Rephrase your message and send it again.",
 }
 
 const PATTERNS: [string[], AgentErrorCode][] = [

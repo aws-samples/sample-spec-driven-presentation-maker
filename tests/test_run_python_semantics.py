@@ -25,6 +25,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from botocore.exceptions import ClientError, ReadTimeoutError
 
 _root = Path(__file__).resolve().parent.parent
 _local = str(_root / "servers" / "local")
@@ -463,6 +464,76 @@ remote_server = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(remote_server)
 
 
+class TestRemoteUserCodeTimeout:
+    """A hung user-code call ends at LONG_CALL's read timeout with a normal result,
+    and stopping a session the sandbox already ended never replaces that result."""
+
+    @pytest.fixture()
+    def clients(self, monkeypatch):
+        from boto_config import LONG_CALL
+
+        exec_mock, api_mock = MagicMock(), MagicMock()
+        api_mock.start_code_interpreter_session.return_value = {"sessionId": "S1"}
+        api_mock.stop_code_interpreter_session.side_effect = ClientError(
+            {"Error": {"Code": "ConflictException", "Message": "Session already terminated"}},
+            "StopCodeInterpreterSession",
+        )
+        monkeypatch.setattr(
+            remote_sandbox.boto3, "client",
+            lambda *a, config=None, **k: exec_mock if config is LONG_CALL else api_mock,
+        )
+        return exec_mock, api_mock
+
+    def test_limit_is_120s_and_never_retried(self):
+        from boto_config import LONG_CALL
+
+        assert LONG_CALL.read_timeout == 120
+        assert LONG_CALL.retries["total_max_attempts"] == 1
+        assert "max_attempts" not in LONG_CALL.retries
+        assert remote_sandbox.TIMED_OUT.startswith("Error: execution timed out (120s)")
+
+    def test_timeout_on_invoke_returns_timed_out(self, clients):
+        exec_mock, api_mock = clients
+        exec_mock.invoke_code_interpreter.side_effect = ReadTimeoutError(endpoint_url="https://x")
+        out = remote_sandbox.execute_in_sandbox(code="x", storage=_FakeStorage(), region="r", deck_id=None)
+        assert out == (remote_sandbox.TIMED_OUT, [], [], [])
+        api_mock.stop_code_interpreter_session.assert_called_once()
+
+    def test_timeout_while_reading_the_stream_returns_timed_out(self, clients):
+        exec_mock, api_mock = clients
+
+        def stream():
+            raise ReadTimeoutError(endpoint_url="https://x")
+            yield  # pragma: no cover
+
+        exec_mock.invoke_code_interpreter.return_value = {"stream": stream()}
+        out = remote_sandbox.execute_in_sandbox(code="x", storage=_FakeStorage(), region="r", deck_id=None)
+        assert out == (remote_sandbox.TIMED_OUT, [], [], [])
+        api_mock.stop_code_interpreter_session.assert_called_once()
+
+    def test_failed_stop_keeps_the_output(self, clients, monkeypatch):
+        monkeypatch.setattr(remote_sandbox, "_collect_stream", lambda _resp: "ok")
+        out = remote_sandbox.execute_in_sandbox(code="x", storage=_FakeStorage(), region="r", deck_id=None)
+        assert out == ("ok", [], [], [])
+
+    def test_style_python_timeout_returns_timed_out_without_read_back(self, clients, monkeypatch):
+        exec_mock, api_mock = clients
+        exec_mock.invoke_code_interpreter.side_effect = ReadTimeoutError(endpoint_url="https://x")
+        monkeypatch.setattr(remote_server, "_get_user_id", lambda: "u" * 8)
+        out = json.loads(remote_server.run_style_python(purpose="p", code="x"))
+        assert out == {"output": remote_sandbox.TIMED_OUT}
+        # Only the setup call ran on the session; no style.html read-back.
+        assert api_mock.invoke_code_interpreter.call_count == 1
+        api_mock.stop_code_interpreter_session.assert_called_once()
+
+    def test_style_python_sends_code_without_the_deck_helpers(self, clients, monkeypatch):
+        exec_mock, _ = clients
+        monkeypatch.setattr(remote_sandbox, "_collect_stream", lambda _resp: "ok")
+        monkeypatch.setattr(remote_server, "_get_user_id", lambda: "u" * 8)
+        remote_server.run_style_python(purpose="p", code="x")
+        assert exec_mock.invoke_code_interpreter.call_args.kwargs["arguments"]["code"] == "x"
+
+
 class TestPostProcessingPlan:
     """The contract matrix, as a pure decision table (sdpm.api.pptx_refresh_plan)."""
 
@@ -749,6 +820,16 @@ class TestRemoteRunPythonBranching:
         out = self._run()
         assert calls == {"prepare": 0, "build": 0, "measure": 0, "export_svg": 0}
         assert storage.uploads == {} and "measure" not in out
+
+    def test_timeout_with_measure_builds_nothing(self, remote_rig, monkeypatch):
+        fake_execute, storage, calls = remote_rig
+        monkeypatch.setattr(
+            remote_server.sandbox_mod, "execute_in_sandbox",
+            lambda *a, **k: (remote_sandbox.TIMED_OUT, [], [], []),
+        )
+        out = self._run(measure_slides=["a"])
+        assert out == {"output": remote_sandbox.TIMED_OUT}
+        assert calls == {"prepare": 0, "build": 0, "measure": 0, "export_svg": 0}
 
     def test_change_without_measure_builds_artifact_and_rerenders(self, remote_rig):
         fake_execute, storage, calls = remote_rig

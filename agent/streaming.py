@@ -12,9 +12,13 @@ from partial_json_parser import loads as _partial_loads
 from strands import Agent
 
 import background
+from errors import CONTENT_FILTERED, error_event
 from resilience import TURN_STOP_KEY
 
 logger = logging.getLogger("sdpm.agent")
+
+# Strands ends these turns normally (an AgentResult), with no text to show.
+_FILTERED_STOPS = frozenset({"content_filtered", "guardrail_intervened"})
 
 KEEPALIVE_INTERVAL = 5
 
@@ -164,6 +168,11 @@ async def stream_agent(
                                         "status": tr.get("status", "success"),
                                         "content": content_text,
                                     }}
+                    elif isinstance(event, dict) and "result" in event:
+                        stop = getattr(event["result"], "stop_reason", None)
+                        if stop in _FILTERED_STOPS:
+                            logger.warning("Model stopped the reply (%s) for session %s", stop, session_id[:12])
+                            yield error_event(f"The model stopped its reply: {stop}", code=CONTENT_FILTERED)
                     pending = None
 
                     if _should_stop():

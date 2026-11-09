@@ -1031,6 +1031,9 @@ def run_python(
     )
 
     result["output"] = output
+    if output == sandbox_mod.TIMED_OUT:
+        # Nothing was saved, so measure_slides has nothing new to build.
+        return json.dumps(result, ensure_ascii=False)
 
     if outline_warnings:
         result.setdefault("warnings", {})["outline"] = (
@@ -1360,14 +1363,10 @@ def run_style_python(
                 arguments={"content": file_contents},
             )
 
-        # Execute user code
-        response = exec_client.invoke_code_interpreter(
-            codeInterpreterIdentifier="aws.codeinterpreter.v1",
-            sessionId=session_id,
-            name="executeCode",
-            arguments={"language": "python", "code": code},
-        )
-        output = sandbox_mod._collect_stream(response)
+        output = sandbox_mod.run_user_code(exec_client, session_id, code)
+        if output is None:
+            # The session is still busy with the code: skip the read-back.
+            return json.dumps({"output": sandbox_mod.TIMED_OUT}, ensure_ascii=False)
 
         result: dict = {"output": output}
 
@@ -1408,10 +1407,7 @@ def run_style_python(
         return json.dumps(result, ensure_ascii=False)
 
     finally:
-        client.stop_code_interpreter_session(
-            codeInterpreterIdentifier="aws.codeinterpreter.v1",
-            sessionId=session_id,
-        )
+        sandbox_mod.stop_session(client, session_id)
 
 
 def _load_style_html(user_id: str, name: str) -> str | None:

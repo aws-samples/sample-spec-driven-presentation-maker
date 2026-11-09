@@ -18,6 +18,12 @@ describe("parseStreamingChunk error events", () => {
     const out = parseStreamingChunk(line, "", vi.fn())
     expect(out).toBe("\u26a0\ufe0f This page is out of date. Reload the page, then send again.")
   })
+
+  it("appends the content-filter message for a filtered stop", () => {
+    const filtered = `data: ${JSON.stringify({ status: "error", code: "content_filtered", error: "The model stopped its reply: content_filtered" })}`
+    const out = parseStreamingChunk(filtered, "", vi.fn())
+    expect(out).toBe("\u26a0\ufe0f The model stopped its reply because of its content filter. Rephrase your message and send it again.")
+  })
 })
 
 describe("parseEvent", () => {

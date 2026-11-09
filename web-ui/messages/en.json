@@ -302,6 +302,8 @@
     "localContextFromOtherEngine": "This deck was also continued on the other agent engine. The agent does not have the turns made there, but the deck files are up to date.",
     "errorStopGeneration": "Failed to stop generation",
     "errorSessionReloadRequired": "This page is out of date. Reload the page, then send again.",
+    "errorThrottled": "The model's usage quota or rate limit was reached. Wait a minute and try again, or choose another model in Settings.",
+    "errorContentFiltered": "The model stopped its reply because of its content filter. Rephrase your message and send it again.",
     "steerNotDelivered": "Not delivered: the agent stopped before it read this message.",
     "steerFailed": "Your message could not be sent to the agent. Send it again.",
     "steerPending": "Sent while the agent works",

@@ -522,7 +522,11 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const translateError = useCallback(
     (code: string) => code === "session_reload_required"
       ? t("errorSessionReloadRequired")
-      : isLocalTurnErrorCode(code) ? t(LOCAL_TURN_ERROR_KEYS[code]) : undefined,
+      : code === "throttled"
+        ? t("errorThrottled")
+        : code === "content_filtered"
+          ? t("errorContentFiltered")
+          : isLocalTurnErrorCode(code) ? t(LOCAL_TURN_ERROR_KEYS[code]) : undefined,
     [t],
   )
 
@@ -644,7 +648,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
           ? t(conflictCode === "session_busy" ? "sessionBusy" : "sessionLocked")
           : code === "internal"
             ? "Sorry, something went wrong. Please try again."
-            : agentErrorMessage(errorMessage, code)
+            : agentErrorMessage(errorMessage, code, translateError)
         setMessages((prev) => {
           const updated = [...prev]
           const last = updated[updated.length - 1]

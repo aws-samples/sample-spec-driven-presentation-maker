@@ -10,6 +10,7 @@ import asyncio
 import json
 import threading
 
+import pytest
 from strands import Agent, tool
 from strands.hooks import BeforeToolCallEvent
 from strands.types.tools import ToolContext
@@ -112,3 +113,33 @@ def test_no_input_continues_the_history_with_the_delivered_result():
     assert [m["role"] for m in last[-2:]] == ["assistant", "user"]
     assert json.loads(background.result_text(background.delivered(last[-1])[0]))["status"] == "completed"
     assert not [ev for ev in events if "toolResult" in ev], "the synthetic delivery is history, not a stream event"
+
+
+class _FilteredModel(PolicyModel):
+    """Stops its reply with ``stop_reason`` and no content, as a content filter does."""
+
+    def __init__(self, stop_reason):
+        super().__init__(lambda m: None)
+        self.stop_reason = stop_reason
+
+    async def stream(self, messages, tool_specs=None, system_prompt=None, **kwargs):
+        yield {"messageStart": {"role": "assistant"}}
+        yield {"messageStop": {"stopReason": self.stop_reason}}
+
+
+@pytest.mark.parametrize("stop_reason", ["content_filtered", "guardrail_intervened"])
+def test_a_filtered_stop_ends_with_a_content_filtered_error(stop_reason):
+    agent = Agent(model=_FilteredModel(stop_reason), tools=[], callback_handler=None)
+    events = asyncio.run(_collect(agent, "hello"))
+
+    errors = [ev for ev in events if ev.get("status") == "error"]
+    assert len(errors) == 1
+    assert errors[0]["code"] == "content_filtered"
+    assert stop_reason in errors[0]["error"]
+
+
+def test_an_answered_turn_has_no_error_event():
+    agent = Agent(model=PolicyModel(lambda m: ("text", "hi")), tools=[], callback_handler=None)
+    events = asyncio.run(_collect(agent, "hello"))
+
+    assert not [ev for ev in events if ev.get("status") == "error"]
