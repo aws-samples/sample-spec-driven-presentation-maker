@@ -34,7 +34,7 @@ _OUTLINE = """# Deck
 
 @pytest.fixture
 def deck(tmp_path: Path) -> Path:
-    r = tools.init_deck_workspace(str(tmp_path / "deck"))
+    r = tools.init_deck_workspace("deck")
     deck_dir = Path(r["output_dir"])
     tools.apply_style(str(deck_dir), style="typographic", template="blank-dark")
     specs = deck_dir / "specs"
@@ -52,7 +52,7 @@ _SLIDE_HTML = '<section data-layout="Title Only"><h1 data-ph="title">{slug}</h1>
 
 @pytest.fixture
 def html_deck(tmp_path: Path) -> Path:
-    r = tools.init_deck_workspace(str(tmp_path / "html-deck"), output_format="html")
+    r = tools.init_deck_workspace("html-deck", output_format="html")
     deck_dir = Path(r["output_dir"])
     tools.apply_style(str(deck_dir), style="typographic", template="blank-dark")
     specs = deck_dir / "specs"
@@ -91,13 +91,13 @@ class TestInitDeckWorkspace:
         from sdpm.knowledge.reference import read_docs
         from sdpm.config import REFERENCES_DIR
 
-        r = tools.init_deck_workspace(str(tmp_path / "h"), output_format="html")
+        r = tools.init_deck_workspace("h", output_format="html")
         notes = read_docs(REFERENCES_DIR / "guides", ["html-deck"])[0]["content"]
         assert r["format_notes"] == notes
         assert "`visual`" in notes and "ECharts" in notes and "constraints" in notes
 
     def test_pptx_deck_returns_no_format_notes(self, tmp_path: Path):
-        r = tools.init_deck_workspace(str(tmp_path / "p"))
+        r = tools.init_deck_workspace("p")
         assert "format_notes" not in r
         assert set(r) == {"output_dir", "deck_json", "workspace"}
 
@@ -402,7 +402,7 @@ def test_apply_style_returns_a_line_numbered_toc(tmp_path: Path):
     slice the lines it needs. Structural only: .slide blocks, not the Part convention."""
     from sdpm.api import style_toc
 
-    deck_dir = tools.init_deck_workspace(str(tmp_path / "deck"))["output_dir"]
+    deck_dir = tools.init_deck_workspace("deck")["output_dir"]
     toc = tools.apply_style(deck_dir, style="newspaper", template="blank-light")["style_toc"]
     slides = [e for e in toc if e["kind"] == "slide"]
     assert toc[0]["kind"] == "style" and len(slides) >= 8
@@ -485,7 +485,7 @@ def _layout_pass_slide(slug: str, mode: str) -> str:
 @pytest.mark.parametrize("mode", ["pptx", "html"])
 def test_start_composing_fits_the_tool_result_budget(mode: str, tmp_path: Path):
     """Layout pass and content pass of a 3-slide deck, for every built-in style."""
-    deck_dir = Path(tools.init_deck_workspace(str(tmp_path / "deck"), output_format=mode)["output_dir"])
+    deck_dir = Path(tools.init_deck_workspace("deck", output_format=mode)["output_dir"])
     specs = deck_dir / "specs"
     slides = deck_dir / "slides"
     sizes: dict[str, int] = {}

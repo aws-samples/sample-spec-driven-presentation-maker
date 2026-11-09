@@ -277,6 +277,23 @@ def test_api_init_rejects_unknown_output_format(tmp_path: Path) -> None:
     assert not (tmp_path / "bad").exists()
 
 
+@pytest.mark.parametrize("name", ["/abs/deck", "sub/deck", "..\\deck", "C:\\decks\\deck"])
+def test_api_init_rejects_a_path_as_the_name(tmp_path: Path, monkeypatch, name: str) -> None:
+    """The deck folder is <timestamp>-<name> one level under the deck root; a path in the
+    name is refused before anything is created (it used to nest the path under the root)."""
+    root = tmp_path / "root"
+    monkeypatch.setenv("SDPM_DECK_ROOT", str(root))
+    with pytest.raises(ValueError, match="without a path"):
+        init(name)
+    assert not root.exists()
+
+
+def test_api_init_puts_a_named_deck_one_level_under_the_deck_root(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path))
+    deck = Path(init("lambda-overview")["output_dir"])
+    assert deck.parent == tmp_path and deck.name.endswith("-lambda-overview")
+
+
 _PPTX_DECK_JSON_BYTES = (
     b'{\n  "template": "",\n  "fonts": {\n    "fullwidth": "",\n    "halfwidth": ""\n  },\n'
     b'  "defaultTextColor": "",\n  "slideSize": {}\n}\n'

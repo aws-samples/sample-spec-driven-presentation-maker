@@ -142,7 +142,7 @@ class _ContractClient:
 def _deck_with_specs(tmp_path: Path) -> str:
     from sdpm import tools as contract
 
-    deck_dir = contract.init_deck_workspace(str(tmp_path / "deck"))["output_dir"]
+    deck_dir = contract.init_deck_workspace("deck")["output_dir"]
     contract.apply_style(deck_dir, style="typographic", template="blank-dark")
     (Path(deck_dir) / "specs" / "brief.md").write_text("# Brief\n", encoding="utf-8")
     (Path(deck_dir) / "specs" / "outline.md").write_text(
@@ -173,7 +173,7 @@ def test_composer_start_rejects_broken_specs(monkeypatch, tmp_path: Path) -> Non
     composer = _load_composer(monkeypatch)
     from sdpm import tools as contract
 
-    deck_dir = contract.init_deck_workspace(str(tmp_path / "deck"))["output_dir"]
+    deck_dir = contract.init_deck_workspace("deck")["output_dir"]
     with pytest.raises(RuntimeError, match="specs rejected"):
         composer._start_composing(_ContractClient(), deck_dir, ["a"])
 
