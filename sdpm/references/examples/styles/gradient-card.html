@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>gradient-card — For technical walkthroughs in Japanese on a shared screen, where the listener must follow which item is being discussed; on a black ground, rules, bands, round icon nodes and connectors carry the structure, a thin blue-to-violet gradient runs only along lines and node rims, an outline is kept for things with a boundary, one magenta outline per slide marks the subject, and the only coloured text is blue labels and numbers. Titles are one-line noun phrases; the lead under them states the claim.</title>
+<style>
+:root {
+--color-bg:#000000;
+--color-text:#FFFFFF;
+--color-text-2:#E6EDF3; /* body under a heading */
+--color-muted:#8B949E; /* comparators, axis ends */
+--color-surface:#161D26; /* node, outline box, code panel */
+--color-surface-2:#232E3D; /* band, panel, chip, bar */
+--color-border:#3D4757; /* rules */
+--accent:#41B3FF; /* line start, labels, numbers */
+--accent-2:#AD5CFF; /* line end */
+--hot:#E333FF; /* selected outline, one per slide */
+--hot-2:#952EFF;
+--mk-1:#AA0071;
+--mk-2:#E333FF;
+--mk-3:#9580A8;
+--font-family:Arial,"Helvetica Neue","Hiragino Sans","Yu Gothic",Meiryo,"Noto Sans JP",sans-serif; /* HTML only; PPTX fonts come from the template */
+--font-mono:Consolas,Menlo,monospace; /* code only */
+--fs-cover-title:60pt;
+--fs-slide-title:40pt;
+--fs-section:28pt;
+--fs-heading:24pt;
+--fs-body:20pt;
+--fs-caption:17pt;
+--fs-small:14pt;
+--fs-index:48pt;
+--fs-metric:72pt;
+--margin-x:120px;
+--content-w:1680px;
+--radius:20px; /* adjustments = 20 / shorter side */
+--line-card:3px;
+--line-hot:4.5px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{padding:40px;background:#111;font-family:var(--font-family);zoom:0.7}
+.slide{position:relative;width:1920px;height:1080px;margin:0 auto 40px;overflow:hidden;background:var(--color-bg);color:var(--color-text);--fill:linear-gradient(var(--color-surface),var(--color-surface)) padding-box;--ring:radial-gradient(circle at 100% 100%,var(--accent),var(--accent-2) 70%) border-box;--grad:linear-gradient(90deg,var(--accent),var(--accent-2));--mark:linear-gradient(135deg,var(--mk-1),var(--mk-2) 54%,var(--mk-3))}
+.el{position:absolute;line-height:1.2}
+.t-cover{font-size:calc(var(--fs-cover-title)*1.5);font-weight:700}
+.t-title{font-size:calc(var(--fs-slide-title)*1.5);font-weight:700}
+.t-sec{font-size:calc(var(--fs-section)*1.5)}
+.t-head{font-size:calc(var(--fs-heading)*1.5);font-weight:700}
+.t-body,.take{font-size:calc(var(--fs-body)*1.5)}
+.t-cap,.list p,.trow{font-size:calc(var(--fs-caption)*1.5)}
+.url,.code{font-size:calc(var(--fs-small)*1.5)}
+.t-index{font-size:calc(var(--fs-index)*1.5);font-weight:700;color:var(--accent)}
+.t-metric{font-size:calc(var(--fs-metric)*1.5);font-weight:700}
+.unit{font-size:calc(var(--fs-heading)*1.5);margin-left:8px}
+.b,.take,.lab,.unit{font-weight:700}
+.lab,.ca,.url{color:var(--accent)}.c2{color:var(--color-text-2)}.cm{color:var(--color-muted)}
+.ctr{text-align:center}.rt{text-align:right}.mid{display:flex;align-items:center;padding-left:24px}.pi{padding-left:80px}.two{line-height:1.7}.mid.ctr{justify-content:center;padding:0}
+.rule{background:var(--color-border)}
+.band{background:var(--grad) bottom/100% 4px no-repeat,var(--color-surface-2)}
+.panel{background:var(--color-surface)}
+.card{border-radius:var(--radius);border:var(--line-card) solid transparent;background:var(--fill),var(--ring)}
+.hot{border-width:var(--line-hot);background:var(--fill),radial-gradient(circle at 100% 100%,var(--hot),var(--hot-2) 70%) border-box}
+.disc{border-radius:50%;border:var(--line-card) solid transparent;background:var(--fill),var(--ring)}
+.ring{border-radius:50%;border:4px solid transparent;background:linear-gradient(var(--color-bg),var(--color-bg)) padding-box,var(--grad) border-box}
+.list p{display:flex;gap:20px;margin-bottom:28px}.list p:last-child{margin-bottom:0}
+.list p::before{content:"";flex:none;width:26px;height:26px;margin-top:8px;border-radius:5px;background:var(--mark)}
+.conn{background:var(--grad)}
+.ah-r,.ah-l,.ah-u,.ah-d{background:var(--accent)}.ah-r{clip-path:polygon(0 0,100% 50%,0 100%)}.ah-l{clip-path:polygon(100% 0,0 50%,100% 100%)}.ah-u{clip-path:polygon(50% 0,100% 100%,0 100%)}.ah-d{clip-path:polygon(0 0,100% 0,50% 100%)}
+.icon{display:block;width:100%;height:100%;fill:var(--color-text)}
+.code{font-family:var(--font-mono);color:var(--color-text-2);white-space:pre;line-height:1.3}
+.trow{display:flex;align-items:center;border-bottom:1.5px solid var(--color-border);color:var(--color-text-2)}
+.trow.th{border:0;background:var(--grad) bottom/100% 4px no-repeat,var(--color-surface-2);color:var(--color-text);font-weight:700}
+.trow span{padding-left:24px;width:30%}.trow span:nth-child(2){width:46%}.tb span:first-child{font-weight:700;color:var(--color-text)}.tb span:last-child{color:var(--accent);font-weight:700}
+.sb{fill:var(--color-border)}.sb-on{fill:url(#gbar)}
+.svg text{text-anchor:middle;font-size:calc(var(--fs-body)*1.5);fill:var(--color-muted)}.svg .x{font-size:calc(var(--fs-caption)*1.5)}.svg .on{fill:var(--color-text);font-weight:700}
+.sw{border-radius:12px;border:1.5px solid var(--color-border)}.k-bg{background:var(--color-bg)}.k-tx{background:var(--color-text)}.k-t2{background:var(--color-text-2)}.k-mu{background:var(--color-muted)}.k-s1{background:var(--color-surface)}.k-s2{background:var(--color-surface-2)}.k-bd{background:var(--color-border)}.k-ac{background:var(--accent)}.g-ln{background:var(--grad)}.g-hot{background:linear-gradient(90deg,var(--hot),var(--hot-2))}.g-mk{background:var(--mark)}
+.hex{font-family:var(--font-mono);font-size:calc(var(--fs-small)*1.5);color:var(--color-muted)}.t-sm{font-size:calc(var(--fs-small)*1.5);line-height:1.45}.f-mono{font-family:var(--font-mono)}
+</style>
+</head>
+<body>
+
+<!-- Part: Cover -->
+<!-- Frame: cover — the style draws it on the black ground, from its own components: customer 28pt #E6EDF3 at y220, name 60pt bold at y400 (one line; two lines start at y330), subtitle 28pt bold at y560, a 640px connector-gradient line (no arrow) at y680, organisation 20pt bold at y830, date 17pt at y900, all at x120 and left of x1240; on the right the ring and three icon nodes of the diagram pattern, no labels. -->
+<div class="slide">
+<div class="el t-sec c2" style="left:120px;top:220px;width:1100px;height:68px">お客様名</div>
+<div class="el t-cover" style="left:120px;top:400px;width:1100px;height:144px">gradient-card</div>
+<div class="el t-sec b" style="left:120px;top:560px;width:1100px;height:68px">罫線と帯と細い線で、技術を順に説明する</div>
+<div class="el conn" style="left:120px;top:680px;width:640px;height:3px"></div>
+<div class="el t-body b" style="left:120px;top:830px;width:1100px;height:48px">組織名</div>
+<div class="el t-cap" style="left:120px;top:900px;width:600px;height:41px">2026年10月</div>
+<div class="el ring" style="left:1340px;top:300px;width:440px;height:440px"></div>
+<div class="el disc" style="left:1504px;top:244px;width:112px;height:112px"></div>
+<div class="el" style="left:1532px;top:272px;width:56px;height:56px"><svg class="icon"><use href="#material/polyline"/></svg></div>
+<div class="el disc" style="left:1694px;top:574px;width:112px;height:112px"></div>
+<div class="el" style="left:1722px;top:602px;width:56px;height:56px"><svg class="icon"><use href="#material/fact_check"/></svg></div>
+<div class="el disc" style="left:1314px;top:574px;width:112px;height:112px"></div>
+<div class="el" style="left:1342px;top:602px;width:56px;height:56px"><svg class="icon"><use href="#material/code"/></svg></div>
+</div>
+
+<!-- Part: Rules -->
+<!-- Frame: content — "placeholders": {"0": ""} on every slide: the title is this textbox, never the placeholder; title {"type":"textbox","x":120,"y":48,"width":1680,"height":96,"text":"{{bold:題名}}","fontSize":40,"verticalAlign":"top","marginLeft":0,"marginTop":0}, one line; lead textbox y168 h96 20pt; content from y280 to y950; no line under the title. Bold only works as {{bold:…}} in the text. One line is 72px at 24pt, 58px at 20pt, 50px at 17pt. -->
+<!-- Decision: shared-screen technical walkthroughs, so the listener must follow which item is being discussed. The default build is open: rules, bands, icon nodes, connectors and space on black. An outlined box is the exception, for a thing with a boundary (a system in a flow, a group) or the one subject. Not used: grids of outlined cards, orange, green or red text, per-column colours, emoji. -->
+<div class="slide">
+<div class="el t-title" style="left:120px;top:48px;width:1680px;height:96px">スタイルの前提</div>
+<!-- Component: lead (.t-body) — the slide's claim under the title. -->
+<div class="el t-body" style="left:120px;top:168px;width:1680px;height:96px">既定は罫線と帯と余白で組み、枠で囲むのは境界のあるものだけにする。</div>
+<!-- Component: container (.rule, .band, .panel, .card) — rule: line #3D4757 1pt between rows and columns. band: rectangle fill #232E3D, line none, a 3px rectangle under it with "gradient":{"angle":0,"stops":[{"position":0,"color":"#41B3FF"},{"position":1,"color":"#AD5CFF"}]}. panel: rectangle fill #161D26, line none, only for an example or code. outline (.card), only around a thing with a boundary: rounded_rectangle fill #161D26, "lineWidth":1.5, "lineGradient":{"type":"circle","fillToRect":{"l":100000,"t":100000},"tileRect":{"r":-100000,"b":-100000},"stops":[{"position":0,"color":"#41B3FF"},{"position":0.7,"color":"#AD5CFF"}]}, "adjustments":[20 / shorter side]. Text in separate textboxes 24px inside any outline. -->
+<div class="el band mid" style="left:120px;top:300px;width:390px;height:80px"><span class="t-cap b">見出し</span></div>
+<div class="el rule" style="left:529px;top:292px;width:2px;height:340px"></div>
+<!-- Component: step (.disc) — node: oval fill #161D26, line none, "lineWidth":2, "lineGradient":{"type":"linear","angle":45,"stops":[{"position":0,"color":"#41B3FF"},{"position":1,"color":"#AD5CFF"}]}; a white icon (half the node) or a #41B3FF bold digit inside; 48–128px. -->
+<div class="el disc" style="left:689px;top:292px;width:112px;height:112px"></div>
+<div class="el" style="left:717px;top:320px;width:56px;height:56px"><svg class="icon"><use href="#material/polyline"/></svg></div>
+<div class="el rule" style="left:959px;top:292px;width:2px;height:340px"></div>
+<div class="el card" style="left:980px;top:300px;width:180px;height:160px"></div>
+<!-- Component: selected (.hot) — an outline with "lineWidth": 2.25 and stops #E333FF (0) / #952EFF (0.7); one per slide at most, on the subject; items beside it stay open. -->
+<div class="el card hot" style="left:1190px;top:300px;width:180px;height:160px"></div>
+<div class="el rule" style="left:1389px;top:292px;width:2px;height:340px"></div>
+<!-- Component: tag (.lab) — labels, numbers and small headings: {{bold,#41B3FF:長所}}. -->
+<div class="el t-cap" style="left:1420px;top:300px;width:380px;height:50px"><span class="lab">長所</span>　速い</div>
+<!-- Component: marker (.list) — list bullet: rounded_rectangle 26 (18 beside a heading), line none, "gradient":{"angle":135,"stops":[{"position":0,"color":"#AA0071"},{"position":0.54,"color":"#E333FF"},{"position":1,"color":"#9580A8"}]}. -->
+<div class="el list" style="left:1420px;top:370px;width:380px;height:100px"><p>要点</p><p>要点</p></div>
+<div class="el t-head" style="left:120px;top:500px;width:390px;height:58px">帯と罫線</div>
+<div class="el t-cap c2" style="left:120px;top:566px;width:390px;height:41px">列の見出しと区切り</div>
+<div class="el t-head" style="left:560px;top:500px;width:370px;height:58px">ノード</div>
+<div class="el t-cap c2" style="left:560px;top:566px;width:370px;height:41px">丸に白のアイコン</div>
+<div class="el t-head" style="left:980px;top:500px;width:390px;height:58px">枠</div>
+<div class="el t-cap c2" style="left:980px;top:566px;width:390px;height:41px">境界のあるものと主題</div>
+<div class="el t-head" style="left:1420px;top:500px;width:380px;height:58px">ラベルと印</div>
+<div class="el t-cap c2" style="left:1420px;top:566px;width:380px;height:41px">青の太字と紫の角丸</div>
+<!-- Component: takeaway (.take) — optional {{bold:…}} 20pt line 48px below the content. -->
+<div class="el take" style="left:120px;top:680px;width:1680px;height:48px">同じ組み方を3枚続けない。形は項目どうしの関係から選ぶ。</div>
+</div>
+
+<!-- Colour roles: use only these. Every fill is dark, so text on a fill is #FFFFFF or #E6EDF3. -->
+<div class="slide">
+<div class="el t-title" style="left:120px;top:48px;width:1680px;height:96px">カラーパレット</div>
+<div class="el t-body" style="left:120px;top:168px;width:1680px;height:96px">黒の地に中立の灰と紺で組み、色は青→紫の線と、主題のマゼンタだけに使う。</div>
+<div class="el sw k-bg" style="left:120px;top:292px;width:216px;height:80px"></div>
+<div class="el t-sm c2" style="left:120px;top:388px;width:216px;height:117px"><span class="t-cap b">背景</span><br>スライドの地<br><span class="hex">#000000</span></div>
+<div class="el sw k-tx" style="left:364px;top:292px;width:216px;height:80px"></div>
+<div class="el t-sm c2" style="left:364px;top:388px;width:216px;height:117px"><span class="t-cap b">文字</span><br>見出し・数値<br><span class="hex">#FFFFFF</span></div>
+<div class="el sw k-t2" style="left:608px;top:292px;width:216px;height:80px"></div>
+<div class="el t-sm c2" style="left:608px;top:388px;width:216px;height:117px"><span class="t-cap b">本文</span><br>説明・表の中<br><span class="hex">#E6EDF3</span></div>
+<div class="el sw k-mu" style="left:852px;top:292px;width:216px;height:80px"></div>
+<div class="el t-sm c2" style="left:852px;top:388px;width:216px;height:117px"><span class="t-cap b">補足</span><br>比べる基準<br><span class="hex">#8B949E</span></div>
+<div class="el sw k-s1" style="left:1096px;top:292px;width:216px;height:80px"></div>
+<div class="el t-sm c2" style="left:1096px;top:388px;width:216px;height:117px"><span class="t-cap b">ノード</span><br>丸・枠の中<br><span class="hex">#161D26</span></div>
+<div class="el sw k-s2" style="left:1340px;top:292px;width:216px;height:80px"></div>
+<div class="el t-sm c2" style="left:1340px;top:388px;width:216px;height:117px"><span class="t-cap b">帯</span><br>帯・面・棒<br><span class="hex">#232E3D</span></div>
+<div class="el sw k-bd" style="left:1584px;top:292px;width:216px;height:80px"></div>
+<div class="el t-sm c2" style="left:1584px;top:388px;width:216px;height:117px"><span class="t-cap b">罫線</span><br>区切り・灰の棒<br><span class="hex">#3D4757</span></div>
+<div class="el sw k-ac" style="left:120px;top:560px;width:399px;height:80px"></div>
+<div class="el t-sm c2" style="left:120px;top:656px;width:399px;height:117px"><span class="t-cap lab">ラベル</span><br>ラベル・番号<br><span class="hex">#41B3FF</span></div>
+<div class="el sw g-ln" style="left:547px;top:560px;width:399px;height:80px"></div>
+<div class="el t-sm c2" style="left:547px;top:656px;width:399px;height:117px"><span class="t-cap b">線とノードの枠</span><br>つなぐ線・丸・帯の下線<br><span class="hex">#41B3FF → #AD5CFF</span></div>
+<div class="el sw g-hot" style="left:974px;top:560px;width:399px;height:80px"></div>
+<div class="el t-sm c2" style="left:974px;top:656px;width:399px;height:117px"><span class="t-cap b">強調</span><br>主題の枠・比べる1本。1枚に1つ<br><span class="hex">#E333FF → #952EFF</span></div>
+<div class="el sw g-mk" style="left:1401px;top:560px;width:399px;height:80px"></div>
+<div class="el t-sm c2" style="left:1401px;top:656px;width:399px;height:151px"><span class="t-cap b">印</span><br>箇条書きの頭<br><span class="hex">#AA0071 → #E333FF<br>→ #9580A8</span></div>
+<div class="el take" style="left:120px;top:850px;width:1680px;height:48px">塗りはどれも暗いので、上の文字は白にする。橙・緑・赤は使わない。</div>
+</div>
+
+<!-- Type scale: 40 / 24 / 20 / 17 / 14pt and 72pt figures (cover and chapter names 60pt, chapter index 48pt), regular and bold only. Fonts come from the template into deck.json; set no fontFamily on textboxes except code as {{font=Consolas:…}}. -->
+<div class="slide">
+<div class="el t-title" style="left:120px;top:48px;width:1680px;height:96px">文字の大きさと書体</div>
+<div class="el t-body" style="left:120px;top:168px;width:1680px;height:96px">大きさは5段と数値の1段。書体はテンプレートのものを使い、等幅はコードだけ。</div>
+<div class="el t-title" style="left:120px;top:292px;width:680px;height:96px">タイトル</div>
+<div class="el hex" style="left:800px;top:322px;width:220px;height:34px">40pt 太字</div>
+<div class="el rule" style="left:120px;top:400px;width:900px;height:2px"></div>
+<div class="el t-head" style="left:120px;top:418px;width:680px;height:58px">見出し・名前</div>
+<div class="el hex" style="left:800px;top:430px;width:220px;height:34px">24pt 太字</div>
+<div class="el rule" style="left:120px;top:490px;width:900px;height:2px"></div>
+<div class="el t-body" style="left:120px;top:508px;width:680px;height:48px">リード・本文</div>
+<div class="el hex" style="left:800px;top:515px;width:220px;height:34px">20pt</div>
+<div class="el rule" style="left:120px;top:570px;width:900px;height:2px"></div>
+<div class="el t-cap" style="left:120px;top:588px;width:680px;height:41px">ラベル・補足・表の中</div>
+<div class="el hex" style="left:800px;top:592px;width:220px;height:34px">17pt</div>
+<div class="el rule" style="left:120px;top:643px;width:900px;height:2px"></div>
+<div class="el t-sm" style="left:120px;top:661px;width:680px;height:34px">コード・URL・注記</div>
+<div class="el hex" style="left:800px;top:661px;width:220px;height:34px">14pt</div>
+<div class="el rule" style="left:120px;top:709px;width:900px;height:2px"></div>
+<div class="el t-metric" style="left:120px;top:725px;width:680px;height:173px">6.2<span class="unit">日</span></div>
+<div class="el hex" style="left:800px;top:800px;width:220px;height:68px">72pt 太字<br>単位 24pt</div>
+<div class="el rule" style="left:1059px;top:292px;width:2px;height:606px"></div>
+<div class="el band mid" style="left:1100px;top:292px;width:700px;height:80px"><span class="t-head">書体</span></div>
+<div class="el t-cap lab" style="left:1100px;top:400px;width:700px;height:41px">全角</div>
+<div class="el t-body" style="left:1100px;top:446px;width:700px;height:48px">日本語の本文</div>
+<div class="el rule" style="left:1100px;top:516px;width:700px;height:2px"></div>
+<div class="el t-cap lab" style="left:1100px;top:536px;width:700px;height:41px">半角</div>
+<div class="el t-body" style="left:1100px;top:582px;width:700px;height:48px">Evaluations 2.1</div>
+<div class="el rule" style="left:1100px;top:652px;width:700px;height:2px"></div>
+<div class="el t-cap lab" style="left:1100px;top:672px;width:700px;height:41px">コード</div>
+<div class="el t-body f-mono" style="left:1100px;top:718px;width:700px;height:48px">Consolas　assertions=[]</div>
+<div class="el rule" style="left:1100px;top:788px;width:700px;height:2px"></div>
+<div class="el t-cap c2" style="left:1100px;top:808px;width:700px;height:90px">太さは標準と太字だけ<br>斜体は使わない</div>
+</div>
+
+<!-- Part: Message & Outline -->
+<!-- Density: 60 -->
+<!-- Title: 40pt, one line, topic noun phrase, never a question. Lead: the claim, two lines max. Text: short phrases, 17–20pt, three lines max; reasons and questions to the audience go to the notes. In Japanese about 150 visible characters per slide besides the title. The outline names how items relate, never "three cards": range → axis; order → nodes and arrows; repetition → ring; growth → rising bars; lookup → table; parallel facts → banded columns or icon rows. An agenda after the cover may use 48pt #41B3FF indices with #3D4757 rules between rows. -->
+
+<!-- Part: Patterns -->
+<!-- The slides below are examples, not templates: pick, combine or invent layouts freely and keep the components above. Also used: outlined boxes joined by connectors when each box is a system (data flows, architecture); a band with a 6px gradient bar at its left edge for the input of an example; chips (fill #232E3D, 17pt) joined by short arrows for a sequence of names; icon rows (72px white icon, #41B3FF number and bold heading, description on the right, rules between rows) for uses read one by one. -->
+<!-- Component: progress — growth by stage: bars of rising height, fill #232E3D, a 4pt connector-gradient line on the top edge, figure inside, stage name above. -->
+<!-- Frame: divider — optional chapter opener: index, chapter name 60pt bold, a short connector, one muted line. -->
+<div class="slide">
+<!-- Component: numbered (.t-index) — two-digit index in #41B3FF bold. -->
+<div class="el t-index" style="left:120px;top:300px;width:400px;height:116px">03</div>
+<div class="el t-cover" style="left:120px;top:430px;width:1680px;height:144px">参考例</div>
+<!-- Component: connector (.conn, .ah-r) — {"type":"line","color":"#41B3FF","lineWidth":2.5,"lineGradient":{"type":"linear","angle":0,"stops":[{"position":0,"color":"#41B3FF"},{"position":1,"color":"#AD5CFF"}]},"arrowEnd":"triangle"}; edge to edge. -->
+<div class="el conn" style="left:120px;top:610px;width:640px;height:3px"></div>
+<div class="el t-body cm" style="left:120px;top:650px;width:1680px;height:48px">これまでのデッキで使った組み方。縛りではない</div>
+</div>
+
+<!-- Pattern: columns — for: parallel items; regions: col-1, col-2, col-3; components: container (band, rule, panel) + icon + tag + code. -->
+<div class="slide">
+<div class="el t-title" style="left:120px;top:48px;width:1680px;height:96px">帯の見出しの列</div>
+<div class="el t-body" style="left:120px;top:168px;width:1680px;height:96px">並列の項目は帯の見出しの下に同じ並びで置き、列の間に縦の罫線を引く。</div>
+<div class="el band mid pi" style="left:120px;top:292px;width:520px;height:88px"><span class="t-head">罫線</span></div>
+<!-- Component: icon (.icon) — Material line icon, "iconColor": "#FFFFFF", 40–96px; service icons from aws/ keep their colours. -->
+<div class="el" style="left:144px;top:312px;width:48px;height:48px"><svg class="icon"><use href="#material/rule"/></svg></div>
+<div class="el t-body" style="left:144px;top:410px;width:472px;height:48px">行と列を分ける</div>
+<div class="el t-cap" style="left:144px;top:490px;width:472px;height:82px"><span class="lab">向く</span><br>対応表・用途の並び</div>
+<div class="el t-cap" style="left:144px;top:600px;width:472px;height:82px"><span class="lab">避ける</span><br>線を二重に引く</div>
+<div class="el rule" style="left:669px;top:292px;width:2px;height:440px"></div>
+<div class="el band mid pi" style="left:700px;top:292px;width:520px;height:88px"><span class="t-head">帯</span></div>
+<div class="el" style="left:724px;top:312px;width:48px;height:48px"><svg class="icon"><use href="#material/checklist"/></svg></div>
+<div class="el t-body" style="left:724px;top:410px;width:472px;height:48px">列の見出しを置く</div>
+<div class="el t-cap" style="left:724px;top:490px;width:472px;height:82px"><span class="lab">向く</span><br>3〜4列の並列</div>
+<div class="el t-cap" style="left:724px;top:600px;width:472px;height:82px"><span class="lab">避ける</span><br>5列以上</div>
+<div class="el rule" style="left:1249px;top:292px;width:2px;height:440px"></div>
+<div class="el band mid pi" style="left:1280px;top:292px;width:520px;height:88px"><span class="t-head">コード例</span></div>
+<div class="el" style="left:1304px;top:312px;width:48px;height:48px"><svg class="icon"><use href="#material/code"/></svg></div>
+<div class="el t-body" style="left:1304px;top:410px;width:472px;height:48px">薄い面に等幅で置く</div>
+<div class="el t-cap" style="left:1304px;top:490px;width:472px;height:82px"><span class="lab">向く</span><br>設定や入力の形</div>
+<div class="el panel" style="left:1304px;top:600px;width:472px;height:120px"></div>
+<!-- Component: code (.code) — 14pt #E6EDF3 {{font=Consolas:…}} on a panel. -->
+<div class="el code" style="left:1324px;top:624px;width:432px;height:72px">assertions=[
+  "金額が上限以内"]</div>
+</div>
+
+<!-- Pattern: comparison - for: options along one range; regions: axis, opt-1, opt-2, opt-3; components: connector (axis band) + marker x3 + tag + container (rule). No discs and no icons in this pattern: a continuum must not look like the process pattern. -->
+<!-- Component: axis band (.conn at 16px, .ah-l, .ah-r) - ONE unbroken gradient band across the content with "arrowStart" and "arrowEnd" triangles at both ends, #8B949E 17pt labels saying what grows. Options are marked by .ah-d triangles pointing down at the band with the name above; never by nodes sitting on the line. -->
+<div class="slide">
+<div class="el t-title" style="left:120px;top:48px;width:1680px;height:96px">軸の上の比較</div>
+<div class="el t-body" style="left:120px;top:168px;width:1680px;height:96px">性質が連続して変わる選択肢は、切れ目のない帯の上の位置で示し、長所と短所を下でそろえる。</div>
+<div class="el t-cap cm" style="left:180px;top:316px;width:400px;height:41px">人の判断</div>
+<div class="el t-cap cm rt" style="left:1340px;top:316px;width:400px;height:41px">自動で決定的</div>
+<div class="el t-head ctr" style="left:160px;top:380px;width:480px;height:58px">手作業</div>
+<div class="el t-head ctr" style="left:720px;top:380px;width:480px;height:58px">半自動</div>
+<div class="el t-head ctr" style="left:1280px;top:380px;width:480px;height:58px">自動</div>
+<div class="el ah-d" style="left:389px;top:462px;width:22px;height:20px"></div>
+<div class="el ah-d" style="left:949px;top:462px;width:22px;height:20px"></div>
+<div class="el ah-d" style="left:1509px;top:462px;width:22px;height:20px"></div>
+<div class="el conn" style="left:196px;top:492px;width:1528px;height:16px"></div>
+<div class="el ah-l" style="left:176px;top:486px;width:20px;height:28px"></div>
+<div class="el ah-r" style="left:1724px;top:486px;width:20px;height:28px"></div>
+<div class="el rule" style="left:160px;top:600px;width:1600px;height:2px"></div>
+<div class="el rule" style="left:679px;top:622px;width:2px;height:150px"></div>
+<div class="el rule" style="left:1239px;top:622px;width:2px;height:150px"></div>
+<div class="el t-cap two" style="left:180px;top:640px;width:460px;height:115px"><span class="lab">長所</span>　例外に強い<br><span class="lab">短所</span>　遅い・揺れる</div>
+<div class="el t-cap two" style="left:740px;top:640px;width:460px;height:115px"><span class="lab">長所</span>　確かめやすい<br><span class="lab">短所</span>　手順が増える</div>
+<div class="el t-cap two" style="left:1300px;top:640px;width:460px;height:115px"><span class="lab">長所</span>　速い・再現性<br><span class="lab">短所</span>　例外に弱い</div>
+</div>
+
+<!-- Pattern: process — for: ordered stages; regions: step-1, step-2, step-3; components: step ×3 + connector ×2 + icon + tag. -->
+<div class="slide">
+<div class="el t-title" style="left:120px;top:48px;width:1680px;height:96px">段の流れ</div>
+<div class="el t-body" style="left:120px;top:168px;width:1680px;height:96px">順に進む段は番号つきの丸を大きな矢印でつなぎ、名前と短い説明を下に置く。</div>
+<div class="el disc" style="left:340px;top:440px;width:120px;height:120px"></div>
+<div class="el" style="left:370px;top:470px;width:60px;height:60px"><svg class="icon"><use href="#material/description"/></svg></div>
+<div class="el conn" style="left:484px;top:499px;width:376px;height:3px"></div>
+<div class="el ah-r" style="left:860px;top:486px;width:24px;height:28px"></div>
+<div class="el disc" style="left:900px;top:440px;width:120px;height:120px"></div>
+<div class="el" style="left:930px;top:470px;width:60px;height:60px"><svg class="icon"><use href="#material/polyline"/></svg></div>
+<div class="el conn" style="left:1044px;top:499px;width:376px;height:3px"></div>
+<div class="el ah-r" style="left:1420px;top:486px;width:24px;height:28px"></div>
+<div class="el disc" style="left:1460px;top:440px;width:120px;height:120px"></div>
+<div class="el" style="left:1490px;top:470px;width:60px;height:60px"><svg class="icon"><use href="#material/fact_check"/></svg></div>
+<div class="el t-cap lab ctr" style="left:140px;top:380px;width:520px;height:41px">01</div>
+<div class="el t-cap lab ctr" style="left:700px;top:380px;width:520px;height:41px">02</div>
+<div class="el t-cap lab ctr" style="left:1260px;top:380px;width:520px;height:41px">03</div>
+<div class="el t-head ctr" style="left:140px;top:590px;width:520px;height:58px">取り込む</div>
+<div class="el t-body c2 ctr" style="left:140px;top:664px;width:520px;height:116px">元のページを<br>JSON にする</div>
+<div class="el t-head ctr" style="left:700px;top:590px;width:520px;height:58px">組む</div>
+<div class="el t-body c2 ctr" style="left:700px;top:664px;width:520px;height:116px">部品を複製し<br>文を短い句にする</div>
+<div class="el t-head ctr" style="left:1260px;top:590px;width:520px;height:58px">確かめる</div>
+<div class="el t-body c2 ctr" style="left:1260px;top:664px;width:520px;height:116px">画像にして<br>重なりを見る</div>
+</div>
+
+<!-- Pattern: metric — for: figures that carry the slide; regions: kpi-1, kpi-2, kpi-3; components: metric ×3 + tag + container (rule). -->
+<!-- Component: metric (.t-metric) — 72pt bold white figure as "{{bold:6.2}}{{bold,24pt: 日}}" (a Japanese unit starts with a space), a #8B949E comparator below; no box. -->
+<div class="slide">
+<div class="el t-title" style="left:120px;top:48px;width:1680px;height:96px">数値の並び</div>
+<div class="el t-body" style="left:120px;top:168px;width:1680px;height:96px">数値は枠に入れず大きく白で置き、単位と比べる基準を小さく添える。</div>
+<div class="el t-cap lab" style="left:120px;top:420px;width:520px;height:41px">強調の枠</div>
+<div class="el t-metric" style="left:120px;top:480px;width:520px;height:173px">1<span class="unit">か所</span></div>
+<div class="el t-cap cm" style="left:120px;top:680px;width:520px;height:41px">1枚あたり</div>
+<div class="el rule" style="left:669px;top:410px;width:2px;height:330px"></div>
+<div class="el t-cap lab" style="left:700px;top:420px;width:520px;height:41px">続けてよい同じ組み方</div>
+<div class="el t-metric" style="left:700px;top:480px;width:520px;height:173px">2<span class="unit">枚まで</span></div>
+<div class="el t-cap cm" style="left:700px;top:680px;width:520px;height:41px">3枚目は形を変える</div>
+<div class="el rule" style="left:1249px;top:410px;width:2px;height:330px"></div>
+<div class="el t-cap lab" style="left:1280px;top:420px;width:520px;height:41px">本文の文字</div>
+<div class="el t-metric" style="left:1280px;top:480px;width:520px;height:173px">20<span class="unit">pt</span></div>
+<div class="el t-cap cm" style="left:1280px;top:680px;width:520px;height:41px">ラベルは 17pt</div>
+</div>
+
+<!-- Pattern: table — for: lookup; regions: table; components: table + tag. -->
+<!-- Component: table (.trow) — native table, no box: header row a band (bold white) with the gradient line under it; body #E6EDF3; bottom border #3D4757; no vertical rules; marks are 32px gradient dots, absent a #3D4757 dash. -->
+<!-- Pattern: chart — for: one compared mark; regions: chart; components: chart. -->
+<!-- Component: chart (.svg) — native bar chart, no box: series[0] "color" #3D4757; the one compared bar is a gradient, not a flat colour - set series[0] "_pointXml" {"&lt;index&gt;": "&lt;a:spPr xmlns:a=&quot;http://schemas.openxmlformats.org/drawingml/2006/main&quot;&gt;&lt;a:gradFill rotWithShape=&quot;1&quot;&gt;&lt;a:gsLst&gt;&lt;a:gs pos=&quot;0&quot;&gt;&lt;a:srgbClr val=&quot;E333FF&quot;/&gt;&lt;/a:gs&gt;&lt;a:gs pos=&quot;100000&quot;&gt;&lt;a:srgbClr val=&quot;952EFF&quot;/&gt;&lt;/a:gs&gt;&lt;/a:gsLst&gt;&lt;a:lin ang=&quot;5400000&quot; scaled=&quot;0&quot;/&gt;&lt;/a:gradFill&gt;&lt;a:ln&gt;&lt;a:noFill/&gt;&lt;/a:ln&gt;&lt;/a:spPr&gt;"} (top #E333FF to bottom #952EFF). Do NOT use "pointColors" for it; dataLabels on; valueAxis {"gridlines": false, "line": "none"}; no legend. -->
+<div class="slide">
+<div class="el t-title" style="left:120px;top:48px;width:1680px;height:96px">表とグラフ</div>
+<div class="el t-body" style="left:120px;top:168px;width:1680px;height:96px">表は帯の見出しと罫線で組み、グラフは比べたい1本だけをマゼンタのグラデーションにする。</div>
+<div class="el trow th" style="left:120px;top:300px;width:820px;height:64px"><span>形</span><span>向く関係</span><span>数</span></div>
+<div class="el trow tb" style="left:120px;top:364px;width:820px;height:80px"><span>軸</span><span>連続する選択肢</span><span>2〜4</span></div>
+<div class="el trow tb" style="left:120px;top:444px;width:820px;height:80px"><span>段の流れ</span><span>順序のある工程</span><span>3〜5</span></div>
+<div class="el trow tb" style="left:120px;top:524px;width:820px;height:80px"><span>循環</span><span>繰り返す関係</span><span>3〜4</span></div>
+<div class="el trow tb" style="left:120px;top:604px;width:820px;height:80px"><span>帯の列</span><span>並列の項目</span><span>2〜4</span></div>
+<div class="el rule" style="left:1009px;top:300px;width:2px;height:420px"></div>
+<div class="el" style="left:1060px;top:300px;width:740px;height:420px"><svg class="svg" viewBox="0 0 740 420" width="740" height="420"><defs><linearGradient id="gbar" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#E333FF"/><stop offset="1" stop-color="#952EFF"/></linearGradient></defs><rect class="sb" x="0" y="370" width="740" height="2"/><rect class="sb" x="60" y="202" width="110" height="168"/><text x="115" y="186">42</text><text class="x" x="115" y="408">1月</text><rect class="sb" x="230" y="150" width="110" height="220"/><text x="285" y="134">55</text><text class="x" x="285" y="408">2月</text><rect class="sb" x="400" y="126" width="110" height="244"/><text x="455" y="110">61</text><text class="x" x="455" y="408">3月</text><rect class="sb-on" x="570" y="58" width="110" height="312"/><text class="on" x="625" y="42">78</text><text class="x" x="625" y="408">4月</text></svg></div>
+</div>
+
+<!-- Pattern: diagram — for: a cycle with a labelled return; regions: ring, node-1, node-2, node-3, return; components: step ×3 + icon ×3 + tag. The ring (.ring) is an oval, fill none, "lineWidth":2.5 with the connector gradient; 28px triangles fill #41B3FF rotated along it between nodes; labels outside the ring. -->
+<div class="slide">
+<div class="el t-title" style="left:120px;top:48px;width:1680px;height:96px">循環</div>
+<div class="el t-body" style="left:120px;top:168px;width:1680px;height:96px">繰り返す関係は円の上にノードを置き、戻すものを円の下に一行で添える。</div>
+<div class="el ring" style="left:710px;top:360px;width:500px;height:500px"></div>
+<div class="el ah-d" style="left:1162px;top:506px;width:22px;height:20px"></div>
+<div class="el ah-l" style="left:948px;top:846px;width:20px;height:22px"></div>
+<div class="el ah-u" style="left:736px;top:506px;width:22px;height:20px"></div>
+<div class="el disc" style="left:896px;top:266px;width:128px;height:128px"></div>
+<div class="el" style="left:928px;top:328px;width:64px;height:64px"><svg class="icon"><use href="#material/code"/></svg></div>
+<div class="el disc" style="left:1112px;top:671px;width:128px;height:128px"></div>
+<div class="el" style="left:1144px;top:703px;width:64px;height:64px"><svg class="icon"><use href="#material/fact_check"/></svg></div>
+<div class="el disc" style="left:679px;top:671px;width:128px;height:128px"></div>
+<div class="el" style="left:711px;top:703px;width:64px;height:64px"><svg class="icon"><use href="#material/sync"/></svg></div>
+<div class="el t-head" style="left:1060px;top:310px;width:600px;height:58px">作る</div>
+<div class="el t-cap" style="left:1060px;top:374px;width:600px;height:41px"><span class="lab">部品を複製して組む</span></div>
+<div class="el t-head" style="left:1270px;top:680px;width:530px;height:58px">確かめる</div>
+<div class="el t-cap" style="left:1270px;top:744px;width:530px;height:41px"><span class="lab">画像で重なりを見る</span></div>
+<div class="el t-head rt" style="left:120px;top:680px;width:530px;height:58px">直す</div>
+<div class="el t-cap rt" style="left:120px;top:744px;width:530px;height:41px"><span class="lab">指摘を反映する</span></div>
+<div class="el t-body ctr" style="left:120px;top:900px;width:1680px;height:48px">見つかった崩れを、次に作るときの規則に戻す</div>
+</div>
+
+<!-- Part: Closing -->
+<!-- Frame: closing — references in two columns: #41B3FF index, title 24pt, URL 14pt in its own shape {"type":"shape","shape":"rectangle","text":URL,"fontColor":"#41B3FF","link":URL,"align":"left"} with no fill or line (a {{link:…}} run takes the template's hyperlink colour), #3D4757 rule between entries; Japanese official documents first. -->
+<div class="slide">
+<div class="el t-title" style="left:120px;top:48px;width:1680px;height:96px">参考資料</div>
+<div class="el t-body" style="left:120px;top:168px;width:1680px;height:96px">最後のページは参考資料にし、番号・題名・URL を2列で並べる。</div>
+<div class="el t-head ca" style="left:120px;top:300px;width:64px;height:58px">01</div>
+<div class="el t-head" style="left:200px;top:300px;width:740px;height:58px">公式ドキュメント</div>
+<div class="el url" style="left:200px;top:362px;width:740px;height:34px">https://docs.aws.amazon.com/ja_jp/</div>
+<div class="el rule" style="left:120px;top:430px;width:820px;height:2px"></div>
+<div class="el t-head ca" style="left:120px;top:450px;width:64px;height:58px">02</div>
+<div class="el t-head" style="left:200px;top:450px;width:740px;height:58px">ブログ</div>
+<div class="el url" style="left:200px;top:512px;width:740px;height:34px">https://aws.amazon.com/jp/blogs/</div>
+<div class="el t-head ca" style="left:980px;top:300px;width:64px;height:58px">03</div>
+<div class="el t-head" style="left:1060px;top:300px;width:740px;height:58px">サンプルコード</div>
+<div class="el url" style="left:1060px;top:362px;width:740px;height:34px">https://github.com/awslabs</div>
+<div class="el rule" style="left:980px;top:430px;width:820px;height:2px"></div>
+<div class="el t-head ca" style="left:980px;top:450px;width:64px;height:58px">04</div>
+<div class="el t-head" style="left:1060px;top:450px;width:740px;height:58px">ワークショップ</div>
+<div class="el url" style="left:1060px;top:512px;width:740px;height:34px">https://workshops.aws/</div>
+<div class="el take" style="left:120px;top:640px;width:1680px;height:48px">罫線と帯と余白で組み、枠は境界のあるものだけ。強調はマゼンタの枠1つ。</div>
+</div>
+
+</body>
+</html>

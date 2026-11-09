@@ -62,6 +62,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   (`show_deck` is listed only to MCP Apps clients) and the same `check_specs` result; the
   remote server lists `show_deck` only to clients that declare MCP Apps in each request's
   `_meta`.
+- **Two built-in styles for Japanese decks: `gradient-card` and `mono-blue`.**
+  `gradient-card` is dark, for technical walkthroughs on a shared screen: rules, bands, icon
+  nodes and connectors with a thin blue-to-violet gradient, and one magenta outline for the
+  subject. `mono-blue` is white, for briefings read alone afterwards: sentence titles, a grey
+  takeaway band and one blue pointer per slide. Both draw their own cover and closing, so
+  they work with the bundled `blank-dark` and `blank-light` templates; the catalogue now has
+  18 styles.
 
 ### Changed
 

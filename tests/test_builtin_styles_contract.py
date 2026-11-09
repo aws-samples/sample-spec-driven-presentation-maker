@@ -34,6 +34,8 @@ EXPECTED_NAMES = {
     "prism-dark", "prism-light",
     # product-UI tier — the deck looks like the AWS Management Console
     "aws-console",
+    # Japanese tier — sample text and title grammar in Japanese
+    "gradient-card", "mono-blue",
 }
 
 REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide-title", "--fs-body")
