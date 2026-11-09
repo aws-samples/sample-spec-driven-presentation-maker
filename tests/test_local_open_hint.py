@@ -4,9 +4,9 @@
 
 Only with the Web UI installed (full profile, a built web-ui) and only for a client that did not
 declare MCP Apps in initialize (``capabilities.extensions["io.modelcontextprotocol/ui"]``). The
-field is added by a wrapper in servers/local/server.py; the tools' schemas stay the contract's,
-server_acp.py (the Web UI's own agent) binds the contract functions unwrapped, and the role
-documents that relay the field name it.
+field is a sentence for the user, added by a wrapper in servers/local/server.py; the tools'
+schemas stay the contract's, server_acp.py (the Web UI's own agent) binds the contract functions
+unwrapped, and no role document mentions the field (the result carries the hint alone).
 """
 
 from __future__ import annotations
@@ -28,6 +28,7 @@ from sdpm.tools.apps import UI_EXTENSION
 _ROOT = Path(__file__).resolve().parents[1]
 _LOCAL = _ROOT / "servers" / "local"
 _WORKFLOWS = _ROOT / "sdpm" / "references" / "workflows"
+_NOTE = "To open this deck in the browser Web UI, run `sdpm open {}` in a terminal."
 _APPS = {UI_EXTENSION: {"mimeTypes": ["text/html;profile=mcp-app"]}}
 
 
@@ -118,8 +119,8 @@ def test_a_client_without_mcp_apps_gets_the_command(server, local):
     made, built = _create_and_build(server, None)
     deck = Path(made["output_dir"])
     assert deck.parent == local
-    assert made[server.OPEN_HINT_FIELD] == f"sdpm open {deck.name}"
-    assert built[server.OPEN_HINT_FIELD] == f"sdpm open {deck.name}"
+    assert made[server.OPEN_HINT_FIELD] == _NOTE.format(deck.name)
+    assert built[server.OPEN_HINT_FIELD] == _NOTE.format(deck.name)
     # Another extension is not MCP Apps.
     made, _ = _create_and_build(server, {"io.example/other": {}})
     assert server.OPEN_HINT_FIELD in made
@@ -175,9 +176,10 @@ def test_the_wrapped_tools_keep_the_contract_schema(server):
 
 def test_the_web_uis_own_server_binds_the_contract_unwrapped():
     text = (_LOCAL / "server_acp.py").read_text(encoding="utf-8")
-    assert "_with_open_hint" not in text and "open_in_webui" not in text
+    assert "_with_open_hint" not in text and "OPEN_HINT_FIELD" not in text
 
 
-@pytest.mark.parametrize("doc", ["orchestrator.md", "translate.md"])
-def test_the_role_documents_name_the_field(server, doc):
-    assert f"`{server.OPEN_HINT_FIELD}`" in (_WORKFLOWS / doc).read_text(encoding="utf-8")
+def test_no_role_document_mentions_the_hint(server):
+    for doc in _WORKFLOWS.glob("*.md"):
+        text = doc.read_text(encoding="utf-8")
+        assert server.OPEN_HINT_FIELD not in text and "sdpm open" not in text, doc.name

@@ -52,9 +52,10 @@ mcp = FastMCP(
 # Local-environment fact: the `sdpm open` hint
 # ---------------------------------------------------------------------------
 
-# The result field naming the command that opens the deck in the browser Web UI. The
-# orchestrator and translate role documents say what to do with it.
-OPEN_HINT_FIELD = "open_in_webui"
+# The result field carrying a sentence for the agent to pass to the user: the command that
+# opens the deck in the browser Web UI. The sentence says what it is, so no role document
+# mentions it.
+OPEN_HINT_FIELD = "note_for_user"
 _CHECKOUT = _REPO_ROOT
 
 
@@ -67,9 +68,10 @@ def _client_params():
 
 
 def _with_open_hint(fn):
-    """``fn`` with ``open_in_webui`` added to its result when the Web UI is installed here and
-    the client did not declare MCP Apps (it would show the deck itself). Same name, docstring
-    and signature, so the tool's schema is the contract's."""
+    """``fn`` with ``note_for_user`` (how to open the deck with ``sdpm open``) added to its
+    result when the Web UI is installed here and the client did not declare MCP Apps (it would
+    show the deck itself). Same name, docstring and signature, so the tool's schema is the
+    contract's."""
 
     @functools.wraps(fn)
     def bound(*args, **kwargs):
@@ -81,7 +83,7 @@ def _with_open_hint(fn):
             return result
         hint = sdpm_command.open_hint(Path(deck), _get_output_base_dir())
         if hint:
-            result[OPEN_HINT_FIELD] = hint
+            result[OPEN_HINT_FIELD] = f"To open this deck in the browser Web UI, run `{hint}` in a terminal."
         return result
 
     return bound

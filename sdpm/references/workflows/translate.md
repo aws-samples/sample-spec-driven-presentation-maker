@@ -33,5 +33,3 @@ shell access to it (CLI, or an agent whose tools include a shell).
   the guide with each element's fields; `read_guides(["slide-json-spec"])` brings it back).
   Measurement does not catch unnatural line breaks in the target language — check the
   previews for those.
-- When `generate_pptx` returns `open_in_webui`, give that command to the user in your report;
-  run in a terminal, it opens the translated deck in the browser Web UI.

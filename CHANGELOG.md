@@ -16,8 +16,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 ### Added
 
 - `sdpm open <deck>` opens a deck in the browser Web UI and starts the Web UI if it is not
-  running. The local MCP server names that command when it creates or builds a deck, for
-  clients that do not declare MCP Apps.
+  running. For clients that do not declare MCP Apps, the local MCP server adds a note for the
+  user naming that command (`note_for_user`) to the result when it creates or builds a deck.
 
 ### Changed
 
