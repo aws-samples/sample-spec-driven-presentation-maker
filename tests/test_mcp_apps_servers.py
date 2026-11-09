@@ -189,6 +189,17 @@ def test_a_client_with_mcp_apps_sees_the_app_tool(which, declaration, request) -
     action = props["action"]
     assert action.get("enum", [action.get("const")]) == ["style_previews"]  # one value: pydantic writes const
     assert tool.inputSchema["required"] == ["action"]
+    # Hosts check a view's arguments against inputSchema before passing the call on, and
+    # Kiro Crew's gateway refuses a schema with anyOf/oneOf/allOf ("failing closed").
+    assert not {"anyOf", "oneOf", "allOf"} & _keywords(tool.inputSchema)
+
+
+def _keywords(schema) -> set[str]:
+    if isinstance(schema, dict):
+        return set(schema) | {k for v in schema.values() for k in _keywords(v)}
+    if isinstance(schema, list):
+        return {k for v in schema for k in _keywords(v)}
+    return set()
 
 
 def test_the_stateless_remote_lists_the_app_tool_only_per_request(remote) -> None:

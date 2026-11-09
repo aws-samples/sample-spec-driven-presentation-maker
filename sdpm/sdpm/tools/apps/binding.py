@@ -84,9 +84,9 @@ def register(mcp: Any, *, read_styles: Any = None, load_icons: Any = None) -> No
     async def app_action(
         action: Annotated[_ACTIONS, Field(description="Operation: style_previews (display copies of styles).")],
         names: Annotated[
-            list[str] | None,
+            list[str],
             Field(description=f"Style names for style_previews, 1 to {gallery.MAX_NAMES}.", max_length=gallery.MAX_NAMES),
-        ] = None,
+        ] = [],  # noqa: B006 (FastMCP copies defaults); not Optional: hosts that validate view calls reject anyOf
     ) -> types.CallToolResult:
         """Data for sdpm's MCP Apps views; only the views call it.
         style_previews: the named styles cut into slides, icons drawn in.
