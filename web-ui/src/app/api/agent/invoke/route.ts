@@ -144,8 +144,9 @@ export async function POST(req: Request) {
   }
   const { subscribe, send, replayFrom, onEnd } = prompted
 
-  // The period's events from this turn on (its notice among them), then the live ones; a stream
-  // that writes the period's end has delivered it (a closed tab's period is replayed by /stream).
+  // The period's events from this turn on (its notice among them), then the live ones. A stream
+  // that writes the period's end records it; the page's save after it delivers the period
+  // (/api/agent/chat), until then /stream replays it (a tab closed before it saved).
   const stream = createSSEStream({ subscribe, replay: getBufferedEvents(clientSessionId, replayFrom - 1), onEnd })
 
   send()

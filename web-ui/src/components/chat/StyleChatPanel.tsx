@@ -27,11 +27,12 @@ import { buildAttachedMarkers } from "@/lib/attachmentMarker"
 import { notifyError } from "@/lib/errors"
 
 interface StyleChatPanelProps {
+  /** Style the chat edits; "" for a new style, which the agent names. */
   styleId: string
   /** Called when agent writes a style — parent should refetch preview. */
   onStyleWritten?: () => void
   /** Called when agent saves the style (write_style succeeded with saved result). */
-  onStyleSaved?: (saved: { title: string; filename: string }) => void
+  onStyleSaved?: (saved: { title?: string; filename: string }) => void
 }
 
 export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleChatPanelProps) {
@@ -48,7 +49,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
     if (data?.completed && data?.result) {
       const result = data.result as Record<string, unknown>
       if (result.saved) {
-        const saved = result.saved as { title: string; filename: string }
+        const saved = result.saved as { title?: string; filename: string }
         onStyleWritten?.()
         onStyleSaved?.(saved)
       }
@@ -102,10 +103,11 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
     attachments: { fileName: string; fileType: string }[],
   ) => {
     let fullMessage = text
-    // First message: inject style context so the agent knows which style to write
+    // First message on an existing style: name it so the agent writes that style.
+    // A new style (no styleId yet) is named by the agent; the parent follows its first save.
     if (!hasSentRef.current) {
       hasSentRef.current = true
-      fullMessage = `[Style: ${styleId}]\n\n${fullMessage}`
+      if (styleId) fullMessage = `[Style: ${styleId}]\n\n${fullMessage}`
     }
     if (uploadedFiles.length > 0) {
       fullMessage = `${buildAttachedMarkers(uploadedFiles)}\n\n${fullMessage}`

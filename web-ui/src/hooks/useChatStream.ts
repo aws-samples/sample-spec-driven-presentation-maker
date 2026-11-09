@@ -103,8 +103,12 @@ export interface UseChatStreamOptions {
   deckId?: string
   /** Called on every tool event (start, complete, stream). Panel handles side effects. */
   onToolEvent?: (toolName: string, data: ToolUseCallbackData | undefined) => void
-  /** Called after each send completes (success or abort). */
-  onSendComplete?: () => void
+  /**
+   * Called after each send completes (success or abort), and after a resume that followed work.
+   * Local: with the session id whose stream the run read, which the panel's next save reports
+   * delivered (the server stops replaying that period once the chat holding it is saved).
+   */
+  onSendComplete?: (streamed?: string) => void
   /** Called when a turn ends (`turnEnd`), while the work may go on. */
   onTurnEnd?: () => void
 }
@@ -118,10 +122,12 @@ export interface UseChatStreamReturn {
   stopGeneration: () => void
   /**
    * Follow the session if it is working (after a reload or on a reopened deck; Local: also a
-   * period that ended while no page followed it). `cutHistory(prompt)` returns the messages
-   * before the prompt that opened the work, which the replay then rebuilds. Local resolves
-   * `true` when it followed a period, `false` when nothing ran (or the request failed), and
-   * `undefined` when it did not run or a newer resume or Stop ended it; Cloud resolves `undefined`.
+   * period that ended before a page saved it). `cutHistory(prompt)` returns the messages
+   * before the prompt that opened the work, which the replay then rebuilds (Local's replay always
+   * starts with that prompt: chat.ts never drops a period's opening events). Local resolves
+   * `true` when it followed a period, `false` when the server said nothing runs, and `undefined`
+   * when it did not run, the request failed, or a newer resume or Stop ended it; Cloud resolves
+   * `undefined`.
    */
   resume: (cutHistory: (prompt: string) => Message[]) => Promise<boolean | undefined>
   /** Cloud: the connection dropped while the session works and is being restored. */
@@ -669,7 +675,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       setIsLoading(false)
       setTurnActiveState(false)
       setReconnecting(false)
-      onSendComplete?.()
+      onSendComplete?.(IS_LOCAL ? runSessionId : undefined)
     }
     return ok
   }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent, onSendComplete, onTurnEnd, t, translateError])
@@ -726,12 +732,10 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       }, { signal: controller.signal })
       result = working
     } catch (err) {
-      // A newer resume, Stop or unmount ended it (AbortError): nothing failed.
-      if (err instanceof DOMException && err.name === "AbortError") result = undefined
-      else {
-        console.error("Resume failed:", err)
-        result = false
-      }
+      // A newer resume, Stop or unmount ended it (AbortError): nothing failed. A failed request
+      // says nothing about the session's work either.
+      if (!(err instanceof DOMException && err.name === "AbortError")) console.error("Resume failed:", err)
+      result = undefined
     } finally {
       if (resumeRunRef.current === token) {
         resumeControllerRef.current = null
@@ -743,7 +747,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
           isLoadingRef.current = false
           setIsLoading(false)
           setTurnActiveState(false)
-          onSendComplete?.()
+          onSendComplete?.(sessionId)
         }
       }
       if (resumeGateRef.current === gate) resumeGateRef.current = null

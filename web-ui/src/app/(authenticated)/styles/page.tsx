@@ -5,8 +5,8 @@
  *
  * Uses URL hash routing (useStyleWorkspace):
  * - No hash: style list grid
- * - #create: new style creation (Phase 3 agent chat)
- * - #{name}: style preview (user styles get chat panel in Phase 3)
+ * - #/create: new style (chat open, no file until the agent saves it)
+ * - #{name}: style preview (user styles get the chat panel)
  */
 
 "use client"
@@ -14,7 +14,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from "react"
 import { useTranslations } from "next-intl"
 import { useAuth } from "@/hooks/useAuth"
-import { useStyleWorkspace } from "@/hooks/useStyleWorkspace"
+import { parseHash, useStyleWorkspace } from "@/hooks/useStyleWorkspace"
 import { AppShell } from "@/components/AppShell"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { fetchStyles, fetchStyleHtml, pinStyle, saveUserStyle, deleteUserStyle, renameUserStyle, type StyleEntry } from "@/services/deckService"
@@ -39,6 +39,8 @@ export default function StylesPage() {
   const [inlineRenameError, setInlineRenameError] = useState("")
   const [toast, setToast] = useState<{ message: string; type: "success" | "error" } | null>(null)
   const [chatOpen, setChatOpen] = useState(false)
+  // The style a new-style chat saved, so its workspace keeps the chat before the list has it.
+  const [sessionStyle, setSessionStyle] = useState<string | null>(null)
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type })
@@ -56,20 +58,12 @@ export default function StylesPage() {
 
   useEffect(() => { refreshStyles() }, [refreshStyles])
 
-  // When #create is visited, show name dialog and go back to list view
+  // A new style opens with the chat; the list closes it. A preview keeps the panel as it is,
+  // so a new style's chat stays as the user left it when its first save opens the preview.
   useEffect(() => {
-    if (ws.view.mode === "create") {
-      ws.navigateToList()
-      handleCreateStyle()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ws.view.mode])
-
-  // Reset chat state when navigating away from preview
-  useEffect(() => {
-    if (ws.view.mode !== "preview") {
-      setChatOpen(false)
-    }
+    if (ws.view.mode === "preview") return
+    setChatOpen(ws.view.mode === "create")
+    setSessionStyle(null)
   }, [ws.view.mode])
 
   const handlePin = async (name: string) => {
@@ -128,17 +122,10 @@ export default function StylesPage() {
     showToast(t("copiedAs", { name: `Copy of ${originalTitle}` }))
   }
 
-  const handleCreateStyle = async () => {
-    if (!idToken) return
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, "0")
-    const name = `style-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
-    const html = `<!DOCTYPE html><html><head><title>Untitled Style</title></head><body><div class="slide" style="width:1920px;height:1080px;display:flex;align-items:center;justify-content:center;font-family:sans-serif;background:#1a1a2e;color:#fff;"><h1>Untitled Style</h1></div></body></html>`
-    const result = await saveUserStyle(name, html, idToken)
-    if (result.error) { showToast(result.error, "error"); return }
-    await refreshStyles()
-    ws.navigateToStyle(name)
-    setChatOpen(true)
+  // A new style has no file until the agent saves it under the name it chose
+  // (and with its <title>); the workspace then follows that save.
+  const handleCreateStyle = () => {
+    ws.navigateToCreate()
   }
 
   const handleInlineRenameSubmit = async () => {
@@ -155,6 +142,7 @@ export default function StylesPage() {
   }
 
   const currentStyle = ws.styleName ? styles.find(s => s.name === ws.styleName) : null
+  const isUserStyle = currentStyle?.source === "user" || (!!ws.styleName && ws.styleName === sessionStyle)
 
   const userStyles = styles.filter(s => s.source === "user")
   const builtinStyles = styles.filter(s => s.source === "builtin")
@@ -201,7 +189,7 @@ export default function StylesPage() {
               >
                 <Star className="h-3.5 w-3.5" fill={currentStyle?.pinned ? "currentColor" : "none"} />
               </button>
-              {currentStyle?.source === "user" && (
+              {isUserStyle && (
                 <>
                   <button
                     onClick={() => setChatOpen(true)}
@@ -229,18 +217,29 @@ export default function StylesPage() {
             <StyleSlidePreview html={ws.previewHtml} loading={ws.previewLoading} />
           </div>
         ) : ws.view.mode === "create" ? (
-          /* ── Create new style → creates Untitled Style and navigates ── */
+          /* ── New style: the chat is open; the style appears once the agent saves it ── */
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <Sparkles className="h-12 w-12 text-brand-teal/20 mx-auto mb-4" />
               <h2 className="text-sm font-semibold mb-1">{t("createWithAI")}</h2>
-              <p className="text-xs text-foreground-muted mb-4">{t("creatingStyle")}</p>
-              <button
-                onClick={ws.navigateToList}
-                className="mt-4 px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-foreground/[0.04] transition-colors"
-              >
-                ← {t("backToStyles")}
-              </button>
+              <p className="text-xs text-foreground-muted mb-4">{t("newStyleHint")}</p>
+              {!chatOpen && (
+                <button
+                  onClick={() => setChatOpen(true)}
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-brand-teal hover:text-brand-teal-bright border border-brand-teal/25 hover:border-brand-teal/40 bg-brand-teal/[0.06] hover:bg-brand-teal/[0.1] transition-colors"
+                >
+                  <MessageSquare className="h-3 w-3" />
+                  {t("openChat")}
+                </button>
+              )}
+              <div>
+                <button
+                  onClick={ws.navigateToList}
+                  className="mt-4 px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-foreground/[0.04] transition-colors"
+                >
+                  ← {t("backToStyles")}
+                </button>
+              </div>
             </div>
           </div>
         ) : (
@@ -323,16 +322,24 @@ export default function StylesPage() {
         )}
         </div>
 
-        {/* Style Chat Panel (side panel) */}
-        {ws.view.mode === "preview" && currentStyle?.source === "user" && (
+        {/* Style Chat Panel (side panel). One element for both views, so a new style's
+            chat stays the same session when its first save moves the workspace to it. */}
+        {(ws.view.mode === "create" || (ws.view.mode === "preview" && isUserStyle)) && (
           <StyleChatShell
             open={chatOpen}
             onClose={() => setChatOpen(false)}
-            styleId={ws.styleName!}
-            styleName={ws.styleName!}
+            styleId={ws.styleName ?? ""}
+            styleName={ws.styleName ?? ""}
             onStyleWritten={() => ws.refreshPreview()}
             onStyleSaved={async (saved) => {
-              showToast(t("styleSaved", { title: saved.title }), "success")
+              const name = saved.filename.replace(/\.html$/i, "")
+              // A new style's first save names it: open its preview with this chat. Read the
+              // live hash, because the stream keeps the callback of the render that sent.
+              if (parseHash(window.location.hash).mode === "create") {
+                setSessionStyle(name)
+                ws.navigateToStyle(name)
+              }
+              showToast(t("styleSaved", { title: saved.title ?? name }), "success")
               await refreshStyles()
             }}
           />

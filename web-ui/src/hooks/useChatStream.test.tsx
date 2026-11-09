@@ -26,6 +26,7 @@ vi.mock("@/services/agentCoreService", () => ({ invokeAgentCore, resumeLocalAgen
 vi.mock("@/services/localService", () => ({ stopLocalAgent, steerLocalAgent }))
 vi.mock("@/lib/errors", () => ({ notifyError }))
 
+import { cutLocalAtPrompt } from "@/components/chat/chatHistory"
 import { useChatStream, type Message } from "./useChatStream"
 
 beforeEach(() => {
@@ -259,6 +260,46 @@ describe("useChatStream resume (local)", () => {
     await act(async () => { run.finish!(); await done })
   })
 
+  it("a replay whose middle the server dropped rebuilds from its prompt: no copy of a saved reply or steer, the dropped part is gone", async () => {
+    // .chat.json holds the whole period: the reply, a steer and the reply after it.
+    const saved: Message[] = [
+      ...history.slice(0, 3),
+      { role: "assistant", content: "head and tail", toolUses: [] },
+      { role: "user", content: "also this", toolUses: [], steerId: "s1", steerState: "delivered" },
+      { role: "assistant", content: "More", toolUses: [] },
+    ]
+    const run = captureResume()
+    const { result } = render()
+    act(() => { result.current.setMessages(saved) })
+    const cut = vi.fn((prompt: string) => cutLocalAtPrompt(saved, prompt))
+    let done: Promise<boolean | undefined> | undefined
+    act(() => { done = result.current.resume(cut) })
+    // The buffer kept the period's opening (work, its prompt) and lost the reply's head.
+    act(() => {
+      run.handlers!.onResumeAck({ working: true })
+      run.handlers!.onSession.onEvent({ work: { state: "busy" } }, { own: false })
+      run.handlers!.onSession.onEvent({ turn: { id: "t1", why: "prompt", text: "make it" } }, { own: false })
+      run.handlers!.onStreamUpdate("tail")
+      run.handlers!.onSession.onEvent({ steer: { id: "s1", text: "also this", state: "accepted" } }, { own: false })
+      run.handlers!.onStreamUpdate("tailMore")
+    })
+    expect(cut).toHaveBeenCalledTimes(1)
+    expect(cut).toHaveBeenCalledWith("make it")
+    expect(roles(result.current.messages)).toEqual(["user:earlier", "assistant:earlier reply", "user:make it", "assistant:tail", "user:also this", "assistant:More"])
+    await act(async () => { run.finish!(); await done })
+  })
+
+  it("resolves undefined when the stream request fails", async () => {
+    resumeLocalAgent.mockImplementationOnce(async () => { throw new Error("Local stream error: 500") })
+    const error = vi.spyOn(console, "error").mockImplementation(() => {})
+    const { result } = render()
+    let resolved: boolean | undefined = false
+    await act(async () => { resolved = await result.current.resume(() => []) })
+    expect(resolved).toBeUndefined()
+    expect(result.current.isLoading).toBe(false)
+    error.mockRestore()
+  })
+
   it("turns a send during the followed period into a steer, and a send after it into an invoke", async () => {
     const run = captureResume()
     const onSendComplete = vi.fn()
@@ -276,6 +317,7 @@ describe("useChatStream resume (local)", () => {
     expect(resolved).toBe(true)
     expect(result.current.isLoading).toBe(false)
     expect(onSendComplete).toHaveBeenCalledTimes(1)
+    expect(onSendComplete).toHaveBeenCalledWith("K1")
     invokeAgentCore.mockResolvedValueOnce("")
     await act(async () => { await result.current.sendMessage("next") })
     expect(invokeAgentCore).toHaveBeenCalledTimes(1)

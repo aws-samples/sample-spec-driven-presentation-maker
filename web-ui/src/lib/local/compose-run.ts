@@ -20,10 +20,12 @@
  *   error failed), unless messages kiro-cli had not injected are left: they go into one follow-up
  *   prompt on the same session first. Then the session is closed (V3 deletes it) and the kiro-cli's
  *   process tree gets SIGTERM; its slot frees once the tree is gone (hosts.ts).
- * - **message_composer.** Routed from its `tool_use` (the input is complete there): a `_session/steer`
- *   to that group's own kiro-cli, prefixed as Cloud's; kept for the first prompt of a group that is
- *   waiting or starting; anything else is not delivered (the card's result is an error, and the
- *   orchestrator gets `<message_composer_error>`). The MCP tool's own result is never shown.
+ * - **message_composer.** Routed from its `tool_use` (the input is complete there) when the input is
+ *   within the tool's own bounds (`group` 1 or more, `text` 1 to MESSAGE_TEXT_MAX characters): a
+ *   `_session/steer` to that group's own kiro-cli, prefixed as Cloud's; kept for the first prompt of
+ *   a group that is waiting or starting; anything else is not delivered (the card's result is an
+ *   error, and the orchestrator gets `<message_composer_error>`). The MCP tool's own result is shown
+ *   only when the tool refused input out of its bounds: nothing is sent, and the card is an error.
  * - **Task end.** Output check (the output is stale when two or more groups were prompted, or when
  *   it is older than the newest slide file), report (conversation/compose-report.ts), `taskEnd`, the
  *   `<compose_result>` delivered to the chat (a wake turn, a steer into a running turn, or kept for
@@ -57,6 +59,8 @@ export const MAX_PARALLEL_COMPOSERS = 4
 export const COMPOSER_STOP_KILL_MS = 1000
 /** A task's limit (Cloud's task timeout). */
 export const COMPOSE_TASK_TIMEOUT_MS = 3_600_000
+/** The longest message_composer text (servers/local/compose_dispatch.py MAX_TEXT, in code points). */
+export const MESSAGE_TEXT_MAX = 10_000
 /** Cloud's prefix of a message from the orchestrator (agent/compose_messaging.py). */
 export const COMPOSER_MESSAGE_PREFIX = "Message from the orchestrator while you work: "
 /** How long a composer's session/close and session/delete may take before its tree is ended anyway. */
@@ -71,6 +75,14 @@ const errorText = (error: unknown) => (error instanceof Error ? error.message : 
 /** Read the group's state afresh (it changes while a start or a request is awaited). */
 const hasEnded = (g: { state: string }) => g.state === "ended"
 const isAbort = (error: unknown) => error instanceof Error && error.name === "AbortError"
+
+/** A message_composer input the MCP tool accepts (it refuses the others itself). */
+function messageInBounds(input: Record<string, unknown> | undefined): input is { group: number; text: string } {
+  const { group, text } = (input ?? {}) as { group?: unknown; text?: unknown }
+  if (!Number.isInteger(group) || (group as number) < 1 || typeof text !== "string") return false
+  const length = [...text].length
+  return length >= 1 && length <= MESSAGE_TEXT_MAX
+}
 
 /** A dispatched compose_slides result, checked. */
 export interface Dispatch {
@@ -268,7 +280,7 @@ export class ComposeTask implements WorkHold {
     if (this.ended || this.isDropped) return
     console.warn("[compose] task %s: its composers did not stop in time; ending it cancelled", this.id)
     for (const g of this.groups) if (g.state !== "ended") this.setOutcome(g, "cancelled")
-    this.finish()
+    this.finish({ dropped: true })
     this.isDropped = true
   }
 
@@ -515,11 +527,12 @@ export class ComposeTask implements WorkHold {
     this.finish()
   }
 
-  private finish(): void {
+  /** `dropped`: Stop's settle timeout ends it, cancelled (also after the task's own timeout). */
+  private finish({ dropped = false }: { dropped?: boolean } = {}): void {
     if (this.ended) return
     this.ended = true
     this.clearTimeout()
-    const cancelled = this.reason === "stop" || this.isDropped
+    const cancelled = this.reason === "stop" || dropped
     const outcomes = this.groups.map((g) => g.outcome!)
     const generated = outcomes.some((o) => o.status === "success")
     const stale = generated && !cancelled && this.outputStale()
@@ -527,7 +540,7 @@ export class ComposeTask implements WorkHold {
       groups: outcomes, outlineSlugs: this.dispatch.outlineSlugs, specWarnings: this.dispatch.specWarnings,
       cancelled, stale, outputFormat: this.dispatch.outputFormat, deckId: this.dispatch.deckId,
     })
-    const status: TaskStatus = taskStatus({ cancelled, failed: this.reason === "host_exit" || this.reason === "timeout" })
+    const status: TaskStatus = taskStatus({ cancelled, failed: !dropped && (this.reason === "host_exit" || this.reason === "timeout") })
     const content = JSON.stringify(report)
     this.emit([data({ taskEnd: { toolUseId: this.toolUseId, taskId: this.id, name: COMPOSE_TOOL, status, content } })])
     this.chat.conversation.tasks.close(this.toolUseId)
@@ -594,10 +607,9 @@ export class ComposeRunner {
     if (use.name !== MESSAGE_TOOL) return
     const entry = this.messages.get(use.id)
     if (entry && entry.outcome !== false) return
-    const { group, text } = use.input as { group?: unknown; text?: unknown }
-    const complete = Number.isInteger(group) && typeof text === "string"
+    const input = use.input
     const task = this.current
-    this.messages.set(use.id, { input: use.input, outcome: complete && task ? task.message(group as number, text as string, Date.now()) : false })
+    this.messages.set(use.id, { input, outcome: messageInBounds(input) && task ? task.message(input.group, input.text, Date.now()) : false })
   }
 
   /** Its end (the run answers it). */
@@ -673,6 +685,13 @@ export class ComposeRunner {
   }
 
   private messageEnded(end: RunToolEnd, input: Record<string, unknown> | undefined, delivered: boolean): void {
+    // The tool refused input out of its bounds: nothing was sent, and its own answer says why.
+    // Input it accepts (it coerces a numeric string group) and toolUse did not route goes on as
+    // not delivered.
+    if (input && !messageInBounds(input) && (end.status === "error" || end.result.status === "error")) {
+      this.push(this.chat.conversation.toolResult(end.id, "error", end.result, MESSAGE_TOOL).events)
+      return
+    }
     const group = Number((input as { group?: unknown } | undefined)?.group) || 0
     if (delivered) {
       this.push(this.chat.conversation.toolResult(end.id, "success", end.result, MESSAGE_TOOL).events)

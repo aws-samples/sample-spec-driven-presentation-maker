@@ -6,8 +6,9 @@
  * back from `.chat.json`. A deck follows its chat's work period after `.chat.json` loads
  * (resumeLocalAgent, no EventSource): the replay rebuilds the period from its prompt, the Stop
  * button and the background line show while it runs, and the chat is saved on a task's start
- * and end and on a turn's end. A task still running in the history while nothing runs shows
- * stopped. A history load of an earlier session id that answers late does not put the saved
+ * and end and on a turn's end; the save after the stream's end reports the period delivered. A
+ * task still running in the history while nothing runs shows stopped, and stays running when the
+ * stream request fails. A history load of an earlier session id that answers late does not put the saved
  * history over the replay.
  */
 
@@ -146,6 +147,20 @@ describe("ChatPanel resume (Local)", () => {
     expect(screen.queryByText("2 slides in production")).toBeNull()
   })
 
+  it("keeps a task the history has running when the stream request fails", async () => {
+    const tool = { toolUseId: "c1", name: "compose_slides", task: { id: "k1", state: "running" }, input: {} }
+    getChatHistory.mockResolvedValue({
+      messages: [...HISTORY.slice(0, 3), { role: "assistant", content: "Composing.", toolUses: [tool], blocks: [{ type: "text", text: "Composing." }, { type: "tool", tool }] }],
+      truncated: false,
+    })
+    resumeLocalAgent.mockImplementationOnce(async () => { throw new Error("Local stream error: 500") })
+    const error = vi.spyOn(console, "error").mockImplementation(() => {})
+    renderWithIntl(<ChatPanel deckId="d1" chatSessionId="S1" />)
+    await waitFor(() => expect(error).toHaveBeenCalledWith("Resume failed:", expect.any(Error)))
+    expect(screen.queryByText("Stopped")).toBeNull()
+    error.mockRestore()
+  })
+
   it("shows the background line and saves the chat on a task's start and end and a turn's end", async () => {
     getChatHistory.mockResolvedValue({ messages: HISTORY, truncated: false })
     const live = workingResume()
@@ -186,11 +201,13 @@ describe("ChatPanel resume (Local)", () => {
     expect(await screen.findByText("All done")).toBeTruthy()
     await waitFor(() => expect(saveLocalChat).toHaveBeenCalled())
     // Every save holds the replayed reply (none of the messages before the replay rendered).
-    const saves = saveLocalChat.mock.calls as unknown as [string, { content: string }[]][]
+    const saves = saveLocalChat.mock.calls as unknown as [string, { content: string }[], string | undefined][]
     for (const [deckId, messages] of saves) {
       expect(deckId).toBe("d1")
       expect(messages.map((m) => m.content)).toEqual(["earlier", "earlier reply", "make it", "All done"])
     }
+    // The save after the stream's end reports the period delivered (the server stops replaying it).
+    await waitFor(() => expect(saves.some(([, , delivered]) => delivered === "S1")).toBe(true))
   })
 })
 

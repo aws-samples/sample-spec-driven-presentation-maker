@@ -146,7 +146,9 @@ uv run python3 scripts/pptx_builder.py analyze_template my-template.pptx --layou
 
 または、エージェントに「このプレゼンには my-template.pptx を使って」と伝えるだけでも構いません。
 
-`sdpm/templates/` に置いたテンプレートは、自動で `list_templates` に表示されます。
+`<user-config>/templates/`（下の「ユーザーローカルのテンプレート」を参照）に置いたテンプレートは、自動で
+`list_templates` に表示されます。`sdpm/templates/` は同梱のテンプレートの置き場所です。インストールした SDPM では
+`sdpm update` が管理する `~/.sdpm/checkout` の一部なので、自分のテンプレートは置かないでください。
 
 同梱のテンプレート:
 

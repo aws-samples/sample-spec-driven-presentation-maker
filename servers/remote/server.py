@@ -1351,6 +1351,8 @@ def run_style_python(
     """Run Python in a style workspace: style.html is the style named by style_name, ref/ holds
     the ref_styles. Writes to style.html persist to the user's style store on every run.
     """
+    if style_name and not user_library.is_valid_style_name(style_name):
+        raise ValueError("Invalid style name: use letters, digits, '_' and '-'")
     user_id = _get_user_id()
 
     client = boto3.client("bedrock-agentcore", region_name=_region, config=SHORT_API)
