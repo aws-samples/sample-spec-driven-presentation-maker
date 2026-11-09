@@ -27,6 +27,16 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **Cloud chat: throttling names the cause.** The message now says the model's usage quota
   or rate limit was reached and suggests waiting or choosing another model in Settings, in
   English and Japanese.
+### Added
+
+- `sdpm open <deck>` opens a deck in the browser Web UI and starts the Web UI if it is not
+  running. For clients that do not declare MCP Apps, the local MCP server adds a note for the
+  user naming that command (`note_for_user`) to the result when it creates or builds a deck.
+
+### Changed
+
+- A deck made through an MCP client opens in the Local Web UI as a new chat on that deck
+  without the "no Kiro session" notice.
 
 ## [0.13.0] - 2026-11-09
 

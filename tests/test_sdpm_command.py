@@ -83,7 +83,7 @@ def test_doctor_runs_in_the_servers_environment(ctx):
 def test_webui_binds_loopback_on_a_valid_port(ctx, monkeypatch):
     monkeypatch.setattr(sc, "port_is_open", lambda _p: False)
     monkeypatch.setattr(sc.shutil, "which", lambda _n: "/x/npm")
-    monkeypatch.setattr(sc, "_wait_and_open", lambda port, stop: None)
+    monkeypatch.setattr(sc, "_wait_and_open", lambda port, stop, path="": None)
     monkeypatch.setenv("SDPM_WEBUI_PORT", "3100")
     assert sc.webui(ctx) == 0
     argv, kwargs = ctx.calls[-1]
@@ -155,3 +155,174 @@ def test_status_shows_the_channel(ctx, monkeypatch, capsys):
     monkeypatch.setattr(sc, "version", lambda _c: "v0.13.0 (1a2b3c4)")
     sc.status(ctx)
     assert capsys.readouterr().out.splitlines()[0] == "SDPM v0.13.0 (1a2b3c4) · release channel"
+
+
+# ---------------------------------------------------------------------------
+# sdpm open DECK
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def decks(tmp_path, monkeypatch):
+    """A deck root with one deck, `my-deck`; no config.json is read."""
+    root = tmp_path / "decks"
+    (root / "my-deck").mkdir(parents=True)
+    (root / "my-deck" / "deck.json").write_text("{}")
+    monkeypatch.setenv("SDPM_DECK_ROOT", str(root))
+    monkeypatch.delenv("SDPM_OUTPUT_DIR", raising=False)
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "xdg"))
+    return root
+
+
+@pytest.mark.parametrize(("deck_root", "output_dir", "config_json", "expected"), [
+    ("<tmp>/a", "<tmp>/b", {"output_dir": "<tmp>/c"}, "<tmp>/a"),
+    ("", "<tmp>/b", {"output_dir": "<tmp>/c"}, "<tmp>/b"),
+    (None, None, {"output_dir": "<tmp>/c"}, "<tmp>/c"),
+    (None, None, {"output_dir": "~/cfg-decks"}, "~/cfg-decks"),
+    (None, None, {"output_dir": "~"}, "~"),
+    (None, None, {"output_dir": ""}, "~/Documents/SDPM-Presentations"),
+    (None, None, {"output_dir": 3}, "~/Documents/SDPM-Presentations"),
+    (None, None, "{not json", "~/Documents/SDPM-Presentations"),
+    (None, None, None, "~/Documents/SDPM-Presentations"),
+])
+def test_deck_root_follows_the_web_ui_and_the_engine(monkeypatch, tmp_path, deck_root, output_dir, config_json,
+                                                     expected):
+    from sdpm import config
+    from sdpm.api import _get_output_base_dir
+
+    def value(text):
+        return text.replace("<tmp>", str(tmp_path))
+
+    for name, raw in (("SDPM_DECK_ROOT", deck_root), ("SDPM_OUTPUT_DIR", output_dir)):
+        if raw is None:
+            monkeypatch.delenv(name, raising=False)
+        else:
+            monkeypatch.setenv(name, value(raw))
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "xdg"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "xdg"))
+    (tmp_path / "xdg" / "sdpm").mkdir(parents=True)
+    if config_json is not None:
+        text = config_json if isinstance(config_json, str) else value(json.dumps(config_json))
+        (tmp_path / "xdg" / "sdpm" / "config.json").write_text(text)
+    want = Path(value(expected)).expanduser()
+    assert sc.deck_root() == want
+    # The engine's order is the same off WSL (an output_dir that is not a string is its own case).
+    if config_json != {"output_dir": 3}:
+        monkeypatch.setattr("sdpm.engine.preview.backend._is_wsl", lambda: False)
+        config.invalidate_cache()
+        try:
+            assert _get_output_base_dir() == want
+        finally:
+            config.invalidate_cache()
+
+
+def test_resolve_deck_by_name_and_by_path(decks, tmp_path, monkeypatch):
+    assert sc.resolve_deck("my-deck") == "my-deck"
+    assert sc.resolve_deck(str(decks / "my-deck")) == "my-deck"
+    assert sc.resolve_deck(str(decks / "my-deck") + "/") == "my-deck"
+    monkeypatch.chdir(decks / "my-deck")
+    assert sc.resolve_deck(".") == "my-deck"
+    monkeypatch.chdir(decks)
+    assert sc.resolve_deck("./my-deck") == "my-deck"
+    monkeypatch.setenv("HOME", str(tmp_path))
+    assert sc.resolve_deck("~/decks/my-deck") == "my-deck"
+
+
+@pytest.mark.parametrize(("arg", "code", "text"), [
+    ("nope", 1, "No deck nope in"),
+    (".hidden", 2, "usage: sdpm open"),
+    ("a b", 2, "usage: sdpm open"),
+    ("<tmp>/elsewhere/deck", 1, "The Web UI shows decks in"),
+    ("<tmp>/decks/empty", 1, "(no deck.json)"),
+    ("<tmp>/decks/bad name", 1, "cannot open a deck folder named"),
+])
+def test_resolve_deck_refuses(decks, tmp_path, arg, code, text):
+    for path in (tmp_path / "elsewhere" / "deck", decks / "bad name"):
+        path.mkdir(parents=True)
+        (path / "deck.json").write_text("{}")
+    (decks / "empty").mkdir()
+    with pytest.raises(cu.Stop) as stop:
+        sc.resolve_deck(arg.replace("<tmp>", str(tmp_path)))
+    assert stop.value.code == code and text in stop.value.message
+
+
+def test_open_opens_the_deck_page_of_a_running_sdpm(ctx, decks, monkeypatch):
+    opened = []
+    monkeypatch.setattr(sc, "open_url", opened.append)
+    monkeypatch.setattr(sc, "port_is_open", lambda _p: True)
+    monkeypatch.setattr(sc, "is_sdpm", lambda _p: True)
+    assert sc.dispatch(ctx, ["open", "my-deck"]) == 0
+    assert opened == ["http://localhost:3000/decks/#my-deck"]
+    assert ctx.calls == []
+
+
+def test_open_starts_the_web_ui_on_loopback_and_waits_for_the_deck_page(ctx, decks, monkeypatch):
+    waited = []
+    monkeypatch.setattr(sc, "port_is_open", lambda _p: False)
+    monkeypatch.setattr(sc.shutil, "which", lambda _n: "/x/npm")
+    monkeypatch.setattr(sc, "_wait_and_open", lambda port, stop, path="": waited.append((port, path)))
+    monkeypatch.setenv("SDPM_WEBUI_PORT", "3310")
+    assert sc.dispatch(ctx, ["open", str(decks / "my-deck")]) == 0
+    argv, kwargs = ctx.calls[-1]
+    assert argv == ["/x/npm", "run", "start", "--", "--hostname", "127.0.0.1", "--port", "3310"]
+    assert kwargs["env"]["NEXT_PUBLIC_MODE"] == "local"
+    assert waited == [(3310, "/decks/#my-deck")]
+
+
+def test_the_waiter_opens_the_path(monkeypatch):
+    opened = []
+    monkeypatch.setattr(sc, "open_url", opened.append)
+    monkeypatch.setattr(sc, "port_is_open", lambda _p: True)
+    sc._wait_and_open(3000, sc.threading.Event(), "/decks/#my-deck")
+    assert opened == ["http://localhost:3000/decks/#my-deck"]
+
+
+def test_open_with_a_bad_deck_or_arguments_starts_nothing(ctx, decks, monkeypatch, capsys):
+    monkeypatch.setattr(sc, "port_is_open", lambda _p: pytest.fail("nothing may start"))
+    with pytest.raises(cu.Stop) as stop:
+        sc.dispatch(ctx, ["open", "nope"])
+    assert stop.value.code == 1
+    assert sc.dispatch(ctx, ["open"]) == 2
+    assert sc.dispatch(ctx, ["open", "my-deck", "other"]) == 2
+    assert "usage: sdpm open" in capsys.readouterr().err
+    assert ctx.calls == []
+
+
+def test_open_in_the_mcp_profile(ctx, decks):
+    cu.write_state(ctx.home, profile="mcp")
+    ctx.state = cu.load_state(ctx.home)
+    assert sc.dispatch(ctx, ["open", "my-deck"]) == 1
+    assert ctx.calls == []
+
+
+def test_main_reports_a_bad_deck(ctx, decks, capsys):
+    assert sc.main(["--checkout", str(ctx.checkout), "--uv", "/x/uv", "open", "nope"]) == 1
+    assert "No deck nope in" in capsys.readouterr().err
+
+
+def test_open_hint_follows_the_same_rules(decks, tmp_path):
+    assert sc.open_hint(decks / "my-deck", decks) == "sdpm open my-deck"
+    elsewhere = tmp_path / "elsewhere" / "deck"
+    elsewhere.mkdir(parents=True)
+    (elsewhere / "deck.json").write_text("{}")
+    assert sc.open_hint(elsewhere, decks) is None
+    (decks / "empty").mkdir()
+    assert sc.open_hint(decks / "empty", decks) is None
+    (decks / "bad name").mkdir()
+    (decks / "bad name" / "deck.json").write_text("{}")
+    assert sc.open_hint(decks / "bad name", decks) is None
+    link = tmp_path / "link-root"
+    link.symlink_to(decks)
+    assert sc.open_hint(link / "my-deck", decks) == "sdpm open my-deck"
+
+
+def test_webui_installed_at_reads_the_profile_each_call(ctx):
+    assert sc.webui_installed_at(ctx.checkout) is True
+    cu.write_state(ctx.home, profile="mcp")
+    assert sc.webui_installed_at(ctx.checkout) is False
+
+
+def test_help_lists_open(ctx, capsys):
+    sc.dispatch(ctx, ["help"])
+    assert "open DECK" in capsys.readouterr().out

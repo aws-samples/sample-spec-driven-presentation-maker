@@ -12,6 +12,7 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import shutil
 import socket
 import subprocess
@@ -32,6 +33,7 @@ HELP_TEXT = """Usage: sdpm [COMMAND]
 
 Surfaces
   webui                 Start the browser Web UI and open it
+  open DECK             Open a deck (its folder or name) in the Web UI, starting it if needed
   mcp                   Run the MCP server on stdio (terminal check)
 
 MCP clients
@@ -99,8 +101,20 @@ def version(ctx: Context) -> str:
     return f"{ref} ({commit})"
 
 
+def _has_webui(profile: str, checkout: Path) -> bool:
+    return profile == "full" and (checkout / "web-ui" / "build").is_dir()
+
+
+def webui_installed_at(checkout: Path) -> bool:
+    """The full profile (state.json next to the checkout; none means full) with a built Web UI.
+
+    For the MCP server's hint: reads state.json on every call and prints nothing.
+    """
+    return _has_webui(cu.load_state(checkout.parent, warnings=False)["profile"], checkout)
+
+
 def webui_installed(ctx: Context) -> bool:
-    return ctx.state["profile"] == "full" and (ctx.checkout / "web-ui" / "build").is_dir()
+    return _has_webui(ctx.state["profile"], ctx.checkout)
 
 
 def status(ctx: Context) -> int:
@@ -187,19 +201,20 @@ def open_url(url: str) -> None:
         print(f"Open {url} in your browser.", flush=True)
 
 
-def _wait_and_open(port: int, stop: threading.Event) -> None:
+def _wait_and_open(port: int, stop: threading.Event, path: str = "") -> None:
     deadline = time.monotonic() + 120
     while not stop.is_set() and time.monotonic() < deadline:
         if port_is_open(port):
             if not stop.is_set():
-                open_url(f"http://localhost:{port}")
+                open_url(f"http://localhost:{port}{path}")
             return
         stop.wait(0.5)
     if not stop.is_set():
         cu.warn(f"SDPM did not become ready on port {port} within 120 seconds.")
 
 
-def webui(ctx: Context) -> int:
+def webui(ctx: Context, path: str = "") -> int:
+    """Open the Web UI at ``path`` (``/decks/#<id>`` for ``sdpm open``), starting it if needed."""
     if not webui_installed(ctx):
         cu.warn(f"The browser Web UI is not installed in this profile ({ctx.state['profile']}).")
         cu.warn("Add it with:  sdpm update --with-webui   (needs Node.js 20+)")
@@ -208,7 +223,7 @@ def webui(ctx: Context) -> int:
     if port_is_open(port):
         if is_sdpm(port):
             print(f"SDPM is already running on port {port}; opening it.", flush=True)
-            open_url(f"http://localhost:{port}")
+            open_url(f"http://localhost:{port}{path}")
             return 0
         cu.warn(f"Port {port} is used by another program. Choose another port with SDPM_WEBUI_PORT "
                 f"(for example SDPM_WEBUI_PORT={port + 1 if port < 65535 else 3001} sdpm webui).")
@@ -219,12 +234,95 @@ def webui(ctx: Context) -> int:
         return 1
     stop = threading.Event()
     # A daemon thread: it never outlives this process, so a failed start opens nothing.
-    threading.Thread(target=_wait_and_open, args=(port, stop), daemon=True).start()
+    threading.Thread(target=_wait_and_open, args=(port, stop, path), daemon=True).start()
     # Loopback only; the Local API routes also refuse a non-loopback Host (web-ui/src/proxy.ts).
     rc = _call([npm, "run", "start", "--", "--hostname", "127.0.0.1", "--port", str(port)],
                cwd=str(ctx.checkout / "web-ui"), env=cu.child_env({"NEXT_PUBLIC_MODE": "local"}))
     stop.set()
     return rc
+
+
+# A deck id as the Web UI accepts it (web-ui/src/lib/local/deck-paths.ts resolveDeckDir).
+DECK_ID = re.compile(r"^[A-Za-z0-9._-]+$")
+OPEN_USAGE = "usage: sdpm open DECK   (a deck folder, or its name in the deck root)"
+
+
+def _valid_deck_id(name: str) -> bool:
+    return bool(DECK_ID.match(name)) and not name.startswith(".")
+
+
+def _user_config_dir() -> Path:
+    if os.name == "nt":
+        base = os.environ.get("APPDATA") or str(Path.home() / "AppData" / "Roaming")
+    else:
+        base = os.environ.get("XDG_CONFIG_HOME") or str(Path.home() / ".config")
+    return Path(base) / "sdpm"
+
+
+def deck_root() -> Path:
+    """The Web UI's deck root, in its order (web-ui/src/lib/local/deck-paths.ts resolveDeckRoot,
+    the same as sdpm.api._get_output_base_dir off WSL): SDPM_DECK_ROOT → SDPM_OUTPUT_DIR →
+    ``output_dir`` in config.json (``~`` expanded) → ~/Documents/SDPM-Presentations."""
+    for name in ("SDPM_DECK_ROOT", "SDPM_OUTPUT_DIR"):
+        value = os.environ.get(name)
+        if value:
+            return Path(value)
+    try:
+        config = json.loads((_user_config_dir() / "config.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        config = None
+    configured = config.get("output_dir") if isinstance(config, dict) else None
+    if isinstance(configured, str) and configured:
+        return Path(configured).expanduser()
+    return Path.home() / "Documents" / "SDPM-Presentations"
+
+
+def _same_dir(a: Path, b: Path) -> bool:
+    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+
+
+def open_hint(deck_dir: Path, root: Path) -> str | None:
+    """``sdpm open <id>`` for a deck the Web UI can open (it has deck.json, sits directly in
+    ``root`` and has a valid id); None otherwise, so a hint never names a command that fails."""
+    real = Path(os.path.realpath(deck_dir))
+    if not (real / "deck.json").is_file() or not _same_dir(real.parent, root) or not _valid_deck_id(real.name):
+        return None
+    return f"sdpm open {real.name}"
+
+
+def _is_path(arg: str) -> bool:
+    separators = ("/", "\\") if os.name == "nt" else ("/",)
+    return arg in (".", "..") or arg.startswith("~") or any(s in arg for s in separators)
+
+
+def resolve_deck(arg: str) -> str:
+    """The Web UI id of ``arg`` (a deck folder, or a deck name in the deck root)."""
+    root = deck_root()
+    if _is_path(arg):
+        real = Path(os.path.realpath(os.path.expanduser(arg)))
+        if not (real / "deck.json").is_file():
+            raise cu.Stop(1, f"No deck at {real} (no deck.json).")
+        if not _same_dir(real.parent, root):
+            raise cu.Stop(1, f"The Web UI shows decks in {root}; {real} is not there. "
+                             f"Move it there, or run with SDPM_DECK_ROOT={real.parent}.")
+        if not _valid_deck_id(real.name):
+            raise cu.Stop(1, f"The Web UI cannot open a deck folder named {real.name!r}; rename it "
+                             "to letters, digits, '.', '_' and '-'.")
+        return real.name
+    if not _valid_deck_id(arg):
+        raise cu.Stop(2, OPEN_USAGE)
+    if not (root / arg / "deck.json").is_file():
+        raise cu.Stop(1, f"No deck {arg} in {root}.")
+    return arg
+
+
+def open_deck(ctx: Context, args: list[str]) -> int:
+    """``sdpm open DECK``: the deck's page in the Web UI. A bad deck starts nothing."""
+    if len(args) != 1 or not args[0]:
+        cu.warn(OPEN_USAGE)
+        return 2
+    deck_id = resolve_deck(args[0])
+    return webui(ctx, f"/decks/#{deck_id}")
 
 
 def mcp(ctx: Context) -> int:
@@ -302,6 +400,8 @@ def dispatch(ctx: Context, rest: list[str]) -> int:
         return status(ctx)
     if command in ("webui", "launch"):
         return webui(ctx)
+    if command == "open":
+        return open_deck(ctx, args)
     if command == "mcp":
         return mcp(ctx)
     if command in ("register", "unregister"):
