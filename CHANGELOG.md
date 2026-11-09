@@ -33,6 +33,19 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   CLI `init_deck_workspace` without `-o`) now returns an error saying the name is a folder
   name without a path, and creates nothing; decks always go to `<deck root>/<timestamp>-<name>`.
   `make test` no longer leaves such folders in `~/Documents/SDPM-Presentations`.
+- **Local Web UI: a reopened deck no longer loses or doubles a reply.** A reply that ended
+  just before a reload or a closed tab, before the page saved the chat, used to be gone on
+  reopen; the server now replays a finished work period until the page has saved the chat
+  after reading it. A long reply could show twice after a reopen, because the 2,000-event
+  replay buffer dropped the period's prompt; the buffer now keeps a run of streamed text as
+  one event, and a replay that starts after its prompt rebuilds from the last user message.
+  A failed reconnect no longer shows a running compose task as stopped.
+- **Local Web UI compose: `message_composer` input the tool refuses is not sent.** An empty
+  text, a text over 10,000 characters or group 0 used to reach the composer while the
+  orchestrator read an error; the card now shows the tool's error and nothing is sent. A task
+  whose 60-minute timeout came before a Stop its composers did not answer ends cancelled, as
+  Stop does, instead of failed.
+
 ### Added
 
 - `sdpm open <deck>` opens a deck in the browser Web UI and starts the Web UI if it is not

@@ -26,6 +26,7 @@ vi.mock("@/services/agentCoreService", () => ({ invokeAgentCore, resumeLocalAgen
 vi.mock("@/services/localService", () => ({ stopLocalAgent, steerLocalAgent }))
 vi.mock("@/lib/errors", () => ({ notifyError }))
 
+import { cutLocalAtPrompt } from "@/components/chat/chatHistory"
 import { useChatStream, type Message } from "./useChatStream"
 
 beforeEach(() => {
@@ -243,7 +244,7 @@ describe("useChatStream resume (local)", () => {
     const run = captureResume()
     const { result } = render()
     act(() => { result.current.setMessages(history) })
-    const cut = vi.fn((prompt: string) => history.slice(0, history.findLastIndex((m) => m.role === "user" && m.content === prompt)))
+    const cut = vi.fn((prompt: string | null) => history.slice(0, history.findLastIndex((m) => m.role === "user" && m.content === prompt)))
     let done: Promise<boolean | undefined> | undefined
     act(() => { done = result.current.resume(cut) })
     expect(run.sessionId).toBe("K1")
@@ -257,6 +258,50 @@ describe("useChatStream resume (local)", () => {
     expect(roles(result.current.messages)).toEqual(["user:earlier", "assistant:earlier reply", "user:make it", "assistant:On it"])
     expect(result.current.isLoading).toBe(true)
     await act(async () => { run.finish!(); await done })
+  })
+
+  it("rebuilds after the last user message when the replay starts after its prompt", async () => {
+    const run = captureResume()
+    const { result } = render()
+    act(() => { result.current.setMessages(history) })
+    const cut = vi.fn((prompt: string | null) => cutLocalAtPrompt(history, prompt))
+    let done: Promise<boolean | undefined> | undefined
+    act(() => { done = result.current.resume(cut) })
+    act(() => {
+      run.handlers!.onResumeAck({ working: true })
+      run.handlers!.onStreamUpdate("partial and the rest")
+      run.handlers!.onSession.onEvent({ steer: { id: "s1", text: "also this", state: "accepted" } }, { own: false })
+      run.handlers!.onStreamUpdate("partial and the rest. More")
+    })
+    expect(cut).toHaveBeenCalledTimes(1)
+    expect(cut).toHaveBeenCalledWith(null)
+    expect(roles(result.current.messages)).toEqual(["user:earlier", "assistant:earlier reply", "user:make it", "assistant:partial and the rest", "user:also this", "assistant:. More"])
+    await act(async () => { run.finish!(); await done })
+  })
+
+  it("keeps the history when the cut has nothing for a replay that starts after its prompt", async () => {
+    const run = captureResume()
+    const { result } = render()
+    act(() => { result.current.setMessages(history) })
+    let done: Promise<boolean | undefined> | undefined
+    act(() => { done = result.current.resume((prompt) => (prompt === null ? undefined : [])) })
+    act(() => {
+      run.handlers!.onResumeAck({ working: true })
+      run.handlers!.onStreamUpdate("more")
+    })
+    expect(roles(result.current.messages)).toEqual([...roles(history), "assistant:more"])
+    await act(async () => { run.finish!(); await done })
+  })
+
+  it("resolves undefined when the stream request fails", async () => {
+    resumeLocalAgent.mockImplementationOnce(async () => { throw new Error("Local stream error: 500") })
+    const error = vi.spyOn(console, "error").mockImplementation(() => {})
+    const { result } = render()
+    let resolved: boolean | undefined = false
+    await act(async () => { resolved = await result.current.resume(() => []) })
+    expect(resolved).toBeUndefined()
+    expect(result.current.isLoading).toBe(false)
+    error.mockRestore()
   })
 
   it("turns a send during the followed period into a steer, and a send after it into an invoke", async () => {
@@ -276,6 +321,7 @@ describe("useChatStream resume (local)", () => {
     expect(resolved).toBe(true)
     expect(result.current.isLoading).toBe(false)
     expect(onSendComplete).toHaveBeenCalledTimes(1)
+    expect(onSendComplete).toHaveBeenCalledWith("K1")
     invokeAgentCore.mockResolvedValueOnce("")
     await act(async () => { await result.current.sendMessage("next") })
     expect(invokeAgentCore).toHaveBeenCalledTimes(1)

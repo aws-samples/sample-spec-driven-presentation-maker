@@ -256,8 +256,14 @@ function typedText(prompt: string): string {
  * Local mode: the messages before the user message that opened a work period. `.chat.json`
  * keeps the typed text and the period's prompt is the text sent, so a user message matches
  * either. The last match wins; the whole list when there is none (the prompt is not saved yet).
+ * `null` (a replay that starts after its prompt): the messages through the last user message,
+ * whose reply the replay rebuilds.
  */
-export function cutLocalAtPrompt(messages: Message[], prompt: string): Message[] {
+export function cutLocalAtPrompt(messages: Message[], prompt: string | null): Message[] {
+  if (prompt === null) {
+    for (let i = messages.length - 1; i >= 0; i--) if (messages[i].role === "user") return messages.slice(0, i + 1)
+    return messages
+  }
   if (!prompt) return messages
   const typed = typedText(prompt)
   for (let i = messages.length - 1; i >= 0; i--) {

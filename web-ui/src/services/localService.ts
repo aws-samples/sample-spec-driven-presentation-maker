@@ -89,10 +89,12 @@ export async function openInOs(deckId: string, file?: string): Promise<void> {
  *
  * @param deckId - Deck or style identifier the chat belongs to
  * @param messages - Messages in the chat panel's own format
+ * @param delivered - The session whose stream the chat read to its end before this save: once
+ *   the messages are written, the server no longer replays that work period
  */
-export async function saveLocalChat(deckId: string, messages: unknown[]): Promise<void> {
+export async function saveLocalChat(deckId: string, messages: unknown[], delivered?: string): Promise<void> {
   if (!IS_LOCAL) return
-  await postJson("/api/agent/chat", { deckId, messages })
+  await postJson("/api/agent/chat", { deckId, messages, ...(delivered ? { delivered } : {}) })
 }
 
 /**

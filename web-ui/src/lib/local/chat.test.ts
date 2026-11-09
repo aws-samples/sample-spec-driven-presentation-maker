@@ -411,8 +411,46 @@ describe("chat events", () => {
     await settle()
     // work busy and turn (buffered before the listener came), two texts, turnEnd, work idle, end.
     expect(live).toEqual([3, 4, 5, 6, 7])
-    expect(acp.getBufferedEvents("C1").map((e) => e.id)).toEqual([1, 2, ...live])
-    expect(acp.getBufferedEvents("C1", 2).map((e) => e.id)).toEqual(live)
+    // The two texts are buffered as one, under the second one's id.
+    expect(acp.getBufferedEvents("C1").map((e) => e.id)).toEqual([1, 2, 4, 5, 6, 7])
+    expect(acp.getBufferedEvents("C1", 2).map((e) => e.id)).toEqual([4, 5, 6, 7])
+  })
+
+  it("buffers consecutive texts as one; a reconnect inside them gets only the text after its last id", async () => {
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "hello")
+    prompted.send()
+    const child = children[0]
+    for (const text of ["one ", "two ", "three"]) child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text } })
+    child.update("K1", { sessionUpdate: "tool_call", toolCallId: "t1", title: "Running: @sdpm/list_styles", rawInput: {}, _meta: { kiro: { toolName: "list_styles", mcpServerName: "sdpm" } } })
+    child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "four" } })
+    await settle()
+    const texts = (afterId?: number) => acp.getBufferedEvents("C1", afterId).flatMap((e) => {
+      const payload = e.event.kind === "data" ? (e.event.payload as { event?: { contentBlockDelta?: { delta: { text: string } } } }) : undefined
+      return payload?.event?.contentBlockDelta ? [[e.id, payload.event.contentBlockDelta.delta.text]] : []
+    })
+    // 1 work, 2 turn, 3-5 the texts, then the tool's events, then "four".
+    expect(texts()).toEqual([[5, "one two three"], [expect.any(Number), "four"]])
+    expect(texts(2)).toEqual(texts())
+    expect(texts(3)).toEqual([[5, "two three"], texts()[1]])
+    expect(texts(4)).toEqual([[5, "three"], texts()[1]])
+    expect(texts(5)).toEqual([texts()[1]])
+  })
+
+  it("counts a run of texts as one event against the cap", async () => {
+    const { MAX_BUFFERED_EVENTS } = await import("./chat")
+    await acp.createNewProcessFor("C1")
+    const prompted = await acp.sendPrompt("C1", "hello")
+    prompted.send()
+    const child = children[0]
+    for (let i = 0; i < 3 * MAX_BUFFERED_EVENTS; i++) child.update("K1", { sessionUpdate: "agent_message_chunk", content: { type: "text", text: "x" } })
+    await settle()
+    const buffered = acp.getBufferedEvents("C1")
+    expect(buffered.map((e) => e.event)).toEqual([
+      { kind: "data", payload: { work: { state: "busy" } } },
+      { kind: "data", payload: { turn: { id: expect.any(String), why: "prompt", text: "hello" } } },
+      { kind: "data", payload: { event: { contentBlockDelta: { delta: { text: "x".repeat(3 * MAX_BUFFERED_EVENTS) } } } } },
+    ])
   })
 
   it("buffers the turn's notice as its first payload after the turn event", async () => {

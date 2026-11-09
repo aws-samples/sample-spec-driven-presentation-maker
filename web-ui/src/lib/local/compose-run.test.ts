@@ -13,10 +13,12 @@
  *   The task ends with `taskEnd` and one wake turn carrying `<compose_result>`.
  * - message_composer: a steer on that group's kiro-cli before the tool's own end; a message for a
  *   starting group goes into its first prompt; a late one into a follow-up prompt on the same
- *   kiro-cli; an ended or unknown group is not delivered and the orchestrator is told.
- * - Stop, twice and then the chat's exit; the settle timeout; a composer's exit and start
+ *   kiro-cli; an ended or unknown group is not delivered and the orchestrator is told; input out of
+ *   the tool's bounds sends nothing and shows the tool's refusal.
+ * - Stop, twice and then the chat's exit; the settle timeout, also after the task's timeout; a composer's exit and start
  *   failure; the chat's exit; the 60-minute timeout; a queued task; an invalid result; the
- *   output check; a compose period whose chat the cap released is replayed once (a closed tab).
+ *   output check; a compose period whose chat the cap released is replayed until the page saved it
+ *   (a closed tab).
  */
 import fs from "fs"
 import os from "os"
@@ -375,6 +377,30 @@ describe("message_composer", () => {
   })
 })
 
+describe("message_composer bounds", () => {
+  const refusal = { status: "error", content: [{ text: "text must be 1 to 10000 characters" }] }
+
+  it.each([
+    ["an empty text", { group: 1, text: "" }],
+    ["a text over 10 000 characters", { group: 1, text: "x".repeat(10_001) }],
+    ["group 0", { group: 0, text: "x" }],
+  ])("sends nothing for %s, shows the tool's own refusal as an error and tells the orchestrator nothing more", async (_name, input) => {
+    const { orch, events, composers } = await compose("v3", [["cover"]], { keepTurn: true })
+    callTool(orch, "v3", "m1", "message_composer", input, refusal)
+    await settle()
+    expect(methods(composers()[0])).not.toContain("_session/steer")
+    expect(kinds(events, "toolResult").find((r) => r.toolUseId === "m1")).toMatchObject({ name: "message_composer", status: "error" })
+    expect(orch.requests.filter((r) => r.method === "_session/steer")).toEqual([])
+  })
+
+  it("counts the text in code points, as the tool does", async () => {
+    const { orch, composers } = await compose("v3", [["cover"]], { keepTurn: true })
+    callTool(orch, "v3", "m1", "message_composer", { group: 1, text: "🎨".repeat(10_000) }, "Sent")
+    await settle()
+    expect(methods(composers()[0])).toContain("_session/steer")
+  })
+})
+
 describe("Stop", () => {
   it("cancels every composer, SIGTERMs each tree after its cancelled answer and SIGKILLs the rest at 1 s", async () => {
     vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] })
@@ -456,6 +482,24 @@ describe("Stop", () => {
     expect(events.length).toBe(count)
   })
 
+  it("the settle timeout after the task's own timeout still ends it cancelled", async () => {
+    vi.useFakeTimers({ toFake: ["setTimeout", "clearTimeout", "setInterval", "clearInterval"] })
+    const { events, composers } = await compose("v3", [["a"]])
+    const [c1] = composers()
+    // Its tree outlives every signal: only the settle timeout ends the task.
+    c1.kill = () => true
+    await vi.advanceTimersByTimeAsync(3_600_000)
+    expect(c1.cancelled).toEqual([sid(c1)])
+    await vi.advanceTimersByTimeAsync(1000)
+    expect(kinds(events, "taskEnd")).toEqual([])
+    acp.cancelSession("C1")
+    await vi.advanceTimersByTimeAsync(5000)
+    await settle()
+    const ends = kinds(events, "taskEnd")
+    expect(ends.map((e) => e.status)).toEqual(["cancelled"])
+    expect(JSON.parse(ends[0].content as string).status).toBe("cancelled")
+  })
+
   it("the chat's kiro-cli exit SIGKILLs every composer tree at once and keeps the failed report for the next message", async () => {
     const { events, orch, composers } = await compose("v3", [["a"], ["b"]])
     orch.exit(1)
@@ -526,7 +570,7 @@ describe("queue and timeout", () => {
 })
 
 describe("a closed tab", () => {
-  it("replays a compose period once after the cap released its chat; the next /stream finds nothing", async () => {
+  it("replays a compose period after the cap released its chat until the page saved it", async () => {
     const { orch, composers } = await compose("v3", [["a"]])
     composers()[0].endTurn()
     await settle()
@@ -547,6 +591,7 @@ describe("a closed tab", () => {
     expect(replayed?.some((p) => "taskStart" in p)).toBe(true)
     expect(replayed?.some((p) => "taskEnd" in p)).toBe(true)
     expect(replayed?.map((p) => p.event?.contentBlockDelta?.delta?.text).filter(Boolean)).toEqual(["Report seen."])
+    acp.markDelivered("C1")
     expect(await stream("C1")).toBeNull()
   })
 })

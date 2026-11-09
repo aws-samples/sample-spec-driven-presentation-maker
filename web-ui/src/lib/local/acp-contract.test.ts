@@ -293,15 +293,28 @@ describe("kiro-cli 3.0.0 V2, a turn that delegates to the composer", () => {
     expect(composeResults(events)).toEqual(["success"])
   })
 
-  it("numbers the stream's events as the buffer does, so a reconnect replays nothing twice", async () => {
+  it("numbers the stream's events as the buffer does, so a reconnect after any of them replays nothing twice", async () => {
     const { second } = await runCompose()
     const ids = second.map((b) => b.id)
     expect(ids).toEqual(ids.map((_, i) => i + 1))
-    // The turn's end is buffered after the last written event.
-    expect(acp.getBufferedEvents("C1").map((e) => e.id)).toEqual([...ids, ids.length + 1])
-    const lastSeen = ids[4]
-    const reconnect = await readBlocks(bridge.createSSEStream({ subscribe: () => () => {}, replay: acp.getBufferedEvents("C1", lastSeen) }))
-    expect([...second.slice(0, 5), ...reconnect]).toEqual(second)
+    // Consecutive text deltas are buffered as one event under the last one's id; the turn's end
+    // is buffered after the last written event.
+    const buffered = acp.getBufferedEvents("C1").map((e) => e.id)
+    expect(buffered.length).toBeLessThan(ids.length + 1)
+    expect(buffered.at(-1)).toBe(ids.length + 1)
+    expect(buffered.slice(0, -1).every((id) => ids.includes(id))).toBe(true)
+    /** The payloads with consecutive text deltas joined (what the chat shows). */
+    const shown = (blocks: { data: Line }[]) => blocks.reduce<Line[]>((out, { data }) => {
+      const text = (data.event as { contentBlockDelta?: { delta: { text: string } } } | undefined)?.contentBlockDelta?.delta.text
+      const last = out.at(-1)?.event as { contentBlockDelta?: { delta: { text: string } } } | undefined
+      if (text !== undefined && last?.contentBlockDelta) out[out.length - 1] = { event: { contentBlockDelta: { delta: { text: last.contentBlockDelta.delta.text + text } } } }
+      else out.push(data)
+      return out
+    }, [])
+    for (const lastSeen of ids) {
+      const reconnect = await readBlocks(bridge.createSSEStream({ subscribe: () => () => {}, replay: acp.getBufferedEvents("C1", lastSeen) }))
+      expect(shown([...second.slice(0, lastSeen), ...reconnect]), `after ${lastSeen}`).toEqual(shown(second))
+    }
   })
 
   it("keeps the composer session's MCP state apart from the main session's", async () => {

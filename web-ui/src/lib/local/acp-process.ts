@@ -25,10 +25,11 @@
  * - **Stop during start.** A start (an invoke opening its chat and sending its prompt) registers
  *   under its client id (`beginStart`) before anything is opened, so Stop (`cancelSession`, also a
  *   POST from another tab) aborts it: the pool kills the starting kiro-cli, and no prompt is sent.
- * - **Unseen periods.** A work period whose end no stream wrote (its tab was closed) is replayed
- *   once by `/api/agent/stream` (`openStream`), also after its chat was released: `releaseChat`
- *   keeps it under every id of the chat (at most MAX_UNSEEN_PERIODS). It counts as seen once a
- *   stream wrote its end and was not cancelled before; the chat's next period drops it.
+ * - **Unseen periods.** A work period not delivered yet (its tab was closed, or closed before it
+ *   saved the chat) is replayed by `/api/agent/stream` (`openStream`), also after its chat was
+ *   released: `releaseChat` keeps it under every id of the chat (at most MAX_UNSEEN_PERIODS). It
+ *   is delivered (`markDelivered`) once a stream wrote its end without being cancelled before and
+ *   the page then saved its chat; the chat's next period drops it.
  * - **Decks.** `.session`, `.session-engine` and a fork's origin are the chat's (chat.ts,
  *   deck-files.ts); a deck reopened on the other engine says so (`otherEngine`).
  * - **Forks** (`forkSession`): the fork is made and opened with the engine's session; a fork
@@ -47,7 +48,7 @@ import { DECK_ROOT } from "./deck-paths"
 import type { EngineCapabilities, EngineId, LoadOutcome, ModelChoice, ModelOption, StoreContext } from "./acp/engine"
 import { readEngineConfig } from "./acp/engine-config"
 import { readModelCache, writeModelCache } from "./acp/model-cache"
-import { Chat, type ChatHooks, type EventListener, type Period } from "./chat"
+import { bufferedAfter, Chat, type ChatHooks, type EventListener, type Period } from "./chat"
 import type { BufferedEvent } from "./conversation/events"
 import { SteerRejectedError } from "./conversation/steer"
 import { readEngineMark, saveSessionToDeck, writeEngineMark } from "./deck-files"
@@ -153,7 +154,7 @@ function forgetUnseen(id: string): void {
   if (keys && !keys.size) unseen.delete(period)
 }
 
-/** A stream wrote the period's end: it is delivered, and is not replayed again. */
+/** The period is delivered (`markDelivered`): it is not replayed again. */
 function markSeen(period: Period): void {
   period.seen = true
   for (const id of unseen.get(period) ?? []) if (unseenById.get(id) === period) unseenById.delete(id)
@@ -490,7 +491,7 @@ export async function sendPrompt(
     replayFrom,
     subscribe: (fn: EventListener) => chat.subscribe(fn),
     send: () => chat.startPrompt(prompt),
-    onEnd: () => markSeen(period),
+    onEnd: () => { period.endWritten = true },
   }
 }
 
@@ -532,27 +533,35 @@ export function isSessionRunning(sessionId: string): boolean {
 export function getBufferedEvents(sessionId: string, afterId?: number): BufferedEvent[] {
   const chat = aliases.get(sessionId)
   const period = chat?.period ?? chat?.lastPeriod
-  if (!period) return []
-  if (afterId == null) return [...period.buffer]
-  return period.buffer.filter((e) => e.id > afterId)
+  return period ? bufferedAfter(period, afterId) : []
 }
 
 /**
  * What `/api/agent/stream` writes for an id (a client id or a kiro session id): a busy chat's
- * period from after `afterId`, then live; a finished period no stream delivered (of a chat, or
- * kept after its chat was released), replayed to its end; else null (nothing runs). `onEnd` marks
- * the period delivered once the stream wrote its end.
+ * period from after `afterId`, then live; a finished period not delivered yet (of a chat, or
+ * kept after its chat was released), replayed to its end; else null (nothing runs). `onEnd`
+ * records that the stream wrote the period's end (`markDelivered` then delivers it).
  */
 export function openStream(id: string, afterId?: number): { replay: BufferedEvent[]; subscribe?: (fn: EventListener) => () => void; onEnd: () => void } | null {
   const chat = aliases.get(id)
-  const after = (period: Period) => (afterId == null ? [...period.buffer] : period.buffer.filter((e) => e.id > afterId))
+  const ended = (period: Period) => () => { period.endWritten = true }
   if (chat?.period) {
     const period = chat.period
-    return { replay: after(period), subscribe: (fn) => chat.subscribe(fn), onEnd: () => markSeen(period) }
+    return { replay: bufferedAfter(period, afterId), subscribe: (fn) => chat.subscribe(fn), onEnd: ended(period) }
   }
   const period = chat?.lastPeriod && !chat.lastPeriod.seen ? chat.lastPeriod : unseenById.get(id) ?? null
   if (!period) return null
-  return { replay: after(period), onEnd: () => markSeen(period) }
+  return { replay: bufferedAfter(period, afterId), onEnd: ended(period) }
+}
+
+/**
+ * A page saved its chat after the stream it followed for `id` ended: the id's finished period is
+ * delivered, when a stream wrote its end, and is not replayed again. Nothing when it runs.
+ */
+export function markDelivered(id: string): void {
+  const chat = aliases.get(id)
+  const period = chat?.lastPeriod ?? unseenById.get(id)
+  if (period?.endWritten && !period.seen) markSeen(period)
 }
 
 /** Subscribe to a chat's events. */

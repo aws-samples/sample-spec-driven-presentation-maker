@@ -448,15 +448,18 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
  * The server replays the running period (or a finished one no stream delivered) and then
  * follows it live. The handlers get `onResumeAck({working})` first, then the events as in
  * invokeAgentCore, with `{own: false}`; a failed turn shows in the reply (`⚠ …`). Resolves
- * `{working, completion}` when the stream ends (`working`: there was a period to follow);
- * rejects with the fetch's AbortError when `signal` aborts.
+ * `{working, completion}` when the stream ends (`working`: there was a period to follow), and
+ * `{working: false}` only when the server answered that nothing runs (`{running: false}`).
+ * Rejects when the request failed (any other answer), and with the fetch's AbortError when
+ * `signal` aborts.
  */
 export const resumeLocalAgent = async (sessionId, handlers = {}, { lastEventId, signal } = {}) => {
   const headers = lastEventId != null ? { 'Last-Event-ID': String(lastEventId) } : {};
   const response = await fetch(`/api/agent/stream?sessionId=${encodeURIComponent(sessionId)}`, { headers, signal });
   if (!response.ok || !(response.headers.get('content-type') || '').includes('text/event-stream')) {
-    // intentional: the body ({running: false} or an error) carries nothing to show
-    await response.body?.cancel().catch(() => undefined);
+    let body;
+    try { body = await response.json(); } catch { /* not JSON: a failed request */ }
+    if (!response.ok || body?.running !== false) throw new Error(`Local stream error: ${response.status}`);
     handlers.onResumeAck?.({ working: false });
     return { working: false, completion: '' };
   }

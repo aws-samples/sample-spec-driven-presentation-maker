@@ -44,7 +44,10 @@ import type { SessionOrigin } from "./kiro-sessions.types"
 import type { LocalSessionNoticeCode } from "./sessionNotices"
 import { AgentTimeoutError } from "./turnErrors"
 
-/** Chat events kept per work period for a reconnecting stream. */
+/**
+ * Chat events kept per work period for a reconnecting stream (the oldest go first). Consecutive
+ * text deltas count as one: kiro-cli sends one per chunk, most of a turn's events.
+ */
 export const MAX_BUFFERED_EVENTS = 2000
 /** How long Stop waits for the work holds to release before the period ends without them (Cloud's STOP_SETTLE_S). */
 export const STOP_SETTLE_MS = 5000
@@ -59,14 +62,25 @@ export interface WorkHold {
   dropped(): void
 }
 
+/** Consecutive text deltas the buffer keeps as one event (under the last one's id): the first one's id, and where each one's text ends. */
+interface TextRun {
+  first: number
+  ends: number[]
+}
+
 export interface Period {
   readonly number: number
+  /** The period's events for a reconnecting stream (`bufferedAfter`), consecutive text deltas merged. */
   buffer: BufferedEvent[]
+  /** The merged text deltas among `buffer`. */
+  readonly runs: Map<BufferedEvent, TextRun>
   eventId: number
   /** Stop was pressed: nothing that starts model work is sent any more. */
   stopped: boolean
   readonly holds: Set<WorkHold>
   /** A stream wrote this period's end and was not cancelled before it. */
+  endWritten: boolean
+  /** Delivered: a page saved its chat after a stream wrote the end (`endWritten`); it is not replayed again. */
   seen: boolean
   /** Turns started in it. */
   turns: number
@@ -105,6 +119,48 @@ export interface ChatHooks {
 }
 
 const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
+
+/** A text delta's text; null for any other event. */
+function deltaText(event: ChatEvent): string | null {
+  if (event.kind !== "data") return null
+  const payload = event.payload
+  return "event" in payload && "contentBlockDelta" in payload.event ? payload.event.contentBlockDelta.delta.text : null
+}
+
+const textDelta = (text: string): ChatEvent => data({ event: { contentBlockDelta: { delta: { text } } } })
+
+/** Keep an event for a reconnecting stream: a text delta right after another one is merged into it. */
+function bufferEvent(period: Period, entry: BufferedEvent): void {
+  const text = deltaText(entry.event)
+  const last = period.buffer[period.buffer.length - 1]
+  const lastText = text !== null && last ? deltaText(last.event) : null
+  if (text !== null && lastText !== null) {
+    const run = period.runs.get(last) ?? { first: last.id, ends: [lastText.length] }
+    const merged: BufferedEvent = { id: entry.id, event: textDelta(lastText + text) }
+    run.ends.push(lastText.length + text.length)
+    period.runs.delete(last)
+    period.runs.set(merged, run)
+    period.buffer[period.buffer.length - 1] = merged
+    return
+  }
+  period.buffer.push(entry)
+  if (period.buffer.length > MAX_BUFFERED_EVENTS) period.runs.delete(period.buffer.shift()!)
+}
+
+/**
+ * A period's buffered events after `afterId` (all of them without it): a merged text delta that
+ * `afterId` falls in gives only the text after that event.
+ */
+export function bufferedAfter(period: Period, afterId?: number): BufferedEvent[] {
+  if (afterId == null) return [...period.buffer]
+  const out: BufferedEvent[] = []
+  for (const entry of period.buffer) {
+    if (entry.id <= afterId) continue
+    const run = period.runs.get(entry)
+    out.push(run && run.first <= afterId ? { id: entry.id, event: textDelta(deltaText(entry.event)!.slice(run.ends[afterId - run.first])) } : entry)
+  }
+  return out
+}
 
 /** How a turn that was answered with `end` ended. */
 function howOf(end: EndEvent): TurnHow {
@@ -234,8 +290,7 @@ export class Chat implements SessionSink {
     const period = this.period
     if (!period) return
     const entry: BufferedEvent = { id: ++period.eventId, event }
-    period.buffer.push(entry)
-    if (period.buffer.length > MAX_BUFFERED_EVENTS) period.buffer.shift()
+    bufferEvent(period, entry)
     for (const fn of [...this.listeners]) fn(entry)
   }
 
@@ -362,7 +417,7 @@ export class Chat implements SessionSink {
 
   private beginPeriod(): void {
     this.period = {
-      number: ++this.periods, buffer: [], eventId: 0, stopped: false, holds: new Set(), seen: false,
+      number: ++this.periods, buffer: [], runs: new Map(), eventId: 0, stopped: false, holds: new Set(), endWritten: false, seen: false,
       turns: 0, lastEnd: null, lastHow: "finished", errorShown: false, ended: false,
     }
     this.lastPeriod = null
