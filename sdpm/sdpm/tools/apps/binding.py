@@ -10,7 +10,9 @@ What ``register`` installs on a server whose tools are already registered:
   the Outline tab; the result itself is unchanged) and ``show_deck`` (it opens on Slides)
 - the views as ``ui://`` resources (``text/html;profile=mcp-app``; no ``csp`` key, so the spec's
   default CSP applies and the views fetch nothing)
-- ``app_action``, the one tool the views call (``visibility: ["app"]``)
+- ``app_action``, the one tool the views call (``visibility: ["app"]``). Its ``open`` action
+  (the deck's built file or folder, opened on the user's machine) is in its schema only when
+  the deck access opens files (``DeckAccess.opens``, the Local server)
 - a ``tools/list`` that leaves out ``app_action`` and ``show_deck`` unless the caller declared
   MCP Apps. ``tools/call`` is not gated: a host may call for its view without declaring
 - ``extensions["io.modelcontextprotocol/ui"]`` in the initialize capabilities
@@ -26,7 +28,16 @@ from sdpm.tools import apps
 from sdpm.tools.apps import deck as _deck
 from sdpm.tools.apps import gallery
 
-_ACTIONS = Literal["style_previews", "deck", "slide_preview", "submit_review", "outline_edit"]
+_ACTIONS = ("style_previews", "deck", "slide_preview", "submit_review", "outline_edit")
+# Offered only with a deck access that opens files (``DeckAccess.opens``: the Local server).
+_OPEN = "open"
+_DESCRIPTION = """Data for sdpm's MCP Apps views; only the views call it.
+style_previews: the named styles cut into slides, icons drawn in.
+deck: the deck's brief, outline, check result and slide list (no images).
+slide_preview: one slide's preview: compose SVG parts, or a JPEG when the slide has none.
+submit_review: save slide comments as reviews/<id>.json; returns the message for the chat.
+outline_edit: an outline edit as a diff message for the chat; writes nothing."""
+_OPEN_DESCRIPTION = "\nopen: open the deck's built file or its folder (target) with the OS default app."
 
 
 def _caller_declared(mcp: Any) -> bool:
@@ -124,9 +135,11 @@ def register(mcp: Any, *, read_styles: Any = None, load_icons: Any = None, deck:
     access = deck
     if access is not None:
         _register_deck_viewer(mcp, access)
+    opens = access is not None and access.opens
+    actions = Literal[(*_ACTIONS, _OPEN) if opens else _ACTIONS]  # type: ignore[valid-type]
 
     async def app_action(
-        action: Annotated[_ACTIONS, Field(description="Operation; see the tool description.")],
+        action: Annotated[actions, Field(description="Operation; see the tool description.")],
         names: Annotated[
             list[str],
             Field(description=f"Style names for style_previews, 1 to {gallery.MAX_NAMES}.", max_length=gallery.MAX_NAMES),
@@ -142,14 +155,10 @@ def register(mcp: Any, *, read_styles: Any = None, load_icons: Any = None, deck:
         text: Annotated[
             str, Field(description="Outline as edited, for outline_edit.", max_length=_deck.MAX_TEXT),
         ] = "",
+        target: Annotated[
+            Literal[_deck.OPEN_TARGETS], Field(description="For open: the deck's built file, or its folder."),  # type: ignore[valid-type]
+        ] = "file",
     ) -> types.CallToolResult:
-        """Data for sdpm's MCP Apps views; only the views call it.
-        style_previews: the named styles cut into slides, icons drawn in.
-        deck: the deck's brief, outline, check result and slide list (no images).
-        slide_preview: one slide's preview: compose SVG parts, or a JPEG when the slide has none.
-        submit_review: save slide comments as reviews/<id>.json; returns the message for the chat.
-        outline_edit: an outline edit as a diff message for the chat; writes nothing.
-        """
         if action == "style_previews":
             payload = await asyncio.to_thread(gallery.style_previews, names, read_styles, load_icons)
             return _text(f"{len(payload['previews'])} style previews", payload)
@@ -164,10 +173,14 @@ def register(mcp: Any, *, read_styles: Any = None, load_icons: Any = None, deck:
         if action == "submit_review":
             payload = await asyncio.to_thread(_deck.submit_review, deck_id, review, access)
             return _text(f"review {payload['id']} saved", payload)
+        if action == _OPEN:
+            payload = await asyncio.to_thread(_deck.open_target, deck_id, target, access)
+            return _text(f"opened {payload['name']}", payload)
         # outline_edit (the Literal refuses anything else)
         payload = await asyncio.to_thread(_deck.outline_edit, deck_id, base, text, access)
         return _text("outline edit", payload)
 
-    mcp.tool(name=apps.APP_TOOL, meta={"ui": {"visibility": ["app"]}})(app_action)
+    description = _DESCRIPTION + (_OPEN_DESCRIPTION if opens else "")
+    mcp.tool(name=apps.APP_TOOL, description=description, meta={"ui": {"visibility": ["app"]}})(app_action)
     _install_list_filter(mcp)
     _install_capability(mcp)

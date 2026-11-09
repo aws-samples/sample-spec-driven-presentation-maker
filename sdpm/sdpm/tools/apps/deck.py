@@ -1,12 +1,14 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 """The deck viewer's operations (``app_action`` with ``action`` deck / slide_preview /
-submit_review / outline_edit).
+submit_review / outline_edit / open).
 
 Pure: the server passes in a ``DeckAccess`` that reads its own storage (the deck directory on
 the Local server, S3 with the caller's permission check on the remote). Arguments from the
 view are checked here; a bad one raises ``ValueError``. Outline edits are never written: the
-user's edit comes back as a message for the agent to apply.
+user's edit comes back as a message for the agent to apply. Opening the deck's file or folder
+on the user's machine is the server's ``locate`` and ``launch`` (the Local server only); this
+module only calls them.
 
 Slide previews are the compose SVG (``sdpm.engine.preview.compose``) where the deck has it, so
 text and shapes reach the view as vector markup: a host may redact long base64 strings in a
@@ -23,6 +25,7 @@ import math
 import re
 from collections.abc import Callable
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 
 from sdpm.engine.schema import OUTLINE_SLUG_RE, SLUG_RE, deck_output_format, parse_outline_entries, validate_specs
@@ -40,6 +43,8 @@ COMPOSE_VERSION = 1
 # the JPEG. Slides are 10-60 KB of SVG; the style gallery sends up to 6 × 60 KB per call.
 MAX_COMPOSE_BYTES = 2_000_000
 MAX_SVG_CHARS = 300_000
+# What ``open`` opens: the deck's built file (the .pptx, or output.html of an HTML deck), or its folder.
+OPEN_TARGETS = ("file", "folder")
 
 
 def _no_environment(fmt: str) -> dict | None:
@@ -72,6 +77,11 @@ class DeckAccess:
     - ``compose(deck_id)``: ``{slug: stamp}`` of the newest ``compose/<slug>_<epoch>.json`` per
       slug (``COMPOSE_DEFS`` is the deck's defs), the Web UI's live-preview payloads
     - ``read_compose(deck_id, stamp)``: that file's bytes, or None
+    - ``locate(deck_id, target)`` (a server that runs on the user's machine): the path of the
+      deck's built file (``target`` "file") or its folder ("folder"); None when it does not
+      exist or the server does not open it
+    - ``launch(path)``: open ``path`` with the OS default app. Given both, the viewer offers
+      ``open``; a server without them leaves both None
     """
 
     open: Callable[[str, bool], None]
@@ -83,6 +93,13 @@ class DeckAccess:
     preview_environment: Callable[[str], dict | None] = field(default=_no_environment)
     compose: Callable[[str], dict[str, str]] = field(default=_no_compose)
     read_compose: Callable[[str, str], bytes | None] = field(default=_no_compose_file)
+    locate: Callable[[str, str], Path | None] | None = None
+    launch: Callable[[Path], None] | None = None
+
+    @property
+    def opens(self) -> bool:
+        """Whether this server opens a deck's file or folder for the user (``open``)."""
+        return self.locate is not None and self.launch is not None
 
 
 def _deck_id(value: Any) -> str:
@@ -153,6 +170,8 @@ def deck_view(deck_id: Any, access: DeckAccess) -> dict[str, Any]:
     slide file exists, ``preview`` the stamp of what ``slide_preview`` returns (the compose
     payload when there is one, else the image; None without either). ``preview_environment``
     is set only when a built slide has no preview and the server cannot make previews.
+    ``open`` is ``{"file": bool, "folder": bool}``, which of the two the ``open`` action can open
+    now, on a server that offers it; None on one that does not.
     """
     deck_id = _deck_id(deck_id)
     access.open(deck_id, False)
@@ -184,6 +203,7 @@ def deck_view(deck_id: Any, access: DeckAccess) -> dict[str, Any]:
         "slides": slides,
         "check": _check(deck_text, deck_json, failed, outline_text),
         "preview_environment": access.preview_environment(fmt) if lacking else None,
+        "open": {t: access.locate(deck_id, t) is not None for t in OPEN_TARGETS} if access.opens else None,
     }
 
 
@@ -332,3 +352,21 @@ def submit_review(deck_id: Any, review: Any, access: DeckAccess) -> dict[str, An
         raise ValueError("review must be an object {note, comments}")
     access.open(deck_id, True)
     return access.submit_review(deck_id, review)
+
+
+def open_target(deck_id: Any, target: Any, access: DeckAccess) -> dict[str, Any]:
+    """Open the deck's built file (``target`` "file") or its folder ("folder") with the OS
+    default app, through the server's ``locate`` and ``launch``; the path comes from the
+    server, never from the view. Returns ``{"target", "name"}`` (the opened file or folder name).
+    """
+    deck_id = _deck_id(deck_id)
+    if target not in OPEN_TARGETS:
+        raise ValueError(f"target must be one of {', '.join(OPEN_TARGETS)}")
+    if not access.opens:
+        raise ValueError("this server does not open files")
+    access.open(deck_id, False)
+    path = access.locate(deck_id, target)
+    if path is None:
+        raise ValueError("the deck has no built file yet" if target == "file" else "only a deck folder in the deck root opens from here")
+    access.launch(path)
+    return {"target": target, "name": path.name}
