@@ -175,11 +175,11 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const reviewRef = useRef(review)
   useEffect(() => { reviewRef.current = review })
 
-  /** Persist chat messages to disk (Local mode only). */
-  const saveLocalChat = useCallback((overrideDeckId?: string) => {
+  /** Persist chat messages to disk (Local mode only); `delivered`: the session whose stream ended before this save. */
+  const saveLocalChat = useCallback((overrideDeckId?: string, delivered?: string) => {
     const did = overrideDeckId || currentDeckId.current
     if (!IS_LOCAL || !did) return
-    localService.saveLocalChat(did, stream.messagesRef.current).catch((err) => notifyError(t("errorSaveHistory"), err))
+    localService.saveLocalChat(did, stream.messagesRef.current, delivered).catch((err) => notifyError(t("errorSaveHistory"), err))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
@@ -225,10 +225,21 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // --- useChatStream ---
   // A send's or a replay's end, and a turn's end, save the chat once the render that holds their
   // messages is committed (saveLocalChat reads messagesRef, which follows the render): a replayed
-  // period arrives in one chunk, so its messages are not rendered yet when its stream ends.
+  // period arrives in one chunk, so its messages are not rendered yet when its stream ends. The
+  // save after a stream's end reports its session delivered: until then the server replays it.
   const [saveRequest, setSaveRequest] = useState(0)
-  useEffect(() => { if (saveRequest) saveLocalChat() }, [saveRequest, saveLocalChat])
-  const requestSave = useCallback(() => { if (IS_LOCAL) setSaveRequest((n) => n + 1) }, [])
+  const deliveredRef = useRef<string | undefined>(undefined)
+  useEffect(() => {
+    if (!saveRequest) return
+    const delivered = deliveredRef.current
+    deliveredRef.current = undefined
+    saveLocalChat(undefined, delivered)
+  }, [saveRequest, saveLocalChat])
+  const requestSave = useCallback((delivered?: string) => {
+    if (!IS_LOCAL) return
+    if (delivered) deliveredRef.current = delivered
+    setSaveRequest((n) => n + 1)
+  }, [])
   const mode = agentMode === "vibe" ? "vibe" : "spec"
   const stream = useChatStream({
     sessionId,
@@ -361,7 +372,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       // The session may be working (reload, wake, reopened deck): follow it once the agent
       // config is loaded. The replay rebuilds the work from its opening prompt on. Cloud: when
       // it was working as this page last saw it. Local: always (the server also replays a
-      // period that ended while no page followed it).
+      // period that ended before a page saved it).
       if (IS_LOCAL && deckId && deckId !== "new") {
         if (superseded) return
         setResumeCut({ cut: (prompt: string) => cutLocalAtPrompt(loaded, prompt) })

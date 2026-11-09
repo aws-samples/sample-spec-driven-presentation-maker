@@ -106,12 +106,13 @@ export function readOriginFromDeck(deckId: string): SessionOrigin | null {
   try { return JSON.parse(fs.readFileSync(path.join(dir, ".session-origin.json"), "utf-8")) as SessionOrigin } catch { return null } // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
 }
 
-/** Save chat messages to deck's .chat.json file. */
-export function saveChatToDeck(deckId: string, messages: unknown[]): void {
+/** Save chat messages to deck's .chat.json file; false when there is no such deck. */
+export function saveChatToDeck(deckId: string, messages: unknown[]): boolean {
   const fs = require("fs") as typeof import("fs")
   const dir = resolveDeckDir(deckId)
-  if (!dir || !fs.existsSync(dir)) return
+  if (!dir || !fs.existsSync(dir)) return false
   fs.writeFileSync(path.join(dir, ".chat.json"), JSON.stringify(messages), "utf-8") // nosemgrep: path-join-resolve-traversal — dir validated by resolveDeckDir, constant file name
+  return true
 }
 
 /** Read chat messages from deck's .chat.json file. */
