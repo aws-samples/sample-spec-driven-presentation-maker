@@ -573,6 +573,7 @@
     "builtinStyles": "組み込みスタイル",
     "createWithAI": "AI で作成",
     "newStyleHint": "作りたいスタイルをチャットで伝えてください。AI が保存するとマイスタイルに追加されます。",
+    "openChat": "チャットを開く",
     "back": "戻る",
     "backToStyles": "スタイル一覧に戻る",
     "editWithAI": "AI で編集",

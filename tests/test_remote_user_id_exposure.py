@@ -295,6 +295,7 @@ def test_run_style_python_saved_has_no_key():
 
     body = json.loads(result.content[0].text)
     assert body["saved"] == {"filename": "mine.html", "name": "mine"}
+    assert f"user-styles/{SENTINEL}/mine.html" in storage.objects
     assert SENTINEL not in _seen_by_agent(result)
 
 
