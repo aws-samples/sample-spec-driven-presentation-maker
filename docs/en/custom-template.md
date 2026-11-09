@@ -230,7 +230,7 @@ and token contract are defined in the `style` workflow (returned by `start_style
 
 ### Bundled styles
 
-Bundled styles come in two tiers. The **orthodox** tier is for when you do not want to
+Bundled styles come in two tiers, plus two styles written for Japanese decks. The **orthodox** tier is for when you do not want to
 think about looks: any subject, any audience, light or dark. The **concept** tier is
 chosen by look — each style commits to one visual idea and states how far it may be
 pushed. Purpose-specific structure (how a lesson or a workshop deck is organised) belongs
@@ -260,6 +260,13 @@ to the outline, not the style, so any concept style can carry any kind of deck.
 | `prism-dark` | The gradient is a pointer: it marks the one thing the title is talking about, everything else is flat | Near-black ground, one violet-to-pink gradient used as gradient text on the key figure, a 4px outline + one filled pill on the chosen card, or one gradient bar; a 40px gradient bar down the left edge is the only constant. No gradient panels, no blur or glow |
 | `prism-light` | Same rule set as `prism-dark` for lit rooms and print | White ground, near-black type, flat white cards with 1px borders, the same violet-to-pink gradient in the same pointer roles |
 | `aws-console` | The deck is an AWS Management Console screen; every piece of chrome carries deck information | Two dark header bands (aws wordmark, search box showing the deck title and slide index, notification badge = open actions, date and presenter where region and account sit; a favourites row of numbered section chips with the current section lit) over a white toolbar; page title with an Info link and an outline + orange button pair; white 2px-bordered containers with drag handle, Info, kebab and resize handle; blue links and blue metrics; three fixed status colours; dense 56px rows, no prose |
+
+**Japanese — sample text and title grammar in Japanese**
+
+| Style | Built for | Look |
+|---|---|---|
+| `gradient-card` | Technical walkthroughs on a shared screen, where the listener follows one item at a time | Black ground, rules, bands, round icon nodes and connectors; a thin blue-to-violet gradient on lines and node rims; outlines only around things with a boundary, one magenta outline for the subject; noun-phrase titles with a lead sentence |
+| `mono-blue` | Internal and customer briefings shown once, then read alone as the reference copy | White ground, monotone ink, dark-slate numbered markers and outlined cards, sentence titles ending in です/ます, a grey takeaway band on every slide, exactly one blue outline or pale-blue zone |
 
 ### User-local styles
 

@@ -303,11 +303,11 @@ def outline_edit(deck_id: Any, base: Any, text: Any, access: DeckAccess) -> dict
     for name, value in (("base", base), ("text", text)):
         if not isinstance(value, str) or len(value) > MAX_TEXT:
             raise ValueError(f"{name} must be the outline text, at most {MAX_TEXT} characters")
-    if base == text:
+    old, new = base.splitlines(), text.splitlines()
+    if old == new:
         raise ValueError("no changes to send")
     access.open(deck_id, False)
     current = access.read_text(deck_id, OUTLINE) or ""
-    old, new = base.splitlines(), text.splitlines()
     diff = list(difflib.unified_diff(old, new, f"a/{OUTLINE}", f"b/{OUTLINE}", lineterm=""))
     added = sum(1 for line in diff[2:] if line.startswith("+"))
     deleted = sum(1 for line in diff[2:] if line.startswith("-"))

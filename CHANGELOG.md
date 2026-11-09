@@ -37,7 +37,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 - `sdpm open <deck>` opens a deck in the browser Web UI and starts the Web UI if it is not
   running. For clients that do not declare MCP Apps, the local MCP server adds a note for the
-  user naming that command (`note_for_user`) to the result when it creates or builds a deck.
+  user naming that command (`note_for_user`) to the result when it creates or builds a deck in
+  the deck root `sdpm open` searches.
 - **A style gallery in MCP Apps clients.** In a client that declares MCP Apps
   (`io.modelcontextprotocol/ui`), the `list_styles` result shows as cards in the chat with
   each style's slides; **Use this style** sends the choice back as the user's message. Both
@@ -62,6 +63,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   (`show_deck` is listed only to MCP Apps clients) and the same `check_specs` result; the
   remote server lists `show_deck` only to clients that declare MCP Apps in each request's
   `_meta`.
+- **Two built-in styles for Japanese decks: `gradient-card` and `mono-blue`.**
+  `gradient-card` is dark, for technical walkthroughs on a shared screen: rules, bands, icon
+  nodes and connectors with a thin blue-to-violet gradient, and one magenta outline for the
+  subject. `mono-blue` is white, for briefings read alone afterwards: sentence titles, a grey
+  takeaway band and one blue pointer per slide. Both draw their own cover and closing, so
+  they work with the bundled `blank-dark` and `blank-light` templates; the catalogue now has
+  18 styles.
 
 ### Changed
 

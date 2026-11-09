@@ -103,44 +103,69 @@ def local(server, tmp_path, monkeypatch):
     (checkout / "web-ui" / "build").mkdir(parents=True)
     (tmp_path / "home" / "state.json").write_text(json.dumps({"profile": "full"}))
     monkeypatch.setattr(server, "_CHECKOUT", checkout)
+    # generate_pptx reloads the asset catalogs under this test's config dir; restore the cache.
+    from sdpm.knowledge import assets
+
+    monkeypatch.setattr(assets, "_manifest_cache", assets._manifest_cache)
     return root
 
 
 def _create_and_build(server, extensions):
+    """Create a pptx deck on the bundled template and build it, and create an HTML deck and ask
+    for its PPTX (declined); return the three results."""
+
     async def calls(session):
-        made = _result(await session.call_tool("init_deck_workspace", {"name": "hint", "output_format": "html"}))
+        made = _result(await session.call_tool("init_deck_workspace", {"name": "hint"}))
+        deck_json = Path(made["output_dir"]) / "deck.json"
+        deck_json.write_text(json.dumps({**json.loads(deck_json.read_text()), "template": "blank-dark"}))
         built = _result(await session.call_tool("generate_pptx", {"deck_id": made["output_dir"]}))
-        return made, built
+        html = _result(await session.call_tool("init_deck_workspace", {"name": "page", "output_format": "html"}))
+        declined = _result(await session.call_tool("generate_pptx", {"deck_id": html["output_dir"]}))
+        return made, built, declined
 
     return _session(server, extensions, calls)
 
 
 def test_a_client_without_mcp_apps_gets_the_command(server, local):
-    made, built = _create_and_build(server, None)
+    made, built, declined = _create_and_build(server, None)
     deck = Path(made["output_dir"])
     assert deck.parent == local
     assert made[server.OPEN_HINT_FIELD] == _NOTE.format(deck.name)
     assert built[server.OPEN_HINT_FIELD] == _NOTE.format(deck.name)
+    # generate_pptx declining an HTML deck built nothing, so it names no command.
+    assert declined["output_format"] == "html" and server.OPEN_HINT_FIELD not in declined
     # Another extension is not MCP Apps.
-    made, _ = _create_and_build(server, {"io.example/other": {}})
+    made, _, _ = _create_and_build(server, {"io.example/other": {}})
     assert server.OPEN_HINT_FIELD in made
 
 
 def test_a_client_with_mcp_apps_gets_no_command(server, local):
-    made, built = _create_and_build(server, _APPS)
+    made, built, _ = _create_and_build(server, _APPS)
     assert server.OPEN_HINT_FIELD not in made and server.OPEN_HINT_FIELD not in built
-    made, _ = _create_and_build(server, {UI_EXTENSION: {}})
+    made, _, _ = _create_and_build(server, {UI_EXTENSION: {}})
     assert server.OPEN_HINT_FIELD not in made
 
 
 def test_no_command_without_the_web_ui(server, local, tmp_path):
     (tmp_path / "home" / "state.json").write_text(json.dumps({"profile": "mcp"}))
-    made, built = _create_and_build(server, None)
+    made, built, _ = _create_and_build(server, None)
     assert server.OPEN_HINT_FIELD not in made and server.OPEN_HINT_FIELD not in built
     (tmp_path / "home" / "state.json").write_text(json.dumps({"profile": "full"}))
     (server._CHECKOUT / "web-ui" / "build").rmdir()
-    made, _ = _create_and_build(server, None)
+    made, _, _ = _create_and_build(server, None)
     assert server.OPEN_HINT_FIELD not in made
+
+
+def test_the_command_follows_the_root_sdpm_open_searches(server, local, tmp_path, monkeypatch):
+    # The engine's root and sdpm open's can differ (WSL with an unreadable config.json); the
+    # hint names a deck only when it sits where sdpm open looks.
+    deck = local / "my-deck"
+    deck.mkdir()
+    (deck / "deck.json").write_text("{}")
+    wrapped = server._with_open_hint(lambda: {"output_dir": str(deck)})
+    assert wrapped()[server.OPEN_HINT_FIELD] == _NOTE.format("my-deck")
+    monkeypatch.setattr(server.sdpm_command, "deck_root", lambda: tmp_path / "elsewhere")
+    assert server.OPEN_HINT_FIELD not in wrapped()
 
 
 def test_no_command_for_a_deck_outside_the_root_or_a_failed_build(server, local, tmp_path):
