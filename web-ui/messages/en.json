@@ -572,7 +572,7 @@
     "myStyles": "My Styles",
     "builtinStyles": "Built-in Styles",
     "createWithAI": "Create with AI",
-    "creatingStyle": "Creating your new style…",
+    "newStyleHint": "Describe the style in the chat. It joins My Styles once the AI saves it.",
     "back": "Back",
     "backToStyles": "Back to Styles",
     "editWithAI": "Edit with AI",

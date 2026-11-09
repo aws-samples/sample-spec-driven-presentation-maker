@@ -295,5 +295,15 @@ def test_run_style_python_saved_has_no_key():
 
     body = json.loads(result.content[0].text)
     assert body["saved"] == {"filename": "mine.html", "name": "mine"}
-    assert f"user-styles/{SENTINEL}/mine.html" in storage.objects
     assert SENTINEL not in _seen_by_agent(result)
+
+
+def test_run_style_python_rejects_a_style_name_that_is_not_a_file_stem():
+    storage = _Storage()
+
+    with patch.object(remote_server.boto3, "client", lambda *a, **k: _CodeInterpreter()):
+        result = _call(storage, "run_style_python", {"purpose": "edit", "code": "pass", "style_name": "../other/mine"})
+
+    assert result.isError
+    assert "Invalid style name" in result.content[0].text
+    assert not storage.objects

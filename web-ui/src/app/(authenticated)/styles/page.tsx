@@ -56,15 +56,6 @@ export default function StylesPage() {
 
   useEffect(() => { refreshStyles() }, [refreshStyles])
 
-  // When #create is visited, show name dialog and go back to list view
-  useEffect(() => {
-    if (ws.view.mode === "create") {
-      ws.navigateToList()
-      handleCreateStyle()
-    }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ws.view.mode])
-
   // Reset chat state when navigating away from preview
   useEffect(() => {
     if (ws.view.mode !== "preview") {
@@ -128,17 +119,10 @@ export default function StylesPage() {
     showToast(t("copiedAs", { name: `Copy of ${originalTitle}` }))
   }
 
-  const handleCreateStyle = async () => {
-    if (!idToken) return
-    const now = new Date()
-    const pad = (n: number) => String(n).padStart(2, "0")
-    const name = `style-${now.getFullYear()}${pad(now.getMonth() + 1)}${pad(now.getDate())}-${pad(now.getHours())}${pad(now.getMinutes())}`
-    const html = `<!DOCTYPE html><html><head><title>Untitled Style</title></head><body><div class="slide" style="width:1920px;height:1080px;display:flex;align-items:center;justify-content:center;font-family:sans-serif;background:#1a1a2e;color:#fff;"><h1>Untitled Style</h1></div></body></html>`
-    const result = await saveUserStyle(name, html, idToken)
-    if (result.error) { showToast(result.error, "error"); return }
-    await refreshStyles()
-    ws.navigateToStyle(name)
-    setChatOpen(true)
+  // A new style has no file until the agent saves it under the name it chose
+  // (and with its <title>); the workspace then follows that save.
+  const handleCreateStyle = () => {
+    ws.navigateToCreate()
   }
 
   const handleInlineRenameSubmit = async () => {
@@ -229,12 +213,12 @@ export default function StylesPage() {
             <StyleSlidePreview html={ws.previewHtml} loading={ws.previewLoading} />
           </div>
         ) : ws.view.mode === "create" ? (
-          /* ── Create new style → creates Untitled Style and navigates ── */
+          /* ── New style: the chat is open; the style appears once the agent saves it ── */
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <Sparkles className="h-12 w-12 text-brand-teal/20 mx-auto mb-4" />
               <h2 className="text-sm font-semibold mb-1">{t("createWithAI")}</h2>
-              <p className="text-xs text-foreground-muted mb-4">{t("creatingStyle")}</p>
+              <p className="text-xs text-foreground-muted mb-4">{t("newStyleHint")}</p>
               <button
                 onClick={ws.navigateToList}
                 className="mt-4 px-3 py-1.5 text-xs rounded-lg border border-border hover:bg-foreground/[0.04] transition-colors"
@@ -323,17 +307,22 @@ export default function StylesPage() {
         )}
         </div>
 
-        {/* Style Chat Panel (side panel) */}
-        {ws.view.mode === "preview" && currentStyle?.source === "user" && (
+        {/* Style Chat Panel (side panel). One element for both views, so a new style's
+            chat stays the same session when its first save moves the workspace to it. */}
+        {(ws.view.mode === "create" || (ws.view.mode === "preview" && currentStyle?.source === "user")) && (
           <StyleChatShell
-            open={chatOpen}
-            onClose={() => setChatOpen(false)}
-            styleId={ws.styleName!}
-            styleName={ws.styleName!}
+            open={ws.view.mode === "create" || chatOpen}
+            onClose={ws.view.mode === "create" ? ws.navigateToList : () => setChatOpen(false)}
+            styleId={ws.styleName ?? ""}
+            styleName={ws.styleName ?? ""}
             onStyleWritten={() => ws.refreshPreview()}
             onStyleSaved={async (saved) => {
-              showToast(t("styleSaved", { title: saved.title }), "success")
+              const name = saved.filename.replace(/\.html$/i, "")
+              showToast(t("styleSaved", { title: saved.title ?? name }), "success")
               await refreshStyles()
+              // A new style's first save names it; open the workspace on it (same hash: no-op).
+              setChatOpen(true)
+              ws.navigateToStyle(name)
             }}
           />
         )}
