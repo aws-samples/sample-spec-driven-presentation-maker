@@ -37,7 +37,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 - `sdpm open <deck>` opens a deck in the browser Web UI and starts the Web UI if it is not
   running. For clients that do not declare MCP Apps, the local MCP server adds a note for the
-  user naming that command (`note_for_user`) to the result when it creates or builds a deck.
+  user naming that command (`note_for_user`) to the result when it creates or builds a deck in
+  the deck root `sdpm open` searches.
 - **A style gallery in MCP Apps clients.** In a client that declares MCP Apps
   (`io.modelcontextprotocol/ui`), the `list_styles` result shows as cards in the chat with
   each style's slides; **Use this style** sends the choice back as the user's message. Both

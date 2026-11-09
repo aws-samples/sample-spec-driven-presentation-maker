@@ -311,6 +311,8 @@ def test_outline_edit_says_when_the_file_changed_meanwhile() -> None:
 
 @pytest.mark.parametrize(("base", "text"), [
     ("same", "same"),
+    ("- [a] x\r\n- [b] y\r\n", "- [a] x\n- [b] y\n"),
+    ("- [a] x\n", "- [a] x"),
     (None, "x"),
     ("x", 3),
     ("x", "y" * (deck.MAX_TEXT + 1)),
@@ -318,6 +320,17 @@ def test_outline_edit_says_when_the_file_changed_meanwhile() -> None:
 def test_outline_edit_refuses_no_change_or_bad_text(base, text) -> None:
     with pytest.raises(ValueError):
         deck.outline_edit("d1", base, text, Fake().access())
+
+
+def test_outline_edit_of_a_crlf_outline_diffs_only_the_edit() -> None:
+    fake = Fake()
+    base = "".join(f"- [s{i}] line {i}\r\n" for i in range(20))
+    fake.files["specs/outline.md"] = base
+    text = base.replace("\r\n", "\n").replace("line 3", "line three")
+    got = deck.outline_edit("d1", base, text, fake.access())
+    assert (got["added"], got["deleted"]) == (1, 1)
+    assert "\n-- [s3] line 3\n+- [s3] line three\n" in got["message"]
+    assert "changed after" not in got["message"]
 
 
 # --- submit_review -----------------------------------------------------------------------
