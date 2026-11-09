@@ -103,6 +103,12 @@ Web UI で **コメント** ツールをオンにし、スライド上の気に�
 Web UI やエージェントへの依頼で AI に新しいスタイルを作らせることもできます。詳しくは
 [カスタムテンプレート・スタイル・アセット](docs/ja/custom-template.md)を参照してください。
 
+自分のテンプレートをどのデッキでも使えるようにするには、`.pptx` を `~/.config/sdpm/templates/`
+（Windows は `%APPDATA%\sdpm\templates\`）に置きます。エージェントのテンプレート一覧に、ファイル名で並びます。
+どんな場面で使うかの説明を付けたいときは、代わりにローカルの Web UI（`sdpm webui`）のテンプレート画面からアップロードしてください。
+ファイルは同じフォルダに保存されます。インストール先の `~/.sdpm/checkout` には置かないでください。
+SDPM 自身のコードで、`sdpm update` が管理しています。依頼に添付した `.pptx` は、そのデッキだけで使われます。
+
 ![Web UI のスタイル画面に並ぶ組み込みスタイル](docs/assets/screenshots/webui-styles.png)
 
 ---
