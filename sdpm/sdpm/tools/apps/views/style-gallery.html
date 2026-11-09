@@ -30,12 +30,16 @@ button:disabled{opacity:.5;cursor:default}
 #detail .bar strong{font-size:14px;margin-left:4px}
 #detail .slides{display:flex;flex-direction:column;gap:8px;margin-top:8px}
 #status{font-size:12px;color:var(--muted);margin-top:8px;min-height:18px}
+#more{margin-top:12px}
+#more summary{cursor:pointer;font-size:13px;color:var(--muted);margin-bottom:8px}
+#more-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
 </style>
 </head>
 <body>
 <div id="app">
-  <header><h1>Styles</h1><span id="count"></span><span id="others"></span></header>
+  <header><h1>Styles</h1><span id="count"></span></header>
   <div id="grid"></div>
+  <details id="more" hidden><summary></summary><div id="more-grid"></div></details>
   <div id="detail">
     <div class="bar"><button id="back">Back</button><button class="primary" id="use-detail" data-action="use">Use this style</button><strong id="detail-name"></strong></div>
     <div class="slides"></div>
@@ -119,13 +123,10 @@ button:disabled{opacity:.5;cursor:default}
     if (s.source === "user") badge(name, "yours");
     var desc = document.createElement("div");
     desc.className = "desc";
-    var d = s.description || "";
-    var cut = d.indexOf(" — ");
-    desc.textContent = cut >= 0 ? d.slice(cut + 3) : d;
-    desc.title = desc.textContent;
     meta.appendChild(name);
     meta.appendChild(desc);
     el.appendChild(meta);
+    describe(el, s.description || "");
     var actions = document.createElement("div");
     actions.className = "actions";
     var use = document.createElement("button");
@@ -144,12 +145,28 @@ button:disabled{opacity:.5;cursor:default}
     return el;
   }
 
+  function describe(el, d) {
+    var desc = el.querySelector(".desc");
+    var cut = d.indexOf(" — ");
+    desc.textContent = cut >= 0 ? d.slice(cut + 3) : d;
+    desc.title = desc.textContent;
+  }
+
+  // A style hidden by the pin filter arrives as a name only; its description is the
+  // <title> of its document, read once the preview is here (DOMParser runs no scripts).
+  function titleOf(p) {
+    var doc = new DOMParser().parseFromString(p.whole ? p.slides[0] : "<head>" + p.head + "</head>", "text/html");
+    var t = doc.querySelector("title");
+    return t ? t.textContent.trim() : "";
+  }
+
   function showPreview(name) {
     var el = cards[name];
     var p = previews[name];
     if (!el || !p) return;
     el.replaceChild(thumb(slideDoc(p, 0)), el.firstChild);
     el.querySelector('button[data-action="all"]').disabled = false;
+    if (!el.querySelector(".desc").textContent) describe(el, titleOf(p));
   }
 
   function loadPreviews(names) {
@@ -178,6 +195,7 @@ button:disabled{opacity:.5;cursor:default}
     if (!p) return;
     shownName = name;
     $("#grid").style.display = "none";
+    $("#more").style.display = "none";
     $("#detail").className = "open";
     $("#detail-name").textContent = name;
     var list = $("#detail .slides");
@@ -192,28 +210,54 @@ button:disabled{opacity:.5;cursor:default}
     $("#detail").className = "";
     $("#detail .slides").textContent = "";
     $("#grid").style.display = "";
+    $("#more").style.display = "";
     if (bridge.hostContext.displayMode === "fullscreen") bridge.requestDisplayMode("inline").catch(function () {});
     bridge.reportSize();
   };
   $("#use-detail").onclick = function () { if (shownName) useStyle(shownName); };
+
+  function addCards(grid, styles) {
+    styles.forEach(function (s) {
+      cards[s.name] = card(s);
+      grid.appendChild(cards[s.name]);
+      if (previews[s.name]) showPreview(s.name);
+    });
+    return styles.map(function (s) { return s.name; }).filter(function (n) { return !previews[n]; });
+  }
+
+  // Styles hidden by the pin filter (other_styles) sit folded under the shown ones; their
+  // cards and previews are made the first time the section opens. With nothing shown
+  // (no pinned and no own styles) the section starts open.
+  function renderOthers(names) {
+    var more = $("#more");
+    var grid = $("#more-grid");
+    grid.textContent = "";
+    more.hidden = !names.length;
+    more.ontoggle = null;
+    if (!names.length) return;
+    more.querySelector("summary").textContent = "Other styles (" + names.length + ")";
+    var built = false;
+    function build() {
+      if (built || !more.open) return;
+      built = true;
+      var missing = addCards(grid, names.map(function (n) { return { name: n }; }));
+      bridge.ready.then(function () { loadPreviews(missing); });
+    }
+    more.ontoggle = function () { build(); bridge.reportSize(); };
+    more.open = !Object.keys(cards).length;
+    build();
+  }
 
   function render(result) {
     var data = listing(result);
     var grid = $("#grid");
     grid.textContent = "";
     cards = {};
-    data.styles.forEach(function (s) {
-      cards[s.name] = card(s);
-      grid.appendChild(cards[s.name]);
-      if (previews[s.name]) showPreview(s.name);
-    });
+    var missing = addCards(grid, data.styles);
     $("#count").textContent = data.styles.length === 1 ? "1 style" : data.styles.length + " styles";
-    var others = (data.other_styles || []).length;
-    $("#others").textContent = others ? others + " more not shown (ask for all styles)" : "";
+    renderOthers(data.other_styles || []);
     bridge.reportSize();
-    bridge.ready.then(function () {
-      loadPreviews(data.styles.map(function (s) { return s.name; }).filter(function (n) { return !previews[n]; }));
-    });
+    bridge.ready.then(function () { if (missing.length) loadPreviews(missing); });
   }
 
   bridge.onToolResult(render);
