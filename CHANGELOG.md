@@ -69,6 +69,16 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   without the "no Kiro session" notice.
 - Clearer descriptions for the briefing, prism-dark, signal, aws-console, bento,
   neo-brutalist and prism-light styles: each now says when to use it.
+- **The orchestrator picks a style through `list_styles`.** `start_presentation` no longer
+  returns `styles` (with only the bundled styles its result shrinks from about 16,700 to about
+  10,300 characters); it still returns the templates and the output directory. The orchestrator calls
+  `list_styles()`, chooses from the user's pinned and own styles (every style when nothing
+  is pinned), and calls `list_styles(include_all=true)` when none fits or the user wants to
+  see others. In MCP Apps clients the style gallery now shows during a normal request. The
+  Cloud agent's system prompt carries the templates only and lists styles with the same
+  tool. `start_style` still returns every style. Pins that match no existing style now
+  count as no pins: for a user with no styles of their own, `list_styles()` returns every
+  style instead of none.
 
 ### Removed
 

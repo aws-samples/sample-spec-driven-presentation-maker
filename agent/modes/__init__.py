@@ -31,8 +31,8 @@ def _role(tool: str) -> Part:
 
     The L4 agent decides roles itself, so the document goes to system at
     discovery time; interactive clients get the same text as a tool result.
-    Only the deck-independent part is placed here — per-user data (styles,
-    templates) would fragment the prompt cache.
+    Only the deck-independent part is placed here — per-user data (templates)
+    would fragment the prompt cache.
     """
     return Part(
         Source.mcp(tool, {}, pick="static.workflow"),
@@ -41,13 +41,13 @@ def _role(tool: str) -> Part:
     )
 
 
-# The environment start_presentation returns (styles, templates) is per user, so it
+# The environment start_presentation returns (templates) is per user, so it
 # goes into the system prompt *after* the cache point, next to the timestamp, and
 # never fragments the cached prefix. The orchestrator sees the same data an
 # interactive client's model sees after calling the entry tool.
 _ORCHESTRATOR_ENVIRONMENT = [
     Part(Source.file("wiring/environment"), target="system"),
-    Part(Source.mcp("start_presentation", {}, pick="styles,templates"), target="system", label="environment"),
+    Part(Source.mcp("start_presentation", {}, pick="templates"), target="system", label="environment"),
 ]
 
 

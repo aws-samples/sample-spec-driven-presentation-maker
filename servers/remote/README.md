@@ -7,7 +7,7 @@ Remote MCP server for Amazon Bedrock AgentCore Runtime. Provides all spec-driven
 ### Workflow
 | Tool | Description |
 |------|-------------|
-| `start_presentation` | Entry point — orchestrator role document + styles and templates |
+| `start_presentation` | Entry point — orchestrator role document + templates |
 | `start_composing` | Composer entry — role document, slide spec, and the deck's specs and assigned slides (`mode="html"` for HTML decks) |
 | `start_style` | Style entry — role document, style catalogue, a base style's HTML |
 | `init_deck_workspace` | Create an empty deck workspace (`output_format="pptx"\|"html"`) |

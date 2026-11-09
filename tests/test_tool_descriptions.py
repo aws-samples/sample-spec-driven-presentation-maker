@@ -131,6 +131,14 @@ def test_entry_tools_are_the_only_ones_that_start_a_request(any_server_tools):
     assert starters <= entries and "start_presentation" in starters, starters
 
 
+def test_list_styles_describes_its_own_listing(any_server_tools):
+    """The orchestrator gets the styles from list_styles alone; start_presentation returns templates."""
+    doc = any_server_tools["list_styles"].description
+    assert "start_presentation" not in doc
+    assert "other_styles" in doc and "include_all" in doc
+    assert "styles" not in any_server_tools["start_presentation"].description.split("needs first:", 1)[1]
+
+
 def test_contract_functions_are_annotated_not_docstring_args():
     from sdpm import tools
 

@@ -83,10 +83,10 @@ def test_entry_tools_are_not_exposed_as_agent_tools():
 
 
 def test_orchestrator_environment_is_system_after_cache_point():
-    """Per-user styles/templates must not sit inside the cached prefix."""
+    """Per-user templates must not sit inside the cached prefix."""
     parts = MODES["orchestrator"].parts
     cache_idx = max(i for i, p in enumerate(parts) if p.cache_point)
-    env = [i for i, p in enumerate(parts) if p.source.type == "mcp" and p.source.pick == "styles,templates"]
+    env = [i for i, p in enumerate(parts) if p.source.type == "mcp" and p.source.pick == "templates"]
     assert len(env) == 1 and env[0] > cache_idx
     assert parts[env[0]].target == "system"
     assert "wiring/environment" in _file_parts("orchestrator")
@@ -152,13 +152,20 @@ def test_resolve_parts_embeds_role_document_text(mode, entry):
     assert [name for name, _ in client.calls].count(entry[0]) == 1
 
 
-def test_orchestrator_system_carries_styles_but_not_deck_data():
+def test_orchestrator_system_carries_templates_but_not_deck_data():
     system_prompt, messages = resolve_parts(
         MODES["orchestrator"].parts, mcp_client=ContractFakeMCPClient(), context={}, enable_cache=False,
     )
-    styles = contract.start_presentation()["styles"]
-    assert styles and styles[0]["name"] in system_prompt
+    templates = contract.start_presentation()["templates"]
+    assert templates and templates[0]["name"] in system_prompt
     assert messages == []
+
+
+def test_orchestrator_picks_styles_through_list_styles():
+    """start_presentation returns no styles; the orchestrator lists them when it picks one."""
+    for name in ("orchestrator", "vibe", "spec"):
+        assert "list_styles" in MODES[name].allowed_tools
+        assert all(p.source.pick != "styles" and "styles," not in p.source.pick for p in MODES[name].parts)
 
 
 def test_composer_static_is_workflow_plus_slide_spec_and_cacheable():
