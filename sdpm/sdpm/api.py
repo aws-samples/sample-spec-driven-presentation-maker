@@ -515,7 +515,8 @@ def _get_output_base_dir() -> Path:
     expanded; missing or empty means ~/Documents/SDPM-Presentations). If config.json cannot
     be read, ~/Documents/SDPM-Presentations is used, except on WSL, where the Windows
     Documents folder is used. web-ui/src/lib/local/deck-paths.ts ``resolveDeckRoot`` follows
-    the same order without the WSL case (the Web UI uses ~/Documents/SDPM-Presentations there).
+    the same order without the WSL case (the Web UI uses ~/Documents/SDPM-Presentations there),
+    and servers/local/sdpm_command.py ``deck_root`` (``sdpm open``) follows the Web UI's.
     """
     for name in ("SDPM_DECK_ROOT", "SDPM_OUTPUT_DIR"):
         env_dir = os.environ.get(name)

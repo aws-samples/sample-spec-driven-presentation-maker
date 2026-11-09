@@ -92,6 +92,7 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
 ```
 sdpm                    状態: 版、追う先、プロファイル、入っている面、接続済みクライアント
 sdpm webui              ブラウザ用 Web UI を起動して開く
+sdpm open DECK          デッキ（フォルダーか名前）をブラウザ用 Web UI で開く（動いていなければ起動）
 sdpm mcp                MCP サーバーを stdio で起動（ターミナルでの動作確認用）
 sdpm register [CLIENT]  MCP クライアントに接続（検出クライアントのチェックリスト。--yes, --dry-run）
 sdpm unregister         接続を解除
@@ -182,6 +183,11 @@ AWS Builder ID、組織の IAM Identity Center のいずれかで Kiro にサイ
 Kiro には無料プランがあります（[Kiro の料金](https://kiro.dev/pricing/)）。インストーラーは
 デスクトップショートカットも作ります。MCP サーバーだけを入れた場合は、`sdpm update --with-webui` で
 後から Web UI を足せます。詳細: [Web UI ローカルモード](../../web-ui/README_ja.md#local-mode)。
+
+`sdpm open DECK` は 1 つのデッキ（フォルダー、またはデッキフォルダーの中の名前）を Web UI で開きます。
+Web UI が動いていなければ先に起動します。Web UI で話したことのあるデッキはその会話の続きになり、
+AI エージェントが作ったデッキはそのデッキの新しいチャットで開きます。AI エージェントはデッキを作ったときと
+組み上げたときにこのコマンドを伝えます。クライアントが自分でデッキを表示する場合（MCP Apps）は伝えません。
 
 ### Web UI でできること
 

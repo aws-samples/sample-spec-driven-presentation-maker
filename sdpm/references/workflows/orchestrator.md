@@ -31,7 +31,10 @@ hand edits back → `read_guides(["hand-edit-sync"])`; translating a deck →
 
 ## The deck
 
-`init_deck_workspace(name)` creates the deck (`deck.json`, `specs/`). Read the material the
+`init_deck_workspace(name)` creates the deck (`deck.json`, `specs/`). When
+`init_deck_workspace` or `generate_pptx` returns `open_in_webui`, that is a command for the
+user to run in a terminal; it opens this deck in the browser Web UI. Give it to the user when
+the deck is created and again when you report the finished deck. Read the material the
 user supplies, files and URLs, with `read_attachment(source)` before deciding how to use it:
 it needs no deck, returns line-numbered text and pages through long files, so read on until
 the parts the deck needs are covered. Files then come in via `import_attachment(...)` and land

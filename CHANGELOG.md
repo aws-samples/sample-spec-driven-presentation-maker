@@ -13,6 +13,17 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Added
+
+- `sdpm open <deck>` opens a deck in the browser Web UI and starts the Web UI if it is not
+  running. The local MCP server names that command when it creates or builds a deck, for
+  clients that do not declare MCP Apps.
+
+### Changed
+
+- A deck made through an MCP client opens in the Local Web UI as a new chat on that deck
+  without the "no Kiro session" notice.
+
 ## [0.13.0] - 2026-11-09
 
 The Local Web UI now runs kiro-cli on its V3 engine and composes slides in the background,

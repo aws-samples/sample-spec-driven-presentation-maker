@@ -337,8 +337,10 @@ class TestHtmlDeckGuards:
 
 def test_local_server_binds_entry_tools_and_not_workflow_readers():
     src = (Path(__file__).resolve().parents[1] / "servers" / "local" / "server.py").read_text(encoding="utf-8")
-    for name in ("start_presentation", "start_composing", "start_style", "start_translation", "init_deck_workspace"):
+    for name in ("start_presentation", "start_composing", "start_style", "start_translation"):
         assert f"mcp.tool()(tools.{name})" in src
+    # The contract function, wrapped only to add the local `sdpm open` hint to its result.
+    assert "mcp.tool()(_with_open_hint(tools.init_deck_workspace))" in src
     assert "read_workflows" not in src
     assert "init_presentation" not in src
 

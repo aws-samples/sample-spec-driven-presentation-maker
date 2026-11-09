@@ -99,6 +99,7 @@ Then check the result. `sdpm` prints the status, and
 ```
 sdpm                    status: version, channel, profile, surfaces, which clients are connected
 sdpm webui              start the browser Web UI and open it
+sdpm open DECK          open a deck (its folder or name) in the browser Web UI, starting it if needed
 sdpm mcp                run the MCP server on stdio (to check it from a terminal)
 sdpm register [CLIENT]  connect MCP clients (checklist of detected clients; --yes, --dry-run)
 sdpm unregister         disconnect them again
@@ -191,6 +192,12 @@ AWS account is needed, and Kiro has a free plan ([Kiro pricing](https://kiro.dev
 The installer also
 creates a desktop shortcut. If you installed only the MCP server, add the Web UI later with
 `sdpm update --with-webui`. Details: [Web UI Local mode](../../web-ui/README.md#local-mode).
+
+`sdpm open DECK` opens one deck (its folder, or its name in the deck folder) in the Web UI
+and starts the Web UI first if it is not running. A deck you talked about in the Web UI
+continues that chat; a deck an AI agent made opens as a new chat on that deck. When your AI
+agent creates or builds a deck, it gives you this command, unless your client shows decks
+itself (MCP Apps).
 
 ### What you can do in the Web UI
 
