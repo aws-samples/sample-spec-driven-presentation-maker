@@ -69,7 +69,7 @@ class TestStartPresentation:
     def test_returns_workflow_and_environment(self):
         r = tools.start_presentation()
         assert "# Orchestrator" in r["static"]["workflow"]
-        assert {s["name"] for s in r["styles"]}
+        assert "styles" not in r  # list_styles serves them
         assert r["templates"]
         assert r["output_dir"]
 
@@ -387,14 +387,34 @@ def test_grid_accepts_int_and_list_tracks():
     assert a["r0c1"]["x"] == 240 and a["r0c1"]["w"] == 1200 and a["r0c2"]["x"] == 1470
 
 
-def test_start_presentation_returns_every_style_with_pin_flag(monkeypatch):
+def test_start_style_returns_every_style_with_pin_flag(monkeypatch):
     from sdpm import config
 
     monkeypatch.setattr(config, "get_state", lambda: {"pinned_styles": ["report"], "template_metadata": {}})
-    styles = tools.start_presentation()["styles"]
+    styles = tools.start_style()["styles"]
     names = {s["name"] for s in styles}
     assert {"report", "typographic", "briefing"} <= names  # unpinned ones are listed too
     assert {s["name"] for s in styles if s.get("pinned")} == {"report"}
+
+
+def test_orchestrator_picks_the_style_through_list_styles():
+    wf = tools.start_presentation()["static"]["workflow"]
+    assert "`list_styles()`" in wf and "`list_styles(include_all=true)`" in wf
+
+
+@pytest.mark.parametrize("pins", [[], ["no-such-style"]])
+def test_list_styles_without_pins_or_user_styles_describes_every_style(monkeypatch, pins):
+    """What the orchestrator chooses from when the user has pinned and made nothing."""
+    from sdpm import config
+
+    monkeypatch.delenv("SDPM_STYLES_DIR", raising=False)
+    monkeypatch.setattr(config, "get_state", lambda: {"pinned_styles": pins, "template_metadata": {}})
+    listing = tools.list_styles()
+    assert listing == tools.list_styles(include_all=True)
+    names = {s["name"] for s in listing["styles"]}
+    assert names == {p.stem for p in _STYLES_DIR.glob("*.html")}
+    assert all(s["description"] for s in listing["styles"])
+    assert "other_styles" not in listing
 
 
 def test_apply_style_returns_a_line_numbered_toc(tmp_path: Path):
@@ -518,3 +538,8 @@ def test_every_slide_format_guide_fits_the_tool_result_budget():
         assert len(json.dumps(result, ensure_ascii=False)) <= _RESULT_BUDGET, name
     spec = tools.start_composing()["static"]["slide_spec"]
     assert all(name in spec for name in names[1:5])
+
+
+def test_start_presentation_fits_the_tool_result_budget():
+    """The orchestrator's entry comes back inline too; the styles are list_styles' part."""
+    assert len(json.dumps(tools.start_presentation(), ensure_ascii=False)) <= _RESULT_BUDGET

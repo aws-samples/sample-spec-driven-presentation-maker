@@ -58,7 +58,7 @@ async def main(command: str | None = None) -> None:
             entry = json.loads(_text(await session.call_tool("start_presentation", {})))
             workflow = entry.get("static", {}).get("workflow", "")
             assert workflow, "orchestrator workflow is empty"
-            assert entry.get("styles"), "start_presentation returned no styles"
+            assert entry.get("templates"), "start_presentation returned no templates"
 
             print(
                 f"OK: {len(names)} tools, {len(templates['templates'])} templates, "

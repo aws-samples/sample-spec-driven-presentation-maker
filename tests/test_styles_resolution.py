@@ -205,6 +205,16 @@ def test_filter_styles_with_pins_filters_to_pinned_and_user() -> None:
     assert "c" not in names  # neither pinned nor user
 
 
+def test_filter_styles_pins_matching_no_style_return_all() -> None:
+    styles = [
+        {"name": "a", "description": "", "source": "builtin"},
+        {"name": "b", "description": "", "source": "builtin"},
+    ]
+    result = filter_styles(styles, pinned_names=["gone"], include_all=False)
+    assert [s["name"] for s in result] == ["a", "b"]
+    assert not any(s["pinned"] for s in result)
+
+
 # ---------------------------------------------------------------------------
 # build_styles_listing
 # ---------------------------------------------------------------------------

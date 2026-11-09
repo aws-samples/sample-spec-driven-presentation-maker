@@ -9,7 +9,7 @@ series. The assembly now
 - starts start_presentation as soon as the Presentation Maker client is up,
 - builds the Memory session manager next to the MCP connections,
 - drops an optional server still connecting when that path is done, and
-- keeps the role documents (per process) and the styles/templates environment
+- keeps the role documents (per process) and the templates environment
   (per user) from start_presentation, so a later turn makes no call for them.
 """
 
@@ -112,8 +112,7 @@ class _PresentationMaker:
         self.called.set()
         payload = {
             "static": {"workflow": f"# Orchestrator (fetched for {self.user})"},
-            "styles": [{"name": f"style-of-{self.user}"}],
-            "templates": [],
+            "templates": [{"name": f"template-of-{self.user}"}],
         }
         return {"status": "success", "content": [{"text": json.dumps(payload)}]}
 
@@ -371,7 +370,7 @@ def test_second_turn_for_the_same_user_makes_no_start_presentation_call(assembly
 
     assert assembly["calls"] == [("u1", "start_presentation", {})]
     assert _text(second.system_prompt) == _text(first.system_prompt)
-    assert "style-of-u1" in _text(second.system_prompt)
+    assert "template-of-u1" in _text(second.system_prompt)
 
 
 def test_environment_is_cached_per_user_and_role_documents_per_process(assembly):
@@ -380,7 +379,7 @@ def test_environment_is_cached_per_user_and_role_documents_per_process(assembly)
 
     assert assembly["calls"] == [("u1", "start_presentation", {}), ("u2", "start_presentation", {})]
     prompt = _text(other.system_prompt)
-    assert "style-of-u2" in prompt and "style-of-u1" not in prompt
+    assert "template-of-u2" in prompt and "template-of-u1" not in prompt
     # The role document is user-independent: the process keeps the first fetch.
     assert "# Orchestrator (fetched for u1)" in prompt
 
@@ -401,7 +400,7 @@ def test_failed_prefetch_falls_back_to_resolve_parts(assembly, monkeypatch):
     agent, _ = assembly["create"]("u1")
 
     assert attempts == ["start_presentation", "start_presentation"]
-    assert "style-of-u1" in _text(agent.system_prompt)
+    assert "template-of-u1" in _text(agent.system_prompt)
 
 
 # --- composition's process cache --------------------------------------------
@@ -432,7 +431,7 @@ def _parts(composition):
     Part, Source = composition.Part, composition.Source
     return [
         Part(Source.mcp("start_presentation", {}, pick="static.workflow"), target="system"),
-        Part(Source.mcp("start_presentation", {}, pick="styles,templates"), target="system"),
+        Part(Source.mcp("start_presentation", {}, pick="templates"), target="system"),
     ]
 
 
@@ -449,7 +448,7 @@ def test_static_picks_are_cached_without_a_user(composition):
 
 def test_environment_without_a_user_is_not_cached(composition):
     parts = _parts(composition)
-    client = _Client({"static": {"workflow": "W"}, "styles": [], "templates": []})
+    client = _Client({"static": {"workflow": "W"}, "templates": []})
 
     composition.resolve_parts(parts, mcp_client=client, enable_cache=False)
     composition.resolve_parts(parts, mcp_client=client, enable_cache=False)
@@ -472,7 +471,7 @@ def test_a_failed_call_is_not_cached(composition):
     with pytest.raises(RuntimeError):
         composition.prefetch_sources(parts, _Client({}, status="error"), user_id="u1")
 
-    client = _Client({"static": {"workflow": "W"}, "styles": [], "templates": []})
+    client = _Client({"static": {"workflow": "W"}, "templates": []})
     composition.prefetch_sources(parts, client, user_id="u1")
     assert len(client.calls) == 1
     system, _ = composition.resolve_parts(parts, mcp_client=client, enable_cache=False, user_id="u1")

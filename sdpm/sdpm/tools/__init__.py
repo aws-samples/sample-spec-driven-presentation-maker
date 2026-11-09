@@ -27,7 +27,7 @@ def start_presentation() -> dict[str, Any]:
     restyling a deck. Call it before any other sdpm tool.
 
     Returns the orchestrator role document (how to run the work end to end) plus what
-    it needs first: available styles, PPTX templates, and the output directory.
+    it needs first: PPTX templates and the output directory.
     To translate an existing deck into another language, call start_translation instead.
     """
     from sdpm.entry import start_presentation as _start
@@ -228,9 +228,9 @@ def search_assets(
 def list_styles(
     include_all: Annotated[bool, Field(description='Include styles hidden by the pin filter.')] = False,
 ) -> dict[str, Any]:
-    """List design styles — pinned and user styles by default, everything with
-    include_all. Names go to apply_style. start_presentation and start_style already
-    return this list.
+    """List design styles: the user's pinned and own styles with descriptions (every
+    style when nothing is pinned), the names of the rest in other_styles; include_all
+    lists every style with its description. Names go to apply_style.
     """
     from sdpm.api import get_styles_dirs, list_styles_listing
     from sdpm.config import get_state

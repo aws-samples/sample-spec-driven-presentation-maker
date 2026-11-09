@@ -494,14 +494,13 @@ def start_presentation() -> str:
     restyling a deck. Call it before any other sdpm tool.
 
     Returns the orchestrator role document (how to run the work end to end) plus what
-    it needs first: available styles and PPTX templates.
+    it needs first: PPTX templates.
     """
     from sdpm.entry import start_presentation as _start
 
     user_id = _get_user_id()
-    styles = reference.list_styles(storage=_storage, user_id=user_id, include_all=True).get("styles", [])
     templates = template_mod.list_templates(storage=_storage, user_id=user_id).get("templates", [])
-    return json.dumps(_start(styles=styles, templates=templates, output_dir=""), ensure_ascii=False)
+    return json.dumps(_start(templates=templates, output_dir=""), ensure_ascii=False)
 
 
 @offloaded_tool
@@ -836,9 +835,9 @@ def search_assets(
 def list_styles(
     include_all: Annotated[bool, Field(description='Include styles hidden by the pin filter.')] = False,
 ) -> str:
-    """List design styles — pinned and user styles by default, everything with
-    include_all. Names go to apply_style. start_presentation and start_style already
-    return this list.
+    """List design styles: the user's pinned and own styles with descriptions (every
+    style when nothing is pinned), the names of the rest in other_styles; include_all
+    lists every style with its description. Names go to apply_style.
     """
     user_id = _get_user_id()
     return json.dumps(
@@ -1556,10 +1555,10 @@ if _kb_configured:
 
 # --- Startup preload (held in the platform V2 snapshot) ---
 #
-# What the first start_presentation on a restored microVM would otherwise read
-# from the lazily fetched root filesystem is read here, before the snapshot: the
-# botocore service definitions of every AWS API this server calls, the bundled
-# style listing and the role documents (dev, 2026-11-03: start_presentation on a
+# What the first start_presentation and list_styles on a restored microVM would
+# otherwise read from the lazily fetched root filesystem is read here, before the
+# snapshot: the botocore service definitions of every AWS API this server calls, the
+# bundled style listing and the role documents (dev, 2026-11-03: start_presentation on a
 # new session 0.73 s -> 0.50 s). Only files baked into the image are read. No
 # client is built, no credentials are resolved and no connection is opened: the
 # default boto3 session only holds configuration and the parsed definitions until

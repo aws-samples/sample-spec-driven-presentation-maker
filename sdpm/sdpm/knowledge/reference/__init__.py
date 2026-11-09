@@ -309,7 +309,8 @@ def filter_styles(
             have ``source``; defaults to ``"builtin"`` if absent.
         pinned_names: List of pinned style names.
         include_all: If True, return all styles. If False, return only
-            pinned + user styles (or all if no pins exist).
+            pinned + user styles (all when there are no pins, or when the
+            pins match no style and there are no user styles).
 
     Returns:
         Styles with ``pinned: bool`` and ``source: "builtin"|"user"`` added.
@@ -325,7 +326,8 @@ def filter_styles(
     if include_all or not pin_set:
         return result
 
-    return [s for s in result if s["pinned"] or s["source"] == "user"]
+    # Pins whose styles no longer exist pin nothing, so they fall back to all as well.
+    return [s for s in result if s["pinned"] or s["source"] == "user"] or result
 
 
 HIDDEN_STYLES_HINT = (

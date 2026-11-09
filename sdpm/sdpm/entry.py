@@ -111,21 +111,19 @@ def _art_direction_toc(deck_path: Path) -> dict[str, Any] | None:
     return {"path": _ART_DIRECTION, "lines": len(html.splitlines()), "toc": toc}
 
 
-def _styles_and_templates() -> tuple[list[dict], list[dict]]:
-    from sdpm.api import (
-        get_styles_dirs,
-        get_templates_dirs,
-        list_styles_filtered,
-        list_templates_with_metadata,
-    )
+def _styles() -> list[dict]:
+    from sdpm.api import get_styles_dirs, list_styles_filtered
     from sdpm.config import get_state
 
-    state = get_state()
-    # Every style, with its pin flag: the pin filter is a gallery concern, the
-    # orchestrator should know the whole catalogue when it picks.
-    styles = list_styles_filtered(get_styles_dirs(), state.get("pinned_styles", []), include_all=True)
-    templates = list_templates_with_metadata(get_templates_dirs(), state.get("template_metadata", {}))
-    return styles, templates
+    # Every style, with its pin flag: a style author draws on the whole catalogue.
+    return list_styles_filtered(get_styles_dirs(), get_state().get("pinned_styles", []), include_all=True)
+
+
+def _templates() -> list[dict]:
+    from sdpm.api import get_templates_dirs, list_templates_with_metadata
+    from sdpm.config import get_state
+
+    return list_templates_with_metadata(get_templates_dirs(), get_state().get("template_metadata", {}))
 
 
 # ---------------------------------------------------------------------------
@@ -135,26 +133,23 @@ def _styles_and_templates() -> tuple[list[dict], list[dict]]:
 
 def start_presentation(
     *,
-    styles: list[dict] | None = None,
     templates: list[dict] | None = None,
     output_dir: str | None = None,
 ) -> dict[str, Any]:
     """Orchestrator entry: role document + the environment it always asks about first.
 
-    Keyword overrides let a server whose styles/templates live elsewhere (S3) supply
-    its own lists; the local filesystem is the default.
+    The styles come from ``list_styles``, which the orchestrator calls when it picks
+    one. Keyword overrides let a server whose templates live elsewhere (S3) supply
+    its own list; the local filesystem is the default.
     """
-    if styles is None or templates is None:
-        fs_styles, fs_templates = _styles_and_templates()
-        styles = fs_styles if styles is None else styles
-        templates = fs_templates if templates is None else templates
+    if templates is None:
+        templates = _templates()
     if output_dir is None:
         from sdpm.api import _get_output_base_dir
 
         output_dir = str(_get_output_base_dir())
     return {
         "static": {"workflow": _workflow("orchestrator")},
-        "styles": styles,
         "templates": templates,
         "output_dir": output_dir,
     }
@@ -392,7 +387,7 @@ def start_style(
     """
     name = base or _DEFAULT_BASE_STYLE
     if styles is None:
-        styles, _ = _styles_and_templates()
+        styles = _styles()
     if base_html is None:
         from sdpm.api import _find_style_in_dirs, get_styles_dirs
 

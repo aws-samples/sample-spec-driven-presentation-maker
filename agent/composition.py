@@ -143,7 +143,7 @@ def _process_cache_key(source: Source, user_id: str | None) -> tuple | None:
 
     - Picks under ``static`` (the role documents and specs of the entry tools) depend
       only on the tool and its arguments, so they are shared by every user.
-    - Any other pick (the styles and templates start_presentation returns) is per
+    - Any other pick (the templates start_presentation returns) is per
       user, so it is cached only under that user's id.
 
     Plain Source.mcp (no pick) is never cached: it keeps its one-call-per-part
