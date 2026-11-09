@@ -10,8 +10,9 @@
  *
  * A reopened deck is opened by the process manager (openDeckSession, with the id its `.session`
  * names); a `created` outcome (no `.session`, or kiro-cli no longer has it) runs the turn as the
- * session's first prompt, which names the deck (`Current deck: <dir>`), and opens the stream
- * with the `context_not_carried_over` notice, a resumed session that also ran on the other engine with `context_from_other_engine`. A fork's
+ * session's first prompt, which names the deck (`Current deck: <dir>`); only a saved session
+ * kiro-cli lost opens the stream with the `context_not_carried_over` notice (a deck an MCP client
+ * made has no `.session` and gets none), a resumed session that also ran on the other engine with `context_from_other_engine`. A fork's
  * first message after its process was evicted reopens the copy (openForkedSession); a copy
  * kiro-cli could not read gets the notice instead of failing. Stop while the chat starts answers a
  * stream that ends at once (no data); a client that went away gets 499. A new chat whose client id had a
@@ -163,25 +164,38 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
     expect((await events(res)).some((e) => "notice" in e)).toBe(false)
   })
 
-  it.each([["no .session", null], ["a session kiro-cli no longer has", "GONE"]])(
-    "runs a created session's first prompt with the notice first (%s)",
-    async (_case, saved) => {
-      acp.readSessionFromDeck.mockReturnValue(saved)
-      acp.openDeckSession.mockResolvedValue({ chat: {}, outcome: "created", otherEngine: false })
-      acp.sendPrompt.mockImplementation(promptEndingAt("NEW1"))
-      const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
-      expect(res.status).toBe(200)
-      expect(acp.openDeckSession).toHaveBeenCalledWith(DECK_FALLBACK_ID, "mcp-made-deck", saved, "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
-      // A new session's first prompt carries the interaction mode and the deck's directory.
-      expect(resolveDeckDir).toHaveBeenCalledWith("mcp-made-deck")
-      expect(acp.sendPrompt).toHaveBeenCalledWith(
-        DECK_FALLBACK_ID,
-        "Interaction mode: fast\n\nCurrent deck: /home/u/Documents/SDPM-Presentations/mcp-made-deck\n\nhi",
-        { notice: "context_not_carried_over", displayText: "hi", signal: expect.any(AbortSignal) },
-      )
-      expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
-    },
-  )
+  it("runs a deck's first prompt in a new session without a notice when it has no .session", async () => {
+    acp.readSessionFromDeck.mockReturnValue(null)
+    acp.openDeckSession.mockResolvedValue({ chat: {}, outcome: "created", otherEngine: false })
+    acp.sendPrompt.mockImplementation(promptEndingAt("NEW1"))
+    const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
+    expect(res.status).toBe(200)
+    expect(acp.openDeckSession).toHaveBeenCalledWith(DECK_FALLBACK_ID, "mcp-made-deck", null, "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
+    // A new session's first prompt carries the interaction mode and the deck's directory.
+    expect(resolveDeckDir).toHaveBeenCalledWith("mcp-made-deck")
+    expect(acp.sendPrompt).toHaveBeenCalledWith(
+      DECK_FALLBACK_ID,
+      "Interaction mode: fast\n\nCurrent deck: /home/u/Documents/SDPM-Presentations/mcp-made-deck\n\nhi",
+      { notice: undefined, displayText: "hi", signal: expect.any(AbortSignal) },
+    )
+    expect((await events(res)).some((e) => "notice" in e)).toBe(false)
+  })
+
+  it("runs a created session's first prompt with the notice first when kiro-cli lost the saved one", async () => {
+    acp.readSessionFromDeck.mockReturnValue("GONE")
+    acp.openDeckSession.mockResolvedValue({ chat: {}, outcome: "created", otherEngine: false })
+    acp.sendPrompt.mockImplementation(promptEndingAt("NEW1"))
+    const res = await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
+    expect(res.status).toBe(200)
+    expect(acp.openDeckSession).toHaveBeenCalledWith(DECK_FALLBACK_ID, "mcp-made-deck", "GONE", "sdpm-orchestrator", { signal: expect.any(AbortSignal) })
+    expect(acp.readSessionFromDeck).toHaveBeenCalledTimes(1)
+    expect(acp.sendPrompt).toHaveBeenCalledWith(
+      DECK_FALLBACK_ID,
+      "Interaction mode: fast\n\nCurrent deck: /home/u/Documents/SDPM-Presentations/mcp-made-deck\n\nhi",
+      { notice: "context_not_carried_over", displayText: "hi", signal: expect.any(AbortSignal) },
+    )
+    expect((await events(res))[0]).toEqual({ notice: { code: "context_not_carried_over" } })
+  })
 
   it("leaves the deck line out when the deck directory does not resolve", async () => {
     acp.readSessionFromDeck.mockReturnValue(null)
@@ -189,7 +203,7 @@ describe("POST /api/agent/invoke on a reopened deck", () => {
     acp.sendPrompt.mockImplementation(promptEndingAt("NEW1"))
     resolveDeckDir.mockReturnValueOnce(null)
     await invoke({ sessionId: DECK_FALLBACK_ID, deckId: "mcp-made-deck" })
-    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "Interaction mode: fast\n\nhi", { notice: "context_not_carried_over", displayText: "hi", signal: expect.any(AbortSignal) })
+    expect(acp.sendPrompt).toHaveBeenCalledWith(DECK_FALLBACK_ID, "Interaction mode: fast\n\nhi", { notice: undefined, displayText: "hi", signal: expect.any(AbortSignal) })
   })
 
   it("says so when the deck's session also ran on the other engine", async () => {

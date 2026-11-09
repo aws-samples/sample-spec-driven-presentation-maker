@@ -8,7 +8,8 @@
  * that does not answer its setup requests in time with 504 and code `agent_timeout`;
  * one that cannot be made ready (lib/local/turnErrors.ts, AgentStartError) with 502 and its code.
  * A reopened deck whose session kiro-cli does not have, or that has none, gets a new one whose
- * first prompt names the deck (`Current deck: <dir>`); a deck
+ * first prompt names the deck (`Current deck: <dir>`); only the first case says the earlier
+ * conversation is not carried over (a deck made by an MCP client has none). A deck
  * whose session also ran on the other agent engine says so (lib/local/sessionNotices.ts).
  * The chat saves the session to a deck the turn creates (and a fork's origin with it),
  * whether or not this stream is still read. Stop for the session while its chat starts
@@ -96,13 +97,15 @@ export async function POST(req: Request) {
       } else if (deckId && deckId !== "new") {
         // Existing deck reopened after evict — open the kiro session its .session names (the
         // client may still hold an earlier id for this page, e.g. the deck fallback id). A deck
-        // with no session to open (made by an MCP client or Kiro CLI, or its kiro session is gone)
-        // continues in a new one, and the chat says the earlier conversation is not carried over.
-        // The new session's first prompt names the deck's directory, so the agent works on it.
-        const { outcome, otherEngine } = await openDeckSession(clientSessionId, deckId, readSessionFromDeck(deckId), agentName, { signal })
+        // with no session to open continues in a new one whose first prompt names the deck's
+        // directory, so the agent works on it. Only a deck whose saved session kiro-cli no longer
+        // has gets the notice that the earlier conversation is not carried over; a deck made by
+        // an MCP client or Kiro CLI (no .session) had no Web UI conversation to carry over.
+        const saved = readSessionFromDeck(deckId)
+        const { outcome, otherEngine } = await openDeckSession(clientSessionId, deckId, saved, agentName, { signal })
         if (outcome === "created") {
           isFirstPrompt = true
-          notice = "context_not_carried_over"
+          if (saved) notice = "context_not_carried_over"
           currentDeck = resolveDeckDir(deckId)
         } else if (otherEngine) {
           notice = "context_from_other_engine"
