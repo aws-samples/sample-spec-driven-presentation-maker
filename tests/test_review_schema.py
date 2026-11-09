@@ -20,6 +20,7 @@ from shared.review import (
     WHITESPACE,
     build_review_file,
     build_review_message,
+    create_review,
     new_review_id,
     review_template,
     slide_size_of,
@@ -118,3 +119,72 @@ def test_template_placeholders_are_known():
 ])
 def test_slide_size_of(deck_json, expected):
     assert slide_size_of(deck_json) == expected
+
+
+# --- create_review: the review routes' steps, storage passed in ---------------------------
+
+_BODY = {"note": "tighter", "comments": [{"name": "A", "slide": "sales", "rect": [10, 20, 30, 40], "text": " bigger "}]}
+_NOW = datetime(2026, 11, 9, 1, 2, 3, tzinfo=timezone.utc)
+
+
+class _Store:
+    def __init__(self, taken: int = 0) -> None:
+        self.files: dict[str, bytes] = {}
+        self.events: list[str] = []
+        self.taken = taken
+
+    def clear(self) -> None:
+        self.events.append("clear")
+
+    def write_new(self, path: str, data: bytes) -> bool:
+        self.events.append(f"write {path}")
+        if self.taken:
+            self.taken -= 1
+            return False
+        self.files[path] = data
+        return True
+
+
+def _create(store: _Store, body=_BODY):
+    return create_review(body, {"slideSize": {"width": 1280, "height": 720}}, lambda s: s in _SLUGS,
+                         clear=store.clear, write_new=store.write_new, now=lambda: _NOW)
+
+
+def test_create_review_clears_then_writes_the_file_and_returns_the_message():
+    store = _Store()
+    got = _create(store)
+    rid = got["id"]
+    assert REVIEW_ID_RE.fullmatch(rid) and rid.startswith("20261109-010203-")
+    assert store.events == ["clear", f"write reviews/{rid}.json"]
+    normalized, _ = validate_review_submission(_BODY, (1280, 720), lambda s: s in _SLUGS)
+    assert json.loads(store.files[f"reviews/{rid}.json"]) == build_review_file(rid, (1280, 720), normalized)
+    assert got["message"] == build_review_message(rid, normalized)
+
+
+def test_create_review_takes_a_new_id_when_one_is_taken(monkeypatch):
+    hexes = iter(["aaaa", "bbbb"])
+    monkeypatch.setattr("shared.review.secrets.token_hex", lambda n: next(hexes))
+    store = _Store(taken=1)
+    got = _create(store)
+    assert got["id"] == "20261109-010203-bbbb"
+    assert list(store.files) == ["reviews/20261109-010203-bbbb.json"]
+
+
+def test_create_review_gives_up_after_three_taken_ids():
+    store = _Store(taken=3)
+    with pytest.raises(RuntimeError):
+        _create(store)
+    assert store.files == {}
+
+
+@pytest.mark.parametrize("body", [
+    {"comments": []},
+    {"note": None, "comments": [{"name": "A", "slide": "gone", "rect": [0, 0, 5, 5], "text": "x"}]},
+    "not an object",
+    {"note": "x" * (512 * 1024), "comments": []},
+])
+def test_create_review_refuses_a_bad_body_before_clearing(body):
+    store = _Store()
+    with pytest.raises(ValueError):
+        _create(store, body)
+    assert store.events == []

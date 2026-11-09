@@ -229,3 +229,38 @@ def slide_size_of(deck_json: object) -> tuple[int, int]:
         ok = isinstance(value, (int, float)) and not isinstance(value, bool) and math.isfinite(value) and value >= 1
         out.append(int(value) if ok else default)
     return out[0], out[1]
+
+
+def create_review(
+    body: object,
+    deck_json: object,
+    slug_exists: Callable[[str], bool],
+    *,
+    clear: Callable[[], None],
+    write_new: Callable[[str, bytes], bool],
+    now: Callable[[], datetime] = lambda: datetime.now(timezone.utc),
+) -> dict[str, str]:
+    """Validate a change request, replace the deck's review file and return ``{"id", "message"}``.
+
+    The steps of the Web UI's review routes, with the storage passed in: ``clear()`` removes
+    the old files under ``reviews/``, ``write_new(path, data)`` writes ``data`` at the workspace
+    path only if nothing is there yet (False when taken). The Local and remote MCP servers use
+    it for the deck viewer; the cloud API route keeps its own copy of the same steps.
+
+    Raises ValueError for an oversize or invalid body (nothing is cleared) and RuntimeError
+    when three ids in a row are taken.
+    """
+    if len(json.dumps(body, ensure_ascii=False).encode("utf-8")) > MAX_BODY_BYTES:
+        raise ValueError(f"body exceeds {MAX_BODY_BYTES} bytes")
+    size = slide_size_of(deck_json)
+    normalized, error = validate_review_submission(body, size, slug_exists)
+    if error:
+        raise ValueError(error)
+    clear()
+    for _ in range(3):
+        review_id = new_review_id(now())
+        review = build_review_file(review_id, size, normalized)
+        data = (json.dumps(review, ensure_ascii=False, indent=2) + "\n").encode("utf-8")
+        if write_new(review_path(review_id), data):
+            return {"id": review_id, "message": build_review_message(review_id, normalized)}
+    raise RuntimeError("Could not allocate a review id")

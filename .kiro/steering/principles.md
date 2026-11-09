@@ -126,7 +126,7 @@ Path-based; the remote server materialises the deck from S3 and calls the same c
 
 stdio MCP + ACP server for local environments. Must be a **thin bind** of
 `sdpm.tools`. Local-transport specifics (session-scoped upload staging,
-ACP hearing UI) are the only allowed additions.
+ACP hearing UI, the deck viewer's file access `deck_access.py`) are the only allowed additions.
 
 The installed `sdpm` command is a bootstrap (`scripts/install/launcher.*`, `sdpm-bootstrap 1`):
 it resolves uv, fetches, and hands `update` to `servers/local/checkout_update.py` and every

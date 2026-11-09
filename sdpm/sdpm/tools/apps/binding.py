@@ -6,11 +6,13 @@ What ``register`` installs on a server whose tools are already registered:
 
 - ``_meta.ui.resourceUri`` (and the older flat ``ui/resourceUri``) on ``list_styles``, so a host
   that shows MCP Apps renders its result as the style gallery
-- the gallery view as a ``ui://`` resource (``text/html;profile=mcp-app``; no ``csp`` key, so the
-  spec's default CSP applies and the view fetches nothing)
+- with a ``deck`` access (``deck.DeckAccess``): the deck viewer on ``check_specs`` (it opens on
+  the Outline tab; the result itself is unchanged) and ``show_deck`` (it opens on Slides)
+- the views as ``ui://`` resources (``text/html;profile=mcp-app``; no ``csp`` key, so the spec's
+  default CSP applies and the views fetch nothing)
 - ``app_action``, the one tool the views call (``visibility: ["app"]``)
-- a ``tools/list`` that leaves out app-only tools unless the caller declared MCP Apps.
-  ``tools/call`` is not gated: a host may call for its view without declaring
+- a ``tools/list`` that leaves out ``app_action`` and ``show_deck`` unless the caller declared
+  MCP Apps. ``tools/call`` is not gated: a host may call for its view without declaring
 - ``extensions["io.modelcontextprotocol/ui"]`` in the initialize capabilities
 """
 
@@ -21,9 +23,10 @@ from mcp import types
 from pydantic import Field
 
 from sdpm.tools import apps
+from sdpm.tools.apps import deck as _deck
 from sdpm.tools.apps import gallery
 
-_ACTIONS = Literal["style_previews"]
+_ACTIONS = Literal["style_previews", "deck", "slide_preview", "submit_review", "outline_edit"]
 
 
 def _caller_declared(mcp: Any) -> bool:
@@ -39,9 +42,8 @@ def _install_list_filter(mcp: Any) -> None:
 
     async def list_tools() -> list[types.Tool]:
         listed = await unfiltered()
-        if _caller_declared(mcp):
-            return listed
-        return [t for t in listed if apps.model_listed(t.meta)]
+        declared = _caller_declared(mcp)
+        return [t for t in listed if apps.listed(t.name, t.meta, declared)]
 
     list_tools.__doc__ = unfiltered.__doc__
     # FastMCP bound its own method as the handler at init; replace both.
@@ -63,38 +65,108 @@ def _install_capability(mcp: Any) -> None:
     low.get_capabilities = get_capabilities
 
 
-def register(mcp: Any, *, read_styles: Any = None, load_icons: Any = None) -> None:
+def _text(text: str, payload: dict) -> types.CallToolResult:
+    return types.CallToolResult(content=[types.TextContent(type="text", text=text)], structuredContent=payload)
+
+
+def _view(mcp: Any, name: str, doc: str) -> str:
+    """Register ``views/<name>.html`` as its ``ui://`` resource; return the URI."""
+    uri = apps.view_uri(name)
+
+    def view() -> str:
+        return apps.view_html(name)
+
+    view.__doc__ = doc
+    mcp.resource(uri, name=name, mime_type=apps.APP_MIME, meta={"ui": {"prefersBorder": True}})(view)
+    return uri
+
+
+def _ui_meta(uri: str) -> dict[str, Any]:
+    return {"ui": {"resourceUri": uri}, "ui/resourceUri": uri}
+
+
+def _register_deck_viewer(mcp: Any, access: _deck.DeckAccess) -> None:
+    checking = mcp._tool_manager.get_tool("check_specs")
+    if checking is None:
+        raise RuntimeError("register MCP Apps after check_specs")
+    uri = _view(mcp, apps.DECK_VIEWER, "The deck viewer (a template: the deck comes from app_action).")
+    checking.meta = {**(checking.meta or {}), **_ui_meta(uri)}
+
+    async def show_deck(
+        deck_id: Annotated[str, Field(description="Deck ID (the deck_id init_deck_workspace returned).")],
+    ) -> types.CallToolResult:
+        """Show the deck to the user in the chat: Brief, Outline and Slides tabs, with each slide's
+        preview. The user's slide comments (saved to reviews/<id>.json), outline edits (a diff for
+        you to apply) and confirmations arrive as their next message.
+        """
+        deck_id = _deck._deck_id(deck_id)
+        await asyncio.to_thread(access.open, deck_id, False)
+        return _text(
+            f"The deck viewer shows {deck_id} to the user; their comments and edits arrive as their next message.",
+            {"deck_id": deck_id, "tab": "slides"},
+        )
+
+    mcp.tool(name=apps.DECK_TOOL, meta=_ui_meta(uri))(show_deck)
+
+
+def register(mcp: Any, *, read_styles: Any = None, load_icons: Any = None, deck: Any = None) -> None:
     """Install the MCP Apps wiring. ``read_styles(names) -> {name: html}`` and
-    ``load_icons(ids) -> {id: svg bytes}`` default to the local files and catalog."""
+    ``load_icons(ids) -> {id: svg bytes}`` default to the local files and catalog; ``deck``
+    (a ``DeckAccess``) adds the deck viewer, which a server without it does not offer."""
     if read_styles is None:
         from sdpm.api import read_style_htmls as read_styles
 
     listing = mcp._tool_manager.get_tool("list_styles")
     if listing is None:
         raise RuntimeError("register MCP Apps after list_styles")
-    uri = apps.view_uri(apps.GALLERY)
-    listing.meta = {**(listing.meta or {}), "ui": {"resourceUri": uri}, "ui/resourceUri": uri}
-
-    def style_gallery() -> str:
-        """The style gallery view (a template: the styles come from the list_styles result)."""
-        return apps.view_html(apps.GALLERY)
-
-    mcp.resource(uri, name=apps.GALLERY, mime_type=apps.APP_MIME, meta={"ui": {"prefersBorder": True}})(style_gallery)
+    uri = _view(mcp, apps.GALLERY, "The style gallery view (a template: the styles come from the list_styles result).")
+    listing.meta = {**(listing.meta or {}), **_ui_meta(uri)}
+    access = deck
+    if access is not None:
+        _register_deck_viewer(mcp, access)
 
     async def app_action(
-        action: Annotated[_ACTIONS, Field(description="Operation: style_previews (display copies of styles).")],
+        action: Annotated[_ACTIONS, Field(description="Operation; see the tool description.")],
         names: Annotated[
             list[str],
             Field(description=f"Style names for style_previews, 1 to {gallery.MAX_NAMES}.", max_length=gallery.MAX_NAMES),
         ] = [],  # noqa: B006 (FastMCP copies defaults); not Optional: hosts that validate view calls reject anyOf
+        deck_id: Annotated[str, Field(description="Deck for the deck actions: the deck_id the deck tools take.")] = "",
+        slug: Annotated[str, Field(description="Slide for slide_preview.")] = "",
+        review: Annotated[
+            dict[str, Any], Field(description="Change request for submit_review: {note, comments}."),
+        ] = {},  # noqa: B006 (FastMCP copies defaults)
+        base: Annotated[
+            str, Field(description="Outline as loaded, for outline_edit.", max_length=_deck.MAX_TEXT),
+        ] = "",
+        text: Annotated[
+            str, Field(description="Outline as edited, for outline_edit.", max_length=_deck.MAX_TEXT),
+        ] = "",
     ) -> types.CallToolResult:
         """Data for sdpm's MCP Apps views; only the views call it.
         style_previews: the named styles cut into slides, icons drawn in.
+        deck: the deck's brief, outline, check result and slide list (no images).
+        slide_preview: one slide's preview: compose SVG parts, or a JPEG when the slide has none.
+        submit_review: save slide comments as reviews/<id>.json; returns the message for the chat.
+        outline_edit: an outline edit as a diff message for the chat; writes nothing.
         """
-        # action is "style_previews" (the Literal refuses anything else)
-        payload = await asyncio.to_thread(gallery.style_previews, names, read_styles, load_icons)
-        text = f"{len(payload['previews'])} style previews"
-        return types.CallToolResult(content=[types.TextContent(type="text", text=text)], structuredContent=payload)
+        if action == "style_previews":
+            payload = await asyncio.to_thread(gallery.style_previews, names, read_styles, load_icons)
+            return _text(f"{len(payload['previews'])} style previews", payload)
+        if access is None:
+            raise ValueError("the deck viewer is not available here")
+        if action == "deck":
+            payload = await asyncio.to_thread(_deck.deck_view, deck_id, access)
+            return _text(f"deck {payload['deck_id']}: {len(payload['slides'])} slides", payload)
+        if action == "slide_preview":
+            payload = await asyncio.to_thread(_deck.slide_preview, deck_id, slug, access)
+            return _text(f"preview of {payload['slug']}", payload)
+        if action == "submit_review":
+            payload = await asyncio.to_thread(_deck.submit_review, deck_id, review, access)
+            return _text(f"review {payload['id']} saved", payload)
+        # outline_edit (the Literal refuses anything else)
+        payload = await asyncio.to_thread(_deck.outline_edit, deck_id, base, text, access)
+        return _text("outline edit", payload)
 
     mcp.tool(name=apps.APP_TOOL, meta={"ui": {"visibility": ["app"]}})(app_action)
     _install_list_filter(mcp)

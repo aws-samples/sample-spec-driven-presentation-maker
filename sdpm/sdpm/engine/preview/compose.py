@@ -204,6 +204,53 @@ def split_slide_components(svg_path: "Path | etree._ElementTree", slide_num: int
     }
 
 
+# --- The defs one slide draws from ---
+
+# A local reference: href="#id" / xlink:href="#id" / url(#id) / url('#id').
+_LOCAL_REF_RE = re.compile(r"""(?:href\s*=\s*["']#([^"']+)["']|url\(\s*["']?#([^"')\s]+))""")
+
+
+def _local_refs(text: str) -> set[str]:
+    return {a or b for a, b in _LOCAL_REF_RE.findall(text)}
+
+
+def referenced_defs(defs: str, fragments: "list[str]") -> str:
+    """The elements of the deck's ``defs`` (``extract_optimized_defs``) that ``fragments`` (a
+    slide's ``bgSvg`` and component SVGs) reference, followed transitively, as one ``<defs>``.
+
+    The deck's defs also hold every master page, whose background images are already inlined
+    into each slide's ``bgSvg``; inside ``<defs>`` they are never drawn. Returns ``""`` when
+    nothing is referenced, and ``defs`` unchanged when it cannot be parsed.
+    """
+    wanted = set().union(*(_local_refs(f) for f in fragments)) if fragments else set()
+    if not wanted or not defs:
+        return ""
+    parser = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False)
+    try:
+        root = etree.fromstring(f'<svg xmlns="{SVG_NS}">{defs}</svg>', parser)
+    except etree.XMLSyntaxError:
+        return defs
+    by_id = {el.get("id"): el for el in root.iter() if isinstance(el.tag, str) and el.get("id")}
+    picked: set[str] = set()
+    todo = [i for i in wanted if i in by_id]
+    while todo:
+        ref = todo.pop()
+        if ref in picked:
+            continue
+        picked.add(ref)
+        todo.extend(i for i in _local_refs(etree.tostring(by_id[ref], encoding="unicode")) if i in by_id)
+    # Document order; an element inside one already picked comes with it.
+    out = [
+        el for el in root.iter()
+        if isinstance(el.tag, str) and el.get("id") in picked
+        and not any(a.get("id") in picked for a in el.iterancestors())
+    ]
+    if not out:
+        return ""
+    body = "".join(etree.tostring(el, encoding="unicode", with_tail=False) for el in out)
+    return f'<defs xmlns="{SVG_NS}">{body}</defs>'
+
+
 # --- Component-level diff against the previous compose of the same slide ---
 
 

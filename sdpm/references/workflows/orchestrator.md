@@ -74,6 +74,8 @@ task_instruction: {task_instruction}
 
 `check_specs(deck_id)` validates deck.json and outline.md; compose only when it returns ok (on the cloud stack compose_slides runs it itself).
 
+When `show_deck` is among your tools, the user reviews in the chat: call `check_specs(deck_id)` before you ask them to review the outline, and `show_deck(deck_id)` once the slides are composed; both show the brief, outline and slides, and the user's confirmation, outline edits and slide comments come back as their next message.
+
 Passes, the second waiting for the first to finish:
 
 1. **Layout** — one composer, all slugs, `task_instruction: Layout pass.` (exact string). It
