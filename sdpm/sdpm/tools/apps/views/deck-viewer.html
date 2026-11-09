@@ -292,11 +292,13 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
     if (!quiet) status("Loading the deck…");
     bridge.callTool("app_action", { action: "deck", deck_id: deckId }).then(function (r) {
       if (!r || r.isError) { status("Could not load the deck: " + errorText(r)); return; }
-      data = r.structuredContent;
+      data = r.structuredContent || payload(r);
       render();
       status("");
     }, function (e) {
       status("The host refused the call: " + e.message);
+    }).catch(function (e) {
+      status("Could not show the deck: " + e.message);
     }).then(function () {
       loading = false;
       $("#refresh").disabled = false;
@@ -633,7 +635,8 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
   $("#outline-cancel").onclick = function () { editing(false); renderOutline(); };
   $("#outline-send").onclick = function () {
     var text = $("#outline-text").value;
-    if (text === editBase) { status("The outline is unchanged."); return; }
+    // A textarea gives LF line ends; compare the loaded text the same way (a CRLF outline).
+    if (text === editBase.replace(/\r\n?/g, "\n")) { status("The outline is unchanged."); return; }
     if (!canCall()) return;
     var button = $("#outline-send");
     button.disabled = true;
