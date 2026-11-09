@@ -6,8 +6,9 @@
   var pending = new Map();
   var toolResultHandlers = [];
   var lastToolResult = null;
+  var toolInputHandlers = [];
   var lastHeight = 0;
-  var bridge = { hostContext: {}, hostCapabilities: {} };
+  var bridge = { hostContext: {}, hostCapabilities: {}, toolInput: null };
 
   function send(msg) {
     // The host's sandbox has an opaque origin, so no target origin can be named; replies are
@@ -57,6 +58,12 @@
     if (lastToolResult) fn(lastToolResult);
   };
 
+  // The arguments the model called the tool with (ui/notifications/tool-input), replayed to late handlers.
+  bridge.onToolInput = function (fn) {
+    toolInputHandlers.push(fn);
+    if (bridge.toolInput) fn(bridge.toolInput);
+  };
+
   bridge.reportSize = function () {
     var el = document.documentElement;
     if (el.scrollHeight === lastHeight) return;
@@ -80,6 +87,11 @@
     if (m.method === "ui/notifications/tool-result") {
       lastToolResult = m.params || {};
       toolResultHandlers.forEach(function (fn) { fn(lastToolResult); });
+      return;
+    }
+    if (m.method === "ui/notifications/tool-input") {
+      bridge.toolInput = m.params || {};
+      toolInputHandlers.forEach(function (fn) { fn(bridge.toolInput); });
       return;
     }
     if (m.method === "ui/notifications/host-context-changed") {

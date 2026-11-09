@@ -3,14 +3,18 @@
 """MCP Apps (``io.modelcontextprotocol/ui``): sdpm's views, defined once for both servers.
 
 The pure rules live here: what a client declared (``ui_capable``, ``declared``), which tools
-the model sees (``model_listed``), and the view documents and their ``ui://`` URIs. No ``mcp``
-import, no I/O beyond reading the bundled view files, and the rules never raise.
+a client sees (``model_listed``, ``listed``), and the view documents and their ``ui://``
+URIs. No ``mcp`` import, no I/O beyond reading the bundled view files, and the rules never
+raise. The views' operations are pure modules next to this one: ``gallery`` (style previews)
+and ``deck`` (the deck viewer, with storage passed in as a ``DeckAccess``).
 
 ``register(mcp, ...)`` installs the wiring on a FastMCP server (``binding.py``): the style
-gallery on ``list_styles``, the gallery resource, the app-only ``app_action`` tool, the
-``tools/list`` filter and the extension in the initialize capabilities. Both servers call it
-once, after their tools are registered. The Local server also uses ``ui_capable`` to leave out
-the ``sdpm open`` hint (such a client shows decks itself).
+gallery on ``list_styles``; with a ``deck`` access, the deck viewer on ``check_specs`` (Outline
+tab) and on ``show_deck`` (Slides tab, listed only to MCP Apps clients); the views as
+resources, the app-only ``app_action`` tool, the ``tools/list`` filter and the extension in the
+initialize capabilities. Both servers call it once, after their tools are registered. The
+Local server also uses ``ui_capable`` to leave out the ``sdpm open`` hint (such a client shows
+decks itself).
 """
 
 import functools
@@ -26,6 +30,10 @@ CLIENT_CAPABILITIES_META = "io.modelcontextprotocol/clientCapabilities"
 # The one tool only sdpm's views call (visibility ["app"]); its ``action`` selects the operation.
 APP_TOOL = "app_action"
 GALLERY = "style-gallery"
+DECK_VIEWER = "deck-viewer"
+# The model tool that only opens the deck viewer: a client that cannot show it is not offered it.
+DECK_TOOL = "show_deck"
+UI_ONLY_TOOLS = frozenset({APP_TOOL, DECK_TOOL})
 
 _VIEWS = Path(__file__).resolve().parent / "views"
 _BRIDGE_PLACEHOLDER = "/*__SDPM_BRIDGE__*/"
@@ -84,6 +92,14 @@ def model_listed(tool_meta: Any) -> bool:
     return not isinstance(visibility, list) or "model" in visibility
 
 
+def listed(name: Any, tool_meta: Any, declared: bool) -> bool:
+    """Whether ``tools/list`` shows a tool: every tool to a client that declared MCP Apps,
+    otherwise the model's tools except the ones that only serve a view (``UI_ONLY_TOOLS``)."""
+    if declared:
+        return True
+    return model_listed(tool_meta) and not (isinstance(name, str) and name in UI_ONLY_TOOLS)
+
+
 @functools.lru_cache(maxsize=None)
 def view_html(name: str) -> str:
     """The view document ``views/<name>.html`` with the shared bridge script inlined.
@@ -102,8 +118,8 @@ def view_uri(name: str) -> str:
     return f"ui://sdpm/{name}-{digest}.html"
 
 
-def register(mcp: Any, *, read_styles: Any = None, load_icons: Any = None) -> None:
+def register(mcp: Any, *, read_styles: Any = None, load_icons: Any = None, deck: Any = None) -> None:
     """Install sdpm's MCP Apps wiring on a FastMCP server (see ``binding.register``)."""
     from .binding import register as _register
 
-    _register(mcp, read_styles=read_styles, load_icons=load_icons)
+    _register(mcp, read_styles=read_styles, load_icons=load_icons, deck=deck)

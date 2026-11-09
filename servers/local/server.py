@@ -30,6 +30,7 @@ if (_SKILL_DIR / "sdpm" / "config.py").is_file():
 
 import functools  # noqa: E402
 
+import deck_access  # noqa: E402
 import sandbox_tools  # noqa: E402
 import sdpm_command  # noqa: E402
 from mcp.server.fastmcp import FastMCP  # noqa: E402
@@ -120,10 +121,11 @@ mcp.tool()(import_attachment)
 mcp.tool()(sandbox_tools.run_python)
 mcp.tool()(sandbox_tools.run_style_python)
 
-# MCP Apps: the style gallery on list_styles and the app-only tool its view calls
+# MCP Apps: the style gallery on list_styles, the deck viewer on check_specs and show_deck
+# (the deck directory read through deck_access), and the app-only tool the views call
 from sdpm.tools import apps as _apps  # noqa: E402
 
-_apps.register(mcp)
+_apps.register(mcp, deck=deck_access.ACCESS)
 
 
 def main() -> None:

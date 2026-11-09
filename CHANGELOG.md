@@ -42,6 +42,17 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   so it lists `app_action` only to clients that declare MCP Apps in each request's `_meta`;
   a host that refuses view calls to unlisted tools shows the remote gallery's cards without
   previews, and **Use this style** still works.
+- **A deck viewer in MCP Apps clients**, on the local and the remote server. `check_specs`
+  opens it on the Outline tab with the check's errors and warnings, and the new
+  `show_deck(deck_id)` opens it on the Slides tab; one view holds the Brief, Outline and Slides
+  tabs and a **Refresh** button. Slide previews show as images, and a machine that cannot make
+  previews says what to install. Frames drawn on a slide with a comment are saved as
+  `reviews/<id>.json` and sent as the Web UI's review message; outline edits come back as a
+  diff for the agent to apply; **Outline looks good** confirms the outline. The slide view asks
+  for full screen where the host offers it. Clients without MCP Apps see no new tool
+  (`show_deck` is listed only to MCP Apps clients) and the same `check_specs` result; the
+  remote server lists `show_deck` only to clients that declare MCP Apps in each request's
+  `_meta`.
 
 ### Changed
 

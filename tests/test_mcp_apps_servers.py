@@ -17,6 +17,7 @@ import importlib.util
 import json
 import sys
 from pathlib import Path
+from typing import Any
 from unittest.mock import MagicMock, patch
 
 import anyio
@@ -159,13 +160,15 @@ def _call(server, name, arguments, extensions=None) -> types.CallToolResult:
 
 def test_a_client_without_mcp_apps_sees_no_app_tool(server) -> None:
     listed = _listed(server)
-    assert apps.APP_TOOL not in listed
+    assert apps.APP_TOOL not in listed and apps.DECK_TOOL not in listed
     registered = {t.name for t in server.mcp._tool_manager.list_tools()}
-    assert set(listed) == registered - {apps.APP_TOOL}
-    uri = apps.view_uri(apps.GALLERY)
-    meta = listed["list_styles"].meta
-    assert meta["ui"]["resourceUri"] == uri
-    assert meta["ui/resourceUri"] == uri
+    assert apps.UI_ONLY_TOOLS <= registered
+    assert set(listed) == registered - apps.UI_ONLY_TOOLS
+    for name, view in (("list_styles", apps.GALLERY), ("check_specs", apps.DECK_VIEWER)):
+        uri = apps.view_uri(view)
+        meta = listed[name].meta
+        assert meta["ui"]["resourceUri"] == uri
+        assert meta["ui/resourceUri"] == uri
     assert _listed(server, {"io.example/other": {}}).keys() == listed.keys()
 
 
@@ -186,12 +189,19 @@ def test_a_client_with_mcp_apps_sees_the_app_tool(which, declaration, request) -
     assert tool.meta == {"ui": {"visibility": ["app"]}}
     props = tool.inputSchema["properties"]
     assert all(p.get("description") for p in props.values()), props
-    action = props["action"]
-    assert action.get("enum", [action.get("const")]) == ["style_previews"]  # one value: pydantic writes const
+    assert props["action"]["enum"] == ["style_previews", "deck", "slide_preview", "submit_review", "outline_edit"]
     assert tool.inputSchema["required"] == ["action"]
     # Hosts check a view's arguments against inputSchema before passing the call on, and
     # Kiro Crew's gateway refuses a schema with anyOf/oneOf/allOf ("failing closed").
     assert not {"anyOf", "oneOf", "allOf"} & _keywords(tool.inputSchema)
+    assert len(tool.description) <= 560
+
+    show = listed[apps.DECK_TOOL]
+    uri = apps.view_uri(apps.DECK_VIEWER)
+    assert show.meta == {"ui": {"resourceUri": uri}, "ui/resourceUri": uri}
+    assert len(show.description) <= 560
+    assert show.inputSchema["required"] == ["deck_id"]
+    assert show.inputSchema["properties"]["deck_id"]["description"]
 
 
 def _keywords(schema) -> set[str]:
@@ -204,9 +214,10 @@ def _keywords(schema) -> set[str]:
 
 def test_the_stateless_remote_lists_the_app_tool_only_per_request(remote) -> None:
     assert remote.mcp.settings.stateless_http
-    assert apps.APP_TOOL not in _listed(remote, _UI)
-    assert apps.APP_TOOL in _listed(remote, None, _PER_REQUEST)
-    assert apps.APP_TOOL in _listed(remote, _UI, _PER_REQUEST)
+    for name in apps.UI_ONLY_TOOLS:
+        assert name not in _listed(remote, _UI)
+        assert name in _listed(remote, None, _PER_REQUEST)
+        assert name in _listed(remote, _UI, _PER_REQUEST)
 
 
 # --- initialize and resources ------------------------------------------------------------
@@ -221,8 +232,9 @@ def test_initialize_declares_the_extension(server) -> None:
     assert extensions[apps.UI_EXTENSION]["mimeTypes"] == [apps.APP_MIME]
 
 
-def test_the_gallery_resource(server) -> None:
-    uri = apps.view_uri(apps.GALLERY)
+@pytest.mark.parametrize("view", [apps.GALLERY, apps.DECK_VIEWER])
+def test_the_view_resources(server, view) -> None:
+    uri = apps.view_uri(view)
 
     async def calls(session):
         return await session.list_resources(), await session.read_resource(uri)
@@ -233,7 +245,7 @@ def test_the_gallery_resource(server) -> None:
     content = read.contents[0]
     assert content.mimeType == apps.APP_MIME
     assert content.meta == {"ui": {"prefersBorder": True}}
-    assert content.text == apps.view_html(apps.GALLERY)
+    assert content.text == apps.view_html(view)
 
 
 # --- app_action --------------------------------------------------------------------------
@@ -343,3 +355,260 @@ def test_remote_list_styles_is_the_same_json_text(remote, remote_user) -> None:
 
     expected = json.dumps(reference.list_styles(storage=storage, user_id="u1"), ensure_ascii=False)
     assert call.content[0].text == expected
+
+
+# --- the deck viewer ---------------------------------------------------------------------
+
+_SAMPLE = _ROOT / "tests" / "fixtures" / "style-sample-deck"
+_DECK_JSON = {
+    "template": "blank-dark",
+    "fonts": {"fullwidth": "Noto Sans JP", "halfwidth": "Amazon Ember"},
+    "defaultTextColor": "#A1B2C3",
+    "slideSize": {"width": 1920, "height": 1080, "ptPerPx": 0.5},
+}
+
+
+def _png(size=(1280, 720), fmt="PNG") -> bytes:
+    import io
+
+    from PIL import Image
+
+    out = io.BytesIO()
+    Image.new("RGB", size, (200, 30, 30)).save(out, format=fmt)
+    return out.getvalue()
+
+
+def _is_jpeg(data: str) -> bool:
+    import base64
+
+    return base64.b64decode(data)[:3] == b"\xff\xd8\xff"
+
+
+def _slugs() -> list[str]:
+    from sdpm.engine.schema import parse_outline_text
+
+    return parse_outline_text((_SAMPLE / "outline.md").read_text(encoding="utf-8"))
+
+
+@pytest.fixture
+def local_deck(tmp_path: Path) -> Path:
+    """A local deck: the sample specs, slides for all but the last slug, previews for two."""
+    deck = tmp_path / "deck"
+    (deck / "specs").mkdir(parents=True)
+    for name in ("brief.md", "outline.md"):
+        (deck / "specs" / name).write_bytes((_SAMPLE / name).read_bytes())
+    (deck / "deck.json").write_text(json.dumps(_DECK_JSON), encoding="utf-8")
+    slugs = _slugs()
+    (deck / "slides").mkdir()
+    for slug in slugs[:-1]:
+        (deck / "slides" / f"{slug}.json").write_text("{}", encoding="utf-8")
+    (deck / "preview").mkdir()
+    for slug in slugs[:2]:
+        (deck / "preview" / f"{slug}.png").write_bytes(_png())
+    (deck / "reviews").mkdir()
+    (deck / "reviews" / "old.json").write_text("{}", encoding="utf-8")
+    return deck
+
+
+def _act(server, arguments, extensions=None) -> types.CallToolResult:
+    return _call(server, apps.APP_TOOL, arguments, extensions)
+
+
+def _ok(call: types.CallToolResult) -> dict:
+    assert not call.isError, call.content
+    return call.structuredContent
+
+
+@pytest.mark.parametrize("extensions", [None, _UI])
+def test_local_show_deck_and_the_deck_payload(local, local_deck, extensions) -> None:
+    deck_id = str(local_deck)
+    shown = _call(local, apps.DECK_TOOL, {"deck_id": deck_id}, extensions)
+    assert _ok(shown) == {"deck_id": deck_id, "tab": "slides"}
+    assert deck_id in shown.content[0].text
+
+    got = _ok(_act(local, {"action": "deck", "deck_id": deck_id}, extensions))
+    slugs = _slugs()
+    assert [s["slug"] for s in got["slides"]] == slugs
+    assert [s["built"] for s in got["slides"]] == [True] * (len(slugs) - 1) + [False]
+    assert [s["preview"] is not None for s in got["slides"]] == [True, True] + [False] * (len(slugs) - 2)
+    assert got["check"] == tools.check_specs(deck_id)
+    assert got["check"]["ok"] is True
+    assert got["brief"] == (_SAMPLE / "brief.md").read_text(encoding="utf-8")
+    assert len([e for e in got["outline"] if e["type"] == "section"]) == 4
+
+
+def test_local_slide_preview_is_a_jpeg(local, local_deck) -> None:
+    slug = _slugs()[0]
+    got = _ok(_act(local, {"action": "slide_preview", "deck_id": str(local_deck), "slug": slug}))
+    assert got["available"] and got["mimeType"] == "image/jpeg" and _is_jpeg(got["data"])
+    assert _ok(_act(local, {"action": "slide_preview", "deck_id": str(local_deck), "slug": _slugs()[3]})) == {
+        "slug": _slugs()[3], "available": False,
+    }
+
+
+def test_local_submit_review_writes_the_review_file(local, local_deck) -> None:
+    from shared.review import REVIEW_ID_RE
+
+    slug = _slugs()[1]
+    review = {"note": "tighter", "comments": [{"name": "A", "slide": slug, "rect": [10, 20, 300, 200], "text": "bigger"}]}
+    got = _ok(_act(local, {"action": "submit_review", "deck_id": str(local_deck), "review": review}))
+    assert REVIEW_ID_RE.fullmatch(got["id"])
+    assert got["message"].startswith(f"[review:{got['id']}]")
+    files = sorted(p.name for p in (local_deck / "reviews").iterdir())
+    assert files == [f"{got['id']}.json"]
+    saved = json.loads((local_deck / "reviews" / files[0]).read_text(encoding="utf-8"))
+    assert saved["comments"] == review["comments"] and saved["note"] == "tighter"
+
+
+def test_local_submit_review_refuses_an_unbuilt_slide(local, local_deck) -> None:
+    review = {"note": None, "comments": [{"name": "A", "slide": _slugs()[-1], "rect": [0, 0, 10, 10], "text": "x"}]}
+    assert _act(local, {"action": "submit_review", "deck_id": str(local_deck), "review": review}).isError
+    assert (local_deck / "reviews" / "old.json").exists()
+
+
+def test_local_outline_edit_returns_a_diff_and_writes_nothing(local, local_deck) -> None:
+    path = local_deck / "specs" / "outline.md"
+    before = path.read_bytes()
+    base = before.decode("utf-8")
+    slug = _slugs()[2]
+    line = next(x for x in base.splitlines() if x.startswith(f"- [{slug}]"))
+    text = base.replace(line, f"- [{slug}] A sharper message")
+    got = _ok(_act(local, {"action": "outline_edit", "deck_id": str(local_deck), "base": base, "text": text}))
+    assert "```diff" in got["message"]
+    assert f"\n-{line}\n+- [{slug}] A sharper message\n" in got["message"]
+    assert path.read_bytes() == before
+
+
+@pytest.mark.parametrize("arguments", [
+    {"action": "deck", "deck_id": "/nowhere/at/all"},
+    {"action": "deck"},
+    {"action": "slide_preview", "deck_id": "DECK", "slug": "../x"},
+    {"action": "submit_review", "deck_id": "DECK", "review": {"comments": []}},
+    {"action": "outline_edit", "deck_id": "DECK", "base": "a", "text": "a"},
+])
+def test_local_deck_actions_refuse_bad_arguments(local, local_deck, arguments) -> None:
+    arguments = {k: (str(local_deck) if v == "DECK" else v) for k, v in arguments.items()}
+    assert _act(local, arguments).isError
+
+
+def test_local_show_deck_needs_a_deck(local, tmp_path) -> None:
+    assert _call(local, apps.DECK_TOOL, {"deck_id": str(tmp_path / "none")}).isError
+
+
+def test_local_check_specs_result_is_unchanged(local, local_deck) -> None:
+    call = _call(local, "check_specs", {"deck_id": str(local_deck)})
+    assert _ok(call) == tools.check_specs(str(local_deck))
+
+
+# --- the deck viewer on the remote server ------------------------------------------------
+
+
+@pytest.fixture
+def remote_deck(remote, monkeypatch: pytest.MonkeyPatch):
+    """The remote server over a fake S3 deck ``d1``; the permission checks are recorded."""
+    slugs = _slugs()
+    objects: dict[str, bytes] = {
+        "decks/d1/deck.json": json.dumps(_DECK_JSON).encode(),
+        "decks/d1/specs/brief.md": (_SAMPLE / "brief.md").read_bytes(),
+        "decks/d1/specs/outline.md": (_SAMPLE / "outline.md").read_bytes(),
+        f"previews/d1/{slugs[0]}_100.webp": _png((1920, 1080), "WEBP"),
+        "decks/d1/reviews/x.json": b"{}",
+    }
+    for slug in slugs[:-1]:
+        objects[f"decks/d1/slides/{slug}.json"] = b"{}"
+
+    class Storage:
+        pptx_bucket = "pptx-test"
+        table = object()
+
+        def __init__(self) -> None:
+            self.objects = objects
+            self.deleted: list[str] = []
+            self.written: list[str] = []
+
+        def download_file_from_pptx_bucket(self, key: str) -> bytes:
+            return self.objects[key]
+
+        def get_deck_json(self, deck_id: str) -> dict:
+            return json.loads(self.objects[f"decks/{deck_id}/deck.json"])
+
+        def list_files(self, prefix: str, bucket: str = "") -> list[str]:
+            assert bucket == self.pptx_bucket
+            return sorted(k for k in self.objects if k.startswith(prefix))
+
+        def delete_files(self, prefix: str, bucket: str = "") -> int:
+            self.deleted.append(prefix)
+            gone = [k for k in self.objects if k.startswith(prefix)]
+            for k in gone:
+                del self.objects[k]
+            return len(gone)
+
+        def upload_file_if_absent(self, key: str, data: bytes, content_type: str = "", **_: Any) -> bool:
+            if key in self.objects:
+                return False
+            self.written.append(key)
+            self.objects[key] = data
+            return True
+
+    storage = Storage()
+    checks: list[tuple[str, str]] = []
+
+    def check(deck_id: str, action: str = "read") -> None:
+        checks.append((deck_id, action))
+        if deck_id != "d1":
+            raise ValueError("Access denied: not shared")
+
+    monkeypatch.setattr(remote, "_storage", storage)
+    monkeypatch.setattr(remote, "_check_deck_access", check)
+    monkeypatch.setattr(remote, "_get_user_id", lambda: "u1")
+    return storage, checks
+
+
+@pytest.mark.parametrize("extensions", [None, _UI])
+def test_remote_show_deck_and_the_deck_payload(remote, remote_deck, extensions) -> None:
+    storage, checks = remote_deck
+    assert _ok(_call(remote, apps.DECK_TOOL, {"deck_id": "d1"}, extensions)) == {"deck_id": "d1", "tab": "slides"}
+    got = _ok(_act(remote, {"action": "deck", "deck_id": "d1"}, extensions))
+    slugs = _slugs()
+    assert [s["slug"] for s in got["slides"]] == slugs
+    assert got["slides"][0]["preview"] == f"previews/d1/{slugs[0]}_100.webp"
+    assert [s["built"] for s in got["slides"]][-2:] == [True, False]
+    assert got["check"]["ok"] is True
+    assert got["preview_environment"] is None
+    assert checks == [("d1", "read"), ("d1", "read")]
+
+
+def test_remote_slide_preview_is_a_jpeg_of_the_webp(remote, remote_deck) -> None:
+    got = _ok(_act(remote, {"action": "slide_preview", "deck_id": "d1", "slug": _slugs()[0]}))
+    assert got["available"] and _is_jpeg(got["data"])
+
+
+def test_remote_submit_review(remote, remote_deck) -> None:
+    from shared.review import build_review_message, validate_review_submission
+
+    storage, checks = remote_deck
+    slug = _slugs()[0]
+    review = {"note": None, "comments": [{"name": "A", "slide": slug, "rect": [0, 0, 100, 100], "text": "red"}]}
+    got = _ok(_act(remote, {"action": "submit_review", "deck_id": "d1", "review": review}))
+    assert checks == [("d1", "edit_slide")]
+    assert storage.deleted == ["decks/d1/reviews/"]
+    assert storage.written == [f"decks/d1/reviews/{got['id']}.json"]
+    assert "decks/d1/reviews/x.json" not in storage.objects
+    normalized, _ = validate_review_submission(review, (1920, 1080), lambda s: True)
+    assert got["message"] == build_review_message(got["id"], normalized)
+
+
+@pytest.mark.parametrize("arguments", [
+    {"action": "deck", "deck_id": "other"},
+    {"action": "slide_preview", "deck_id": "other", "slug": "cover"},
+    {"action": "outline_edit", "deck_id": "other", "base": "a", "text": "b"},
+])
+def test_remote_deck_actions_need_permission(remote, remote_deck, arguments) -> None:
+    assert _act(remote, arguments).isError
+    assert _call(remote, apps.DECK_TOOL, {"deck_id": "other"}).isError
+
+
+def test_remote_check_specs_result_is_unchanged(remote, remote_deck) -> None:
+    call = _call(remote, "check_specs", {"deck_id": "d1"})
+    assert not call.isError
+    assert json.loads(call.content[0].text) == json.loads(remote.check_specs("d1"))

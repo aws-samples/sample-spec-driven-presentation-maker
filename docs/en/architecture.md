@@ -378,7 +378,7 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 |----------|------|-------------|
 | Prompts | `sdpm-vibe`, `sdpm-spec`, `sdpm-style`, `sdpm-translate` | User-invoked (slash-command) entry points; `vibe` / `spec` set the interaction mode |
 | Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate). `start_composing(mode="pptx"\|"html")` picks the composer document for the deck's output format |
-| Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template` | Create deck workspace (`output_format="pptx"\|"html"`), validate specs, apply style, analyze template. The local stdio server adds `note_for_user`, a sentence for the user that names `sdpm open <deck>`, to the `init_deck_workspace` result when the Web UI is installed and the client did not declare MCP Apps |
+| Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template`, `show_deck` | Create deck workspace (`output_format="pptx"\|"html"`), validate specs, apply style, analyze template. In MCP Apps clients `check_specs` also shows the deck viewer on its Outline tab with the check results, and `show_deck` (listed to MCP Apps clients only) shows it on the Slides tab. The local stdio server adds `note_for_user`, a sentence for the user that names `sdpm open <deck>`, to the `init_deck_workspace` result when the Web UI is installed and the client did not declare MCP Apps |
 | Generation | `generate_pptx` | Generate PPTX (local `generate_pptx` refuses HTML decks; `run_python` builds them). Carries `note_for_user` under the same conditions |
 | Attachments | `read_attachment`, `import_attachment` | Read an attached file (PDF, DOCX, XLSX, PPTX, text, images) with byte-offset paging; import it into the deck workspace |
 | Sandbox | `run_python`, `run_style_python` | Run Python against the deck workspace in a local process (edits, measuring, previews returned as `preview_files`); the style variant for the style workflow |
@@ -395,8 +395,21 @@ initialize or in the request's `_meta`; the initialize result declares the exten
 register it; the remote reads the user's own styles from S3. A client without MCP Apps gets the same
 text result as before.
 
-The remote server runs stateless HTTP and keeps no initialize params, so it lists `app_action` only
-to a client that declares MCP Apps in each request's `_meta`
+The deck viewer (`ui://sdpm/deck-viewer-<hash>.html`) hangs on `check_specs`, which opens it on the
+Outline tab, and on `show_deck(deck_id)`, which opens it on Slides; one view holds the Brief, Outline
+and Slides tabs and a **Refresh** button. It reads the deck through `app_action` (`deck`: brief,
+outline, check result and slide list; `slide_preview`: one preview as a JPEG), with each server's
+storage passed in as a `DeckAccess` (`servers/local/deck_access.py` reads the deck directory,
+`servers/remote/tools/deck_access.py` reads S3 after the caller's `read` permission check). Slide
+comments go through `submit_review`, which writes `reviews/<id>.json` with `shared/review.py` (the
+Web UI's review contract, `edit_slide` permission on the remote) and returns the Web UI's review
+message; the view sends it with `ui/message`. Outline edits go through `outline_edit`, which writes
+nothing and returns the edit as a unified diff for the agent to apply, also sent with `ui/message`.
+`show_deck` is listed with `app_action`: only to clients that declare MCP Apps. The `check_specs`
+result is unchanged.
+
+The remote server runs stateless HTTP and keeps no initialize params, so it lists `app_action` and
+`show_deck` only to a client that declares MCP Apps in each request's `_meta`
 (`io.modelcontextprotocol/clientCapabilities`), which no host in use today sends.
 `tools/call` does not check the listing, so the view still loads previews wherever the host passes
 its calls through. A host that passes only calls to listed tools shows the remote gallery's cards with

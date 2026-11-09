@@ -940,7 +940,8 @@ from sdpm.tools import prompts as _prompts  # noqa: E402
 _prompts.register(mcp)
 
 
-# --- MCP Apps: the style gallery on list_styles (user styles from S3, then the bundled ones) ---
+# --- MCP Apps: the style gallery on list_styles (user styles from S3, then the bundled ones),
+# the deck viewer on check_specs and show_deck (S3 decks, after the caller's permission check) ---
 
 
 def _read_style_htmls(names: list[str]) -> dict[str, str]:
@@ -968,8 +969,12 @@ def _load_style_icons(ids) -> dict[str, bytes]:
 
 
 from sdpm.tools import apps as _apps  # noqa: E402
+from tools import deck_access as _deck_access  # noqa: E402
 
-_apps.register(mcp, read_styles=_read_style_htmls, load_icons=_load_style_icons)
+_apps.register(
+    mcp, read_styles=_read_style_htmls, load_icons=_load_style_icons,
+    deck=_deck_access.make(lambda: _storage, lambda deck_id, action: _check_deck_access(deck_id, action)),
+)
 
 
 # --- Utility Tools ---

@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""The two slug grammars and the outline.md slide-line parsers, each defined once.
+"""The two slug grammars and the outline.md parsers (slide slugs, display entries), each defined once.
 
 - Outline grammar ``[a-z0-9-]+`` (``OUTLINE_SLUG_RE``): the slugs of specs/outline.md
   slide lines ``- [slug] message`` — what the build, check_specs and the outline lint accept.
@@ -41,3 +41,46 @@ def parse_outline_text(text: str) -> list[str]:
         if m:
             slugs.append(m.group(1))
     return slugs
+
+
+# The Web UI outline view's line grammar (web-ui/src/components/deck/outlineParser.ts).
+_ENTRY_SLIDE_RE = re.compile(r"^-\s*\[([^\]]+)\]\s*(.*)")
+_ENTRY_SUB_ITEM_RE = re.compile(r"^\s+-\s*(body|visual|evidence):\s*(.*)")
+_ENTRY_SECTION_RE = re.compile(r"^##\s+(.+)")
+
+
+def parse_outline_entries(text: str) -> list[dict]:
+    """outline.md text as display entries in document order, as the Web UI outline view reads it.
+
+    - ``{"type": "slide", "slug", "message", "subItems": [{"key", "value"}]}`` for
+      ``- [slug] message`` (any bracketed text; sub-items ``  - body|visual|evidence: …``
+      follow their slide)
+    - ``{"type": "section", "title"}`` for ``## Title``
+    - ``{"type": "prose", "text"}`` for any other non-blank line, kept as written
+
+    A section or prose line ends the slide's sub-items. The Python port of the Web UI's
+    ``parseOutline``; CRLF lines parse like LF.
+    """
+    entries: list[dict] = []
+    slide: dict | None = None
+    for raw in text.split("\n"):
+        line = raw[:-1] if raw.endswith("\r") else raw
+        m = _ENTRY_SLIDE_RE.match(line)
+        if m:
+            slide = {"type": "slide", "slug": m.group(1), "message": m.group(2).strip(), "subItems": []}
+            entries.append(slide)
+            continue
+        m = _ENTRY_SUB_ITEM_RE.match(line)
+        if m and slide is not None:
+            slide["subItems"].append({"key": m.group(1), "value": m.group(2).strip()})
+            continue
+        m = _ENTRY_SECTION_RE.match(line)
+        if m:
+            slide = None
+            entries.append({"type": "section", "title": m.group(1).strip()})
+            continue
+        if line.strip() == "":
+            continue
+        slide = None
+        entries.append({"type": "prose", "text": line})
+    return entries

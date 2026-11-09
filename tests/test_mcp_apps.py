@@ -9,6 +9,7 @@ adds the per-request form.
 from __future__ import annotations
 
 import re
+from pathlib import Path
 from types import SimpleNamespace
 
 import pytest
@@ -79,6 +80,20 @@ def test_model_listed() -> None:
     assert apps.model_listed({"ui": "x"})
 
 
+def test_listed() -> None:
+    app_only = {"ui": {"visibility": ["app"]}}
+    assert apps.UI_ONLY_TOOLS == {apps.APP_TOOL, apps.DECK_TOOL}
+    for name, meta in ((apps.APP_TOOL, app_only), (apps.DECK_TOOL, {"ui": {"resourceUri": "ui://x"}}),
+                       ("check_specs", None), ("other", app_only)):
+        assert apps.listed(name, meta, True)
+    assert not apps.listed(apps.APP_TOOL, app_only, False)
+    assert not apps.listed(apps.DECK_TOOL, {"ui": {"resourceUri": "ui://x"}}, False)
+    assert not apps.listed("other", app_only, False)
+    assert apps.listed("check_specs", {"ui": {"resourceUri": "ui://x"}}, False)
+    assert apps.listed("check_specs", None, False)
+    assert apps.listed(["unhashable"], None, False)
+
+
 def test_view_uri_follows_the_document(monkeypatch: pytest.MonkeyPatch) -> None:
     uri = apps.view_uri(apps.GALLERY)
     assert re.fullmatch(r"ui://sdpm/style-gallery-[0-9a-f]{12}\.html", uri)
@@ -98,6 +113,35 @@ def test_the_gallery_view_carries_the_bridge_and_fetches_nothing() -> None:
     assert ".innerHTML" not in html
     for hook in ('data-action="use"', '"all"', 'id="back"', 'id="status"', 'id="count"', "dataset.style"):
         assert hook in html
+
+
+def test_the_deck_viewer_carries_the_bridge_and_fetches_nothing() -> None:
+    html = apps.view_html(apps.DECK_VIEWER)
+    assert re.fullmatch(r"ui://sdpm/deck-viewer-[0-9a-f]{12}\.html", apps.view_uri(apps.DECK_VIEWER))
+    assert "/*__SDPM_BRIDGE__*/" not in html
+    assert "window.sdpmBridge" in html and "ui/initialize" in html and "ui/notifications/tool-input" in html
+    assert 'data-app="sdpm-deck-viewer"' in html
+    assert not re.search(r"https?://", html)
+    assert "<link" not in html and "@import" not in html
+    assert not re.search(r"\ssrc\s*=", html)
+    assert ".innerHTML" not in html
+    assert apps.APP_TOOL in html
+    for action in ('"deck"', '"slide_preview"', '"submit_review"', '"outline_edit"'):
+        assert f"action: {action}" in html, action
+    for hook in ('data-tab="brief"', 'data-tab="outline"', 'data-tab="slides"', "aria-selected",
+                 'id="refresh"', 'id="fullscreen"', 'id="status" role="status"', 'id="brief"',
+                 'id="check"', "dataset.ok", '"entry-slide"', '"entry-section"', "dataset.slug",
+                 'id="outline-edit"', 'id="outline-text"', 'id="outline-send"', 'id="outline-ok"',
+                 '"slide-item"', 'id="stage"', '"frame"', "dataset.frame", 'id="note"',
+                 'id="send-comments"', 'id="prev"', 'id="next"', "No preview yet",
+                 "This host did not pass the deck to the view.", "sendMessage", "requestDisplayMode"):
+        assert hook in html, hook
+
+
+def test_only_the_bridge_posts_messages() -> None:
+    views = Path(apps.__file__).resolve().parent / "views"
+    for page in views.glob("*.html"):
+        assert "postMessage" not in page.read_text(encoding="utf-8"), page.name
 
 
 def _reader(htmls: dict[str, str]):
