@@ -8,8 +8,8 @@
  * A stream replays the buffered events first, then follows the live ones. An `end` event writes
  * its payload (an error), if any, and closes the stream; a replay that already holds the end
  * closes without subscribing, and a stream with nothing live to follow closes after its replay.
- * `onEnd` runs once the end was written, unless the reader went away before it (a closed tab):
- * the period then counts as delivered. A reader that goes away stops the subscription at once.
+ * `onEnd` runs once the end was written, unless the reader went away before it (a closed tab).
+ * A reader that goes away stops the subscription at once.
  *
  * Returns a ReadableStream that the API route can return as a Response.
  */

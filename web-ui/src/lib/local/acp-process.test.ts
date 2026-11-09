@@ -974,16 +974,50 @@ describe("unseen periods", () => {
     return delta ? [delta.delta.text] : []
   })
 
-  it("replays a finished period no stream delivered once; the next /stream finds nothing", async () => {
-    await acp.createNewProcessFor("C1")
+  it("replays a finished period no stream delivered until the page saves its chat after reading it", async () => {
+    (await acp.createNewProcessFor("C1")).chat.bindDeck("d1")
     await unreadPeriod("C1", children[0], "K1")
     const replayed = await stream("C1")
     expect(texts(replayed)).toEqual(["the reply"])
     expect(replayed?.at(-1)).toEqual({ work: { state: "idle", how: "finished" } })
+    // Read but not saved yet (the tab closed in between): replayed again.
+    expect(texts(await stream("C1"))).toEqual(["the reply"])
+    acp.markDelivered("C1")
     expect(await stream("C1")).toBeNull()
   })
 
-  it("leaves nothing to replay when the invoke stream wrote the period's end", async () => {
+  it("delivers the period the invoke stream wrote the end of once the page saves", async () => {
+    (await acp.createNewProcessFor("C1")).chat.bindDeck("d1")
+    const prompted = await acp.sendPrompt("C1", "hello")
+    const { createSSEStream } = await import("./sse-bridge")
+    const body = new Response(createSSEStream({ subscribe: prompted.subscribe, replay: acp.getBufferedEvents("C1", prompted.replayFrom - 1), onEnd: prompted.onEnd })).text()
+    prompted.send()
+    await settle()
+    children[0].endTurn()
+    await body
+    expect(await stream("C1")).not.toBeNull()
+    acp.markDelivered("C1")
+    expect(await stream("C1")).toBeNull()
+  })
+
+  it("does not deliver a period no stream wrote the end of, nor one that runs", async () => {
+    (await acp.createNewProcessFor("C1")).chat.bindDeck("d1")
+    const prompted = await acp.sendPrompt("C1", "hello")
+    prompted.send()
+    await settle()
+    const { createSSEStream } = await import("./sse-bridge")
+    const live = createSSEStream(acp.openStream("C1")!)
+    await live.cancel()
+    acp.markDelivered("C1")
+    children[0].endTurn()
+    await settle()
+    acp.markDelivered("C1")
+    expect((await stream("C1"))?.length).toBeGreaterThan(0)
+    acp.markDelivered("C1")
+    expect(await stream("C1")).toBeNull()
+  })
+
+  it("delivers the period of a chat no deck holds (a style chat) once a stream wrote its end", async () => {
     await acp.createNewProcessFor("C1")
     const prompted = await acp.sendPrompt("C1", "hello")
     const { createSSEStream } = await import("./sse-bridge")
@@ -992,20 +1026,6 @@ describe("unseen periods", () => {
     await settle()
     children[0].endTurn()
     await body
-    expect(await stream("C1")).toBeNull()
-  })
-
-  it("keeps a period whose replay was cancelled before its end for the next /stream", async () => {
-    await acp.createNewProcessFor("C1")
-    const prompted = await acp.sendPrompt("C1", "hello")
-    prompted.send()
-    await settle()
-    const { createSSEStream } = await import("./sse-bridge")
-    const live = createSSEStream(acp.openStream("C1")!)
-    await live.cancel()
-    children[0].endTurn()
-    await settle()
-    expect((await stream("C1"))?.length).toBeGreaterThan(0)
     expect(await stream("C1")).toBeNull()
   })
 
@@ -1020,6 +1040,7 @@ describe("unseen periods", () => {
       await settle()
       expect(children[0].killed).toBe(true)
       expect(texts(await stream("K1"))).toEqual(["ended by the cap"])
+      acp.markDelivered("K1")
       expect(await stream("K1")).toBeNull()
 
       // An exit.

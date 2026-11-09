@@ -3,8 +3,9 @@
 /**
  * Local ACP Stream — SSE endpoint with Last-Event-ID resume support (lib/local/acp-process.ts
  * `openStream`). A busy chat's work period is replayed after the given id (the whole period when
- * the header is not a non-negative integer), then streamed live; a finished period no stream
- * delivered (its tab was closed) is replayed to its end once, also after its chat was released.
+ * the header is not a non-negative integer), then streamed live; a finished period not delivered
+ * yet (its tab was closed before it saved the chat) is replayed to its end, also after its chat
+ * was released, until a page saves the chat after reading it (/api/agent/chat `delivered`).
  * `{running: false}` when there is nothing to stream.
  */
 import { openStream } from "@/lib/local/acp-process"
