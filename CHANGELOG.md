@@ -55,6 +55,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - The local `list_styles` no longer opens a browser gallery or writes
   `/tmp/sdpm-styles-index.html` and `/tmp/sdpm-styles-gallery/`. The CLI `list_styles` prints
   the text listing only, and its `--no-browse` option is gone: drop it from scripts.
+  `sdpm.knowledge.reference.open_styles_gallery` and `generate_styles_index` are removed
+  with it.
 
 ## [0.13.0] - 2026-11-09
 
