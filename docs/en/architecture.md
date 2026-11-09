@@ -395,6 +395,13 @@ initialize or in the request's `_meta`; the initialize result declares the exten
 register it; the remote reads the user's own styles from S3. A client without MCP Apps gets the same
 text result as before.
 
+The remote server runs stateless HTTP and keeps no initialize params, so it lists `app_action` only
+to a client that declares MCP Apps in each request's `_meta`
+(`io.modelcontextprotocol/clientCapabilities`), which no host in use today sends.
+`tools/call` does not check the listing, so the view still loads previews wherever the host passes
+its calls through. A host that passes only calls to listed tools shows the remote gallery's cards with
+names and descriptions, a "Previews could not be loaded" line, and a working **Use this style**.
+
 ### Layer 3 Differences
 
 | Tool | Description |

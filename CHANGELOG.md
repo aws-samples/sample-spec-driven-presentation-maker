@@ -38,7 +38,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   the local and the remote server serve it; the remote shows the user's own styles from S3.
   The view reads previews through `app_action`, a tool only the view calls, which clients
   without MCP Apps do not see in `tools/list`. Their `list_styles` result is unchanged. The
-  servers declare the extension in their initialize result.
+  servers declare the extension in their initialize result. The remote server is stateless,
+  so it lists `app_action` only to clients that declare MCP Apps in each request's `_meta`;
+  a host that refuses view calls to unlisted tools shows the remote gallery's cards without
+  previews, and **Use this style** still works.
 
 ### Changed
 

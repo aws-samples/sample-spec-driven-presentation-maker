@@ -5,7 +5,9 @@
 The style gallery hangs on ``list_styles`` (``_meta.ui.resourceUri``); its view is a ``ui://``
 resource and reads previews through the app-only ``app_action``. A client that does not declare
 MCP Apps (``io.modelcontextprotocol/ui``, in initialize or in the request's ``_meta``) never sees
-``app_action`` in ``tools/list`` and gets today's ``list_styles`` result unchanged.
+``app_action`` in ``tools/list`` and gets today's ``list_styles`` result unchanged. The remote
+server is stateless HTTP and keeps no initialize params, so there only the per-request
+declaration lists ``app_action``.
 """
 
 from __future__ import annotations
@@ -102,18 +104,38 @@ class _Client(ClientSession):
 
 
 def _session(server, extensions, calls):
-    """Run ``calls(session)`` against the server in memory; return what it returns."""
+    """Run ``calls(session)`` against the server in memory; return what it returns.
 
-    async def run():
+    A server with ``stateless_http`` (the remote) runs as it does in production: every HTTP
+    request gets a fresh stateless session, so ``initialize`` goes to one session and
+    ``calls`` run in another that never saw the client's initialize params.
+    """
+    low = server.mcp._mcp_server
+    stateless = server.mcp.settings.stateless_http
+
+    async def connect(work):
         async with create_client_server_memory_streams() as (client_streams, server_streams):
-            low = server.mcp._mcp_server
             async with anyio.create_task_group() as tg:
-                tg.start_soon(lambda: low.run(*server_streams, low.create_initialization_options()))
+                tg.start_soon(lambda: low.run(*server_streams, low.create_initialization_options(), stateless=stateless))
                 async with _Client(*client_streams, extensions=extensions) as session:
-                    await session.initialize()
-                    out = await calls(session)
+                    out = await work(session)
                 tg.cancel_scope.cancel()
         return out
+
+    async def run():
+        if not stateless:
+            async def both(session):
+                await session.initialize()
+                return await calls(session)
+
+            return await connect(both)
+        initialize_result = await connect(lambda session: session.initialize())
+
+        async def fresh(session):
+            session.initialize_result = initialize_result
+            return await calls(session)
+
+        return await connect(fresh)
 
     return asyncio.run(run())
 
@@ -151,8 +173,11 @@ def test_the_local_server_lists_twenty_tools(local) -> None:
     assert len(_listed(local)) == 20
 
 
-@pytest.mark.parametrize("declaration", ["initialize", "per-request"])
-def test_a_client_with_mcp_apps_sees_the_app_tool(server, declaration) -> None:
+@pytest.mark.parametrize(("which", "declaration"), [
+    ("local", "initialize"), ("local", "per-request"), ("remote", "per-request"),
+])
+def test_a_client_with_mcp_apps_sees_the_app_tool(which, declaration, request) -> None:
+    server = request.getfixturevalue(which)
     if declaration == "initialize":
         listed = _listed(server, _UI)
     else:
@@ -164,6 +189,13 @@ def test_a_client_with_mcp_apps_sees_the_app_tool(server, declaration) -> None:
     action = props["action"]
     assert action.get("enum", [action.get("const")]) == ["style_previews"]  # one value: pydantic writes const
     assert tool.inputSchema["required"] == ["action"]
+
+
+def test_the_stateless_remote_lists_the_app_tool_only_per_request(remote) -> None:
+    assert remote.mcp.settings.stateless_http
+    assert apps.APP_TOOL not in _listed(remote, _UI)
+    assert apps.APP_TOOL in _listed(remote, None, _PER_REQUEST)
+    assert apps.APP_TOOL in _listed(remote, _UI, _PER_REQUEST)
 
 
 # --- initialize and resources ------------------------------------------------------------
