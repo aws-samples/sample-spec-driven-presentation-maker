@@ -32,11 +32,31 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - `sdpm open <deck>` opens a deck in the browser Web UI and starts the Web UI if it is not
   running. For clients that do not declare MCP Apps, the local MCP server adds a note for the
   user naming that command (`note_for_user`) to the result when it creates or builds a deck.
+- **A style gallery in MCP Apps clients.** In a client that declares MCP Apps
+  (`io.modelcontextprotocol/ui`), the `list_styles` result shows as cards in the chat with
+  each style's slides; **Use this style** sends the choice back as the user's message. Both
+  the local and the remote server serve it; the remote shows the user's own styles from S3.
+  The view reads previews through `app_action`, a tool only the view calls, which clients
+  without MCP Apps do not see in `tools/list`. Their `list_styles` result is unchanged. The
+  servers declare the extension in their initialize result. The remote server is stateless,
+  so it lists `app_action` only to clients that declare MCP Apps in each request's `_meta`;
+  a host that refuses view calls to unlisted tools shows the remote gallery's cards without
+  previews, and **Use this style** still works.
 
 ### Changed
 
 - A deck made through an MCP client opens in the Local Web UI as a new chat on that deck
   without the "no Kiro session" notice.
+- Clearer descriptions for the briefing, prism-dark, signal, aws-console, bento,
+  neo-brutalist and prism-light styles: each now says when to use it.
+
+### Removed
+
+- The local `list_styles` no longer opens a browser gallery or writes
+  `/tmp/sdpm-styles-index.html` and `/tmp/sdpm-styles-gallery/`. The CLI `list_styles` prints
+  the text listing only, and its `--no-browse` option is gone: drop it from scripts.
+  `sdpm.knowledge.reference.open_styles_gallery` and `generate_styles_index` are removed
+  with it.
 
 ## [0.13.0] - 2026-11-09
 

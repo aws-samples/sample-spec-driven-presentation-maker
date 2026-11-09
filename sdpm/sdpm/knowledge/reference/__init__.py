@@ -8,7 +8,7 @@ See docs/internal/DATASET_COMPLIANCE.md for dataset provenance.
 Reference: unified access to design patterns, components, schemas, rules, and reviews."""
 import re
 from collections.abc import Iterable
-from pathlib import Path
+from pathlib import Path, PureWindowsPath
 from typing import Any
 
 from sdpm.config import REFERENCES_DIR
@@ -28,6 +28,53 @@ def html_title(html: str) -> str:
     """
     m = _HTML_TITLE_RE.search(html)
     return m.group(1).strip() if m else ""
+
+
+_SLIDE_START_RE = re.compile(r'<div class="slide[\s"]')
+_HEAD_RE = re.compile(r"<head[^>]*>([\s\S]*?)</head>", re.IGNORECASE)
+_BODY_OPEN_RE = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
+_SVG_RE = re.compile(r"<svg\b[^>]*>[\s\S]*?</svg>", re.IGNORECASE)
+_TRAILING_CLOSES_RE = re.compile(r"(</div>\s*)+\Z")
+_SYMBOL_RE = re.compile(r"<symbol\b", re.IGNORECASE)
+
+
+def is_style_name(name: Any) -> bool:
+    """Whether ``name`` names a file directly inside a styles directory.
+
+    The local store's rule: any single path component (``社内標準`` and ``acme.v2`` too),
+    never a separator, a drive, ``.`` or ``..``, so a name never walks out of the directory.
+    The remote's S3 keys keep the narrower ``shared.user_library.is_valid_style_name``.
+    """
+    return (
+        isinstance(name, str)
+        and name not in ("", ".", "..")
+        and "\x00" not in name
+        and PureWindowsPath(name).name == name  # Windows rules also catch "/" and "C:"
+    )
+
+
+def style_display_parts(html: str) -> dict[str, Any]:
+    """Cut a style document into the parts a viewer needs to show it one slide at a time.
+
+    Returns ``{"head", "prelude", "slides"}``: the inner ``<head>`` (the CSS, carried once),
+    the icon sprites between ``<body>`` and the first slide, and each slide's markup. A
+    document without slide markers comes back whole (``"whole": True``). The same cut as
+    the Web UI's ``splitStyleSlides``. Pure function.
+    """
+    starts = [m.start() for m in _SLIDE_START_RE.finditer(html)]
+    if not starts:
+        return {"head": "", "prelude": "", "slides": [html], "whole": True}
+    head = _HEAD_RE.search(html)
+    end = html.find("</body>")
+    end = end if end != -1 else len(html)
+    body = _BODY_OPEN_RE.search(html)
+    before = html[body.end() if body else 0:starts[0]]
+    prelude = "".join(svg for svg in _SVG_RE.findall(before) if _SYMBOL_RE.search(svg))
+    slides = [
+        _TRAILING_CLOSES_RE.sub("", html[start:starts[i + 1] if i + 1 < len(starts) else end])
+        for i, start in enumerate(starts)
+    ]
+    return {"head": head.group(1) if head else "", "prelude": prelude, "slides": slides}
 
 
 def _get_description(path: Path) -> str:
@@ -72,136 +119,6 @@ def _get_description(path: Path) -> str:
     except Exception:
         pass
     return ""
-
-
-def _gallery_display_copies(
-    styles: list[tuple[str, str, Path]], copies_dir: Path,
-) -> list[tuple[str, str, Path]]:
-    """Point styles that reference catalog icons at display copies with the icons drawn in.
-
-    A style with nothing to draw keeps its own file, so its relative resources resolve.
-    """
-    from sdpm.knowledge.assets.style_icons import inline_style_icons_many
-
-    sources = [path.read_text(encoding="utf-8") for _, _, path in styles]
-    shown = inline_style_icons_many(sources)
-    copies_dir.mkdir(mode=0o700, parents=True, exist_ok=True)
-    for stale in copies_dir.glob("*.html"):
-        stale.unlink()
-    out = []
-    for (name, subtitle, path), source, html in zip(styles, sources, shown):
-        if html != source:
-            path = copies_dir / f"{name}.html"
-            path.write_text(html, encoding="utf-8")
-        out.append((name, subtitle, path.resolve()))
-    return out
-
-
-def generate_styles_index(styles_dirs: list[Path]) -> Path:
-    """Generate an index HTML with sidebar + iframe preview for style HTMLs.
-
-    Scans multiple directories; user-local styles shadow bundled ones
-    (same stem → first match wins).
-
-    Returns the path to the generated index file.
-    """
-    import html as html_mod
-    import tempfile
-
-    seen: set[str] = set()
-    styles = []
-    for styles_dir in styles_dirs:
-        if not styles_dir.exists():
-            continue
-        for f in sorted(styles_dir.iterdir()):
-            if f.suffix == '.html' and not f.name.startswith('.') and f.stem not in seen:
-                seen.add(f.stem)
-                desc = _get_description(f)
-                # Split "name — description" from title
-                name = f.stem
-                subtitle = ""
-                if " — " in desc:
-                    _, subtitle = desc.split(" — ", 1)
-                elif desc:
-                    subtitle = desc
-                styles.append((name, subtitle, f.resolve()))
-
-    if not styles:
-        return Path()
-
-    styles = _gallery_display_copies(styles, Path(tempfile.gettempdir()) / "sdpm-styles-gallery")
-    first_src = styles[0][2].as_uri()
-
-    items_html = ""
-    for i, (name, subtitle, path) in enumerate(styles):
-        active = ' active' if i == 0 else ""
-        esc_name = html_mod.escape(name)
-        esc_sub = html_mod.escape(subtitle)
-        src = html_mod.escape(path.as_uri())
-        items_html += (
-            f'<div class="item{active}" onclick="select(this,\'{src}\')">'
-            f'<div class="name">{esc_name}'
-            f'<button class="copy" onclick="event.stopPropagation();copy(this,\'{esc_name}\')" title="Copy name">⧉</button>'
-            f'</div>'
-            f'<div class="sub">{esc_sub}</div>'
-            f'</div>\n'
-        )
-
-    index_html = f"""<!DOCTYPE html>
-<html><head><meta charset="utf-8"><title>Style Gallery</title>
-<style>
-*{{margin:0;padding:0;box-sizing:border-box}}
-body{{display:flex;height:100vh;font-family:-apple-system,system-ui,"Segoe UI",sans-serif;background:#111;color:#ccc}}
-#sidebar{{width:300px;min-width:300px;background:#161616;display:flex;flex-direction:column}}
-#sidebar header{{padding:24px 24px 20px;border-bottom:1px solid #222}}
-#sidebar header h1{{font-size:13px;font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:#555}}
-#list{{flex:1;overflow-y:auto;padding:8px 12px}}
-#list::-webkit-scrollbar{{width:4px}}
-#list::-webkit-scrollbar-thumb{{background:#333;border-radius:2px}}
-.item{{padding:12px 14px;border-radius:8px;cursor:pointer;transition:all .2s ease-out;margin-bottom:2px}}
-.item:hover{{background:#1e1e1e}}
-.item.active{{background:#1a2332}}
-.item .name{{font-size:15px;font-weight:600;color:#fff;margin-bottom:4px;transition:color .2s;display:flex;align-items:center;gap:8px}}
-.item.active .name{{color:#79b8ff}}
-.copy{{background:none;border:1px solid #555;color:#aaa;font-size:14px;border-radius:4px;cursor:pointer;padding:2px 6px;opacity:0;transition:opacity .15s,color .15s,border-color .15s;flex-shrink:0;line-height:1}}
-.item:hover .copy{{opacity:1}}
-.copy:hover{{color:#fff;border-color:#888}}
-.copy.ok{{color:#56d364;border-color:#56d364}}
-.item .sub{{font-size:12px;color:#aaa;line-height:1.5;transition:color .2s}}
-.item.active .sub{{color:#a5cdee}}
-#main{{flex:1;overflow:hidden;position:relative;background:#0a0a0a}}
-iframe{{position:absolute;top:0;left:0;width:1920px;border:none;background:#fff;transform-origin:top left}}
-</style></head><body>
-<div id="sidebar">
-<header><h1>Style Gallery</h1></header>
-<div id="list">{items_html}</div>
-</div>
-<div id="main"><iframe id="preview" src="{html_mod.escape(first_src)}"></iframe></div>
-<script>
-function select(el,src){{
-  document.querySelector('#list .active')?.classList.remove('active');
-  el.classList.add('active');
-  document.getElementById('preview').src=src;
-}}
-function copy(btn,name){{
-  navigator.clipboard.writeText(name);
-  btn.textContent='✓';btn.classList.add('ok');
-  setTimeout(function(){{btn.textContent='⧉';btn.classList.remove('ok')}},1200);
-}}
-function fit(){{
-  var m=document.getElementById('main'),f=document.getElementById('preview');
-  var s=m.clientWidth/1920;
-  f.style.transform='scale('+s+')';
-  f.style.height=(m.clientHeight/s)+'px';
-}}
-window.addEventListener('resize',fit);
-window.addEventListener('load',fit);
-new ResizeObserver(fit).observe(document.getElementById('main'));
-</script></body></html>"""
-
-    out = Path(tempfile.gettempdir()) / "sdpm-styles-index.html"
-    out.write_text(index_html, encoding="utf-8")
-    return out
 
 
 def list_pptx_descriptions(pptx_path):
@@ -250,17 +167,6 @@ def get_pptx_notes(pptx_path, pages=None):
 # ---------------------------------------------------------------------------
 # High-level reference helpers (local filesystem)
 # ---------------------------------------------------------------------------
-
-
-def open_styles_gallery(styles_dirs: list[Path]) -> Path | None:
-    """Generate styles gallery HTML and open in browser. Returns index path or None."""
-    import webbrowser
-
-    index_path = generate_styles_index(styles_dirs)
-    if index_path and index_path.exists():
-        webbrowser.open(index_path.as_uri())
-        return index_path
-    return None
 
 
 def _collect_files(directory: Path) -> dict[str, Path]:

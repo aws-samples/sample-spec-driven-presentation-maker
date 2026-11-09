@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html lang="en" data-app="sdpm-style-gallery">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<title>sdpm styles</title>
+<style>
+:root{--bg:var(--color-background-primary,#fff);--fg:var(--color-text-primary,#1d1d1f);--muted:var(--color-text-secondary,#666);--line:var(--color-border-primary,#ddd);--thumb:var(--color-background-secondary,#eee);--accent:#2f6fed}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{padding:12px}
+header{display:flex;align-items:baseline;gap:8px;margin-bottom:10px;flex-wrap:wrap}
+header h1{font-size:14px;margin:0}
+header span{font-size:12px;color:var(--muted)}
+#grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+.card{border:1px solid var(--line);border-radius:8px;overflow:hidden;display:flex;flex-direction:column}
+.thumb{position:relative;width:100%;aspect-ratio:16/9;overflow:hidden;background:var(--thumb)}
+.thumb iframe{position:absolute;top:0;left:0;width:1920px;height:1080px;border:0;transform-origin:0 0;pointer-events:none}
+.meta{padding:8px 10px;display:flex;flex-direction:column;gap:4px;flex:1}
+.name{font-weight:600;font-size:14px;display:flex;gap:6px;align-items:center}
+.badge{font-size:11px;border:1px solid var(--line);border-radius:4px;padding:0 4px;color:var(--muted);font-weight:400}
+.desc{font-size:12px;color:var(--muted);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.actions{display:flex;gap:6px;padding:0 10px 10px}
+button{font:inherit;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+#detail{display:none}
+#detail.open{display:block}
+#detail .bar{display:flex;gap:6px;align-items:center}
+#detail .bar strong{font-size:14px;margin-left:4px}
+#detail .slides{display:flex;flex-direction:column;gap:8px;margin-top:8px}
+#status{font-size:12px;color:var(--muted);margin-top:8px;min-height:18px}
+#more{margin-top:12px}
+#more summary{cursor:pointer;font-size:13px;color:var(--muted);margin-bottom:8px}
+#more-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:12px}
+</style>
+</head>
+<body>
+<div id="app">
+  <header><h1>Styles</h1><span id="count"></span></header>
+  <div id="grid"></div>
+  <details id="more" hidden><summary></summary><div id="more-grid"></div></details>
+  <div id="detail">
+    <div class="bar"><button id="back">Back</button><button class="primary" id="use-detail" data-action="use">Use this style</button><strong id="detail-name"></strong></div>
+    <div class="slides"></div>
+  </div>
+  <div id="status" role="status"></div>
+</div>
+<script>
+/*__SDPM_BRIDGE__*/
+</script>
+<script>
+// The style gallery: cards from the list_styles result, previews from app_action, the pick
+// back to the conversation with ui/message. Everything is built with textContent.
+(function () {
+  "use strict";
+  var bridge = window.sdpmBridge;
+  var BATCH = 3;
+  var RESET = "<style data-preview-reset>html,body{margin:0!important;padding:0!important;zoom:1!important;overflow:hidden!important}.slide{margin:0 auto!important}</style>";
+  var previews = {};
+  var cards = {};
+  var shownName = null;
+  var $ = function (s) { return document.querySelector(s); };
+
+  function status(text) { $("#status").textContent = text; }
+
+  function listing(result) {
+    var sc = result.structuredContent;
+    if (sc && Array.isArray(sc.styles)) return sc;
+    try {
+      if (sc && typeof sc.result === "string") return JSON.parse(sc.result);
+      var first = (result.content || [])[0];
+      if (first && first.type === "text") return JSON.parse(first.text);
+    } catch (e) { /* not a listing */ }
+    return { styles: [] };
+  }
+
+  function slideDoc(p, i) {
+    if (p.whole) return p.slides[0];
+    return "<!DOCTYPE html><html><head>" + p.head + RESET + "</head><body>" + p.prelude + p.slides[i] + "</body></html>";
+  }
+
+  function thumb(doc) {
+    var box = document.createElement("div");
+    box.className = "thumb";
+    if (doc == null) return box;
+    var frame = document.createElement("iframe");
+    frame.setAttribute("sandbox", ""); // a style is static HTML: no scripts, no same-origin
+    frame.setAttribute("title", "preview");
+    frame.setAttribute("tabindex", "-1");
+    frame.srcdoc = doc;
+    box.appendChild(frame);
+    new ResizeObserver(function () { frame.style.transform = "scale(" + (box.clientWidth / 1920) + ")"; }).observe(box);
+    return box;
+  }
+
+  function useStyle(name) {
+    var text = 'Use the style "' + name + '" for this deck (apply_style).';
+    status("Sending: " + text);
+    bridge.sendMessage(text).then(function (r) {
+      status(r && r.isError ? "The host did not accept the message." : "Sent: " + text);
+    }, function (e) { status("Could not send the message: " + e.message); });
+  }
+
+  function badge(parent, text) {
+    var b = document.createElement("span");
+    b.className = "badge";
+    b.textContent = text;
+    parent.appendChild(b);
+  }
+
+  function card(s) {
+    var el = document.createElement("div");
+    el.className = "card";
+    el.dataset.style = s.name;
+    el.appendChild(thumb(null));
+    var meta = document.createElement("div");
+    meta.className = "meta";
+    var name = document.createElement("div");
+    name.className = "name";
+    name.textContent = s.name;
+    if (s.pinned) badge(name, "pinned");
+    if (s.source === "user") badge(name, "yours");
+    var desc = document.createElement("div");
+    desc.className = "desc";
+    meta.appendChild(name);
+    meta.appendChild(desc);
+    el.appendChild(meta);
+    describe(el, s.description || "");
+    var actions = document.createElement("div");
+    actions.className = "actions";
+    var use = document.createElement("button");
+    use.className = "primary";
+    use.textContent = "Use this style";
+    use.dataset.action = "use";
+    use.onclick = function () { useStyle(s.name); };
+    var all = document.createElement("button");
+    all.textContent = "All slides";
+    all.dataset.action = "all";
+    all.disabled = true;
+    all.onclick = function () { openDetail(s.name); };
+    actions.appendChild(use);
+    actions.appendChild(all);
+    el.appendChild(actions);
+    return el;
+  }
+
+  function describe(el, d) {
+    var desc = el.querySelector(".desc");
+    var cut = d.indexOf(" — ");
+    desc.textContent = cut >= 0 ? d.slice(cut + 3) : d;
+    desc.title = desc.textContent;
+  }
+
+  // A style hidden by the pin filter arrives as a name only; its description is the
+  // <title> of its document, read once the preview is here (DOMParser runs no scripts).
+  function titleOf(p) {
+    var doc = new DOMParser().parseFromString(p.whole ? p.slides[0] : "<head>" + p.head + "</head>", "text/html");
+    var t = doc.querySelector("title");
+    return t ? t.textContent.trim() : "";
+  }
+
+  function showPreview(name) {
+    var el = cards[name];
+    var p = previews[name];
+    if (!el || !p) return;
+    el.replaceChild(thumb(slideDoc(p, 0)), el.firstChild);
+    el.querySelector('button[data-action="all"]').disabled = false;
+    if (!el.querySelector(".desc").textContent) describe(el, titleOf(p));
+  }
+
+  function loadPreviews(names) {
+    if (!bridge.hostCapabilities.serverTools) {
+      status("This host does not pass tool calls from views, so previews are not shown.");
+      return;
+    }
+    var batches = [];
+    for (var i = 0; i < names.length; i += BATCH) batches.push(names.slice(i, i + BATCH));
+    var failed = 0;
+    Promise.all(batches.map(function (batch) {
+      return bridge.callTool("app_action", { action: "style_previews", names: batch }).then(function (r) {
+        if (!r || r.isError) { failed += batch.length; return; }
+        var got = (r.structuredContent && r.structuredContent.previews) || {};
+        Object.keys(got).forEach(function (k) { previews[k] = got[k]; showPreview(k); });
+        failed += ((r.structuredContent && r.structuredContent.missing) || []).length;
+      }, function () { failed += batch.length; });
+    })).then(function () {
+      status(failed ? "Previews could not be loaded for " + failed + " styles." : "");
+      bridge.reportSize();
+    });
+  }
+
+  function openDetail(name) {
+    var p = previews[name];
+    if (!p) return;
+    shownName = name;
+    $("#grid").style.display = "none";
+    $("#more").style.display = "none";
+    $("#detail").className = "open";
+    $("#detail-name").textContent = name;
+    var list = $("#detail .slides");
+    list.textContent = "";
+    p.slides.forEach(function (_, i) { list.appendChild(thumb(slideDoc(p, i))); });
+    bridge.requestDisplayMode("fullscreen").catch(function () { /* stays inline */ });
+    bridge.reportSize();
+  }
+
+  $("#back").onclick = function () {
+    shownName = null;
+    $("#detail").className = "";
+    $("#detail .slides").textContent = "";
+    $("#grid").style.display = "";
+    $("#more").style.display = "";
+    if (bridge.hostContext.displayMode === "fullscreen") bridge.requestDisplayMode("inline").catch(function () {});
+    bridge.reportSize();
+  };
+  $("#use-detail").onclick = function () { if (shownName) useStyle(shownName); };
+
+  function addCards(grid, styles) {
+    styles.forEach(function (s) {
+      cards[s.name] = card(s);
+      grid.appendChild(cards[s.name]);
+      if (previews[s.name]) showPreview(s.name);
+    });
+    return styles.map(function (s) { return s.name; }).filter(function (n) { return !previews[n]; });
+  }
+
+  // Styles hidden by the pin filter (other_styles) sit folded under the shown ones; their
+  // cards and previews are made the first time the section opens. With nothing shown
+  // (no pinned and no own styles) the section starts open.
+  function renderOthers(names) {
+    var more = $("#more");
+    var grid = $("#more-grid");
+    grid.textContent = "";
+    more.hidden = !names.length;
+    more.ontoggle = null;
+    if (!names.length) return;
+    more.querySelector("summary").textContent = "Other styles (" + names.length + ")";
+    var built = false;
+    function build() {
+      if (built || !more.open) return;
+      built = true;
+      var missing = addCards(grid, names.map(function (n) { return { name: n }; }));
+      bridge.ready.then(function () { loadPreviews(missing); });
+    }
+    more.ontoggle = function () { build(); bridge.reportSize(); };
+    more.open = !Object.keys(cards).length;
+    build();
+  }
+
+  function render(result) {
+    var data = listing(result);
+    var grid = $("#grid");
+    grid.textContent = "";
+    cards = {};
+    var missing = addCards(grid, data.styles);
+    $("#count").textContent = data.styles.length === 1 ? "1 style" : data.styles.length + " styles";
+    renderOthers(data.other_styles || []);
+    bridge.reportSize();
+    bridge.ready.then(function () { if (missing.length) loadPreviews(missing); });
+  }
+
+  bridge.onToolResult(render);
+  bridge.ready.catch(function (e) { status("The host did not start this view: " + e.message); });
+})();
+</script>
+</body>
+</html>

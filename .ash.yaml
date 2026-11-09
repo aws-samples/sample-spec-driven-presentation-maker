@@ -132,6 +132,28 @@ global_settings:
         runs on developer's machine.
       expiration: "2027-03-29"
 
+    # --- MCP Apps view bridge: postMessage to the host frame ---
+    # MCP Apps hosts render a view in a sandboxed iframe (opaque origin) under a host frame
+    # whose origin each host picks, so the view has no origin to name or compare. The
+    # bridge identifies its peer by frame instead: it sends only to window.parent and drops
+    # every message whose ev.source is not window.parent.
+
+    - rule_id: "javascript.browser.security.wildcard-postmessage-configuration.wildcard-postmessage-configuration"
+      path: "sdpm/sdpm/tools/apps/views/bridge.js"
+      reason: >
+        The host frame's origin differs per MCP Apps host and is unknown to the view, so no
+        target origin can be named. Messages go only to window.parent, the host that
+        embedded the view and supplied the data it sends back.
+      expiration: "2027-11-09"
+
+    - rule_id: "javascript.browser.security.insufficient-postmessage-origin-validation.insufficient-postmessage-origin-validation"
+      path: "sdpm/sdpm/tools/apps/views/bridge.js"
+      reason: >
+        The listener returns unless ev.source === window.parent, which pins the sender to
+        the embedding host frame. An origin allowlist is not possible because the host
+        frame's origin differs per MCP Apps host.
+      expiration: "2027-11-09"
+
     # --- Bandit B108: /tmp usage in local/container code ---
 
     - rule_id: "B108"

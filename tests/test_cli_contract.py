@@ -83,3 +83,26 @@ def test_cli_generate_stops_on_invalid_output_format(tmp_path: Path) -> None:
     assert result.returncode == 1
     assert "outputFormat" in result.stderr
     assert not (deck / "output.pptx").exists()
+
+
+def test_cli_list_styles_prints_text_only(tmp_path: Path) -> None:
+    """list_styles prints the listing; there is no browser gallery and no --no-browse."""
+    import os
+
+    import sdpm.knowledge.reference as reference
+
+    cli = Path(__file__).resolve().parents[1] / "sdpm" / "scripts" / "pptx_builder.py"
+    env = {**os.environ, "XDG_CONFIG_HOME": str(tmp_path / "cfg"), "APPDATA": str(tmp_path / "cfg")}
+    env.pop("SDPM_STYLES_DIR", None)
+    result = subprocess.run(
+        [sys.executable, str(cli), "list_styles", "--all"], capture_output=True, text=True, env=env,
+    )
+    assert result.returncode == 0, result.stderr
+    for style in reference.BUNDLED_STYLES_DIR.glob("*.html"):
+        assert f"  {style.stem} " in result.stdout
+    refused = subprocess.run(
+        [sys.executable, str(cli), "list_styles", "--no-browse"], capture_output=True, text=True, env=env,
+    )
+    assert refused.returncode == 2
+    assert not hasattr(reference, "open_styles_gallery")
+    assert not hasattr(reference, "generate_styles_index")

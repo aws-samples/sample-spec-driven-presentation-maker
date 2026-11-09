@@ -169,6 +169,9 @@ MCP サーバーなので、MCP に対応したエージェントならどれで
 クライアントごとの表示: Claude Desktop は「+」メニュー、Claude Code は `/mcp__sdpm__sdpm-vibe`、
 VS Code は `/mcp.sdpm.sdpm-vibe`、Kiro CLI は `/sdpm-vibe`。
 
+MCP Apps を表示するクライアントでは、スタイルの一覧を頼むとチャットの中にカードで並び、各スタイルのスライドも
+見られます。1 つを選ぶと、エージェントにそのスタイルを使うよう伝わります。
+
 スライドのプレビューには LibreOffice と poppler が必要です。無くてもデッキは作れます。その場合、
 ビルド結果に `preview: {"status": "unavailable", "install": "…"}` として OS に合った導入コマンドが載り、
 エージェントがそれを伝えます。アイコンカタログが何らかの理由で無い場合は、サーバーが初回起動時に

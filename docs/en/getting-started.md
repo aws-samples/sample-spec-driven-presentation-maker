@@ -177,6 +177,9 @@ To choose how the agent works, use the server's prompts where your client shows 
 How each client shows them: Claude Desktop in the "+" menu, Claude Code as
 `/mcp__sdpm__sdpm-vibe`, VS Code as `/mcp.sdpm.sdpm-vibe`, Kiro CLI as `/sdpm-vibe`.
 
+In a client that shows MCP Apps, asking for the styles shows them as cards in the chat, each
+with its slides; choosing one tells the agent to use it.
+
 Slide previews need LibreOffice and poppler. Without them the deck still builds. The build
 result then carries `preview: {"status": "unavailable", "install": "…"}` with the install
 command for your OS, and the agent tells you. If the icon catalogs are missing for any

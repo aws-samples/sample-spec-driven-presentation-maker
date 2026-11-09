@@ -21,6 +21,9 @@ dependencies = [
 [tool.setuptools.packages.find]
 include = ["sdpm*"]
 
+[tool.setuptools.package-data]
+"sdpm.tools.apps" = ["views/*.html", "views/*.js"]
+
 [tool.setuptools.dynamic]
 version = {attr = "sdpm.__version__"}
 

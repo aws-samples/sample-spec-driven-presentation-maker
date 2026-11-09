@@ -18,9 +18,6 @@ Usage:
 import os
 import sys
 from pathlib import Path
-from typing import Annotated
-
-from pydantic import Field
 
 # Prefer checkout sources only when this file is running from the repository.
 # Installed wheels resolve sdpm and shared from their normal site-packages paths.
@@ -103,6 +100,7 @@ mcp.tool()(tools.analyze_template)
 mcp.tool()(_with_open_hint(tools.generate_pptx))
 mcp.tool()(tools.search_assets)
 mcp.tool()(tools.list_templates)
+mcp.tool()(tools.list_styles)
 mcp.tool()(tools.apply_style)
 mcp.tool()(tools.read_guides)
 mcp.tool()(tools.code_to_slide)
@@ -122,24 +120,10 @@ mcp.tool()(import_attachment)
 mcp.tool()(sandbox_tools.run_python)
 mcp.tool()(sandbox_tools.run_style_python)
 
+# MCP Apps: the style gallery on list_styles and the app-only tool its view calls
+from sdpm.tools import apps as _apps  # noqa: E402
 
-# ---------------------------------------------------------------------------
-# Local-transport specific tools (browser style gallery)
-# ---------------------------------------------------------------------------
-
-
-@mcp.tool()
-def list_styles(
-    include_all: Annotated[bool, Field(description='Include styles hidden by the pin filter.')] = False,
-) -> dict:
-    """List design styles — pinned and user styles by default, everything with
-    include_all — and open the visual gallery in the browser. Names go to apply_style.
-    start_presentation and start_style already return this list.
-    """
-    from sdpm.api import get_styles_dirs
-    from sdpm.knowledge.reference import open_styles_gallery
-    open_styles_gallery(get_styles_dirs())
-    return tools.list_styles(include_all=include_all)
+_apps.register(mcp)
 
 
 def main() -> None:
