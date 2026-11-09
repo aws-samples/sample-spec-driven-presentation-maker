@@ -135,7 +135,7 @@ def test_bad_deck_ids(value) -> None:
 
 
 def test_a_good_deck_id_is_kept_as_given() -> None:
-    assert deck._deck_id("/tmp/My Deck") == "/tmp/My Deck"
+    assert deck._deck_id("/home/me/My Deck") == "/home/me/My Deck"
     assert deck._deck_id("x" * 1024)
 
 
