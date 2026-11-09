@@ -25,7 +25,7 @@ interface StyleChatShellProps {
   styleId: string
   styleName: string
   onStyleWritten?: () => void
-  onStyleSaved?: (saved: { title: string; filename: string }) => void
+  onStyleSaved?: (saved: { title?: string; filename: string }) => void
 }
 
 export function StyleChatShell({ open, onClose, styleId, styleName, onStyleWritten, onStyleSaved }: StyleChatShellProps) {

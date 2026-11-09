@@ -265,6 +265,17 @@ describe("resumeLocalAgent", () => {
     expect(fetchMock.mock.calls[0][1].headers).toEqual({ "Last-Event-ID": "7" })
   })
 
+  it.each([
+    ["an error status", () => Response.json({ error: "sessionId required" }, { status: 400 })],
+    ["a body that is not JSON", () => new Response("<html>", { status: 200 })],
+    ["JSON that is not {running: false}", () => Response.json({ ok: true })],
+  ])("rejects on %s: a failed request says nothing about the work", async (_name, answer) => {
+    fetchMock.mockResolvedValueOnce(answer())
+    const onResumeAck = vi.fn()
+    await expect(resumeLocalAgent("L1", { onResumeAck })).rejects.toThrow("Local stream error")
+    expect(onResumeAck).not.toHaveBeenCalled()
+  })
+
   it("rejects with an AbortError when its signal aborts", async () => {
     const controller = new AbortController()
     fetchMock.mockImplementationOnce((_url: string, init: RequestInit) => new Promise((_resolve, reject) => {
