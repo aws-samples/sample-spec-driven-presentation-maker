@@ -15,9 +15,10 @@ Workspace layout:
 
 Usage patterns:
 - Read a reference: `run_style_python(code="html = open('ref/report.html').read(); print(html[:500])", ref_styles=["report"])`
-- Create/edit the style: `run_style_python(code="open('style.html','w').write(html)", style_name="style-20260506-1430")`
-- Read back for incremental edits: `run_style_python(code="print(open('style.html').read())", style_name="style-20260506-1430")`
+- Create/edit the style: `run_style_python(code="open('style.html','w').write(html)", style_name="<name>")`
+- Read back for incremental edits: `run_style_python(code="print(open('style.html').read())", style_name="<name>")`
 
-The user's first message contains `[Style: <name>]` — pass it as the
+`<name>` is the style's name: the one in `[Style: <name>]` when the user's first
+message carries it, otherwise the name you chose for a new style. Pass it as the
 `style_name` parameter on every call (not as a `write_style` argument).
 Writes to style.html persist automatically — there is no save flag.
