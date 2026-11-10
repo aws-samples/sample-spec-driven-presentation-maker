@@ -85,6 +85,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   (`show_deck` is listed only to MCP Apps clients) and the same `check_specs` result; the
   remote server lists `show_deck` only to clients that declare MCP Apps in each request's
   `_meta`.
+- **Local deck viewer: Open file and Open folder.** MCP Apps clients do not get the
+  `sdpm open` note, so the deck viewer's header now opens the deck's built file
+  (`output.pptx`, or `output.html` for an HTML deck) or the deck folder with the system's
+  default app (`open` on macOS, `os.startfile` on Windows, `xdg-open` on Linux). **Open file**
+  is disabled until the deck is built. The server finds the path from the deck id and opens
+  only decks directly in the deck root; the view passes no path. It is the `open` action of
+  `app_action`, offered by the local server only; the remote viewer shows neither button.
 - **Two built-in styles for Japanese decks: `gradient-card` and `mono-blue`.**
   `gradient-card` is dark, for technical walkthroughs on a shared screen: rules, bands, icon
   nodes and connectors with a thin blue-to-violet gradient, and one magenta outline for the

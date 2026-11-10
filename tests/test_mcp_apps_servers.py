@@ -15,8 +15,11 @@ from __future__ import annotations
 import asyncio
 import importlib.util
 import json
+import os
+import shutil
 import sys
 from pathlib import Path
+from types import SimpleNamespace
 from typing import Any
 from unittest.mock import MagicMock, patch
 
@@ -191,7 +194,11 @@ def test_a_client_with_mcp_apps_sees_the_app_tool(which, declaration, request) -
     assert tool.meta == {"ui": {"visibility": ["app"]}}
     props = tool.inputSchema["properties"]
     assert all(p.get("description") for p in props.values()), props
-    assert props["action"]["enum"] == ["style_previews", "deck", "slide_preview", "submit_review", "outline_edit"]
+    actions = ["style_previews", "deck", "slide_preview", "submit_review", "outline_edit"]
+    # Only the local server opens a deck's file or folder for the user.
+    assert props["action"]["enum"] == actions + (["open"] if which == "local" else [])
+    assert ("open:" in tool.description) == (which == "local")
+    assert props["target"]["enum"] == ["file", "folder"]
     assert tool.inputSchema["required"] == ["action"]
     # Hosts check a view's arguments against inputSchema before passing the call on, and
     # Kiro Crew's gateway refuses a schema with anyOf/oneOf/allOf ("failing closed").
@@ -544,6 +551,130 @@ def test_local_check_specs_result_is_unchanged(local, local_deck) -> None:
     assert _ok(call) == tools.check_specs(str(local_deck))
 
 
+# --- open: the deck's built file or its folder (local only) ------------------------------
+
+
+@pytest.fixture
+def launched(local, monkeypatch: pytest.MonkeyPatch) -> list[list[str]]:
+    """The OS opener stubbed out: what it would have started (argv), and nothing starts."""
+    started: list[list[str]] = []
+
+    def popen(argv, **kwargs):
+        assert isinstance(argv, list) and not kwargs.get("shell")
+        assert kwargs["stdout"] is fake.DEVNULL  # the MCP stream stays ours
+        started.append(argv)
+
+    fake = SimpleNamespace(Popen=popen, DEVNULL=object())
+    access = local.deck_access
+    monkeypatch.setattr(access, "subprocess", fake)
+    monkeypatch.setattr(access, "shutil", SimpleNamespace(which=lambda name: f"/usr/bin/{name}"))
+    monkeypatch.setattr(access.os, "startfile", lambda path: started.append([path]), raising=False)
+    return started
+
+
+@pytest.fixture
+def root_deck(local_deck: Path) -> Path:
+    """The local deck moved into the (isolated) deck root, where ``open`` serves it."""
+    target = Path(os.environ["SDPM_DECK_ROOT"]) / "20261110-deck"
+    shutil.move(str(local_deck), target)
+    return target
+
+
+def _real(path: Path) -> str:
+    return os.path.realpath(path)
+
+
+@pytest.mark.parametrize(("fmt", "built"), [("pptx", "output.pptx"), ("html", "output.html")])
+def test_local_open_file_opens_the_built_output(local, root_deck, launched, fmt, built) -> None:
+    if fmt == "html":
+        (root_deck / "deck.json").write_text(json.dumps({**_DECK_JSON, "outputFormat": "html"}), encoding="utf-8")
+        (root_deck / "output.pptx").write_bytes(b"stale")  # not the HTML deck's output
+    (root_deck / built).write_bytes(b"built")
+    deck_id = str(root_deck)
+    assert _ok(_act(local, {"action": "deck", "deck_id": deck_id}))["open"] == {"file": True, "folder": True}
+    got = _ok(_act(local, {"action": "open", "deck_id": deck_id, "target": "file"}))
+    assert got == {"target": "file", "name": built}
+    assert [argv[-1] for argv in launched] == [_real(root_deck / built)]
+
+
+def test_local_open_folder_opens_the_deck_folder(local, root_deck, launched) -> None:
+    got = _ok(_act(local, {"action": "open", "deck_id": str(root_deck), "target": "folder"}))
+    assert got == {"target": "folder", "name": root_deck.name}
+    assert [argv[-1] for argv in launched] == [_real(root_deck)]
+
+
+def test_local_open_file_needs_a_built_output(local, root_deck, launched) -> None:
+    deck_id = str(root_deck)
+    assert _ok(_act(local, {"action": "deck", "deck_id": deck_id}))["open"] == {"file": False, "folder": True}
+    call = _act(local, {"action": "open", "deck_id": deck_id, "target": "file"})
+    assert call.isError and "no built file yet" in call.content[0].text
+    assert launched == []
+
+
+def test_local_deck_with_a_bad_format_still_loads_and_opens_its_folder(local, root_deck, launched) -> None:
+    (root_deck / "deck.json").write_text(json.dumps({**_DECK_JSON, "outputFormat": "pdf"}), encoding="utf-8")
+    (root_deck / "output.pptx").write_bytes(b"built")
+    deck_id = str(root_deck)
+    got = _ok(_act(local, {"action": "deck", "deck_id": deck_id}))
+    assert got["open"] == {"file": False, "folder": True}
+    assert got["check"]["ok"] is False and any("outputFormat" in e for e in got["check"]["errors"])
+    assert _act(local, {"action": "open", "deck_id": deck_id, "target": "file"}).isError
+    _ok(_act(local, {"action": "open", "deck_id": deck_id, "target": "folder"}))
+    assert [argv[-1] for argv in launched] == [_real(root_deck)]
+
+
+@pytest.fixture
+def outside_deck(root_deck: Path, tmp_path: Path) -> Path:
+    """A built deck that is not in the deck root."""
+    outside = tmp_path / "outside"
+    (outside / "specs").mkdir(parents=True)
+    for name in ("deck.json", "specs/brief.md", "specs/outline.md"):
+        (outside / name).write_bytes((root_deck / name).read_bytes())
+    (outside / "output.pptx").write_bytes(b"built")
+    return outside
+
+
+def test_local_open_refuses_a_deck_outside_the_deck_root(local, root_deck, outside_deck, launched) -> None:
+    root = root_deck.parent
+    assert _ok(_act(local, {"action": "deck", "deck_id": str(outside_deck)}))["open"] == {"file": False, "folder": False}
+    climbed = root / ".." / outside_deck.parent.name / outside_deck.name  # a path out of the root
+    assert climbed.resolve() == outside_deck.resolve()
+    for deck_id in (str(outside_deck), str(climbed), str(root), str(root / "missing")):
+        for target in ("file", "folder"):
+            assert _act(local, {"action": "open", "deck_id": deck_id, "target": target}).isError, (deck_id, target)
+    assert launched == []
+
+
+def test_local_open_refuses_links_out_of_the_root(local, root_deck, outside_deck, launched) -> None:
+    link = root_deck.parent / "linked-deck"
+    try:
+        link.symlink_to(outside_deck, target_is_directory=True)
+        (root_deck / "output.pptx").symlink_to(outside_deck / "output.pptx")
+    except OSError:
+        pytest.skip("this user cannot create symlinks")
+    for target in ("file", "folder"):
+        assert _act(local, {"action": "open", "deck_id": str(link), "target": target}).isError, target
+    assert _ok(_act(local, {"action": "deck", "deck_id": str(root_deck)}))["open"] == {"file": False, "folder": True}
+    assert _act(local, {"action": "open", "deck_id": str(root_deck), "target": "file"}).isError
+    assert launched == []
+
+
+def test_local_open_refuses_a_bad_target(local, root_deck, launched) -> None:
+    for target in ("deck.json", "../x", ""):
+        assert _act(local, {"action": "open", "deck_id": str(root_deck), "target": target}).isError
+    assert launched == []
+
+
+def test_local_open_without_xdg_open_says_so(local, root_deck, launched, monkeypatch) -> None:
+    if os.name == "nt":
+        pytest.skip("Windows opens files with os.startfile")
+    monkeypatch.setattr(local.deck_access, "sys", SimpleNamespace(platform="linux"))
+    monkeypatch.setattr(local.deck_access, "shutil", SimpleNamespace(which=lambda name: None))
+    call = _act(local, {"action": "open", "deck_id": str(root_deck), "target": "folder"})
+    assert call.isError and "xdg-open" in call.content[0].text
+    assert launched == []
+
+
 # --- the deck viewer on the remote server ------------------------------------------------
 
 
@@ -682,3 +813,12 @@ def test_remote_check_specs_result_is_unchanged(remote, remote_deck) -> None:
     call = _call(remote, "check_specs", {"deck_id": "d1"})
     assert not call.isError
     assert json.loads(call.content[0].text) == json.loads(remote.check_specs("d1"))
+
+
+def test_remote_offers_no_open(remote, remote_deck) -> None:
+    """The viewer hides its open buttons (``open`` None) and the action is not in the schema."""
+    _, checks = remote_deck
+    assert _ok(_act(remote, {"action": "deck", "deck_id": "d1"}))["open"] is None
+    for target in ("file", "folder"):
+        assert _act(remote, {"action": "open", "deck_id": "d1", "target": target}).isError
+    assert checks == [("d1", "read")]

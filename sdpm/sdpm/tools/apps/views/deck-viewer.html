@@ -64,6 +64,8 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
     </div>
     <span class="spacer"></span>
     <span id="deck-name"></span>
+    <button id="open-file" hidden>Open file</button>
+    <button id="open-folder" hidden>Open folder</button>
     <button id="fullscreen" hidden>Full screen</button>
     <button id="refresh" disabled>Refresh</button>
   </header>
@@ -117,7 +119,9 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
 // (action "deck"), each slide preview from action "slide_preview" (compose SVG drawn in a
 // sandboxed srcdoc frame, or a JPEG); comments are saved with "submit_review" and outline
 // edits turned into a diff with "outline_edit", and both go back to the conversation with
-// ui/message. The view's own DOM is built with textContent.
+// ui/message. On a server that offers "open" (the deck payload's "open"), the header opens
+// the deck's built file or its folder on the user's machine. The view's own DOM is built
+// with textContent.
 (function () {
   "use strict";
   var bridge = window.sdpmBridge;
@@ -269,6 +273,7 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
     $("#deck-name").title = data.deck_id;
     var w = data.slide_size[0], h = data.slide_size[1];
     $("#stage").style.aspectRatio = w + " / " + h;
+    renderOpen();
     renderBrief();
     if ($("#outline-editor").hidden) renderOutline();
     else showCheck(data.check);
@@ -306,6 +311,35 @@ textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;co
   }
 
   $("#refresh").onclick = function () { load(false); };
+
+  // --- open the file or folder (a server that offers it) -----------------------------
+
+  var OPEN_UNAVAILABLE = { file: "The deck has no built file yet.", folder: "Only a deck folder in the deck root opens from here." };
+
+  function renderOpen() {
+    var can = data && data.open;
+    ["file", "folder"].forEach(function (target) {
+      var b = $("#open-" + target);
+      b.hidden = !can;
+      b.disabled = !(can && can[target]);
+      b.title = can && !can[target] ? OPEN_UNAVAILABLE[target] : "";
+    });
+  }
+
+  function openTarget(target) {
+    if (!deckId || !canCall()) return;
+    var b = $("#open-" + target);
+    b.disabled = true;
+    bridge.callTool("app_action", { action: "open", deck_id: deckId, target: target }).then(function (r) {
+      if (!r || r.isError) { status("Could not open it: " + errorText(r)); return; }
+      status("Opened " + ((r.structuredContent || {}).name || target) + ".");
+    }, function (e) {
+      status("The host refused the call: " + e.message);
+    }).then(renderOpen);
+  }
+
+  $("#open-file").onclick = function () { openTarget("file"); };
+  $("#open-folder").onclick = function () { openTarget("folder"); };
 
   // --- slides ------------------------------------------------------------------------
 

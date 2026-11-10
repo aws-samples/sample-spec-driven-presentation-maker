@@ -8,14 +8,23 @@ Local deck route picks them) and ``preview/<slug>.png``.
 ``deck_id`` is the deck directory, as for every local deck tool. Reviews are written the way
 the Web UI's Local review route writes them (old files under ``reviews/`` removed, the new
 file created only if absent), through the shared contract in ``shared/review.py``.
+
+The viewer's ``open`` opens a deck folder that sits directly in the deck root, or its built
+``output.pptx`` / ``output.html``, with the OS default app (``_launch``): the path is resolved
+here from ``deck_id``, and the app is started from an argv list, without a shell.
 """
 
 from __future__ import annotations
 
 import json
+import os
+import shutil
+import subprocess  # nosec B404 - _launch starts the OS opener from a fixed argv
+import sys
 from pathlib import Path
 
-from sdpm.engine.schema import SLUG_RE
+from sdpm.api import _get_output_base_dir
+from sdpm.engine.schema import SLUG_RE, read_deck_format
 from sdpm.tools.apps.deck import DECK_FILES, DeckAccess
 from shared.artifact_keys import COMPOSE_NAME_RE, latest_compose_keys
 from shared.review import create_review
@@ -130,6 +139,49 @@ def _preview_environment(fmt: str) -> dict | None:
     return preview_unavailable()
 
 
+def _same_dir(a: Path, b: Path) -> bool:
+    return os.path.normcase(os.path.realpath(a)) == os.path.normcase(os.path.realpath(b))
+
+
+def _deck_in_root(deck_id: str) -> Path | None:
+    """The deck folder, resolved, when it sits directly in the deck root; None otherwise."""
+    try:
+        deck = _deck(deck_id).resolve(strict=True)
+    except (OSError, RuntimeError):
+        return None
+    if not deck.is_dir() or not _same_dir(deck.parent, _get_output_base_dir().expanduser()):
+        return None
+    return deck
+
+
+def _locate(deck_id: str, target: str) -> Path | None:
+    deck = _deck_in_root(deck_id)
+    if deck is None or target == "folder":
+        return deck
+    try:
+        fmt = read_deck_format(deck)
+    except ValueError:  # a bad outputFormat: deck_view's check names it; the folder still opens
+        return None
+    output = deck / ("output.html" if fmt == "html" else "output.pptx")
+    real = Path(os.path.realpath(output))
+    return real if real.is_file() and _same_dir(real.parent, deck) else None
+
+
+def _launch(path: Path) -> None:
+    """Open ``path`` (absolute, from ``_locate``) with the OS default app; returns once it is started."""
+    if os.name == "nt":
+        os.startfile(str(path))  # type: ignore[attr-defined]  # nosec B606 - a path _locate resolved
+        return
+    opener = "/usr/bin/open" if sys.platform == "darwin" else shutil.which("xdg-open")
+    if not opener:
+        raise ValueError("xdg-open is not installed, so files cannot be opened from here")
+    # stdout stays the MCP stream's: the opener gets none of it.
+    subprocess.Popen(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
+        [opener, str(path)], stdin=subprocess.DEVNULL, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+
+
 ACCESS = DeckAccess(
     open=_open,
     read_text=_read_text,
@@ -140,4 +192,6 @@ ACCESS = DeckAccess(
     preview_environment=_preview_environment,
     compose=_compose,
     read_compose=_read_compose,
+    locate=_locate,
+    launch=_launch,
 )

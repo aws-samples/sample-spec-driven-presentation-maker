@@ -8,6 +8,7 @@ import base64
 import io
 import json
 import re
+from pathlib import Path
 
 import pytest
 from compose_fixture import BULLET, MASTER_IMAGE_ID, SLUGS, UNUSED_BULLET, compose_files
@@ -350,6 +351,63 @@ def test_submit_review_needs_an_object(review) -> None:
     with pytest.raises(ValueError):
         deck.submit_review("d1", review, fake.access())
     assert fake.opened == []
+
+
+# --- open --------------------------------------------------------------------------------
+
+
+def _opener(paths: dict[str, Path | None]) -> tuple[dict, list[Path]]:
+    """``locate`` over ``paths`` (target → path) and a ``launch`` that records what it opens."""
+    launched: list[Path] = []
+    return {"locate": lambda d, target: paths.get(target), "launch": launched.append}, launched
+
+
+def test_a_server_without_locate_and_launch_offers_no_open() -> None:
+    fake = Fake()
+    assert deck.deck_view("d1", fake.access())["open"] is None
+    only_locate, _ = _opener({"folder": Path("/decks/d1")})
+    del only_locate["launch"]
+    assert deck.deck_view("d1", fake.access(**only_locate))["open"] is None
+    with pytest.raises(ValueError, match="does not open files"):
+        deck.open_target("d1", "folder", fake.access())
+    assert fake.opened == [("d1", False), ("d1", False)]
+
+
+def test_deck_view_says_which_targets_open() -> None:
+    fake = Fake()
+    over, launched = _opener({"file": Path("/decks/d1/output.pptx"), "folder": Path("/decks/d1")})
+    assert deck.deck_view("d1", fake.access(**over))["open"] == {"file": True, "folder": True}
+    over, _ = _opener({"folder": Path("/decks/d1")})
+    assert deck.deck_view("d1", fake.access(**over))["open"] == {"file": False, "folder": True}
+    assert launched == []
+
+
+@pytest.mark.parametrize(("target", "path"), [
+    ("file", Path("/decks/d1/output.pptx")), ("folder", Path("/decks/d1")),
+])
+def test_open_launches_what_the_server_locates(target, path) -> None:
+    fake = Fake()
+    over, launched = _opener({"file": Path("/decks/d1/output.pptx"), "folder": Path("/decks/d1")})
+    assert deck.open_target("d1", target, fake.access(**over)) == {"target": target, "name": path.name}
+    assert launched == [path]
+    assert fake.opened == [("d1", False)]
+
+
+def test_open_without_a_built_file_launches_nothing() -> None:
+    fake = Fake()
+    over, launched = _opener({"folder": Path("/decks/d1")})
+    with pytest.raises(ValueError, match="no built file yet"):
+        deck.open_target("d1", "file", fake.access(**over))
+    assert launched == []
+
+
+@pytest.mark.parametrize(("deck_id", "target"), [("d1", "deck.json"), ("d1", None), ("d1", "../x"), ("nope", "file")])
+def test_open_refuses_a_bad_target_or_deck(deck_id, target) -> None:
+    fake = Fake()
+    over, launched = _opener({"file": Path("/decks/d1/output.pptx"), "folder": Path("/decks/d1")})
+    with pytest.raises(ValueError):
+        deck.open_target(deck_id, target, fake.access(**over))
+    assert launched == []
 
 
 @pytest.mark.parametrize("deck_json", [

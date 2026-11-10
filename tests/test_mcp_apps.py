@@ -126,10 +126,11 @@ def test_the_deck_viewer_carries_the_bridge_and_fetches_nothing() -> None:
     assert not re.search(r"\ssrc\s*=", html)
     assert ".innerHTML" not in html
     assert apps.APP_TOOL in html
-    for action in ('"deck"', '"slide_preview"', '"submit_review"', '"outline_edit"'):
+    for action in ('"deck"', '"slide_preview"', '"submit_review"', '"outline_edit"', '"open"'):
         assert f"action: {action}" in html, action
     for hook in ('data-tab="brief"', 'data-tab="outline"', 'data-tab="slides"', "aria-selected",
-                 'id="refresh"', 'id="fullscreen"', 'id="status" role="status"', 'id="brief"',
+                 'id="refresh"', 'id="fullscreen"', 'id="open-file" hidden', 'id="open-folder" hidden',
+                 "data.open", 'id="status" role="status"', 'id="brief"',
                  'id="check"', "dataset.ok", '"entry-slide"', '"entry-section"', "dataset.slug",
                  'id="outline-edit"', 'id="outline-text"', 'id="outline-send"', 'id="outline-ok"',
                  '"slide-item"', 'id="stage"', '"frame"', "dataset.frame", 'id="note"',
