@@ -33,6 +33,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   CLI `init_deck_workspace` without `-o`) now returns an error saying the name is a folder
   name without a path, and creates nothing; decks always go to `<deck root>/<timestamp>-<name>`.
   `make test` no longer leaves such folders in `~/Documents/SDPM-Presentations`.
+- **New styles get a real name and description.** "Create with AI" on the Styles page used
+  to save a placeholder right away as `style-<date>-<time>` with the title "Untitled Style"
+  and told the agent to keep that name, so every new style (and every abandoned attempt)
+  showed up that way in the gallery and `list_styles()`. The page now opens the chat with no
+  file; the agent names the style after what it is for, writes the `<title>` description
+  from the first save, and the page then moves to that style. Styles you already have keep
+  their names.
 - **Local Web UI: a reopened deck no longer loses or doubles a reply.** A reply that ended
   just before a reload or a closed tab, before the page saved the chat, used to be gone on
   reopen; the server now replays a finished work period until the page has saved the chat

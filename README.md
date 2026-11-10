@@ -103,6 +103,14 @@ SDPM comes with 18 styles and 2 blank templates. You can use your own `.pptx` as
 and create new styles with AI in the Web UI or by asking your agent. See
 [Custom templates, styles and assets](docs/en/custom-template.md).
 
+To keep your own template for every deck, put the `.pptx` in `~/.config/sdpm/templates/`
+(Windows: `%APPDATA%\sdpm\templates\`). It then appears in the agent's template list under
+its file name. To give it a description that tells the agent when to use it, upload it on
+the Templates page of the local Web UI (`sdpm webui`) instead, which saves the file to the
+same folder. Keep templates
+out of the installed checkout (`~/.sdpm/checkout`): that is SDPM's own code, which
+`sdpm update` manages. A `.pptx` you attach to a request is used for that deck only.
+
 ![The Styles page of the Web UI, showing the built-in styles](docs/assets/screenshots/webui-styles.png)
 
 ---

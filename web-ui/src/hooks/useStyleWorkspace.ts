@@ -4,7 +4,8 @@
  * useStyleWorkspace — Hash routing for the /styles page.
  *
  * Mirrors useWorkspace (decks) but much simpler: no polling, no deck state.
- * Hash values: "" (list), "#create" (new style), "#{name}" (preview).
+ * Hash values: "" (list), "#/create" (new style), "#{name}" (preview). A style name
+ * never holds "/", so every name, "create" included, has its own preview hash.
  *
  * Preview HTML is resolved from the preloaded styles array (passed via
  * setStyles) to eliminate the /styles/{name} fetch round-trip. Falls back to
@@ -19,10 +20,12 @@ import { fetchStylePreviewHtml, type StyleEntry } from "@/services/deckService"
 
 export type StyleView = { mode: "list" } | { mode: "preview"; name: string } | { mode: "create" }
 
-function parseHash(hash: string): StyleView {
+const CREATE_HASH = "/create"
+
+export function parseHash(hash: string): StyleView {
   const raw = hash.replace("#", "")
   if (!raw) return { mode: "list" }
-  if (raw === "create") return { mode: "create" }
+  if (raw === CREATE_HASH) return { mode: "create" }
   return { mode: "preview", name: decodeURIComponent(raw) }
 }
 
@@ -83,7 +86,7 @@ export function useStyleWorkspace(idToken: string | undefined) {
   }, [])
 
   const navigateToCreate = useCallback(() => {
-    window.location.hash = "create"
+    window.location.hash = CREATE_HASH
   }, [])
 
   return {
