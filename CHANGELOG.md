@@ -13,47 +13,42 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
-### Fixed
+## [0.14.0] - 2026-11-10
 
-- **Cloud chat: a reply the model's content filter stopped now says so.** Strands ends such
-  a turn normally with no text, so the chat showed an empty reply. The agent now sends a
-  `content_filtered` error for a `content_filtered` or `guardrail_intervened` stop, and the
-  Web UI shows "The model stopped its reply because of its content filter".
-- **Cloud `run_python` and `run_style_python` stop user code after 120 seconds.** The tool
-  returns `Error: execution timed out (120s)…` as a normal result, so the composer can go
-  on. Before, a hung call blocked the composer for 10 minutes and then failed with
-  `ConflictException … Session already terminated`, which hid the real cause. Stopping a
-  session the sandbox already ended no longer replaces the result.
-- **Cloud chat: throttling names the cause.** The message now says the model's usage quota
-  or rate limit was reached and suggests waiting or choosing another model in Settings, in
-  English and Japanese.
-- **Local: `init_deck_workspace` refuses a path as the deck name.** Given a name such as
-  `/Users/me/decks/q3`, it used to create `<deck root>/<timestamp>-/Users/me/decks/q3`, a
-  folder nested under a date-only folder that the Web UI does not list. The tool (and the
-  CLI `init_deck_workspace` without `-o`) now returns an error saying the name is a folder
-  name without a path, and creates nothing; decks always go to `<deck root>/<timestamp>-<name>`.
-  `make test` no longer leaves such folders in `~/Documents/SDPM-Presentations`.
-- **New styles get a real name and description.** "Create with AI" on the Styles page used
-  to save a placeholder right away as `style-<date>-<time>` with the title "Untitled Style"
-  and told the agent to keep that name, so every new style (and every abandoned attempt)
-  showed up that way in the gallery and `list_styles()`. The page now opens the chat with no
-  file; the agent names the style after what it is for, writes the `<title>` description
-  from the first save, and the page then moves to that style. Styles you already have keep
-  their names.
-- **Local Web UI: a reopened deck no longer loses or doubles a reply.** A reply that ended
-  just before a reload or a closed tab, before the page saved the chat, used to be gone on
-  reopen; the server now replays a finished work period until the page has saved the chat
-  after reading it. A long reply could show twice after a reopen, because the 2,000-event
-  replay buffer dropped the period's prompt; the buffer now keeps a run of streamed text as
-  one event and never drops the period's prompt. A period with more than 2,000 other events
-  (tool calls, compose progress) is replayed from its prompt without its oldest events, so the
-  reopened chat shows that reply from the oldest part kept. A failed reconnect no longer shows
-  a running compose task as stopped.
-- **Local Web UI compose: `message_composer` input the tool refuses is not sent.** An empty
-  text or a text over 10,000 characters used to reach the composer while the orchestrator read
-  an error; the card now shows the tool's error and nothing is sent. A task
-  whose 60-minute timeout came before a Stop its composers did not answer ends cancelled, as
-  Stop does, instead of failed.
+MCP Apps clients (Claude Desktop, claude.ai connectors, Kiro Crew) now show a style
+gallery and a deck viewer in the chat, from the local and the remote server. The orchestrator
+picks a style through `list_styles`, new styles get a real name and description, two built-in
+styles for Japanese decks join the catalogue, `sdpm open` opens a deck in the browser Web UI,
+and the Local Web UI no longer loses or doubles a reply after a reload.
+
+### Upgrading from 0.13
+
+**Local installs (`sdpm update`).**
+
+- **Styles come from `list_styles`.** `start_presentation` no longer returns `styles`. The
+  bundled agents need nothing. A script or prompt of yours that reads
+  `start_presentation()["styles"]` should call `list_styles()` instead, or
+  `list_styles(include_all=true)` for every style.
+- **The CLI `list_styles` opens no browser gallery and has no `--no-browse`.** Drop
+  `--no-browse` from scripts. An MCP Apps client shows the gallery in the chat; other clients
+  get the text listing as before.
+- **MCP Apps clients show the style gallery and the deck viewer.** Claude Desktop: install the
+  new `sdpm.mcpb` from the release. Kiro Crew: in MCP Management turn on sharing for the sdpm
+  server, approve its launch, then restart the gateway (Settings → About → Restart gateway);
+  "Apply and restart" restarts only the chat agents. Other clients see the same tools and
+  results as before.
+- **Keep your own templates in `~/.config/sdpm/templates/`** (Windows:
+  `%APPDATA%\sdpm\templates\`), not in `~/.sdpm/checkout/sdpm/templates/`, which is SDPM's
+  own code and is managed by `sdpm update`. Move any template you put there.
+
+**Cloud deployments.**
+
+- Deploy SdpmData, SdpmRuntime and SdpmAgent before the Web UI (`scripts/deploy_webui.sh`),
+  or all of them together. The new Styles page opens a new style's chat without a
+  `[Style: …]` prefix; until the agent stack is updated, its old prompt may save new styles
+  as `style-<date>-<time>` again.
+- The remote server serves the gallery and the deck viewer to MCP Apps clients, such as a
+  claude.ai custom connector, with no configuration change.
 
 ### Added
 
@@ -117,6 +112,48 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   count as no pins: for a user with no styles of their own, `list_styles()` returns every
   style instead of none.
 
+### Fixed
+
+- **Cloud chat: a reply the model's content filter stopped now says so.** Strands ends such
+  a turn normally with no text, so the chat showed an empty reply. The agent now sends a
+  `content_filtered` error for a `content_filtered` or `guardrail_intervened` stop, and the
+  Web UI shows "The model stopped its reply because of its content filter".
+- **Cloud `run_python` and `run_style_python` stop user code after 120 seconds.** The tool
+  returns `Error: execution timed out (120s)…` as a normal result, so the composer can go
+  on. Before, a hung call blocked the composer for 10 minutes and then failed with
+  `ConflictException … Session already terminated`, which hid the real cause. Stopping a
+  session the sandbox already ended no longer replaces the result.
+- **Cloud chat: throttling names the cause.** The message now says the model's usage quota
+  or rate limit was reached and suggests waiting or choosing another model in Settings, in
+  English and Japanese.
+- **Local: `init_deck_workspace` refuses a path as the deck name.** Given a name such as
+  `/Users/me/decks/q3`, it used to create `<deck root>/<timestamp>-/Users/me/decks/q3`, a
+  folder nested under a date-only folder that the Web UI does not list. The tool (and the
+  CLI `init_deck_workspace` without `-o`) now returns an error saying the name is a folder
+  name without a path, and creates nothing; decks always go to `<deck root>/<timestamp>-<name>`.
+  `make test` no longer leaves such folders in `~/Documents/SDPM-Presentations`.
+- **New styles get a real name and description.** "Create with AI" on the Styles page used
+  to save a placeholder right away as `style-<date>-<time>` with the title "Untitled Style"
+  and told the agent to keep that name, so every new style (and every abandoned attempt)
+  showed up that way in the gallery and `list_styles()`. The page now opens the chat with no
+  file; the agent names the style after what it is for, writes the `<title>` description
+  from the first save, and the page then moves to that style. Styles you already have keep
+  their names.
+- **Local Web UI: a reopened deck no longer loses or doubles a reply.** A reply that ended
+  just before a reload or a closed tab, before the page saved the chat, used to be gone on
+  reopen; the server now replays a finished work period until the page has saved the chat
+  after reading it. A long reply could show twice after a reopen, because the 2,000-event
+  replay buffer dropped the period's prompt; the buffer now keeps a run of streamed text as
+  one event and never drops the period's prompt. A period with more than 2,000 other events
+  (tool calls, compose progress) is replayed from its prompt without its oldest events, so the
+  reopened chat shows that reply from the oldest part kept. A failed reconnect no longer shows
+  a running compose task as stopped.
+- **Local Web UI compose: `message_composer` input the tool refuses is not sent.** An empty
+  text or a text over 10,000 characters used to reach the composer while the orchestrator read
+  an error; the card now shows the tool's error and nothing is sent. A task
+  whose 60-minute timeout came before a Stop its composers did not answer ends cancelled, as
+  Stop does, instead of failed.
+
 ### Removed
 
 - The local `list_styles` no longer opens a browser gallery or writes
@@ -124,6 +161,12 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   the text listing only, and its `--no-browse` option is gone: drop it from scripts.
   `sdpm.knowledge.reference.open_styles_gallery` and `generate_styles_index` are removed
   with it.
+
+### Security
+
+- **Web UI: `next` and `eslint-config-next` 16.4.4 → 16.4.6.** 16.4.5 carries the Next.js
+  November security fixes (moderate: `'use cache'` and Cache Components, image optimization,
+  Edge runtime cookies, and self-hosted apps that forward fetched responses).
 
 ## [0.13.0] - 2026-11-09
 
@@ -2050,7 +2093,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.10.4...v0.11.0
