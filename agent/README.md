@@ -174,10 +174,6 @@ In addition to MCP tools, the agent includes built-in tools defined locally:
 | Variable | Description | Default |
 |---|---|---|
 | `MCP_RUNTIME_ARN` | L3 MCP Server Runtime ARN | (required) |
-| `COGNITO_DOMAIN` | Amazon Cognito M2M domain (from L3) | (required for M2M) |
-| `M2M_CLIENT_ID` | Amazon Cognito M2M client ID | (required for M2M) |
-| `M2M_CLIENT_SECRET_NAME` | AWS Secrets Manager name for client secret | (required for M2M) |
-| `M2M_SCOPE` | OAuth scope | `sdpm/invoke` |
 | `MEMORY_ID` | Bedrock AgentCore Memory ID | `""` |
 | `MODEL_ID` | Bedrock model ID | `global.anthropic.claude-sonnet-4-6` |
 | `AWS_REGION` / `AWS_DEFAULT_REGION` | AWS region | `us-east-1` |

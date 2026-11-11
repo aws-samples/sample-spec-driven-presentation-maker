@@ -23,7 +23,9 @@ The Layer 4 Agent has workflow constraints (Phase 1 → 2 → 3), MCP tool conne
 ## Prerequisites
 
 - spec-driven-presentation-maker Layer 3 + Layer 4 deployed (see [Developer guide — Full stack](developer-guide.md#full-stack-aws))
-- Authentication infrastructure capable of obtaining JWT tokens (see [Developer guide — Authentication options](developer-guide.md#authentication-options) for details)
+- A way for the bot to obtain a JWT the Agent Runtime accepts. The stack includes no
+  machine-to-machine client; see [Getting a JWT Token](#getting-a-jwt-token) for what to add
+  and [Developer guide — Authentication options](developer-guide.md#authentication-options)
 
 ---
 
@@ -75,7 +77,29 @@ The bot handler reads the SSE stream to completion and concatenates text chunks 
 
 ### Getting a JWT Token
 
-#### Default Amazon Cognito (client_credentials flow)
+#### Default Amazon Cognito
+
+The stack includes no machine-to-machine (`client_credentials`) client. The Agent Runtime
+accepts tokens from the `WebClient` app client only (its JWT authorizer's
+`allowedClients`), and `WebClient` uses the authorization code flow without a client
+secret, so a bot cannot get a token from it on its own.
+
+To call the Agent from a bot with the `client_credentials` flow, add the client yourself:
+
+1. Add an app client to the user pool with a client secret, the `client_credentials` flow
+   and the scope `sdpm-mcp/invoke` (resource server `sdpm-mcp`). The Agent forwards the
+   bot's token to the MCP Runtime, which accepts only tokens that carry this scope.
+2. Add the client's ID to the Agent Runtime's `allowedClients` in
+   `infra/lib/agent-stack.ts`. With the default Cognito, `auth.allowedClients` in
+   `config.yaml` is not used.
+3. Redeploy `SdpmAuth` and `SdpmAgent`.
+
+> **Note:** A `client_credentials` token belongs to the client, not to a person: its `sub`
+> is the client ID. Every deck the bot creates is owned by that client ID (a service
+> account), not by the Slack or Teams user who asked for it, and every user of the bot
+> works on the same set of decks.
+
+With the client in place, the bot gets a token like this:
 
 ```python
 import base64
@@ -85,7 +109,7 @@ import urllib.request
 creds = base64.b64encode(f"{CLIENT_ID}:{CLIENT_SECRET}".encode()).decode()
 req = urllib.request.Request(
     f"https://{COGNITO_DOMAIN}/oauth2/token",
-    data=b"grant_type=client_credentials&scope=sdpm/invoke",
+    data=b"grant_type=client_credentials&scope=sdpm-mcp/invoke",
     headers={
         "Content-Type": "application/x-www-form-urlencoded",
         "Authorization": f"Basic {creds}",
@@ -95,7 +119,15 @@ with urllib.request.urlopen(req) as resp:
     token = json.loads(resp.read())["access_token"]
 ```
 
-Store the client secret in AWS Secrets Manager and cache it during AWS Lambda execution.
+`COGNITO_DOMAIN` is `sdpm-auth-<account>-<region>.auth.<region>.amazoncognito.com` (the
+prefix is in the SSM parameter `/sdpm/auth/cognito-domain-prefix`). Store the client secret
+in AWS Secrets Manager and cache it during AWS Lambda execution.
+
+#### External OIDC IdP
+
+With `auth.oidcDiscoveryUrl`, register the bot as a client in your IdP and add its client ID
+to `auth.allowedClients` in `config.yaml`; both runtimes accept the clients listed there.
+The note above applies in the same way to a token issued to the bot rather than to a user.
 
 ---
 
@@ -146,7 +178,7 @@ def _owner_prefix(token: str) -> str:
 
 def _invoke_agent(prompt: str, session_id: str) -> str:
     """Call the Layer 4 Agent and return the final text."""
-    token = _get_oauth_token()  # Cognito client_credentials
+    token = _get_oauth_token()  # client_credentials client you added (see Getting a JWT Token)
     session_id = f"{_owner_prefix(token)}-{session_id}"
     escaped_arn = urllib.request.quote(os.environ["AGENT_RUNTIME_ARN"], safe="")
     url = (
@@ -235,8 +267,8 @@ Required environment variables:
 | `AGENT_RUNTIME_ARN` | spec-driven-presentation-maker Agent's Amazon Bedrock AgentCore Runtime ARN |
 | `AWS_REGION` | AWS Region |
 | `COGNITO_DOMAIN` | Amazon Cognito domain (for token retrieval) |
-| `M2M_CLIENT_ID` | Amazon Cognito M2M client ID |
-| `M2M_CLIENT_SECRET_NAME` | AWS Secrets Manager secret name |
+| `BOT_CLIENT_ID` | ID of the `client_credentials` app client you added |
+| `BOT_CLIENT_SECRET_NAME` | AWS Secrets Manager secret name for that client's secret |
 
 #### 4. Sharing PPTX Files (Optional)
 
@@ -297,9 +329,11 @@ Calling with the same session ID causes the Agent to respond while retaining the
 ## Security Notes
 
 - Store Slack Bot Token / Signing Secret in AWS Secrets Manager
-- Store Amazon Cognito client secrets in AWS Secrets Manager as well
-- Use least-privilege OAuth scopes for the bot
-- Tokens obtained via M2M (client_credentials) flow operate as a service account. If per-user access control is needed, implement a mechanism to obtain individual JWTs for each user
+- Store the bot's Amazon Cognito client secret in AWS Secrets Manager as well
+- Give the bot's client only the `sdpm-mcp/invoke` scope
+- A token from the `client_credentials` flow acts as a service account: the decks belong to
+  the client ID and are shared by everyone who uses the bot. To keep each person's decks
+  separate, the bot has to obtain a JWT for each user instead
 
 ---
 

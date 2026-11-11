@@ -101,7 +101,18 @@ waf:
 
 ### Default: Amazon Cognito User Pool
 
-CDK creates a Amazon Cognito User Pool with M2M (machine-to-machine) credentials. The M2M client ID and secret are in the CDK outputs.
+CDK creates an Amazon Cognito User Pool (stack `SdpmAuth`) with a resource server `sdpm-mcp`
+and the scope `sdpm-mcp/invoke`. Its app clients use the authorization code flow and have no
+client secret:
+
+- `WebClient` — the Web UI; the Agent Runtime accepts tokens from this client only
+- `McpClient` — created only when `auth.mcpCallbackUrls` is set (Connection Method B above);
+  its ID is the `SdpmRuntime.McpOAuthClientId` output
+- clients registered through DCR (Connection Method A)
+
+The MCP Runtime accepts any token from this user pool that carries `sdpm-mcp/invoke`.
+There is no machine-to-machine (`client_credentials`) client and no client secret in the
+CDK outputs; every caller signs in as a user.
 
 ### External OIDC Identity Provider
 

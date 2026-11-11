@@ -112,8 +112,9 @@ Deployment takes about 15 to 30 minutes.
 
 | Stack | Resources |
 |-------|-----------|
+| SdpmAuth (default Cognito; not created with `auth.oidcDiscoveryUrl`) | Amazon Cognito User Pool, hosted-UI domain, resource server `sdpm-mcp` (scope `sdpm-mcp/invoke`), `WebClient` app client |
 | SdpmData | Amazon DynamoDB table, S3 buckets (pptx + resources), reference files deployed to S3 |
-| SdpmRuntime | Amazon Bedrock AgentCore Runtime endpoint, ECR repository + Docker image, Amazon Cognito M2M auth |
+| SdpmRuntime | Amazon Bedrock AgentCore Runtime endpoint (JWT authorizer, scope `sdpm-mcp/invoke`), ECR repository + Docker image, OAuth discovery endpoint (`McpServerUrl`) |
 
 ### Templates
 
@@ -124,32 +125,17 @@ use `scripts/upload_template.py`; see
 
 ### Verify the deployment
 
-Get an OAuth token:
+The MCP Runtime accepts a user's access token that carries the `sdpm-mcp/invoke` scope; the
+stack creates no machine-to-machine (`client_credentials`) client. Verify with an MCP
+client that signs in through OAuth:
 
-```bash
-TOKEN=$(curl -s -X POST \
-  "https://<CognitoDomain>.auth.<region>.amazoncognito.com/oauth2/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "<M2MClientId>:<M2MClientSecret>" \
-  -d "grant_type=client_credentials&scope=sdpm/invoke" \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-```
+1. Create a user in the Cognito user pool
+   ([Deploy guide — Creating a Cognito user](deploy-cloudshell.md#creating-a-cognito-user-layer-4)).
+2. Register the `SdpmRuntime.McpServerUrl` output in an MCP client
+   ([Connecting Agents — Option 2](add-to-gateway.md#option-2-oauth-21-discovery-endpoint-layer-3-recommended))
+   and sign in as that user.
 
-Find `CognitoDomain`, `M2MClientId` and `M2MClientSecret` in the CDK outputs. Then call
-`tools/list`:
-
-```bash
-ENCODED_ARN=$(python3 -c "import urllib.parse; print(urllib.parse.quote('<RuntimeArn>', safe=''))")
-
-curl -X POST \
-  "https://bedrock-agentcore.<region>.amazonaws.com/runtimes/${ENCODED_ARN}/invocations?qualifier=DEFAULT" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}'
-```
-
-A tool list in the response confirms success.
+The client listing the SDPM tools confirms success.
 
 ## Full stack (AWS)
 
@@ -182,8 +168,7 @@ npx cdk deploy --all
 
 | Stack | Resources |
 |-------|-----------|
-| SdpmAuth | Amazon Cognito User Pool, hosted UI |
-| SdpmAgent | Strands Agent on Amazon Bedrock AgentCore Runtime, ECR image |
+| SdpmAgent | Strands Agent on Amazon Bedrock AgentCore Runtime (JWT authorizer: `WebClient` tokens only), ECR image |
 | SdpmWebUi | S3 bucket, Amazon CloudFront distribution, Amazon API Gateway, Lambda |
 
 ### Choosing the models
@@ -211,8 +196,8 @@ The default for both is `global.anthropic.claude-sonnet-4-6`. Both defaults must
 
 #### Default: Amazon Cognito User Pool
 
-When `agent` or `webUi` is enabled, the CDK creates an Amazon Cognito User Pool with a
-hosted UI. Users sign in through the Web UI, and the JWT is passed through the stack. For
+Unless `auth.oidcDiscoveryUrl` is set, the CDK creates an Amazon Cognito User Pool with a
+hosted UI (stack `SdpmAuth`). Users sign in through the Web UI, and the JWT is passed through the stack. For
 the authentication and authorization model, see
 [Architecture — Authentication and Authorization Model](architecture.md#authentication-and-authorization-model).
 
