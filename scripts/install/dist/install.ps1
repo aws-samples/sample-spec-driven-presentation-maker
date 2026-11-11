@@ -248,9 +248,20 @@ function Test-DependencyAvailable {
 function Install-WingetDependency {
     param([hashtable]$Dependency)
     Start-Step "Installing $($Dependency.Name)" $Dependency.Reason
-    $result = Run-WithSpinner -Exe "winget" -Arguments @("install", "--exact", "--id", $Dependency.Id, "--silent", "--accept-source-agreements", "--accept-package-agreements", "--disable-interactivity")
-    Refresh-Path
-    if (-not $result.Success -or -not (Test-DependencyAvailable -Name $Dependency.Name)) {
+    # winget downloads from the package's own host (poppler: GitHub Releases), where a timeout
+    # or a 5xx usually passes on the next try. Retry only those (HTTP 500-511 as 0x801901F4-FF,
+    # WinINet timeout / cannot connect / aborted / reset); anything else fails at once.
+    $delays = @(5, 10)
+    for ($attempt = 0; ; $attempt++) {
+        $result = Run-WithSpinner -Exe "winget" -Arguments @("install", "--exact", "--id", $Dependency.Id, "--silent", "--accept-source-agreements", "--accept-package-agreements", "--disable-interactivity")
+        Refresh-Path
+        $installed = $result.Success -and (Test-DependencyAvailable -Name $Dependency.Name)
+        $transient = $result.Output -match '0x(801901f[4-9a-f]|80072ee2|80072ef[d-f])\b'
+        if ($installed -or -not $transient -or $attempt -ge $delays.Count) { break }
+        Write-Host "        Download failed ($($Matches[0])); retrying in $($delays[$attempt]) s" -ForegroundColor DarkGray
+        Start-Sleep -Seconds $delays[$attempt]
+    }
+    if (-not $installed) {
         Fail-Step "$($Dependency.Name) installation failed or is not on PATH" $result.Output $Dependency.Url
         exit 1
     }

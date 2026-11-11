@@ -1064,11 +1064,33 @@ def test_exactly_one_manifest_fetch_per_update_and_none_on_main(world, monkeypat
 
 
 def test_manifest_probe_reports_absent_or_error(monkeypatch, capsys):
+    monkeypatch.setattr(cu.time, "sleep", lambda s: None)
     monkeypatch.setattr(cu, "fetch_manifest", lambda *a, **k: ("absent", None, ""))
     assert cu.main(["--checkout", "/c", "manifest-probe", "--tag", "v0.12.0"]) == 0
     monkeypatch.setattr(cu, "fetch_manifest", lambda *a, **k: ("error", None, "TLS"))
     assert cu.main(["--checkout", "/c", "manifest-probe", "--tag", "v0.12.0"]) == 1
     assert capsys.readouterr().out.splitlines() == ["absent", "error: TLS"]
+
+
+@pytest.mark.parametrize("errors, calls, rc", [
+    (["The read operation timed out", "HTTP 504"], 3, 0),  # transient: retried until it passes
+    (["timed out", "timed out", "timed out"], 3, 1),       # gives up after three attempts
+    (["HTTP 404"], 1, 1),                                  # a 4xx is not retried
+    (["invalid (Expecting value)"], 1, 1),                 # nor is a bad body
+])
+def test_manifest_probe_retries_only_transient_errors(monkeypatch, capsys, errors, calls, rc):
+    slept, seen = [], []
+    monkeypatch.setattr(cu.time, "sleep", slept.append)
+
+    def fetch(*a, **k):
+        seen.append(k["timeout"])
+        return ("error", None, errors[len(seen) - 1]) if len(seen) <= len(errors) else ("ok", {}, "")
+
+    monkeypatch.setattr(cu, "fetch_manifest", fetch)
+    assert cu.main(["--checkout", "/c", "manifest-probe", "--tag", "v0.13.0"]) == rc
+    assert seen == [15.0] * calls
+    assert slept == list(cu.PROBE_RETRY_DELAYS[:calls - 1])
+    assert capsys.readouterr().out.splitlines()[-1] == ("ok" if rc == 0 else f"error: {errors[-1]}")
 
 
 # ---------------------------------------------------------------------------
