@@ -58,6 +58,22 @@ describe("useChatStream session conflicts", () => {
   it("keeps the generic message for other failures", async () => {
     expect(await lastReplyAfter(new Error("Local agent error: 500: "))).toBe("Sorry, something went wrong. Please try again.")
   })
+
+  it("shows the message in the reply's blocks too, keeping its tool cards", async () => {
+    invokeAgentCore.mockImplementationOnce(async (...args: unknown[]) => {
+      const onStreamUpdate = args[2] as (text: string) => void
+      const onToolUse = args[5] as (name: string, data: Record<string, unknown>) => void
+      onStreamUpdate("Composing.")
+      onToolUse("compose_slides", { toolUseId: "t1", input: {} })
+      throw new Error("Local agent error: 500: ")
+    })
+    const { result } = renderHook(() => useChatStream({ sessionId: "K1", mode: "vibe", deckId: "d1" }), { wrapper })
+    await act(async () => { await result.current.sendMessage("hi") })
+    const reply = result.current.messages.at(-1)!
+    expect(reply.content).toBe("Sorry, something went wrong. Please try again.")
+    expect(reply.blocks?.map((b) => b.type === "text" ? b.text : b.tool.toolUseId))
+      .toEqual(["t1", "Sorry, something went wrong. Please try again."])
+  })
 })
 
 describe("useChatStream local notice", () => {
