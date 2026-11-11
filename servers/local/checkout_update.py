@@ -1444,9 +1444,32 @@ def print_update_complete(home: Path) -> None:
         out("  sdpm webui     (not installed — sdpm update --with-webui)")
 
 
+PROBE_RETRY_DELAYS = (2.0, 5.0)
+
+
+def _transient_manifest_error(reason: str) -> bool:
+    """Whether a ``fetch_manifest`` error ``reason`` may pass on retry: a 5xx or a network
+    error (a timeout, a reset). A 4xx, an invalid body or an oversized one is permanent."""
+    match = re.match(r"HTTP (\d+)$", reason)
+    if match:
+        return int(match.group(1)) >= 500
+    return not reason.startswith(("invalid (", "larger than "))
+
+
 def manifest_probe(tag: str) -> int:
-    """CI: fetch ``tag``'s update manifest from the real release URL; ok / absent / error."""
-    status, _manifest, reason = fetch_manifest(tag, "update", base=RELEASE_BASE_URL)
+    """CI: fetch ``tag``'s update manifest from the real release URL; ok / absent / error.
+
+    GitHub's release-asset host has slow spells (2026-11-08/09: 5 s read timeouts on every
+    OS at once); the probe checks that the URL is right, not that GitHub is fast, so a
+    transient error is retried with a longer timeout. ``sdpm update`` keeps its 5 s and
+    no retry: there an error only falls back to git tags."""
+    status, reason = "error", ""
+    for delay in (*PROBE_RETRY_DELAYS, None):
+        status, _manifest, reason = fetch_manifest(tag, "update", base=RELEASE_BASE_URL, timeout=15.0)
+        if status != "error" or delay is None or not _transient_manifest_error(reason):
+            break
+        warn(f"(release manifest: {reason}; retrying in {delay:.0f} s)")
+        time.sleep(delay)
     out(status if status != "error" else f"error: {reason}")
     return 1 if status == "error" else 0
 
