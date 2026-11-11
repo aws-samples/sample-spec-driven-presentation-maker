@@ -10,19 +10,26 @@ describe("parseStreamingChunk error events", () => {
     const update = vi.fn()
     const translate = (code: string) => (code === "session_reload_required" ? "translated" : undefined)
     const out = parseStreamingChunk(line, "", update, undefined, translate)
-    expect(out).toBe("\u26a0\ufe0f translated")
-    expect(update).toHaveBeenCalledWith("\u26a0\ufe0f translated")
+    expect(out).toBe("\u26a0 translated")
+    expect(update).toHaveBeenCalledWith("\u26a0 translated")
   })
 
   it("appends the English message without a translator", () => {
     const out = parseStreamingChunk(line, "", vi.fn())
-    expect(out).toBe("\u26a0\ufe0f This page is out of date. Reload the page, then send again.")
+    expect(out).toBe("\u26a0 This page is out of date. Reload the page, then send again.")
   })
 
   it("appends the content-filter message for a filtered stop", () => {
     const filtered = `data: ${JSON.stringify({ status: "error", code: "content_filtered", error: "The model stopped its reply: content_filtered" })}`
     const out = parseStreamingChunk(filtered, "", vi.fn())
-    expect(out).toBe("\u26a0\ufe0f The model stopped its reply because of its content filter. Rephrase your message and send it again.")
+    expect(out).toBe("\u26a0 The model stopped its reply because of its content filter. Rephrase your message and send it again.")
+  })
+
+  it("keeps the partial output and puts the message in its own paragraph", () => {
+    const update = vi.fn()
+    const out = parseStreamingChunk(line, "Here is the outl", update)
+    expect(out).toBe("Here is the outl\n\n\u26a0 This page is out of date. Reload the page, then send again.")
+    expect(update).toHaveBeenCalledWith(out)
   })
 })
 

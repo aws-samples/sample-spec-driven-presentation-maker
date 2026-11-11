@@ -261,7 +261,7 @@ describe("resumeLocalAgent", () => {
     expect(onEvent).toHaveBeenCalledWith({ turn: { id: "t1", why: "prompt", text: "hi" } }, { own: false })
     expect(onStreamUpdate).toHaveBeenCalledWith("part ")
     expect(result.working).toBe(true)
-    expect(result.completion.startsWith("part ⚠")).toBe(true)
+    expect(result.completion.startsWith("part \n\n⚠ ")).toBe(true)
     expect(fetchMock.mock.calls[0][1].headers).toEqual({ "Last-Event-ID": "7" })
   })
 

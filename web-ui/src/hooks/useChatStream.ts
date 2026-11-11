@@ -664,7 +664,14 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
                 content: last.content ? `${last.content}\n\n⚠ ${turnError}` : `⚠ ${turnError}`,
                 ...(last.blocks?.length ? { blocks: [...last.blocks, { type: "text" as const, text: `⚠ ${turnError}` }] } : {}),
               }
-            : { ...last, content: displayMessage }
+            : {
+                ...last,
+                content: displayMessage,
+                // The blocks are what the reply renders: replace their text too, keep the tool cards.
+                ...(last.blocks?.length
+                  ? { blocks: [...last.blocks.filter((b) => b.type === "tool"), { type: "text" as const, text: displayMessage }] }
+                  : {}),
+              }
           return updated
         })
       }

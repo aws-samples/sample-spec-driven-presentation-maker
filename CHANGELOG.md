@@ -23,6 +23,14 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   guide now says which client to add for a bot (and that its decks then belong to that
   client ID, not to each user), and the [Developer guide](docs/en/developer-guide.md#verify-the-deployment)
   verifies a deployment by signing in through an MCP client.
+- **Web UI: an agent error no longer runs into the reply.**
+  When the agent failed mid-reply, the error text was glued to the last word streamed
+  (`…outl⚠️ The model's usage quota…`). It now starts its own paragraph after the partial
+  reply (`⚠`, as a failed Local turn already shows it), in both Cloud and Local mode. (#121)
+- **Web UI: a failed send shows its error even after tool cards.** When the request itself
+  failed (a network error, a busy or locked session) after the reply had shown text or a
+  tool card, the chat kept showing the stale partial reply and the error never appeared.
+  The reply now shows the error after its tool cards. (#121)
 
 ## [0.14.0] - 2026-11-10
 
