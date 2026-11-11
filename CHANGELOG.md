@@ -31,6 +31,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   failed (a network error, a busy or locked session) after the reply had shown text or a
   tool card, the chat kept showing the stale partial reply and the error never appeared.
   The reply now shows the error after its tool cards. (#121)
+- **Installer (Windows): a dependency download that times out is retried.** winget fetches
+  poppler from GitHub Releases, and a timeout or a 502/504 there stopped the install with
+  `poppler installation failed or is not on PATH`. The installer now retries such a download twice (after 5 s
+  and 10 s); any other winget error still stops it at once.
 
 ## [0.14.0] - 2026-11-10
 
