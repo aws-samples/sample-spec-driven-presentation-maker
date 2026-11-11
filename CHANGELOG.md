@@ -13,6 +13,17 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Fixed
+
+- **Docs: the AWS stack's authentication matches what CDK creates.** The guides said CDK
+  creates a machine-to-machine (`client_credentials`) Cognito client with its ID and secret
+  in the outputs, used the scope `sdpm/invoke`, and listed `M2M_*` agent environment
+  variables; none of these exist. The scope is `sdpm-mcp/invoke`, and the Agent Runtime
+  accepts `WebClient` tokens only. The [Teams & Slack](docs/en/teams-slack-integration.md#getting-a-jwt-token)
+  guide now says which client to add for a bot (and that its decks then belong to that
+  client ID, not to each user), and the [Developer guide](docs/en/developer-guide.md#verify-the-deployment)
+  verifies a deployment by signing in through an MCP client.
+
 ## [0.14.0] - 2026-11-10
 
 MCP Apps clients (Claude Desktop, claude.ai connectors, Kiro Crew) now show a style
