@@ -15,6 +15,12 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **Cloud: a deck keeps its chat history when the tab closes during creation.** The link
+  from a deck to the chat that created it (`chatSessionId`) was written only by the
+  browser after the deck appeared; closing the tab or a failed request before then left
+  the deck with an empty chat for good. The MCP server now stores the link when
+  `init_deck_workspace` creates the deck, so it also exists for decks created without a
+  browser. (#574)
 - **Docs: the AWS stack's authentication matches what CDK creates.** The guides said CDK
   creates a machine-to-machine (`client_credentials`) Cognito client with its ID and secret
   in the outputs, used the scope `sdpm/invoke`, and listed `M2M_*` agent environment

@@ -61,6 +61,20 @@ def owned_mcp_session_id(session_id: str, sub: str) -> str:
     return f"{owner_prefix(sub)}-{session_id}"
 
 
+_GROUP_SUFFIX = re.compile(r"-g\d+$")
+
+
+def chat_session_id(mcp_session_id: str, sub: str) -> str | None:
+    """Return the chat session id behind an ``Mcp-Session-Id``, or None.
+
+    The agent sends the runtime session id unchanged when it already belongs to
+    ``sub`` (``owned_mcp_session_id``); composer groups append ``-g<N>``, which is
+    stripped here. Anything that does not belong to ``sub`` maps to None.
+    """
+    session_id = _GROUP_SUFFIX.sub("", mcp_session_id or "")
+    return session_id if belongs_to(session_id, sub) else None
+
+
 def sub_from_jwt(token: str) -> str:
     """Return the ``sub`` claim of a JWT (payload decode only), or ``""``."""
     try:

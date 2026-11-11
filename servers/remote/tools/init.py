@@ -19,6 +19,7 @@ def init_deck_workspace(
     user_id: str,
     storage: Storage,
     output_format: str = "pptx",
+    chat_session_id: str | None = None,
 ) -> dict[str, Any]:
     """Create a Deck, write deck.json and spec files to S3.
 
@@ -31,6 +32,8 @@ def init_deck_workspace(
         storage: Storage backend instance.
         output_format: "pptx" (default) or "html"; deck.json gets
             ``"outputFormat": "html"`` only for HTML decks.
+        chat_session_id: The creating chat session, stored on the deck record
+            (``create_deck``). None leaves the link to the browser's PATCH.
 
     Returns:
         Dict with deckId and workspace file list; ``format_notes`` (the orchestrator's
@@ -46,7 +49,7 @@ def init_deck_workspace(
     deck_json: dict[str, Any] = new_deck_json(output_format)
 
     # Create deck META in DDB
-    deck = create_deck(name=name, user_id=user_id, storage=storage)
+    deck = create_deck(name=name, user_id=user_id, storage=storage, chat_session_id=chat_session_id)
     deck_id = deck["deckId"]
 
     # Write the shared deck.json skeleton to S3.

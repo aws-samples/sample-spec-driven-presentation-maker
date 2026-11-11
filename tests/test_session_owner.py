@@ -93,6 +93,17 @@ def test_owned_mcp_session_id():
     assert owned_mcp_session_id("", "user-1") == ""
 
 
+def test_chat_session_id():
+    assert session_owner.chat_session_id(f"{P1}-{UUID}", "user-1") == f"{P1}-{UUID}"
+    assert session_owner.chat_session_id(f"{P1}-{PADDED_DECK}", "user-1") == f"{P1}-{PADDED_DECK}"
+    assert session_owner.chat_session_id(f"{P1}-{UUID}-g3", "user-1") == f"{P1}-{UUID}"
+    assert session_owner.chat_session_id(f"{P1}-{UUID}-g12", "user-1") == f"{P1}-{UUID}"
+    assert session_owner.chat_session_id(f"{P2}-{UUID}", "user-1") is None
+    assert session_owner.chat_session_id(UUID, "user-1") is None
+    assert session_owner.chat_session_id("", "user-1") is None
+    assert session_owner.chat_session_id(f"{P1}-{UUID}", "") is None
+
+
 def test_process_owner_first_claim_wins():
     owner = ProcessOwner()
     assert owner.claim("user-1")
