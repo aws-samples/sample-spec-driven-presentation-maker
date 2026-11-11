@@ -28,7 +28,7 @@ def create_deck(
     user_id: str,
     storage: Storage,
     tags: list[str] | None = None,
-    chat_session_id: str | None = None,
+    mcp_session_id: str | None = None,
 ) -> dict:
     """Create a new empty Deck (META only).
 
@@ -37,9 +37,8 @@ def create_deck(
         user_id: Owner's user ID (from Runtime header).
         storage: Storage backend instance.
         tags: Optional list of tags for categorization (max 10, each max 50 chars).
-        chat_session_id: The chat session that creates the deck, stored as
-            ``chatSessionId`` so ``GET /chat/<session_id>`` finds its history
-            without the browser's PATCH. Omitted when None.
+        mcp_session_id: The ``Mcp-Session-Id`` of the request that creates the
+            deck, stored as ``createdInMcpSession``. Omitted when None.
 
     Returns:
         Dict with deckId and name.
@@ -67,8 +66,8 @@ def create_deck(
         "createdAt": now,
         "updatedAt": now,
     }
-    if chat_session_id:
-        meta["chatSessionId"] = chat_session_id
+    if mcp_session_id:
+        meta["createdInMcpSession"] = mcp_session_id
     storage.put_deck(deck_id=deck_id, user_id=user_id, meta=meta)
 
     return {"deckId": deck_id, "name": name}

@@ -33,7 +33,7 @@ from mcp.server.fastmcp import FastMCP  # noqa: E402
 
 from shared.authz import authorize  # noqa: E402
 from shared import user_library  # noqa: E402
-from shared.session_owner import ProcessOwner, belongs_to, chat_session_id, is_owner_prefixed, sub_from_jwt  # noqa: E402
+from shared.session_owner import ProcessOwner, belongs_to, is_owner_prefixed, sub_from_jwt  # noqa: E402
 from storage.aws import AwsStorage  # noqa: E402
 from tools import assets, reference, preview, generate  # noqa: E402
 from tools import sandbox as sandbox_mod  # noqa: E402
@@ -397,6 +397,21 @@ def _get_user_id() -> str:
     raise ValueError("User ID not found. Provide a valid JWT Bearer token.")
 
 
+_MCP_SESSION_ID_MAX = 256
+
+
+def _request_mcp_session_id() -> str | None:
+    """The request's ``Mcp-Session-Id`` as sent, or None when absent or oversized.
+
+    Recorded on a new deck as a fact of this transport; what the id means to the
+    client (for the Web UI, its chat session) is the client side's business.
+    An owner-prefixed id has already been checked against the caller by
+    ``_session_refusal``.
+    """
+    value = _current_request_headers.get().get("mcp-session-id", "")
+    return value if 0 < len(value) <= _MCP_SESSION_ID_MAX else None
+
+
 def _check_deck_access(deck_id: str, action: str = "read") -> None:
     """Verify current user has permission for the specified action on the deck.
 
@@ -592,18 +607,13 @@ def init_deck_workspace(
     starts; start_presentation is. Returns the deckId and the workspace file list, plus
     format_notes for an HTML deck.
     """
-    user_id = _get_user_id()
-    # Link the deck to the chat that creates it here, not only through the
-    # browser's best-effort PATCH (lost when the tab closes; absent for clients
-    # without a browser). The PATCH still runs and overwrites with the same id.
-    session_id = chat_session_id(_current_request_headers.get().get("mcp-session-id", ""), user_id)
     return json.dumps(
         init_mod.init_deck_workspace(
             name=name.strip(),
-            user_id=user_id,
+            user_id=_get_user_id(),
             storage=_storage,
             output_format=output_format,
-            chat_session_id=session_id,
+            mcp_session_id=_request_mcp_session_id(),
         ),
         ensure_ascii=False,
     )

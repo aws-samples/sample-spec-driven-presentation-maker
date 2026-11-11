@@ -53,6 +53,7 @@ from shared.review import (
     validate_review_submission,
 )
 from shared import user_library
+from shared.session_owner import belongs_to
 from shared.schema import (
     deck_pk, deck_sk, fav_sk,
     DECK_SK_PREFIX, FAV_SK_PREFIX,
@@ -933,9 +934,29 @@ def _script_warnings(raw: Any) -> List[Dict[str, Any]]:
     return out
 
 
+def _chat_session_id(deck: Dict[str, Any]) -> Optional[str]:
+    """The Web UI chat session a deck belongs to, or None.
+
+    ``chatSessionId`` is the link the browser PATCHes once the deck appears. When
+    that never arrived (tab closed, failed request, no browser), the MCP server's
+    record of the creating session stands in: the agent sends the chat's runtime
+    session id as ``Mcp-Session-Id`` unchanged when it already belongs to the user
+    (``owned_mcp_session_id`` in agent/mcp_clients.py), and ``init_deck_workspace``
+    is an orchestrator tool, so it never carries a composer group suffix. Ids that
+    are not the owner's own (another client's MCP session) are not chat sessions.
+    """
+    linked = deck.get("chatSessionId")
+    if linked:
+        return linked
+    created_in = deck.get("createdInMcpSession")
+    if created_in and belongs_to(created_in, deck.get("createdBy", "")):
+        return created_in
+    return None
+
+
 def _owner_chat_session_id(decision: Any) -> Optional[str]:
     """The deck's chat session id for its owner; None for anyone else."""
-    return decision.deck.get("chatSessionId") if decision.role == "owner" else None
+    return _chat_session_id(decision.deck) if decision.role == "owner" else None
 
 
 def _get_html_deck(deck_id: str, decision: Any, deck_json: Dict[str, Any]) -> Dict[str, Any]:
@@ -1479,10 +1500,10 @@ def get_chat(session_id: str) -> Dict[str, Any]:
 
     resp = table.query(
         KeyConditionExpression=Key("PK").eq(deck_pk(user_id)) & Key("SK").begins_with(DECK_SK_PREFIX),
-        FilterExpression=Attr("chatSessionId").eq(session_id),
-        ProjectionExpression="SK",
+        FilterExpression=Attr("chatSessionId").eq(session_id) | Attr("createdInMcpSession").eq(session_id),
+        ProjectionExpression="chatSessionId, createdInMcpSession, createdBy",
     )
-    if not resp.get("Items"):
+    if not any(_chat_session_id(item) == session_id for item in resp.get("Items", [])):
         return {"messages": []}
     memory_id = os.environ.get("MEMORY_ID", "")
     if not memory_id:
