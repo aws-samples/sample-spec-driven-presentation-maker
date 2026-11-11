@@ -76,9 +76,12 @@ export const parseEvent = (json, currentCompletion, updateCallback, toolCallback
     // Keep-alive
     if (json.keepalive) return currentCompletion;
 
-    // Agent-level error (e.g. Bedrock ValidationException, image/token limit exceeded)
+    // Agent-level error (e.g. Bedrock ValidationException, image/token limit exceeded).
+    // Appended as its own paragraph, never replacing the completion: it is the whole run's
+    // text, which earlier messages and tool card positions are sliced from.
     if (json.status === 'error' && json.error) {
-      const newCompletion = currentCompletion + `⚠️ ${agentErrorMessage(json.error, json.code, translateError)}`;
+      const notice = `⚠ ${agentErrorMessage(json.error, json.code, translateError)}`;
+      const newCompletion = currentCompletion ? `${currentCompletion}\n\n${notice}` : notice;
       updateCallback(newCompletion);
       return newCompletion;
     }

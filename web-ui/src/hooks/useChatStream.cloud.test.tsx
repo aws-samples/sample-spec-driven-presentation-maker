@@ -26,6 +26,8 @@ vi.mock("@/services/localService", () => ({ stopLocalAgent: vi.fn() }))
 vi.mock("@/lib/errors", () => ({ notifyError }))
 
 import { useChatStream } from "./useChatStream"
+import { parseEvent } from "@/services/strandsParser"
+import { agentErrorMessage } from "@/lib/agentErrors"
 
 type Handlers = {
   onStreamUpdate: (text: string) => void
@@ -115,6 +117,36 @@ describe("useChatStream (Cloud) steer", () => {
     expect(card.blocks?.find((b) => b.type === "tool")).toMatchObject({ tool: { status: "success" } })
     expect(steer).toMatchObject({ role: "user", content: "shorter please" })
     expect(after).toMatchObject({ role: "assistant", content: "Done, shorter.", toolUses: [] })
+    await act(async () => { run.finish!() })
+  })
+
+  it("shows an error after a steer in the new message and keeps the one before it", async () => {
+    const run = captureInvoke()
+    const { result } = renderStream()
+    act(() => { void result.current.sendMessage("go") })
+    const h = run.handlers!
+    let completion = ""
+    const update = (text: string) => { completion = text; h.onStreamUpdate(text) }
+    act(() => {
+      update("Composing.")
+      h.onToolUse("compose_slides", { toolUseId: "t1", input: {} })
+      update("Composing. Started.")
+    })
+    steerAgentCore.mockResolvedValueOnce({ id: "x", as: "steer" })
+    await act(async () => { await result.current.sendMessage("shorter please") })
+    const steerId = steerAgentCore.mock.calls[0][3] as string
+    act(() => {
+      h.onSession.onEvent({ steer: { id: steerId, text: "shorter please", state: "accepted" } }, { own: true })
+      parseEvent({ status: "error", error: "boom", code: "throttled" }, completion, update, h.onToolUse)
+    })
+    const notice = `⚠ ${agentErrorMessage("boom", "throttled")}`
+    const [, before, steer, after] = result.current.messages
+    expect(before.content).toBe("Composing. Started.")
+    expect(before.blocks?.map((b) => b.type === "text" ? b.text : b.tool.toolUseId)).toEqual(["Composing.", "t1", " Started."])
+    expect(steer).toMatchObject({ role: "user", content: "shorter please" })
+    expect(after.content.trim()).toBe(notice)
+    expect(after.blocks?.at(-1)).toMatchObject({ type: "text" })
+    expect((after.blocks?.at(-1) as { text: string }).text.trim()).toBe(notice)
     await act(async () => { run.finish!() })
   })
 
