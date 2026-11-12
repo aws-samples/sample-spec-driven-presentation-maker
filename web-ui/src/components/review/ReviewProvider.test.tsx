@@ -208,6 +208,21 @@ describe("ReviewProvider", () => {
     expect(api.drafts.map(d => d.text)).toEqual(["first"])
   })
 
+  it("submit builds the request with createRequest when given, not through the API", async () => {
+    const createRequest = vi.fn().mockResolvedValue({ id: "20261112-213600-c0de", message: "[review:20261112-213600-c0de] style" })
+    renderProvider({ deckId: "style:brand-blue", slugs: ["1", "2"], createRequest })
+    addSaved("2", "bigger")
+    let created: SubmittedReview | null = null
+    await act(async () => { created = await api.submit("note") })
+    expect(createRequest).toHaveBeenCalledWith({
+      note: "note",
+      comments: [{ name: "A", slide: "2", rect: [10, 21, 300, 201], text: "bigger" }],
+    })
+    expect(createReview).not.toHaveBeenCalled()
+    expect(created).toMatchObject({ id: "20261112-213600-c0de", message: "[review:20261112-213600-c0de] style" })
+    expect(api.drafts).toEqual([])
+  })
+
   it("submit failure keeps the drafts", async () => {
     createReview.mockRejectedValue(new Error("boom"))
     renderProvider()

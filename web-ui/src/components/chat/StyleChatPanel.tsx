@@ -6,6 +6,12 @@
  * Uses useChatStream + ChatInput (shared components).
  * No @mentions, no Options, no Panel A/B, no reconnect.
  * Detects write_style calls and notifies parent to refresh preview.
+ *
+ * Comments (inside the style page's enabled ReviewProvider): the frames drawn on the style
+ * preview collect in a draft bar above the input, and one send turns them and the typed text
+ * into a change request message (`createRequest` of the provider), sent like any message.
+ * A steer the agent did not take puts the frames back into the drafts and the text back into
+ * an empty input.
  */
 
 "use client"
@@ -25,6 +31,9 @@ import { Sparkles, MessageSquare, Image, Palette } from "lucide-react"
 import type { UploadedFile } from "@/services/uploadService"
 import { buildAttachedMarkers } from "@/lib/attachmentMarker"
 import { notifyError } from "@/lib/errors"
+import { useReview, type SubmittedReview } from "@/components/review/ReviewProvider"
+import { ReviewDraftBar } from "@/components/review/ReviewDraftBar"
+import { stripWhitespace } from "@/lib/review/schema"
 
 interface StyleChatPanelProps {
   /** Style the chat edits; "" for a new style, which the agent names. */
@@ -33,11 +42,14 @@ interface StyleChatPanelProps {
   onStyleWritten?: () => void
   /** Called when agent saves the style (write_style succeeded with saved result). */
   onStyleSaved?: (saved: { title?: string; filename: string }) => void
+  /** Reports whether the agent is working (the comment tool shows its busy hint). */
+  onLoadingChange?: (loading: boolean) => void
 }
 
-export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleChatPanelProps) {
+export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved, onLoadingChange }: StyleChatPanelProps) {
   const t = useTranslations("styleChat")
   const tChat = useTranslations("chat")
+  const tReview = useTranslations("review")
   const auth = useAuth()
   const sessionId = useRef(generateSessionId(auth.user?.profile?.sub)).current
   const messagesEndRef = useRef<HTMLDivElement>(null)
@@ -126,6 +138,54 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.sendMessage, stream.isLoading, styleId])
 
+  useEffect(() => {
+    onLoadingChange?.(stream.isLoading)
+    return () => onLoadingChange?.(false)
+  }, [stream.isLoading, onLoadingChange])
+
+  // --- Review comments from the style preview ---
+  const review = useReview()
+  const reviewActive = !!review?.enabled
+  const hasReviewDrafts = reviewActive && (review?.readyDrafts.length ?? 0) > 0
+  // Read in callbacks that outlive a render.
+  const reviewRef = useRef(review)
+  useEffect(() => { reviewRef.current = review })
+  const [inputBlank, setInputBlank] = useState(true)
+  const handleInputChange = useCallback((value: string) => setInputBlank(!stripWhitespace(value)), [])
+
+  /**
+   * Send from the input. A plain send goes straight to `handleSend` (not wrapped in a
+   * promise, so the input clears as `handleSend` allows). With comments waiting, the typed text
+   * becomes the request's note and the request message is sent instead.
+   */
+  const handleInputSend = useCallback((
+    text: string,
+    uploadedFiles: UploadedFile[],
+    snippets: { label: string; text: string }[],
+    attachments: { fileName: string; fileType: string }[],
+  ) => {
+    const r = reviewRef.current
+    if (!hasReviewDrafts || !r) return handleSend(text, uploadedFiles, snippets, attachments)
+    return (async (): Promise<void | false> => {
+      let created: SubmittedReview
+      try {
+        created = await r.submit(text)
+      } catch (err) {
+        notifyError(tReview("sendFailed"), err)
+        return false
+      }
+      void Promise.resolve(handleSend(created.message, uploadedFiles, snippets, attachments)).then((ok) => {
+        if (ok !== false) return
+        created.restore()
+        // Later than ChatInput clearing the input after this send.
+        setTimeout(() => {
+          const input = chatInputRef.current
+          if (text.trim() && input && !input.textareaRef.current?.value.trim()) input.replaceText(text)
+        }, 100)
+      })
+    })()
+  }, [hasReviewDrafts, handleSend, tReview])
+
   const isInitial = stream.messages.length === 0
 
   return (
@@ -199,7 +259,10 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
 
       <ChatInput
         ref={chatInputRef}
-        onSend={handleSend}
+        onSend={handleInputSend}
+        onInputChange={handleInputChange}
+        topSlot={reviewActive ? <ReviewDraftBar inputBlank={inputBlank} /> : undefined}
+        sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: false, canSend: review.canSubmit } : undefined}
         isLoading={stream.isLoading}
         onStop={stream.stopGeneration}
         canSendWhileLoading

@@ -12,11 +12,22 @@
  * Icon sprites before the first slide (`<svg>` with `<symbol>`s — drawn in by the API
  * from the asset catalog, or embedded by older styles) are the `prelude`, carried into
  * every per-slide document and the cover so `<use href="#…">` resolves there.
+ *
+ * Comment tool (`commentable`, inside an enabled ReviewProvider, split path only): each card
+ * carries a ReviewSlideLayer keyed by its 1-based number ("1", "2", …) and the hover CTA; the
+ * root holds the hint, ReviewKeyboard and ReviewCommentCard. The deck page also renders this
+ * preview inside its own ReviewProvider, so without `commentable` nothing of this renders.
  */
 
 "use client"
 
 import { useCallback, useRef, useState } from "react"
+import { useReview } from "@/components/review/ReviewProvider"
+import { ReviewSlideLayer } from "@/components/review/ReviewSlideLayer"
+import { ReviewSlideCta } from "@/components/review/ReviewSlideCta"
+import { ReviewToolHint } from "@/components/review/ReviewToolHint"
+import { ReviewCommentCard } from "@/components/review/ReviewCommentCard"
+import { ReviewKeyboard } from "@/components/review/ReviewKeyboard"
 
 // Slide native dimensions (CSS px at 100%)
 const SLIDE_WIDTH = 1920
@@ -134,9 +145,11 @@ function FallbackPreview({ html, containerWidth }: { html: string; containerWidt
 }
 
 /** Per-slide card with iframe scaled to the face column width. */
-function SlideCard({ head, prelude, slideBody, index, faceWidth }: { head: string; prelude: string; slideBody: string; index: number; faceWidth: number }) {
+function SlideCard({ head, prelude, slideBody, index, faceWidth, reviewOn = false }: { head: string; prelude: string; slideBody: string; index: number; faceWidth: number; reviewOn?: boolean }) {
+  const review = useReview()
   const scale = faceWidth / SLIDE_WIDTH
   const cardHeight = SLIDE_HEIGHT * scale
+  const slug = String(index + 1)
 
   return (
     <div
@@ -147,30 +160,38 @@ function SlideCard({ head, prelude, slideBody, index, faceWidth }: { head: strin
       <span className="font-mono text-xs text-foreground-muted text-right pt-2 select-none" style={{ fontVariantNumeric: "tabular-nums" }}>
         {index + 1}
       </span>
-      {/* Card */}
-      <div className="rounded-[10px] border border-border-hover overflow-hidden shadow-[0_10px_32px_rgba(0,0,0,0.2)] transition-[transform,box-shadow] duration-[250ms] ease-out hover:-translate-y-[2px] hover:shadow-[0_16px_44px_rgba(0,0,0,0.26)] motion-reduce:hover:translate-y-0">
-        <div style={{ width: "100%", height: cardHeight, overflow: "hidden" }}>
-          <iframe
-            srcDoc={prepareSlideDoc(head, slideBody, prelude)}
-            className="pointer-events-none"
-            style={{
-              width: SLIDE_WIDTH,
-              height: SLIDE_HEIGHT,
-              transform: `scale(${scale})`,
-              transformOrigin: "top left",
-              border: "none",
-            }}
-            sandbox="allow-same-origin"
-            loading="lazy"
-            title={`Slide ${index + 1}`}
-          />
+      {/* Card; the wrapper lifts on hover and holds the comment layer outside the card's clip */}
+      <div
+        data-review-slide={reviewOn ? slug : undefined}
+        className="relative group/slide transition-transform duration-[250ms] ease-out hover:-translate-y-[2px] motion-reduce:hover:translate-y-0"
+      >
+        <div className="rounded-[10px] border border-border-hover overflow-hidden shadow-[0_10px_32px_rgba(0,0,0,0.2)] transition-shadow duration-[250ms] ease-out group-hover/slide:shadow-[0_16px_44px_rgba(0,0,0,0.26)]">
+          <div style={{ width: "100%", height: cardHeight, overflow: "hidden" }}>
+            <iframe
+              srcDoc={prepareSlideDoc(head, slideBody, prelude)}
+              className="pointer-events-none"
+              style={{
+                width: SLIDE_WIDTH,
+                height: SLIDE_HEIGHT,
+                transform: `scale(${scale})`,
+                transformOrigin: "top left",
+                border: "none",
+              }}
+              sandbox="allow-same-origin"
+              loading="lazy"
+              title={`Slide ${index + 1}`}
+            />
+          </div>
         </div>
+        {reviewOn && <ReviewSlideLayer slug={slug} index={index} />}
+        {reviewOn && !review?.toolOn && <ReviewSlideCta onClick={() => review?.setToolOn(true)} />}
       </div>
     </div>
   )
 }
 
-export function StyleSlidePreview({ html, loading }: { html: string; loading: boolean }) {
+export function StyleSlidePreview({ html, loading, commentable = false }: { html: string; loading: boolean; commentable?: boolean }) {
+  const review = useReview()
   const [containerWidth, setContainerWidth] = useState(0)
   const roRef = useRef<ResizeObserver | null>(null)
   const measuredRef = useCallback((node: HTMLDivElement | null) => {
@@ -194,9 +215,12 @@ export function StyleSlidePreview({ html, loading }: { html: string; loading: bo
   const split = splitStyleSlides(html)
   // Rail (36px) + gap (14px) — the slide face gets the remaining width
   const faceWidth = Math.max(containerWidth - 50, 0)
+  const reviewOn = commentable && !!review?.enabled && !!split
+  const toolOn = reviewOn && !!review?.toolOn
 
   return (
-    <div ref={measuredRef} className="w-full max-w-4xl mx-auto">
+    <div ref={measuredRef} className={`w-full max-w-4xl mx-auto ${toolOn ? "review-tooling rounded-lg" : ""}`}>
+      {toolOn && !review?.hintSeen && <ReviewToolHint />}
       {containerWidth > 0 ? (
         split ? (
           /* Per-slide card view */
@@ -209,6 +233,7 @@ export function StyleSlidePreview({ html, loading }: { html: string; loading: bo
                 slideBody={slide}
                 index={i}
                 faceWidth={faceWidth}
+                reviewOn={reviewOn}
               />
             ))}
           </div>
@@ -220,6 +245,12 @@ export function StyleSlidePreview({ html, loading }: { html: string; loading: bo
         <div className="flex items-center justify-center py-20">
           <div className="w-6 h-6 border-2 border-brand-teal/30 border-t-brand-teal rounded-full animate-spin" />
         </div>
+      )}
+      {reviewOn && (
+        <>
+          <ReviewKeyboard />
+          <ReviewCommentCard />
+        </>
       )}
     </div>
   )
