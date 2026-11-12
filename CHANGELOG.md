@@ -13,6 +13,24 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-11-12
+
+A Cloud deployment can now let your own automation (a script, cron job, Lambda function or
+Step Functions state machine) create decks as you, through an opt-in programmatic client.
+Decks created without a browser keep the chat that created them, attachments refuse more
+SVG content that reaches outside the file, and the local Web UI serves deck files with
+`nosniff` and a sandbox CSP.
+
+### Upgrading from 0.14
+
+**Cloud deployments.**
+
+- Deploy all stacks (`scripts/deploy.sh`), in any order. With `auth.programmaticClient` off
+  (the default) Cognito and the accepted client IDs stay as they are.
+- To turn on programmatic access, set `auth.programmaticClient` in `infra/config.yaml` and
+  deploy all stacks: `SdpmAuth` creates the client, `SdpmAgent` and `SdpmWebUi` accept it.
+  See [Programmatic Access](docs/en/programmatic-access.md).
+
 ### Added
 
 - **Cloud: programmatic access, for automation that creates decks as you.** A new opt-in
@@ -33,14 +51,6 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
-- **Attachments: stricter SVG content checks.** `read_attachment` / `import_attachment`
-  now parse an SVG before accepting it and refuse more kinds of content that refers to
-  something outside the file.
-- **Local Web UI: deck files are served with `nosniff` and a sandbox CSP.** Images, JSON
-  and PPTX files from a deck (`/api/preview/…`) now carry the same kind of protection the
-  HTML previews already had.
-- **Local Web UI: `npm run start` listens on 127.0.0.1 only.** Started by hand, `next start`
-  used to listen on every interface; `sdpm webui` already passed `--hostname 127.0.0.1`.
 - **Imported DOCX and XLSX tables keep their cells intact.** A `|` or a line break inside a
   table cell split the cell in the Markdown that `import_attachment` writes: DOCX cells
   were escaped twice, XLSX cells not at all. Both now go through the same escaping as PDF
@@ -72,6 +82,20 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   poppler from GitHub Releases, and a timeout or a 502/504 there stopped the install with
   `poppler installation failed or is not on PATH`. The installer now retries such a download twice (after 5 s
   and 10 s); any other winget error still stops it at once.
+
+### Security
+
+- **Attachments: stricter SVG content checks.** `read_attachment` / `import_attachment`
+  now parse an SVG before accepting it and refuse more kinds of content that refers to
+  something outside the file: CSS imports and resource functions, `url()` that names
+  anything but an element of the document, animation of links and event handlers, and
+  `data:` URLs other than a raster image in `<image>` / `<feImage>`. Malformed SVG is
+  refused too. The bundled icon catalogs and generated QR codes pass unchanged.
+- **Local Web UI: deck files are served with `nosniff` and a sandbox CSP.** Images, JSON
+  and PPTX files from a deck (`/api/preview/…`) now carry the same kind of protection the
+  HTML previews already had.
+- **Local Web UI: `npm run start` listens on 127.0.0.1 only.** Started by hand, `next start`
+  used to listen on every interface; `sdpm webui` already passed `--hostname 127.0.0.1`.
 
 ## [0.14.0] - 2026-11-10
 
@@ -2153,7 +2177,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.14.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.15.0...HEAD
+[0.15.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.11.0...v0.12.0
