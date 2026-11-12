@@ -108,12 +108,12 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved, onLoadin
 
   const hasSentRef = useRef(false)
 
-  const handleSend = useCallback(async (
+  const handleSend = useCallback((
     text: string,
     uploadedFiles: UploadedFile[],
     snippets: { label: string; text: string }[],
     attachments: { fileName: string; fileType: string }[],
-  ) => {
+  ): Promise<void | false> | void => {
     let fullMessage = text
     // First message on an existing style: name it so the agent writes that style.
     // A new style (no styleId yet) is named by the agent; the parent follows its first save.
@@ -128,10 +128,13 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved, onLoadin
       const snippetInfo = snippets.map((s) => `---snippet---\n${s.text}\n---/snippet---`).join("\n\n")
       fullMessage = `${fullMessage}\n\n${snippetInfo}`
     }
-    // Agent working: a steer. A steer that was not accepted keeps the input.
-    const steering = stream.isLoading
-    const ok = await stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments)
-    if (steering && !ok) return false
+    // Agent working: a steer. A steer that was not accepted keeps the input, so ChatInput waits
+    // for its answer. Any other send returns at once: sendMessage settles only when the turn
+    // ends, and ChatInput clears the input after the Promise it is given.
+    if (stream.isLoading) {
+      return stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments).then((ok) => (ok ? undefined : false))
+    }
+    void stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments)
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.sendMessage, stream.isLoading, styleId])
 

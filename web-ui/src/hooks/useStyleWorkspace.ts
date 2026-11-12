@@ -11,6 +11,10 @@
  * setStyles) to eliminate the /styles/{name} fetch round-trip. Falls back to
  * fetchStylePreviewHtml only when the style is not in the preloaded set (e.g.
  * direct navigation via URL hash before the list has loaded).
+ *
+ * refreshPreview (the agent saved the style) always fetches: the preloaded array still holds
+ * the style as it was before the save, so resolving from it showed every save one save late.
+ * The current preview stays on screen until the new HTML arrives.
  */
 
 "use client"
@@ -37,6 +41,8 @@ export function useStyleWorkspace(idToken: string | undefined) {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewVersion, setPreviewVersion] = useState(0)
   const stylesRef = useRef<StyleEntry[]>([])
+  /** Set by refreshPreview: the next resolve fetches instead of reading stylesRef. */
+  const fetchNextRef = useRef(false)
 
   /** Provide the preloaded styles array so preview can resolve locally. */
   const setStyles = useCallback((styles: StyleEntry[]) => {
@@ -54,24 +60,31 @@ export function useStyleWorkspace(idToken: string | undefined) {
   useEffect(() => {
     if (view.mode !== "preview" || !idToken) { setPreviewHtml(""); return }
 
+    const refreshing = fetchNextRef.current
+    fetchNextRef.current = false
+
     // Try resolving from preloaded styles (instant, no round-trip)
-    const cached = stylesRef.current.find(s => s.name === view.name)
+    const cached = refreshing ? undefined : stylesRef.current.find(s => s.name === view.name)
     if (cached?.html) {
       setPreviewHtml(cached.html)
       setPreviewLoading(false)
       return
     }
 
-    // Fallback: fetch from server (e.g. direct URL navigation before list loaded)
+    // Fetch from server: after a save, or before the list has loaded (direct URL navigation)
     let cancelled = false
-    setPreviewLoading(true)
+    if (!refreshing) setPreviewLoading(true)
     fetchStylePreviewHtml(view.name, idToken).then(html => {
-      if (!cancelled) { setPreviewHtml(html); setPreviewLoading(false) }
+      if (cancelled) return
+      // A failed refresh ("") keeps the preview that is on screen.
+      if (html || !refreshing) setPreviewHtml(html)
+      setPreviewLoading(false)
     })
     return () => { cancelled = true }
   }, [view, idToken, previewVersion])
 
   const refreshPreview = useCallback(() => {
+    fetchNextRef.current = true
     setPreviewVersion(v => v + 1)
   }, [])
 
