@@ -421,6 +421,15 @@ class TestTextboxParagraphs:
         assert (x["marL"], x["indent"], x["align"]) == (457200, -228600, "center")
         assert y["align"] == "right"
 
+    def test_line_spacing_precedes_bullets(self, tmp_path):
+        (sp,) = _built_shapes(tmp_path, [_textbox(paragraphs=[
+            {"text": "a", "list": {"type": "disc"}, "lineSpacingPct": 150000, "spaceBefore": 600},
+            {"text": "b", "list": {"type": "arabicPeriod"}, "lineSpacingPct": 120000},
+        ])])
+        for p in sp.text_frame.paragraphs:
+            tags = _tags(p._p.pPr)
+            assert tags[0] == "lnSpc", tags
+
     @pytest.mark.xfail(strict=True, reason="the converter writes fixed paragraph line spacing "
                        "as 'lineSpacing' (1/100 pt), which the builder does not read")
     def test_fixed_line_spacing_survives_a_second_build(self, tmp_path):

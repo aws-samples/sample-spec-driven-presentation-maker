@@ -33,6 +33,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   freeforms and polylines wrote the end arrowhead before the start one, and lines with a
   `sys*` `dashStyle` wrote the dash after the arrowheads. Out-of-order line properties are
   ones PowerPoint may ignore; they are now sorted into schema order.
+- **Paragraph line spacing comes before bullets.** A textbox paragraph with both a `list` and
+  `lineSpacingPct` wrote the spacing after the bullet properties, out of schema order.
 
 ## [0.15.0] - 2026-11-12
 
