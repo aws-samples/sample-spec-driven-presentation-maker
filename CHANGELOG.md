@@ -29,6 +29,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - The animated slide preview no longer shows a layout placeholder's prompt text (the
   Title Slide layout's "Subtitle") behind a slide, whether or not the slide fills that
   placeholder in. The thumbnails never showed it.
+- The style chat empties its input as soon as a message is sent. It used to keep the text
+  until the agent finished its reply; a message sent while the agent works and not taken by
+  it still stays in the input.
 
 ## [0.15.0] - 2026-11-12
 
