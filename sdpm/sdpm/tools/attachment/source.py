@@ -477,6 +477,7 @@ def enforce_content_limits(path: Path, media_type: str) -> None:
             target = match.group(1).strip().lower()
             if not target.startswith("#") and not target.startswith("data:image/"):
                 raise SourceValidationError("SVG contains an external resource reference")
+        _check_svg_tree(text)
         return
 
     if media_type in {"image/png", "image/jpeg", "image/gif", "image/webp"}:
@@ -552,6 +553,75 @@ def enforce_content_limits(path: Path, media_type: str) -> None:
             raise
         except Exception as error:
             raise SourceValidationError(f"Invalid PDF: {error}")
+
+
+_SVG_ANIMATION_TAGS = frozenset({"set", "animate", "animatetransform", "animatemotion", "animatecolor"})
+# Elements whose href may embed a raster image as a data: URL.
+_SVG_IMAGE_TAGS = frozenset({"image", "feimage"})
+_SVG_NS_PREFIX = "{http://www.w3.org/2000/svg}"
+# CSS functions that load a resource from a string argument (no url() needed).
+_CSS_RESOURCE_FUNCTION = re.compile(r"(?<![\w-])(?:-webkit-)?(?:image-set|image|cross-fade|src)\(")
+_CSS_URL = re.compile(r"(?<![\w-])url\(\s*['\"]?\s*(.)?")
+
+
+def _check_svg_css(value: str) -> None:
+    """Reject CSS that can reach outside the document; url() may only name '#id'.
+
+    Applied to <style> text and to every attribute value without a foreign namespace, since
+    presentation attributes (fill, stroke, filter, ...) are CSS values too; editor metadata
+    such as inkscape:export-filename is never read as CSS. Backslashes are refused because CSS
+    escapes would let a function or at-rule name be spelled around these checks.
+    """
+    lowered = value.lower()
+    if "\\" in lowered or "@import" in lowered or _CSS_RESOURCE_FUNCTION.search(lowered):
+        raise SourceValidationError("SVG contains an external resource reference")
+    for match in _CSS_URL.finditer(lowered):
+        if match.group(1) != "#":
+            raise SourceValidationError("SVG contains an external resource reference")
+
+
+def _check_svg_href(tag: str, value: str) -> None:
+    """An href names an element of the document, or embeds a raster image in <image>/<feImage>.
+
+    data:image/svg+xml is refused: the embedded document would bypass every check here.
+    """
+    target = value.strip().lower()
+    if target.startswith("#"):
+        return
+    if tag in _SVG_IMAGE_TAGS and target.startswith("data:image/") and not target.startswith("data:image/svg"):
+        return
+    raise SourceValidationError("SVG contains an external resource reference")
+
+
+def _check_svg_tree(text: str) -> None:
+    """Element-level SVG checks on the parsed document (entities decoded, PIs dropped)."""
+    from defusedxml.ElementTree import ParseError, fromstring
+
+    try:
+        root = fromstring(text.encode("utf-8"))
+    except (ParseError, ValueError) as error:
+        raise SourceValidationError(f"SVG is not well-formed XML: {error}")
+
+    for element in root.iter():
+        if not isinstance(element.tag, str):
+            continue
+        tag = element.tag.rsplit("}", 1)[-1].lower()
+        for name, value in element.attrib.items():
+            local = name.rsplit("}", 1)[-1].lower()
+            if local.startswith("on"):
+                raise SourceValidationError("SVG contains unsafe active content")
+            if local == "href":
+                _check_svg_href(tag, value)
+                continue
+            if name.startswith("{") and not name.startswith(_SVG_NS_PREFIX):
+                continue
+            _check_svg_css(value)
+        if tag in _SVG_ANIMATION_TAGS:
+            animated = element.get("attributeName", "").rsplit(":", 1)[-1].strip().lower()
+            if animated == "href" or animated.startswith("on"):
+                raise SourceValidationError("SVG contains unsafe active content")
+        if tag == "style":
+            _check_svg_css("".join(element.itertext()))
 
 
 def get_canonical_extension(media_type: str) -> str:

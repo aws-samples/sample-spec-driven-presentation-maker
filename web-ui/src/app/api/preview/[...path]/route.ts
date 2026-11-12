@@ -11,6 +11,10 @@
  *     allow-popups-to-escape-sandbox`: a link it opens loads normally in its tab)
  *   - `preview/<slug>.html`: static slide thumbnails (`sandbox`, no scripts)
  * Every other `.html` path is 404.
+ *
+ * Every response carries `nosniff`. Every other file also carries a CSP that turns it into an
+ * inert, sandboxed document if a browser ever opens it as one (an SVG opened in a tab, say);
+ * a CSP on a response read as an image (`<img>`) or through `fetch()` has no effect.
  */
 
 
@@ -27,6 +31,9 @@ const MIME: Record<string, string> = {
 }
 
 const HTML_PREVIEW_FILE_RE = /^[a-z0-9][a-z0-9_-]*\.html$/
+
+/** The CSP of every non-HTML file. */
+const FILE_CSP = "sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'"
 
 /** CSP sandbox for an allowed HTML path, or null when the path must not be served. */
 function htmlSandbox(rest: string[]): string | null {
@@ -62,6 +69,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ path: s
   const body = fs.readFileSync(filePath)
 
   return new Response(body, {
-    headers: { "Content-Type": contentType, "Cache-Control": "no-cache" },
+    headers: {
+      "Content-Type": contentType,
+      "Content-Security-Policy": FILE_CSP,
+      "X-Content-Type-Options": "nosniff",
+      "Cache-Control": "no-cache",
+    },
   })
 }

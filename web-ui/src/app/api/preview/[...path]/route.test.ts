@@ -3,7 +3,8 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * Local preview route: the two HTML paths it serves carry a CSP sandbox, every other
- * HTML path and every path outside the deck is refused.
+ * HTML path and every path outside the deck is refused, and every other file is served
+ * with nosniff and a CSP that keeps it inert if opened as a document.
  */
 
 import fs from "fs"
@@ -18,6 +19,7 @@ let GET: Route["GET"]
 let savedRoot: string | undefined
 
 const PNG = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a])
+const FILE_CSP = "sandbox; default-src 'none'; img-src data:; style-src 'unsafe-inline'"
 
 function write(rel: string, data: string | Buffer) {
   const file = path.join(root, rel) // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
@@ -37,6 +39,10 @@ beforeAll(async () => {
   write("d1/preview/cover.html", "<!doctype html><title>cover</title>")
   write("d1/specs/x.html", "<!doctype html><title>spec</title>")
   write("d1/preview/png/cover.png", PNG)
+  write("d1/attachments/imports/k/extracted/images/logo.svg", '<svg xmlns="http://www.w3.org/2000/svg"/>')
+  write("d1/compose/defs.json", '{"version":1,"defs":""}')
+  write("d1/output.pptx", "PK")
+  write("d1/notes.txt", "x")
   write("other.html", "<!doctype html>")
   vi.resetModules()
   GET = (await import("./route")).GET
@@ -81,5 +87,29 @@ describe("GET /api/preview/[...path]", () => {
     expect(res.status).toBe(200)
     expect(res.headers.get("Content-Type")).toBe("image/png")
     expect(Buffer.from(await res.arrayBuffer()).equals(PNG)).toBe(true)
+  })
+
+  it.each([
+    [["preview", "png", "cover.png"], "image/png"],
+    [["attachments", "imports", "k", "extracted", "images", "logo.svg"], "image/svg+xml"],
+    [["compose", "defs.json"], "application/json"],
+    [["output.pptx"], "application/vnd.openxmlformats-officedocument.presentationml.presentation"],
+  ])("serves %j with nosniff and an inert-document CSP", async (rest, type) => {
+    const res = await get("d1", ...rest)
+    expect(res.status).toBe(200)
+    expect(res.headers.get("Content-Type")).toBe(type)
+    expect(res.headers.get("X-Content-Type-Options")).toBe("nosniff")
+    expect(res.headers.get("Content-Security-Policy")).toBe(FILE_CSP)
+  })
+
+  it("keeps the file CSP sandboxed, script-free and offline", () => {
+    const directives = FILE_CSP.split(";").map((d) => d.trim())
+    expect(directives).toContain("sandbox")
+    expect(directives).toContain("default-src 'none'")
+    expect(FILE_CSP).not.toMatch(/script-src|allow-scripts|https?:/)
+  })
+
+  it("refuses file types it does not list", async () => {
+    expect((await get("d1", "notes.txt")).status).toBe(404)
   })
 })

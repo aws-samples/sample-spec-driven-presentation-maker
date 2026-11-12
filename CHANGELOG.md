@@ -33,6 +33,14 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **Attachments: stricter SVG content checks.** `read_attachment` / `import_attachment`
+  now parse an SVG before accepting it and refuse more kinds of content that refers to
+  something outside the file.
+- **Local Web UI: deck files are served with `nosniff` and a sandbox CSP.** Images, JSON
+  and PPTX files from a deck (`/api/preview/…`) now carry the same kind of protection the
+  HTML previews already had.
+- **Local Web UI: `npm run start` listens on 127.0.0.1 only.** Started by hand, `next start`
+  used to listen on every interface; `sdpm webui` already passed `--hostname 127.0.0.1`.
 - **Imported DOCX and XLSX tables keep their cells intact.** A `|` or a line break inside a
   table cell split the cell in the Markdown that `import_attachment` writes: DOCX cells
   were escaped twice, XLSX cells not at all. Both now go through the same escaping as PDF
