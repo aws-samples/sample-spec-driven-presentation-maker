@@ -14,6 +14,8 @@ import threading
 from collections.abc import Callable
 from typing import Any, Optional
 
+from shared import user_library
+from shared.schema import user_template_key, user_template_sk
 from storage import Storage
 
 
@@ -213,39 +215,16 @@ class AwsStorage(Storage):
 
     def list_templates(self) -> list[dict]:
         """List builtin templates. S3 is source of truth for existence, DDB is metadata cache."""
-        # S3: what exists
-        resp = self._s3.list_objects_v2(Bucket=self._resource_bucket, Prefix="templates/")
-        s3_templates = {}
-        for obj in resp.get("Contents", []):
-            key = obj["Key"]
-            if key.endswith(".pptx"):
-                name = key.removeprefix("templates/").removesuffix(".pptx")
-                s3_templates[name] = {"s3Key": key, "s3ETag": obj["ETag"]}
-
-        if not s3_templates:
-            return []
-
-        # DDB: cached metadata
-        keys = [{"PK": f"TEMPLATE#{n}", "SK": "META"} for n in s3_templates]
-        ddb_resp = self._table.meta.client.batch_get_item(
-            RequestItems={self._table.name: {"Keys": keys}}
-        )
-        ddb_cache = {}
-        for item in ddb_resp.get("Responses", {}).get(self._table.name, []):
-            ddb_cache[item["name"]] = item
-
-        # Merge: S3 existence + DDB metadata
-        results = []
-        for name, s3_info in s3_templates.items():
-            cached = ddb_cache.get(name, {})
-            results.append({
-                "name": name,
-                "s3Key": s3_info["s3Key"],
-                "description": cached.get("description", ""),
-                "fonts": cached.get("fonts", {}),
-                "analysisJson": cached.get("analysisJson", "{}") if cached.get("s3ETag") == s3_info["s3ETag"] else "{}",
-            })
-        return results
+        return [
+            {
+                "name": t["name"],
+                "s3Key": t["s3Key"],
+                "description": t["cache"].get("description", ""),
+                "fonts": t["cache"].get("fonts", {}),
+                "analysisJson": t["cache"].get("analysisJson", "{}") if t["fresh"] else "{}",
+            }
+            for t in user_library.list_builtin_templates(self._s3, self._table, self._resource_bucket)
+        ]
 
     # --- File I/O ---
 
@@ -364,56 +343,39 @@ class AwsStorage(Storage):
 
     def get_style_pins(self, user_id: str) -> list[str]:
         """Get pinned style names from DDB."""
-        resp = self._table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
-        item = resp.get("Item")
-        if not item:
-            return []
-        return item.get("pinned_styles", [])
+        return user_library.get_style_pins(self._table, user_id)
 
     def put_style_pins(self, user_id: str, pins: list[str]) -> None:
         """Save pinned style names to DDB."""
-        self._table.put_item(Item={
-            "PK": f"USER#{user_id}",
-            "SK": "STYLE_PINS",
-            "pinned_styles": pins,
-        })
+        user_library.put_style_pins(self._table, user_id, pins)
+
+    # --- User Styles ---
+
+    def list_user_styles(self, user_id: str) -> list[dict]:
+        """List the user's styles (name, description, source) from the pptx bucket."""
+        return user_library.list_user_styles(self._s3, self._pptx_bucket, user_id)
 
     # --- User Templates ---
 
     def get_builtin_template_notes(self, user_id: str) -> dict[str, str]:
         """Get per-user notes for builtin templates from DDB."""
-        resp = self._table.query(
-            KeyConditionExpression="PK = :pk AND begins_with(SK, :prefix)",
-            ExpressionAttributeValues={
-                ":pk": f"USER#{user_id}",
-                ":prefix": "BUILTIN_NOTE#",
-            },
-        )
-        return {
-            item["SK"].removeprefix("BUILTIN_NOTE#"): item.get("description", "")
-            for item in resp.get("Items", [])
-        }
+        return user_library.list_builtin_template_notes(self._table, user_id)
 
     def list_user_templates(self, user_id: str) -> list[dict]:
         """List user templates from DDB."""
-        resp = self._table.query(
-            KeyConditionExpression="PK = :pk AND begins_with(SK, :prefix)",
-            ExpressionAttributeValues={":pk": f"USER#{user_id}", ":prefix": "TEMPLATE#"},
-        )
-        return resp.get("Items", [])
+        return user_library.list_user_templates(self._table, user_id)
 
     def get_user_template_metadata(self, user_id: str, name: str) -> dict | None:
         """Get single user template metadata."""
-        resp = self._table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+        resp = self._table.get_item(Key=user_template_key(user_id, name))
         return resp.get("Item")
 
     def put_user_template(self, user_id: str, name: str, data: bytes, metadata: dict) -> None:
         """Upload user template to S3 and metadata to DDB."""
-        s3_key = f"user-templates/{user_id}/{name}.pptx"
+        s3_key = user_library.user_template_s3_key(user_id, name)
         self._s3.put_object(Bucket=self._pptx_bucket, Key=s3_key, Body=data)
         self._table.put_item(Item={
-            "PK": f"USER#{user_id}",
-            "SK": f"TEMPLATE#{name}",
+            **user_template_key(user_id, name),
             "name": name,
             "s3Key": s3_key,
             **metadata,
@@ -421,20 +383,20 @@ class AwsStorage(Storage):
 
     def delete_user_template(self, user_id: str, name: str) -> None:
         """Delete user template from S3 and DDB."""
-        s3_key = f"user-templates/{user_id}/{name}.pptx"
+        s3_key = user_library.user_template_s3_key(user_id, name)
         self._s3.delete_object(Bucket=self._pptx_bucket, Key=s3_key)
-        self._table.delete_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+        self._table.delete_item(Key=user_template_key(user_id, name))
 
     def download_user_template(self, user_id: str, name: str) -> bytes:
         """Download user template from S3."""
-        s3_key = f"user-templates/{user_id}/{name}.pptx"
+        s3_key = user_library.user_template_s3_key(user_id, name)
         resp = self._s3.get_object(Bucket=self._pptx_bucket, Key=s3_key)
         return resp["Body"].read()
 
     def rename_user_template(self, user_id: str, old_name: str, new_name: str) -> None:
         """Rename user template (copy S3 + update DDB + delete old)."""
-        old_key = f"user-templates/{user_id}/{old_name}.pptx"
-        new_key = f"user-templates/{user_id}/{new_name}.pptx"
+        old_key = user_library.user_template_s3_key(user_id, old_name)
+        new_key = user_library.user_template_s3_key(user_id, new_name)
         # Copy S3 object
         self._s3.copy_object(
             Bucket=self._pptx_bucket,
@@ -443,9 +405,9 @@ class AwsStorage(Storage):
         )
         self._s3.delete_object(Bucket=self._pptx_bucket, Key=old_key)
         # Move DDB item
-        old_item = self._table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{old_name}"}).get("Item", {})
-        self._table.delete_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{old_name}"})
-        old_item["SK"] = f"TEMPLATE#{new_name}"
+        old_item = self._table.get_item(Key=user_template_key(user_id, old_name)).get("Item", {})
+        self._table.delete_item(Key=user_template_key(user_id, old_name))
+        old_item["SK"] = user_template_sk(new_name)
         old_item["name"] = new_name
         old_item["s3Key"] = new_key
         self._table.put_item(Item=old_item)
@@ -462,7 +424,7 @@ class AwsStorage(Storage):
             attr_names[alias] = k
             attr_values[val_alias] = v
         self._table.update_item(
-            Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"},
+            Key=user_template_key(user_id, name),
             UpdateExpression="SET " + ", ".join(expr_parts),
             ExpressionAttributeNames=attr_names,
             ExpressionAttributeValues=attr_values,

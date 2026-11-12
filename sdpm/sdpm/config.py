@@ -21,6 +21,7 @@ SKILL_ROOT = Path(_skill_root_env).expanduser() if _skill_root_env else PACKAGE_
 ASSETS_DIR = SKILL_ROOT / "assets"
 REFERENCES_DIR = SKILL_ROOT / "references"
 TEMPLATES_DIR = SKILL_ROOT / "templates"
+VENDOR_DIR = SKILL_ROOT / "vendor"
 SCRIPTS_DIR = SKILL_ROOT / "scripts"
 CACHE_DIR = SKILL_ROOT / ".cache"
 
@@ -115,8 +116,8 @@ def get_config() -> dict:
 
 
 def get_output_dir() -> Path:
-    """Resolved output base directory with tilde expansion."""
-    return Path(get_config()["output_dir"]).expanduser()
+    """Resolved output base directory with tilde expansion; an empty value means the default."""
+    return Path(get_config()["output_dir"] or _DEFAULTS["output_dir"]).expanduser()
 
 
 def get_extra_sources() -> list[dict]:

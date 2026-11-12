@@ -14,6 +14,7 @@ from __future__ import annotations
 import re
 import zipfile
 from contextlib import contextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import Iterator, Literal
 
@@ -101,10 +102,15 @@ def materialize_local_source(
 
 SourceKind = Literal["local_path", "s3_key", "url"]
 
-# Cloud source pattern: uploads/{userId}/{uuid4}/{sanitizedName}
-_CLOUD_SOURCE_RE = re.compile(
-    r"^uploads/[^/]+/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/[^/]+$"
-)
+_UUID4 = r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}"
+
+# Cloud upload handle (what the agent sees): uploads/{uuid4}/{sanitizedName}.
+# The S3 key adds the caller's user id: uploads/{userId}/{uuid4}/{sanitizedName}.
+_CLOUD_HANDLE_RE = re.compile(rf"^uploads/{_UUID4}/[^/]+$")
+
+# Previous handle form, which was the S3 key itself: uploads/{userId}/{uuid4}/{sanitizedName}.
+# Accepted only for the caller's own uploads while those objects can still exist.
+_CLOUD_SOURCE_RE = re.compile(rf"^uploads/[^/]+/{_UUID4}/[^/]+$")
 
 # Characters forbidden in filenames
 _FILENAME_FORBIDDEN = re.compile(r'[/\\]|\.\.|\x00-\x1f')
@@ -116,12 +122,12 @@ def classify_source(source: str) -> SourceKind:
 
     Returns:
         "url" for http(s):// URLs
-        "s3_key" for Cloud source keys (uploads/...)
+        "s3_key" for Cloud upload handles (uploads/...)
         "local_path" for everything else (absolute paths)
     """
     if source.startswith("https://") or source.startswith("http://"):
         return "url"
-    if _CLOUD_SOURCE_RE.match(source):
+    if _CLOUD_HANDLE_RE.match(source) or _CLOUD_SOURCE_RE.match(source):
         return "s3_key"
     return "local_path"
 
@@ -181,45 +187,62 @@ def validate_local_source(source: str, *, allow_any_path: bool = False, root: Pa
     return resolved
 
 
-def validate_cloud_source(source: str, current_user_id: str) -> str:
-    """Validate a Cloud S3 key source.
+@dataclass(frozen=True)
+class CloudSource:
+    """A Cloud upload resolved for one caller.
+
+    ``key`` is the S3 object key and goes to storage only. ``handle`` is what the
+    agent sees (results, headers, errors); it carries no user id.
+    """
+
+    key: str
+    handle: str
+
+
+def _unsafe(value: str) -> bool:
+    return ".." in value or "\\" in value or any(ord(c) < 0x20 or ord(c) == 0x7F for c in value)
+
+
+def resolve_cloud_source(source: str, current_user_id: str) -> CloudSource:
+    """Resolve a Cloud upload handle to the caller's S3 key.
+
+    The key is always built from ``current_user_id`` (the authenticated caller), so a
+    handle can only name the caller's own uploads. The previous form, which carried a
+    user id, is accepted only when that id is the caller's, and is normalized to the
+    handle. Error messages never repeat the input or the id in it.
 
     Args:
-        source: The source key string.
+        source: ``uploads/{uuid4}/{name}``, or the previous ``uploads/{userId}/{uuid4}/{name}``.
         current_user_id: The authenticated user's ID.
 
-    Returns:
-        Validated source key.
-
     Raises:
-        SourceValidationError: On invalid key format.
-        SourceAccessDenied: If key doesn't belong to current user.
+        SourceValidationError: On an invalid handle or caller id.
+        SourceAccessDenied: If a previous-form source names another user.
     """
     from sdpm.tools.attachment.errors import SourceAccessDenied
 
-    # Check pattern
-    if not _CLOUD_SOURCE_RE.match(source):
-        raise SourceValidationError(f"Invalid Cloud source format: {source}")
+    if not current_user_id or "/" in current_user_id or _unsafe(current_user_id):
+        raise SourceValidationError("Invalid caller identity for a Cloud source")
+    if _unsafe(source):
+        raise SourceValidationError("Invalid Cloud source")
 
-    # Check for path traversal
-    if ".." in source or "\\" in source:
-        raise SourceValidationError(f"Path traversal in source: {source}")
-
-    # Check control characters
-    if any(ord(c) < 0x20 for c in source):
-        raise SourceValidationError(f"Control characters in source: {source}")
-
-    # Extract userId from key and verify ownership
     parts = source.split("/")
-    # Pattern: uploads/{userId}/{uuid4}/{name}
-    if len(parts) != 4:
-        raise SourceValidationError(f"Invalid Cloud source structure: {source}")
+    if _CLOUD_HANDLE_RE.match(source):
+        upload_id, name = parts[1], parts[2]
+    elif _CLOUD_SOURCE_RE.match(source):
+        upload_id, name = parts[2], parts[3]
+    else:
+        raise SourceValidationError("Invalid Cloud source format; expected uploads/{uuid}/{name}")
 
-    key_user_id = parts[1]
-    if key_user_id != current_user_id:
-        raise SourceAccessDenied(source)
+    handle = f"uploads/{upload_id}/{name}"
+    if len(parts) == 4 and parts[1] != current_user_id:
+        raise SourceAccessDenied(handle)
+    return CloudSource(key=f"uploads/{current_user_id}/{upload_id}/{name}", handle=handle)
 
-    return source
+
+def validate_cloud_source(source: str, current_user_id: str) -> str:
+    """S3 key of a Cloud source the caller owns (see resolve_cloud_source)."""
+    return resolve_cloud_source(source, current_user_id).key
 
 
 def sanitize_filename(name: str) -> str:
@@ -454,6 +477,7 @@ def enforce_content_limits(path: Path, media_type: str) -> None:
             target = match.group(1).strip().lower()
             if not target.startswith("#") and not target.startswith("data:image/"):
                 raise SourceValidationError("SVG contains an external resource reference")
+        _check_svg_tree(text)
         return
 
     if media_type in {"image/png", "image/jpeg", "image/gif", "image/webp"}:
@@ -529,6 +553,75 @@ def enforce_content_limits(path: Path, media_type: str) -> None:
             raise
         except Exception as error:
             raise SourceValidationError(f"Invalid PDF: {error}")
+
+
+_SVG_ANIMATION_TAGS = frozenset({"set", "animate", "animatetransform", "animatemotion", "animatecolor"})
+# Elements whose href may embed a raster image as a data: URL.
+_SVG_IMAGE_TAGS = frozenset({"image", "feimage"})
+_SVG_NS_PREFIX = "{http://www.w3.org/2000/svg}"
+# CSS functions that load a resource from a string argument (no url() needed).
+_CSS_RESOURCE_FUNCTION = re.compile(r"(?<![\w-])(?:-webkit-)?(?:image-set|image|cross-fade|src)\(")
+_CSS_URL = re.compile(r"(?<![\w-])url\(\s*['\"]?\s*(.)?")
+
+
+def _check_svg_css(value: str) -> None:
+    """Reject CSS that can reach outside the document; url() may only name '#id'.
+
+    Applied to <style> text and to every attribute value without a foreign namespace, since
+    presentation attributes (fill, stroke, filter, ...) are CSS values too; editor metadata
+    such as inkscape:export-filename is never read as CSS. Backslashes are refused because CSS
+    escapes would let a function or at-rule name be spelled around these checks.
+    """
+    lowered = value.lower()
+    if "\\" in lowered or "@import" in lowered or _CSS_RESOURCE_FUNCTION.search(lowered):
+        raise SourceValidationError("SVG contains an external resource reference")
+    for match in _CSS_URL.finditer(lowered):
+        if match.group(1) != "#":
+            raise SourceValidationError("SVG contains an external resource reference")
+
+
+def _check_svg_href(tag: str, value: str) -> None:
+    """An href names an element of the document, or embeds a raster image in <image>/<feImage>.
+
+    data:image/svg+xml is refused: the embedded document would bypass every check here.
+    """
+    target = value.strip().lower()
+    if target.startswith("#"):
+        return
+    if tag in _SVG_IMAGE_TAGS and target.startswith("data:image/") and not target.startswith("data:image/svg"):
+        return
+    raise SourceValidationError("SVG contains an external resource reference")
+
+
+def _check_svg_tree(text: str) -> None:
+    """Element-level SVG checks on the parsed document (entities decoded, PIs dropped)."""
+    from defusedxml.ElementTree import ParseError, fromstring
+
+    try:
+        root = fromstring(text.encode("utf-8"))
+    except (ParseError, ValueError) as error:
+        raise SourceValidationError(f"SVG is not well-formed XML: {error}")
+
+    for element in root.iter():
+        if not isinstance(element.tag, str):
+            continue
+        tag = element.tag.rsplit("}", 1)[-1].lower()
+        for name, value in element.attrib.items():
+            local = name.rsplit("}", 1)[-1].lower()
+            if local.startswith("on"):
+                raise SourceValidationError("SVG contains unsafe active content")
+            if local == "href":
+                _check_svg_href(tag, value)
+                continue
+            if name.startswith("{") and not name.startswith(_SVG_NS_PREFIX):
+                continue
+            _check_svg_css(value)
+        if tag in _SVG_ANIMATION_TAGS:
+            animated = element.get("attributeName", "").rsplit(":", 1)[-1].strip().lower()
+            if animated == "href" or animated.startswith("on"):
+                raise SourceValidationError("SVG contains unsafe active content")
+        if tag == "style":
+            _check_svg_css("".join(element.itertext()))
 
 
 def get_canonical_extension(media_type: str) -> str:

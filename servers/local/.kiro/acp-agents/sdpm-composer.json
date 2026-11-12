@@ -1,6 +1,6 @@
 {
   "name": "sdpm-composer",
-  "description": "Composer agent for spec-driven-presentation-maker. Writes slide JSON, builds PPTX, measures, and polishes autonomously. No user interaction.",
+  "description": "Composer agent for spec-driven-presentation-maker. Writes slide files (JSON or HTML), builds the deck, checks, and polishes autonomously. No user interaction.",
   "tools": [
     "@sdpm/analyze_template",
     "@sdpm/apply_style",

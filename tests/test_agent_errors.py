@@ -21,11 +21,13 @@ _spec.loader.exec_module(_errors)
 
 AUTH = _errors.AUTH
 BAD_INPUT = _errors.BAD_INPUT
+CONTENT_FILTERED = _errors.CONTENT_FILTERED
 CONVERSATION_TOO_LONG = _errors.CONVERSATION_TOO_LONG
 INTERNAL = _errors.INTERNAL
 MAX_OUTPUT = _errors.MAX_OUTPUT
 MODEL_NOT_READY = _errors.MODEL_NOT_READY
 SERVICE_UNAVAILABLE = _errors.SERVICE_UNAVAILABLE
+SESSION_RELOAD_REQUIRED = _errors.SESSION_RELOAD_REQUIRED
 THROTTLED = _errors.THROTTLED
 TIMEOUT = _errors.TIMEOUT
 _PATTERNS = _errors._PATTERNS
@@ -66,6 +68,15 @@ class TestErrorEvent:
         ev = error_event("No JWT token", code=AUTH)
         assert ev["code"] == AUTH
 
+    def test_session_reload_required_is_sent_with_its_code(self):
+        ev = error_event("Reload the page", code=SESSION_RELOAD_REQUIRED)
+        assert ev == {"status": "error", "code": "session_reload_required", "error": "Reload the page"}
+
+    def test_content_filtered_is_sent_with_its_code(self):
+        assert error_event("x", code=CONTENT_FILTERED)["code"] == "content_filtered"
+        # No pattern: only the agent's stop-reason check sends it.
+        assert classify_error("content_filtered") == INTERNAL
+
 
 class TestTypeScriptParity:
     """Guard against drift between agent/errors.py and lib/agentErrors.ts."""
@@ -75,6 +86,7 @@ class TestTypeScriptParity:
         py_codes = {
             CONVERSATION_TOO_LONG, THROTTLED, TIMEOUT, MODEL_NOT_READY,
             SERVICE_UNAVAILABLE, AUTH, BAD_INPUT, MAX_OUTPUT, INTERNAL,
+            SESSION_RELOAD_REQUIRED, CONTENT_FILTERED,
         }
         for code in py_codes:
             assert f'"{code}"' in ts, f"code {code!r} missing from agentErrors.ts"
@@ -88,6 +100,7 @@ class TestTypeScriptParity:
         py_codes = {
             CONVERSATION_TOO_LONG, THROTTLED, TIMEOUT, MODEL_NOT_READY,
             SERVICE_UNAVAILABLE, AUTH, BAD_INPUT, MAX_OUTPUT, INTERNAL,
+            SESSION_RELOAD_REQUIRED, CONTENT_FILTERED,
         }
         assert ts_codes == py_codes, (
             f"code sets differ — TS only: {ts_codes - py_codes}, Python only: {py_codes - ts_codes}"

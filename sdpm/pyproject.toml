@@ -10,22 +10,26 @@ dependencies = [
     "qrcode",
     "pygments>=2.19.2",
     "defusedxml",
+    "websockets>=13",
+    # sdpm.tools.attachment.ingest / pipeline: PDF / DOCX / XLSX conversion
+    "pypdf>=6.15.0",
+    "pdfplumber>=0.11.0",
+    "python-docx>=1.0.0",
+    "openpyxl>=3.1.0",
 ]
 
 [tool.setuptools.packages.find]
 include = ["sdpm*"]
 
+[tool.setuptools.package-data]
+"sdpm.tools.apps" = ["views/*.html", "views/*.js"]
+
 [tool.setuptools.dynamic]
 version = {attr = "sdpm.__version__"}
 
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "ruff",
-]
-
 [tool.ruff]
-line-length = 120
+# Rule set and line length come from the workspace root.
+extend = "../pyproject.toml"
 
 [tool.ruff.lint.per-file-ignores]
 "sdpm/engine/converter/color.py" = ["E402"]

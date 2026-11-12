@@ -15,13 +15,22 @@ curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-pres
 (Windows PowerShell: `irm …/scripts/install/dist/install.ps1 | iex` with `-McpOnly -NonInteractive -Register`.)
 `--mcp-only` skips the browser Web UI (needs Node.js 20+; use `--full` to include it);
 `--register` connects every MCP client found on the machine and cleans up leftovers of older
-setups without asking; `--agent-name NAME` renames the Kiro CLI agent (default `sdpm`).
-Then verify: `~/.local/bin/sdpm` prints status; `python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp`
+setups without asking; `--agent-name NAME` renames the Kiro CLI agent (default `sdpm`). It
+installs the latest release (`--channel main` / `SDPM_CHANNEL=main` follows `main` instead).
+Without a terminal nothing waits for input; if sudo needs a password, the installer prints
+the commands for the user to run and exits 1. Then verify: `~/.local/bin/sdpm` prints status; `python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp`
 must print `OK: … 20 tools`. Tell the user how to start: Kiro CLI `kiro-cli chat --agent sdpm`;
 other clients just ask for slides; browser `sdpm webui`.
+**Updating it for a user:** run `sdpm update` (`~/.local/bin/sdpm`; Windows
+`%USERPROFILE%\bin\sdpm.cmd`). It never prompts; read the exit code: 0 updated, up to date or
+stayed (an install ahead of the latest release stays until a release contains it, with one
+`Staying on …` line), 1 failed (the last lines say whether it went back and where the install
+is), 2 usage, 130 interrupted. `--channel main|release` (or `SDPM_CHANNEL`) switches what it
+follows and is remembered; `--with-webui` adds the browser Web UI. `sdpm register` without a
+terminal needs `--yes` (every detected client) or client names, otherwise it exits 2.
 **Migrating an older setup** (Claude Code / Codex plugin, Kiro Power, `make install-kiro`,
 `skills/`, `uvx … sdpm-mcp` entries): all of these are gone — follow
-[Migration: onboarding](docs/en/migration-onboarding.md); `sdpm register` detects and offers
+[Migration: onboarding](docs/en/migration/onboarding.md); `sdpm register` detects and offers
 to remove the Kiro and Claude Code leftovers itself.
 
 **Using it to generate slides:**
@@ -64,8 +73,9 @@ docs/        Documentation
 are peers. `sdpm.tools` defines every MCP tool once — names, schemas,
 docstrings, logic — and both servers register those functions directly. Role and
 procedure text is content, not client config: `sdpm/references/workflows/<role>.md`
-(orchestrator, composer, style, translate) is the single definition for each role,
-delivered to any MCP client by the `start_*` entry tools (`start_presentation`,
+(orchestrator, composer, style, translate) is the single definition for each role — one
+document per mode for the composer (`composer.md` for pptx, `composer-html.md` for html),
+the mode chosen by the spawner through `start_composing(..., mode=…)` — delivered to any MCP client by the `start_*` entry tools (`start_presentation`,
 `start_composing`, `start_style`, `start_translation`), each of which also returns what
 that role reads first. Nothing lives on the client side: `sdpm register`
 (`servers/local/client_config.py`) writes the one line that starts the server into each
@@ -75,8 +85,10 @@ See [Architecture](docs/en/architecture.md).
 ## Conventions
 
 - Engine source of truth: `sdpm/sdpm/` — servers must stay thin binds of `sdpm.tools`
-- Role + procedure text lives only in `sdpm/references/workflows/<role>.md`; `SKILL.md`,
-  the ACP agent definitions and server instructions are dispatch/environment only
+- Role + procedure text lives only in `sdpm/references/workflows/<role>.md`, one document
+  per mode (composer: `composer.md` / `composer-html.md`, chosen by the spawner via
+  `start_composing`'s `mode` argument); `SKILL.md`, the ACP agent definitions and server
+  instructions are dispatch/environment only
 - Client configuration is generated, never hand-written: one template in
   `servers/local/client_config.py` (absolute `uv` + absolute checkout, no launcher, no
   `PATH`), rendered per client; `tests/test_client_config.py` guards it. Both launchers
@@ -102,14 +114,16 @@ See [Architecture](docs/en/architecture.md).
 ## Onboarding code — read before touching
 
 - `docs/en/getting-started.md` — the user contract (installer options, launcher, per-client registration)
-- `docs/en/migration-onboarding.md` — what was removed and why
+- `docs/en/migration/onboarding.md` — what was removed and why
 - `scripts/install/README.md` — build (`build.sh`, CI rejects drift) and the isolated-home smoke test
 - `servers/local/client_config.py` (+ `picker.py`, the checklist widget) + `tests/test_client_config.py` — the one implementation of client wiring and its guarded invariants (absolute paths, no launcher/PATH, CLI-based registration, marker-owned files)
 - `.github/workflows/installer.yml` — real install + MCP handshake on ubuntu / macos / windows
 
 ## Further Documentation
 
-- [Getting Started](docs/en/getting-started.md) — browser, local agent, manual, and AWS setup
+- [Getting Started](docs/en/getting-started.md) — install, AI agent, Web UI, HTML decks
+- [Developer guide](docs/en/developer-guide.md) — checkout setup and CDK deployment
+- [Security](docs/en/security.md) — what the AWS stack sets up and what to review
 - [Architecture](docs/en/architecture.md) — data flow, auth model, MCP tool reference
 - [Custom Templates & Assets](docs/en/custom-template.md)
 - [Connecting Agents](docs/en/add-to-gateway.md)

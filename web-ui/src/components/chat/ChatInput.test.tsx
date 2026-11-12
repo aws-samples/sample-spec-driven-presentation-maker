@@ -66,7 +66,7 @@ describe("ChatInput slash picker", () => {
     const { onSend, textarea } = renderInput()
 
     changeValue(textarea, "/")
-    expect(screen.getByRole("listbox", { name: "Template and style suggestions" })).toBeTruthy()
+    expect(screen.getByRole("listbox", { name: "Template, style and format suggestions" })).toBeTruthy()
     expect(textarea.getAttribute("aria-expanded")).toBe("true")
 
     fireEvent.keyDown(textarea, { key: "ArrowDown" })
@@ -127,5 +127,113 @@ describe("ChatInput slash picker", () => {
 
     expect(screen.getByRole("listbox")).toBeTruthy()
     expect(textarea.getAttribute("aria-expanded")).toBe("true")
+  })
+})
+
+describe("ChatInput replaceText", () => {
+  it("replaces the whole input, notifies onInputChange and keeps focus with the caret at the end", () => {
+    const onInputChange = vi.fn()
+    const { handle, textarea } = renderInput({ onInputChange })
+    changeValue(textarea, "a launch deck")
+    onInputChange.mockClear()
+
+    const raf = vi.spyOn(window, "requestAnimationFrame").mockImplementation((cb) => { cb(0); return 0 })
+    act(() => handle.current?.replaceText("@format:html a launch deck"))
+    raf.mockRestore()
+
+    expect(textarea.value).toBe("@format:html a launch deck")
+    expect(onInputChange).toHaveBeenCalledWith("@format:html a launch deck")
+    expect(document.activeElement).toBe(textarea)
+    expect(textarea.selectionStart).toBe("@format:html a launch deck".length)
+  })
+
+  it("mirrors picker inserts and the send reset through onInputChange", () => {
+    const onInputChange = vi.fn()
+    const { onSend, textarea } = renderInput({ onInputChange })
+    changeValue(textarea, "/")
+    fireEvent.keyDown(textarea, { key: "ArrowDown" })
+    fireEvent.keyDown(textarea, { key: "Enter" })
+    expect(onInputChange).toHaveBeenLastCalledWith("@style:lumina ")
+
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true })
+    expect(onSend).toHaveBeenCalled()
+    expect(onInputChange).toHaveBeenLastCalledWith("")
+  })
+})
+
+describe("ChatInput send override and keep-on-failure", () => {
+  it("renders the override label and sends with an empty input", () => {
+    const { onSend } = renderInput({ sendOverride: { label: "Request changes", blocked: false } })
+    const button = screen.getByRole("button", { name: "Request changes" }) as HTMLButtonElement
+    expect(button.disabled).toBe(false)
+    fireEvent.click(button)
+    expect(onSend).toHaveBeenCalledWith("", [], [], [])
+  })
+
+  it("disables the override button while blocked", () => {
+    const { onSend, textarea } = renderInput({ sendOverride: { label: "Request changes", blocked: true } })
+    const button = screen.getByRole("button", { name: "Request changes" }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    changeValue(textarea, "fix it")
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true })
+    expect(onSend).not.toHaveBeenCalled()
+  })
+
+  it("keeps the override button disabled until canSend accepts the input", () => {
+    const { onSend, textarea } = renderInput({ sendOverride: { label: "Request changes", blocked: false, canSend: (input: string) => input.trim() !== "" } })
+    const button = screen.getByRole("button", { name: "Request changes" }) as HTMLButtonElement
+    expect(button.disabled).toBe(true)
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true })
+    expect(onSend).not.toHaveBeenCalled()
+    changeValue(textarea, "overall")
+    expect(button.disabled).toBe(false)
+  })
+
+  it("keeps the text when onSend resolves to false", async () => {
+    const onSend = vi.fn(async () => false as const)
+    const { textarea } = renderInput({ onSend, sendOverride: { label: "Request changes", blocked: false } })
+    changeValue(textarea, "make it shorter")
+    await act(async () => {
+      fireEvent.click(screen.getByRole("button", { name: "Request changes" }))
+    })
+    expect(onSend).toHaveBeenCalledWith("make it shorter", [], [], [])
+    expect(textarea.value).toBe("make it shorter")
+  })
+
+  it("clears the text when an async onSend succeeds", async () => {
+    const onSend = vi.fn(async () => undefined)
+    const { textarea } = renderInput({ onSend })
+    changeValue(textarea, "hello")
+    await act(async () => {
+      fireEvent.keyDown(textarea, { key: "Enter", metaKey: true })
+    })
+    expect(onSend).toHaveBeenCalled()
+    expect(textarea.value).toBe("")
+  })
+
+  it("renders the top slot inside the form", () => {
+    const { textarea } = renderInput({ topSlot: <div data-testid="top-slot" /> })
+    expect(textarea.closest("form")?.querySelector("[data-testid='top-slot']")).toBeTruthy()
+  })
+})
+
+describe("ChatInput while loading", () => {
+  it("offers Send next to Stop and sends with canSendWhileLoading (Cloud)", () => {
+    const { onSend, textarea } = renderInput({ isLoading: true, canSendWhileLoading: true })
+    expect(screen.getByRole("button", { name: "Stop generation" })).toBeTruthy()
+    changeValue(textarea, "use blue")
+    const send = screen.getByRole("button", { name: "Send message" }) as HTMLButtonElement
+    expect(send.disabled).toBe(false)
+    fireEvent.click(send)
+    expect(onSend).toHaveBeenCalledWith("use blue", [], [], [])
+  })
+
+  it("shows only Stop without it (Local)", () => {
+    const { onSend, textarea } = renderInput({ isLoading: true })
+    expect(screen.getByRole("button", { name: "Stop generation" })).toBeTruthy()
+    expect(screen.queryByRole("button", { name: "Send message" })).toBeNull()
+    changeValue(textarea, "more")
+    fireEvent.keyDown(textarea, { key: "Enter", metaKey: true })
+    expect(onSend).not.toHaveBeenCalled()
   })
 })

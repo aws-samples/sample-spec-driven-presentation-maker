@@ -14,38 +14,56 @@
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
+import { useTranslations } from "next-intl"
 import { IS_LOCAL } from "@/lib/mode"
 import {
   listDecks, DeckSummary,
-  listPublicDecks, listSharedDecks, listFavorites,
+  listPublicDecks, listFavorites,
   updateVisibility, deleteDeck, toggleFavorite,
   searchSlides, SlideSearchResult,
 } from "@/services/deckService"
+import { openInOs } from "@/services/localService"
 import { toast } from "sonner"
 import { notifyError } from "@/lib/errors"
+import { isHtmlPreview } from "@/lib/preview"
 
 /** Parallel DELETE calls during a bulk delete. */
 const BULK_DELETE_CONCURRENCY = 5
+
+/**
+ * HTML thumbnails (deck cards, search results) are 15-minute S3 presigned URLs.
+ * While any are listed, the lists and the search are re-fetched after this age
+ * so frames that load later get a valid signature; loaded frames keep their
+ * document (HtmlSlideFrame compares the file, not the signature).
+ */
+const HTML_URL_REFRESH_MS = 10 * 60 * 1000
 
 export function useDeckList(
   idToken: string | undefined,
   isAuthenticated: boolean,
   activeDeckId: string | null,
 ) {
+  const t = useTranslations("decksPage")
+  const tCarousel = useTranslations("carousel")
   const [decks, setDecks] = useState<DeckSummary[]>([])
   const [publicDecks, setPublicDecks] = useState<DeckSummary[]>([])
-  const [sharedDecks, setSharedDecks] = useState<DeckSummary[]>([])
   const [favoriteDecks, setFavoriteDecks] = useState<DeckSummary[]>([])
   const [favoriteIds, setFavoriteIds] = useState<Set<string>>(new Set())
-  const [activeListTab, setActiveListTab] = useState<"mine" | "favorites" | "public" | "shared">("mine")
+  const [activeListTab, setActiveListTab] = useState<"mine" | "favorites" | "public">("mine")
   const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  /** The first list load failed; translated at render (the raw error goes to the console). */
+  const [loadFailed, setLoadFailed] = useState(false)
   const [deleteTarget, setDeleteTarget] = useState<DeckSummary | null>(null)
   const [bulkDeleteTargets, setBulkDeleteTargets] = useState<DeckSummary[] | null>(null)
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null)
   const [searchQuery, setSearchQuery] = useState("")
   const [searchResults, setSearchResults] = useState<SlideSearchResult[]>([])
   const [searching, setSearching] = useState(false)
+  const [listEpoch, setListEpoch] = useState(0)
+  const [searchEpoch, setSearchEpoch] = useState(0)
+  /** When the deck lists / the search results (and their signed preview URLs) were fetched. */
+  const listFetchedAt = useRef(0)
+  const searchFetchedAt = useRef(0)
 
   /** Fetch all deck lists when on list view. */
   const initialLoadDone = useRef(false)
@@ -55,10 +73,9 @@ export function useDeckList(
 
     async function load() {
       try {
-        const [myData, pubDecks, shDecks, favDecks] = await Promise.all([
+        const [myData, pubDecks, favDecks] = await Promise.all([
           listDecks(idToken!),
           listPublicDecks(idToken!),
-          listSharedDecks(idToken!),
           listFavorites(idToken!),
         ])
         // Merge: preserve existing thumbnailUrl if deckId matches to avoid image flicker
@@ -66,19 +83,20 @@ export function useDeckList(
           const prevMap = new Map(prev.map((d) => [d.deckId, d]))
           return myData.decks.map((d) => {
             const existing = prevMap.get(d.deckId)
-            if (existing && existing.thumbnailUrl && d.thumbnailUrl) {
+            if (existing && existing.thumbnailUrl && d.thumbnailUrl && !isHtmlPreview(d.thumbnailUrl)) {
               return { ...d, thumbnailUrl: existing.thumbnailUrl }
             }
             return d
           })
         })
+        listFetchedAt.current = Date.now()
         setFavoriteIds(new Set(myData.favoriteIds))
         setPublicDecks(pubDecks)
-        setSharedDecks(shDecks)
         setFavoriteDecks(favDecks)
       } catch (err) {
         if (!initialLoadDone.current) {
-          setError(err instanceof Error ? err.message : "Failed to load decks")
+          console.error("Failed to load decks", err)
+          setLoadFailed(true)
         }
       } finally {
         initialLoadDone.current = true
@@ -87,7 +105,7 @@ export function useDeckList(
     }
 
     load()
-  }, [isAuthenticated, idToken, activeDeckId])
+  }, [isAuthenticated, idToken, activeDeckId, listEpoch])
 
   /** Debounced slide search. */
   useEffect(() => {
@@ -100,11 +118,56 @@ export function useDeckList(
     setSearching(true)
     const timer = setTimeout(async () => {
       const results = await searchSlides(searchQuery, idToken)
+      searchFetchedAt.current = Date.now()
       setSearchResults(results)
       setSearching(false)
     }, 300)
     return () => { clearTimeout(timer); setSearching(false) }
   }, [searchQuery, idToken])
+
+  /** Re-sign HTML thumbnails before they expire (cloud; only while any are listed). */
+  const listHasHtml = [decks, publicDecks, favoriteDecks]
+    .some((list) => list.some((d) => isHtmlPreview(d.thumbnailUrl)))
+  const searchHasHtml = searchResults.some((r) => isHtmlPreview(r.previewUrl))
+  useEffect(() => {
+    if (IS_LOCAL || activeDeckId !== null || !(listHasHtml || searchHasHtml)) return
+    // Each clock starts when its URLs were signed (fetched). The deck lists are
+    // re-fetched when the list view comes back; search results survive a visit to a
+    // deck, so returning after a long visit re-signs them at once.
+    const refresh = () => {
+      const now = Date.now()
+      if (listHasHtml && now - listFetchedAt.current >= HTML_URL_REFRESH_MS) {
+        listFetchedAt.current = now
+        setListEpoch((n) => n + 1)
+      }
+      if (searchHasHtml && now - searchFetchedAt.current >= HTML_URL_REFRESH_MS) {
+        searchFetchedAt.current = now
+        setSearchEpoch((n) => n + 1)
+      }
+    }
+    refresh()
+    const onVisible = () => { if (document.visibilityState === "visible") refresh() }
+    const timer = setInterval(refresh, 60 * 1000)
+    document.addEventListener("visibilitychange", onVisible)
+    return () => { clearInterval(timer); document.removeEventListener("visibilitychange", onVisible) }
+  }, [activeDeckId, listHasHtml, searchHasHtml])
+
+  /** Silent re-run of the current search (no loading state) for fresh preview signatures. */
+  const handledSearchEpoch = useRef(0)
+  useEffect(() => {
+    if (searchEpoch === handledSearchEpoch.current) return
+    handledSearchEpoch.current = searchEpoch
+    if (!idToken || searchQuery.length < 2) return
+    let cancelled = false
+    searchSlides(searchQuery, idToken)
+      .then((results) => {
+        if (cancelled) return
+        searchFetchedAt.current = Date.now()
+        setSearchResults(results)
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [searchEpoch, searchQuery, idToken])
 
   const handleToggleFavorite = useCallback(async (deckId: string, action: "add" | "remove") => {
     if (!idToken) return
@@ -132,24 +195,24 @@ export function useDeckList(
       await updateVisibility(deckId, visibility, idToken)
       setDecks((prev) => prev.map((d) => d.deckId === deckId ? { ...d, visibility } : d))
     } catch {
-      toast.error("Failed to update visibility.")
+      toast.error(t("errorUpdateVisibility"))
     }
-  }, [idToken])
+  }, [idToken, t])
 
   const handleDownload = useCallback((deckId: string) => {
     const target = decks.find((d) => d.deckId === deckId)
     if (!target?.pptxUrl) return
     if (IS_LOCAL) {
-      fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch((err) => notifyError("Failed to open PPTX", err))
+      openInOs(deckId, "output.pptx").catch((err) => notifyError(tCarousel("errorOpenPptx"), err))
     } else {
       window.open(target.pptxUrl, "_blank")
     }
-  }, [decks])
+  }, [decks, tCarousel])
 
   const handleOpenFolder = useCallback((deckId: string) => {
     if (!IS_LOCAL) return
-    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch((err) => notifyError("Failed to open deck folder", err))
-  }, [])
+    openInOs(deckId).catch((err) => notifyError(tCarousel("errorOpenFolder"), err))
+  }, [tCarousel])
 
   const confirmDelete = useCallback(async () => {
     if (!deleteTarget || !idToken) return
@@ -158,9 +221,9 @@ export function useDeckList(
       setDecks((prev) => prev.filter((d) => d.deckId !== deleteTarget.deckId))
       setDeleteTarget(null)
     } catch {
-      toast.error("Failed to delete deck.")
+      toast.error(t("errorDeleteDeck"))
     }
-  }, [deleteTarget, idToken])
+  }, [deleteTarget, idToken, t])
 
   /** Bulk delete: ask for confirmation, then delete in parallel (bounded). */
   const requestBulkDelete = useCallback((deckIds: string[]) => {
@@ -200,8 +263,9 @@ export function useDeckList(
   /** Decks for the currently active list tab. */
   const tabDecks = activeListTab === "mine" ? decks
     : activeListTab === "favorites" ? favoriteDecks
-    : activeListTab === "public" ? publicDecks
-    : sharedDecks
+    : publicDecks
+
+  const error = loadFailed ? t("errorLoadDecks") : null
 
   return {
     decks, tabDecks, favoriteIds, activeListTab, setActiveListTab,

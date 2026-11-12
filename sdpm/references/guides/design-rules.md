@@ -34,7 +34,7 @@ pt is an absolute unit. The same pt renders at the same size regardless of slide
 
 ## Icons
 
-When, how and at what size to use icons: slide-json-spec, **Visual forms**.
+When, how and at what size to use icons: the `visual-forms` guide.
 
 ## Effects
 

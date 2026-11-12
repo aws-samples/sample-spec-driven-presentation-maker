@@ -1,13 +1,14 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * useSlashPickerItems — Lazy, lifetime-cached template/style candidates.
+ * useSlashPickerItems — Lazy, lifetime-cached template/style candidates, plus the
+ * built-in output format (always offered, even when the catalogue fetch fails).
  */
 
 "use client"
 
 import { useCallback, useEffect, useRef, useState } from "react"
-import type { PickerItem } from "@/lib/slashToken"
+import { FORMAT_HTML_ITEM, type PickerItem } from "@/lib/slashToken"
 import { fetchStyles, fetchTemplates } from "@/services/deckService"
 
 interface UseSlashPickerItemsResult {
@@ -57,7 +58,8 @@ export function useSlashPickerItems(idToken?: string): UseSlashPickerItemsResult
           }))
           return [...templateItems, ...styleItems]
         })
-        .catch(() => [])
+        .catch((): PickerItem[] => [])
+        .then((catalogue) => [...catalogue, FORMAT_HTML_ITEM])
         .then((nextItems) => {
           if (mountedRef.current) setItems(nextItems)
           return nextItems

@@ -18,6 +18,7 @@ import json
 import os
 import re
 import uuid
+from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
 
 import boto3
@@ -33,11 +34,32 @@ from chat_history import (
     truncate_tool_inputs,
 )
 from common import get_user_id, now_iso, presigned_url
+from html_presign import (
+    PURPOSES as HTML_PURPOSES,
+    html_presign_client,
+    html_slide_slugs,
+    is_html_deck,
+    presigned_html_url,
+    slide_size,
+)
+from shared.artifact_keys import build_html_preview_key_map, preview_prefix as html_preview_prefix
+from shared.review import (
+    MAX_BODY_BYTES as REVIEW_MAX_BODY_BYTES,
+    build_review_file,
+    build_review_message,
+    new_review_id,
+    review_path,
+    slide_size_of,
+    validate_review_submission,
+)
+from shared import user_library
+from shared.session_owner import belongs_to
 from shared.schema import (
-    deck_pk, deck_sk, shared_pk, fav_sk,
+    deck_pk, deck_sk, fav_sk,
     DECK_SK_PREFIX, FAV_SK_PREFIX,
     extract_deck_id, extract_fav_id,
     GSI_PUBLIC_DECKS, public_gsi1pk,
+    builtin_note_key, user_template_key, user_template_sk,
     validate_outline_content,
 )
 
@@ -99,6 +121,13 @@ metrics = Metrics()
 dynamodb = boto3.resource("dynamodb")
 table = dynamodb.Table(TABLE_NAME)
 s3_client = boto3.client("s3", config=BotoConfig(signature_version="s3v4"))
+# HTML decks run scripts, so they are served only from the S3 regional
+# endpoint (a different origin from the Web UI): the Web UI CloudFront
+# distribution serves previews/*, decks/*/* and pptx/* on the app origin.
+# HTML keys are signed with this client only — never preview_url() /
+# _cf_signed_url().
+REGION = os.environ.get("AWS_REGION") or boto3.session.Session().region_name or "us-east-1"
+html_s3_client = html_presign_client(REGION)
 app = APIGatewayHttpResolver(cors=cors_config)
 
 # --- KB (optional) ---
@@ -155,6 +184,23 @@ def _list_preview_keys(deck_id: str) -> set:
     return {obj["Key"] for obj in resp.get("Contents", [])}
 
 
+def _html_presigned(key: str, purpose: str = "view", deck_name: str = "") -> Optional[str]:
+    """Presigned S3 URL for an HTML artifact (regional S3 origin, never CloudFront).
+
+    Returns None when the key is not an ``html/**.html`` key.
+    """
+    try:
+        return presigned_html_url(html_s3_client, BUCKET_NAME, key, purpose, deck_name)[0]
+    except ValueError:
+        return None
+
+
+def _list_html_preview_map(deck_id: str) -> Dict[str, str]:
+    """slug → latest HTML preview key under html/{deck_id}/preview/ (one S3 call)."""
+    resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=html_preview_prefix(deck_id))
+    return build_html_preview_key_map(obj["Key"] for obj in resp.get("Contents", []))
+
+
 def _resolve_preview_url(deck_id: str, slug: str, preview_keys: set) -> Optional[str]:
     """Resolve the best preview URL for a slide from cached keys.
 
@@ -168,7 +214,7 @@ def _resolve_preview_url(deck_id: str, slug: str, preview_keys: set) -> Optional
     Returns:
         Presigned/signed URL or None.
     """
-    from shared.preview import build_slide_key_map
+    from shared.artifact_keys import build_slide_key_map
 
     key_map = build_slide_key_map(preview_keys)
     key = key_map.get(slug)
@@ -193,31 +239,38 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
     for deck in deck_items:
         deck_id = extract_deck_id(deck["SK"])
         key = deck.get("thumbnailS3Key")
+        if key and key.endswith(".html"):
+            extras[deck_id] = {"thumbnailUrl": _html_presigned(key)}
+            continue
         extras[deck_id] = {"thumbnailUrl": preview_url(key) if key else None}
     return extras
 
 
-def _deck_summary(item: Dict, extras: Dict[str, Dict]) -> Dict[str, Any]:
+def _deck_summary(item: Dict, extras: Dict[str, Dict], owner: bool = False) -> Dict[str, Any]:
     """Build a consistent deck summary dict from a DDB item.
 
     Args:
         item: DDB deck record.
         extras: Output of _get_deck_extras.
+        owner: The caller owns the deck; adds its ``chatSessionId`` (None when the
+            deck has no chat link), so a client can find the deck its session created.
 
     Returns:
         Deck summary dict with all standard fields.
     """
     deck_id = extract_deck_id(item["SK"])
     ex = extras.get(deck_id, {})
-    return {
+    summary = {
         "deckId": deck_id,
         "name": item.get("name", "Untitled"),
         "slideCount": item.get("slideCount", 0),
         "updatedAt": item.get("updatedAt", ""),
         "thumbnailUrl": ex.get("thumbnailUrl"),
         "visibility": item.get("visibility", "private"),
-        "createdBy": item.get("createdBy", ""),
     }
+    if owner:
+        summary["chatSessionId"] = _chat_session_id(item)
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -225,64 +278,60 @@ def _deck_summary(item: Dict, extras: Dict[str, Dict]) -> Dict[str, Any]:
 # ---------------------------------------------------------------------------
 
 
+def _display_html(htmls: List[str]) -> List[str]:
+    """Display copies of style HTML: the catalog icons the styles reference, drawn in.
+
+    The style files hold icon references only (what agents read); every response the
+    Web UI renders goes through here. On any failure the HTML is returned as stored.
+    """
+    if not RESOURCE_BUCKET or not htmls:
+        return htmls
+    from sdpm.knowledge.assets.style_icons import inline_style_icons_many
+
+    try:
+        return inline_style_icons_many(
+            htmls, load=lambda ids: user_library.load_catalog_icons(s3_client, RESOURCE_BUCKET, ids))
+    except Exception as e:
+        logger.warning(f"Style icons not drawn: {e}")
+        return htmls
+
+
+def _with_display_html(styles: List[Dict[str, Any]]) -> List[Dict[str, Any]]:
+    """Listing entries with their ``html`` replaced by the display copy."""
+    shown = _display_html([style.get("html", "") for style in styles])
+    return [{**style, "html": html} if "html" in style else style for style, html in zip(styles, shown)]
+
+
 @app.get("/styles")
 def list_styles() -> Dict[str, Any]:
     """List available styles with full HTML for client-side rendering.
 
-    Includes builtin styles and user styles with pin/source metadata.
+    Includes builtin styles and user styles with pin/source metadata, one entry
+    per name: a user style replaces the builtin style of the same name.
 
     Returns:
         Dict with styles list (name, description, html, pinned, source).
     """
     user_id = get_user_id(app.current_event)
 
-    # Builtin styles (cached)
+    # Bundled styles (cached: references are static, deployed once)
     global _styles_cache  # noqa: PLW0603
     if _styles_cache is None and RESOURCE_BUCKET:
-        prefix = "references/examples/styles/"
-        resp = s3_client.list_objects_v2(Bucket=RESOURCE_BUCKET, Prefix=prefix)
-        builtin: List[Dict[str, str]] = []
-        for obj in resp.get("Contents", []):
-            key = obj["Key"]
-            if not key.endswith(".html"):
-                continue
-            name = key.removeprefix(prefix).removesuffix(".html")
-            body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=key)["Body"].read().decode("utf-8")
-            description = ""
-            m = re.search(r"<title>(.*?)</title>", body, re.IGNORECASE)
-            if m:
-                description = m.group(1).strip()
-            builtin.append({"name": name, "description": description, "html": body, "source": "builtin"})
-        _styles_cache = builtin
+        _styles_cache = _with_display_html(user_library.list_builtin_styles(s3_client, RESOURCE_BUCKET))
 
-    all_styles: List[Dict[str, Any]] = list(_styles_cache or [])
-
-    # User styles
-    user_prefix = f"user-styles/{user_id}/"
+    user_styles: List[Dict[str, Any]] = []
     try:
-        resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=user_prefix)
-        for obj in resp.get("Contents", []):
-            key = obj["Key"]
-            if not key.endswith(".html"):
-                continue
-            name = key.removeprefix(user_prefix).removesuffix(".html")
-            body = s3_client.get_object(Bucket=BUCKET_NAME, Key=key)["Body"].read().decode("utf-8")
-            description = ""
-            m = re.search(r"<title>(.*?)</title>", body, re.IGNORECASE)
-            if m:
-                description = m.group(1).strip()
-            all_styles.append({"name": name, "description": description, "html": body, "source": "user"})
+        user_styles = user_library.list_user_styles(s3_client, BUCKET_NAME, user_id, include_html=True)
     except Exception:
         pass
+    user_styles = _with_display_html(user_styles)
 
-    # Pins
-    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
-    pinned_names = set(pin_resp.get("Item", {}).get("pinned_styles", []))
+    # One entry per name — a user style replaces the bundled one (same rule as Local and MCP)
+    from sdpm.knowledge.reference import build_styles_listing
 
-    for s in all_styles:
-        s["pinned"] = s["name"] in pinned_names
-
-    return {"styles": all_styles}
+    styles = user_library.merge_styles(user_styles, _styles_cache or [])
+    pinned = user_library.get_style_pins(table, user_id)
+    return {"styles": build_styles_listing(styles, pinned, include_all=True)["styles"]}
 
 
 @app.get("/styles/<name>")
@@ -290,27 +339,28 @@ def get_style(name: str) -> Dict[str, Any]:
     """Get full HTML for a single style (user or builtin).
 
     Returns:
-        Dict with name and fullHtml.
+        Dict with name, source, fullHtml (the stored file: Export / Copy) and html
+        (the display copy with the referenced catalog icons drawn in).
     """
-    if not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
+    if not user_library.is_valid_style_name(name):
         return {"error": "Invalid style name"}, 400
 
     user_id = get_user_id(app.current_event)
 
     # Try user style first
-    user_key = f"user-styles/{user_id}/{name}.html"
+    user_key = user_library.user_style_key(user_id, name)
     try:
         body = s3_client.get_object(Bucket=BUCKET_NAME, Key=user_key)["Body"].read().decode("utf-8")
-        return {"name": name, "fullHtml": body, "source": "user"}
+        return {"name": name, "fullHtml": body, "html": _display_html([body])[0], "source": "user"}
     except Exception:
         pass
 
     # Fall back to builtin
     if RESOURCE_BUCKET:
-        builtin_key = f"references/examples/styles/{name}.html"
+        builtin_key = user_library.builtin_style_key(name)
         try:
             body = s3_client.get_object(Bucket=RESOURCE_BUCKET, Key=builtin_key)["Body"].read().decode("utf-8")
-            return {"name": name, "fullHtml": body, "source": "builtin"}
+            return {"name": name, "fullHtml": body, "html": _display_html([body])[0], "source": "builtin"}
         except Exception:
             pass
 
@@ -327,19 +377,18 @@ def pin_style() -> Dict[str, Any]:
     name = body.get("name", "")
     pinned = body.get("pinned", False)
 
-    if not name or not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
+    if not name or not user_library.is_valid_style_name(name):
         return {"error": "Invalid style name"}, 400
 
     user_id = get_user_id(app.current_event)
-    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
-    current_pins: List[str] = pin_resp.get("Item", {}).get("pinned_styles", [])
+    current_pins = user_library.get_style_pins(table, user_id)
 
     if pinned and name not in current_pins:
         current_pins.append(name)
     elif not pinned and name in current_pins:
         current_pins.remove(name)
 
-    table.put_item(Item={"PK": f"USER#{user_id}", "SK": "STYLE_PINS", "pinned_styles": current_pins})
+    user_library.put_style_pins(table, user_id, current_pins)
     return {"ok": True, "pinned_styles": current_pins}
 
 
@@ -353,13 +402,13 @@ def save_user_style() -> Dict[str, Any]:
     name = body.get("name", "")
     html = body.get("html", "")
 
-    if not name or not re.fullmatch(r"[a-zA-Z0-9_-]+", name):
+    if not name or not user_library.is_valid_style_name(name):
         return {"error": "Invalid style name"}, 400
     if not html:
         return {"error": "html is required"}, 400
 
     user_id = get_user_id(app.current_event)
-    key = f"user-styles/{user_id}/{name}.html"
+    key = user_library.user_style_key(user_id, name)
     s3_client.put_object(Bucket=BUCKET_NAME, Key=key, Body=html.encode("utf-8"), ContentType="text/html")
     return {"saved": name}
 
@@ -370,11 +419,11 @@ def delete_user_style(style_name: str) -> Dict[str, Any]:
 
     Also removes from pins if pinned.
     """
-    if not re.fullmatch(r"[a-zA-Z0-9_-]+", style_name):
+    if not user_library.is_valid_style_name(style_name):
         return {"error": "Invalid style name"}, 400
 
     user_id = get_user_id(app.current_event)
-    key = f"user-styles/{user_id}/{style_name}.html"
+    key = user_library.user_style_key(user_id, style_name)
 
     try:
         s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
@@ -382,11 +431,10 @@ def delete_user_style(style_name: str) -> Dict[str, Any]:
         return {"error": f"Style not found: {style_name}"}, 404
 
     # Remove from pins
-    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
-    current_pins: List[str] = pin_resp.get("Item", {}).get("pinned_styles", [])
+    current_pins = user_library.get_style_pins(table, user_id)
     if style_name in current_pins:
         current_pins.remove(style_name)
-        table.put_item(Item={"PK": f"USER#{user_id}", "SK": "STYLE_PINS", "pinned_styles": current_pins})
+        user_library.put_style_pins(table, user_id, current_pins)
 
     return {"deleted": style_name}
 
@@ -400,14 +448,14 @@ def rename_user_style(style_name: str) -> Dict[str, Any]:
     body = app.current_event.json_body
     new_name = body.get("newName", "")
 
-    if not re.fullmatch(r"[a-zA-Z0-9_-]+", style_name):
+    if not user_library.is_valid_style_name(style_name):
         return {"error": "Invalid style name"}, 400
-    if not new_name or not re.fullmatch(r"[a-zA-Z0-9_-]+", new_name):
+    if not new_name or not user_library.is_valid_style_name(new_name):
         return {"error": "Invalid new name"}, 400
 
     user_id = get_user_id(app.current_event)
-    old_key = f"user-styles/{user_id}/{style_name}.html"
-    new_key = f"user-styles/{user_id}/{new_name}.html"
+    old_key = user_library.user_style_key(user_id, style_name)
+    new_key = user_library.user_style_key(user_id, new_name)
 
     # Check source exists
     try:
@@ -427,11 +475,10 @@ def rename_user_style(style_name: str) -> Dict[str, Any]:
     s3_client.delete_object(Bucket=BUCKET_NAME, Key=old_key)
 
     # Update pins
-    pin_resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": "STYLE_PINS"})
-    current_pins: List[str] = pin_resp.get("Item", {}).get("pinned_styles", [])
+    current_pins = user_library.get_style_pins(table, user_id)
     if style_name in current_pins:
         current_pins[current_pins.index(style_name)] = new_name
-        table.put_item(Item={"PK": f"USER#{user_id}", "SK": "STYLE_PINS", "pinned_styles": current_pins})
+        user_library.put_style_pins(table, user_id, current_pins)
 
     return {"renamed": {"from": style_name, "to": new_name}}
 
@@ -454,47 +501,19 @@ def list_templates() -> Dict[str, Any]:
     user_id = get_user_id(app.current_event)
     templates: List[Dict[str, Any]] = []
 
-    # --- Builtin: S3 source of truth ---
-    s3_templates: Dict[str, str] = {}  # name -> etag
-    if RESOURCE_BUCKET:
-        resp = s3_client.list_objects_v2(Bucket=RESOURCE_BUCKET, Prefix="templates/")
-        for obj in resp.get("Contents", []):
-            key = obj["Key"]
-            if key.endswith(".pptx"):
-                name = key.removeprefix("templates/").removesuffix(".pptx")
-                s3_templates[name] = obj["ETag"]
-
-    # Batch get DDB cache for builtins
-    ddb_cache: Dict[str, Dict] = {}
-    if s3_templates:
-        keys = [{"PK": f"TEMPLATE#{n}", "SK": "META"} for n in s3_templates]
-        resp = table.meta.client.batch_get_item(
-            RequestItems={table.name: {"Keys": keys}}
-        )
-        for item in resp.get("Responses", {}).get(table.name, []):
-            ddb_cache[item["name"]] = item
+    # --- Builtin: S3 source of truth, DDB analysis cache ---
+    builtins = user_library.list_builtin_templates(s3_client, table, RESOURCE_BUCKET) if RESOURCE_BUCKET else []
 
     # Per-user notes overlay builtin metadata without modifying shared cache rows.
-    builtin_notes: Dict[str, str] = {}
-    if s3_templates:
-        resp = table.query(
-            KeyConditionExpression=Key("PK").eq(f"USER#{user_id}")
-            & Key("SK").begins_with("BUILTIN_NOTE#"),
-        )
-        builtin_notes = {
-            item["SK"].removeprefix("BUILTIN_NOTE#"): item.get("description", "")
-            for item in resp.get("Items", [])
-        }
+    builtin_notes = user_library.list_builtin_template_notes(table, user_id) if builtins else {}
 
     # Build builtin list with lazy analysis
-    to_analyze: List[str] = []
-    for name, etag in s3_templates.items():
-        cached = ddb_cache.get(name)
-        if cached and cached.get("s3ETag") == etag:
-            analysis = {}
-            raw = cached.get("analysisJson", "")
-            if raw and raw != "{}":
-                analysis = json.loads(raw) if isinstance(raw, str) else raw
+    to_analyze: List[Dict[str, Any]] = []
+    for builtin in builtins:
+        name = builtin["name"]
+        if builtin["fresh"]:
+            cached = builtin["cache"]
+            analysis = user_library.parse_analysis(cached.get("analysisJson", ""))
             templates.append({
                 "name": name,
                 "source": "builtin",
@@ -504,7 +523,7 @@ def list_templates() -> Dict[str, Any]:
                 "layout_count": len(analysis.get("layouts", [])),
             })
         else:
-            to_analyze.append(name)
+            to_analyze.append(builtin)
             templates.append({
                 "name": name,
                 "source": "builtin",
@@ -518,40 +537,27 @@ def list_templates() -> Dict[str, Any]:
     if to_analyze:
         from sdpm.engine.analyzer import analyze_template as _analyze
 
-        tmp = Path(tempfile.mkdtemp())
-        for name in to_analyze:
-            s3_key = f"templates/{name}.pptx"
-            tpl_path = tmp / f"{name}.pptx"
-            s3_client.download_file(RESOURCE_BUCKET, s3_key, str(tpl_path))
-            analysis = _analyze(tpl_path)
-            etag = s3_templates[name]
-            item = {
-                "PK": f"TEMPLATE#{name}",
-                "SK": "META",
-                "name": name,
-                "s3Key": s3_key,
-                "s3ETag": etag,
-                "fonts": analysis.get("fonts", {}),
-                "analysisJson": json.dumps(analysis, ensure_ascii=False),
-            }
-            table.put_item(Item=item)
-            # Update the placeholder in templates list
-            for t in templates:
-                if t["name"] == name and t["source"] == "builtin":
-                    t["theme_colors"] = analysis.get("theme_colors", {})
-                    t["fonts"] = analysis.get("fonts", {})
-                    t["layout_count"] = len(analysis.get("layouts", []))
-                    break
+        # TemporaryDirectory (not mkdtemp): warm Lambda containers keep /tmp between invocations
+        with tempfile.TemporaryDirectory() as tmp:
+            for builtin in to_analyze:
+                name = builtin["name"]
+                tpl_path = Path(tmp) / f"{name}.pptx"
+                s3_client.download_file(RESOURCE_BUCKET, builtin["s3Key"], str(tpl_path))
+                analysis = _analyze(tpl_path)
+                table.put_item(Item=user_library.builtin_template_cache_item(
+                    name, builtin["s3Key"], builtin["s3ETag"], analysis,
+                ))
+                # Update the placeholder in templates list
+                for t in templates:
+                    if t["name"] == name and t["source"] == "builtin":
+                        t["theme_colors"] = analysis.get("theme_colors", {})
+                        t["fonts"] = analysis.get("fonts", {})
+                        t["layout_count"] = len(analysis.get("layouts", []))
+                        break
 
     # --- User templates: DDB source of truth ---
-    resp = table.query(
-        KeyConditionExpression=Key("PK").eq(f"USER#{user_id}") & Key("SK").begins_with("TEMPLATE#"),
-    )
-    for t in resp.get("Items", []):
-        analysis = {}
-        raw = t.get("analysisJson", "")
-        if raw and raw != "{}":
-            analysis = json.loads(raw) if isinstance(raw, str) else raw
+    for t in user_library.list_user_templates(table, user_id):
+        analysis = user_library.parse_analysis(t.get("analysisJson", ""))
         templates.append({
             "name": t.get("name", ""),
             "source": "user",
@@ -572,7 +578,7 @@ def download_template(name: str) -> Any:
     disposition = f'attachment; filename="{name}.pptx"'
 
     # Try user template
-    user_key = f"user-templates/{user_id}/{name}.pptx"
+    user_key = user_library.user_template_s3_key(user_id, name)
     try:
         s3_client.head_object(Bucket=BUCKET_NAME, Key=user_key)
         url = s3_client.generate_presigned_url(
@@ -589,7 +595,7 @@ def download_template(name: str) -> Any:
         pass
 
     # Try builtin (S3 source of truth)
-    builtin_key = f"templates/{name}.pptx"
+    builtin_key = user_library.builtin_template_s3_key(name)
     try:
         s3_client.head_object(Bucket=RESOURCE_BUCKET, Key=builtin_key)
         url = s3_client.generate_presigned_url(
@@ -622,11 +628,11 @@ def patch_builtin_template_note(name: str) -> Dict[str, Any]:
 
     # Notes can only target builtin templates that currently exist in S3.
     try:
-        s3_client.head_object(Bucket=RESOURCE_BUCKET, Key=f"templates/{name}.pptx")
+        s3_client.head_object(Bucket=RESOURCE_BUCKET, Key=user_library.builtin_template_s3_key(name))
     except Exception:
         return {"error": "Template not found"}, 404
 
-    key = {"PK": f"USER#{user_id}", "SK": f"BUILTIN_NOTE#{name}"}
+    key = builtin_note_key(user_id, name)
     description = description_raw.strip()
     if not description:
         table.delete_item(Key=key)
@@ -651,11 +657,11 @@ def presign_template_upload() -> Dict[str, Any]:
         return {"error": "Invalid template name"}, 400
 
     # Duplicate check
-    existing = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+    existing = table.get_item(Key=user_template_key(user_id, name))
     if existing.get("Item"):
         return {"error": f'Template "{name}" already exists'}, 409
 
-    s3_key = f"user-templates/{user_id}/{name}.pptx"
+    s3_key = user_library.user_template_s3_key(user_id, name)
     url = s3_client.generate_presigned_url(
         "put_object",
         Params={
@@ -687,7 +693,7 @@ def upload_user_template() -> Dict[str, Any]:
     if not name or not re.fullmatch(r"[a-zA-Z0-9_\-\s.()]+", name):
         return {"error": "Invalid template name"}, 400
 
-    s3_key = f"user-templates/{user_id}/{name}.pptx"
+    s3_key = user_library.user_template_s3_key(user_id, name)
 
     # Verify file exists in S3
     try:
@@ -695,14 +701,14 @@ def upload_user_template() -> Dict[str, Any]:
     except Exception:
         return {"error": "File not found in S3. Upload via presigned URL first."}, 400
 
-    # Download and analyze
-    tmp = Path(tempfile.mkdtemp())
-    tpl_path = tmp / f"{name}.pptx"
-    s3_client.download_file(BUCKET_NAME, s3_key, str(tpl_path))
-
     from sdpm.engine.analyzer import analyze_template as _analyze
 
-    analysis = _analyze(tpl_path)
+    # Download and analyze. TemporaryDirectory (not mkdtemp): warm Lambda
+    # containers keep /tmp between invocations.
+    with tempfile.TemporaryDirectory() as tmp:
+        tpl_path = Path(tmp) / f"{name}.pptx"
+        s3_client.download_file(BUCKET_NAME, s3_key, str(tpl_path))
+        analysis = _analyze(tpl_path)
     metadata = {
         "description": description,
         "fonts": analysis.get("fonts", {}),
@@ -711,8 +717,7 @@ def upload_user_template() -> Dict[str, Any]:
 
     # Store in DDB
     table.put_item(Item={
-        "PK": f"USER#{user_id}",
-        "SK": f"TEMPLATE#{name}",
+        **user_template_key(user_id, name),
         "name": name,
         "s3Key": s3_key,
         **metadata,
@@ -727,13 +732,13 @@ def delete_user_template(name: str) -> Dict[str, Any]:
     user_id = get_user_id(app.current_event)
 
     # Check exists
-    resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+    resp = table.get_item(Key=user_template_key(user_id, name))
     if not resp.get("Item"):
         return {"error": "Template not found"}, 404
 
-    s3_key = f"user-templates/{user_id}/{name}.pptx"
+    s3_key = user_library.user_template_s3_key(user_id, name)
     s3_client.delete_object(Bucket=BUCKET_NAME, Key=s3_key)
-    table.delete_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+    table.delete_item(Key=user_template_key(user_id, name))
 
     return {"deleted": name}
 
@@ -747,7 +752,7 @@ def patch_user_template(name: str) -> Dict[str, Any]:
     user_id = get_user_id(app.current_event)
     body = app.current_event.json_body
 
-    resp = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
+    resp = table.get_item(Key=user_template_key(user_id, name))
     item = resp.get("Item")
     if not item:
         return {"error": "Template not found"}, 404
@@ -758,12 +763,12 @@ def patch_user_template(name: str) -> Dict[str, Any]:
         if not re.fullmatch(r"[a-zA-Z0-9_-]+", new_name):
             return {"error": "Letters, numbers, hyphens, underscores only"}, 400
         # Check duplicate
-        dup = table.get_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{new_name}"})
+        dup = table.get_item(Key=user_template_key(user_id, new_name))
         if dup.get("Item"):
             return {"error": "Name already exists"}, 409
         # S3 copy + delete
-        old_key = f"user-templates/{user_id}/{name}.pptx"
-        new_key = f"user-templates/{user_id}/{new_name}.pptx"
+        old_key = user_library.user_template_s3_key(user_id, name)
+        new_key = user_library.user_template_s3_key(user_id, new_name)
         s3_client.copy_object(
             Bucket=BUCKET_NAME,
             CopySource={"Bucket": BUCKET_NAME, "Key": old_key},
@@ -771,8 +776,8 @@ def patch_user_template(name: str) -> Dict[str, Any]:
         )
         s3_client.delete_object(Bucket=BUCKET_NAME, Key=old_key)
         # DDB: delete old, put new
-        table.delete_item(Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"})
-        item["SK"] = f"TEMPLATE#{new_name}"
+        table.delete_item(Key=user_template_key(user_id, name))
+        item["SK"] = user_template_sk(new_name)
         item["name"] = new_name
         item["s3Key"] = new_key
         table.put_item(Item=item)
@@ -782,7 +787,7 @@ def patch_user_template(name: str) -> Dict[str, Any]:
     description = body.get("description")
     if description is not None:
         table.update_item(
-            Key={"PK": f"USER#{user_id}", "SK": f"TEMPLATE#{name}"},
+            Key=user_template_key(user_id, name),
             UpdateExpression="SET description = :d",
             ExpressionAttributeValues={":d": description},
         )
@@ -814,7 +819,7 @@ def list_decks() -> Dict[str, Any]:
     )
     favorite_ids = [extract_fav_id(item["SK"]) for item in fav_resp.get("Items", [])]
 
-    decks = [_deck_summary(item, extras) for item in items]
+    decks = [_deck_summary(item, extras, owner=True) for item in items]
     decks.sort(key=lambda d: d["updatedAt"], reverse=True)
     return {"decks": decks, "favoriteIds": favorite_ids}
 
@@ -841,30 +846,6 @@ def list_favorites() -> Dict[str, Any]:
     return {"decks": result}
 
 
-@app.get("/decks/shared")
-def list_shared() -> Dict[str, Any]:
-    """List decks shared with the current user."""
-    user_id = get_user_id(app.current_event)
-    resp = table.query(
-        KeyConditionExpression=Key("PK").eq(shared_pk(user_id)) & Key("SK").begins_with(DECK_SK_PREFIX),
-    )
-    deck_items = []
-    for item in resp.get("Items", []):
-        deck_id = extract_deck_id(item["SK"])
-        owner_id = item.get("ownerUserId", "")
-        if not owner_id:
-            continue
-        owner_resp = table.get_item(Key={"PK": deck_pk(owner_id), "SK": deck_sk(deck_id)})
-        owner_deck = owner_resp.get("Item")
-        if owner_deck and "deletedAt" not in owner_deck:
-            deck_items.append(owner_deck)
-
-    extras = _get_deck_extras(deck_items)
-    decks = [_deck_summary(item, extras) for item in deck_items]
-    decks.sort(key=lambda d: d["updatedAt"], reverse=True)
-    return {"decks": decks}
-
-
 @app.get("/decks/public")
 def list_public() -> Dict[str, Any]:
     """List public decks via PublicDecks GSI."""
@@ -882,6 +863,184 @@ def list_public() -> Dict[str, Any]:
     return {"decks": decks}
 
 
+def _read_deck_json(deck_id: str) -> Dict[str, Any]:
+    """deck.json as a dict ({} when missing, unreadable or not an object)."""
+    try:
+        dj_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/deck.json")
+        data = json.loads(dj_resp["Body"].read())
+    except Exception:
+        return {}
+    return data if isinstance(data, dict) else {}
+
+
+def _read_outline_slugs(deck_id: str) -> List[str]:
+    """Slugs from specs/outline.md in order ([] when missing), as the build reads them."""
+    from sdpm.engine.schema import parse_outline_text
+
+    try:
+        outline_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/specs/outline.md")
+        return parse_outline_text(outline_resp["Body"].read().decode("utf-8"))
+    except Exception:
+        return []
+
+
+def _read_specs(deck_id: str) -> Dict[str, Any]:
+    """Read spec files from S3 (brief.md, outline.md, art-direction.html/.md)."""
+    specs: Dict[str, Any] = {}
+
+    # brief and outline — always .md
+    for spec_name in ("brief", "outline"):
+        spec_key = f"decks/{deck_id}/specs/{spec_name}.md"
+        try:
+            spec_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=spec_key)
+            content = spec_resp["Body"].read().decode("utf-8")
+            specs[spec_name] = content if content.strip() else None
+        except Exception:
+            specs[spec_name] = None
+
+    # art-direction — try .html first, fall back to .md
+    art_direction_content = None
+    for ext in (".html", ".md"):
+        art_key = f"decks/{deck_id}/specs/art-direction{ext}"
+        try:
+            art_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=art_key)
+            content = art_resp["Body"].read().decode("utf-8")
+            if content.strip():
+                # the Web UI shows the deck's style copy: draw its referenced icons
+                art_direction_content = _display_html([content])[0] if ext == ".html" else content
+                break
+        except Exception:
+            pass
+    specs["artDirection"] = art_direction_content
+    return specs
+
+
+_SCRIPT_WARNING_KINDS = frozenset({"navigation", "popup", "external-url", "webrtc"})
+_SCRIPT_WARNINGS_MAX = 200
+
+
+def _script_warnings(raw: Any) -> List[Dict[str, Any]]:
+    """The record's htmlScriptExternal as ``[{slug, kinds}]``: at most 200 entries with a
+    slide slug and known kinds; anything else is dropped."""
+    from sdpm.engine.schema import SLUG_RE
+
+    out: List[Dict[str, Any]] = []
+    for entry in raw if isinstance(raw, list) else []:
+        if len(out) >= _SCRIPT_WARNINGS_MAX:
+            break
+        if not isinstance(entry, dict):
+            continue
+        slug, kinds = entry.get("slug"), entry.get("kinds")
+        if not isinstance(slug, str) or not SLUG_RE.fullmatch(slug):
+            continue
+        if not isinstance(kinds, list) or not all(isinstance(k, str) and k in _SCRIPT_WARNING_KINDS for k in kinds):
+            continue
+        out.append({"slug": slug, "kinds": list(kinds)})
+    return out
+
+
+def _chat_session_id(deck: Dict[str, Any]) -> Optional[str]:
+    """The Web UI chat session a deck belongs to, or None.
+
+    ``chatSessionId`` is the link the browser PATCHes once the deck appears. When
+    that never arrived (tab closed, failed request, no browser), the MCP server's
+    record of the creating session stands in: the agent sends the chat's runtime
+    session id as ``Mcp-Session-Id`` unchanged when it already belongs to the user
+    (``owned_mcp_session_id`` in agent/mcp_clients.py), and ``init_deck_workspace``
+    is an orchestrator tool, so it never carries a composer group suffix. Ids that
+    are not the owner's own (another client's MCP session) are not chat sessions.
+    """
+    linked = deck.get("chatSessionId")
+    if linked:
+        return linked
+    created_in = deck.get("createdInMcpSession")
+    if created_in and belongs_to(created_in, deck.get("createdBy", "")):
+        return created_in
+    return None
+
+
+def _owner_chat_session_id(decision: Any) -> Optional[str]:
+    """The deck's chat session id for its owner; None for anyone else."""
+    return _chat_session_id(decision.deck) if decision.role == "owner" else None
+
+
+def _get_html_deck(deck_id: str, decision: Any, deck_json: Dict[str, Any]) -> Dict[str, Any]:
+    """get_deck response for an HTML deck (outputFormat "html").
+
+    Slides are the outline slugs whose slides/{slug}.html exists; previews are
+    the static per-slide HTML thumbnails. Every HTML URL is an S3 presign.
+    scriptWarnings lists the slides whose script can reach outside the deck.
+    """
+    deck = decision.deck
+    resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/slides/")
+    slide_keys = [obj["Key"] for obj in resp.get("Contents", [])]
+    slugs = html_slide_slugs(_read_outline_slugs(deck_id), slide_keys, deck_id)
+
+    preview_map = _list_html_preview_map(deck_id)
+    slides = []
+    for slug in slugs:
+        key = preview_map.get(slug)
+        slides.append({"slug": slug, "previewUrl": _html_presigned(key) if key else None})
+
+    html_key = deck.get("htmlS3Key")
+    return {
+        "deckId": deck_id,
+        "name": deck.get("name", "Untitled"),
+        "slideCount": len(slides),
+        "slides": slides,
+        "specs": _read_specs(deck_id),
+        "template": deck_json.get("template") or None,
+        "defsUrl": None,
+        "pptxUrl": None,
+        "outputFormat": "html",
+        "htmlUrl": _html_presigned(html_key) if html_key else None,
+        "scriptWarnings": _script_warnings(deck.get("htmlScriptExternal")),
+        "slideSize": slide_size(deck_json),
+        "updatedAt": deck.get("updatedAt", ""),
+        "chatSessionId": _owner_chat_session_id(decision),
+        "isOwner": decision.role == "owner",
+        "role": decision.role,
+        "visibility": deck.get("visibility", "private"),
+    }
+
+
+@app.get("/decks/<deck_id>/html")
+def get_deck_html(deck_id: str) -> Any:
+    """Presigned S3 URL of the built HTML deck.
+
+    Query params:
+        purpose: "present" (inline, 4 h) or "download" (attachment, 15 min).
+
+    Same read permission as get_deck (owner, or viewer of a public deck). The URL is on the S3 regional endpoint, never CloudFront.
+
+    Returns:
+        Dict with url and expiresIn (seconds).
+    """
+    user_id = get_user_id(app.current_event)
+
+    decision = authorize(user_id, deck_id, "read", table)
+    if not decision.allowed:
+        return {"error": decision.reason}, 403
+
+    purpose = app.current_event.get_query_string_value("purpose") or ""
+    if purpose not in HTML_PURPOSES:
+        return {"error": "purpose must be 'present' or 'download'"}, 400
+
+    deck = decision.deck
+    html_key = deck.get("htmlS3Key")
+    if not html_key:
+        return {"error": "HTML not built yet"}, 404
+
+    try:
+        url, expires = presigned_html_url(
+            html_s3_client, BUCKET_NAME, html_key, purpose, deck.get("name", ""),
+        )
+    except ValueError:
+        logger.warning(f"Deck {deck_id} has a non-HTML htmlS3Key")
+        return {"error": "HTML not built yet"}, 404
+    return {"url": url, "expiresIn": expires}
+
+
 
 @app.get("/decks/<deck_id>")
 def get_deck(deck_id: str) -> Dict[str, Any]:
@@ -893,49 +1052,31 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         return {"error": decision.reason}, 403
 
     deck = decision.deck
+    deck_json = _read_deck_json(deck_id)
+    if is_html_deck(deck_json):
+        return _get_html_deck(deck_id, decision, deck_json)
+
     pptx_key = deck.get("pptxS3Key")
 
     # Read slides from S3 (deck.json + slides/*.json format)
     slides = []
-    include_json = (app.current_event.get_query_string_value("include") or "") == "slideJson"
 
-    # Collect compose keys for animation (epoch-keyed)
-    compose_keys = set()
+    # Live-preview payloads: slug → latest compose/{slug}_{epoch}.json (defs included)
+    from shared.artifact_keys import COMPOSE_DEFS, compose_prefix, latest_compose_keys
+
+    compose_keys: List[str] = []
     try:
-        for obj in s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/compose/").get("Contents", []):
-            compose_keys.add(obj["Key"])
+        listed = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=compose_prefix(deck_id))
+        compose_keys = [obj["Key"] for obj in listed.get("Contents", [])]
     except Exception:
         pass
+    latest_compose = latest_compose_keys(compose_keys, compose_prefix(deck_id))
 
-    import re as _re
-    def _latest_compose_key(prefix: str, keys: set) -> Optional[str]:
-        """Pick the key with the highest epoch from epoch-keyed compose files."""
-        best_epoch, best_key = -1, None
-        for k in keys:
-            if not k.startswith(prefix):
-                continue
-            m = _re.search(r"_(\d+)\.json$", k)
-            epoch = int(m.group(1)) if m else 0
-            if epoch > best_epoch:
-                best_epoch, best_key = epoch, k
-        return best_key
-
-    defs_key = _latest_compose_key(f"decks/{deck_id}/compose/defs_", compose_keys)
+    defs_key = latest_compose.get(COMPOSE_DEFS)
     has_defs = defs_key is not None
 
     # outline.md for slug order, then slides/*.json
-    # Canonical implementation: sdpm.api.parse_outline_slugs (not importable in Lambda)
-    slugs = []
-    try:
-        outline_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/specs/outline.md")
-        outline_text = outline_resp["Body"].read().decode("utf-8")
-        slug_re = _re.compile(r"^-\s*\[([a-z0-9-]+)\]\s*")
-        for line in outline_text.splitlines():
-            m = slug_re.match(line)
-            if m:
-                slugs.append(m.group(1))
-    except Exception:
-        pass
+    slugs = _read_outline_slugs(deck_id)
 
     # If no outline slugs, list slides/ directory
     if not slugs:
@@ -959,60 +1100,24 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
 
     preview_keys = _list_preview_keys(deck_id)
     for i, slug in enumerate(slugs):
-        slide_data = None
-        if legacy_slides is not None:
-            slide_data = legacy_slides[i]
-        else:
+        if legacy_slides is None:
+            # A slug whose slides/{slug}.json is missing or unreadable is not listed.
             try:
                 slide_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/slides/{slug}.json")
-                slide_data = json.loads(slide_resp["Body"].read())
+                json.loads(slide_resp["Body"].read())
             except Exception:
                 continue
         slide_preview = _resolve_preview_url(deck_id, slug, preview_keys)
         slide_entry: Dict[str, Any] = {"slug": slug, "previewUrl": slide_preview}
-        compose_key = _latest_compose_key(f"decks/{deck_id}/compose/{slug}_", compose_keys)
-        if not compose_key:
-            compose_key = _latest_compose_key(f"decks/{deck_id}/compose/slide_{i + 1}_", compose_keys)
+        compose_key = latest_compose.get(slug) or latest_compose.get(f"slide_{i + 1}")
         if compose_key:
             slide_entry["composeUrl"] = preview_url(compose_key)
-        if include_json:
-            slide_entry["slideJson"] = json.dumps(slide_data)
         slides.append(slide_entry)
 
-    # Read spec files from S3 (brief.md, outline.md, art-direction.html/.md)
-    specs: Dict[str, Any] = {}
-
-    # brief and outline — always .md
-    for spec_name in ("brief", "outline"):
-        spec_key = f"decks/{deck_id}/specs/{spec_name}.md"
-        try:
-            spec_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=spec_key)
-            content = spec_resp["Body"].read().decode("utf-8")
-            specs[spec_name] = content if content.strip() else None
-        except Exception:
-            specs[spec_name] = None
-
-    # art-direction — try .html first, fall back to .md
-    art_direction_content = None
-    for ext in (".html", ".md"):
-        art_key = f"decks/{deck_id}/specs/art-direction{ext}"
-        try:
-            art_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=art_key)
-            content = art_resp["Body"].read().decode("utf-8")
-            if content.strip():
-                art_direction_content = content
-                break
-        except Exception:
-            pass
-    specs["artDirection"] = art_direction_content
+    specs = _read_specs(deck_id)
 
     # Confirmed template name from deck.json (written by the agent at Art Direction)
-    template = None
-    try:
-        dj_resp = s3_client.get_object(Bucket=BUCKET_NAME, Key=f"decks/{deck_id}/deck.json")
-        template = json.loads(dj_resp["Body"].read()).get("template") or None
-    except Exception:
-        pass
+    template = deck_json.get("template") or None
 
     return {
         "deckId": deck_id,
@@ -1023,8 +1128,9 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         "template": template,
         "defsUrl": preview_url(defs_key) if has_defs else None,
         "pptxUrl": (_cf_signed_url(pptx_key) or presigned_url(s3_client, BUCKET_NAME, pptx_key)) if pptx_key else None,
+        "slideSize": slide_size(deck_json),
         "updatedAt": deck.get("updatedAt", ""),
-        "chatSessionId": deck.get("chatSessionId"),
+        "chatSessionId": _owner_chat_session_id(decision),
         "isOwner": decision.role == "owner",
         "role": decision.role,
         "visibility": deck.get("visibility", "private"),
@@ -1113,7 +1219,7 @@ def put_outline(deck_id: str) -> Dict[str, Any]:
 
     Unconditional overwrite by design: the editor tells the agent what changed in the same
     turn (a user message carrying the diff), so the agent — not the API — reconciles its own
-    context. Owners and collaborators may write (same permission as editing slides).
+    context. Only the owner may write (same permission as editing slides).
 
     Args:
         deck_id: Deck identifier.
@@ -1146,6 +1252,100 @@ def put_outline(deck_id: str) -> Dict[str, Any]:
             ExpressionAttributeValues={":t": now_iso()},
         )
     return {"bytes": len(data)}
+
+
+def _review_key(deck_id: str, review_id: str) -> str:
+    """S3 key of a review file; ``review_id`` comes from ``new_review_id``."""
+    return f"decks/{deck_id}/{review_path(review_id)}"
+
+
+def _slide_slugs(deck_id: str) -> set:
+    """Slugs that have a slides/<slug>.json or slides/<slug>.html object."""
+    prefix = f"decks/{deck_id}/slides/"
+    resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=prefix)
+    slugs = set()
+    for obj in resp.get("Contents", []):
+        name = obj["Key"][len(prefix):]
+        for ext in (".json", ".html"):
+            if name.endswith(ext) and "/" not in name:
+                slugs.add(name[: -len(ext)])
+    return slugs
+
+
+def _delete_reviews(deck_id: str) -> None:
+    """Delete every object under the deck's reviews/ (a review file is used once)."""
+    paginator = s3_client.get_paginator("list_objects_v2")
+    keys = [
+        obj["Key"]
+        for page in paginator.paginate(Bucket=BUCKET_NAME, Prefix=f"decks/{deck_id}/reviews/")
+        for obj in page.get("Contents", [])
+    ]
+    for key in keys:
+        s3_client.delete_object(Bucket=BUCKET_NAME, Key=key)
+
+
+def _object_exists(key: str) -> bool:
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=key)
+    except Exception:
+        return False
+    return True
+
+
+@app.post("/decks/<deck_id>/reviews")
+def create_review(deck_id: str) -> Any:
+    """Create a change request from the Web UI comment tool.
+
+    Replaces the deck's review file: deletes everything under ``reviews/`` (the file is a
+    disposable hand-off, and the Web UI only sends while the agent is idle), then writes
+    ``reviews/<id>.json`` (what was sent plus the composers' guide; nobody rewrites it) and
+    returns the chat message the Web UI sends to the orchestrator. The server picks the
+    id and takes slide_size from deck.json; the client sends only
+    ``{note, comments: [{name, slide, rect, text}]}``. Only the owner may write (same
+    permission as editing slides).
+
+    Args:
+        deck_id: Deck identifier.
+
+    Returns:
+        ``{"id": review id, "message": chat message}``.
+    """
+    user_id = get_user_id(app.current_event)
+    decision = authorize(user_id, deck_id, "edit_slide", table)
+    if not decision.allowed:
+        return {"error": decision.reason}, 403
+
+    raw = app.current_event.body or ""
+    if len(raw.encode("utf-8")) > REVIEW_MAX_BODY_BYTES:
+        return {"error": f"body exceeds {REVIEW_MAX_BODY_BYTES} bytes"}, 413
+    try:
+        body = app.current_event.json_body
+    except Exception:
+        return {"error": "Invalid JSON"}, 400
+
+    size = slide_size_of(_read_deck_json(deck_id))
+    slugs = _slide_slugs(deck_id)
+    normalized, error = validate_review_submission(body, size, lambda slug: slug in slugs)
+    if error:
+        return {"error": error}, 400
+
+    _delete_reviews(deck_id)
+    for _ in range(3):
+        review_id = new_review_id(datetime.now(timezone.utc))
+        key = _review_key(deck_id, review_id)
+        if not _object_exists(key):
+            break
+    else:
+        return {"error": "Could not allocate a review id"}, 409
+
+    review = build_review_file(review_id, size, normalized)
+    s3_client.put_object(
+        Bucket=BUCKET_NAME,
+        Key=key,
+        Body=json.dumps(review, ensure_ascii=False, indent=2).encode("utf-8"),
+        ContentType="application/json; charset=utf-8",
+    )
+    return {"id": review_id, "message": build_review_message(review_id, normalized)}
 
 
 @app.delete("/decks/<deck_id>")
@@ -1236,6 +1436,7 @@ def search_slides_api() -> Dict[str, Any]:
     results: List[Dict] = []
     seen: set = set()
     seen_decks: Dict[str, set] = {}
+    seen_html_decks: Dict[str, Dict[str, str]] = {}
     for r in response.get("retrievalResults", []):
         meta = r.get("metadata", {})
         deck_id = meta.get("deckId", "")
@@ -1252,6 +1453,15 @@ def search_slides_api() -> Dict[str, Any]:
             if deck_id not in seen_decks:
                 seen_decks[deck_id] = _list_preview_keys(deck_id)
             slide_preview_url = _resolve_preview_url(deck_id, slide_id, seen_decks[deck_id])
+            if not slide_preview_url:
+                # HTML decks keep static per-slide previews under html/{deck}/preview/
+                if deck_id not in seen_html_decks:
+                    try:
+                        seen_html_decks[deck_id] = _list_html_preview_map(deck_id)
+                    except Exception:
+                        seen_html_decks[deck_id] = {}
+                html_key = seen_html_decks[deck_id].get(slide_id)
+                slide_preview_url = _html_presigned(html_key) if html_key else None
             slide_preview_url = slide_preview_url or ""
 
         results.append({
@@ -1295,10 +1505,10 @@ def get_chat(session_id: str) -> Dict[str, Any]:
 
     resp = table.query(
         KeyConditionExpression=Key("PK").eq(deck_pk(user_id)) & Key("SK").begins_with(DECK_SK_PREFIX),
-        FilterExpression=Attr("chatSessionId").eq(session_id),
-        ProjectionExpression="SK",
+        FilterExpression=Attr("chatSessionId").eq(session_id) | Attr("createdInMcpSession").eq(session_id),
+        ProjectionExpression="chatSessionId, createdInMcpSession, createdBy",
     )
-    if not resp.get("Items"):
+    if not any(_chat_session_id(item) == session_id for item in resp.get("Items", [])):
         return {"messages": []}
     memory_id = os.environ.get("MEMORY_ID", "")
     if not memory_id:
@@ -1499,12 +1709,15 @@ def presign_attachment() -> Dict[str, Any]:
     if object_count >= CLOUD_RAW_MAX_OBJECTS or stored_bytes + file_size > CLOUD_RAW_MAX_BYTES:
         return {"error": "Raw attachment quota exceeded"}, 429
 
-    source = f"uploads/{user_id}/{uuid.uuid4()}/{file_name}"
+    # The S3 key is per user; the browser and the agent get the handle without the
+    # user id, which the MCP server resolves back to this key for the same caller.
+    upload_id = uuid.uuid4()
+    key = f"uploads/{user_id}/{upload_id}/{file_name}"
     presigned_url = s3_client.generate_presigned_url(
         "put_object",
         Params={
             "Bucket": BUCKET_NAME,
-            "Key": source,
+            "Key": key,
             "ContentType": content_type,
             "IfNoneMatch": "*",
             "Tagging": "sdpm-class=attachment-source",
@@ -1512,7 +1725,7 @@ def presign_attachment() -> Dict[str, Any]:
         ExpiresIn=PRESIGNED_URL_EXPIRY,
     )
     return {
-        "source": source,
+        "source": f"uploads/{upload_id}/{file_name}",
         "presignedUrl": presigned_url,
         "requiredHeaders": {
             "Content-Type": content_type,

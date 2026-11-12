@@ -131,6 +131,14 @@ def test_entry_tools_are_the_only_ones_that_start_a_request(any_server_tools):
     assert starters <= entries and "start_presentation" in starters, starters
 
 
+def test_list_styles_describes_its_own_listing(any_server_tools):
+    """The orchestrator gets the styles from list_styles alone; start_presentation returns templates."""
+    doc = any_server_tools["list_styles"].description
+    assert "start_presentation" not in doc
+    assert "other_styles" in doc and "include_all" in doc
+    assert "styles" not in any_server_tools["start_presentation"].description.split("needs first:", 1)[1]
+
+
 def test_contract_functions_are_annotated_not_docstring_args():
     from sdpm import tools
 
@@ -151,3 +159,29 @@ def test_generate_pptx_describes_both_motion_overrides(any_server_tools):
         for accepted in ("inherit", "on", "off"):
             assert accepted in description, f"{argument}: {description}"
         assert "deck.json" in description, f"{argument} must say what it overrides"
+
+
+def _public_functions(module) -> set[str]:
+    return {n for n, f in inspect.getmembers(module, inspect.isfunction)
+            if f.__module__ == module.__name__ and not n.startswith("_")}
+
+
+# The tools each server implements for its own transport (a local process or the
+# AgentCore Code Interpreter), and the documented Layer 3 differences
+# (docs/en/architecture.md): the remote's preview and optional KB search, and the one
+# contract tool it does not bind.
+_SANDBOX_TOOLS = {"run_python", "run_style_python"}
+_REMOTE_ONLY = {"get_preview", "search_slides"}
+_REMOTE_UNBOUND = {"start_translation"}
+
+
+def test_both_servers_expose_the_tool_contract_and_nothing_else(local_tools, remote_tools):
+    """Every tool is defined once in sdpm.tools; a server-only tool (as fence_turn was)
+    cannot appear on either server without being added to the lists above."""
+    from sdpm import tools
+    from sdpm.tools.attachment import contracts
+
+    contract = _public_functions(tools) | _public_functions(contracts)
+
+    assert set(local_tools) == contract | _SANDBOX_TOOLS
+    assert set(remote_tools) == (contract - _REMOTE_UNBOUND) | _SANDBOX_TOOLS | _REMOTE_ONLY

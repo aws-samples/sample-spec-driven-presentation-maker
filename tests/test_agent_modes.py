@@ -13,12 +13,20 @@ _AGENT_DIR = _ROOT / "agent"
 
 sys.path.insert(0, str(_AGENT_DIR))
 try:
-    from composition import resolve_parts
+    from composition import clear_process_cache, resolve_parts
     from modes import MODES
 finally:
     sys.path.remove(str(_AGENT_DIR))
 
 from sdpm import tools as contract  # noqa: E402
+
+
+@pytest.fixture(autouse=True)
+def _fresh_process_cache():
+    """Each test counts its own entry-tool calls."""
+    clear_process_cache()
+    yield
+    clear_process_cache()
 
 _PROMPTS_DIR = _AGENT_DIR / "prompts"
 # mode -> (entry tool, first heading of the role document)
@@ -75,10 +83,10 @@ def test_entry_tools_are_not_exposed_as_agent_tools():
 
 
 def test_orchestrator_environment_is_system_after_cache_point():
-    """Per-user styles/templates must not sit inside the cached prefix."""
+    """Per-user templates must not sit inside the cached prefix."""
     parts = MODES["orchestrator"].parts
     cache_idx = max(i for i, p in enumerate(parts) if p.cache_point)
-    env = [i for i, p in enumerate(parts) if p.source.type == "mcp" and p.source.pick == "styles,templates"]
+    env = [i for i, p in enumerate(parts) if p.source.type == "mcp" and p.source.pick == "templates"]
     assert len(env) == 1 and env[0] > cache_idx
     assert parts[env[0]].target == "system"
     assert "wiring/environment" in _file_parts("orchestrator")
@@ -144,13 +152,20 @@ def test_resolve_parts_embeds_role_document_text(mode, entry):
     assert [name for name, _ in client.calls].count(entry[0]) == 1
 
 
-def test_orchestrator_system_carries_styles_but_not_deck_data():
+def test_orchestrator_system_carries_templates_but_not_deck_data():
     system_prompt, messages = resolve_parts(
         MODES["orchestrator"].parts, mcp_client=ContractFakeMCPClient(), context={}, enable_cache=False,
     )
-    styles = contract.start_presentation()["styles"]
-    assert styles and styles[0]["name"] in system_prompt
+    templates = contract.start_presentation()["templates"]
+    assert templates and templates[0]["name"] in system_prompt
     assert messages == []
+
+
+def test_orchestrator_picks_styles_through_list_styles():
+    """start_presentation returns no styles; the orchestrator lists them when it picks one."""
+    for name in ("orchestrator", "vibe", "spec"):
+        assert "list_styles" in MODES[name].allowed_tools
+        assert all(p.source.pick != "styles" and "styles," not in p.source.pick for p in MODES[name].parts)
 
 
 def test_composer_static_is_workflow_plus_slide_spec_and_cacheable():
@@ -160,6 +175,23 @@ def test_composer_static_is_workflow_plus_slide_spec_and_cacheable():
     assert all(p.source.args == {} for p in parts)
     system_prompt, messages = resolve_parts(parts, mcp_client=ContractFakeMCPClient(), context={}, enable_cache=False)
     assert "# Composer" in system_prompt and "deck.json" in system_prompt
+    assert messages == []
+
+
+def test_html_composer_static_is_the_html_mode_of_start_composing():
+    parts = MODES["html_composer"].parts
+    assert [p.source.value for p in parts] == ["start_composing", "start_composing"]
+    assert [p.source.pick for p in parts] == ["static.workflow", "static.slide_spec"]
+    assert all(p.source.args == {"mode": "html"} for p in parts)
+    assert all(p.target == "system" for p in parts)
+    assert MODES["html_composer"].use_composer is False
+    assert MODES["html_composer"].allowed_tools == MODES["composer"].allowed_tools
+    client = ContractFakeMCPClient()
+    system_prompt, messages = resolve_parts(parts, mcp_client=client, context={}, enable_cache=False)
+    static = contract.start_composing(mode="html")["static"]
+    assert "# Composer (HTML)" in system_prompt
+    assert static["workflow"] in system_prompt and static["slide_spec"] in system_prompt
+    assert client.calls == [("start_composing", {"mode": "html"})]
     assert messages == []
 
 

@@ -1,0 +1,354 @@
+{
+  "layout": "Title Only",
+  "placeholders": {
+    "0": ""
+  },
+  "notes": "Before a single slide exists, you agree on three short documents, in this order: the brief, the style and the outline. You approve each one before the next.",
+  "elements": [
+    {
+      "_comment": "region: step-1",
+      "x": 120,
+      "y": 300,
+      "w": 544,
+      "h": 464
+    },
+    {
+      "_comment": "region: step-2",
+      "x": 688,
+      "y": 300,
+      "w": 544,
+      "h": 464
+    },
+    {
+      "_comment": "region: step-3",
+      "x": 1256,
+      "y": 300,
+      "w": 544,
+      "h": 464
+    },
+    {
+      "_comment": "region: takeaway",
+      "x": 120,
+      "y": 788,
+      "w": 1680,
+      "h": 220
+    },
+    {
+      "type": "textbox",
+      "x": 120,
+      "y": 62,
+      "width": 700,
+      "height": 34,
+      "text": "{{bold:SPEC FIRST}}",
+      "fontSize": 10,
+      "fontColor": "#66666B",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0,
+      "_comment": "frame: label"
+    },
+    {
+      "type": "textbox",
+      "x": 120,
+      "y": 118,
+      "width": 1680,
+      "height": 160,
+      "text": "{{bold:Agree on the content first}}",
+      "fontSize": 30,
+      "fontColor": "#1D1D1F",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0,
+      "_comment": "frame: title"
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 120,
+      "y": 300,
+      "width": 544,
+      "height": 464,
+      "fill": "#3B5BFF",
+      "adjustments": [
+        0.0431
+      ],
+      "shadow": {
+        "type": "outer",
+        "blur": 8,
+        "distance": 2,
+        "direction": 90,
+        "color": "#000000",
+        "opacity": 0.08
+      }
+    },
+    {
+      "type": "textbox",
+      "x": 160,
+      "y": 340,
+      "width": 200,
+      "height": 90,
+      "text": "{{bold:01}}",
+      "fontSize": 44,
+      "fontColor": "#FFFFFF",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "image",
+      "src": "assets:material/description",
+      "x": 160,
+      "y": 452,
+      "width": 88,
+      "height": 88,
+      "iconColor": "#FFFFFF"
+    },
+    {
+      "type": "textbox",
+      "x": 160,
+      "y": 572,
+      "width": 464,
+      "height": 52,
+      "text": "{{bold:Brief}}",
+      "fontSize": 20,
+      "fontColor": "#FFFFFF",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 160,
+      "y": 630,
+      "width": 464,
+      "height": 96,
+      "text": "Who it is for,\nwhat they should do",
+      "fontSize": 16,
+      "fontColor": "#FFFFFF",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 688,
+      "y": 300,
+      "width": 544,
+      "height": 464,
+      "fill": "#FFFFFF",
+      "adjustments": [
+        0.0431
+      ],
+      "shadow": {
+        "type": "outer",
+        "blur": 8,
+        "distance": 2,
+        "direction": 90,
+        "color": "#000000",
+        "opacity": 0.08
+      }
+    },
+    {
+      "type": "textbox",
+      "x": 728,
+      "y": 340,
+      "width": 200,
+      "height": 90,
+      "text": "{{bold:02}}",
+      "fontSize": 44,
+      "fontColor": "#66666B",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "image",
+      "src": "assets:material/palette",
+      "x": 728,
+      "y": 452,
+      "width": 88,
+      "height": 88,
+      "iconColor": "#1D1D1F"
+    },
+    {
+      "type": "textbox",
+      "x": 728,
+      "y": 572,
+      "width": 464,
+      "height": 52,
+      "text": "{{bold:Style}}",
+      "fontSize": 20,
+      "fontColor": "#1D1D1F",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 728,
+      "y": 630,
+      "width": 464,
+      "height": 96,
+      "text": "How every slide looks",
+      "fontSize": 16,
+      "fontColor": "#1D1D1F",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 1256,
+      "y": 300,
+      "width": 544,
+      "height": 464,
+      "fill": "#FFFFFF",
+      "adjustments": [
+        0.0431
+      ],
+      "shadow": {
+        "type": "outer",
+        "blur": 8,
+        "distance": 2,
+        "direction": 90,
+        "color": "#000000",
+        "opacity": 0.08
+      }
+    },
+    {
+      "type": "textbox",
+      "x": 1296,
+      "y": 340,
+      "width": 200,
+      "height": 90,
+      "text": "{{bold:03}}",
+      "fontSize": 44,
+      "fontColor": "#66666B",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "image",
+      "src": "assets:material/format_list_numbered",
+      "x": 1296,
+      "y": 452,
+      "width": 88,
+      "height": 88,
+      "iconColor": "#1D1D1F"
+    },
+    {
+      "type": "textbox",
+      "x": 1296,
+      "y": 572,
+      "width": 464,
+      "height": 52,
+      "text": "{{bold:Outline}}",
+      "fontSize": 20,
+      "fontColor": "#1D1D1F",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 1296,
+      "y": 630,
+      "width": 464,
+      "height": 96,
+      "text": "One message per slide",
+      "fontSize": 16,
+      "fontColor": "#1D1D1F",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "shape",
+      "shape": "rounded_rectangle",
+      "x": 120,
+      "y": 788,
+      "width": 1680,
+      "height": 220,
+      "fill": "#1D1D1F",
+      "adjustments": [
+        0.0909
+      ],
+      "shadow": {
+        "type": "outer",
+        "blur": 8,
+        "distance": 2,
+        "direction": 90,
+        "color": "#000000",
+        "opacity": 0.08
+      }
+    },
+    {
+      "type": "textbox",
+      "x": 144,
+      "y": 812,
+      "width": 1632,
+      "height": 34,
+      "text": "{{bold:BEFORE ANY SLIDE}}",
+      "fontSize": 10,
+      "fontColor": "#A1A1A6",
+      "align": "left",
+      "verticalAlign": "top",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    },
+    {
+      "type": "textbox",
+      "x": 144,
+      "y": 930,
+      "width": 1632,
+      "height": 54,
+      "text": "{{bold:You approve each one before the next.}}",
+      "fontSize": 20,
+      "fontColor": "#FFFFFF",
+      "align": "left",
+      "verticalAlign": "bottom",
+      "marginLeft": 0,
+      "marginTop": 0,
+      "marginRight": 0,
+      "marginBottom": 0
+    }
+  ]
+}

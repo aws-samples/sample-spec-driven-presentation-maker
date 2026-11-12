@@ -1,497 +1,678 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ACP Process Manager — manages multiple kiro-cli acp child processes,
- * keyed by sessionId. Enables background processing: switching decks
- * does not interrupt running agents.
+ * The Local chat registry: the API the routes use to reach chats (chat.ts), which run on the
+ * kiro-cli processes of the host pool (hosts.ts), one kiro-cli per chat. Switching decks does not
+ * interrupt a running chat.
  *
- * Max MAX_PROCESSES concurrent processes. Idle processes are evicted LRU.
+ * - **Ids.** `aliases` holds every id a client may use for a chat: its client ids (the invoke's
+ *   `sessionId`, a deck's fallback id, a fork's id) and its current kiro session id (the one saved
+ *   to a deck's `.session`). A chat for a kiro session is found by either before anything is
+ *   opened, so a kiro session is open in at most one chat (a second tab or a reopened deck reuses
+ *   it). `register` is the only writer, `releaseChat` the only remover.
+ * - **Placement.** A new chat, a reopened deck, a fork: the pool starts a kiro-cli of the configured
+ *   engine for it (`acquireForChat`) and the chat opens its session there. An open that fails reports
+ *   AgentStartError, AgentTimeoutError or SessionLockedError (a session another kiro-cli outside
+ *   this server holds), and registers nothing.
+ * - **Release.** `releaseChat` is the one way out: the chat's ids are forgotten and its kiro-cli
+ *   is killed. The pool releases the least recently active idle chat for its cap; an engine switch
+ *   releases idle deck-bound chats of the other engine (a busy one when its period ends, or when
+ *   its prompt could not be prepared and no period runs). A busy chat is never released. A chat
+ *   that is released, or whose kiro-cli exited, is remembered as an orphan: the next message of its
+ *   client id opens its kiro session again.
+ * - **Carry-over.** Texts for the agent a chat could not deliver (after Stop, after an exit) wait
+ *   under the kiro session and go before the user's text of its next prompt.
+ * - **Stop during start.** A start (an invoke opening its chat and sending its prompt) registers
+ *   under its client id (`beginStart`) before anything is opened, so Stop (`cancelSession`, also a
+ *   POST from another tab) aborts it: the pool kills the starting kiro-cli, and no prompt is sent.
+ * - **Unseen periods.** A work period not delivered yet (its tab was closed, or closed before it
+ *   saved the chat) is replayed by `/api/agent/stream` (`openStream`), also after its chat was
+ *   released: `releaseChat` keeps it under every id of the chat (at most MAX_UNSEEN_PERIODS). It
+ *   is delivered (`markDelivered`) once a stream wrote its end without being cancelled before and
+ *   the page then saved its chat, or at that end for a chat no deck holds (`endWritten`: no page
+ *   reopens it); the chat's next period drops it.
+ * - **Decks.** `.session`, `.session-engine` and a fork's origin are the chat's (chat.ts,
+ *   deck-files.ts); a deck reopened on the other engine says so (`otherEngine`).
+ * - **Forks** (`forkSession`): the fork is made and opened with the engine's session; a fork
+ *   kiro-cli could not read, or an open that fails or is cancelled once the fork exists, is deleted
+ *   through that session (`discardFork`), never anything else.
+ * - **Listing** the stored sessions (`withEngineConnection`) uses a live kiro-cli of the engine,
+ *   else the pool starts one for the listing.
+ * - **Models.** Each chat chooses its kiro session's model and effort (`chooseSessionModel`). An
+ *   idle chat changes them at once (the engine's setModel, one change at a time); otherwise the
+ *   choice waits under the chat's client id and is applied right before its next session/prompt,
+ *   so a turn never switches models half-way. The models are listed without starting kiro-cli:
+ *   from the chat's session, else the last list a session of the configured engine reported
+ *   (kept in acp-models.json, acp/model-cache.ts).
  */
-import { spawn, type ChildProcess } from "child_process"
-import path from "path"
-import { DECK_ROOT, resolveDeckDir } from "./deck-paths"
-import { getActiveAgent, type AgentConfig } from "./acp-adapter"
-import { syncToAgentsDir } from "./agents-sync"
-import type { ForkSessionPhase, ForkSessionPhaseDetail, SessionOrigin } from "./kiro-sessions.types"
-import { watchMcpServerReady } from "./mcp-ready"
+import { DECK_ROOT } from "./deck-paths"
+import type { EngineCapabilities, EngineId, LoadOutcome, ModelChoice, ModelOption, StoreContext } from "./acp/engine"
+import { readEngineConfig } from "./acp/engine-config"
+import { readModelCache, writeModelCache } from "./acp/model-cache"
+import { bufferedAfter, Chat, type ChatHooks, type EventListener, type Period } from "./chat"
+import type { BufferedEvent } from "./conversation/events"
+import { SteerRejectedError } from "./conversation/steer"
+import { readEngineMark, saveSessionToDeck, writeEngineMark } from "./deck-files"
+import { discardFork, HostOpenError, pool, type Open, type OpenPhase } from "./hosts"
+import type { SessionOrigin } from "./kiro-sessions.types"
+import { ForkNotReadError, ModelChoiceError, SessionBusyError, SessionLockedError } from "./sessionErrors"
+import type { LocalSessionNoticeCode } from "./sessionNotices"
 
 export { DECK_ROOT }
-const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
-const MAX_PROCESSES = 3
-/** Matches the sdpm server's `timeout` in the ACP agent definitions. */
-const MCP_READY_TIMEOUT_MS = 120_000
+export type { LoadOutcome, ModelChoice, ModelOption }
+export {
+  readChatFromDeck, readEngineMark, readOriginFromDeck, readSessionFromDeck, saveChatToDeck, saveOriginToDeck, saveSessionToDeck,
+  writeEngineMark, type EngineMark,
+} from "./deck-files"
 
-type PendingResolve = (value: unknown) => void
-interface PendingRequest {
-  resolve: PendingResolve
-  reject: (reason?: unknown) => void
-}
-type NotifyListener = (msg: Record<string, unknown>) => void
+/** Model choices kept for chats that are not idle; the oldest is dropped beyond this. */
+const MAX_PENDING_MODEL_CHOICES = 100
+/** Released chats whose next message opens their kiro session again. */
+const MAX_ORPHANS = 100
+/** Sessions with texts kept for their next prompt, and texts per session. */
+const MAX_CARRY_OVER_SESSIONS = 100
+const MAX_CARRY_OVER_TEXTS = 5
 
-interface SpawnProcessOptions {
-  setMode?: boolean
-  onPhase?: (phase: ForkSessionPhase, detail?: ForkSessionPhaseDetail) => void
-  signal?: AbortSignal
-}
-
-interface ProcessState {
-  child: ChildProcess
-  deckId: string
-  sessionId: string | null
-  agentName: string
-  requestId: number
-  pending: Map<number, PendingRequest>
-  listeners: Set<NotifyListener>
-  lineBuffer: string
-  running: boolean
-  notifications: { id: number; msg: Record<string, unknown> }[]
-  eventIdCounter: number
-  lastActivity: number
-  subSessionIds: Set<string>
-}
-
-/** Map keyed by sessionId */
-const processes = new Map<string, ProcessState>()
+/** Every id of a chat (`register`). */
+const aliases = new Map<string, Chat>()
 export const pendingOrigins = new Map<string, SessionOrigin>()
+/** Client id → the kiro session of its chat, released or left by an exited kiro-cli. */
+const orphans = new Map<string, string>()
+/** Kiro session id → texts for the agent its next user prompt starts with. */
+const carryOver = new Map<string, string[]>()
+/** Finished periods of released chats that no stream delivered, oldest first, with the ids they are kept under. */
+const MAX_UNSEEN_PERIODS = 50
+const unseen = new Map<Period, Set<string>>()
+const unseenById = new Map<string, Period>()
+/** Client id → the starts in progress for it (`beginStart`), which Stop aborts. */
+const pendingStarts = new Map<string, Set<AbortController>>()
 
-// Model info (shared, populated from first process)
-export interface AcpModel { modelId: string; name: string; description?: string }
-let currentModelId = ""
-let availableModels: AcpModel[] = []
+/** The model list a session of each engine last reported in this server (also in acp-models.json). */
+const knownModels = new Map<EngineId, ModelOption[]>()
+/** Client id → the model choice its chat made while it could not take it at once. */
+const pendingModelChoices = new Map<string, ModelChoice>()
 
-// ── Per-process helpers ──
-
-function handleLine(ps: ProcessState, line: string) {
-  if (!line.trim()) return
-  let msg: Record<string, unknown>
-  try { msg = JSON.parse(line) } catch { return }
-
-  // JSON-RPC response — resolve the pending promise, then fall through
-  // so the end_turn detection below can flip ps.running back to false.
-  // Returning here would short-circuit reuse: each turn would spawn a fresh
-  // process, dropping the prior turn's context (read_guides, upload result,
-  // hearing answers) and making the agent appear to drift back into Phase 1.
-  if (msg.id != null && ps.pending.has(msg.id as number)) {
-    const pending = ps.pending.get(msg.id as number)!
-    ps.pending.delete(msg.id as number)
-    if (msg.error) {
-      const error = msg.error as { message?: string; data?: unknown }
-      // kiro-cli puts the actual cause in `data` ("Internal error" alone is useless in logs)
-      const detail = error.data === undefined ? "" : `: ${typeof error.data === "string" ? error.data : JSON.stringify(error.data)}`
-      ps.running = false
-      pending.reject(new Error(`${error.message || "ACP request failed"}${detail}`))
-    } else {
-      pending.resolve(msg.result)
-    }
-  }
-
-  // Auto-approve permission requests
-  if (msg.method === "session/request_permission") {
-    const reqId = msg.id as string
-    if (reqId && ps.child) {
-      ps.child.stdin!.write(JSON.stringify({
-        jsonrpc: "2.0", id: reqId, result: { outcome: { outcome: "selected", optionId: "allow_always" } },
-      }) + "\n")
-    }
-    return
-  }
-
-  // Buffer notifications
-  if (msg.method === "session/update" || msg.method === "_kiro.dev/session/update") {
-    const p = msg.params as Record<string, unknown>
-    const sid = p?.sessionId as string
-    if (sid && sid !== ps.sessionId) ps.subSessionIds.add(sid)
-    // Detect subagent turn_end → remove from active set
-    const upd = p?.update as Record<string, unknown> | undefined
-    const updType = upd?.sessionUpdate as string | undefined
-    if ((updType === "turn_end" || updType === "end_turn") && sid && sid !== ps.sessionId) {
-      ps.subSessionIds.delete(sid)
-    }
-    ps.notifications.push({ id: ++ps.eventIdCounter, msg })
-    if (ps.notifications.length > 2000) ps.notifications.shift()
-  }
-
-  // Detect end_turn
-  if (msg.id != null && msg.result) {
-    const r = msg.result as Record<string, unknown>
-    if (r.stopReason === "end_turn" || r.stopReason === "cancelled") {
-      if (ps.subSessionIds.size === 0) {
-        ps.running = false
-      }
-    }
-  }
-
-  for (const fn of ps.listeners) fn(msg)
+const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error))
+const throwIfAborted = (signal: AbortSignal | undefined) => {
+  if (signal?.aborted) throw new DOMException("Request cancelled", "AbortError")
 }
 
-function rpcRequestTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}): Promise<unknown> {
-  if (!ps.child) throw new Error("Process not running")
-  const id = ++ps.requestId
-  ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", id, method, params }) + "\n")
-  return new Promise((resolve, reject) => { ps.pending.set(id, { resolve, reject }) })
+/** Map insertion order as LRU: (re)insert `key` last and drop the oldest beyond `max`. */
+function keepNewest<V>(map: Map<string, V>, key: string, value: V, max: number): void {
+  map.delete(key)
+  map.set(key, value)
+  while (map.size > max) map.delete(map.keys().next().value!)
 }
 
-function rpcNotifyTo(ps: ProcessState, method: string, params: Record<string, unknown> = {}): void {
-  if (!ps.child) return
-  ps.child.stdin!.write(JSON.stringify({ jsonrpc: "2.0", method, params }) + "\n")
+const hooks: ChatHooks = {
+  takeOrigin(clientId) {
+    const origin = pendingOrigins.get(clientId)
+    if (origin) pendingOrigins.delete(clientId)
+    return origin
+  },
+  carryOver(sessionId, text) {
+    const texts = [...(carryOver.get(sessionId) ?? []), text].slice(-MAX_CARRY_OVER_TEXTS)
+    keepNewest(carryOver, sessionId, texts, MAX_CARRY_OVER_SESSIONS)
+  },
+  periodStarted(chat) {
+    // The chat has moved on: what an earlier period of its ids left is not replayed any more.
+    for (const id of idsOf(chat)) forgetUnseen(id)
+  },
+  periodEnded(chat) { releaseChecks(chat) },
+  hostExited(chat) { releaseChat(chat, { remember: true }) },
+  release(chat) { releaseChat(chat, { remember: true }) },
 }
 
-/** Ensure agents/ has files (first launch before Settings is opened). */
-async function spawnProcess(
+/** Every id a chat is known by. */
+function idsOf(chat: Chat): string[] {
+  return [...chat.clientIds, ...(chat.sessionId ? [chat.sessionId] : [])]
+}
+
+/** Keep a finished period no stream delivered under `ids`; the oldest goes beyond MAX_UNSEEN_PERIODS. */
+function keepUnseen(period: Period, ids: string[]): void {
+  if (period.seen) return
+  const keys = unseen.get(period) ?? new Set<string>()
+  for (const id of ids) {
+    const earlier = unseenById.get(id)
+    if (earlier && earlier !== period) forgetUnseen(id)
+    keys.add(id)
+    unseenById.set(id, period)
+  }
+  unseen.set(period, keys)
+  while (unseen.size > MAX_UNSEEN_PERIODS) {
+    const [oldest, oldestKeys] = unseen.entries().next().value!
+    unseen.delete(oldest)
+    for (const id of oldestKeys) if (unseenById.get(id) === oldest) unseenById.delete(id)
+  }
+}
+
+function forgetUnseen(id: string): void {
+  const period = unseenById.get(id)
+  if (!period) return
+  unseenById.delete(id)
+  const keys = unseen.get(period)
+  keys?.delete(id)
+  if (keys && !keys.size) unseen.delete(period)
+}
+
+/** The period is delivered (`markDelivered`): it is not replayed again. */
+function markSeen(period: Period): void {
+  period.seen = true
+  for (const id of unseen.get(period) ?? []) if (unseenById.get(id) === period) unseenById.delete(id)
+  unseen.delete(period)
+}
+
+/**
+ * A stream wrote the period's end. A chat no deck holds (a style chat, a new deck's chat that made
+ * no deck) has no page that reopens it: its period is delivered at once. Else `markDelivered`
+ * delivers it once the page saved its chat.
+ */
+function endWritten(chat: Chat | undefined, period: Period): () => void {
+  return () => {
+    period.endWritten = true
+    if (chat && !chat.savedDecks.size) markSeen(period)
+  }
+}
+
+/** The chats (each once). */
+function chats(): Chat[] {
+  return [...new Set(aliases.values())]
+}
+
+/** The only writer of `aliases`: the chat under every client id that uses it and its kiro session id. */
+function register(chat: Chat, clientId: string): void {
+  chat.clientIds.add(clientId)
+  for (const id of chat.clientIds) aliases.set(id, chat)
+  if (chat.sessionId) aliases.set(chat.sessionId, chat)
+  orphans.delete(clientId)
+  chat.touch()
+}
+
+/**
+ * The only way out of the registry: forget every id of the chat and its pending origin, and kill
+ * its kiro-cli. `remember`: its client ids reopen its kiro session on their next message.
+ */
+function releaseChat(chat: Chat, opts: { remember: boolean }): void {
+  if (chat.released) return
+  chat.released = true
+  if (opts.remember && chat.sessionId) {
+    for (const id of chat.clientIds) keepNewest(orphans, id, chat.sessionId, MAX_ORPHANS)
+  }
+  if (chat.lastPeriod && !chat.lastPeriod.seen) keepUnseen(chat.lastPeriod, idsOf(chat))
+  for (const [id, candidate] of aliases) if (candidate === chat) aliases.delete(id)
+  pendingOrigins.delete(chat.clientId)
+  endHost(chat)
+}
+
+/** A chat whose fork is deleted: forgotten, and its kiro-cli killed. */
+function dropChat(chat: Chat): void {
+  chat.released = true
+  for (const [id, candidate] of aliases) if (candidate === chat) aliases.delete(id)
+  pendingOrigins.delete(chat.clientId)
+  endHost(chat)
+}
+
+function endHost(chat: Chat): void {
+  const host = chat.hs.host
+  chat.hs.drop()
+  if (!host.exited) host.kill()
+}
+
+/** The release checks once a period's end was written to its listeners (or a prompt's preparation failed with none running). */
+function releaseChecks(chat: Chat): void {
+  if (chat.released) return
+  const host = chat.hs.host
+  if (host.exited) return
+  // Settings switched the engine while this period ran: the deck's next message opens it on the new one.
+  // A prompt still being prepared keeps the chat until its own period ends.
+  if (chat.deckBound && chat.engine !== readEngineConfig().engine && !chat.busy()) {
+    console.log("[acp] sessionId=%s: the agent engine is no longer %s; ending the deck's chat", chat.sessionId, chat.engine)
+    releaseChat(chat, { remember: true })
+  }
+}
+
+/** The chat a client id, or the kiro session it opens, already has; registered under the client id. */
+function findLive(clientId: string, sessionId: string | null): Chat | null {
+  const chat = aliases.get(clientId) ?? (sessionId ? (aliases.get(sessionId) ?? chats().find((c) => c.sessionId === sessionId)) : undefined)
+  if (!chat) return null
+  register(chat, clientId)
+  return chat
+}
+
+/** Place a chat on a host of the configured engine and open its session (`how`). Not registered yet. */
+async function openChat(
+  clientId: string,
   agentName: string,
-  existingSessionId?: string,
-  opts: SpawnProcessOptions = {},
-  adapter?: AgentConfig,
-): Promise<ProcessState> {
-  if (opts.signal?.aborted) throw new DOMException("Fork cancelled", "AbortError")
+  how: Open,
+  opts: { signal?: AbortSignal; onPhase?: OpenPhase } = {},
+): Promise<{ chat: Chat; outcome: LoadOutcome }> {
+  if (opts.signal?.aborted) throw new DOMException("Request cancelled", "AbortError")
   opts.onPhase?.("starting")
-  // Re-derive .kiro/agents/ from the acp-agents catalog + user selection on
-  // every spawn (idempotent, all-or-nothing) — a `git pull` that updates the
-  // catalog takes effect on the next spawn. If the derivation fails, the
-  // spawn fails: launching from silently stale agent files is the exact bug
-  // this re-derivation exists to prevent.
-  syncToAgentsDir()
-  const cfg = adapter || getActiveAgent()
-  let args = [...cfg.args]
-  const flagIdx = args.indexOf("--agent")
-  if (flagIdx >= 0 && flagIdx + 1 < args.length) {
-    args[flagIdx + 1] = agentName
-  }
-  const child = spawn(cfg.path, args, {
-    cwd: MCP_LOCAL_DIR,
-    stdio: ["pipe", "pipe", "pipe"],
-    env: { ...process.env, ...cfg.env, SDPM_OUTPUT_DIR: DECK_ROOT, SDPM_DECK_ROOT: DECK_ROOT },
-  })
-  const abortSpawn = () => child.kill()
-  opts.signal?.addEventListener("abort", abortSpawn, { once: true })
-
-  const ps: ProcessState = {
-    child, deckId: "", sessionId: null, agentName,
-    requestId: 0, pending: new Map(), listeners: new Set(),
-    lineBuffer: "", running: false, notifications: [], eventIdCounter: 0,
-    lastActivity: Date.now(), subSessionIds: new Set(),
-  }
-
-  child.stdout!.setEncoding("utf-8")
-  child.stdout!.on("data", (data: string) => {
-    ps.lineBuffer += data
-    const lines = ps.lineBuffer.split("\n")
-    ps.lineBuffer = lines.pop() || ""
-    for (const l of lines) handleLine(ps, l)
-  })
-
-  child.stderr!.setEncoding("utf-8")
-  child.stderr!.on("data", (d: string) => console.warn("[acp] stderr: %s", d.trim()))
-
-  child.on("close", (code) => {
-    console.log("[acp close] sessionId=%s code=%s", ps.sessionId, code)
-    for (const pending of ps.pending.values()) pending.reject(new Error(`ACP process exited with code ${code}`))
-    ps.pending.clear()
-    if (ps.sessionId) processes.delete(ps.sessionId)
-  })
-
+  const engine = readEngineConfig().engine
+  const host = await pool.acquireForChat(engine, agentName, { signal: opts.signal })
+  const chat = new Chat(clientId, agentName, engine, hooks)
+  let opened: Awaited<ReturnType<typeof host.openSession>>
   try {
-    // Initialize ACP
-    await rpcRequestTo(ps, "initialize", {
-      protocolVersion: 1,
-      clientCapabilities: { fs: { readTextFile: false, writeTextFile: false } },
-      clientInfo: { name: "sdpm-local", version: "0.1.0" },
-    })
-
-    // Create session
-    const result = await rpcRequestTo(ps, "session/new", {
-      cwd: MCP_LOCAL_DIR,
-      mcpServers: [],
-      agent: agentName,
-    }) as Record<string, unknown>
-    ps.sessionId = result.sessionId as string
-
-    // Restore existing session context if provided (Obsidian agent-client pattern)
-    if (existingSessionId) {
-      let replayed = 0
-      let lastReported = 0
-      let lastReportAt = Date.now()
-      const replayListener: NotifyListener = (msg) => {
-        if (msg.method !== "session/update" && msg.method !== "_kiro.dev/session/update") return
-        const params = msg.params as Record<string, unknown> | undefined
-        if (params?.sessionId !== existingSessionId) return
-        replayed++
-        const now = Date.now()
-        if (replayed % 20 === 0 || now - lastReportAt >= 250) {
-          lastReported = replayed
-          lastReportAt = now
-          opts.onPhase?.("loading", { replayed })
-        }
-      }
-
-      opts.onPhase?.("loading", { replayed: 0 })
-      ps.listeners.add(replayListener)
-      // Watch from before session/load: the source agent may already carry the
-      // sdpm server, and after set_mode its readiness can arrive before the reply.
-      const sdpmReady = opts.setMode ? watchMcpServerReady(ps.listeners, existingSessionId) : null
-      let loaded: { modes?: { availableModes?: { id: string }[] } }
-      try {
-        loaded = await rpcRequestTo(ps, "session/load", {
-          sessionId: existingSessionId,
-          cwd: MCP_LOCAL_DIR,
-          mcpServers: [],
-        }) as { modes?: { availableModes?: { id: string }[] } }
-      } catch (error) {
-        sdpmReady?.dispose()
-        throw error
-      } finally {
-        ps.listeners.delete(replayListener)
-      }
-      if (replayed !== lastReported) opts.onPhase?.("loading", { replayed })
-
-      // After session/load, prompts must use the old sessionId
-      processes.delete(ps.sessionId!)
-      ps.sessionId = existingSessionId
-      if (opts.setMode) {
-        const available = loaded.modes?.availableModes
-        if (!available?.some((mode) => mode.id === agentName)) {
-          sdpmReady?.dispose()
-          throw new Error(`mode ${agentName} unavailable`)
-        }
-        opts.onPhase?.("switching")
-        try {
-          await rpcRequestTo(ps, "session/set_mode", { sessionId: existingSessionId, modeId: agentName })
-        } catch (error) {
-          sdpmReady?.dispose()
-          throw error
-        }
-        // set_mode replies before the new agent's MCP servers are up; the first
-        // prompt (the continuation greeting) needs start_presentation.
-        if (sdpmReady && !(await sdpmReady.wait(MCP_READY_TIMEOUT_MS, opts.signal))) {
-          console.warn("[acp] sdpm MCP server not initialized after %dms (session %s)", MCP_READY_TIMEOUT_MS, existingSessionId)
-        }
-      }
-    }
-
-    // Extract model info from first process
-    if (!availableModels.length) {
-      const modelsData = result.models as { currentModelId?: string; availableModels?: AcpModel[] } | undefined
-      if (modelsData) {
-        currentModelId = modelsData.currentModelId || ""
-        availableModels = (modelsData.availableModels || [])
-          .filter(o => !o.description?.startsWith("[Internal]") && !o.description?.startsWith("[Deprecated]"))
-      }
-    }
-
-    opts.signal?.removeEventListener("abort", abortSpawn)
-    return ps
+    opened = await host.openSession(agentName, how, { signal: opts.signal, onPhase: opts.onPhase, sink: chat })
   } catch (error) {
-    opts.signal?.removeEventListener("abort", abortSpawn)
-    child.kill()
+    if (error instanceof HostOpenError && error.kind === "session_locked") throw new SessionLockedError(error.message)
     throw error
   }
+  chat.hs = opened.hs
+  chat.opening = false
+  if (!chat.clientId) chat.clientId = opened.hs.sessionId!
+  rememberModels(chat)
+  return { chat, outcome: opened.outcome }
 }
 
-async function evictIfNeeded(): Promise<void> {
-  if (processes.size < MAX_PROCESSES) return
-  let oldest: ProcessState | null = null
-  for (const ps of processes.values()) {
-    if (ps.running) continue
-    if (!oldest || ps.lastActivity < oldest.lastActivity) oldest = ps
+/**
+ * Run `fn` with a lazy connection to an initialized kiro-cli of `engine`: a live one, else one
+ * the pool starts on the first `connect` and kills once `fn` is done. Concurrent listings are
+ * shared by the session catalog, not here.
+ */
+export async function withEngineConnection<T>(engine: EngineId, fn: (connect: StoreContext["connect"]) => Promise<T>): Promise<T> {
+  let acquired: ReturnType<typeof pool.acquireForListing> | undefined
+  const connect: StoreContext["connect"] = async () => {
+    acquired ??= pool.acquireForListing(engine)
+    const { request, caps } = await acquired
+    return { request, caps }
   }
-  if (oldest) {
-    oldest.child.kill()
-    if (oldest.sessionId) processes.delete(oldest.sessionId)
-    await new Promise(r => setTimeout(r, 500))
+  try {
+    return await fn(connect)
+  } finally {
+    void acquired?.then(({ release }) => release(), () => {})
   }
 }
 
 // ── Public API ──
 
-/** Check if a live process exists for a sessionId. */
+/**
+ * A start for `clientId` (opening its chat, preparing its prompt): its `signal` follows `outer`
+ * (the request) and Stop for the client id (`cancelSession`, `cancelAll`). `stoppedByUser` tells
+ * Stop from a client that went away; `end` once the prompt's period started (or the start failed).
+ */
+export function beginStart(clientId: string, outer?: AbortSignal): { signal: AbortSignal; stoppedByUser: () => boolean; end: () => void } {
+  const controller = new AbortController()
+  let stopped = false
+  const follow = () => controller.abort()
+  if (outer?.aborted) controller.abort()
+  else outer?.addEventListener("abort", follow, { once: true })
+  const starts = pendingStarts.get(clientId) ?? new Set<AbortController>()
+  starts.add(controller)
+  pendingStarts.set(clientId, starts)
+  controller.signal.addEventListener("abort", () => { if (!outer?.aborted) stopped = true }, { once: true })
+  return {
+    signal: controller.signal,
+    stoppedByUser: () => stopped,
+    end: () => {
+      outer?.removeEventListener("abort", follow)
+      starts.delete(controller)
+      if (!starts.size && pendingStarts.get(clientId) === starts) pendingStarts.delete(clientId)
+    },
+  }
+}
+
+/** Abort the starts in progress for a client id (all of them without one). */
+function abortStarts(clientId?: string): void {
+  const groups = clientId ? [pendingStarts.get(clientId)] : [...pendingStarts.values()]
+  for (const starts of groups) for (const controller of starts ?? []) controller.abort()
+}
+
+/** Whether a chat is known by this id (a client id or its kiro session id). */
 export function hasProcess(sessionId: string): boolean {
-  return processes.has(sessionId)
+  return aliases.has(sessionId)
 }
 
-/** Kill a process and remove every map key that refers to it. */
+/** Release a chat and every id of it (its kiro-cli too when it carries only this chat). */
 export function terminateProcess(sessionId: string): void {
-  const ps = processes.get(sessionId)
-    ?? Array.from(processes.values()).find((candidate) => candidate.sessionId === sessionId)
-  if (!ps) return
-  for (const [key, candidate] of processes) {
-    if (candidate === ps) processes.delete(key)
-  }
-  ps.child.kill()
+  const chat = aliases.get(sessionId) ?? chats().find((candidate) => candidate.sessionId === sessionId)
+  if (chat) releaseChat(chat, { remember: false })
 }
 
-/** Get or create a process for a sessionId. Restores context if existingSessionId provided. */
-export async function getOrCreateProcess(
-  sessionId: string,
+/**
+ * A Settings switch to `engine`: the idle deck-bound chats of other engines are released now (the
+ * deck's next message opens its session on `engine`); a busy one is released when its period ends.
+ */
+export function terminateIdleProcesses(engine: EngineId): void {
+  for (const chat of chats()) {
+    if (chat.engine === engine || !chat.deckBound || chat.busy()) continue
+    console.log("[acp] sessionId=%s: the agent engine is now %s; ending the deck's %s chat", chat.sessionId, engine, chat.engine)
+    releaseChat(chat, { remember: true })
+  }
+}
+
+/** What the kiro-cli of a chat advertised (null without a chat). */
+export function getCapabilities(sessionId: string): EngineCapabilities | null {
+  return aliases.get(sessionId)?.hs.host.caps ?? null
+}
+
+/**
+ * A chat for a client id that has none: a new session, or, for a client whose chat was released
+ * or whose kiro-cli exited (an orphan), its kiro session opened again (`resumed`; `notice` when
+ * kiro-cli did not have it any more and the chat starts empty).
+ */
+export async function createNewProcessFor(
+  clientId: string,
   agentName: string = "sdpm-orchestrator",
-  opts: SpawnProcessOptions = {},
-): Promise<ProcessState> {
-  let ps = processes.get(sessionId)
-  if (ps) {
-    ps.lastActivity = Date.now()
-    return ps
+  opts: { signal?: AbortSignal } = {},
+): Promise<{ chat: Chat; resumed: boolean; notice?: LocalSessionNoticeCode }> {
+  const orphan = orphans.get(clientId) ?? null
+  if (orphan) {
+    const live = findLive(clientId, orphan)
+    if (live) return { chat: live, resumed: true }
   }
-  // No live process — spawn new one and restore session context
-  await evictIfNeeded()
-  ps = await spawnProcess(agentName, sessionId, opts)
-  processes.set(sessionId, ps)
-  return ps
+  const { chat, outcome } = await openChat(clientId, agentName, orphan ? { kind: "load", sessionId: orphan } : { kind: "new" }, opts)
+  register(chat, clientId)
+  if (!orphan) return { chat, resumed: false }
+  if (outcome === "created") return { chat, resumed: false, notice: "context_not_carried_over" }
+  return { chat, resumed: true }
 }
 
-/** Spawn a brand-new process (no existing session). Returns the new sessionId. */
-export async function createNewProcess(agentName: string = "sdpm-orchestrator"): Promise<ProcessState> {
-  await evictIfNeeded()
-  const ps = await spawnProcess(agentName)
-  processes.set(ps.sessionId!, ps)
-  return ps
-}
-
-/** Spawn a new process and register it under a client-provided key. */
-export async function createNewProcessFor(clientSessionId: string, agentName: string = "sdpm-orchestrator"): Promise<ProcessState> {
-  await evictIfNeeded()
-  const ps = await spawnProcess(agentName)
-  processes.set(clientSessionId, ps)
-  return ps
-}
-
-/** Send a prompt to a session's process. */
-export async function sendPrompt(sessionId: string, text: string, agentName?: string): Promise<{ sessionId: string; subscribe: (fn: NotifyListener) => () => void; send: () => void }> {
-  const ps = await getOrCreateProcess(sessionId, agentName || "sdpm-orchestrator")
-  ps.running = true
-  ps.notifications = []; ps.eventIdCounter = 0
-  ps.lastActivity = Date.now()
-
-  return {
-    sessionId: ps.sessionId!,
-    subscribe: (fn: NotifyListener) => {
-      ps.listeners.add(fn)
-      return () => { ps.listeners.delete(fn) }
-    },
-    send: () => {
-      void rpcRequestTo(ps, "session/prompt", {
-        sessionId: ps.sessionId,
-        prompt: [{ type: "text", text }],
-      }).catch(() => {
-        // handleLine forwards the same JSON-RPC error to the subscribed SSE bridge.
-      })
-    },
+/**
+ * The chat of a reopened deck, registered under `clientId`: the live chat of the client or of the
+ * deck's saved session (`resumed`), else the saved session opened on the configured engine (its
+ * engine tells `resumed` from `created`), or a new one when the deck has none (`created`). The
+ * chat is bound to the deck either way. A created session is saved to `.session` with a new
+ * engine mark; a resumed one reports `otherEngine` when its turns also ran on the other engine.
+ */
+export async function openDeckSession(
+  clientId: string,
+  deckId: string,
+  savedSessionId: string | null,
+  agentName: string,
+  opts: { signal?: AbortSignal } = {},
+): Promise<{ chat: Chat; outcome: LoadOutcome; otherEngine: boolean }> {
+  let chat = findLive(clientId, savedSessionId)
+  let outcome: LoadOutcome = "resumed"
+  if (!chat) {
+    const opened = await openChat(clientId, agentName, savedSessionId ? { kind: "load", sessionId: savedSessionId } : { kind: "new" }, opts)
+    chat = opened.chat
+    outcome = opened.outcome
+    register(chat, clientId)
   }
-}
-
-/** Cancel a session's active prompt. */
-export function cancelSession(sessionId: string): void {
-  const ps = processes.get(sessionId)
-  if (!ps) return
-  if (ps.sessionId) {
-    rpcNotifyTo(ps, "session/cancel", { sessionId: ps.sessionId })
-    for (const subId of ps.subSessionIds) {
-      rpcNotifyTo(ps, "session/cancel", { sessionId: subId })
-    }
-    ps.subSessionIds.clear()
+  chat.bindDeck(deckId)
+  if (outcome === "created") {
+    saveSessionToDeck(deckId, chat.sessionId!)
+    writeEngineMark(deckId, { last: chat.engine, engines: [chat.engine] })
+    return { chat, outcome, otherEngine: false }
   }
+  const mark = readEngineMark(deckId)
+  return { chat, outcome, otherEngine: mark.last !== chat.engine && mark.engines.includes(chat.engine) }
 }
 
-/** Cancel all processes (stop button with no specific session). */
-export function cancelAll(): void {
-  for (const ps of processes.values()) {
-    if (ps.running && ps.sessionId) {
-      rpcNotifyTo(ps, "session/cancel", { sessionId: ps.sessionId })
-      for (const subId of ps.subSessionIds) {
-        rpcNotifyTo(ps, "session/cancel", { sessionId: subId })
+/**
+ * Fork a stored session (`sourceId`, any store the configured engine can open) and open the
+ * fork, registered under the fork's id (its client id too, which keys `pendingOrigins`). A fork
+ * kiro-cli could not read is deleted again: ForkNotReadError.
+ */
+export async function forkSession(
+  sourceId: string,
+  agentName: string,
+  opts: { signal?: AbortSignal; onPhase?: OpenPhase } = {},
+): Promise<{ chat: Chat; sessionId: string; outcome: LoadOutcome }> {
+  const { chat, outcome } = await openChat("", agentName, { kind: "fork", sourceId }, opts)
+  const sessionId = chat.sessionId!
+  if (outcome === "created") {
+    console.warn("[acp] fork %s of %s: kiro-cli could not read it", sessionId, sourceId)
+    await discardFork(chat.hs.engine, sessionId)
+    dropChat(chat)
+    throw new ForkNotReadError()
+  }
+  register(chat, sessionId)
+  return { chat, sessionId, outcome }
+}
+
+/** Delete a fork `forkSession` made and release its chat (a fork that is not live is left alone). */
+export async function discardForkedSession(sessionId: string): Promise<void> {
+  const chat = aliases.get(sessionId)
+  if (!chat || chat.sessionId !== sessionId) return
+  for (const [id, candidate] of aliases) if (candidate === chat) aliases.delete(id)
+  await discardFork(chat.hs.engine, sessionId)
+  dropChat(chat)
+}
+
+/**
+ * The chat of a forked chat: `clientId` is the fork's id, which is also the forked kiro
+ * session's. The live chat, or the fork opened again (`created` when kiro-cli could not read it
+ * and started an empty session).
+ */
+export async function openForkedSession(
+  clientId: string,
+  agentName: string,
+  opts: { signal?: AbortSignal; onPhase?: OpenPhase } = {},
+): Promise<{ chat: Chat; outcome: LoadOutcome }> {
+  const live = findLive(clientId, null)
+  if (live) return { chat: live, outcome: "resumed" }
+  const { chat, outcome } = await openChat(clientId, agentName, { kind: "load", sessionId: clientId }, opts)
+  register(chat, clientId)
+  return { chat, outcome }
+}
+
+/**
+ * Send a user prompt to a chat. Its turn starts a work period when none runs, else it is a turn
+ * of the running one (a hold keeps it open); `replayFrom` is the id of the turn's first event
+ * (the period's events are numbered from 1), and a `notice` about the chat's session
+ * (sessionNotices.ts) follows the `turn` event. `displayText` is what the `turn` event shows (the
+ * user's own text). The chat's pending model choice is applied first (one kiro-cli refuses is
+ * logged and the prompt goes on), then the texts kept for the session go before `text`.
+ * Throws SessionBusyError while the chat's turn runs or its stopped period settles (the same chat
+ * open in two panels or tabs); prompts are not queued. Throws AbortError when `signal` (the
+ * start's, `beginStart`) aborts before the turn started.
+ */
+export async function sendPrompt(
+  sessionId: string,
+  text: string,
+  opts: { notice?: LocalSessionNoticeCode; displayText?: string; signal?: AbortSignal } = {},
+): Promise<{ sessionId: string; replayFrom: number; subscribe: (fn: EventListener) => () => void; send: () => void; onEnd: () => void }> {
+  const chat = aliases.get(sessionId)
+  if (!chat) throw new Error(`no chat for session ${sessionId}`)
+  throwIfAborted(opts.signal)
+  // Steers the last turn left must be out of kiro-cli's queue before this prompt.
+  if (chat.steerClear) await chat.steerClear
+  throwIfAborted(opts.signal)
+  if (chat.turn || chat.reserved || chat.period?.stopped) throw new SessionBusyError()
+  chat.reserved = true
+  try {
+    // The chat's model choice goes in before the prompt (a change made while idle has finished).
+    if (chat.configChange) await chat.configChange
+    throwIfAborted(opts.signal)
+    const choice = pendingModelChoices.get(sessionId)
+    if (choice) {
+      pendingModelChoices.delete(sessionId)
+      try {
+        await applyModelChoice(chat, choice)
+      } catch (error) {
+        console.warn("[acp] sessionId=%s: could not apply the chat's model choice: %s", chat.sessionId, errorText(error))
       }
-      ps.subSessionIds.clear()
+      throwIfAborted(opts.signal)
+    }
+  } catch (error) {
+    chat.reserved = false
+    // An engine switch waited for this prepare: the chat goes now, as at a period's end.
+    if (!chat.period) releaseChecks(chat)
+    throw error
+  } finally {
+    chat.reserved = false
+  }
+  const carried = chat.sessionId ? carryOver.get(chat.sessionId) : undefined
+  if (carried) carryOver.delete(chat.sessionId!)
+  const prompt = carried?.length ? [...carried, text].join("\n\n") : text
+  const replayFrom = chat.beginPrompt(opts.displayText ?? text, opts.notice)
+  const period = chat.period!
+  return {
+    sessionId: chat.sessionId!,
+    replayFrom,
+    subscribe: (fn: EventListener) => chat.subscribe(fn),
+    send: () => chat.startPrompt(prompt),
+    onEnd: endWritten(chat, period),
+  }
+}
+
+/**
+ * Send a message into the chat's running turn (`_session/steer`), or, while work holds its
+ * period without a turn, start a turn with it. Resolves once it is accepted; the listeners then
+ * get its steer event `accepted`, later `delivered` or `discarded`. Throws SteerRejectedError
+ * when no period runs (or it was stopped), kiro-cli does not queue it (or does not implement
+ * steering: then no later steer is sent to that kiro-cli), or the turn ended meanwhile (the
+ * message is then taken back out of kiro-cli's queue).
+ */
+export async function steerSession(sessionId: string, id: string, text: string): Promise<void> {
+  const chat = aliases.get(sessionId)
+  if (!chat) throw new SteerRejectedError("session_idle")
+  await chat.steer(id, text)
+}
+
+/**
+ * Stop a chat: a start in progress for the id is aborted (no prompt is sent), and the chat's
+ * period's turn and work are cancelled, and nothing starts model work in it any more.
+ */
+export function cancelSession(sessionId: string): void {
+  abortStarts(sessionId)
+  aliases.get(sessionId)?.stop()
+}
+
+/** Stop every start and every busy chat (stop button with no specific session). */
+export function cancelAll(): void {
+  abortStarts()
+  for (const chat of chats()) if (chat.period) chat.stop()
+}
+
+/** Whether a chat is busy (a turn runs, work holds its period, or a prompt is being prepared). */
+export function isSessionRunning(sessionId: string): boolean {
+  return aliases.get(sessionId)?.busy() ?? false
+}
+
+/** The chat's current (else last) period's buffered events, after `afterId` when given (a reconnect's Last-Event-ID). */
+export function getBufferedEvents(sessionId: string, afterId?: number): BufferedEvent[] {
+  const chat = aliases.get(sessionId)
+  const period = chat?.period ?? chat?.lastPeriod
+  return period ? bufferedAfter(period, afterId) : []
+}
+
+/**
+ * What `/api/agent/stream` writes for an id (a client id or a kiro session id): a busy chat's
+ * period from after `afterId`, then live; a finished period not delivered yet (of a chat, or
+ * kept after its chat was released), replayed to its end; else null (nothing runs). `onEnd`
+ * records that the stream wrote the period's end (`endWritten`; `markDelivered` then delivers it).
+ */
+export function openStream(id: string, afterId?: number): { replay: BufferedEvent[]; subscribe?: (fn: EventListener) => () => void; onEnd: () => void } | null {
+  const chat = aliases.get(id)
+  if (chat?.period) {
+    const period = chat.period
+    return { replay: bufferedAfter(period, afterId), subscribe: (fn) => chat.subscribe(fn), onEnd: endWritten(chat, period) }
+  }
+  const period = chat?.lastPeriod && !chat.lastPeriod.seen ? chat.lastPeriod : unseenById.get(id) ?? null
+  if (!period) return null
+  return { replay: bufferedAfter(period, afterId), onEnd: endWritten(chat, period) }
+}
+
+/**
+ * A page saved its chat after the stream it followed for `id` ended: the id's finished period is
+ * delivered, when a stream wrote its end, and is not replayed again. Nothing when it runs.
+ */
+export function markDelivered(id: string): void {
+  const chat = aliases.get(id)
+  const period = chat?.lastPeriod ?? unseenById.get(id)
+  if (period?.endWritten && !period.seen) markSeen(period)
+}
+
+/** Subscribe to a chat's events. */
+export function subscribeToSession(sessionId: string): { sessionId: string | null; subscribe: (fn: EventListener) => () => void } | null {
+  const chat = aliases.get(sessionId)
+  if (!chat) return null
+  return { sessionId: chat.sessionId, subscribe: (fn: EventListener) => chat.subscribe(fn) }
+}
+
+// ── Models ──
+
+/** Keep the engine's model list when a session reported a new one (in memory and acp-models.json). */
+function rememberModels(chat: Chat): void {
+  const available = chat.hs.engine.models()?.available
+  if (!available?.length) return
+  const known = knownModels.get(chat.engine) ?? readModelCache(chat.engine)
+  knownModels.set(chat.engine, available)
+  if (JSON.stringify(known) !== JSON.stringify(available)) writeModelCache(chat.engine, available)
+}
+
+/** Change the session's model and effort, after any change still in flight; rejects with kiro-cli's error. */
+function applyModelChoice(chat: Chat, choice: ModelChoice): Promise<void> {
+  const previous = chat.configChange ?? Promise.resolve()
+  const run = previous.then(() => chat.hs.engine.setModel(choice))
+  const settled = run.then(() => {
+    rememberModels(chat)
+    console.log("[acp] sessionId=%s: model %s effort %s", chat.sessionId, choice.model ?? "(unchanged)", choice.effort ?? "(default)")
+  }, () => {})
+  chat.configChange = settled
+  void settled.then(() => { if (chat.configChange === settled) chat.configChange = null })
+  return run
+}
+
+/** A chat's models as the picker shows them. */
+export interface LocalSessionModels {
+  engine: EngineId
+  available: ModelOption[]
+  /** What the chat's session runs (null without a live session that reported it). */
+  current: { model: string; effort: string | null; effortLevels: string[] } | null
+  /** A choice that applies from the chat's next message. */
+  pending: ModelChoice | null
+}
+
+/**
+ * The models of a chat (`clientId`): its session's list and current model and effort, else the
+ * configured engine's last known list (never a new kiro-cli). `pending` is the chat's choice
+ * still to apply.
+ */
+export function getSessionModels(clientId?: string): LocalSessionModels {
+  const pending = (clientId && pendingModelChoices.get(clientId)) || null
+  const chat = clientId ? aliases.get(clientId) : undefined
+  const live = chat && !chat.hs.host.exited ? chat.hs.engine.models() : null
+  if (chat && live) {
+    return {
+      engine: chat.engine,
+      available: live.available,
+      current: { model: live.current, effort: live.effort?.current ?? null, effortLevels: live.effort?.levels ?? [] },
+      pending,
     }
   }
+  const engine = readEngineConfig().engine
+  return { engine, available: knownModels.get(engine) ?? readModelCache(engine), current: null, pending }
 }
 
-/** Check if a session has a running process. */
-export function isSessionRunning(sessionId: string): boolean {
-  return processes.get(sessionId)?.running ?? false
-}
-
-/** Drain buffered notifications for a session. */
-export function getBufferedEvents(sessionId: string, afterId?: number): { id: number; msg: Record<string, unknown> }[] {
-  const ps = processes.get(sessionId)
-  if (!ps) return []
-  if (afterId == null) return [...ps.notifications]
-  return ps.notifications.filter(e => e.id > afterId)
-}
-
-/** Subscribe to a session's process notifications. */
-export function subscribeToSession(sessionId: string): { sessionId: string | null; subscribe: (fn: NotifyListener) => () => void } | null {
-  const ps = processes.get(sessionId)
-  if (!ps) return null
-  return {
-    sessionId: ps.sessionId,
-    subscribe: (fn: NotifyListener) => {
-      ps.listeners.add(fn)
-      return () => { ps.listeners.delete(fn) }
-    },
+/**
+ * A chat chose a model and/or effort. Checked against the models it is offered (kiro-cli would
+ * take any value): a known model; an effort only for a model with effort levels, one of them.
+ * Applied at once when the chat is live and no turn runs or is being prepared (ModelChoiceError
+ * `model_not_changed` when kiro-cli refuses, and nothing is kept); otherwise kept for the chat's
+ * next message, where a new model drops an effort chosen for the previous one. Answers the
+ * chat's models after it.
+ */
+export async function chooseSessionModel(clientId: string, choice: ModelChoice): Promise<LocalSessionModels> {
+  const view = getSessionModels(clientId)
+  if (!view.available.length) throw new ModelChoiceError("models_unknown")
+  if (choice.model && !view.available.some((model) => model.modelId === choice.model)) throw new ModelChoiceError("unknown_model")
+  const pending = view.pending
+  if (choice.effort) {
+    const target = choice.model ?? pending?.model ?? view.current?.model
+    const levels = target && target === view.current?.model
+      ? view.current.effortLevels
+      : view.available.find((model) => model.modelId === target)?.effortLevels ?? []
+    if (!levels.length) throw new ModelChoiceError("effort_not_supported")
+    if (!levels.includes(choice.effort)) throw new ModelChoiceError("unknown_effort")
   }
-}
+  const merged: ModelChoice = choice.model && choice.model !== pending?.model
+    ? { model: choice.model, ...(choice.effort ? { effort: choice.effort } : {}) }
+    : { ...pending, ...choice }
 
-export function getModels(): { current: string; available: AcpModel[] } {
-  return { current: currentModelId, available: availableModels }
-}
-
-export async function setConfigOption(sessionId: string, configId: string, value: string): Promise<void> {
-  const ps = processes.get(sessionId)
-  if (!ps?.sessionId) return
-  await rpcRequestTo(ps, "session/set_config_option", { sessionId: ps.sessionId, configId, value })
-}
-
-/** Save sessionId to deck's .session file. */
-export function saveSessionToDeck(deckId: string, sessionId: string): void {
-  const fs = require("fs") as typeof import("fs")
-  const dir = resolveDeckDir(deckId)
-  if (!dir || !fs.existsSync(dir)) return
-  fs.writeFileSync(path.join(dir, ".session"), sessionId, "utf-8")
-}
-
-/** Read sessionId from deck's .session file. */
-export function readSessionFromDeck(deckId: string): string | null {
-  const fs = require("fs") as typeof import("fs")
-  const dir = resolveDeckDir(deckId)
-  if (!dir) return null
-  try { return fs.readFileSync(path.join(dir, ".session"), "utf-8").trim() } catch { return null }
-}
-
-/** Save a fork's source metadata to the deck. */
-export function saveOriginToDeck(deckId: string, origin: SessionOrigin): void {
-  const fs = require("fs") as typeof import("fs")
-  const dir = resolveDeckDir(deckId)
-  if (!dir || !fs.existsSync(dir)) return
-  fs.writeFileSync(path.join(dir, ".session-origin.json"), JSON.stringify(origin), "utf-8")
-}
-
-/** Read a fork's source metadata from the deck. */
-export function readOriginFromDeck(deckId: string): SessionOrigin | null {
-  const fs = require("fs") as typeof import("fs")
-  const dir = resolveDeckDir(deckId)
-  if (!dir) return null
-  try { return JSON.parse(fs.readFileSync(path.join(dir, ".session-origin.json"), "utf-8")) as SessionOrigin } catch { return null }
-}
-
-/** Save chat messages to deck's .chat.json file. */
-export function saveChatToDeck(deckId: string, messages: unknown[]): void {
-  const fs = require("fs") as typeof import("fs")
-  const dir = resolveDeckDir(deckId)
-  if (!dir || !fs.existsSync(dir)) return
-  fs.writeFileSync(path.join(dir, ".chat.json"), JSON.stringify(messages), "utf-8")
-}
-
-/** Read chat messages from deck's .chat.json file. */
-export function readChatFromDeck(deckId: string): unknown[] {
-  const fs = require("fs") as typeof import("fs")
-  const dir = resolveDeckDir(deckId)
-  if (!dir) return []
-  try { return JSON.parse(fs.readFileSync(path.join(dir, ".chat.json"), "utf-8")) } catch { return [] }
-}
-
-// Cleanup on process exit
-for (const sig of ["exit", "SIGINT", "SIGTERM"] as const) {
-  process.on(sig, () => {
-    for (const ps of processes.values()) ps.child.kill()
-    processes.clear()
-    pendingOrigins.clear()
-  })
+  const chat = aliases.get(clientId)
+  if (chat && !chat.hs.host.exited && !chat.turn && !chat.reserved && chat.hs.engine.models()) {
+    try {
+      await applyModelChoice(chat, merged)
+    } catch (error) {
+      throw new ModelChoiceError("model_not_changed", errorText(error))
+    }
+    pendingModelChoices.delete(clientId)
+  } else {
+    keepNewest(pendingModelChoices, clientId, merged, MAX_PENDING_MODEL_CHOICES)
+  }
+  return getSessionModels(clientId)
 }

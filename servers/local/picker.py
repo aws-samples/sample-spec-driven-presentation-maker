@@ -6,8 +6,9 @@
           Claude Desktop      not here — use sdpm.mcpb          (disabled row)
 
 ↑/↓ (or j/k) move, space toggles, `a` toggles all, enter confirms, q / esc cancels.
-Without a TTY (CI, `--yes`, pipes) callers fall back to line input or the defaults —
-this module never blocks on a non-interactive stream.
+Without a terminal (CI, an agent, pipes) ``pick`` asks nothing and returns None: callers
+check the TTY rule first and never reach it there. Line input (``pick_line``) is only for a
+terminal the raw-mode widget cannot drive.
 
 The picker writes to and reads from the controlling terminal (/dev/tty on POSIX, the
 console on Windows), so it works under `curl … | bash` where stdin is the script.
@@ -31,8 +32,14 @@ class Option:
 
 
 def _tty_available() -> bool:
+    """The TTY rule (checkout_update.tty_allowed): stdout is a terminal and one can be read."""
+    try:
+        if not sys.stdout.isatty():
+            return False
+    except (AttributeError, ValueError):
+        return False
     if sys.platform == "win32":
-        return sys.stdout.isatty()
+        return sys.stdin.isatty()
     try:
         fd = os.open("/dev/tty", os.O_RDWR)
     except OSError:
@@ -108,10 +115,11 @@ def _render(options: list[Option], cursor: int, title: str, help_line: str) -> s
 def pick(options: list[Option], *, title: str = "Select", out=None) -> Optional[list[str]]:
     """Interactive multi-select. Returns the checked keys, or None if cancelled.
 
-    Falls back to `pick_line` when no terminal is available.
+    Without a terminal it returns None and reads nothing. Falls back to `pick_line` when the
+    terminal cannot be put in raw mode.
     """
     if not _tty_available():
-        return pick_line(options, title=title)
+        return None
     enabled_idx = [i for i, o in enumerate(options) if o.enabled]
     if not enabled_idx:
         return []
@@ -125,12 +133,18 @@ def pick(options: list[Option], *, title: str = "Select", out=None) -> Optional[
         tty_file = None
         raw = None
     else:
-        tty_file = open("/dev/tty", "r+b", buffering=0)
+        tty_file = None
+        try:
+            tty_file = open("/dev/tty", "r+b", buffering=0)
+            fd = tty_file.fileno()
+            raw = _raw_mode(fd)
+            raw.__enter__()
+        except Exception:  # noqa: BLE001 - OSError or termios.error: the widget cannot run here
+            if tty_file is not None:
+                tty_file.close()
+            return pick_line(options, title=title)
         write = lambda s: (tty_file.write(s.encode()), tty_file.flush())  # noqa: E731
-        fd = tty_file.fileno()
         read_key = lambda: _read_key_posix(fd)  # noqa: E731
-        raw = _raw_mode(fd)
-        raw.__enter__()
 
     try:
         write("\x1b[?25l")  # hide cursor

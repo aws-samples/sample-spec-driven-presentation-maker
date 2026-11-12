@@ -5,7 +5,7 @@
 Spec-Driven Presentation Maker の Layer 4 Web UI コンポーネント。
 チャットベースの対話でプレゼンテーションの設計・生成・プレビューを行う React アプリケーション。
 
-![チャット画面](readme-imgs/fast-chat-screenshot.png)
+![デッキ画面。左にスライド、右にチャット（修正依頼とエージェントの返答）](../docs/assets/screenshots/webui-deck.png)
 
 ---
 
@@ -16,7 +16,7 @@ Spec-Driven Presentation Maker の Layer 4 Web UI コンポーネント。
 | フレームワーク | Next.js 16 (Turbopack) / React 19 / TypeScript 5 |
 | スタイリング | Tailwind CSS v4 / shadcn/ui / Radix UI |
 | 認証 | react-oidc-context (Cognito User Pool) |
-| その他 | react-markdown, react-dropzone, Lucide React, sonner |
+| その他 | react-markdown, Lucide React, sonner |
 | ビルド | Static export (`output: "export"`, `distDir: "build"`) |
 
 ---
@@ -82,7 +82,19 @@ npm run dev:local
 
 ### 動作の仕組み
 
-`NEXT_PUBLIC_MODE=local` が設定されると、`src/app/api/` 以下の Next.js API Routes が有効になり、アクティブなデッキごとに `kiro-cli acp --agent sdpm-orchestrator` を子プロセスとして起動します。正規の Agent 定義は [`servers/local/.kiro/acp-agents/`](../servers/local/.kiro/acp-agents/) に、MCP ツールは [`servers/local/server_acp.py`](../servers/local/server_acp.py) に格納されています。
+`NEXT_PUBLIC_MODE=local` が設定されると、`src/app/api/` 以下の Next.js API Routes が有効になり、アクティブなチャットごとに `kiro-cli acp --agent-engine v3` を子プロセスとして起動し、セッションをそのエージェントのモード（デッキは `sdpm-orchestrator`）で始めます（kiro-cli 3.0 以降）。正規の Agent 定義は [`servers/local/.kiro/acp-agents/`](../servers/local/.kiro/acp-agents/) に、MCP ツールは [`servers/local/server_acp.py`](../servers/local/server_acp.py) に格納されています。新しいチャットを始めるたびに、これらから `servers/local/.kiro/agents/` を kiro-cli の両方のエンジンが読める形で生成し直し、変更がなければそのままにします。
+
+kiro-cli の V2 エンジン（`kiro-cli acp --agent sdpm-orchestrator`）で動かすには、Settings → **エージェントエンジン** で V2 を選ぶか、`servers/local/.sdpm/acp-config.json` に `{"version": 2, "engine": "v2"}` と書きます。選択は次のメッセージから反映されます。
+
+`~/.kiro/steering` の常に読み込まれるルールは、V2 と同じく V3 でも sdpm のエージェントの文脈に入ります。
+
+### バックグラウンドでのスライド作成
+
+Cloud と同じく、オーケストレーターは `compose_slides` でコンポーザーに作業を渡してターンを終えます。コンポーザーは Local サーバーが起動し、スライドを書いている間もチャットは使えます。Compose カードには各グループの進み具合が表示されます。方針が変わったらチャットで伝えてください。オーケストレーターが `message_composer` で作業中のコンポーザーに伝えます。すべてのグループが終わると、オーケストレーターがレポートを受け取り、デッキの完成を知らせます。Stop でコンポーザーは止まりますが、タブを閉じても止まりません。デッキは最後まで作られ、開き直すと結果が表示されます。composer はそれぞれ専用の kiro-cli で動き、同時に最大 4 つ。1 つあたり約 0.5 GB、プレビューを描画している間は最大約 0.7 GB です。V3 でも V2 でも動きます。
+
+### モデルと思考の深さ
+
+チャット入力欄の上のボタンに、そのチャットのモデル（V3 では思考の深さも）が表示され、押すとメニューで変更できます。変更はこのチャットの kiro セッションに反映されます。チャットが待機中ならすぐに、応答中なら次のメッセージからです。V3 ではモデルと、対応するモデルなら思考の深さを選べます。V2 で選べるのはモデルだけです。kiro-cli が選択をセッションに保存するため、デッキを開き直しても同じ設定で続きます。Settings → **モデル** は新しいチャットの既定値のままで、コンポーザーもチャットの選択に従います。一覧は最後にモデルを報告した kiro-cli セッションのもの（`servers/local/.sdpm/acp-models.json`）を使うため、このボタンも Settings も kiro-cli を起動しません。初回はエージェントが最初に応答した後に表示されます。
 
 ---
 
@@ -205,7 +217,7 @@ web-ui/
 
 - `ChatPanel` — メインのチャット UI
 - `ChatMessage` — メッセージの描画（Markdown 対応）
-- `ToolCard` / `ToolIndicator` — エージェントのツール実行表示
+- `ToolCard` — エージェントのツール実行表示
 - `FileDropZone` / `AttachmentPreview` — ファイルアップロード
 
 ### deck
@@ -215,7 +227,6 @@ web-ui/
 - `DeckCard` / `DeckListView` — デッキ一覧と検索
 - `SlideCarousel` — スライドのプレビュー表示
 - `OutlineView` / `SpecStepNav` — アウトラインとスペック進行状況
-- `WorkspaceView` — ワークスペース管理
 
 ### auth
 
@@ -230,9 +241,10 @@ Cognito OIDC 認証フロー。
 
 | ドキュメント | 説明 |
 |---|---|
-| [セットアップガイド](../docs/ja/getting-started.md) | Layer 1〜4 の構築手順 |
-| [アーキテクチャ](../docs/en/architecture.md) | 4層設計、データフロー、認証モデル |
-| [推奨デプロイ手順](../docs/en/deploy-cloudshell.md) | AWS デプロイの推奨手順（CloudShell・ローカル対応） |
+| [はじめに](../docs/ja/getting-started.md) | 利用ガイド: インストール、AI エージェント、Web UI、HTML デッキ |
+| [開発者ガイド](../docs/en/developer-guide.md) | checkout での開発と CDK デプロイ（英語） |
+| [アーキテクチャ](../docs/en/architecture.md) | 4 層設計、データフロー、認証モデル（英語） |
+| [デプロイガイド](../docs/en/deploy-cloudshell.md) | AWS デプロイの推奨手順（CloudShell・ローカル対応、英語） |
 
 ---
 

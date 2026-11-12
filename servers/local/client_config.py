@@ -2,9 +2,9 @@
 """Wire the local MCP server into the MCP clients installed on this machine.
 
 This is the single implementation behind ``sdpm mcp-config``, ``sdpm register``,
-``sdpm unregister`` and ``sdpm`` (status) on every OS; the shell and PowerShell
-launchers only delegate here. It knows about clients, not about slides, so it
-lives with the local adapter rather than in ``sdpm.tools``.
+``sdpm unregister``, ``sdpm`` (status) and the end of ``sdpm update`` (``refresh``) on
+every OS; the shell and PowerShell launchers only delegate here. It knows about clients,
+not about slides, so it lives with the local adapter rather than in ``sdpm.tools``.
 
 Every generated configuration points at the **absolute path of uv and of the
 checkout** — never at a launcher script, never at anything on ``PATH``. GUI
@@ -24,6 +24,7 @@ import argparse
 import base64
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -31,6 +32,19 @@ import webbrowser
 from dataclasses import dataclass
 from pathlib import Path, PurePosixPath, PureWindowsPath
 from typing import Callable, Optional
+
+# The install lifecycle (sibling module, standard library only): the launcher markers and
+# refresh_launcher live there, next to the code that installs the launcher.
+from checkout_update import (  # noqa: E402
+    BOOTSTRAP_MARKER,
+    LAUNCHER_FINGERPRINT,
+    PY_ARGS,
+    child_env,
+    refresh_launcher,
+    same_path,
+    sdpm_home,
+    tty_allowed,
+)
 
 SERVER_NAME = "sdpm"
 
@@ -57,10 +71,14 @@ class Target:
 
 
 def server_config(target: Target) -> dict:
-    """The stdio server definition every client receives (R3.1)."""
+    """The stdio server definition every client receives (R3.1).
+
+    ``--frozen``: uv uses the lockfile as it is and never rewrites it. A tracked file the
+    server's start changed in the checkout would get in the way of the next ``sdpm update``.
+    """
     return {
         "command": target.uv,
-        "args": ["run", "--directory", target.server_dir, "python", "server.py"],
+        "args": ["run", "--directory", target.server_dir, "--frozen", "python", "server.py"],
     }
 
 
@@ -120,23 +138,48 @@ DEFAULT_KIRO_AGENT = "sdpm"
 _KIRO_AGENT_TOOLS = ["@sdpm", "use_subagent", "read", "glob", "grep", "web_search", "web_fetch"]
 
 
+def _kiro_permission_rules(name: str) -> list[dict]:
+    """The V3 form of allowedTools + trustedAgents: the same tools run without approval."""
+    return [
+        {"capability": "mcp", "match": [f"{SERVER_NAME}/*"], "effect": "allow"},
+        {"capability": "subagent", "match": [name], "effect": "allow"},
+        {"capability": "fs_read", "effect": "allow"},  # read, glob, grep
+        {"capability": "web_search", "effect": "allow"},
+        {"capability": "web_fetch", "effect": "allow"},
+    ]
+
+
 def kiro_agent_definition(t: Target, name: str = DEFAULT_KIRO_AGENT) -> dict:
+    """One file both Kiro CLI engines load as-is.
+
+    The V2 engine reads ``tools`` / ``allowedTools`` / ``toolsSettings``; the V3 engine
+    (kiro-cli 3.x) reads ``tools`` (``subagent/<name>``) and ``permissions`` and ignores
+    the V2 fields. V3 rejects — or, with auto-upgrade on, rewrites and backs up — only a
+    definition without ``permissions``, so this one is never converted.
+    """
     cfg = server_config(t)
     return {
         "name": name,
         "description": (
             "Spec-Driven Presentation Maker — slides from material or dialogue. "
-            "Prompts: /sdpm-vibe /sdpm-spec /sdpm-style /sdpm-translate. " + KIRO_AGENT_MARKER
+            "Prompts: /sdpm-vibe /sdpm-spec /sdpm-style /sdpm-translate. "
+            # Kiro CLI 3.x shows this text as the subagent tool's description. Without this
+            # sentence the first turn hands the whole request to a copy of this agent.
+            "As a sub-agent it runs only the sdpm role its prompt names: spawn it with the composer "
+            "prompt from start_presentation, not with the user's request. " + KIRO_AGENT_MARKER
         ),
-        "mcpServers": {SERVER_NAME: {**cfg, "timeout": 120000}},
+        # Kiro CLI 3.x sends the first model request before an MCP server connects unless the
+        # server has waitForReady; without it the first turn sees no sdpm tool and delegates.
+        "mcpServers": {SERVER_NAME: {**cfg, "timeout": 120000, "waitForReady": True}},
         # @sdpm is trusted: composing a deck is dozens of run_python calls, and run_python
         # is a local sandbox confined to the deck directory. Nothing here writes files or
         # runs shell commands outside that sandbox.
-        "tools": list(_KIRO_AGENT_TOOLS),
+        "tools": [*_KIRO_AGENT_TOOLS, f"subagent/{name}"],
         "allowedTools": list(_KIRO_AGENT_TOOLS),
         # Composers are copies of this agent: spawning it needs no approval, and no other
         # agent (say, a stale one from an old installer) can be picked by mistake.
         "toolsSettings": {"subagent": {"availableAgents": [name], "trustedAgents": [name]}},
+        "permissions": {"rules": _kiro_permission_rules(name)},
         "resources": [],
     }
 
@@ -152,22 +195,135 @@ def _is_our_agent_file(path: Path) -> bool:
         return False
 
 
+def _as_list(value: object) -> list:
+    return list(value) if isinstance(value, list) else []
+
+
+def _as_dict(value: object) -> dict:
+    return dict(value) if isinstance(value, dict) else {}
+
+
+def _with(existing: list, ours: list) -> list:
+    """``existing`` in its order, then each of ``ours`` it does not have yet."""
+    merged = list(existing)
+    merged.extend(item for item in ours if item not in existing)
+    return merged
+
+
+def _v3_form_of_added_v2(current: dict, name: str) -> tuple[list[dict], list[str]]:
+    """For a file without ``permissions`` (only the V2 engine's fields): the V3 permission
+    rules for what other tools added to ``allowedTools`` / ``toolsSettings``, and the names
+    of the additions that have no rule with the same meaning sdpm can write.
+
+    Writing ``permissions`` makes the V3 engine read only that, so an addition without its
+    rule would silently stop applying there (a denied command would run, say).
+    """
+    rules: list[dict] = []
+    unmatched: list[str] = []
+    for tool in _as_list(current.get("allowedTools")):
+        if tool in _KIRO_AGENT_TOOLS:
+            continue
+        if isinstance(tool, str) and tool.startswith("@") and "/" not in tool and len(tool) > 1:
+            rules.append({"capability": "mcp", "match": [f"{tool[1:]}/*"], "effect": "allow"})
+        else:
+            unmatched.append(f"allowedTools: {tool}")
+    settings = _as_dict(current.get("toolsSettings"))
+    for key in settings:
+        if key != "subagent":
+            unmatched.append(f"toolsSettings.{key}")
+    subagent = _as_dict(settings.get("subagent"))
+    for key in subagent:
+        if key not in ("availableAgents", "trustedAgents"):
+            unmatched.append(f"toolsSettings.subagent.{key}")
+    for agent in _as_list(subagent.get("trustedAgents")):
+        if agent != name:
+            rules.append({"capability": "subagent", "match": [agent], "effect": "allow"})
+    return rules, unmatched
+
+
+def merged_kiro_agent(current: object, t: Target, name: str = DEFAULT_KIRO_AGENT) -> tuple[Optional[dict], list[str]]:
+    """Our definition applied to the file as it is: the keys and entries sdpm owns (name,
+    description, the ``sdpm`` server, its tools, allowed tools, subagent settings and
+    permission rules) are brought up to date; everything else another tool or Kiro added
+    (other MCP servers and tools, other tools' settings, ``kiroUpgrade``, …) stays.
+
+    Returns ``(None, names)`` when the file has only V2 fields and some of those additions
+    cannot be given their V3 form with the same meaning: then the file is not rewritten.
+    """
+    ours = kiro_agent_definition(t, name)
+    if not isinstance(current, dict):
+        return ours, []
+    extra_rules: list[dict] = []
+    if "permissions" not in current:
+        extra_rules, unmatched = _v3_form_of_added_v2(current, name)
+        if unmatched:
+            return None, unmatched
+    merged = dict(current)
+    merged["name"] = ours["name"]
+    merged["description"] = ours["description"]
+    servers = _as_dict(current.get("mcpServers"))
+    servers[SERVER_NAME] = {**_as_dict(servers.get(SERVER_NAME)), **ours["mcpServers"][SERVER_NAME]}
+    merged["mcpServers"] = servers
+    merged["tools"] = _with(_as_list(current.get("tools")), ours["tools"])
+    merged["allowedTools"] = _with(_as_list(current.get("allowedTools")), ours["allowedTools"])
+    settings = _as_dict(current.get("toolsSettings"))
+    subagent = _as_dict(settings.get("subagent"))
+    for key, value in ours["toolsSettings"]["subagent"].items():
+        subagent[key] = _with(_as_list(subagent.get(key)), value)
+    settings["subagent"] = subagent
+    merged["toolsSettings"] = settings
+    permissions = _as_dict(current.get("permissions"))
+    permissions["rules"] = _with(_as_list(permissions.get("rules")), [*ours["permissions"]["rules"], *extra_rules])
+    merged["permissions"] = permissions
+    if not isinstance(merged.get("resources"), list):
+        merged["resources"] = ours["resources"]
+    return merged, []
+
+
+KIRO_LOGIN_FIRST = "kiro-cli login first"
+
+
 def write_kiro_agent(t: Target, *, name: str = DEFAULT_KIRO_AGENT, dry_run: bool = False,
-                     root: Optional[Path] = None) -> int:
-    """Create or refresh the agent file we own. A user's own agent of that name is left alone."""
+                     root: Optional[Path] = None, notes: Optional[list[str]] = None) -> int:
+    """Create or refresh the agent file we own. A user's own agent of that name is left alone;
+    in ours, what other tools added is kept (:func:`merged_kiro_agent`).
+
+    ``kiro-cli agent validate`` needs a signed-in kiro-cli. When ``kiro-cli whoami`` says it
+    is not (its exit code; the output is not parsed), the written file is the registration:
+    validation is skipped, one line says to sign in, and :data:`KIRO_LOGIN_FIRST` is added
+    to ``notes`` for the result table.
+    """
     path = kiro_agent_path(name, root)
     if path.exists() and not _is_our_agent_file(path):
         print(f"{path} exists and is not managed by sdpm — leaving it alone.")
         print("  Use `sdpm register kiro-cli --agent-name <other>` or add the server to that agent yourself:")
         print("  " + json.dumps(server_config(t)))
         return 0
-    text = json.dumps(kiro_agent_definition(t, name), indent=2, ensure_ascii=False) + "\n"
+    current: object = None
+    if path.exists():
+        try:
+            current = json.loads(path.read_text(encoding="utf-8"))
+        except (OSError, ValueError):
+            current = None  # ours by its marker, but unreadable: write it new
+    agent, unmatched = merged_kiro_agent(current, t, name)
+    if agent is None:
+        print(f"{path} has settings another tool added for kiro-cli 2.x only: {', '.join(unmatched)}.")
+        print("  sdpm cannot write their kiro-cli 3.x form (permissions) with the same meaning, so it left")
+        print("  the file as it is. Move them into `permissions` (or remove them), then run")
+        print(f"  `sdpm register kiro-cli`. The sdpm server it should run: {json.dumps(server_config(t))}")
+        return 0
+    text = json.dumps(agent, indent=2, ensure_ascii=False) + "\n"
     if dry_run:
         print("[dry-run] write " + str(path))
         return 0
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(text, encoding="utf-8")
     if shutil.which("kiro-cli"):
+        if _run_quiet(["kiro-cli", "whoami"]) != 0:
+            print(f"  Kiro CLI is not signed in yet: run `kiro-cli login`, then `kiro-cli chat --agent {name}`.")
+            if notes is not None:
+                notes.append(KIRO_LOGIN_FIRST)
+            return 0
         rc = _run(["kiro-cli", "agent", "validate", "--path", str(path)])
         if rc != 0:
             print(f"  kiro-cli agent validate rejected {path}", file=sys.stderr)
@@ -175,12 +331,26 @@ def write_kiro_agent(t: Target, *, name: str = DEFAULT_KIRO_AGENT, dry_run: bool
     return 0
 
 
+def _kiro_upgrade_backups(name: str, root: Optional[Path] = None) -> list[Path]:
+    """`<name>.json.bak[.N]` copies of our file that kiro-cli 3.x left when it converted the
+    pre-V3 definition at launch. Only copies that still carry our marker are ours."""
+    path = kiro_agent_path(name, root)
+    try:
+        candidates = sorted(path.parent.iterdir())
+    except OSError:
+        return []
+    prefix = path.name + ".bak"
+    return [p for p in candidates
+            if p.is_file() and (p.name == prefix or p.name.startswith(prefix + ".")) and _is_our_agent_file(p)]
+
+
 def remove_kiro_agent(*, name: str = DEFAULT_KIRO_AGENT, dry_run: bool = False, root: Optional[Path] = None) -> None:
     path = kiro_agent_path(name, root)
-    if path.exists() and _is_our_agent_file(path):
-        print(("[dry-run] remove " if dry_run else "removed ") + str(path))
+    ours = [path] if path.exists() and _is_our_agent_file(path) else []
+    for p in ours + _kiro_upgrade_backups(name, root):
+        print(("[dry-run] remove " if dry_run else "removed ") + str(p))
         if not dry_run:
-            path.unlink()
+            p.unlink()
 
 
 def kiro_agent_registered(name: str = DEFAULT_KIRO_AGENT, root: Optional[Path] = None) -> bool:
@@ -407,7 +577,10 @@ def config_document(clients: list[Client], target: Target, agent_name: str = DEF
 
 
 def _confirm(question: str) -> bool:
-    """Ask on the terminal. Under `curl … | bash` stdin is the script, so prefer /dev/tty."""
+    """Ask on the terminal. Under `curl … | bash` stdin is the script, so prefer /dev/tty.
+    Without a terminal (the TTY rule in checkout_update) the answer is no, unasked."""
+    if not tty_allowed():
+        return False
     prompt = f"{question} [y/N] "
     try:
         if sys.platform != "win32" and os.path.exists("/dev/tty"):
@@ -495,8 +668,15 @@ def register(
     open_url: Callable[[str], bool] = webbrowser.open,
     agent_name: str = DEFAULT_KIRO_AGENT,
     chosen: Optional[list[Client]] = None,
+    cleanup: bool = True,
+    record: Optional[dict] = None,
 ) -> int:
-    """Pick clients, register with each, print one result table. Returns the number of failures."""
+    """Pick clients, register with each, print one result table. Returns the number of failures.
+
+    ``cleanup`` offers to remove what older setups left in the client (Kiro installer files,
+    the global Kiro entry, the Claude Code plugin); ``refresh`` turns it off. ``record``
+    collects the ids that were registered (``--record``).
+    """
     if chosen is None:
         chosen = choose_clients(clients, agent_name=agent_name, assume_yes=assume_yes, dry_run=dry_run)
     chosen_ids = {c.id for c in chosen}
@@ -509,11 +689,16 @@ def register(
             outcomes.append(Outcome(client, "skipped", f"sdpm register {client.id}"))
             continue
         if client.id == "kiro-cli":
-            if write_kiro_agent(target, name=agent_name, dry_run=dry_run) == 0:
-                outcomes.append(Outcome(client, "registered", f"agent `{agent_name}`  {next_step(client, agent_name)}"))
+            notes: list[str] = []
+            if write_kiro_agent(target, name=agent_name, dry_run=dry_run, notes=notes) == 0:
+                step = next_step(client, agent_name)
+                if notes:  # not signed in: "→ kiro-cli login first, then kiro-cli chat --agent …"
+                    step = f"→ {', '.join(notes)}, then {step.removeprefix('→ ')}"
+                outcomes.append(Outcome(client, "registered", f"agent `{agent_name}`  {step}"))
             else:
                 outcomes.append(Outcome(client, "failed", "sdpm mcp-config kiro-cli"))
-            _offer_leftover_cleanup(dry_run=dry_run, assume_yes=assume_yes, run=run)
+            if cleanup:
+                _offer_leftover_cleanup(dry_run=dry_run, assume_yes=assume_yes, run=run)
             continue
         if client.register is not None:
             argv = client.register(target)
@@ -525,7 +710,7 @@ def register(
                 outcomes.append(Outcome(client, "failed", f"add it by hand: sdpm mcp-config {client.id}"))
             else:
                 outcomes.append(Outcome(client, "registered", next_step(client, agent_name)))
-            if client.id == "claude-code":
+            if client.id == "claude-code" and cleanup:
                 _offer_claude_plugin_cleanup(
                     dry_run=dry_run, assume_yes=assume_yes, run=run, probe=probe
                 )
@@ -539,12 +724,25 @@ def register(
             else:
                 outcomes.append(Outcome(client, "failed", f"open the link from: sdpm mcp-config {client.id}"))
     print_outcomes(outcomes)
+    if record is not None and not dry_run:
+        record.setdefault("registered", []).extend(
+            o.client.id for o in outcomes if o.status in ("registered", "opened"))
     return sum(1 for o in outcomes if o.status == "failed")
 
 
-_MARK = {"registered": "\x1b[32m✓\x1b[0m", "opened": "\x1b[32m✓\x1b[0m", "skipped": "–",
-         "failed": "\x1b[31m✗\x1b[0m", "manual": " "}
+_MARK = {"registered": ("32", "✓"), "opened": ("32", "✓"), "skipped": ("", "–"),
+         "failed": ("31", "✗"), "manual": ("", " ")}
 _WORD = {"registered": "registered", "opened": "link opened", "skipped": "skipped", "failed": "failed", "manual": ""}
+
+
+def use_color() -> bool:
+    """Colour only on a terminal, and not when NO_COLOR is set (https://no-color.org)."""
+    return sys.stdout.isatty() and not os.environ.get("NO_COLOR")
+
+
+def _mark(status: str, color: bool) -> str:
+    code, mark = _MARK[status]
+    return f"\x1b[{code}m{mark}\x1b[0m" if color and code else mark
 
 
 def print_outcomes(outcomes: list[Outcome]) -> None:
@@ -552,8 +750,9 @@ def print_outcomes(outcomes: list[Outcome]) -> None:
         return
     print()
     width = max(len(o.client.label) for o in outcomes) + 2
+    color = use_color()
     for o in outcomes:
-        print(f"  {_MARK[o.status]} {o.client.label:<{width}}{_WORD[o.status]:<12} {o.detail}")
+        print(f"  {_mark(o.status, color)} {o.client.label:<{width}}{_WORD[o.status]:<12} {o.detail}")
     print()
 
 
@@ -618,14 +817,16 @@ def _offer_leftover_cleanup(*, dry_run: bool, assume_yes: bool, run: Callable[[l
 
 
 def unregister(clients: list[Client], *, dry_run: bool = False, run: Callable[[list[str]], int] = _run,
-               agent_name: str = DEFAULT_KIRO_AGENT) -> int:
+               agent_name: str = DEFAULT_KIRO_AGENT, record: Optional[dict] = None) -> int:
     failures = 0
+    removed = record.setdefault("unregistered", []) if record is not None and not dry_run else []
     for client in clients:
         if client.id == "kiro-cli":
             remove_kiro_agent(name=agent_name, dry_run=dry_run)
             leftovers = kiro_leftovers()
             if leftovers:
                 remove_leftovers(leftovers, dry_run=dry_run)
+            removed.append(client.id)
             continue
         if client.unregister is None:
             print(f"{client.label}: remove '{SERVER_NAME}' from {client.manual_target}")
@@ -634,6 +835,8 @@ def unregister(clients: list[Client], *, dry_run: bool = False, run: Callable[[l
         print(("[dry-run] " if dry_run else "") + _shell_join(argv))
         if not dry_run and run(argv) != 0:
             failures += 1
+        else:
+            removed.append(client.id)
     return failures
 
 
@@ -644,15 +847,263 @@ def registered(clients: list[Client], agent_name: str = DEFAULT_KIRO_AGENT) -> d
         if client.id == "kiro-cli":
             result[client.id] = kiro_agent_registered(agent_name)
             continue
-        if client.list_cmd is None:
-            result[client.id] = None
-            continue
-        try:
-            out = subprocess.run(client.list_cmd, capture_output=True, text=True, timeout=20, check=False)
-            result[client.id] = SERVER_NAME in (out.stdout + out.stderr)
-        except (OSError, subprocess.TimeoutExpired):
-            result[client.id] = None
+        listing = _list_output(client)
+        result[client.id] = None if listing is None else SERVER_NAME in listing
     return result
+
+
+def _list_output(client: Client) -> Optional[str]:
+    """What ``client.list_cmd`` prints; None when there is no such command or it cannot run."""
+    if client.list_cmd is None:
+        return None
+    try:
+        out = subprocess.run(client.list_cmd, capture_output=True, text=True, timeout=20, check=False)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    return out.stdout + out.stderr
+
+
+# One line per server in both `claude mcp list` ("sdpm: <command> <args> - ✓ Connected") and
+# `codex mcp list` (a table whose first column is the name).
+_SERVER_LINE = re.compile(rf"^\s*{re.escape(SERVER_NAME)}(:|\s)")
+
+
+def entry_checkout(listing: str, target: Target) -> Optional[str]:
+    """Whose ``sdpm`` entry a client lists: "here" when it runs ``target``'s checkout,
+    "other" when it runs another one (``make register-dev`` uses the same name), None when
+    the client has no ``sdpm`` entry."""
+    lines = [line for line in listing.splitlines() if _SERVER_LINE.match(line)]
+    if not lines:
+        return None
+    return "here" if any(target.server_dir in line for line in lines) else "other"
+
+
+# ---------------------------------------------------------------------------
+# After `sdpm update`: bring the rest of the install up to date (refresh)
+# ---------------------------------------------------------------------------
+#
+# Both launchers end `sdpm update` with `client_config.py refresh`, after the pull, so this
+# runs the new checkout's code. Since the bootstrap, `finish` (checkout_update.py) calls it;
+# launchers from before reach the new path through the hook below (or the #397 bridge).
+# LAUNCHER_FINGERPRINT and refresh_launcher are imported from checkout_update above.
+
+
+def _run_quiet(argv: list[str]) -> int:
+    try:
+        return subprocess.run(argv, capture_output=True, check=False).returncode
+    except OSError:
+        return 127
+
+
+def old_launcher_adopt(launcher: Optional[Path], target: Target, since: Optional[str]) -> Optional[list[str]]:
+    """The ``adopt`` an old launcher's ``refresh`` hands over to, or None.
+
+    The #529 and #532 launchers end `sdpm update` with this file's ``refresh --launcher
+    SELF``. When ``SELF`` is an SDPM launcher from before the bootstrap, this run is such an
+    update of the managed checkout: the new path (checkout_update.py adopt) takes over.
+    ``finish`` sets SDPM_UPDATER for its own refresh, which never comes back here.
+    """
+    if launcher is None or os.environ.get("SDPM_UPDATER"):
+        return None
+    try:
+        text = launcher.read_text(encoding="utf-8", errors="replace")
+    except OSError:
+        return None
+    if LAUNCHER_FINGERPRINT not in text or BOOTSTRAP_MARKER in text:
+        return None
+    home = sdpm_home()
+    checkout = Path(target.checkout)
+    if not same_path(checkout, home / "checkout"):
+        return None
+    argv = [target.uv, *PY_ARGS, str(checkout / "servers" / "local" / "checkout_update.py"),
+            "--checkout", str(checkout), "--uv", target.uv, "adopt", "--launcher", str(launcher),
+            "--prepared", "all"]
+    if since and _REVISION.match(since):
+        argv[argv.index("adopt") + 1:argv.index("adopt") + 1] = ["--from", since]
+    return argv
+
+
+def run_adopt(argv: list[str], call: Callable[..., int] = subprocess.call) -> int:
+    """Run it outside the checkout's .venv: no VIRTUAL_ENV, from the home directory."""
+    sys.stdout.flush()
+    return call(argv, env=child_env(), cwd=str(sdpm_home()))  # nosec B603 - our interpreter line and script
+
+
+def update_leftovers(checkout: Path, agent_name: str = DEFAULT_KIRO_AGENT, root: Optional[Path] = None) -> list[Path]:
+    """What earlier versions left that nothing uses any more. An explicit list, each item
+    identified by its contents, so a user's own file of the same name is never matched:
+
+    - ``servers/local/.venv`` and ``sdpm/.venv`` — per-package environments before 0.12
+      (now ``<checkout>/.venv``); only directories that are virtual environments
+    - the files of the old Kiro installer (:func:`kiro_leftovers`)
+    - ``<agent>.json.bak[.N]`` copies kiro-cli 3.x made of our pre-V3 agent file
+    """
+    venvs = [checkout / "servers" / "local" / ".venv", checkout / "sdpm" / ".venv"]
+    found = [p for p in venvs if p.is_dir() and not p.is_symlink() and (p / "pyvenv.cfg").is_file()]
+    return found + kiro_leftovers(root) + _kiro_upgrade_backups(agent_name, root)
+
+
+def refresh_registrations(
+    target: Target,
+    *,
+    agent_name: str = DEFAULT_KIRO_AGENT,
+    clients: Optional[list[Client]] = None,
+    run: Callable[[list[str]], int] = _run,
+    run_quiet: Callable[[list[str]], int] = _run_quiet,
+    record: Optional[dict] = None,
+) -> tuple[int, list[Client], list[Client]]:
+    """Register again every client whose server runs this install; add none.
+
+    Returns the number of failures, the detected clients that do not have the server (for
+    one "add with sdpm register" line), and the clients whose ``sdpm`` entry runs another
+    checkout — a developer's ``make register-dev`` — which are left alone. The Kiro agent
+    file is the registration itself, so it is refreshed even when kiro-cli is not on PATH.
+    A client whose CLI can remove the server is cleared first: ``claude mcp add`` refuses a
+    name that exists.
+    """
+    clients = detect() if clients is None else list(clients)
+    if not any(c.id == "kiro-cli" for c in clients) and kiro_agent_registered(agent_name):
+        clients.insert(0, by_id("kiro-cli"))
+    ours: list[Client] = []
+    missing: list[Client] = []
+    elsewhere: list[Client] = []
+    for client in clients:
+        if client.id == "kiro-cli":
+            # Ours by marker, under the install-time name; register-dev uses another name.
+            state = "here" if kiro_agent_registered(agent_name) else None
+        else:
+            listing = _list_output(client)
+            if listing is None:
+                continue  # cannot tell (no list command): never touched
+            state = entry_checkout(listing, target)
+        if state == "here":
+            ours.append(client)
+        elif state == "other":
+            elsewhere.append(client)
+        elif _selectable(client):
+            missing.append(client)
+    if record is not None:
+        record.setdefault("here", []).extend(c.id for c in ours)
+    if not ours:
+        return 0, missing, elsewhere
+    for client in ours:
+        if client.unregister is not None:
+            run_quiet(client.unregister())
+    failures = register(ours, target, run=run, agent_name=agent_name, chosen=ours, cleanup=False, record=record)
+    return failures, missing, elsewhere
+
+
+# Upgrading notes. In CHANGELOG.md, the bullets that follow a paragraph
+# `**Local installs (`sdpm update`).**` inside an Upgrading section are written for people
+# who run `sdpm update`, each as what to do. refresh prints those the previous checkout's
+# CHANGELOG did not contain yet, so a release's notes are shown once, whichever version the
+# install came from.
+_LOCAL_NOTES = re.compile(r"^\*\*Local installs\b.*\*\*\s*$")
+_REVISION = re.compile(r"^[0-9a-fA-F]{7,64}$")
+
+
+def local_install_notes(changelog: str) -> list[tuple[str, str]]:
+    """``(version, bullet)`` for every bullet of a Local installs block, bullets on one line."""
+    notes: list[tuple[str, str]] = []
+    version, inside, bullet = "", False, None
+
+    def flush() -> None:
+        nonlocal bullet
+        if bullet:
+            notes.append((version, " ".join(bullet)))
+        bullet = None
+
+    for line in changelog.splitlines():
+        if line.startswith("#"):
+            flush()
+            inside = False
+            if line.startswith("## "):
+                heading = line[3:].strip()
+                version = heading[1:heading.index("]")] if heading.startswith("[") and "]" in heading else heading
+        elif _LOCAL_NOTES.match(line):
+            flush()
+            inside = True
+        elif not inside:
+            continue
+        elif line.startswith("- "):
+            flush()
+            bullet = [line[2:].strip()]
+        elif line.startswith("  ") and line.strip() and bullet is not None:
+            bullet.append(line.strip())
+        elif not line.strip():
+            flush()
+        else:
+            flush()
+            inside = False
+    flush()
+    return notes
+
+
+def upgrade_notes(checkout: Path, since: Optional[str]) -> list[tuple[str, str]]:
+    """Local installs notes that are new since revision ``since`` of the checkout."""
+    if not since or not _REVISION.match(since):
+        return []
+    try:
+        new = (checkout / "CHANGELOG.md").read_text(encoding="utf-8")
+        old = subprocess.run(["git", "-C", str(checkout), "show", f"{since}:CHANGELOG.md"],
+                             capture_output=True, text=True, encoding="utf-8", errors="replace", check=False)
+    except OSError:
+        return []
+    if old.returncode != 0:
+        return []
+    seen = " ".join(old.stdout.split())
+    return [(v, text) for v, text in local_install_notes(new) if " ".join(text.split()) not in seen]
+
+
+def print_upgrade_notes(notes: list[tuple[str, str]], checkout: Path) -> None:
+    if not notes:
+        return
+    import textwrap
+
+    print()
+    print("  What to do after this update:")
+    shown = None
+    for version, text in notes:
+        if version != shown:
+            print(f"    {version}")
+            shown = version
+        print(textwrap.fill(text.replace("**", ""), width=92, initial_indent="    - ", subsequent_indent="      "))
+    print(f"    All changes: {Path(checkout) / 'CHANGELOG.md'}")
+
+
+def refresh(
+    target: Target,
+    *,
+    launcher: Optional[Path],
+    since: Optional[str],
+    agent_name: str = DEFAULT_KIRO_AGENT,
+    run: Callable[[list[str]], int] = _run,
+    run_quiet: Callable[[list[str]], int] = _run_quiet,
+    clients: Optional[list[Client]] = None,
+    register_missing: bool = False,
+    record: Optional[dict] = None,
+) -> int:
+    """The end of ``sdpm update``: launcher, registered clients, leftovers, upgrading notes.
+
+    ``register_missing`` (the installer's ``--register`` over an existing install) also
+    registers the detected clients that do not have the server yet.
+    """
+    checkout = Path(target.checkout)
+    if launcher is not None:
+        print(f"  sdpm command: {refresh_launcher(launcher, checkout)}")
+    failures, missing, elsewhere = refresh_registrations(target, agent_name=agent_name, clients=clients,
+                                                         run=run, run_quiet=run_quiet, record=record)
+    for client in elsewhere:
+        print(f"  {client.label}: its {SERVER_NAME} server runs another checkout — left alone")
+    if missing and register_missing:
+        failures += register(missing, target, run=run, agent_name=agent_name, chosen=missing, cleanup=False,
+                             record=record)
+    elif missing:
+        print(f"  Also found {', '.join(c.label for c in missing)} — add with: "
+              f"sdpm register {' '.join(c.id for c in missing)}")
+    remove_leftovers(update_leftovers(checkout, agent_name))
+    print_upgrade_notes(upgrade_notes(checkout, since), checkout)
+    return 1 if failures else 0
 
 
 # ---------------------------------------------------------------------------
@@ -670,7 +1121,20 @@ def _default_target(args: argparse.Namespace) -> Target:
     return Target(uv=str(Path(uv).absolute()), checkout=str(checkout))
 
 
+def tolerate_narrow_console() -> None:
+    """Print marks (✓ → –) as '?' rather than fail where the console cannot show them.
+
+    Windows hands a piped Python its ANSI code page (cp1252, cp932), which has no ✓; a
+    UnicodeEncodeError there would stop `sdpm update` halfway through the refresh.
+    """
+    for stream in (sys.stdout, sys.stderr):
+        reconfigure = getattr(stream, "reconfigure", None)
+        if reconfigure is not None:
+            reconfigure(errors="replace")
+
+
 def main(argv: Optional[list[str]] = None) -> int:
+    tolerate_narrow_console()
     parser = argparse.ArgumentParser(prog="sdpm mcp-config", description=__doc__.split("\n\n")[0])
     parser.add_argument("--uv", help="absolute path of uv (default: SDPM_UV, then PATH)")
     parser.add_argument("--checkout", help="checkout root (default: this file's repository)")
@@ -689,19 +1153,32 @@ def main(argv: Optional[list[str]] = None) -> int:
     p.add_argument("--all", action="store_true", help="every supported client, detected or not")
     agent_name_option(p)
 
+    def record_option(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("--record", help="write {here, registered, unregistered} client ids to this JSON file")
+
     p = sub.add_parser("register", help="register with detected (or named) clients")
     p.add_argument("clients", nargs="*", choices=[*CLIENT_IDS, []])
     p.add_argument("--dry-run", action="store_true")
     p.add_argument("--yes", "-y", action="store_true", help="do not ask per client")
     agent_name_option(p)
+    record_option(p)
 
     p = sub.add_parser("unregister", help="remove the server from detected (or named) clients")
     p.add_argument("clients", nargs="*", choices=[*CLIENT_IDS, []])
     p.add_argument("--dry-run", action="store_true")
     agent_name_option(p)
+    record_option(p)
 
     p = sub.add_parser("status", help="which detected clients have the server registered")
     p.add_argument("--json", action="store_true")
+
+    p = sub.add_parser("refresh", help="end of `sdpm update`: launcher, registered clients, leftovers, notes")
+    p.add_argument("--launcher", help="the installed sdpm command to replace with the checkout's launcher")
+    p.add_argument("--since", help="commit the update started from (selects the upgrading notes)")
+    p.add_argument("--register-missing", action="store_true",
+                   help="also register the detected clients that do not have the server")
+    agent_name_option(p)
+    record_option(p)
 
     args = parser.parse_args(argv)
     if not getattr(args, "agent_name", None):
@@ -721,19 +1198,41 @@ def main(argv: Optional[list[str]] = None) -> int:
                 print()
         return 0
 
+    record: Optional[dict] = {} if getattr(args, "record", None) else None
+
+    def recorded(rc: int) -> int:
+        if record is not None:
+            Path(args.record).write_text(json.dumps(record), encoding="utf-8")
+        return rc
+
     if args.command == "register":
         clients = detect(args.clients or None)
         if not clients:
             print("No supported MCP client detected. Add this to your client's MCP configuration:")
             print(manual_json(target))
-            return 0
+            return recorded(0)
+        if not (args.clients or args.yes or args.dry_run) and not tty_allowed():
+            # Never wait on a pipe: without a terminal nothing is registered unasked.
+            print("Detected: " + ", ".join(c.label for c in clients))
+            print("No terminal to ask in. Run sdpm register --yes (all detected) or "
+                  "sdpm register <client>…  (" + " ".join(c.id for c in clients if _selectable(c)) + ")")
+            return recorded(2)
         # Named clients on the command line are the selection; no picker.
         chosen = clients if args.clients else None
-        return 1 if register(clients, target, dry_run=args.dry_run, assume_yes=args.yes,
-                             agent_name=args.agent_name, chosen=chosen) else 0
+        return recorded(1 if register(clients, target, dry_run=args.dry_run, assume_yes=args.yes,
+                                      agent_name=args.agent_name, chosen=chosen, record=record) else 0)
 
     if args.command == "unregister":
-        return 1 if unregister(detect(args.clients or None), dry_run=args.dry_run, agent_name=args.agent_name) else 0
+        return recorded(1 if unregister(detect(args.clients or None), dry_run=args.dry_run,
+                                        agent_name=args.agent_name, record=record) else 0)
+
+    if args.command == "refresh":
+        launcher = Path(args.launcher).absolute() if args.launcher else None
+        adopt = old_launcher_adopt(launcher, target, args.since)
+        if adopt is not None:
+            return run_adopt(adopt)
+        return recorded(refresh(target, launcher=launcher, since=args.since, agent_name=args.agent_name,
+                                register_missing=args.register_missing, record=record))
 
     if args.command == "status":
         clients = detect()

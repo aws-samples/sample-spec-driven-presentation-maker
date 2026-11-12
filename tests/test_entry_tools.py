@@ -3,6 +3,7 @@
 """Role entry tools: one call returns the role document plus what the role reads first."""
 
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -33,7 +34,7 @@ _OUTLINE = """# Deck
 
 @pytest.fixture
 def deck(tmp_path: Path) -> Path:
-    r = tools.init_deck_workspace(str(tmp_path / "deck"))
+    r = tools.init_deck_workspace("deck")
     deck_dir = Path(r["output_dir"])
     tools.apply_style(str(deck_dir), style="typographic", template="blank-dark")
     specs = deck_dir / "specs"
@@ -46,11 +47,29 @@ def deck(tmp_path: Path) -> Path:
     return deck_dir
 
 
+_SLIDE_HTML = '<section data-layout="Title Only"><h1 data-ph="title">{slug}</h1></section>\n'
+
+
+@pytest.fixture
+def html_deck(tmp_path: Path) -> Path:
+    r = tools.init_deck_workspace("html-deck", output_format="html")
+    deck_dir = Path(r["output_dir"])
+    tools.apply_style(str(deck_dir), style="typographic", template="blank-dark")
+    specs = deck_dir / "specs"
+    (specs / "brief.md").write_text("# Brief\n\nAudience: engineers.\n\n## Sources\n1. pasted notes\n", encoding="utf-8")
+    (specs / "outline.md").write_text(_OUTLINE, encoding="utf-8")
+    slides = deck_dir / "slides"
+    slides.mkdir(exist_ok=True)
+    for slug in ("intro", "demo-1", "demo-2"):
+        (slides / f"{slug}.html").write_text(_SLIDE_HTML.format(slug=slug), encoding="utf-8")
+    return deck_dir
+
+
 class TestStartPresentation:
     def test_returns_workflow_and_environment(self):
         r = tools.start_presentation()
         assert "# Orchestrator" in r["static"]["workflow"]
-        assert {s["name"] for s in r["styles"]}
+        assert "styles" not in r  # list_styles serves them
         assert r["templates"]
         assert r["output_dir"]
 
@@ -60,6 +79,28 @@ class TestStartPresentation:
         assert "read_workflows" not in wf
         assert "init_presentation" not in wf
 
+    def test_workflow_is_format_neutral_and_points_to_format_notes(self):
+        wf = tools.start_presentation()["static"]["workflow"]
+        assert "format_notes" in wf and 'output_format="html"' in wf
+        for html_only in ("ECharts", "D3", "deck.css", "fragment", "preview/png", "slider"):
+            assert html_only not in wf, html_only
+
+
+class TestInitDeckWorkspace:
+    def test_html_deck_returns_format_notes(self, tmp_path: Path):
+        from sdpm.knowledge.reference import read_docs
+        from sdpm.config import REFERENCES_DIR
+
+        r = tools.init_deck_workspace("h", output_format="html")
+        notes = read_docs(REFERENCES_DIR / "guides", ["html-deck"])[0]["content"]
+        assert r["format_notes"] == notes
+        assert "`visual`" in notes and "ECharts" in notes and "constraints" in notes
+
+    def test_pptx_deck_returns_no_format_notes(self, tmp_path: Path):
+        r = tools.init_deck_workspace("p")
+        assert "format_notes" not in r
+        assert set(r) == {"output_dir", "deck_json", "workspace"}
+
 
 class TestStartComposing:
     def test_static_only_without_deck(self):
@@ -68,8 +109,117 @@ class TestStartComposing:
         assert "# Composer" in r["static"]["workflow"]
         assert "deck.json" in r["static"]["slide_spec"]
 
-    def test_static_is_identical_across_calls(self, deck: Path):
-        assert tools.start_composing()["static"] == tools.start_composing(str(deck), ["intro"])["static"]
+    @pytest.mark.parametrize("mode", ["pptx", "html"])
+    def test_static_depends_only_on_mode(self, mode: str, request: pytest.FixtureRequest):
+        deck_dir = request.getfixturevalue("deck" if mode == "pptx" else "html_deck")
+        with_deck = tools.start_composing(str(deck_dir), ["intro"], mode=mode)
+        assert with_deck["deck"]["specs_ok"] is True
+        assert tools.start_composing(mode=mode)["static"] == with_deck["static"]
+
+    def test_static_differs_between_modes(self):
+        pptx = tools.start_composing()["static"]
+        html = tools.start_composing(mode="html")["static"]
+        assert pptx == tools.start_composing(mode="pptx")["static"]
+        assert pptx != html
+        assert "# Composer" in html["workflow"] and "html" in html["workflow"].lower()
+        assert "slide-html" in html["slide_spec"] or "data-layout" in html["slide_spec"]
+
+    def test_invalid_mode_is_rejected(self, deck: Path):
+        for args in ((), (str(deck), ["intro"])):
+            r = tools.start_composing(*args, mode="svg")
+            assert r["specs_ok"] is False and r["errors"]
+            assert "static" not in r
+
+    def test_mode_mismatch_names_the_deck_format(self, deck: Path, html_deck: Path):
+        r = tools.start_composing(str(deck), ["intro"], mode="html")
+        assert r["specs_ok"] is False and r["mode"] == "pptx"
+        assert 'mode="pptx"' in r["errors"][0]
+        assert "static" not in r and "deck" not in r
+        r = tools.start_composing(str(html_deck), ["intro"])
+        assert r["specs_ok"] is False and r["mode"] == "html"
+        assert 'mode="html"' in r["errors"][0]
+
+    def test_html_deck_payload(self, html_deck: Path):
+        d = tools.start_composing(str(html_deck), ["demo-2", "closing"], mode="html")["deck"]
+        assert d["specs_ok"] is True
+        assert "template_analysis" not in d
+        assert d["slides_present"] == ["demo-1", "demo-2", "intro"]
+        assert set(d["existing_slides"]) == {"demo-1", "demo-2"}
+        assert "<section" in d["existing_slides"]["demo-2"]["html"]
+        assert d["existing_slides"]["demo-1"]["readonly"] is True
+        assert "readonly" not in d["existing_slides"]["demo-2"]
+        assert "Audience: engineers" in d["brief"] and "[demo-2]" in d["outline"]
+        th = d["template_html"]
+        assert th["slideSize"]["width"] and th["ptScale"] and th["themeColors"]
+        assert th["layouts"] and all(layout["curated"] for layout in th["layouts"])
+        assert any(layout["placeholders"] for layout in th["layouts"])
+        assert "decorations_status" in th
+
+    def test_html_deck_css(self, html_deck: Path):
+        assert tools.start_composing(str(html_deck), ["intro"], mode="html")["deck"]["deck_css"] is None
+        (html_deck / "deck.css").write_text(".card { padding: 8px; }\n", encoding="utf-8")
+        d = tools.start_composing(str(html_deck), ["intro"], mode="html")["deck"]
+        assert d["deck_css"] == ".card { padding: 8px; }\n"
+
+    def test_template_html_view_matches_the_payload(self, html_deck: Path, tmp_path: Path):
+        from sdpm.config import TEMPLATES_DIR
+        from sdpm.engine.html.template import cache_key
+        from sdpm.entry import template_html_view
+
+        template = TEMPLATES_DIR / "blank-dark.pptx"
+        cache = tmp_path / "view-cache"
+        view = template_html_view(template, cache_root=cache)
+        assert (cache / cache_key(template) / "template.json").is_file()
+        payload = tools.start_composing(str(html_deck), ["intro"], mode="html")["deck"]["template_html"]
+        assert view == payload
+        assert template_html_view(tmp_path / "missing.pptx") is None
+
+    def test_template_html_view_plain_template_needs_no_libreoffice(self, tmp_path: Path, monkeypatch):
+        from sdpm.config import TEMPLATES_DIR
+        from sdpm.engine.html import decorations
+        from sdpm.entry import template_html_view
+
+        monkeypatch.setattr(decorations, "soffice_path", lambda: None)
+        view = template_html_view(TEMPLATES_DIR / "blank-light.pptx", cache_root=tmp_path / "c")
+        assert view is not None and view["decorations_status"] is None
+
+    def test_template_html_view_complete_mixed_cache(self, decorated_template: Path, tmp_path: Path, monkeypatch):
+        """Layouts without decorations have no SVG; a cache holding every needed SVG is complete."""
+        from sdpm.engine.html import decorations
+        from sdpm.engine.html.template import load_template_html
+        from sdpm.entry import template_html_view
+
+        def fake_render(template_path, layouts, out_dir, *, work_dir):
+            out_dir.mkdir(parents=True, exist_ok=True)
+            for entry in layouts:
+                (out_dir / f"{entry['file']}.svg").write_text("<svg/>", encoding="utf-8")
+                if entry["baked"]:
+                    (out_dir / f"{entry['file']}.ground.svg").write_text("<svg/>", encoding="utf-8")
+            return {"svgs": {}, "ground_svgs": {}, "status": None}
+
+        cache = tmp_path / "c"
+        monkeypatch.setattr(decorations, "decoration_tools_status", lambda: None)
+        monkeypatch.setattr(decorations, "render_decoration_svgs", fake_render)
+        converted = load_template_html(decorated_template, cache_root=cache)
+        assert len(converted.svg_paths) < len(converted.info["layouts"])  # Blank needs no render
+        monkeypatch.undo()
+        monkeypatch.setattr(decorations, "soffice_path", lambda: None)
+        assert template_html_view(decorated_template, cache_root=cache)["decorations_status"] is None
+
+    def test_supplied_template_html_is_used(self, html_deck: Path, monkeypatch: pytest.MonkeyPatch):
+        from sdpm import entry
+
+        monkeypatch.setattr(entry, "_template_html", lambda *a, **k: pytest.fail("computed locally"))
+        supplied = {"slideSize": {"width": 1, "height": 1}, "layouts": []}
+        d = entry.start_composing(str(html_deck), ["intro"], mode="html", template_html=supplied)["deck"]
+        assert d["template_html"] is supplied
+
+    def test_template_html_does_not_touch_pptx_payload(self, deck: Path):
+        from sdpm import entry
+
+        plain = entry.start_composing(str(deck), ["intro"])
+        with_html = entry.start_composing(str(deck), ["intro"], template_html={"x": 1})
+        assert with_html == plain and "template_html" not in plain["deck"]
 
     def test_deck_payload_for_assigned_slugs(self, deck: Path):
         r = tools.start_composing(str(deck), ["intro", "closing"])
@@ -78,7 +228,11 @@ class TestStartComposing:
         assert d["deck"]["template"]
         assert "Audience: engineers" in d["brief"]
         assert "[demo-2]" in d["outline"]  # whole outline, not just assigned rows
-        assert "<html" in d["art_direction"].lower()
+        toc = d["art_direction_toc"]
+        assert toc["path"] == "specs/art-direction.html" and "art_direction" not in d
+        assert toc["lines"] == len((deck / toc["path"]).read_text(encoding="utf-8").splitlines())
+        assert toc["toc"] and all(re.match(r"\d+-\d+: \S", line) for line in toc["toc"])
+        assert any("Pattern:" in line for line in toc["toc"])
         assert d["template_analysis"] and d["template_analysis"]["layouts"]
         assert d["assigned_slugs"] == ["intro", "closing"]
         assert d["slides_present"] == ["demo-1", "demo-2", "intro"]
@@ -145,11 +299,48 @@ class TestStartTranslation:
         with pytest.raises(FileNotFoundError):
             tools.start_translation(str(tmp_path), "en")
 
+    def test_html_deck_is_refused(self, html_deck: Path):
+        with pytest.raises(ValueError, match="PPTX decks only"):
+            tools.start_translation(str(html_deck), "en")
+
+
+class TestHtmlDeckGuards:
+    def test_generate_pptx_builds_nothing(self, html_deck: Path):
+        r = tools.generate_pptx(str(html_deck))
+        assert r["output_format"] == "html" and "output.html" in r["message"]
+        assert not (html_deck / "output.pptx").exists()
+
+    def test_code_to_slide_is_refused(self, html_deck: Path):
+        r = tools.code_to_slide(str(html_deck), "print(1)", "snippet")
+        assert "<pre><code>" in r["error"]
+        assert not (html_deck / "includes").exists()
+
+    def test_diff_refuses_html_decks(self, html_deck: Path):
+        from sdpm.api import diff_report
+
+        with pytest.raises(ValueError, match="PPTX decks only"):
+            diff_report(html_deck, html_deck)
+
+    def test_generate_pptx_refuses_an_invalid_output_format(self, deck: Path):
+        deck_json = json.loads((deck / "deck.json").read_text(encoding="utf-8"))
+        deck_json["outputFormat"] = "htlm"
+        (deck / "deck.json").write_text(json.dumps(deck_json), encoding="utf-8")
+        with pytest.raises(ValueError, match="outputFormat"):
+            tools.generate_pptx(str(deck))
+        assert not (deck / "output.pptx").exists()
+
+    @pytest.mark.parametrize("payload", [[], "deck", 3])
+    def test_non_object_deck_json_is_not_html(self, deck: Path, payload):
+        (deck / "deck.json").write_text(json.dumps(payload), encoding="utf-8")
+        assert tools._is_html_deck(str(deck)) is False
+
 
 def test_local_server_binds_entry_tools_and_not_workflow_readers():
     src = (Path(__file__).resolve().parents[1] / "servers" / "local" / "server.py").read_text(encoding="utf-8")
-    for name in ("start_presentation", "start_composing", "start_style", "start_translation", "init_deck_workspace"):
+    for name in ("start_presentation", "start_composing", "start_style", "start_translation"):
         assert f"mcp.tool()(tools.{name})" in src
+    # The contract function, wrapped only to add the local `sdpm open` hint to its result.
+    assert "mcp.tool()(_with_open_hint(tools.init_deck_workspace))" in src
     assert "read_workflows" not in src
     assert "init_presentation" not in src
 
@@ -196,14 +387,34 @@ def test_grid_accepts_int_and_list_tracks():
     assert a["r0c1"]["x"] == 240 and a["r0c1"]["w"] == 1200 and a["r0c2"]["x"] == 1470
 
 
-def test_start_presentation_returns_every_style_with_pin_flag(monkeypatch):
+def test_start_style_returns_every_style_with_pin_flag(monkeypatch):
     from sdpm import config
 
     monkeypatch.setattr(config, "get_state", lambda: {"pinned_styles": ["report"], "template_metadata": {}})
-    styles = tools.start_presentation()["styles"]
+    styles = tools.start_style()["styles"]
     names = {s["name"] for s in styles}
     assert {"report", "typographic", "briefing"} <= names  # unpinned ones are listed too
     assert {s["name"] for s in styles if s.get("pinned")} == {"report"}
+
+
+def test_orchestrator_picks_the_style_through_list_styles():
+    wf = tools.start_presentation()["static"]["workflow"]
+    assert "`list_styles()`" in wf and "`list_styles(include_all=true)`" in wf
+
+
+@pytest.mark.parametrize("pins", [[], ["no-such-style"]])
+def test_list_styles_without_pins_or_user_styles_describes_every_style(monkeypatch, pins):
+    """What the orchestrator chooses from when the user has pinned and made nothing."""
+    from sdpm import config
+
+    monkeypatch.delenv("SDPM_STYLES_DIR", raising=False)
+    monkeypatch.setattr(config, "get_state", lambda: {"pinned_styles": pins, "template_metadata": {}})
+    listing = tools.list_styles()
+    assert listing == tools.list_styles(include_all=True)
+    names = {s["name"] for s in listing["styles"]}
+    assert names == {p.stem for p in _STYLES_DIR.glob("*.html")}
+    assert all(s["description"] for s in listing["styles"])
+    assert "other_styles" not in listing
 
 
 def test_apply_style_returns_a_line_numbered_toc(tmp_path: Path):
@@ -211,7 +422,7 @@ def test_apply_style_returns_a_line_numbered_toc(tmp_path: Path):
     slice the lines it needs. Structural only: .slide blocks, not the Part convention."""
     from sdpm.api import style_toc
 
-    deck_dir = tools.init_deck_workspace(str(tmp_path / "deck"))["output_dir"]
+    deck_dir = tools.init_deck_workspace("deck")["output_dir"]
     toc = tools.apply_style(deck_dir, style="newspaper", template="blank-light")["style_toc"]
     slides = [e for e in toc if e["kind"] == "slide"]
     assert toc[0]["kind"] == "style" and len(slides) >= 8
@@ -222,8 +433,113 @@ def test_apply_style_returns_a_line_numbered_toc(tmp_path: Path):
     assert all("slide" in lines[e["line"] - 1] for e in slides)
     # a nested element whose class merely contains "slide-" is not a slide
     assert not any("slide-title" in e["classes"] for e in slides)
+    # the ranges tile the file from the <style> block on, and each slide's range holds the
+    # comments that describe it (the ones above its opening and the ones inside it)
+    assert all(a["end"] + 1 == b["start"] for a, b in zip(toc, toc[1:]))
+    assert toc[-1]["end"] == len(lines)
+    assert all(e["start"] <= e["line"] <= e["end"] for e in toc)
+    for number, line in enumerate(lines, 1):
+        m = re.match(r"\s*<!--\s*((?:Frame|Component|Pattern):.{0,20})", line)
+        if m:
+            (block,) = [e for e in toc if e["start"] <= number <= e["end"]]
+            assert m.group(1) in (block.get("comment") or ""), (number, m.group(1))
     # every bundled style maps; a file without .slide blocks maps to nothing
     styles_dir = Path(__file__).resolve().parents[1] / "sdpm" / "references" / "examples" / "styles"
     for path in styles_dir.glob("*.html"):
         assert len([e for e in style_toc(path.read_text(encoding="utf-8")) if e["kind"] == "slide"]) >= 8, path.name
     assert style_toc("<html><body><p>plain</p></body></html>") == []
+
+
+# ---------------------------------------------------------------------------
+# Size budget: the start_composing result reaches the composer inline
+# ---------------------------------------------------------------------------
+
+# Kiro CLI V3 moves a tool result of 30,000+ characters to a file and shows the model
+# only its ends; Claude Code caps MCP output too. 25,000 leaves room for larger groups.
+_RESULT_BUDGET = 25_000
+
+_BUDGET_OUTLINE = """# Deck
+
+## Why
+- [intro] Why this matters now
+  - body: One paragraph of context on the change the audience faces
+  - visual: A single statement with one supporting figure
+  - evidence: brief Sources 1
+- [problem] Three things slow teams down today
+  - body: Three pain points, each with its cost
+  - visual: Three cards with an icon each
+  - evidence: brief Sources 1
+- [closing] What to do next
+  - body: Call to action with owners and dates
+  - visual: A three-step flow
+  - evidence: brief Sources 1
+"""
+_BUDGET_SLUGS = ["intro", "problem", "closing"]
+_STYLES_DIR = Path(__file__).resolve().parents[1] / "sdpm" / "references" / "examples" / "styles"
+
+
+def _layout_pass_slide(slug: str, mode: str) -> str:
+    """What a layout pass leaves for the content pass: frame elements and named regions."""
+    if mode == "html":
+        return (
+            f'<section data-layout="Title Only">\n  <h1 data-ph="title">The claim of the {slug} slide</h1>\n'
+            '  <div class="section-label" style="position:absolute;left:120px;top:96px;width:800px;height:40px">Section</div>\n'
+            '  <div data-region="body" style="left:120px;top:300px;width:1680px;height:520px"></div>\n'
+            '  <div data-region="takeaway" style="left:120px;top:860px;width:1680px;height:110px"></div>\n'
+            '  <aside class="notes"></aside>\n</section>\n'
+        )
+    return json.dumps({
+        "layout": "Title Only",
+        "placeholders": {"0": f"The claim of the {slug} slide"},
+        "notes": "",
+        "elements": [
+            {"_comment": "region: body", "x": 120, "y": 300, "w": 1680, "h": 520},
+            {"_comment": "region: takeaway", "x": 120, "y": 860, "w": 1680, "h": 110},
+            {"type": "textbox", "x": 120, "y": 96, "width": 800, "height": 40, "text": "Section",
+             "fontSize": 14, "fontColor": "#111111", "marginTop": 0},
+            {"type": "line", "x1": 120, "y1": 260, "x2": 1800, "y2": 260, "color": "#111111", "lineWidth": 2},
+        ],
+    }, ensure_ascii=False, indent=2)
+
+
+@pytest.mark.parametrize("mode", ["pptx", "html"])
+def test_start_composing_fits_the_tool_result_budget(mode: str, tmp_path: Path):
+    """Layout pass and content pass of a 3-slide deck, for every built-in style."""
+    deck_dir = Path(tools.init_deck_workspace("deck", output_format=mode)["output_dir"])
+    specs = deck_dir / "specs"
+    slides = deck_dir / "slides"
+    sizes: dict[str, int] = {}
+    for style in sorted(p.stem for p in _STYLES_DIR.glob("*.html")):
+        tools.apply_style(str(deck_dir), style=style, template="blank-dark")
+        (specs / "brief.md").write_text("# Brief\n\nAudience: engineers.\n\n## Sources\n1. pasted notes\n", encoding="utf-8")
+        (specs / "outline.md").write_text(_BUDGET_OUTLINE, encoding="utf-8")
+        for path in slides.glob("*"):
+            path.unlink()
+        for pass_name in ("layout", "content"):
+            if pass_name == "content":
+                for slug in _BUDGET_SLUGS:
+                    suffix = "html" if mode == "html" else "json"
+                    (slides / f"{slug}.{suffix}").write_text(_layout_pass_slide(slug, mode), encoding="utf-8")
+            result = tools.start_composing(str(deck_dir), _BUDGET_SLUGS, mode=mode)
+            assert result["deck"]["specs_ok"] is True
+            assert len(result["deck"]["existing_slides"]) == (3 if pass_name == "content" else 0)
+            sizes[f"{style}/{pass_name}"] = len(json.dumps(result, ensure_ascii=False))
+    over = {key: size for key, size in sizes.items() if size > _RESULT_BUDGET}
+    assert not over, over
+
+
+def test_every_slide_format_guide_fits_the_tool_result_budget():
+    """The parts of the format a composer reads on demand come back inline too."""
+    names = ["slide-json-spec", "slide-json-elements", "slide-json-media", "slide-json-effects",
+             "visual-forms", "slide-html-spec", "slide-html-scripts"]
+    for name in names:
+        result = tools.read_guides([name])
+        assert result["documents"][0]["content"], name
+        assert len(json.dumps(result, ensure_ascii=False)) <= _RESULT_BUDGET, name
+    spec = tools.start_composing()["static"]["slide_spec"]
+    assert all(name in spec for name in names[1:5])
+
+
+def test_start_presentation_fits_the_tool_result_budget():
+    """The orchestrator's entry comes back inline too; the styles are list_styles' part."""
+    assert len(json.dumps(tools.start_presentation(), ensure_ascii=False)) <= _RESULT_BUDGET

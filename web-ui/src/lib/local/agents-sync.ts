@@ -7,12 +7,23 @@
  *
  *     agents/ = f(acp-agents/ catalog, acp-agent-selection.json, model)
  *
- * It is re-derived idempotently on every agent spawn (acp-process.ts) and on
- * Settings save (api/agent/definitions/route.ts), so a `git pull` that
- * updates the catalog is picked up by the next spawn — no stale copies.
+ * It is re-derived idempotently before every chat is placed on a kiro-cli and
+ * every kiro-cli start (hosts.ts), and on Settings save
+ * (api/agent/definitions/route.ts), so a `git pull` that updates the catalog
+ * is picked up by the next new chat — no stale copies. A generation equal to
+ * what the directory holds leaves it untouched.
  * Hand-edits to agents/ are therefore lost by design; the README marker
- * written alongside the files says so.
+ * written alongside the files says so. The marker is `README.txt`: V3 reads
+ * every `.md` and `.json` in the directory as an agent.
+ *
+ * The catalog is written in kiro-cli V2's form. Each generated definition is
+ * read by both engines (`withPermissions`): V2 reads its `tools` /
+ * `allowedTools` / `toolsSettings`, V3 its `tools` (with `subagent/<name>`
+ * for each delegation target) and `permissions.rules`, derived from what V2
+ * allows without asking. A catalog entry that already has `permissions` was
+ * written for V3 and is used as it is.
  */
+import { createHash } from "crypto"
 import fs from "fs"
 import path from "path"
 
@@ -54,6 +65,8 @@ const ROLE_TO_FIXED: Record<string, string> = {
   translate: "sdpm-translate.json",
 }
 
+const README_FILE = "README.txt"
+
 const README_MARKER = `# Generated directory — do not hand-edit
 
 Files here are re-derived from \`../acp-agents/\` (the catalog) combined with
@@ -69,10 +82,22 @@ export function isSafeFileName(name: string): boolean {
   return /^[\w-]+\.json$/.test(name)
 }
 
+const SELECTION_KEYS = ["orchestrator", "composer", "style", "translate", "model"] as const
+
+/** The selection's own keys; older keys (`spec`, `vibe`, `single`, ...) are dropped. */
+function pickSelection(raw: Record<string, unknown>): Partial<AgentSelection> {
+  const picked: Partial<AgentSelection> = {}
+  for (const key of SELECTION_KEYS) {
+    if (raw[key] !== undefined) (picked as Record<string, unknown>)[key] = raw[key]
+  }
+  return picked
+}
+
 export function readSelection(dirs: SyncDirs = DEFAULT_DIRS): AgentSelection {
   try {
     if (fs.existsSync(dirs.configPath)) {
-      return { ...SELECTION_DEFAULTS, ...JSON.parse(fs.readFileSync(dirs.configPath, "utf-8")) }
+      const raw: unknown = JSON.parse(fs.readFileSync(dirs.configPath, "utf-8"))
+      if (raw && typeof raw === "object" && !Array.isArray(raw)) return { ...SELECTION_DEFAULTS, ...pickSelection(raw as Record<string, unknown>) }
     }
   } catch {}
   return { ...SELECTION_DEFAULTS }
@@ -80,7 +105,104 @@ export function readSelection(dirs: SyncDirs = DEFAULT_DIRS): AgentSelection {
 
 export function writeSelection(sel: AgentSelection, dirs: SyncDirs = DEFAULT_DIRS): void {
   fs.mkdirSync(path.dirname(dirs.configPath), { recursive: true })
-  fs.writeFileSync(dirs.configPath, JSON.stringify(sel, null, 2) + "\n", "utf-8")
+  fs.writeFileSync(dirs.configPath, JSON.stringify(pickSelection(sel as unknown as Record<string, unknown>), null, 2) + "\n", "utf-8")
+}
+
+/** V2 tool names V3 reads as its `fs_read` capability (kiro-cli's own mapping). */
+const FS_READ_TOOLS = new Set(["read", "glob", "grep"])
+/** V2 tool names that are V3 capabilities of the same name. */
+const SAME_NAME_CAPABILITIES = new Set(["web_fetch", "web_search"])
+/** V2's delegation tool; V3 delegates through `subagent/<name>` tools, allowed by the subagent rule. */
+const V2_DELEGATION_TOOL = "use_subagent"
+
+const unknownToolsWarned = new Set<string>()
+
+function stringList(field: string, value: unknown, fileName: string): string[] {
+  if (value === undefined) return []
+  if (Array.isArray(value) && value.every((v) => typeof v === "string")) return [...value]
+  console.warn("[agents-sync] %s: %s is not a list of names; not converted", fileName, field)
+  return []
+}
+
+/**
+ * The definition in the form both engines read: the V2 fields as they are, `subagent/<name>`
+ * added to `tools` for each `toolsSettings.subagent.availableAgents`, and `permissions.rules`
+ * allowing what `allowedTools` allows (`@<server>/<tool>` → one `mcp` rule; read / glob / grep →
+ * `fs_read`; web_fetch / web_search → their own capability; `trustedAgents` → `subagent`). Any
+ * other allowed tool gets no rule (V3 then asks, and the transport answers allow_once) and one
+ * warning. A definition with `permissions` is returned unchanged.
+ */
+export function withPermissions(agent: Record<string, unknown>, fileName: string): Record<string, unknown> {
+  if (agent.permissions !== undefined) return agent
+  const subagent = ((agent.toolsSettings as { subagent?: Record<string, unknown> } | undefined)?.subagent) ?? {}
+  const available = stringList("toolsSettings.subagent.availableAgents", subagent.availableAgents, fileName)
+  const trusted = stringList("toolsSettings.subagent.trustedAgents", subagent.trustedAgents, fileName)
+  const allowed = stringList("allowedTools", agent.allowedTools, fileName)
+
+  const converted: Record<string, unknown> = { ...agent }
+  const toolsListed = agent.tools === undefined || (Array.isArray(agent.tools) && agent.tools.every((t) => typeof t === "string"))
+  const tools = stringList("tools", agent.tools, fileName)
+  if (toolsListed) {
+    for (const name of available) if (!tools.includes(`subagent/${name}`)) tools.push(`subagent/${name}`)
+    if (agent.tools !== undefined || tools.length) converted.tools = tools
+  }
+
+  const mcp: string[] = []
+  const capabilities: string[] = []
+  for (const tool of allowed) {
+    if (tool.startsWith("@") && tool.includes("/")) {
+      if (!mcp.includes(tool.slice(1))) mcp.push(tool.slice(1))
+    } else if (FS_READ_TOOLS.has(tool)) {
+      if (!capabilities.includes("fs_read")) capabilities.push("fs_read")
+    } else if (SAME_NAME_CAPABILITIES.has(tool)) {
+      if (!capabilities.includes(tool)) capabilities.push(tool)
+    } else if (tool !== V2_DELEGATION_TOOL && !unknownToolsWarned.has(`${fileName} ${tool}`)) {
+      unknownToolsWarned.add(`${fileName} ${tool}`)
+      console.warn("[agents-sync] %s: allowed tool %s has no V3 permission rule; V3 asks for it", fileName, tool)
+    }
+  }
+  const rules: Record<string, unknown>[] = []
+  if (mcp.length) rules.push({ capability: "mcp", match: mcp, effect: "allow" })
+  for (const capability of capabilities) rules.push({ capability, effect: "allow" })
+  if (trusted.length) rules.push({ capability: "subagent", match: trusted, effect: "allow" })
+  converted.permissions = { rules }
+  return converted
+}
+
+const COMPOSE_TOOLS = ["@sdpm/compose_slides", "@sdpm/message_composer"]
+const COMPOSER_SUBAGENT = "sdpm-composer"
+
+/**
+ * The orchestrator as the Local Web UI runs it: it dispatches composers with `compose_slides` and
+ * reaches them with `message_composer` (both added to `tools` and `allowedTools`), and no longer
+ * has the composer as a sub-agent (`sdpm-composer` taken out of
+ * `toolsSettings.subagent.availableAgents` / `trustedAgents`; with no other sub-agent left,
+ * `toolsSettings.subagent` and `use_subagent` go too). A custom orchestrator that delegates to
+ * other agents keeps them.
+ */
+export function withAsyncCompose(agent: Record<string, unknown>): Record<string, unknown> {
+  const out: Record<string, unknown> = { ...agent }
+  const settings = (agent.toolsSettings && typeof agent.toolsSettings === "object") ? { ...(agent.toolsSettings as Record<string, unknown>) } : null
+  const subagent = settings?.subagent && typeof settings.subagent === "object" ? { ...(settings.subagent as Record<string, unknown>) } : null
+  let noSubagents = !subagent
+  if (settings && subagent) {
+    for (const key of ["availableAgents", "trustedAgents"]) {
+      if (Array.isArray(subagent[key])) subagent[key] = (subagent[key] as unknown[]).filter((name) => name !== COMPOSER_SUBAGENT)
+    }
+    noSubagents = !Array.isArray(subagent.availableAgents) || subagent.availableAgents.length === 0
+    if (noSubagents) delete settings.subagent
+    else settings.subagent = subagent
+    if (Object.keys(settings).length) out.toolsSettings = settings
+    else delete out.toolsSettings
+  }
+  for (const key of ["tools", "allowedTools"]) {
+    const list = agent[key]
+    if (list !== undefined && !(Array.isArray(list) && list.every((t) => typeof t === "string"))) continue
+    const names = ((list as string[] | undefined) ?? []).filter((t) => !(noSubagents && t === V2_DELEGATION_TOOL))
+    for (const tool of COMPOSE_TOOLS) if (!names.includes(tool)) names.push(tool)
+    out[key] = names
+  }
+  return out
 }
 
 /**
@@ -96,11 +218,26 @@ export function writeSelection(sel: AgentSelection, dirs: SyncDirs = DEFAULT_DIR
  * backup and restored if the swap fails), so a failure can never leave a
  * mix of old and new generations — or no directory at all — and stale
  * files from removed catalog entries are swept away.
+ *
+ * The orchestrator gets `withAsyncCompose` (before the permission rules are
+ * derived); the composer, style and translate definitions are converted as
+ * they are.
+ *
+ * The Settings model goes into every definition, the composer's included: each
+ * composer runs on a kiro-cli of its own, and the compose run then sets the
+ * chat's model and effort on its session.
+ *
+ * Returns the generation's digest (`agentsDigest`: SHA-256 over the file
+ * names and contents). When the current directory already holds exactly
+ * that generation, the swap is skipped and nothing is touched, so a
+ * kiro-cli reading `agents/` at that moment (a new session of a running
+ * one) never falls into the rename window. A current directory that cannot
+ * be read is swapped as before.
  */
 export function syncToAgentsDir(
   sel: AgentSelection = readSelection(),
   dirs: SyncDirs = DEFAULT_DIRS,
-): void {
+): string {
   if (!fs.existsSync(dirs.acpAgentsDir)) {
     throw new Error(`agents catalog not found: ${dirs.acpAgentsDir}`)
   }
@@ -126,8 +263,20 @@ export function syncToAgentsDir(
     } else {
       delete agent.model
     }
-    staged.push({ fileName: fixedName, content: JSON.stringify(agent, null, 2) + "\n" })
+    if (role === "orchestrator") agent = withAsyncCompose(agent)
+    staged.push({ fileName: fixedName, content: JSON.stringify(withPermissions(agent, fileName as string), null, 2) + "\n" })
   }
+  staged.push({ fileName: README_FILE, content: README_MARKER })
+  // Both engines must read every definition (V3 only one with permissions), and V3 would read a
+  // .md here as an agent.
+  for (const { fileName, content } of staged) {
+    if (fileName.endsWith(".md")) throw new Error(`generated agents directory would hold ${fileName}, which V3 reads as an agent`)
+    if (!fileName.endsWith(".json")) continue
+    const permissions = (JSON.parse(content) as { permissions?: unknown }).permissions
+    if (typeof permissions !== "object" || permissions === null) throw new Error(`generated agent definition ${fileName} has no permissions`)
+  }
+  const digest = agentsDigest(staged)
+  if (currentDigest(dirs.agentsDir) === digest) return digest
   // Phase 2 — transactional replacement with backup: stage a sibling temp
   // dir, move the old output aside, swap the new one in, and restore the
   // backup if the swap fails. No failure path loses the old generation.
@@ -138,10 +287,9 @@ export function syncToAgentsDir(
   fs.mkdirSync(tmpDir, { recursive: true })
   try {
     for (const { fileName, content } of staged) {
-      // fileName comes from the ROLE_TO_FIXED constant, not user input
+      // fileName comes from the ROLE_TO_FIXED constant or README_FILE, not user input
       fs.writeFileSync(path.join(tmpDir, fileName), content) // nosemgrep: path-join-resolve-traversal
     }
-    fs.writeFileSync(path.join(tmpDir, "README.md"), README_MARKER) // nosemgrep: path-join-resolve-traversal
     const hadPrevious = fs.existsSync(dirs.agentsDir)
     if (hadPrevious) fs.renameSync(dirs.agentsDir, backupDir)
     try {
@@ -153,5 +301,29 @@ export function syncToAgentsDir(
     fs.rmSync(backupDir, { recursive: true, force: true })
   } finally {
     fs.rmSync(tmpDir, { recursive: true, force: true })
+  }
+  return digest
+}
+
+/** SHA-256 (hex) over the files sorted by name, each fed as `name + "\0" + content + "\0"`. */
+function agentsDigest(files: Array<{ fileName: string; content: string | Buffer }>): string {
+  const hash = createHash("sha256")
+  for (const { fileName, content } of [...files].sort((a, b) => (a.fileName < b.fileName ? -1 : a.fileName > b.fileName ? 1 : 0))) {
+    hash.update(fileName).update("\0").update(content).update("\0")
+  }
+  return hash.digest("hex")
+}
+
+/** The digest of what `agentsDir` holds now (its regular files), or null when it cannot be read. */
+function currentDigest(agentsDir: string): string | null {
+  try {
+    const files = fs.readdirSync(agentsDir, { withFileTypes: true }).map((entry) => {
+      if (!entry.isFile()) throw new Error(`${entry.name} is not a regular file`)
+      // entry.name comes from readdir of the generated directory
+      return { fileName: entry.name, content: fs.readFileSync(path.join(agentsDir, entry.name)) } // nosemgrep: path-join-resolve-traversal
+    })
+    return agentsDigest(files)
+  } catch {
+    return null
   }
 }

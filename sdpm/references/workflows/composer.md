@@ -15,30 +15,38 @@ You work silently: no questions to the user, results go back to the orchestrator
 `start_composing(deck_id, assigned_slugs)` — the call that gave you this document — also gave
 you your sources: `brief` (audience, message, constraints, and a **Sources** list), `outline`
 (one claim per slide plus `body` / `visual` / `evidence`; the whole deck, so you see where
-your slides sit), `art_direction` (the style), `deck` (template, slide size),
-`template_analysis` (the template's layouts and theme — its layout names are the source of
-truth), `slides_present`, and `existing_slides` (the JSON of your assigned slides, plus any
-override-group head they inherit from, marked `readonly`). Do not read those files again;
-the sources the brief points to are the only thing left to fetch — the parts your slides need.
+your slides sit), `art_direction_toc` (the map of the style, below), `deck` (template, slide
+size), `template_analysis` (the template's layouts and theme — its layout names are the source
+of truth), `slides_present`, and `existing_slides` (the JSON of your assigned slides, plus any
+override-group head they inherit from, marked `readonly`). These are current. What is left to
+read is the parts of the style your slides use and the parts of the brief's Sources your
+slides need.
 Treat `body` and `visual` as the intent to realise: choose the layout, dimensions and decoration,
-and refine wording as needed. Do not add facts that are not in the brief or its sources.
+and refine wording as needed. Facts come from the brief and its sources.
 
 ## What SDPM needs you to know
 
-- `slide_spec` (returned with this document) is the slide format; `read_guides(["slide-json-spec"])`
-  brings it back if it has left your context.
+- `slide_spec` (returned with this document) is the core of the slide format. Its **Elements**
+  part names the guides with each element type's fields, the effects and the visual-form
+  recipes: read the ones your slides use. `read_guides(["slide-json-spec"])` brings the core
+  back if it has left your context.
 - `specs/art-direction.html` is the style — a short deck built in the style, about the style.
   Design = style expressed in the spec's JSON: its `Frame:` comments say what repeats on every
   slide, its `Component:` comments the parts slides are built from (by role), its `Pattern:`
   slides how this style builds each slide type and which regions that divides into. Match its
   density and its look. Its patterns show how it draws, not the limit of what a slide may show.
-- Show before you tell: realise each slide's `visual` as a drawn form — the spec's **Visual
-  forms** (flow, cycle, hub, hierarchy, matrix, timeline, progress, icon + label…) built from
-  the style's components, icons from `search_assets`. Where the outline's `visual` is only text
-  but the `body` has a structure (steps, parts, a centre and satellites, a trade-off), draw the
-  structure and say so in your summary. A card or node that names a concept carries an icon,
-  as the style's icon rule places it. A slide that is mostly sentences inside cards is a
-  defect unless its claim is itself a sentence.
+- Read the parts of the style your slides use (the `:root` tokens, the rules, the frames, and
+  the components and patterns that fit your slides' `visual`) and more whenever a slide calls
+  for it: each line of `art_direction_toc.toc` is a line range of the file (1-based,
+  inclusive) with its comments, and one `run_python` prints a range with `read_text`. With an
+  empty `toc`, read the file in parts.
+- Show before you tell: realise each slide's `visual` as a drawn form — the forms of the
+  `visual-forms` guide (flow, cycle, hub, hierarchy, matrix, timeline, progress, icon +
+  label…) built from the style's components, icons from `search_assets`. Where the outline's
+  `visual` is only text but the `body` has a structure (steps, parts, a centre and satellites,
+  a trade-off), draw the structure and say so in your summary. A card or node that names a
+  concept carries an icon, as the style's icon rule places it. A slide that is mostly
+  sentences inside cards is a defect unless its claim is itself a sentence.
 - `grid(purpose, spec)` computes exact coordinates for row × column layouts from a CSS-Grid
   style spec — use it for rectangular arrangements instead of hand-placing; compute
   non-rectangular positions (arcs, radial, curves) yourself.
@@ -46,21 +54,18 @@ and refine wording as needed. Do not add facts that are not in the brief or its 
   `grid`, `table`, `chart-bar` / `chart-line` / `chart-pie`, `freeform`,
   `arch-layout-engine` + `arch-elements` (architecture diagrams via `arch_diagram`),
   `design-rules`.
-- Animations and slide transitions are off by default and are **not** part of ordinary
-  composition. Call `read_guides(["animations"])` only when at least one of these is true:
-  `deck` (returned with this document) has `animations.enabled` or `transitions.enabled`
-  set to `true`, or one of your assigned slides in `existing_slides` already carries a
-  `transition` or `animations` field (or an element with `morphId`). If neither holds —
-  the usual case — do not load that guide and write no `transition`, `animations`,
-  `morphId` or `_rawTiming` / `_rawTransition` field, no matter what the outline's `visual`
-  suggests; a drawn form, an `override` build or a chart is how a slide shows change.
-  Never turn the switches on yourself: they are `deck.json`, which is the orchestrator's.
-- When you do animate a slide, it must still say everything it says with animation and
-  transitions disabled. No claim, number, label, caveat or instruction may exist only in an
-  animated state — off, PDF and print carry the full meaning, and previews never play
-  motion. Say in your summary what each animation adds on top of the static slide.
+- Animations and transitions are off by default and are **not** part of ordinary
+  composition. Load `read_guides(["animations"])` only when `deck` has
+  `animations.enabled` or `transitions.enabled` true, or an assigned slide in
+  `existing_slides` already carries `transition`, `animations` or a `morphId`. Otherwise —
+  the usual case — do not load it, and write none of those fields whatever the outline's
+  `visual` suggests: a drawn form, an `override` build or a chart is how a still slide shows
+  change. The switches live in `deck.json`, the orchestrator's; never turn them on yourself.
+- An animated slide must still say everything with animation and transitions disabled. No
+  claim, number or label may live only in an animated state: previews, PDF and print never
+  play motion. Say in your summary what the motion adds to the still slide.
 - Slugs sharing a prefix (`demo-1`, `demo-2`) are one override group: later slides inherit
-  from the first via `override` (see the spec) — use it for progressive builds.
+  from the first via `override` (`slide-json-elements`) — use it for progressive builds.
 - If `slides/<slug>.json` already exists, the layout pass wrote it: keep its frame elements and
   realize your content inside the regions it left (`_comment` elements with `x`, `y`, `w`, `h`).
   Leave those region elements in place with their coordinates — the Web UI draws them as the

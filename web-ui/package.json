@@ -4,11 +4,11 @@
   "private": true,
   "license": "MIT-0",
   "scripts": {
-    "dev": "next dev --turbopack",
-    "dev:local": "NEXT_PUBLIC_MODE=local next dev --turbopack",
-    "build": "next build",
-    "build:cloud": "bash -c 'trap \"mv src/app/_api src/app/api 2>/dev/null\" EXIT; mv src/app/api src/app/_api && next build'",
-    "start": "next start",
+    "dev": "next dev --turbopack --hostname 127.0.0.1",
+    "dev:local": "NEXT_PUBLIC_MODE=local next dev --turbopack --hostname 127.0.0.1",
+    "build": "node scripts/next-build.mjs",
+    "build:cloud": "bash -c 'trap \"mv src/app/_api src/app/api 2>/dev/null; mv src/_proxy.ts src/proxy.ts 2>/dev/null\" EXIT; mv src/app/api src/app/_api && mv src/proxy.ts src/_proxy.ts && next build'",
+    "start": "next start --hostname 127.0.0.1",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "test": "vitest run",
@@ -17,13 +17,12 @@
     "clean": "rm -rf build/ node_modules/ .next/"
   },
   "dependencies": {
-    "@dnd-kit/helpers": "0.5.1",
-    "@dnd-kit/react": "0.5.1",
+    "@aws-crypto/sha256-js": "^5.2.0",
+    "@dnd-kit/helpers": "0.5.3",
+    "@dnd-kit/react": "0.5.3",
     "@radix-ui/react-alert-dialog": "^1.2.1",
     "@radix-ui/react-dialog": "^1.3.1",
-    "@radix-ui/react-progress": "^1.2.1",
     "@radix-ui/react-radio-group": "^1.5.1",
-    "@radix-ui/react-select": "^2.4.1",
     "@radix-ui/react-slot": "^1.5.0",
     "@tailwindcss/typography": "^0.5.19",
     "@types/dompurify": "^3.2.0",
@@ -32,9 +31,9 @@
     "clsx": "^2.1.1",
     "cmdk": "^1.1.1",
     "dompurify": "^3.4.17",
-    "lucide-react": "^1.64.0",
-    "motion": "14.6.0",
-    "next": "^16.4.3",
+    "lucide-react": "^1.66.0",
+    "motion": "14.9.0",
+    "next": "^16.4.6",
     "next-intl": "^4.14.9",
     "next-themes": "^0.4.6",
     "radix-ui": "^1.8.1",
@@ -49,6 +48,7 @@
     "tailwind-merge": "^3.2.0"
   },
   "devDependencies": {
+    "@agentclientprotocol/sdk": "^2.4.0",
     "@eslint/eslintrc": "^3.3.6",
     "@playwright/test": "^1.64.1",
     "@shadcn/ui": "^0.0.4",
@@ -58,9 +58,9 @@
     "@types/node": "^26.6.6",
     "@types/react": "^19",
     "@types/react-dom": "^19",
-    "@vitest/coverage-v8": "^5.0.5",
+    "@vitest/coverage-v8": "^5.1.0",
     "eslint": "^9.39.5",
-    "eslint-config-next": "^16.4.3",
+    "eslint-config-next": "^16.4.6",
     "jsdom": "^30.1.3",
     "shadcn": "^4.23.0",
     "tailwindcss": "^4",
@@ -68,5 +68,10 @@
     "typescript": "^6.0.3",
     "vite": "^8.3.5",
     "vitest": "^5.0.5"
+  },
+  "overrides": {
+    "@tailwindcss/typography": {
+      "postcss-selector-parser": "^6.1.5"
+    }
   }
 }

@@ -139,9 +139,10 @@ class LineMixin:
         )
 
         # Effects are explicit: apply_effects pins an empty effectLst when the
-        # JSON asks for none, so the theme shadow behind python-pptx's default
-        # <p:style effectRef> never paints under a plain line. Imported lines
-        # (_noEffects) additionally drop the <p:style> itself.
+        # JSON asks for none and points <p:style effectRef> at no theme effect,
+        # so the theme shadow never paints under a plain line (LibreOffice
+        # ignores an empty effectLst). Imported lines (_noEffects)
+        # additionally drop the <p:style> itself.
         if elem.get("_noEffects"):
             from pptx.oxml.ns import qn as _qn_ne
             for style in connector._element.findall(_qn_ne('p:style')):
@@ -291,26 +292,6 @@ class LineMixin:
             connector.line.width = Pt(line_width)
 
         # Apply dash style
-        dash_style = elem.get("dashStyle")
-        if dash_style:
-            from pptx.enum.dml import MSO_LINE_DASH_STYLE
-            dash_map = {
-                "solid": MSO_LINE_DASH_STYLE.SOLID,
-                "dash": MSO_LINE_DASH_STYLE.DASH,
-                "dot": MSO_LINE_DASH_STYLE.ROUND_DOT,
-                "dash_dot": MSO_LINE_DASH_STYLE.DASH_DOT,
-                "dash_dot_dot": MSO_LINE_DASH_STYLE.DASH_DOT_DOT,
-                "long_dash": MSO_LINE_DASH_STYLE.LONG_DASH,
-                "long_dash_dot": MSO_LINE_DASH_STYLE.LONG_DASH_DOT,
-                "square_dot": MSO_LINE_DASH_STYLE.SQUARE_DOT,
-            }
-            if dash_style in dash_map:
-                connector.line.dash_style = dash_map[dash_style]
-            elif dash_style in ("sysDash", "sysDot", "sysDashDot", "sysDashDotDot"):
-                from lxml import etree
-                from pptx.oxml.ns import qn
-                ln = connector.line._ln
-                prstDash = etree.SubElement(ln, qn('a:prstDash'))
-                prstDash.set('val', dash_style)
+        self._apply_dash_style(connector, elem)
     
 

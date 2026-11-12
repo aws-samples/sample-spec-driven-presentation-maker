@@ -1,0 +1,1 @@
+- [4layer-architecture] The four layers: three adapters bind one tool contract over a pure core

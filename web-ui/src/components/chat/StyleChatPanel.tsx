@@ -6,6 +6,12 @@
  * Uses useChatStream + ChatInput (shared components).
  * No @mentions, no Options, no Panel A/B, no reconnect.
  * Detects write_style calls and notifies parent to refresh preview.
+ *
+ * Comments (inside the style page's enabled ReviewProvider): the frames drawn on the style
+ * preview collect in a draft bar above the input, and one send turns them and the typed text
+ * into a change request message (`createRequest` of the provider), sent like any message.
+ * A steer the agent did not take puts the frames back into the drafts and the text back into
+ * an empty input.
  */
 
 "use client"
@@ -19,23 +25,33 @@ import { ChatMessage } from "./ChatMessage"
 import { FileDropZone } from "./FileDropZone"
 import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
 import { IS_LOCAL } from "@/lib/mode"
+import { loadRuntimeConfig } from "@/lib/runtimeConfig"
+import { saveLocalChat } from "@/services/localService"
 import { Sparkles, MessageSquare, Image, Palette } from "lucide-react"
 import type { UploadedFile } from "@/services/uploadService"
 import { buildAttachedMarkers } from "@/lib/attachmentMarker"
 import { notifyError } from "@/lib/errors"
+import { useReview, type SubmittedReview } from "@/components/review/ReviewProvider"
+import { ReviewDraftBar } from "@/components/review/ReviewDraftBar"
+import { stripWhitespace } from "@/lib/review/schema"
 
 interface StyleChatPanelProps {
+  /** Style the chat edits; "" for a new style, which the agent names. */
   styleId: string
   /** Called when agent writes a style — parent should refetch preview. */
   onStyleWritten?: () => void
   /** Called when agent saves the style (write_style succeeded with saved result). */
-  onStyleSaved?: (saved: { title: string; filename: string }) => void
+  onStyleSaved?: (saved: { title?: string; filename: string }) => void
+  /** Reports whether the agent is working (the comment tool shows its busy hint). */
+  onLoadingChange?: (loading: boolean) => void
 }
 
-export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleChatPanelProps) {
+export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved, onLoadingChange }: StyleChatPanelProps) {
   const t = useTranslations("styleChat")
+  const tChat = useTranslations("chat")
+  const tReview = useTranslations("review")
   const auth = useAuth()
-  const sessionId = useRef(generateSessionId()).current
+  const sessionId = useRef(generateSessionId(auth.user?.profile?.sub)).current
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const scrollContainerRef = useRef<HTMLDivElement>(null)
   const shouldAutoScroll = useRef(true)
@@ -45,7 +61,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
     if (data?.completed && data?.result) {
       const result = data.result as Record<string, unknown>
       if (result.saved) {
-        const saved = result.saved as { title: string; filename: string }
+        const saved = result.saved as { title?: string; filename: string }
         onStyleWritten?.()
         onStyleSaved?.(saved)
       }
@@ -65,8 +81,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
     if (IS_LOCAL) return
     async function loadConfig() {
       try {
-        const response = await fetch("/aws-exports.json")
-        const config = await response.json()
+        const config = await loadRuntimeConfig()
         await setAgentConfig(config.agentRuntimeArn, config.awsRegion || "us-east-1")
         setConfigLoaded(true)
       } catch (err) {
@@ -79,11 +94,7 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
   // Save chat after each send (Local mode)
   useEffect(() => {
     if (!stream.isLoading && stream.messages.length > 0 && IS_LOCAL && styleId) {
-      fetch("/api/agent/chat", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ deckId: styleId, messages: stream.messages }),
-      }).catch((err) => notifyError(t("saveChatFailed"), err))
+      saveLocalChat(styleId, stream.messages).catch((err) => notifyError(t("saveChatFailed"), err))
     }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stream.isLoading])
@@ -97,17 +108,18 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
 
   const hasSentRef = useRef(false)
 
-  const handleSend = useCallback(async (
+  const handleSend = useCallback((
     text: string,
     uploadedFiles: UploadedFile[],
     snippets: { label: string; text: string }[],
     attachments: { fileName: string; fileType: string }[],
-  ) => {
+  ): Promise<void | false> | void => {
     let fullMessage = text
-    // First message: inject style context so the agent knows which style to write
+    // First message on an existing style: name it so the agent writes that style.
+    // A new style (no styleId yet) is named by the agent; the parent follows its first save.
     if (!hasSentRef.current) {
       hasSentRef.current = true
-      fullMessage = `[Style: ${styleId}]\n\n${fullMessage}`
+      if (styleId) fullMessage = `[Style: ${styleId}]\n\n${fullMessage}`
     }
     if (uploadedFiles.length > 0) {
       fullMessage = `${buildAttachedMarkers(uploadedFiles)}\n\n${fullMessage}`
@@ -116,14 +128,68 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
       const snippetInfo = snippets.map((s) => `---snippet---\n${s.text}\n---/snippet---`).join("\n\n")
       fullMessage = `${fullMessage}\n\n${snippetInfo}`
     }
-    await stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments)
+    // Agent working: a steer. A steer that was not accepted keeps the input, so ChatInput waits
+    // for its answer. Any other send returns at once: sendMessage settles only when the turn
+    // ends, and ChatInput clears the input after the Promise it is given.
+    if (stream.isLoading) {
+      return stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments).then((ok) => (ok ? undefined : false))
+    }
+    void stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stream.sendMessage, styleId])
+  }, [stream.sendMessage, stream.isLoading, styleId])
+
+  useEffect(() => {
+    onLoadingChange?.(stream.isLoading)
+    return () => onLoadingChange?.(false)
+  }, [stream.isLoading, onLoadingChange])
+
+  // --- Review comments from the style preview ---
+  const review = useReview()
+  const reviewActive = !!review?.enabled
+  const hasReviewDrafts = reviewActive && (review?.readyDrafts.length ?? 0) > 0
+  // Read in callbacks that outlive a render.
+  const reviewRef = useRef(review)
+  useEffect(() => { reviewRef.current = review })
+  const [inputBlank, setInputBlank] = useState(true)
+  const handleInputChange = useCallback((value: string) => setInputBlank(!stripWhitespace(value)), [])
+
+  /**
+   * Send from the input. A plain send goes straight to `handleSend` (not wrapped in a
+   * promise, so the input clears as `handleSend` allows). With comments waiting, the typed text
+   * becomes the request's note and the request message is sent instead.
+   */
+  const handleInputSend = useCallback((
+    text: string,
+    uploadedFiles: UploadedFile[],
+    snippets: { label: string; text: string }[],
+    attachments: { fileName: string; fileType: string }[],
+  ) => {
+    const r = reviewRef.current
+    if (!hasReviewDrafts || !r) return handleSend(text, uploadedFiles, snippets, attachments)
+    return (async (): Promise<void | false> => {
+      let created: SubmittedReview
+      try {
+        created = await r.submit(text)
+      } catch (err) {
+        notifyError(tReview("sendFailed"), err)
+        return false
+      }
+      void Promise.resolve(handleSend(created.message, uploadedFiles, snippets, attachments)).then((ok) => {
+        if (ok !== false) return
+        created.restore()
+        // Later than ChatInput clearing the input after this send.
+        setTimeout(() => {
+          const input = chatInputRef.current
+          if (text.trim() && input && !input.textareaRef.current?.value.trim()) input.replaceText(text)
+        }, 100)
+      })
+    })()
+  }, [hasReviewDrafts, handleSend, tReview])
 
   const isInitial = stream.messages.length === 0
 
   return (
-    <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={stream.isLoading} className="flex flex-col h-full">
+    <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} className="flex flex-col h-full">
       <div
         ref={scrollContainerRef}
         className="flex-1 overflow-y-auto px-4 py-4"
@@ -161,21 +227,23 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
             {(() => {
               const lastUserIdx = stream.messages.findLastIndex((m) => m.role === "user")
               return stream.messages.map((msg, i) => (
-              <ChatMessage
-                key={i}
-                role={msg.role}
-                content={msg.content}
-                toolUses={msg.toolUses}
-                blocks={msg.blocks}
-                snippets={msg.snippets}
-                attachments={msg.attachments}
-                isStreaming={stream.isLoading && i === stream.messages.length - 1}
-                idToken={auth.user?.id_token}
-                accessToken={auth.user?.access_token}
-                sessionId={sessionId}
-                onSend={(text: string) => handleSend(text, [], [], [])}
-                hearingDisabled={i < lastUserIdx}
-              />
+              <div key={i}>
+                <ChatMessage
+                  role={msg.role}
+                  content={msg.content}
+                  toolUses={msg.toolUses}
+                  blocks={msg.blocks}
+                  snippets={msg.snippets}
+                  attachments={msg.attachments}
+                  isStreaming={stream.isLoading && i === stream.messages.length - 1}
+                  idToken={auth.user?.id_token}
+                  onSend={(text: string) => handleSend(text, [], [], [])}
+                  hearingDisabled={i < lastUserIdx}
+                />
+                {msg.steerNotDelivered && (
+                  <p className="mt-1 text-right text-xs text-foreground-muted">{tChat("steerNotDelivered")}</p>
+                )}
+              </div>
             ))
             })()}
             <div ref={messagesEndRef} />
@@ -183,11 +251,21 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved }: StyleC
         )}
       </div>
 
+      {(stream.stopping || stream.reconnecting) && (
+        <p role="status" className="flex-none px-4 pb-1 text-xs text-foreground-muted">
+          {stream.stopping ? tChat("stopping") : tChat("reconnecting")}
+        </p>
+      )}
+
       <ChatInput
         ref={chatInputRef}
-        onSend={handleSend}
+        onSend={handleInputSend}
+        onInputChange={handleInputChange}
+        topSlot={reviewActive ? <ReviewDraftBar inputBlank={inputBlank} /> : undefined}
+        sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: false, canSend: review.canSubmit } : undefined}
         isLoading={stream.isLoading}
         onStop={stream.stopGeneration}
+        canSendWhileLoading
         idToken={auth.user?.id_token}
         sessionId={sessionId}
         placeholder={t("placeholder")}

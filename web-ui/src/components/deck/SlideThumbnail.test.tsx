@@ -148,3 +148,23 @@ describe("SlideThumbnail — aspect ratio agnostic", () => {
     expect(img.style.getPropertyValue("--reveal-delay")).toBe("360ms")
   })
 })
+
+describe("SlideThumbnail — HTML previews", () => {
+  it("renders an .html preview in a sandbox=\"\" iframe at the deck aspect ratio", () => {
+    const onAspectRatio = vi.fn()
+    const { container } = render(
+      <SlideThumbnail src="/api/preview/d1/preview/intro.html?v=1" alt="slide 1" index={0} slug="intro" slideSize={{ width: 1280, height: 960 }} onAspectRatio={onAspectRatio} />
+    )
+    expect(container.querySelector("img")).toBeNull()
+    const frame = container.querySelector("iframe")
+    expect(frame?.getAttribute("sandbox")).toBe("")
+    expect((container.firstChild as HTMLElement).style.aspectRatio).toBe("1280/960")
+    expect(onAspectRatio).toHaveBeenCalledWith(1280 / 960)
+  })
+
+  it("keeps <img> for .png previews", () => {
+    const { container } = render(<SlideThumbnail src="/api/preview/d1/preview/intro.png" alt="slide 1" index={0} />)
+    expect(container.querySelector("iframe")).toBeNull()
+    expect(container.querySelector("img")).toBeTruthy()
+  })
+})

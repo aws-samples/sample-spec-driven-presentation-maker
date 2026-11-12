@@ -9,11 +9,44 @@
 
 import fs from "fs"
 import path from "path"
-import { resolveDeckDir, DECK_ROOT } from "@/lib/local/deck-paths"
+import { resolveDeckDir, readSlideSize, DECK_ROOT } from "@/lib/local/deck-paths"
 import { readOriginFromDeck } from "@/lib/local/acp-process"
+import { inlineStyleIcons } from "@/lib/local/styleIcons"
 
 function safeRead(p: string): string | null {
   try { return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : null } catch { return null }
+}
+
+// Copies of the Python definitions, pinned by tests/test_slug_parity.py.
+/** Slug grammar of HTML slide files (`slides/<slug>.html`): `SLUG_RE` in sdpm.engine.schema. */
+const HTML_SLUG_RE = /^[a-z0-9][a-z0-9_-]*$/
+/** A slide line of outline.md: `OUTLINE_ENTRY_RE` in sdpm.engine.schema. */
+const OUTLINE_ENTRY_RE = /^-\s*\[([a-z0-9-]+)\]/
+/** `compose/<slug>_<epoch>.json` (slug "defs" is the deck's defs): `COMPOSE_NAME_RE` in shared/artifact_keys.py. */
+const COMPOSE_FILE_RE = /^(.+)_(\d+)\.json$/
+/** Local preview image of a slide, `preview/<slug>.png` (outline slug). */
+const PREVIEW_PNG_RE = /^([a-z0-9-]+)\.png$/
+
+/** `?v=<mtime>` cache-buster so the UI sees a rebuilt file as a new URL; null when absent. */
+function versionedUrl(filePath: string, url: string): string | null {
+  try { return `${url}?v=${Math.floor(fs.statSync(filePath).mtimeMs)}` } catch { return null }
+}
+
+/** HTML deck slides: `slides/<slug>.html` in outline order, previews from `preview/<slug>.html`. */
+function htmlSlides(dp: string, deckId: string, outlineSlugs: string[]): Record<string, unknown>[] {
+  // `dp` comes from resolveDeckDir (allow-list + realpath check); every slug passes HTML_SLUG_RE before it is joined.
+  const slidesDir = path.join(dp, "slides") // nosemgrep: path-join-resolve-traversal — dp validated by resolveDeckDir
+  if (!fs.existsSync(slidesDir)) return []
+  const slugList = outlineSlugs.length > 0 ? outlineSlugs
+    : fs.readdirSync(slidesDir).filter(f => f.endsWith(".html")).map(f => f.slice(0, -".html".length)).sort()
+  return slugList
+    .filter(slug => HTML_SLUG_RE.test(slug) && fs.existsSync(path.join(slidesDir, `${slug}.html`))) // nosemgrep: path-join-resolve-traversal — slug checked by HTML_SLUG_RE first
+    .map(slug => ({
+      slug,
+      previewUrl: versionedUrl(path.join(dp, "preview", `${slug}.html`), `/api/preview/${deckId}/preview/${slug}.html`), // nosemgrep: path-join-resolve-traversal — slug passed HTML_SLUG_RE above
+      composeUrl: null,
+      updatedAt: new Date().toISOString(),
+    }))
 }
 
 export async function GET(_req: Request, { params }: { params: Promise<{ id: string }> }) {
@@ -33,12 +66,12 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   let defsFilename: string | null = null
   const composeDir = path.join(dp, "compose")
   if (fs.existsSync(composeDir)) {
-    const epochOf = (n: string) => { const m = n.match(/_(\d+)\.json$/); return m ? parseInt(m[1]) : 0 }
+    const epochOf = (n: string) => { const m = n.match(COMPOSE_FILE_RE); return m ? parseInt(m[2]) : 0 }
     let defsEpoch = -1
     for (const n of fs.readdirSync(composeDir)) {
       if (!n.endsWith(".json")) continue
       if (n.startsWith("defs_")) { const e = epochOf(n); if (e > defsEpoch) { defsEpoch = e; defsFilename = n }; continue }
-      const m = n.match(/^(.+)_(\d+)\.json$/)
+      const m = n.match(COMPOSE_FILE_RE)
       if (!m) continue
       const [, slug, epochStr] = m
       const cur = composeBySlug.get(slug)
@@ -50,7 +83,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const specsDir = path.join(dp, "specs")
   const outlineText = safeRead(path.join(specsDir, "outline.md"))
   const outlineSlugs = outlineText
-    ? outlineText.split("\n").map(l => /^-\s*\[([a-z0-9-]+)\]/.exec(l)?.[1]).filter((s): s is string => !!s)
+    ? outlineText.split("\n").map(l => OUTLINE_ENTRY_RE.exec(l)?.[1]).filter((s): s is string => !!s)
     : []
 
   // Index preview PNGs — supports both slug-named ({slug}.png) and legacy page-numbered (page{N}-*.png)
@@ -61,17 +94,18 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     for (const f of fs.readdirSync(previewDir)) {
       if (!f.endsWith(".png")) continue
       const pageMatch = f.match(/^page(\d+)[-.]/); if (pageMatch) { previewByPage.set(parseInt(pageMatch[1]), f); continue }
-      const slugMatch = f.match(/^([a-z0-9-]+)\.png$/); if (slugMatch) previewBySlug.set(slugMatch[1], f)
+      const slugMatch = f.match(PREVIEW_PNG_RE); if (slugMatch) previewBySlug.set(slugMatch[1], f)
     }
   }
 
   // Build slides array
+  const isHtml = deckJson.outputFormat === "html"
   const slidesDir = path.join(dp, "slides")
-  const slides: Record<string, unknown>[] = []
+  const slides: Record<string, unknown>[] = isHtml ? htmlSlides(dp, deckId, outlineSlugs) : []
   let slugList = outlineSlugs.length > 0 ? outlineSlugs
     : (fs.existsSync(slidesDir) ? fs.readdirSync(slidesDir).filter(f => f.endsWith(".json")).map(f => f.replace(".json", "")) : [])
   let pageNum = 0
-  if (fs.existsSync(slidesDir)) {
+  if (!isHtml && fs.existsSync(slidesDir)) {
     for (const slug of slugList) {
       if (!fs.existsSync(path.join(slidesDir, `${slug}.json`))) continue
       pageNum++
@@ -90,7 +124,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   let specs = null
   const brief = safeRead(path.join(specsDir, "brief.md"))
   const outline = safeRead(path.join(specsDir, "outline.md"))
-  const artDirection = safeRead(path.join(specsDir, "art-direction.html")) || safeRead(path.join(specsDir, "art-direction.md"))
+  // The deck's style copy is shown in the Web UI: draw the catalog icons it references
+  const artHtml = safeRead(path.join(specsDir, "art-direction.html"))
+  const artDirection = artHtml ? (await inlineStyleIcons([artHtml]))[0] : safeRead(path.join(specsDir, "art-direction.md"))
   if (brief || outline || artDirection) specs = { brief, outline, artDirection }
 
   const pptxPath = path.join(dp, "output.pptx")
@@ -110,8 +146,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ...(sessionOrigin ? { sessionOrigin } : {}),
     visibility: "private",
     isOwner: true,
-    collaborators: [],
-    collaboratorAliases: {},
+    slideSize: readSlideSize(deckJson),
+    ...(isHtml ? {
+      outputFormat: "html",
+      htmlUrl: versionedUrl(path.join(dp, "output.html"), `/api/preview/${deckId}/output.html`),
+    } : {}),
   })
 }
 

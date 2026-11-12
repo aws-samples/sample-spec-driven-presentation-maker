@@ -5,26 +5,47 @@
  * Shows all slides stacked vertically with PPTX download and folder open links.
  * Features a polished loading animation during PPTX generation.
  * Integrates SpecStepNav for viewing brief/outline/art-direction content.
+ *
+ * HTML decks (outputFormat "html"): the full view is the sandboxed in-app player
+ * (HtmlDeckPlayer), the grid shows `preview/<slug>.html` thumbnails, and the
+ * header carries a read-only "HTML" badge with Present / PDF / Download (cloud)
+ * or Open (local) instead of the PPTX button.
+ *
+ * Comment tool (inside a ReviewProvider that is enabled): header toggle, C key, slide-hover
+ * button; frames are drawn on the full view. While the tool is on, HTML decks show the stacked
+ * static previews instead of the player so every slide can carry frames. Without a provider
+ * nothing of this renders.
  */
 
 "use client"
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { SlidePreview } from "@/services/deckService"
-import type { SpecFiles } from "@/services/deckService"
-import { Download, Layers, LayoutGrid, Rows3, FolderOpen } from "lucide-react"
+import { SlidePreview, fetchHtmlUrl } from "@/services/deckService"
+import { openInOs } from "@/services/localService"
+import type { ScriptWarning, SpecFiles } from "@/services/deckService"
+import { Download, ExternalLink, Layers, LayoutGrid, Presentation, Printer, Rows3, FolderOpen } from "lucide-react"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
+import { HtmlDeckPlayer, type HtmlPlayerSlide } from "@/components/deck/HtmlDeckPlayer"
+import { ScriptWarningBadge } from "@/components/deck/ScriptWarningBadge"
 import { DeckDefs, type DeckDefsStatus } from "@/components/deck/DeckDefs"
 import { useFollowScroll } from "@/components/deck/useFollowScroll"
 import { IS_LOCAL } from "@/lib/mode"
+import { previewIdentity } from "@/lib/preview"
 import { notifyError } from "@/lib/errors"
 import { useTranslations } from "next-intl"
 import { AGENT_WAIT_COLORS } from "@/components/deck/SpecWaiting"
+import { useReview } from "@/components/review/ReviewProvider"
+import { ReviewSlideLayer } from "@/components/review/ReviewSlideLayer"
+import { ReviewSlideCta } from "@/components/review/ReviewSlideCta"
+import { ReviewToolButton } from "@/components/review/ReviewToolButton"
+import { ReviewToolHint } from "@/components/review/ReviewToolHint"
+import { ReviewCommentCard } from "@/components/review/ReviewCommentCard"
+import { ReviewKeyboard } from "@/components/review/ReviewKeyboard"
 
 
 /**
@@ -33,11 +54,12 @@ import { AGENT_WAIT_COLORS } from "@/components/deck/SpecWaiting"
  * `layout` lets neighbours slide when a slide is inserted or removed.
  */
 const CARD_SPRING = { type: "spring", stiffness: 500, damping: 40, mass: 0.8 } as const
-function SlideCard({ slug, children, className }: { slug: string; children: React.ReactNode; className?: string }) {
+function SlideCard({ slug, children, className, reviewSlide }: { slug: string; children: React.ReactNode; className?: string; reviewSlide?: boolean }) {
   return (
     <motion.div
       layout
       layoutId={`slide-${slug}`}
+      data-review-slide={reviewSlide ? slug : undefined}
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.98, transition: { duration: 0.18 } }}
@@ -77,10 +99,21 @@ interface SlideCarouselProps {
   currentTemplate?: string | null
   /** Cognito ID token for style API calls. */
   idToken?: string
+  /** deck.json outputFormat; missing means PPTX. */
+  outputFormat?: "pptx" | "html"
+  /** HTML decks: in-app view URL of output.html (null until built). */
+  htmlUrl?: string | null
+  /** HTML decks: canvas size in CSS px. */
+  slideSize?: { width: number; height: number }
+  /** HTML decks (cloud): slides whose script can send data outside the deck. */
+  scriptWarnings?: ScriptWarning[]
 }
 
-export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken }: SlideCarouselProps) {
+const HEADER_BUTTON = "inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
+
+export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outputFormat, htmlUrl, slideSize, scriptWarnings }: SlideCarouselProps) {
   const t = useTranslations("carousel")
+  const isHtml = outputFormat === "html"
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
   const slugs = slides.map(s => s.slug)
   if (new Set(slugs).size !== slugs.length) console.warn("[SlideCarousel] duplicate slugs:", slugs)
@@ -94,6 +127,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   }
   if (dupUrls.length) console.warn("[SlideCarousel] same composeUrl used for multiple slides:", dupUrls, urlBySlug)
   const { viewMode, setViewMode } = usePreferences()
+  const review = useReview()
+  const reviewOn = !!review?.enabled && slidesWithPreview.length > 0
+  const [playerHover, setPlayerHover] = useState(false)
+  const toolOn = reviewOn && !!review?.toolOn
   const [scrollElement, setScrollElement] = useState<HTMLDivElement | null>(null)
   const followChangedSlide = useFollowScroll(scrollElement)
   const [defsState, setDefsState] = useState<{ url: string; status: DeckDefsStatus }>({
@@ -151,7 +188,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   useEffect(() => {
     const newUpdated = new Set<string>()
     for (const slide of slides) {
-      const newKey = slide.previewUrl?.split("?")[0] || ""
+      const newKey = slide.previewUrl ? previewIdentity(slide.previewUrl) : ""
       const prevKey = prevUrlKeys.current.get(slide.slug) || ""
       if (prevKey && newKey && newKey !== prevKey) {
         newUpdated.add(slide.slug)
@@ -204,13 +241,34 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
     }
   }, [slides.length])
 
+  // Turning the comment tool on shows the slides in the full view, where frames are drawn (R1.5).
+  const prevToolOn = useRef(false)
+  useEffect(() => {
+    if (toolOn && !prevToolOn.current) {
+      setSpecTab("slides")
+      if (viewMode === "grid") setViewMode("full")
+    }
+    prevToolOn.current = toolOn
+  }, [toolOn, viewMode, setViewMode])
+
   // Grid thumbnail click: switch to full view and land on that slide once the
   // shared-layout morph has run.
   const [focusSlug, setFocusSlug] = useState<string | null>(null)
+  // HTML decks show one player instead of stacked slides: it is told which slide
+  // to open (index as numbered on the thumbnails).
+  const [playerSlide, setPlayerSlide] = useState<HtmlPlayerSlide | null>(null)
+  const previewSlugKey = slidesWithPreview.map((s) => s.slug).join(" ")
+  const showInPlayer = useCallback((slug: string): boolean => {
+    const index = previewSlugKey.split(" ").indexOf(slug)
+    if (index < 0) return false
+    setPlayerSlide((prev) => ({ index, seq: (prev?.seq ?? 0) + 1 }))
+    return true
+  }, [previewSlugKey])
   const openSlideInFullView = useCallback((slug: string) => {
-    setFocusSlug(slug)
+    if (isHtml) showInPlayer(slug)
+    else setFocusSlug(slug)
     setViewMode("full")
-  }, [setViewMode])
+  }, [isHtml, showInPlayer, setViewMode])
   useEffect(() => {
     if (!focusSlug || viewMode !== "full" || !scrollElement) return
     const el = scrollElement.querySelector(`[data-slide-id="${focusSlug}"]`)
@@ -224,6 +282,11 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   // Scroll to target slide when navigating from search results
   useEffect(() => {
     if (!scrollToSlide || !scrollElement) return
+    if (isHtml && viewMode === "full" && htmlUrl) {
+      const slug = scrollToSlide
+      const timer = setTimeout(() => { if (showInPlayer(slug)) onScrollComplete?.() }, 0)
+      return () => clearTimeout(timer)
+    }
     const el = scrollElement.querySelector(`[data-slide-id="${scrollToSlide}"]`)
     if (el) {
       setTimeout(() => {
@@ -231,18 +294,59 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
         onScrollComplete?.()
       }, 300)
     }
-  }, [scrollToSlide, slidesWithPreview.length, onScrollComplete, scrollElement])
+  }, [scrollToSlide, slidesWithPreview.length, onScrollComplete, scrollElement, isHtml, viewMode, htmlUrl, showInPlayer])
 
   /** Local: open deck directory in Finder/Explorer */
   async function handleFolderOpen() {
     if (!deckId || !IS_LOCAL) return
-    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId }) }).catch((err) => notifyError(t("errorOpenFolder"), err, { retry: handleFolderOpen }))
+    openInOs(deckId).catch((err) => notifyError(t("errorOpenFolder"), err, { retry: handleFolderOpen }))
   }
 
   /** Local: open output.pptx with default app */
   async function handlePptxOpen() {
     if (!deckId || !IS_LOCAL) return
-    fetch("/api/open", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ deckId, file: "output.pptx" }) }).catch((err) => notifyError(t("errorOpenPptx"), err, { retry: handlePptxOpen }))
+    openInOs(deckId, "output.pptx").catch((err) => notifyError(t("errorOpenPptx"), err, { retry: handlePptxOpen }))
+  }
+
+  /**
+   * HTML decks, cloud: open Present (or the print view for PDF) in a new tab.
+   * The tab opens synchronously inside the click (popup blockers), drops its
+   * opener, then navigates to the 4-hour presigned URL once it arrives.
+   */
+  async function handleHtmlPresent(view: "present" | "pdf") {
+    if (!deckId || IS_LOCAL) return
+    const tab = window.open("about:blank", "_blank")
+    if (tab) tab.opener = null
+    try {
+      const { url } = await fetchHtmlUrl(deckId, "present", idToken ?? "")
+      const target = view === "pdf" ? `${url}#print-pdf` : url
+      if (tab) tab.location.replace(target)
+      else window.open(target, "_blank", "noopener,noreferrer")
+    } catch (err) {
+      tab?.close()
+      notifyError(view === "pdf" ? t("errorPdf") : t("errorPresent"), err, { retry: () => void handleHtmlPresent(view) })
+    }
+  }
+
+  /** HTML decks, cloud: download output.html (the presigned URL is an attachment). */
+  async function handleHtmlDownload() {
+    if (!deckId || IS_LOCAL) return
+    try {
+      const { url } = await fetchHtmlUrl(deckId, "download", idToken ?? "")
+      window.location.assign(url)
+    } catch (err) {
+      notifyError(t("errorDownloadHtml"), err, { retry: () => void handleHtmlDownload() })
+    }
+  }
+
+  /** HTML decks, local: open output.html in the default browser. */
+  async function handleHtmlOpen() {
+    if (!deckId || !IS_LOCAL) return
+    try {
+      await openInOs(deckId, "output.html")
+    } catch (err) {
+      notifyError(t("errorOpenHtml"), err, { retry: handleHtmlOpen })
+    }
   }
 
   /**
@@ -349,7 +453,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             <div className="w-14 h-14 rounded-2xl bg-muted flex items-center justify-center mb-4 text-muted-foreground/40">
               <Layers className="h-7 w-7" />
             </div>
-            <p className="text-sm text-muted-foreground">{t("previewsPlaceholder")}</p>
+            <p className="text-sm text-muted-foreground">{t(isHtml ? "htmlPreviewsPlaceholder" : "previewsPlaceholder")}</p>
           </>
         )}
       </div>
@@ -362,10 +466,33 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
    * @returns JSX element for the slides view
    */
   function renderSlidesContent(): React.ReactNode {
+    if (isHtml && viewMode === "full" && htmlUrl && !toolOn) {
+      // The deck iframe hides the pointer from the page: the pane around it tracks the hover
+      // that shows the slide's "Comment" button.
+      return (
+        <div
+          ref={setScrollElement}
+          data-slide-scroller
+          className="flex-1 overflow-y-auto px-6 py-6"
+          onMouseEnter={reviewOn ? () => setPlayerHover(true) : undefined}
+          onMouseLeave={reviewOn ? () => setPlayerHover(false) : undefined}
+        >
+          <HtmlDeckPlayer
+            htmlUrl={htmlUrl}
+            slideSize={slideSize}
+            deckName={deckName}
+            slide={playerSlide}
+            overlay={reviewOn ? <ReviewSlideCta onClick={() => review?.setToolOn(true)} /> : undefined}
+            hovered={reviewOn && playerHover}
+          />
+        </div>
+      )
+    }
     if (slidesWithPreview.length === 0) return renderSlidesEmpty()
 
     return (
-      <div ref={setScrollElement} data-slide-scroller className="flex-1 overflow-y-auto px-6 py-6">
+      <div ref={setScrollElement} data-slide-scroller className={`flex-1 overflow-y-auto px-6 py-6 transition-shadow duration-200 ${toolOn ? "review-tooling" : ""}`}>
+        {toolOn && !review?.hintSeen && <ReviewToolHint />}
         {viewMode === "grid" ? (
           <div className="grid grid-cols-2 xl:grid-cols-3 gap-3">
             <AnimatePresence initial={false}>
@@ -378,6 +505,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                     slug={slide.slug}
                     onClick={() => { openSlideInFullView(slide.slug); onSlideClick?.(i + 1) }}
                     updated={updatedIds.has(slide.slug)}
+                    slideSize={isHtml ? slideSize : undefined}
                     className="slide-cv border border-border/40 hover:border-border-hover hover:-translate-y-[1px] hover:shadow-[0_4px_16px_oklch(0_0_0/30%)] transition-all duration-200 cursor-pointer group"
                   >
                     <span className="absolute bottom-1.5 right-2 text-[11px] font-medium text-white/30 group-hover:text-white/50 transition-colors">
@@ -395,7 +523,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                style={{ maxWidth: `calc((100vh - 170px) * ${deckAr})` }}>
           <AnimatePresence initial={false}>
           {slidesWithPreview.map((slide, i) => (
-            <SlideCard key={slide.slug} slug={slide.slug}>
+            <SlideCard key={slide.slug} slug={slide.slug} reviewSlide={reviewOn} className={reviewOn ? "relative group/slide" : undefined}>
             {slide.composeUrl && defsUrl ? (
               <AnimatedSlidePreview
                 defsUrl={defsUrl}
@@ -426,9 +554,12 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 onClick={() => onSlideClick?.(i + 1)}
                 updated={updatedIds.has(slide.slug)}
                 onAspectRatio={handleAspectRatio}
+                slideSize={isHtml ? slideSize : undefined}
                 className="slide-cv slide-shadow w-full cursor-pointer hover:ring-2 hover:ring-primary/50 transition-shadow"
               />
             )}
+            {reviewOn && <ReviewSlideLayer slug={slide.slug} index={i} />}
+            {reviewOn && !toolOn && <ReviewSlideCta onClick={() => review?.setToolOn(true)} />}
             </SlideCard>
           ))}
           </AnimatePresence>
@@ -456,17 +587,28 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
         <div className="flex-none flex items-center justify-between px-5 py-3 border-b border-border/40">
           <div className="flex items-center gap-3">
             <div>
-              <h2 className="text-sm font-medium truncate max-w-[200px]">
-                {deckName || t("preview")}
-              </h2>
+              <div className="flex items-center gap-2">
+                <h2 className="text-sm font-medium truncate max-w-[200px]">
+                  {deckName || t("preview")}
+                </h2>
+                {isHtml && (
+                  <span
+                    className="shrink-0 rounded border border-border px-1.5 py-px text-[11px] font-medium text-foreground-secondary"
+                    title={t("formatBadgeTitle")}
+                  >
+                    {t("formatHtml")}
+                  </span>
+                )}
+              </div>
               <p className="text-xs text-muted-foreground">
-                {slidesWithPreview.length} {slidesWithPreview.length === 1 ? "slide" : "slides"}
-                {ownerAlias && <span> · by {ownerAlias}</span>}
+                {t("slideCount", { count: slidesWithPreview.length })}
+                {ownerAlias && <span> · {t("byOwner", { owner: ownerAlias })}</span>}
               </p>
             </div>
             {headerActions}
           </div>
           <div className="flex items-center gap-1">
+            {reviewOn && <ReviewToolButton on={toolOn} onClick={() => review?.toggleTool()} />}
             {/* View mode toggle */}
             <div className="flex items-center rounded-lg border border-border/40 p-0.5 mr-1">
               <button
@@ -477,7 +619,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 <Rows3 className="h-3.5 w-3.5" />
               </button>
               <button
-                onClick={() => setViewMode("grid")}
+                onClick={() => { if (toolOn) review?.setToolOn(false); setViewMode("grid") }}
                 className={`p-1.5 rounded-md transition-colors ${viewMode === "grid" ? "bg-background-hover text-foreground" : "text-muted-foreground hover:text-foreground"}`}
                 aria-label={t("gridView")}
               >
@@ -491,10 +633,34 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 aria-label={t("openFolder")}
               >
                 <FolderOpen className="h-3.5 w-3.5" />
-                Folder
+                {t("folder")}
               </button>
             )}
-            {pptxUrl && (
+            {isHtml && htmlUrl && (
+              IS_LOCAL ? (
+                <button onClick={handleHtmlOpen} className={HEADER_BUTTON} aria-label={t("openHtml")}>
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {t("open")}
+                </button>
+              ) : (
+                <>
+                  {scriptWarnings && scriptWarnings.length > 0 && <ScriptWarningBadge warnings={scriptWarnings} />}
+                  <button onClick={() => void handleHtmlPresent("present")} className={HEADER_BUTTON} aria-label={t("presentAria")}>
+                    <Presentation className="h-3.5 w-3.5" />
+                    {t("present")}
+                  </button>
+                  <button onClick={() => void handleHtmlPresent("pdf")} className={HEADER_BUTTON} aria-label={t("pdfAria")}>
+                    <Printer className="h-3.5 w-3.5" />
+                    {t("pdf")}
+                  </button>
+                  <button onClick={() => void handleHtmlDownload()} className={HEADER_BUTTON} aria-label={t("downloadHtml")}>
+                    <Download className="h-3.5 w-3.5" />
+                    {t("formatHtml")}
+                  </button>
+                </>
+              )
+            )}
+            {pptxUrl && !isHtml && (
               IS_LOCAL ? (
                 <button
                   onClick={handlePptxOpen}
@@ -518,6 +684,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
             )}
           </div>
         </div>
+      )}
+
+      {reviewOn && specTab === "slides" && (
+        <>
+          <ReviewKeyboard />
+          <ReviewCommentCard />
+        </>
       )}
 
       {/* Content area */}

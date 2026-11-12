@@ -167,9 +167,10 @@ class TextboxMixin:
                     from lxml import etree
                     from pptx.oxml.ns import qn as _qn
                     pPr = p._element.get_or_add_pPr()
-                    lnSpc = etree.SubElement(pPr, _qn('a:lnSpc'))
+                    lnSpc = etree.Element(_qn('a:lnSpc'))
                     spcPct = etree.SubElement(lnSpc, _qn('a:spcPct'))
                     spcPct.set('val', str(para_item["lineSpacingPct"]))
+                    pPr.insert(0, lnSpc)  # first in sequence, before bullets
                 
                 # Apply space after
                 if isinstance(para_item, dict) and para_item.get("spaceAfter") is not None:

@@ -17,11 +17,11 @@ CI runs ruff, pytest, and ASH (security scan) on every PR. Failing checks block 
 
 ## Development setup
 
-This repo uses `uv` — do not call `python` directly. The root `pyproject.toml` provides a single dev dependency group that covers all layers.
+This repo uses `uv` — do not call `python` directly. The root `pyproject.toml` is a uv workspace (`sdpm`, `servers/local`, `servers/remote`, `agent`, `api`) with one lock, `uv.lock`, for all of them. Its dev group installs every member, so the tests run against the versions each surface ships. After editing any member's dependencies, run `make lock` (`uv lock`) and commit `uv.lock`.
 
 ```bash
-# Install dev dependencies (ruff, pytest, engine, and runtime deps)
-uv sync --group dev
+# Install dev dependencies (ruff, pytest, and every member's runtime deps)
+uv sync
 
 # Run all checks (lint + tests)
 make all
@@ -33,6 +33,8 @@ make format   # ruff format (write changes)
 ```
 
 For web-ui / infra TypeScript changes, use `npm ci` in the respective directory.
+
+The [Developer guide](docs/en/developer-guide.md) covers working from a checkout next to an installed release (`make register-dev`, `npm run dev:local`) and deploying with the CDK.
 
 ## Security scanning
 

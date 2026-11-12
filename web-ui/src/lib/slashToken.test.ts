@@ -5,10 +5,13 @@ import {
   buildToken,
   detectSlashFragment,
   filterItems,
+  FORMAT_HTML_ITEM,
+  hasFormatToken,
   parseTokens,
   SLASH_TOKEN_RE,
   SLASH_TOKEN_SOURCE,
   splitQuery,
+  toggleFormatToken,
   type PickerItem,
 } from "./slashToken"
 
@@ -193,5 +196,61 @@ describe("SLASH_TOKEN_RE", () => {
   it("SLASH_TOKEN_SOURCE has no capturing groups, so String.split does not leak subcaptures", () => {
     const parts = 'use @style:lumina and @template:"My Brand (2026)" please'.split(new RegExp(`(${SLASH_TOKEN_SOURCE})`))
     expect(parts).toEqual(["use ", "@style:lumina", " and ", '@template:"My Brand (2026)"', " please"])
+  })
+})
+
+describe("format token", () => {
+  it("builds and parses @format:html", () => {
+    expect(buildToken(FORMAT_HTML_ITEM)).toBe("@format:html ")
+    expect(parseTokens("@format:html make a deck")).toEqual([{ kind: "format", name: "html", start: 0, end: 12 }])
+  })
+
+  it("is part of SLASH_TOKEN_SOURCE for message highlighting", () => {
+    const parts = "@format:html and @style:lumina".split(new RegExp(`(${SLASH_TOKEN_SOURCE})`))
+    expect(parts).toEqual(["", "@format:html", " and ", "@style:lumina", ""])
+  })
+
+  it("hasFormatToken follows the text", () => {
+    expect(hasFormatToken("a deck")).toBe(false)
+    expect(hasFormatToken("a deck @format:html")).toBe(true)
+    expect(hasFormatToken("@format:pptx a deck")).toBe(false)
+  })
+
+  it("toggles on by prepending the token", () => {
+    expect(toggleFormatToken("")).toBe("@format:html ")
+    expect(toggleFormatToken("a launch deck")).toBe("@format:html a launch deck")
+  })
+
+  it("toggles off by removing every format token and one trailing space", () => {
+    expect(toggleFormatToken("@format:html a launch deck")).toBe("a launch deck")
+    expect(toggleFormatToken("@format:html ")).toBe("")
+    expect(toggleFormatToken("@style:lumina @format:html deck @format:html")).toBe("@style:lumina deck ")
+  })
+
+  it("round-trips", () => {
+    const text = "@template:corporate a deck"
+    expect(toggleFormatToken(toggleFormatToken(text))).toBe(text)
+  })
+})
+
+describe("filterItems with formats", () => {
+  const all = [
+    item({ kind: "style", name: "lumina" }),
+    FORMAT_HTML_ITEM,
+    item({ kind: "template", name: "corporate" }),
+  ]
+
+  it("orders the format section after templates and styles", () => {
+    expect(filterItems(all, "").map((i) => i.kind)).toEqual(["template", "style", "format"])
+  })
+
+  it("scopes to the format section with `/format `", () => {
+    expect(detectSlashFragment("/format ", 8)).toEqual({ start: 0, query: "format " })
+    expect(filterItems(all, "format ")).toEqual([FORMAT_HTML_ITEM])
+  })
+
+  it("matches by name and by the kind word", () => {
+    expect(filterItems(all, "htm")).toEqual([FORMAT_HTML_ITEM])
+    expect(filterItems(all, "form")).toEqual([FORMAT_HTML_ITEM])
   })
 })

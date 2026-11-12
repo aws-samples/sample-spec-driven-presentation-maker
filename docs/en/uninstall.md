@@ -1,4 +1,4 @@
-[EN](../en/uninstall.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
+[English](uninstall.md) | [日本語](../ja/uninstall.md)
 
 # Uninstall Guide
 
@@ -16,6 +16,13 @@ Stack list (deleted in reverse dependency order):
 - `SdpmData`
 - `SdpmAuth` (if using the default Cognito setup)
 - `SdpmCloudFrontWaf` (only when WAF is enabled, us-east-1 only)
+
+If you used **One-Click Deploy**, the Launch Stack button also created `SdpmDeploymentStack`
+in the region you picked. It holds only what runs the deployment: a CodeBuild project, its
+IAM role (with `AdministratorAccess`), a Lambda function that starts the build, and the SNS
+topic for the notification emails. Deleting it does not remove the app stacks above, and
+deleting them does not remove it. Delete it last, after the app stacks, with the
+CloudFormation console or `delstack --region <region> -s SdpmDeploymentStack`.
 
 ## Recommended: Use delstack
 
@@ -106,7 +113,7 @@ If a stack fails with `DELETE_FAILED` because of leftover S3 buckets or ECR repo
 
 Confirm the following resources are gone:
 
-- CloudFormation: the stacks listed above
+- CloudFormation: the stacks listed above (and `SdpmDeploymentStack` after One-Click Deploy)
 - S3: buckets with `sdpm-*` or `cdk-*` prefix
 - DynamoDB: `sdpm-*` tables
 - ECR: `sdpm-*` repositories

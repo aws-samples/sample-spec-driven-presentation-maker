@@ -1,196 +1,66 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * SSE Bridge — translates kiro-cli acp JSON-RPC notifications into
- * SSE events matching the strandsParser format used by the web-ui.
+ * SSE Bridge — writes a chat's work-period events (lib/local/chat.ts) as server-sent events in
+ * the strandsParser format the web-ui reads: `id: <n>` (the number the chat gave the event within
+ * its period, for Last-Event-ID) and `data: <payload>`.
+ *
+ * A stream replays the buffered events first, then follows the live ones. An `end` event writes
+ * its payload (an error), if any, and closes the stream; a replay that already holds the end
+ * closes without subscribing, and a stream with nothing live to follow closes after its replay.
+ * `onEnd` runs once the end was written, unless the reader went away before it (a closed tab).
+ * A reader that goes away stops the subscription at once.
  *
  * Returns a ReadableStream that the API route can return as a Response.
  */
-
-import { basename } from "./pathUtils"
+import type { BufferedEvent, SsePayload } from "./conversation/events"
 
 interface BridgeOptions {
-  sessionId: string
-  subscribe: (fn: (msg: Record<string, unknown>) => void) => () => void
-  onDeckId?: (deckId: string) => void
-  onDone?: () => void
-  onError?: () => void
-  /** Pre-buffered notifications to replay before subscribing to live events. */
-  replay?: { id: number; msg: Record<string, unknown> }[]
+  subscribe?: (fn: (entry: BufferedEvent) => void) => () => void
+  /** Buffered events to write before subscribing to live ones. */
+  replay?: BufferedEvent[]
+  /** The period's end was written to a reader that was still there. */
+  onEnd?: () => void
 }
 
-function extractSlugs(q: string): string {
-  const m = q.match(/slides?:\s*([a-z0-9,\-\s]+?)(?:\.|$|\n)/i)
-  return m ? m[1].trim() : ""
-}
-
-export function createSSEStream({ sessionId, subscribe, onDeckId, onDone, onError, replay }: BridgeOptions): ReadableStream {
+export function createSSEStream({ subscribe, replay, onEnd }: BridgeOptions): ReadableStream {
   const encoder = new TextEncoder()
+  let closed = false
+  let cancelled = false
+  let unsubscribe = () => {}
 
   return new ReadableStream({
     start(controller) {
-      let subagentToolCallId: string | null = null
-      let totalGroups = 0
-      const subagentGroups = new Map<string, { group: number; slugs: string }>()
-      const subagentQueryQueue: string[] = []
-
-      let eventId = 0
-      function send(event: Record<string, unknown>, id?: number) {
-        const eid = id ?? ++eventId
-        try { controller.enqueue(encoder.encode(`id: ${eid}\ndata: ${JSON.stringify(event)}\n\n`)) } catch {}
+      function send(id: number, payload: SsePayload) {
+        try { controller.enqueue(encoder.encode(`id: ${id}\ndata: ${JSON.stringify(payload)}\n\n`)) } catch {}
       }
 
-      function close() {
+      /** Write one event; true when it ended the period and the stream closed. */
+      function write({ id, event }: BufferedEvent): boolean {
+        if (closed) return true
+        if (event.payload) send(id, event.payload)
+        if (event.kind !== "end") return false
+        closed = true
         unsubscribe()
-        onDone?.()
+        try { controller.close() } catch {}
+        if (!cancelled) onEnd?.()
+        return true
+      }
+
+      for (const entry of replay ?? []) {
+        if (write(entry)) return
+      }
+      if (subscribe) {
+        unsubscribe = subscribe((entry) => { write(entry) })
+      } else {
+        closed = true
         try { controller.close() } catch {}
       }
-
-      // Replay buffered notifications first (for reconnecting to background sessions)
-      let replaying = true
-      if (replay?.length) {
-        for (const { id, msg } of replay) {
-          eventId = id  // sync event ID counter
-          processMsg(msg)
-        }
-      }
-      replaying = false
-
-      const unsubscribe = subscribe(processMsg)
-
-      function processMsg(msg: Record<string, unknown>) {
-        if (msg.id != null && msg.error) {
-          if (!replaying) {
-            const error = msg.error as { message?: string }
-            send({ status: "error", error: error.message || "ACP request failed" })
-            onError?.()
-            close()
-          }
-          return
-        }
-
-        // End turn from RPC response
-        if (msg.id != null && msg.result) {
-          const r = msg.result as Record<string, unknown>
-          if (r.stopReason === "end_turn" || r.stopReason === "cancelled") {
-            if (!replaying) { close(); return }
-            // During replay, ignore end_turn from old responses
-            return
-          }
-        }
-
-        if (msg.method !== "session/update" && msg.method !== "_kiro.dev/session/update") return
-        const params = msg.params as Record<string, unknown>
-        const msgSessionId = params.sessionId as string
-        const update = params.update as Record<string, unknown>
-        if (!update) return
-        const type = update.sessionUpdate as string
-
-        // --- Subagent session (compose_slides progress) ---
-        if (msgSessionId !== sessionId && subagentToolCallId) {
-          let groupInfo = subagentGroups.get(msgSessionId)
-          if (!groupInfo) {
-            const idx = subagentGroups.size
-            const slugs = subagentQueryQueue[idx] || `group ${idx + 1}`
-            groupInfo = { group: idx + 1, slugs }
-            subagentGroups.set(msgSessionId, groupInfo)
-            send({ toolStream: { toolUseId: subagentToolCallId, name: "compose_slides", data: { group: groupInfo.group, total_groups: totalGroups, slugs: groupInfo.slugs, status: "starting" } } })
-          }
-          const g = groupInfo
-          if (type === "tool_call") {
-            const title = (update.title || "") as string
-            const toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title
-            send({ toolStream: { toolUseId: subagentToolCallId, name: "compose_slides", data: { group: g.group, slugs: g.slugs, tool: toolName, toolUseId: update.toolCallId } } })
-          } else if (type === "tool_call_update") {
-            const status = update.status as string
-            if (status === "completed" || status === "error" || status === "failed") {
-              send({ toolStream: { toolUseId: subagentToolCallId, name: "compose_slides", data: { group: g.group, slugs: g.slugs, toolResult: update.toolCallId, toolStatus: status === "completed" ? "success" : "error" } } })
-            }
-          } else if (type === "turn_end" || type === "end_turn") {
-            send({ toolStream: { toolUseId: subagentToolCallId, name: "compose_slides", data: { group: g.group, slugs: g.slugs, status: "done" } } })
-          }
-          return
-        }
-
-        if (msgSessionId !== sessionId) return
-
-        // --- Main session events ---
-        if (type === "agent_message_chunk") {
-          const content = update.content as Record<string, unknown>
-          if (content?.text) {
-            send({ event: { contentBlockDelta: { delta: { text: content.text } } } })
-          }
-        }
-
-        if (type === "tool_call" || type === "tool_call_chunk") {
-          const toolCallId = update.toolCallId as string || ""
-          const title = (update.title || update.name || "") as string
-          let name = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title
-          const input = (update.rawInput || update.input || {}) as Record<string, unknown>
-          if (title === "Spawning agent crew" || name === "subagent") {
-            subagentToolCallId = toolCallId
-            subagentGroups.clear()
-            // Extract group queries from use_subagent input
-            // Cloud: input.content.queries[]  |  kiro-cli: input.stages[].prompt_template
-            const content = (input.content as Record<string, unknown> | undefined) || input
-            const queries = (content.queries as string[]) || []
-            const stages = (input.stages as Array<Record<string, unknown>>) || []
-            const groupTexts = queries.length > 0
-              ? queries
-              : stages.map((s) => (s.prompt_template as string) || (s.name as string) || "")
-            totalGroups = groupTexts.length
-            subagentQueryQueue.length = 0
-            groupTexts.forEach((q: string) => subagentQueryQueue.push(extractSlugs(q)))
-            // Build slide_groups for ComposeCard (Cloud format)
-            const slideGroups = groupTexts.map((q: string) => ({
-              slugs: extractSlugs(q).split(", ").map((s: string) => s.trim()).filter(Boolean),
-              instruction: q,
-            }))
-            name = "compose_slides"
-            if (type === "tool_call_chunk") {
-              send({ toolStart: { toolUseId: toolCallId, name } })
-            } else {
-              send({ toolUse: { toolUseId: toolCallId, name, input: { slide_groups: slideGroups } } })
-            }
-            return
-          }
-          // tool_call_chunk: show card immediately; tool_call: update with input
-          if (type === "tool_call_chunk") {
-            send({ toolStart: { toolUseId: toolCallId, name } })
-          } else {
-            send({ toolUse: { toolUseId: toolCallId, name, input } })
-          }
-        }
-
-        if (type === "tool_call_update") {
-          const toolCallId = update.toolCallId as string || ""
-          const title = (update.title || "") as string
-          let toolName = title.replace(/^Running:\s*@sdpm\//, "").replace(/^Running:\s*/, "") || title
-          if (toolCallId === subagentToolCallId) toolName = "compose_slides"
-          const status = update.status as string
-          if (status === "completed") {
-            let result: Record<string, unknown> = {}
-            try {
-              const rawOutput = update.rawOutput as Record<string, unknown>
-              const items = rawOutput?.items as Array<Record<string, unknown>>
-              if (items?.[0]) {
-                const json = items[0].Json as Record<string, unknown>
-                const content = json?.content as Array<Record<string, unknown>>
-                if (content?.[0]?.text) result = JSON.parse(content[0].text as string)
-              }
-            } catch {}
-            if (result.output_dir && !result.deckId) {
-              result.deckId = basename(result.output_dir as string)
-            }
-            if (result.deckId && onDeckId) onDeckId(result.deckId as string)
-            send({ toolResult: { toolUseId: toolCallId, name: toolName, status: "success", content: JSON.stringify(result) } })
-          }
-        }
-
-        // Don't close on session/update turn_end — it may fire before
-        // compose_slides tool_call_update(completed). Close only on
-        // RPC response end_turn (line 62 above).
-      }
+    },
+    cancel() {
+      cancelled = true
+      closed = true
+      unsubscribe()
     },
   })
 }

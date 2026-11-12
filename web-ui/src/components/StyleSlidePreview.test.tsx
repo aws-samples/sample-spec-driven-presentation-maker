@@ -4,9 +4,15 @@
  * StyleSlidePreview tests — splitStyleSlides pure function + component rendering.
  */
 
-import { describe, it, expect, afterEach, beforeAll, afterAll } from "vitest"
+import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from "vitest"
 import { screen, cleanup } from "@testing-library/react"
 import { render } from "@testing-library/react"
+import { renderWithIntl } from "@/test/renderWithIntl"
+
+vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { dismiss: vi.fn() }) }))
+vi.mock("@/services/deckService", () => ({ createReview: vi.fn() }))
+
+import { ReviewProvider } from "@/components/review/ReviewProvider"
 import { splitStyleSlides, StyleSlidePreview, buildCoverDoc } from "./StyleSlidePreview"
 
 afterEach(cleanup)
@@ -68,6 +74,34 @@ describe("splitStyleSlides", () => {
     expect(result!.head).toContain("charset")
     expect(result!.head).toContain("h1{color:red}")
     expect(result!.head).toContain("link")
+  })
+})
+
+const SPRITE = `<svg width="0" height="0" style="position:absolute" aria-hidden="true" data-sdpm-icons><symbol id="material/hub" viewBox="0 0 1 1"><path d="M0 0"/></symbol></svg>`
+const ICON_STYLE = `<html><head><style>.slide{width:1920px}</style></head><body class="x">
+${SPRITE}
+<div class="slide cover"><svg class="icon"><use href="#material/hub"/></svg>S1</div>
+<div class="slide body">S2<svg><symbol id="local/x"><path/></symbol></svg></div>
+</body></html>`
+
+describe("icon sprite prelude", () => {
+  it("collects the sprite between <body> and the first slide", () => {
+    const result = splitStyleSlides(ICON_STYLE)!
+    expect(result.prelude).toBe(SPRITE)
+    // a symbol inside a slide stays with its slide
+    expect(result.prelude).not.toContain("local/x")
+  })
+
+  it("carries the sprite into the cover document", () => {
+    const cover = buildCoverDoc(ICON_STYLE)
+    expect(cover).toContain(`<body>${SPRITE}<div class="slide cover">`)
+    expect(cover).not.toContain("S2")
+  })
+
+  it("is empty without a sprite, leaving the cover as before", () => {
+    const html = `<html><head></head><body>\n<svg class="deco"><circle/></svg>\n<div class="slide cover">S1</div></body></html>`
+    expect(splitStyleSlides(html)!.prelude).toBe("")
+    expect(buildCoverDoc(html)).toContain(`<body><div class="slide cover">S1</body>`)
   })
 })
 
@@ -156,6 +190,20 @@ describe("StyleSlidePreview component", () => {
     Element.prototype.getBoundingClientRect = originalGBCR
   })
 
+  it("gives every slide card the icon sprite", () => {
+    const originalGBCR = Element.prototype.getBoundingClientRect
+    Element.prototype.getBoundingClientRect = function () {
+      return { width: 600, height: 400, top: 0, left: 0, bottom: 400, right: 600, x: 0, y: 0, toJSON: () => ({}) }
+    }
+
+    const { container } = render(<StyleSlidePreview html={ICON_STYLE} loading={false} />)
+    const iframes = container.querySelectorAll("iframe")
+    expect(iframes.length).toBe(2)
+    for (const iframe of iframes) expect(iframe.getAttribute("srcdoc")).toContain(`<body>${SPRITE}<div class="slide`)
+
+    Element.prototype.getBoundingClientRect = originalGBCR
+  })
+
   it("renders single fallback iframe when no .slide markers", () => {
     const originalGBCR = Element.prototype.getBoundingClientRect
     Element.prototype.getBoundingClientRect = function () {
@@ -169,5 +217,41 @@ describe("StyleSlidePreview component", () => {
     expect(iframes[0].title).toBe("Style Preview")
 
     Element.prototype.getBoundingClientRect = originalGBCR
+  })
+
+  describe("comment layers", () => {
+    const html = `<html><head></head><body>
+<div class="slide cover">S1</div>
+<div class="slide body">S2</div>
+<div class="slide closing">S3</div>
+</body></html>`
+    const originalGBCR = Element.prototype.getBoundingClientRect
+    beforeAll(() => {
+      Element.prototype.getBoundingClientRect = function () {
+        return { width: 600, height: 400, top: 0, left: 0, bottom: 400, right: 600, x: 0, y: 0, toJSON: () => ({}) }
+      }
+    })
+    afterAll(() => { Element.prototype.getBoundingClientRect = originalGBCR })
+
+    const renderInProvider = (commentable: boolean) => renderWithIntl(
+      <ReviewProvider deckId="style:brand-blue" slugs={["1", "2", "3"]} enabled agentBusy={false} openChat={() => {}}>
+        <StyleSlidePreview html={html} loading={false} commentable={commentable} />
+      </ReviewProvider>,
+    )
+
+    it("draws one layer per slide, keyed by its number, when commentable", () => {
+      const { container } = renderInProvider(true)
+      const layers = [...container.querySelectorAll("[data-review-layer]")].map(el => el.getAttribute("data-review-layer"))
+      expect(layers).toEqual(["1", "2", "3"])
+      const slides = [...container.querySelectorAll("[data-review-slide]")].map(el => el.getAttribute("data-review-slide"))
+      expect(slides).toEqual(["1", "2", "3"])
+    })
+
+    it("draws nothing of the comment tool without commentable (the deck page's spec preview)", () => {
+      const { container } = renderInProvider(false)
+      expect(container.querySelectorAll("iframe")).toHaveLength(3)
+      expect(container.querySelector("[data-review-layer]")).toBeNull()
+      expect(container.querySelector("[data-review-slide]")).toBeNull()
+    })
   })
 })

@@ -1,15 +1,26 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * AgentCore Service - Streaming Response Handler
+ * AgentCore Service - the agent connection.
  *
- * Handles streaming responses from AgentCore agents using Server-Sent Events (SSE).
+ * Cloud: one WebSocket per session work period (services/sessionSocket.ts) to the agent's
+ * `/ws` entry. `invokeAgentCore` sends a prompt and follows the session until it goes idle;
+ * `steerAgentCore` sends a message into the running work; `cancelAgentCore` is the stop
+ * button (StopRuntimeSession when the cancel is not acknowledged); `resumeAgentCore`
+ * follows a session that is working after a reload; `prepareAgentCore` builds the session
+ * early on the new deck screen. Events go through the same parser as before.
+ *
+ * Local: Server-Sent Events from the Next.js API Routes. The invoke stream lasts the chat's work
+ * period: its turns and the messages sent into it (services/localService.ts steerLocalAgent),
+ * which come back as `steer` events. `resumeLocalAgent` follows that period after a reload or on
+ * a reopened deck (GET /api/agent/stream, which replays it first).
  */
 
 import * as parser from './strandsParser.js';
+import { SessionSocket } from './sessionSocket';
 import { getAllowedModels } from "@/lib/allowedModels";
-
-const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === 'local';
+import { IS_LOCAL } from "@/lib/mode";
+import { newSessionId } from "@/lib/sessionId";
 
 // Read the user's selected chat model from localStorage, validated against the allowed list.
 function readSelectedChatModelId() {
@@ -55,113 +66,311 @@ export const setAgentConfig = (runtimeArn, region = "us-east-1") => {
 }
 
 /**
- * Invokes the AgentCore runtime with streaming support
+ * Invokes the agent. Cloud: sends a prompt over the session's WebSocket and follows the
+ * session until it goes idle (steers and the turns they start included); resolves the
+ * accumulated text. `onSession` (Cloud) gets `onEvent(ev, {own})` for the session's
+ * `work` / `turn` / `turnEnd` / `steer` / `composerNote` events and `onReconnecting(active)`.
+ * A background compose (`taskStart` … `taskEnd`) keeps the session working after its turn,
+ * so the follow lasts until its result has been delivered.
  */
-export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId, continuedFrom) => {
+export const invokeAgentCore = async (query, sessionId, onStreamUpdate, accessToken, userId, onToolUse, signal, mode, deckId, continuedFrom, translateError, onSession) => {
   // Local mode: proxy through Next.js API Route → kiro-cli acp
   if (IS_LOCAL) {
-    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom);
+    return invokeLocalAgent(query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom, onSession, translateError);
   }
 
-  try {
-    if (!userId) {
-      throw new Error("No valid user ID found in session. Please ensure you are authenticated.")
-    }
+  if (!userId) {
+    throw new Error("No valid user ID found in session. Please ensure you are authenticated.")
+  }
+  if (!accessToken) {
+    throw new Error("No valid access token found. Please ensure you are authenticated.")
+  }
+  if (!AGENT_CONFIG.AGENT_RUNTIME_ARN) {
+    throw new Error("Agent Runtime ARN not configured")
+  }
 
-    if (!accessToken) {
-      throw new Error("No valid access token found. Please ensure you are authenticated.")
-    }
+  const entry = sessionEntry(sessionId, accessToken)
+  if (entry.follower) finish(entry, superseded())
+  if (parser.resetParserState) parser.resetParserState();
+  const id = generateId()
+  entry.ownIds.add(id)
+  const done = follow(entry, { onStreamUpdate, onToolUse, onSession, translateError }, signal, { promptId: id })
+  entry.socket.send({ type: "prompt", id, prompt: query, mode: mode || "spec", ...selectedModels() })
+  return done
+}
 
-    if (!AGENT_CONFIG.AGENT_RUNTIME_ARN) {
-      throw new Error("Agent Runtime ARN not configured")
-    }
+// --- Cloud session connection (WebSocket) -------------------------------------------
 
-    // Bedrock Agent Core endpoint
-    const endpoint = `https://bedrock-agentcore.${AGENT_CONFIG.AWS_REGION}.amazonaws.com`
+/** How long a steer or a cancel waits for its acknowledgement. */
+export const STEER_ACK_MS = 3000
+export const CANCEL_ACK_MS = 3000
+/** After a cancel is acknowledged, how long the stop waits for the session to go idle. */
+export const STOP_SETTLE_MS = 2000
+const PREPARE_LIMIT_MS = 60_000
 
-    // URL encode the agent ARN
-    const escapedAgentArn = encodeURIComponent(AGENT_CONFIG.AGENT_RUNTIME_ARN)
+const SESSION_EVENT_KEYS = ["work", "turn", "turnEnd", "steer", "composerNote"]
 
-    // Construct the URL
-    const url = `${endpoint}/runtimes/${escapedAgentArn}/invocations?qualifier=DEFAULT`
+/** sessionId → { socket, token, follower, ownIds, waiters } */
+const sessions = new Map()
 
-    // Generate trace ID
-    const traceId = `1-${Math.floor(Date.now() / 1000).toString(16)}-${generateId()}`
+function selectedModels() {
+  const chatModelId = readSelectedChatModelId();
+  const createModelId = readSelectedCreateModelId();
+  return {
+    ...(chatModelId ? { chatModelId } : {}),
+    ...(createModelId ? { createModelId } : {}),
+  }
+}
 
-    // Set up headers
-    const headers = {
-      Authorization: `Bearer ${accessToken}`,
-      "X-Amzn-Trace-Id": traceId,
-      "Content-Type": "application/json",
-      "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": sessionId,
-    }
+function sessionWsUrl(sessionId) {
+  const endpoint = `wss://bedrock-agentcore.${AGENT_CONFIG.AWS_REGION}.amazonaws.com`
+  const arn = encodeURIComponent(AGENT_CONFIG.AGENT_RUNTIME_ARN)
+  return `${endpoint}/runtimes/${arn}/ws?qualifier=DEFAULT&X-Amzn-Bedrock-AgentCore-Runtime-Session-Id=${encodeURIComponent(sessionId)}`
+}
 
-    // Create the payload
-    const selectedChatModelId = readSelectedChatModelId();
-    const selectedCreateModelId = readSelectedCreateModelId();
-    const payload = {
-      prompt: query,
-      runtimeSessionId: sessionId,
-      userId: userId,
-      mode: mode || "spec",
-      ...(selectedChatModelId ? { chatModelId: selectedChatModelId } : {}),
-      ...(selectedCreateModelId ? { createModelId: selectedCreateModelId } : {}),
-    }
-
-    const response = await fetch(url, {
-      method: "POST",
-      headers,
-      body: JSON.stringify(payload),
-      signal,
+function sessionEntry(sessionId, accessToken) {
+  if (!AGENT_CONFIG.AGENT_RUNTIME_ARN) throw new Error("Agent Runtime ARN not configured")
+  let entry = sessions.get(sessionId)
+  if (!entry) {
+    entry = { token: accessToken, follower: null, ownIds: new Set(), waiters: new Map(), socket: null }
+    const current = entry
+    entry.socket = new SessionSocket({
+      url: sessionWsUrl(sessionId),
+      sessionId,
+      getToken: () => current.token,
+      listener: sessionListener(current),
     })
+    sessions.set(sessionId, entry)
+  }
+  if (accessToken) entry.token = accessToken
+  return entry
+}
 
-    if (!response.ok) {
-      const errorText = await response.text()
-      throw new Error(`HTTP ${response.status}: ${errorText}`)
+/** Follow the session's events until it goes idle with nothing unanswered. */
+function follow(entry, handlers, signal, extra) {
+  let resolve, reject
+  const promise = new Promise((res, rej) => { resolve = res; reject = rej })
+  const follower = {
+    handlers, completion: "", accepted: false, idleSeen: false, resuming: false, wasWorking: false,
+    promptId: undefined, resolve, reject, promise, onAbort: undefined, ...extra,
+  }
+  if (signal) {
+    if (signal.aborted) {
+      reject(new DOMException("Aborted", "AbortError"))
+      return promise
     }
+    // Detach only: leaving never cancels the session's work.
+    follower.onAbort = () => { if (entry.follower === follower) finish(entry, new DOMException("Aborted", "AbortError")) }
+    signal.addEventListener("abort", follower.onAbort, { once: true })
+    follower.signal = signal
+  }
+  entry.follower = follower
+  return promise
+}
 
-    let completion = '';
-    let buffer = '';
+/** A newer invoke or resume on this session takes over: the old follower detaches (keeps its partial output). */
+function superseded() {
+  return new DOMException("Superseded", "AbortError")
+}
 
-    // Reset parser state for new request
-    if (parser.resetParserState) parser.resetParserState();
+function finish(entry, error) {
+  const follower = entry.follower
+  if (!follower) return
+  entry.follower = null
+  if (follower.signal && follower.onAbort) follower.signal.removeEventListener("abort", follower.onAbort)
+  if (error) follower.reject(error)
+  else follower.resolve(follower.completion)
+}
 
-    // Handle streaming response
-    if (response.body) {
-      const reader = response.body.getReader()
-      const decoder = new TextDecoder()
+function settle(entry) {
+  const follower = entry.follower
+  if (follower && follower.idleSeen && !follower.resuming && entry.socket.pendingCount === 0) finish(entry, null)
+}
 
-      try {
-        while (true) {
-          const { done, value } = await reader.read()
-          if (done) break
+function takeWaiter(entry, key) {
+  if (key === undefined) return undefined
+  const waiter = entry.waiters.get(key)
+  if (waiter) {
+    entry.waiters.delete(key)
+    clearTimeout(waiter.timer)
+  }
+  return waiter
+}
 
-          const chunk = decoder.decode(value, { stream: true });
-          buffer += chunk;
+/** Send a message and wait for its answer (rejects after `ms`). */
+function waitFor(entry, key, ms, send) {
+  return new Promise((resolve, reject) => {
+    const timer = setTimeout(() => {
+      entry.waiters.delete(key)
+      entry.socket.forget(key)
+      reject(new Error("The agent did not answer in time"))
+    }, ms)
+    entry.waiters.set(key, { resolve, reject, timer })
+    send()
+  })
+}
 
-          // Process complete lines (SSE format uses newlines as delimiters)
-          const lines = buffer.split('\n');
-          buffer = lines.pop() || ''; // Keep incomplete line in buffer
+function agentError(ctl) {
+  return Object.assign(new Error(ctl.error || "Agent error"), { code: ctl.code })
+}
 
-          for (const line of lines) {
-            if (line.trim()) {
-              completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
-            }
-          }
+function sessionListener(entry) {
+  return {
+    onItem({ ev }) {
+      const follower = entry.follower
+      // A resume on an open connection: the live items before its ack come again in its replay.
+      if (!follower || follower.resuming) return
+      if (SESSION_EVENT_KEYS.some((k) => k in ev)) {
+        const id = ev.turn?.id ?? ev.steer?.id
+        follower.handlers.onSession?.onEvent?.(ev, { own: !!id && entry.ownIds.has(id) })
+        if (ev.work?.state === "idle") {
+          follower.idleSeen = true
+          settle(entry)
+        } else if (ev.work?.state === "busy") {
+          follower.idleSeen = false
         }
-      } finally {
-        reader.releaseLock()
+        return
       }
-    } else {
-      // Fallback for non-streaming response
-      completion = await response.text()
-      onStreamUpdate(completion)
-    }
+      const { onStreamUpdate, onToolUse, translateError } = follower.handlers
+      follower.completion = parser.parseEvent(ev, follower.completion, onStreamUpdate, onToolUse, translateError)
+    },
+    onCtl(ctl, answered) {
+      const follower = entry.follower
+      switch (ctl.ctl) {
+        case "accepted":
+          takeWaiter(entry, answered)?.resolve({ id: ctl.id, as: ctl.as })
+          if (follower) {
+            if (answered && answered === follower.promptId) follower.accepted = true
+            if (ctl.as === "turn") follower.idleSeen = false
+          }
+          break
+        case "resumeAck":
+          if (follower && follower.resuming) {
+            follower.resuming = false
+            follower.wasWorking = ctl.working === true
+            follower.handlers.onResumeAck?.(ctl)
+            if (!follower.wasWorking) follower.idleSeen = true
+          } else if (follower && ctl.working !== true && !(ctl.replay_from <= ctl.head)) {
+            // A reconnect found the work over and nothing left to replay (the process is gone).
+            follower.idleSeen = true
+          }
+          break
+        case "cancelAck":
+          takeWaiter(entry, answered)?.resolve(ctl.result)
+          break
+        case "ready":
+          takeWaiter(entry, "prepare")?.resolve(ctl.mcp_status)
+          break
+        case "error": {
+          const error = agentError(ctl)
+          if (answered === undefined) {
+            takeWaiter(entry, "prepare")?.reject(error)
+          } else if (follower && ((answered === follower.promptId && !follower.accepted) || (answered === "resume" && follower.resuming))) {
+            finish(entry, error)
+          } else {
+            takeWaiter(entry, answered)?.reject(error)
+          }
+          break
+        }
+        default:
+          break
+      }
+      settle(entry)
+    },
+    onReconnecting(active) {
+      entry.follower?.handlers.onSession?.onReconnecting?.(active)
+    },
+    onClosed({ lost, reconnecting, gaveUp }) {
+      const error = new Error("The connection to the agent closed")
+      for (const key of lost) takeWaiter(entry, key)?.reject(error)
+      const follower = entry.follower
+      if (!follower) return
+      const promptLost = follower.promptId !== undefined && lost.includes(follower.promptId) && !follower.accepted
+      if (gaveUp || promptLost || (!reconnecting && !follower.idleSeen)) finish(entry, error)
+      else settle(entry)
+    },
+  }
+}
 
-    return completion
-  } catch (error) {
-    console.error("Error invoking AgentCore:", error)
-    throw error
+/** Stop following a session: the page shows it stopped and forgets its work. */
+function detach(entry) {
+  finish(entry, null)
+  entry.socket.markIdle()
+  entry.socket.close()
+}
+
+/**
+ * Send a message into the session's running work (a steer). Resolves `{id, as}` when the
+ * agent accepted it (`as`: "steer", or "turn" when the work had just ended); rejects when
+ * it was not acknowledged within STEER_ACK_MS.
+ */
+export const steerAgentCore = async (sessionId, text, accessToken, id = generateId()) => {
+  if (IS_LOCAL) throw new Error("Steer is a Cloud feature")
+  const entry = sessionEntry(sessionId, accessToken)
+  entry.ownIds.add(id)
+  return waitFor(entry, id, STEER_ACK_MS, () => entry.socket.send({ type: "steer", id, text }))
+}
+
+/**
+ * The stop button. Sends `cancel`; with an acknowledgement, waits up to STOP_SETTLE_MS for
+ * the session to go idle, then shows it stopped either way. Without one within
+ * CANCEL_ACK_MS, falls back to StopRuntimeSession. Resolves "idle" | "stopped" | "fallback".
+ */
+export const cancelAgentCore = async (sessionId, accessToken) => {
+  const entry = sessionEntry(sessionId, accessToken)
+  const id = generateId()
+  let result
+  try {
+    result = await waitFor(entry, `cancel:${id}`, CANCEL_ACK_MS, () => entry.socket.send({ type: "cancel", id }))
+  } catch {
+    detach(entry)
+    void stopRuntimeSession(sessionId, accessToken)
+    return "fallback"
+  }
+  const follower = entry.follower
+  if (result === "cancelling" && follower) {
+    let timer
+    await Promise.race([
+      follower.promise.catch(() => undefined),
+      new Promise((resolve) => { timer = setTimeout(resolve, STOP_SETTLE_MS) }),
+    ])
+    clearTimeout(timer)
+  }
+  if (entry.follower === follower && follower) detach(entry)
+  return result === "idle" ? "idle" : "stopped"
+}
+
+/**
+ * Follow a session that may be working (after a reload): `resume {from_seq}`. The handlers
+ * get `onResumeAck(ack)` first, then the replayed and live events as in invokeAgentCore.
+ * Resolves `{working, completion}` when the session is idle (`working`: it was working).
+ */
+export const resumeAgentCore = async (sessionId, accessToken, fromSeq, handlers) => {
+  if (IS_LOCAL) return { working: false, completion: "" }
+  const entry = sessionEntry(sessionId, accessToken)
+  if (entry.follower) finish(entry, superseded())
+  if (parser.resetParserState) parser.resetParserState();
+  const done = follow(entry, handlers || {}, undefined, { resuming: true })
+  const follower = entry.follower
+  entry.socket.send({ type: "resume", from_seq: fromSeq || 0 })
+  const completion = await done
+  return { working: follower.wasWorking, completion }
+}
+
+/**
+ * Build the session early (the new deck screen): `prepare`, no turn and no Memory write.
+ * The connection stays open until `ready`, so a send before then goes over it (the same VM).
+ * Resolves the MCP status list.
+ */
+export const prepareAgentCore = async (sessionId, accessToken, mode) => {
+  if (IS_LOCAL || !accessToken || !AGENT_CONFIG.AGENT_RUNTIME_ARN) return undefined
+  const entry = sessionEntry(sessionId, accessToken)
+  entry.socket.hold()
+  try {
+    return await waitFor(entry, "prepare", PREPARE_LIMIT_MS,
+      () => entry.socket.send({ type: "prepare", mode: mode || "spec", ...selectedModels() }))
+  } finally {
+    entry.socket.release()
   }
 }
 
@@ -191,49 +400,23 @@ export const stopRuntimeSession = async (sessionId, accessToken) => {
 }
 
 /**
- * Soft-stop an in-flight compose_slides tool invocation.
- * Runs `touch /tmp/compose_stops/{toolUseId}` inside the session's microVM via
- * InvokeAgentRuntimeCommand. The composer's BeforeToolCallEvent hook picks up
- * the file and feeds STOP_PROMPT to the LLM as the cancelled tool result, so
- * the agent wraps up with a plain-text partial summary.
- * Fire-and-forget: errors are logged, not thrown.
+ * Generate a new session ID. Cloud ids carry the owner prefix of `sub` (lib/sessionId.ts).
  */
-export const stopComposeSlides = async (sessionId, toolUseId, accessToken) => {
-  try {
-    if (!sessionId || !toolUseId || !accessToken || !AGENT_CONFIG.AGENT_RUNTIME_ARN) return
-    const endpoint = `https://bedrock-agentcore.${AGENT_CONFIG.AWS_REGION}.amazonaws.com`
-    const escapedAgentArn = encodeURIComponent(AGENT_CONFIG.AGENT_RUNTIME_ARN)
-    const url = `${endpoint}/runtimes/${escapedAgentArn}/commands?qualifier=DEFAULT`
-    await fetch(url, {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${accessToken}`,
-        "Content-Type": "application/json",
-        "X-Amzn-Bedrock-AgentCore-Runtime-Session-Id": sessionId,
-      },
-      body: JSON.stringify({
-        command: `/bin/bash -c "mkdir -p /tmp/compose_stops && touch /tmp/compose_stops/${toolUseId}"`,
-        timeout: 10,
-      }),
-    })
-  } catch (error) {
-    console.error("Error stopping compose_slides:", error)
-  }
+export const generateSessionId = (sub) => {
+  return IS_LOCAL || !sub ? generateId() : newSessionId(sub)
 }
 
-/**
- * Generate a new session ID
- */
-export const generateSessionId = () => {
-  return generateId()
-}
+/** Local stream events that go to `onSession.onEvent` instead of the parser (Local sends no `composerNote`). */
+const LOCAL_SESSION_EVENT_KEYS = ["work", "turn", "turnEnd", "steer"];
 
 /**
  * Invoke the local ACP agent via API Route.
- * Reads SSE stream from /api/agent/invoke and feeds events through the same
- * strandsParser used by the cloud path, so ChatPanel works unchanged.
+ * Reads the SSE stream of /api/agent/invoke, which lasts the chat's work period (every turn of
+ * it, and the steers sent into it), and feeds its events through the same strandsParser as the
+ * cloud path, so ChatPanel works unchanged. `work` / `turn` / `turnEnd` / `steer` events go to
+ * `onSession.onEvent(ev, {own: true})`, as the Cloud session's do.
  */
-const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom) => {
+const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, signal, mode, deckId, continuedFrom, onSession, translateError) => {
   const response = await fetch('/api/agent/invoke', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -250,68 +433,84 @@ const invokeLocalAgent = async (query, sessionId, onStreamUpdate, onToolUse, sig
   if (!response.ok) {
     const errorText = await response.text();
     console.error('[invokeLocal] error:', errorText);
-    throw new Error(`Local agent error: ${response.status}: ${errorText}`);
+    const error = new Error(`Local agent error: ${response.status}: ${errorText}`);
+    // 409 session conflicts and the 504 agent_timeout carry a stable `code` (lib/local/sessionErrors.ts, turnErrors.ts) the chat UI translates.
+    try { error.code = JSON.parse(errorText).code; } catch { /* non-JSON body */ }
+    throw error;
   }
-
-  let completion = '';
-  let buffer = '';
 
   if (parser.resetParserState) parser.resetParserState();
-
-  if (response.body) {
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
-    try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        const chunk = decoder.decode(value, { stream: true });
-        buffer += chunk;
-        const lines = buffer.split('\n');
-        buffer = lines.pop() || '';
-        for (const line of lines) {
-          if (line.trim()) {
-            if (line.startsWith('data: ')) {
-              let event;
-              try { event = JSON.parse(line.substring(6).trim()); } catch { /* parser handles malformed lines */ }
-              if (event?.status === 'error' && event.error) throw new Error(event.error);
-            }
-            completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
-          }
-        }
-      }
-    } finally {
-      reader.releaseLock();
-    }
-  }
-
-  return completion;
+  return readLocalStream(response, { onStreamUpdate, onToolUse, onSession, translateError }, { own: true, throwOnError: true });
 }
 
 /**
- * Reconnect to a running background session using EventSource.
- * Supports Last-Event-ID for seamless resume after disconnect.
- * Returns a cleanup function, or null if no session is running.
+ * Local: follow a chat's work period after a reload or a reopened deck (GET /api/agent/stream).
+ * The server replays the running period (or a finished one no stream delivered) and then
+ * follows it live. The handlers get `onResumeAck({working})` first, then the events as in
+ * invokeAgentCore, with `{own: false}`; a failed turn shows in the reply (`⚠ …`). Resolves
+ * `{working, completion}` when the stream ends (`working`: there was a period to follow), and
+ * `{working: false}` only when the server answered that nothing runs (`{running: false}`).
+ * Rejects when the request failed (any other answer), and with the fetch's AbortError when
+ * `signal` aborts.
  */
-export const reconnectLocalSession = (sessionId, onStreamUpdate, onToolUse) => {
-  if (!IS_LOCAL) return null;
-
-  const url = `/api/agent/stream?sessionId=${encodeURIComponent(sessionId)}`;
-  const es = new EventSource(url);
-  let completion = '';
+export const resumeLocalAgent = async (sessionId, handlers = {}, { lastEventId, signal } = {}) => {
+  const headers = lastEventId != null ? { 'Last-Event-ID': String(lastEventId) } : {};
+  const response = await fetch(`/api/agent/stream?sessionId=${encodeURIComponent(sessionId)}`, { headers, signal });
+  if (!response.ok || !(response.headers.get('content-type') || '').includes('text/event-stream')) {
+    let body;
+    try { body = await response.json(); } catch { /* not JSON: a failed request */ }
+    if (!response.ok || body?.running !== false) throw new Error(`Local stream error: ${response.status}`);
+    handlers.onResumeAck?.({ working: false });
+    return { working: false, completion: '' };
+  }
+  handlers.onResumeAck?.({ working: true });
   if (parser.resetParserState) parser.resetParserState();
+  const completion = await readLocalStream(response, handlers, { own: false, throwOnError: false });
+  return { working: true, completion };
+}
 
-  es.onmessage = (event) => {
-    const line = `data: ${event.data}`;
-    completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse);
-  };
-
-  es.onerror = () => {
-    // EventSource auto-reconnects with Last-Event-ID
-    // If server returns non-SSE (session ended), close
-    es.close();
-  };
-
-  // Return cleanup function
-  return () => es.close();
-};
+/**
+ * Read a Local SSE stream: session events go to `onSession.onEvent(ev, {own})`, the rest to
+ * the parser. An `{status: "error"}` line throws when `throwOnError` is set (the invoke shows
+ * the error itself), else the parser shows it in the reply. Resolves the accumulated text.
+ */
+async function readLocalStream(response, { onStreamUpdate, onToolUse, onSession, translateError }, { own, throwOnError }) {
+  let completion = '';
+  let buffer = '';
+  if (!response.body) return completion;
+  const reader = response.body.getReader();
+  const decoder = new TextDecoder();
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = decoder.decode(value, { stream: true });
+      buffer += chunk;
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || '';
+      for (const line of lines) {
+        if (!line.trim()) continue;
+        if (line.startsWith('data: ')) {
+          let event;
+          try { event = JSON.parse(line.substring(6).trim()); } catch { /* parser handles malformed lines */ }
+          if (throwOnError && event?.status === 'error' && event.error) {
+            const error = new Error(event.error);
+            // A turn that ended without an answer carries a stable `code` (lib/local/turnErrors.ts).
+            if (event.code) error.code = event.code;
+            throw error;
+          }
+          if (event && LOCAL_SESSION_EVENT_KEYS.some((k) => k in event)) {
+            onSession?.onEvent?.(event, { own });
+            continue;
+          }
+          // A notice about this turn's session (lib/local/sessionNotices.ts) goes to the chat as a session event.
+          if (event?.notice?.code) onSession?.onEvent?.({ localNotice: event.notice.code }, { own });
+        }
+        completion = parser.parseStreamingChunk(line, completion, onStreamUpdate, onToolUse, translateError);
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return completion;
+}

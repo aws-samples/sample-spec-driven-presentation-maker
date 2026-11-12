@@ -60,3 +60,27 @@ def test_with_override_bases_adds_the_chain():
     assert with_override_bases(["demo-3"], SLIDES) == ["demo-1", "demo-2", "demo-3"]
     assert with_override_bases(["cover"], SLIDES) == ["cover"]
     assert with_override_bases(["missing"], SLIDES) == []
+
+
+# ── HTML decks (html=True) ──────────────────────────────────────────────
+
+HTML_SLIDES = {"cover": {}, "demo-1": {}, "demo-2": {}, "end": {}}
+
+
+def test_html_slide_file_hits_that_slide():
+    assert affected_slugs(["slides/demo-1.html"], HTML_SLIDES, html=True) == ["demo-1"]
+    assert affected_slugs(["slides/end.html", "slides/cover.html"], HTML_SLIDES, html=True) == ["cover", "end"]
+    assert affected_slugs(["slides/draft.html"], HTML_SLIDES, html=True) == []
+
+
+def test_html_deck_wide_files_hit_every_slide():
+    for path in ("deck.json", "specs/outline.md", "specs/art-direction.html", "deck.css", "./deck.css"):
+        assert affected_slugs([path], HTML_SLIDES, html=True) == list(HTML_SLIDES)
+
+
+def test_html_mode_ignores_json_slides_and_includes():
+    assert affected_slugs(["slides/cover.json", "includes/snippet.json"], HTML_SLIDES, html=True) == []
+
+
+def test_pptx_mode_ignores_html_only_inputs():
+    assert affected_slugs(["slides/cover.html", "deck.css", "specs/art-direction.html"], SLIDES) == []

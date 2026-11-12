@@ -34,11 +34,13 @@ import {
   BookOpen, List, Search, FolderPlus, Pencil, Image,
   Trash2, ArrowUpDown, FolderOpen, Copy, Globe, Wrench,
   Check, FileText, Download, Code, Palette,
-  LayoutTemplate, Package, AlertCircle, RefreshCw,
+  LayoutTemplate, Package, AlertCircle, RefreshCw, MessageSquare,
 } from "lucide-react"
 import type { LucideIcon } from "lucide-react"
 import { useTranslations } from "next-intl"
 import { ComposeCard } from "./compose/ComposeCard"
+import { ComposerNoteCard } from "./ComposerNoteCard"
+import { useDeckFormat } from "./DeckFormatContext"
 import { CAT, type ToolCategory } from "./toolPalette"
 import { basename } from "@/lib/local/pathUtils"
 
@@ -117,6 +119,7 @@ export const TOOL_META: Record<string, ToolMeta> = {
   spec_driven_presentation_maker_grid:               { Icon: LayoutTemplate, label: "Computing layout",      category: "compute" },
   // Agent tools
   compose_slides:     { Icon: Package,         label: "Composing slides",       category: "produce" },
+  message_composer:   { Icon: MessageSquare,   label: "Messaging a composer",   category: "other" },
 }
 
 /**
@@ -170,13 +173,8 @@ interface ToolCardProps {
   isActive?: boolean
   /** Streaming progress events from tool execution. */
   streamMessages?: Record<string, unknown>[]
-  /** tool use id — forwarded to ComposeCard for soft-stop. */
-  toolUseId?: string
-  /** Session ID — forwarded to ComposeCard for soft-stop. */
-  sessionId?: string
-  /** Auth token — forwarded to ComposeCard (ID token: previews) / (Access token: cancel). */
+  /** Cognito ID token. */
   idToken?: string
-  accessToken?: string
 }
 
 /** Strip MCP prefix from tool name for display lookup. */
@@ -184,26 +182,45 @@ export function stripPrefix(n: string): string {
   return n.replace(/^spec_driven_presentation_maker_/, "")
 }
 
-export function ToolCard({ name, input, status, result, isActive = false, streamMessages, toolUseId, sessionId, idToken, accessToken }: ToolCardProps) {
+/** Message key of a tool's label: generate_pptx finalizes an HTML deck when the deck or its result is HTML. */
+function labelKey(name: string, deckFormat: "pptx" | "html" | undefined, result?: Record<string, unknown>): string {
+  const key = stripPrefix(name)
+  if (key === "generate_pptx"
+    && (deckFormat === "html" || result?.outputFormat === "html" || result?.output_format === "html")) {
+    return "generate_pptx_html"
+  }
+  return key
+}
+
+export function ToolCard({ name, input, status, result, isActive = false, streamMessages, idToken }: ToolCardProps) {
   const t = useTranslations("tools")
+  const deckFormat = useDeckFormat()
   // Dispatch: compose_slides has a dedicated rich card.
   if (name === "compose_slides" || name.endsWith("_compose_slides")) {
     return (
       <ComposeCard
         input={input}
         status={status}
-        result={result}
         isActive={isActive}
         streamMessages={streamMessages}
-        toolUseId={toolUseId}
-        sessionId={sessionId}
-        accessToken={accessToken}
+      />
+    )
+  }
+  // A message to a running composer reads as a message, not a tool row.
+  if (name === "message_composer" || name.endsWith("_message_composer")) {
+    return (
+      <ComposerNoteCard
+        direction="to"
+        group={Number(input?.group) || 0}
+        text={typeof input?.text === "string" ? input.text : ""}
+        failed={status === "error"}
       />
     )
   }
 
   const meta = TOOL_META[stripPrefix(name)] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
-  const label = t.has(stripPrefix(name)) ? t(stripPrefix(name)) : meta.label
+  const key = labelKey(name, deckFormat, result)
+  const label = t.has(key) ? t(key) : meta.label
   const isError = status === "error"
   const isComplete = !!status
   const colors = isError ? { ...CAT.other, accent: ERR.accent, bg: ERR.bg, border: ERR.border } : CAT[meta.category]
@@ -384,8 +401,10 @@ export function ToolCard({ name, input, status, result, isActive = false, stream
  */
 export function ToolCardCompact({ name, input }: { name: string; input?: Record<string, unknown> }) {
   const t = useTranslations("tools")
+  const deckFormat = useDeckFormat()
   const meta = TOOL_META[stripPrefix(name)] || { Icon: Wrench, label: name.replace(/_/g, " "), category: "other" as ToolCategory }
-  const label = t.has(stripPrefix(name)) ? t(stripPrefix(name)) : meta.label
+  const key = labelKey(name, deckFormat)
+  const label = t.has(key) ? t(key) : meta.label
   const colors = CAT[meta.category]
   const detail = getDetail(name, input)
 

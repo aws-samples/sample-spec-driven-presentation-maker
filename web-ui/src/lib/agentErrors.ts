@@ -17,10 +17,12 @@ export type AgentErrorCode =
   | "bad_input"
   | "max_output"
   | "internal"
+  | "session_reload_required"
+  | "content_filtered"
 
 const MESSAGES: Record<AgentErrorCode, string> = {
   conversation_too_long: "This conversation is too long for the model to process. Please start a new chat to continue.",
-  throttled: "The service is temporarily busy. Please wait a moment and try again.",
+  throttled: "The model's usage quota or rate limit was reached. Wait a minute and try again, or choose another model in Settings.",
   timeout: "The model took too long to respond. Please try again.",
   model_not_ready: "The model is not ready yet. Please wait a moment and try again.",
   service_unavailable: "The service is temporarily unavailable. Please try again later.",
@@ -28,6 +30,8 @@ const MESSAGES: Record<AgentErrorCode, string> = {
   bad_input: "The request could not be processed. Please adjust your input and try again.",
   max_output: "The response hit the model's output limit. Ask for a smaller step and try again.",
   internal: "Sorry, something went wrong. Please try again.",
+  session_reload_required: "This page is out of date. Reload the page, then send again.",
+  content_filtered: "The model stopped its reply because of its content filter. Rephrase your message and send it again.",
 }
 
 const PATTERNS: [string[], AgentErrorCode][] = [
@@ -54,17 +58,20 @@ export function classifyAgentError(message: string): AgentErrorCode {
  *
  * @param message - Raw error text from the event
  * @param code - Stable code from the event, when present
+ * @param translate - Optional translator; asked first for a code this table does not know (the
+ *   Local turn codes in lib/local/turnErrors.ts), then for the resolved code. English is used
+ *   when it returns undefined
  */
-export function agentErrorMessage(message: string, code?: string): string {
+export function agentErrorMessage(
+  message: string,
+  code?: string,
+  translate?: (code: string) => string | undefined,
+): string {
+  const own = code && !(code in MESSAGES) ? translate?.(code) : undefined
+  if (own) return own
   const resolved = (code && code in MESSAGES ? code : classifyAgentError(message)) as AgentErrorCode
   // Unclassified internal errors keep the raw message — it's more actionable
   // than a generic apology when nothing matched.
   if (resolved === "internal" && !code && message) return message
-  return MESSAGES[resolved]
-}
-
-/** Whether the user can fix this by simply retrying. */
-export function isRetryableAgentError(message: string, code?: string): boolean {
-  const resolved = (code && code in MESSAGES ? code : classifyAgentError(message)) as AgentErrorCode
-  return resolved === "throttled" || resolved === "timeout" || resolved === "model_not_ready" || resolved === "service_unavailable"
+  return translate?.(resolved) ?? MESSAGES[resolved]
 }

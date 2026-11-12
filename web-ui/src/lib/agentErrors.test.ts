@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import { describe, it, expect } from "vitest"
-import { classifyAgentError, agentErrorMessage, isRetryableAgentError } from "./agentErrors"
+import { classifyAgentError, agentErrorMessage } from "./agentErrors"
 
 describe("classifyAgentError", () => {
   it.each([
@@ -20,11 +20,11 @@ describe("classifyAgentError", () => {
 
 describe("agentErrorMessage", () => {
   it("prefers the code from the event over pattern matching", () => {
-    expect(agentErrorMessage("raw text", "throttled")).toMatch(/temporarily busy/)
+    expect(agentErrorMessage("raw text", "throttled")).toMatch(/usage quota or rate limit/)
   })
 
   it("falls back to pattern matching when no code", () => {
-    expect(agentErrorMessage("ThrottlingException: rate exceeded")).toMatch(/temporarily busy/)
+    expect(agentErrorMessage("ThrottlingException: rate exceeded")).toMatch(/usage quota or rate limit/)
   })
 
   it("keeps the raw message for unclassified errors without a code", () => {
@@ -38,16 +38,31 @@ describe("agentErrorMessage", () => {
   it("ignores unknown codes and falls back to classification", () => {
     expect(agentErrorMessage("timed out waiting", "future_code")).toMatch(/took too long/)
   })
+
+  it("maps content_filtered to the content-filter message", () => {
+    expect(agentErrorMessage("x", "content_filtered")).toMatch(/content filter/)
+  })
 })
 
-describe("isRetryableAgentError", () => {
-  it("marks throttling and timeouts retryable", () => {
-    expect(isRetryableAgentError("", "throttled")).toBe(true)
-    expect(isRetryableAgentError("timed out")).toBe(true)
+describe("agentErrorMessage with session_reload_required", () => {
+  it("maps the code to the English reload message", () => {
+    expect(agentErrorMessage("Reload the page", "session_reload_required")).toBe(
+      "This page is out of date. Reload the page, then send again.",
+    )
   })
 
-  it("marks auth and conversation-limit not retryable", () => {
-    expect(isRetryableAgentError("", "auth")).toBe(false)
-    expect(isRetryableAgentError("Too much media")).toBe(false)
+  it("uses the translator when it returns a string", () => {
+    const translate = (code: string) => (code === "session_reload_required" ? "translated" : undefined)
+    expect(agentErrorMessage("Reload the page", "session_reload_required", translate)).toBe("translated")
+  })
+
+  it("falls back to English when the translator returns undefined", () => {
+    expect(agentErrorMessage("raw", "throttled", () => undefined)).toMatch(/usage quota or rate limit/)
+  })
+
+  it("asks the translator for a code outside its table before classifying", () => {
+    const translate = (code: string) => (code === "agent_exited" ? "translated" : undefined)
+    expect(agentErrorMessage("kiro-cli stopped", "agent_exited", translate)).toBe("translated")
+    expect(agentErrorMessage("timed out waiting", "future_code", translate)).toMatch(/took too long/)
   })
 })

@@ -1,4 +1,4 @@
-[EN](../en/custom-template.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
+[English](custom-template.md) | [日本語](../ja/custom-template.md)
 
 # Custom Templates, Styles, and Assets
 
@@ -27,6 +27,18 @@ When you call `analyze_template`, the engine inspects the .pptx file and extract
 - **Placeholders** — Title, body, footer with exact coordinates
 
 The agent uses this information to place elements precisely within the template's design system.
+
+### HTML decks
+
+HTML decks (`deck.json` `outputFormat: "html"`) use the same `.pptx` templates. The engine
+converts a template into a `theme.css` (canvas size, theme colors, fonts, placeholder
+positions and text styles), a `template.json` (layouts, placeholders, slide-number and footer
+chrome) and one SVG per layout for the decorations the master and layouts draw (logos,
+bands, background art). The result is cached by the template's content hash under
+`sdpm/.cache/template-html/`, so editing the `.pptx` triggers a fresh conversion. Rendering
+the decorations needs LibreOffice and poppler; without them the structure still converts
+and the build reports the missing tools once. A template that draws nothing besides its
+placeholders (such as the bundled `blank-light` / `blank-dark`) never needs them.
 
 ---
 
@@ -109,7 +121,7 @@ The agent calls `analyze_template` automatically during the design phase. You ca
 
 ### Layer 3 (Remote)
 
-Templates are stored in S3 and registered in DynamoDB. The agent calls `list_templates` to see available templates, then `analyze_template` with the selected template ID.
+Templates are stored in S3 (DynamoDB caches their metadata). The agent calls `list_templates` to see available templates, then `analyze_template` with the selected template ID.
 
 ---
 
@@ -130,14 +142,17 @@ Place your .pptx file anywhere accessible and specify the path when initializing
 
 Or simply tell the agent: "Use my-template.pptx for this presentation."
 
-Place templates in `sdpm/templates/` to have them appear in `list_templates` automatically.
+Place templates in `<user-config>/templates/` (see **User-local templates** below) to have
+them appear in `list_templates` automatically. `sdpm/templates/` holds the bundled ones; in
+an installed SDPM it is part of `~/.sdpm/checkout`, which `sdpm update` manages, so keep your
+own templates out of it.
 
 Included sample templates:
 
 ```
 sdpm/templates/
-├── sample_template_dark.pptx
-└── sample_template_light.pptx
+├── blank-dark.pptx
+└── blank-light.pptx
 ```
 
 #### User-local templates
@@ -218,7 +233,7 @@ and token contract are defined in the `style` workflow (returned by `start_style
 
 ### Bundled styles
 
-Bundled styles come in two tiers. The **orthodox** tier is for when you do not want to
+Bundled styles come in two tiers, plus two styles written for Japanese decks. The **orthodox** tier is for when you do not want to
 think about looks: any subject, any audience, light or dark. The **concept** tier is
 chosen by look — each style commits to one visual idea and states how far it may be
 pushed. Purpose-specific structure (how a lesson or a workshop deck is organised) belongs
@@ -244,9 +259,17 @@ to the outline, not the style, so any concept style can carry any kind of deck.
 | `newspaper` | Broadsheet; the deck is meant to be read | Aged paper, near-black serif headlines, 3px masthead rule and 1px hairlines, 2–3 justified columns, drop cap, one red figure or rule |
 | `swiss-poster` | One red geometric shape anchors the page | White, black type at poster sizes that never bleeds, exactly one red circle / bar / band / square (may bleed), 1–2 grid lines, a vertical label |
 | `duotone` | One hard edge, two fields: claim on one, evidence on the other | Near-black and vivid orange, 50/50 or 33/67 split (vertical or horizontal); near-black type on orange, white and orange type on near-black, grey only for meta; shape bar charts with one white bar |
+| `agent-spectrum` | Made to be watched (screen recordings, animated previews, README stills); colour only tells the parts of a figure apart | Flat near-black ground, light type, five builder colours (blue, teal, violet, amber, pink) always in that order, a five-segment stripe on every slide, monospaced labels and tags, dashed region frames; no gradients, glow or shadows |
 | `prism-dark` | The gradient is a pointer: it marks the one thing the title is talking about, everything else is flat | Near-black ground, one violet-to-pink gradient used as gradient text on the key figure, a 4px outline + one filled pill on the chosen card, or one gradient bar; a 40px gradient bar down the left edge is the only constant. No gradient panels, no blur or glow |
 | `prism-light` | Same rule set as `prism-dark` for lit rooms and print | White ground, near-black type, flat white cards with 1px borders, the same violet-to-pink gradient in the same pointer roles |
 | `aws-console` | The deck is an AWS Management Console screen; every piece of chrome carries deck information | Two dark header bands (aws wordmark, search box showing the deck title and slide index, notification badge = open actions, date and presenter where region and account sit; a favourites row of numbered section chips with the current section lit) over a white toolbar; page title with an Info link and an outline + orange button pair; white 2px-bordered containers with drag handle, Info, kebab and resize handle; blue links and blue metrics; three fixed status colours; dense 56px rows, no prose |
+
+**Japanese — sample text and title grammar in Japanese**
+
+| Style | Built for | Look |
+|---|---|---|
+| `gradient-card` | Technical walkthroughs on a shared screen, where the listener follows one item at a time | Black ground, rules, bands, round icon nodes and connectors; a thin blue-to-violet gradient on lines and node rims; outlines only around things with a boundary, one magenta outline for the subject; noun-phrase titles with a lead sentence |
+| `mono-blue` | Internal and customer briefings shown once, then read alone as the reference copy | White ground, monotone ink, dark-slate numbered markers and outlined cards, sentence titles ending in です/ます, a grey takeaway band on every slide, exactly one blue outline or pale-blue zone |
 
 ### User-local styles
 
@@ -268,8 +291,9 @@ Search order (first match wins on same file name):
 2. `<user-config>/styles/`
 3. `sdpm/references/examples/styles/` (package-bundled samples)
 
-The styles gallery (opened by `list_styles` or the CLI `examples styles` command)
-scans all three locations and displays them in a single list. User-local styles
+`list_styles` (the MCP tool and the CLI command) scans all three locations and
+returns them in a single list; in a client that shows MCP Apps, the tool's result
+appears as a style gallery in the chat. User-local styles
 shadow bundled ones of the same name so you can override samples without
 touching the repository.
 
@@ -396,9 +420,9 @@ Full schema with defaults:
 }
 ```
 
-- `output_dir` — Base directory where generated PPTX files are written.
-  Supports `~` expansion. Can also be overridden per-run via
-  `$SDPM_OUTPUT_DIR`.
+- `output_dir` — Deck root: where the CLI and the MCP servers write decks and generated
+  PPTX files, and where the Local Web UI lists them. Supports `~` expansion; empty means
+  the default. `$SDPM_DECK_ROOT`, then `$SDPM_OUTPUT_DIR`, override it.
 - `extra_sources` — Additional asset manifests (see **Option B** above).
 
 The previously-shipped `sdpm/assets/config.json` is no longer read — it was
@@ -420,5 +444,6 @@ uv run python scripts/upload_assets.py \
 
 ## Related Documents
 
-- [Getting Started](getting-started.md) — Setup and deployment instructions
+- [Getting Started](getting-started.md) — Install and use SDPM
+- [Developer guide](developer-guide.md) — CDK deployment, including the template upload step
 - [Architecture](architecture.md) — How the asset resolver works

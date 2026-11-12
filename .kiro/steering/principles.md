@@ -21,9 +21,10 @@ The SPEC agent handles user dialogue (Phase 1). Composer agents handle slide gen
 (Phase 2+3) via the `compose_slides` tool (Agents as Tools pattern).
 
 Role and procedure text lives in `sdpm/references/workflows/<role>.md` (orchestrator,
-composer, style, translate) and reaches MCP clients through the role's entry tool
-(`start_presentation` / `start_composing` / `start_style` / `start_translation`), which also
-returns what that role reads first (`sdpm.entry`).
+composer, style, translate; the composer's html mode in `composer-html.md`) and reaches MCP
+clients through the role's entry tool (`start_presentation` / `start_composing` /
+`start_style` / `start_translation`), which also returns what that role reads first
+(`sdpm.entry`).
 Client-side files are thin wiring (composer sub-agent registration) that name a role
 document without restating it. The L4 agent fetches role documents through the same
 port (`Source.mcp("start_*", pick="static.workflow")` in `agent/modes/`); only transport-specific
@@ -55,20 +56,31 @@ Rules that follow from this:
    hexagonal purity for one less abstraction — acceptable while there is a
    single cloud backend. Revisit only if a second backend appears.
 4. **Role documents are content, not client config** ("server-driven behavior").
-   Each role (orchestrator, composer, style, translate) has exactly one document,
-   `sdpm/references/workflows/<role>.md`, served through the port via
-   the role's `start_*` entry tool. Entry points (the `sdpm-*` prompts, ACP agent
+   Each role (orchestrator, composer, style, translate) has exactly one document per
+   mode, `sdpm/references/workflows/<role>.md`, served through the port via
+   the role's `start_*` entry tool. The composer has two modes, pptx (`composer.md`) and
+   html (`composer-html.md`); the spawner chooses the mode through the entry tool argument
+   (`start_composing(..., mode=…)`) at dispatch time — never inferred from deck contents —
+   and the entry tool's `static` part depends only on the mode. Entry points (the `sdpm-*` prompts, ACP agent
    definitions, `SKILL.md`, server instructions) only ever name a role document — they
    never restate or duplicate its content. Nothing else lives on the client side: a client
    holds the one line that starts the server, written by `sdpm register`.
 
    Role assignment is a dispatch-time decision, not a discovery-time one: a
    spawner (the orchestrator delegating to a composer, a prompt dispatching a
-   role, a client picking a mode) tells the spawned agent which role to load in
-   its first instruction. The agent then calls `start_<role>(...)`
-   itself. There is no docstring heuristic to infer role from arguments, and no
+   role, a client picking a mode) tells the spawned agent which role — and, for the
+   composer, which mode — to load in its first instruction. The agent then calls
+   `start_<role>(...)` itself, passing the mode as an argument. There is no docstring heuristic to infer role from arguments, and no
    case where a role's text is embedded into a system prompt instead of fetched
-   — every consumer, including the L4 agent, fetches live.
+   — every consumer, including the L4 agent, fetches it through the port (the L4 agent
+   once per process).
+
+   Writing role documents and guides: state what the agent can do (its tools and their
+   range) and what it should do, in positive form rather than "X is not Y" / "do not X";
+   give no concrete examples or form-to-interaction tables (models copy them); leave out
+   what a check already stops (static checks, CSP, browser check) — the warning itself
+   says how to fix it. Format-specific notes for the orchestrator come from
+   `init_deck_workspace` (`format_notes`), keeping `orchestrator.md` format-neutral.
 5. **Change-locality goal** — the structure is optimised so that:
    prompt changes touch only `sdpm/references/workflows/`; engine changes touch only
    `sdpm/sdpm/engine/`; a new MCP client touches only the client table in
@@ -76,13 +88,11 @@ Rules that follow from this:
 
 Known debt against this philosophy:
 - `api/index.py` has no test coverage (tracked for v0.5.x).
-- `sdpm.tools.attachment.pipeline` imports the repository-level `shared` package,
-  so the core currently depends outward on shared application code. Harmless while the
-  server always runs from a checkout; move the required attachment logic inward before
-  the core is ever packaged on its own.
 
 (v0.5.2 resolved: `converter/elements.py` monolith → `converter/elements/`
-package with an enforced dependency DAG; scale state → ContextVar scope.)
+package with an enforced dependency DAG; scale state → ContextVar scope.
+Resolved after v0.11.0: `shared/ingest.py` → `sdpm.tools.attachment.ingest`, removing
+the core → `shared` → core import cycle.)
 
 ## Engine & Knowledge (`sdpm/sdpm/`)
 
@@ -116,7 +126,13 @@ Path-based; the remote server materialises the deck from S3 and calls the same c
 
 stdio MCP + ACP server for local environments. Must be a **thin bind** of
 `sdpm.tools`. Local-transport specifics (session-scoped upload staging,
-browser style gallery, ACP hearing UI) are the only allowed additions.
+ACP hearing UI, the deck viewer's file access `deck_access.py`) are the only allowed additions.
+
+The installed `sdpm` command is a bootstrap (`scripts/install/launcher.*`, `sdpm-bootstrap 1`):
+it resolves uv, fetches, and hands `update` to `servers/local/checkout_update.py` and every
+other command to `servers/local/sdpm_command.py`. It changes only if that contract does. An
+update runs released code only: the installed version selects the target and moves the
+checkout, the target's own `finish` prepares it. Main's code runs only through the installer.
 
 `servers/local/client_config.py` is the one place that knows about MCP clients: one
 server template (absolute `uv` + absolute checkout, never a launcher or `PATH`), per-client
@@ -146,7 +162,7 @@ server; Kiro CLI holds it inside a generated `sdpm` agent (wiring only: no promp
   drift) and read `scripts/install/README.md` for the isolated-home smoke test.
 
 Read before touching onboarding: `docs/en/getting-started.md` (user contract),
-`docs/en/migration-onboarding.md` (what was removed and why), `scripts/install/README.md`
+`docs/en/migration/onboarding.md` (what was removed and why), `scripts/install/README.md`
 (build + smoke), `tests/test_client_config.py` (the guarded invariants).
 
 ## Remote server (`servers/remote/`) — Layer 3
@@ -210,6 +226,7 @@ Local            — Next.js API Routes → kiro-cli ACP, filesystem storage
 | UI components | `<CloudOnly>` / `<LocalOnly>` (declarative) |
 | Service layer | `IS_LOCAL` early return at function entry point |
 | API Routes (`src/app/api/`) | Local-only. Excluded from cloud build by `build:cloud` |
+| Request guard (`src/proxy.ts`) | Runs whenever the API routes are served, in either mode (no `IS_LOCAL` check). Refuses a non-loopback `Host` on every request; excluded from cloud build by `build:cloud` |
 | Local-only logic | Isolated in `src/lib/local/` |
 
 ### Web-first principle
@@ -219,8 +236,8 @@ Local            — Next.js API Routes → kiro-cli ACP, filesystem storage
 
 ### Build strategy
 - `output: "export"` and `trailingSlash: true` are cloud-only (`next.config.ts`)
-- `build:cloud` temporarily moves `src/app/api/` out to enable static export (with `trap EXIT` for safe restore)
-- This is a known workaround — Next.js does not support `output: "export"` + API Routes coexistence
+- `build:cloud` temporarily moves `src/app/api/` and `src/proxy.ts` out to enable static export (with `trap EXIT` for safe restore)
+- This is a known workaround — Next.js does not support `output: "export"` + API Routes / Proxy coexistence
 
 ### Session persistence (Local)
 - `.session` file in deck directory — ACP sessionId

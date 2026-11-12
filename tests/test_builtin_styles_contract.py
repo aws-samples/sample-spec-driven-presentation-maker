@@ -20,6 +20,7 @@ import pytest
 
 from sdpm import api, tools
 from sdpm.engine.checks.font_size import _FS_TOKEN_RE
+from sdpm.knowledge.assets.style_icons import ICON_ID_RE, inline_style_icons
 from sdpm.knowledge.reference import BUNDLED_STYLES_DIR
 
 BUNDLED = sorted(p for p in BUNDLED_STYLES_DIR.glob("*.html"))
@@ -28,18 +29,20 @@ EXPECTED_NAMES = {
     "report", "briefing", "aws-light", "aws-dark",
     # concept tier — chosen by look
     "neo-brutalist", "typographic", "signal", "racing",
-    "bento", "newspaper", "swiss-poster", "duotone",
+    "bento", "newspaper", "swiss-poster", "duotone", "agent-spectrum",
     # gradient tier — the gradient is a pointer, everything else is flat
     "prism-dark", "prism-light",
     # product-UI tier — the deck looks like the AWS Management Console
     "aws-console",
+    # Japanese tier — sample text and title grammar in Japanese
+    "gradient-card", "mono-blue",
 }
 
 REQUIRED_TOKENS = ("--color-text", "--color-bg", "--fs-cover-title", "--fs-slide-title", "--fs-body")
 PARTS = ("Cover", "Rules", "Message & Outline", "Patterns", "Closing")
 REQUIRED_FRAMES = ("content", "divider", "closing")
 REQUIRED_PATTERNS = ("comparison", "columns", "process", "metric", "table", "chart", "diagram")
-# Every composer receives the whole file; the skeleton plus its icon symbols fits under this.
+# Every composer receives the whole file; the skeleton fits under this.
 MAX_STYLE_CHARS = 44_000
 # Component vocabulary (workflows/style.md): roles every style must state, and all roles
 REQUIRED_ROLES = ("container", "selected", "takeaway", "numbered", "metric", "step", "connector", "tag", "table", "chart", "icon")
@@ -57,7 +60,7 @@ EMOJI_RE = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0
 ROOT_RE = re.compile(r":root\s*\{(.*?)\}", re.DOTALL | re.IGNORECASE)
 SLIDE_RE = re.compile(r'<div class="slide[\s"]')
 EL_STYLE_RE = re.compile(r'class="[^"]*\bel\b[^"]*"[^>]*style="([^"]*)"')
-SYMBOL_RE = re.compile(r'<symbol id="([\w./-]+)"[^>]*>(.*?)</symbol>', re.DOTALL)
+SYMBOL_RE = re.compile(r'<symbol id="([\w./-]+)"')
 USE_RE = re.compile(r'<use href="#([\w./-]+)"')
 ASSETS_DIR = Path(__file__).resolve().parents[1] / "sdpm" / "assets"
 
@@ -133,25 +136,26 @@ class TestStyleContract:
             words = len(re.findall(r"[\w%$€£¥+−-]+", text))
             assert words <= limit, f"{path.stem}: slide {i} shows {words} words > density {limit}"
 
-    def test_icons_are_self_contained_assets(self, path: Path) -> None:
-        # the gallery renders the file alone (iframe srcdoc): icons are inline <symbol>s whose
-        # id is the search_assets name, so the slide JSON src is "assets:" + id
+    def test_icons_are_catalog_references(self, path: Path) -> None:
+        # the file holds icon references only: the id is the search_assets name, so the slide
+        # JSON src is "assets:" + id; every display draws the shape from the catalog
         html = path.read_text(encoding="utf-8")
-        symbols = dict(SYMBOL_RE.findall(html))
+        assert "<symbol" not in html, f"{path.stem}: icon shapes come from the catalog, not the file"
         used = set(USE_RE.findall(html))
-        assert used <= set(symbols), f"{path.stem}: <use> without a symbol: {sorted(used - set(symbols))}"
+        for sid in used:
+            source = sid.split("/", 1)[0]
+            assert ICON_ID_RE.fullmatch(sid) and source in {"aws", "material"}, f"{path.stem}: {sid} is not a catalog id"
         assert not re.search(r'src="\.\./', html), f"{path.stem}: relative asset paths do not resolve in the gallery"
         diagram = html.split("<!-- Pattern: diagram", 1)[1].split('<div class="slide', 2)[1]
         declares_none = re.search(r"<!--\s*Component:\s*icon[^>]*—\s*none", html)
         assert declares_none or USE_RE.search(diagram) or "<svg" in diagram, f"{path.stem}: diagram pattern draws no icon"
-        for sid, body in symbols.items():
-            source, _, name = sid.partition("/")
-            asset = ASSETS_DIR / source / f"{name}.svg"
-            if not asset.parent.is_dir():
-                continue  # catalog not downloaded (CI); names are still checked where it exists
-            assert asset.is_file(), f"{path.stem}: symbol {sid} is not a search_assets name"
-            first = re.search(r'd="([^"]{24})', body)
-            assert first and first.group(1) in asset.read_text(encoding="utf-8"), f"{path.stem}: {sid} path not copied from the asset"
+        installed = {sid for sid in used if (ASSETS_DIR / sid.split("/", 1)[0]).is_dir()}
+        for sid in installed:  # catalog not downloaded (CI): names are checked where it exists
+            source, name = sid.split("/", 1)
+            assert (ASSETS_DIR / source / f"{name}.svg").is_file(), f"{path.stem}: {sid} is not a search_assets name"
+        if installed:
+            drawn = set(SYMBOL_RE.findall(inline_style_icons(html)))
+            assert installed <= drawn, f"{path.stem}: not drawn from the catalog: {sorted(installed - drawn)}"
 
     def test_size_budget(self, path: Path) -> None:
         size = len(path.read_text(encoding="utf-8"))
@@ -178,8 +182,7 @@ class TestStyleContract:
         assert not re.search(r"\bAI\b", html.split("<body", 1)[-1]), f"{path.stem}: defines itself against 'AI'"
 
     def test_apply_style_reads_the_style(self, path: Path, tmp_path: Path) -> None:
-        r = tools.init_deck_workspace(str(tmp_path / "deck"))
-        deck = Path(r.get("output_dir", str(tmp_path / "deck")))
+        deck = Path(tools.init_deck_workspace("deck")["output_dir"])
         result = api.apply_style(deck, path.stem, "blank-light")
         deck_json = json.loads((deck / "deck.json").read_text())
         assert result["sources"]["defaultTextColor"] == "style --color-text"
@@ -193,8 +196,7 @@ class TestStyleContract:
 def test_sample_deck_outline_parses_with_every_style(tmp_path: Path) -> None:
     fixture = Path(__file__).parent / "fixtures" / "style-sample-deck"
     for path in BUNDLED:
-        r = tools.init_deck_workspace(str(tmp_path / path.stem))
-        deck = Path(r.get("output_dir", str(tmp_path / path.stem)))
+        deck = Path(tools.init_deck_workspace(path.stem)["output_dir"])
         (deck / "specs" / "outline.md").write_text((fixture / "outline.md").read_text())
         api.apply_style(deck, path.stem, "blank-light")
         result = tools.check_specs(str(deck))

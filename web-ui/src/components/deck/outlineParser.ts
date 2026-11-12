@@ -63,9 +63,6 @@ export type OutlineEntry = SlideEntry | SectionEntry | ProseEntry
 /** @deprecated Use SlideEntry instead. Kept for backward compatibility. */
 export type OutlineSlide = SlideEntry
 
-/** Visual state of a slide in the timeline. */
-export type SlideState = "skeleton" | "active" | "done"
-
 // ---------------------------------------------------------------------------
 // Regex patterns
 // ---------------------------------------------------------------------------
@@ -147,60 +144,3 @@ export function parseOutline(markdown: string): OutlineEntry[] {
 
   return entries
 }
-
-// ---------------------------------------------------------------------------
-// State resolution (applies to slide entries only)
-// ---------------------------------------------------------------------------
-
-/**
- * Determine the visual state of each slide based on sub-item presence.
- *
- * - skeleton: no sub-items (table-of-contents only)
- * - active: has sub-items AND is the last enriched slide (currently under review)
- * - done: has sub-items but is before the active slide (already reviewed)
- *
- * This function accepts the full entry array but only assigns states to slide entries.
- * Non-slide entries receive no state (they are structural/content, not workflow items).
- *
- * @param entries - Parsed entries from parseOutline
- * @returns Map from entry index to SlideState (only slide indices are present)
- */
-export function resolveStates(entries: OutlineEntry[]): Map<number, SlideState> {
-  const states = new Map<number, SlideState>()
-
-  // Find the last enriched slide index
-  let lastEnrichedIndex = -1
-  for (let i = entries.length - 1; i >= 0; i--) {
-    const entry = entries[i]
-    if (entry.type === "slide" && entry.subItems.length > 0) {
-      lastEnrichedIndex = i
-      break
-    }
-  }
-
-  for (let i = 0; i < entries.length; i++) {
-    const entry = entries[i]
-    if (entry.type !== "slide") continue
-
-    if (entry.subItems.length === 0) {
-      states.set(i, "skeleton")
-    } else if (i === lastEnrichedIndex) {
-      states.set(i, "active")
-    } else {
-      states.set(i, "done")
-    }
-  }
-
-  return states
-}
-
-// ---------------------------------------------------------------------------
-// Utility helpers
-// ---------------------------------------------------------------------------
-
-/** Extract only slide entries from the parsed outline. */
-export function getSlideEntries(entries: OutlineEntry[]): SlideEntry[] {
-  return entries.filter((e): e is SlideEntry => e.type === "slide")
-}
-
-

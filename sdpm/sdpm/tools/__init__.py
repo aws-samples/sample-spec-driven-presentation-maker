@@ -15,7 +15,7 @@ their own infrastructure-specific variants.
 """
 
 from pathlib import Path
-from typing import Annotated, Any
+from typing import Annotated, Any, Literal
 
 from pydantic import Field
 
@@ -27,7 +27,7 @@ def start_presentation() -> dict[str, Any]:
     restyling a deck. Call it before any other sdpm tool.
 
     Returns the orchestrator role document (how to run the work end to end) plus what
-    it needs first: available styles, PPTX templates, and the output directory.
+    it needs first: PPTX templates and the output directory.
     To translate an existing deck into another language, call start_translation instead.
     """
     from sdpm.entry import start_presentation as _start
@@ -38,19 +38,20 @@ def start_presentation() -> dict[str, Any]:
 def start_composing(
     deck_id: Annotated[str, Field(description='Deck directory path, as given in your instruction.')] = "",
     assigned_slugs: Annotated[list[str] | None, Field(description='The slugs you own. Other slides belong to other composers running in parallel.')] = None,
+    mode: Annotated[Literal["pptx", "html"], Field(description='Composer mode from your instruction: pptx (slide JSON) or html (slide HTML).')] = "pptx",
 ) -> dict[str, Any]:
     """Composer entry. You are a composer when your instruction gives you a deck_id and
-    assigned_slugs — call this first with those values.
+    assigned_slugs — call this first with those values and the mode.
 
-    Validates the specs, then returns the composer role document, the slide JSON spec,
-    and everything the deck gives you: deck.json, brief, outline, art direction, template
-    analysis, which slides exist, and the JSON of your assigned slides (plus any
-    override-group head they inherit from, marked read-only). specs_ok=false with
-    errors means stop and report.
+    Validates the specs, then returns the composer role document, the slide spec for the
+    mode, and everything the deck gives you: deck.json, brief, outline, a table of contents
+    of the art direction, template analysis (template_html in html mode), which slides exist,
+    and your assigned slides (plus any override-group head they inherit from, marked read-only).
+    specs_ok=false with errors means stop and report.
     """
     from sdpm.entry import start_composing as _start
 
-    return _start(deck_dir=deck_id or None, assigned_slugs=assigned_slugs)
+    return _start(deck_dir=deck_id or None, assigned_slugs=assigned_slugs, mode=mode)
 
 
 def start_style(
@@ -82,14 +83,20 @@ def start_translation(
 
 def init_deck_workspace(
     name: Annotated[str, Field(description='Presentation name, e.g. "lambda-overview".')],
+    output_format: Annotated[Literal["pptx", "html"], Field(description="html only when the user asks for an HTML / browser deck; pptx otherwise.")] = "pptx",
 ) -> dict[str, Any]:
     """Create an empty deck workspace (deck.json, slides/, specs/). A step inside the
     orchestrator workflow — after the brief is agreed, before apply_style — not where a
-    request starts; start_presentation is.
+    request starts; start_presentation is. An HTML deck also returns format_notes.
     """
     from sdpm.api import init
+    from sdpm.entry import format_notes
 
-    return init(name=name)
+    result = init(name=name, output_format=output_format)
+    notes = format_notes(output_format)
+    if notes:
+        result["format_notes"] = notes
+    return result
 
 
 def check_specs(
@@ -137,6 +144,16 @@ def analyze_template(
     return result
 
 
+def _is_html_deck(deck_id: str) -> bool:
+    """True when deck.json says outputFormat html; unreadable or non-object deck.json → False.
+
+    Raises ValueError when deck.json names an invalid outputFormat.
+    """
+    from sdpm.engine.schema import read_deck_format
+
+    return read_deck_format(deck_id) == "html"
+
+
 def generate_pptx(
     deck_id: Annotated[str, Field(description='Deck directory path.')],
     animation_mode: Annotated[str, Field(description='Object animations: inherit|on|off, overriding deck.json.')] = "inherit",
@@ -146,6 +163,11 @@ def generate_pptx(
     already rebuilds after edits; use this for an explicit full build. The two mode
     arguments render without animations or transitions without editing the deck.
     """
+    if _is_html_deck(deck_id):
+        return {
+            "output_format": "html",
+            "message": "This deck is an HTML deck: no PPTX is built. run_python rebuilds output.html after every change.",
+        }
     from sdpm.api import generate
     from sdpm.knowledge.assets import invalidate_manifest_cache
 
@@ -213,9 +235,9 @@ def search_assets(
 def list_styles(
     include_all: Annotated[bool, Field(description='Include styles hidden by the pin filter.')] = False,
 ) -> dict[str, Any]:
-    """List design styles — pinned and user styles by default, everything with
-    include_all. Names go to apply_style. start_presentation and start_style already
-    return this list.
+    """List design styles: the user's pinned and own styles with descriptions (every
+    style when nothing is pinned), the names of the rest in other_styles; include_all
+    lists every style with its description. Names go to apply_style.
     """
     from sdpm.api import get_styles_dirs, list_styles_listing
     from sdpm.config import get_state
@@ -333,6 +355,8 @@ def code_to_slide(
     """Render source code as a syntax-highlighted block saved to deck/includes/<name>.json.
     Reference it from a slide as {"type": "include", "src": "includes/<name>.json"}.
     """
+    if _is_html_deck(deck_id):
+        return {"error": "code_to_slide emits PPTX elements; in HTML decks write <pre><code> instead."}
     from sdpm.api import code_block as _code_block
 
     elements = _code_block(code=code, language=language, theme=theme, x=x, y=y, width=width, height=height)

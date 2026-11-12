@@ -4,6 +4,7 @@ version = "1.0.0"
 description = "spec-driven-presentation-maker MCP Server — Streamable HTTP for AgentCore Runtime (Layer 3)"
 requires-python = ">=3.11"
 dependencies = [
+    # <2: mcp 2.0 removes mcp.server.fastmcp (FastMCP); migration tracked in #301.
     "mcp[cli]>=1.28.1,<2",
     "boto3",
     "sdpm-skill",
@@ -15,17 +16,13 @@ dependencies = [
     "openpyxl>=3.1.0",
 ]
 
+# An application, not a library: uv installs its dependencies, never builds it.
+[tool.uv]
+package = false
+
 [tool.uv.sources]
-sdpm-skill = { path = "../../sdpm", editable = true }
-
-[tool.setuptools.packages.find]
-include = ["tools*", "storage*"]
-
-[dependency-groups]
-dev = [
-    "pytest>=9.0.2",
-    "ruff",
-]
+sdpm-skill = { workspace = true }
 
 [tool.ruff]
-line-length = 120
+# Rule set and line length come from the workspace root.
+extend = "../../pyproject.toml"

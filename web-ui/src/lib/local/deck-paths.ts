@@ -11,7 +11,24 @@ import fs from "fs"
 import path from "path"
 import os from "os"
 
-export const DECK_ROOT = process.env.SDPM_DECK_ROOT || path.join(os.homedir(), "Documents", "SDPM-Presentations")
+import { getConfiguredOutputDir } from "./sdpmPaths"
+
+/**
+ * Deck root, in the order the CLI and both local MCP servers use (sdpm.api._get_output_base_dir):
+ * SDPM_DECK_ROOT → SDPM_OUTPUT_DIR → `output_dir` in config.json → ~/Documents/SDPM-Presentations.
+ * One deliberate difference: on WSL with an unreadable config.json, Python uses the Windows
+ * Documents folder and this uses the default. servers/local/sdpm_command.py `deck_root`
+ * (`sdpm open`) follows this one exactly. Read once per process: restart after editing
+ * config.json.
+ */
+export function resolveDeckRoot(): string {
+  return process.env.SDPM_DECK_ROOT
+    || process.env.SDPM_OUTPUT_DIR
+    || getConfiguredOutputDir()
+    || path.join(os.homedir(), "Documents", "SDPM-Presentations")
+}
+
+export const DECK_ROOT = resolveDeckRoot()
 
 /**
  * Resolve a user-provided deckId to an absolute directory path.
@@ -37,6 +54,13 @@ export function resolveDeckDir(deckId: string): string | null {
   } catch {
     return null
   }
+}
+
+/** deck.json `slideSize` as {width, height} px (1920x1080 when missing or invalid). */
+export function readSlideSize(deckJson: Record<string, unknown>): { width: number; height: number } {
+  const size = deckJson.slideSize as { width?: unknown; height?: unknown } | undefined
+  const ok = (v: unknown): v is number => typeof v === "number" && Number.isFinite(v) && v > 0
+  return size && ok(size.width) && ok(size.height) ? { width: size.width, height: size.height } : { width: 1920, height: 1080 }
 }
 
 /**

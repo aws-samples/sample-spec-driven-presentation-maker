@@ -63,7 +63,7 @@ def test_remote_read_owned_s3_key() -> None:
 
     result = read_attachment(source, "user-1", storage)
 
-    assert result["header"]["source"] == source
+    assert result["header"]["source"] == "uploads/123e4567-e89b-12d3-a456-426614174000/report.txt"
     assert result["header"]["fileName"] == "report.txt"
     assert "hello" in result["body"]
     assert storage.head_calls[0] == source

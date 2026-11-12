@@ -1,16 +1,22 @@
-[EN](../en/getting-started.md) | [JA](../ja/getting-started.md)
+[English](../en/getting-started.md) | [日本語](getting-started.md)
 
 # はじめに
 
-SDPM はブラウザで使うことも、普段の AI エージェントに接続することもできます。どちらも
-AWS アカウントなしでローカル利用できます。内部の 4 層構成については
-[アーキテクチャ](../en/architecture.md#4-layer-architecture)を参照してください。
+SDPM の使い方は 3 つあります。
+
+- MCP 経由で **いつもの AI エージェント**（Claude Code、Kiro CLI、Cursor、VS Code、Codex、Claude Desktop）から使う
+- 手元のコンピューターで動かす Web UI を **ブラウザ** で使う
+- **AWS 上のチームサーバー** で使う
+
+このガイドでは最初の 2 つを説明します。どちらも手元で動き、AWS アカウントは不要です。AWS 上のサーバーは
+[デプロイガイド](../en/deploy-cloudshell.md)（英語）、コードを変更する場合は
+[開発者ガイド](../en/developer-guide.md)（英語）を参照してください。
 
 ## インストール
 
-1 コマンドで SDPM が `~/.sdpm` に入ります: git checkout、MCP サーバーの環境、アイコンカタログ、
-`sdpm` ランチャー。同じ checkout がすべての面に使われます — MCP 経由の AI エージェントと、
-必要ならブラウザ用 Web UI。更新するものも削除するものも 1 つです。
+1 コマンドで SDPM の最新のリリースが `~/.sdpm` に入ります。git checkout、MCP サーバーの環境、アイコンカタログ、
+`sdpm` ランチャーをまとめて用意します。同じ checkout が AI エージェントと、必要ならブラウザ用の
+Web UI の両方に使われるので、更新するものも削除するものも 1 つです。
 
 ```bash
 # macOS / Linux
@@ -24,17 +30,25 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 
 流れ:
 
-1. 依存を確認し、無ければ導入を提案します: `git`、`uv`、そしてスライドプレビュー用の
-   LibreOffice と poppler。プレビューは任意で、無くてもデッキは生成されます。
-2. **What to install** — 2 行のチェックリスト: MCP サーバー（常に on）とブラウザ用 Web UI（既定 on、
-   space で外す）。Web UI を含めると Node.js 20+ と Kiro CLI（そのエージェント基盤）を入れて UI を
-   ビルド、外せば Node.js は不要。
-3. `~/.sdpm/checkout` に clone し、サーバー環境を同期し、AWS / Material のアイコンカタログを取得。
-4. **Connect SDPM to your MCP clients** — マシン上で見つかったクライアントのチェックリスト（全部 on）。
-   不要なものを space で外し、enter で確定。結果が表で出ます: ✓ registered / – skipped（後でやる
-   `sdpm register <client>` 付き）/ ✗ failed。外したクライアントには何も書きません。
+1. `git` と `uv` があるかを確認し、無ければ導入を提案します。スライドのプレビューに使う
+   LibreOffice と poppler も提案します。プレビューは任意で、無くてもデッキは作れます。
+2. **What to install** は 2 行のチェックリストです。MCP サーバー（常にオン）とブラウザ用 Web UI
+   （既定でオン。space で外す）。Web UI を含めると、Node.js 20+ と Kiro CLI（Web UI のエージェント
+   基盤）も入れて UI をビルドします。外せば Node.js は不要です。
+3. `~/.sdpm/checkout` に clone し、最新のリリース（いちばん新しい `vX.Y.Z` のタグ。`--channel main`
+   なら `main` の先端）にそろえます。サーバーの環境を同期し、AWS と Material のアイコンカタログを取得します。
+4. **Connect SDPM to your MCP clients** は、マシン上で見つかったクライアントのチェックリストです
+   （すべてオン）。不要なものを space で外し、enter で確定します。続けて結果が表で出ます:
+   ✓ registered、– skipped（後で接続するための `sdpm register <client>` 付き）、✗ failed。
+   外したクライアントには何も書き込みません。
 
-再実行しても既存のインストールを修復するだけで、2 つ目は作りません。
+インストーラーをもう一度実行すると、既存のインストールを修復します。2 つ目は作りません。
+そのインストールのプロファイル、Kiro エージェントの名前、追う先を引き継ぎ（`--full`、`--mcp-only`、
+`--agent-name`、`--channel` を渡した場合を除く）、`sdpm update` と同じく更新します。クライアントの
+チェックリストの代わりに、SDPM が登録済みのクライアントに登録し直します。`--register` を付けると、
+未登録の検出済みクライアントにも登録します。
+
+インストールと update のたびに、OS と用途に合ったリリースのマニフェストを 1 つダウンロードします。その回数は GitHub が数え、ほかには何も送りません。
 
 ### インストーラーのオプション
 
@@ -42,403 +56,329 @@ irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentatio
 |---|---|
 | `--full` / `--mcp-only` | プロファイルの質問を省く |
 | `--register` / `--no-register` | 検出した全クライアントに登録 / 設定を表示するだけ |
-| `--agent-name NAME` | Kiro CLI エージェントの名前（既定 `sdpm`。`sdpm register` / 状態表示でも使われる） |
-| `--non-interactive` | すべて yes（プロファイルは full） |
+| `--agent-name NAME` | Kiro CLI エージェントの名前（既定 `sdpm`。`sdpm register` と状態表示でも使われる） |
+| `--channel release\|main` | 最新のリリースを追う（既定）か、`main` にマージされた変更をすべて追うか。`sdpm update` も引き継ぐ |
+| `--non-interactive` | すべての質問に yes（プロファイルは full）。端末が無いときは自動でこの動作になる |
 | `--skip-libreoffice`, `--skip-shortcut` | それらを省く |
-| `--deps-only` | `git`・`uv`・LibreOffice・poppler だけ入れる（開発者の checkout 向け） |
+| `--deps-only` | `git`・`uv`・LibreOffice・poppler だけを入れる（開発者の checkout 向け） |
 
-環境変数版: `SDPM_PROFILE=full|mcp`、`SDPM_REGISTER=yes|no`、`SDPM_NON_INTERACTIVE=1`、
-`SDPM_HOME`（既定 `~/.sdpm`）、`SDPM_LAUNCHER_DIR`（既定 `~/.local/bin`、Windows は
-`%USERPROFILE%\bin`）。`curl … | bash -s -- --mcp-only` のようにオプションを渡せます。
+環境変数版: `SDPM_PROFILE=full|mcp`、`SDPM_REGISTER=yes|no`、`SDPM_CHANNEL=release|main`、
+`SDPM_AGENT_NAME`、`SDPM_NON_INTERACTIVE=1`、
+`SDPM_HOME`（インストール先、既定 `~/.sdpm`）、`SDPM_LAUNCHER_DIR`（既定 `~/.local/bin`、Windows は
+`%USERPROFILE%\bin`）。`curl … | bash -s -- --mcp-only` のようにしてオプションを渡せます。
+
+### 非対話のインストール（スクリプトと AI エージェント向け）
+
+このリポジトリの URL をコーディングエージェントに渡して、インストールを頼む人も多いはずです。
+質問なしで実行する形は次のとおりです。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --mcp-only --non-interactive --register
+```
+
+- `--mcp-only` はブラウザ用 Web UI を省きます。Web UI も入れるなら外すか `--full` を使います
+  （Node.js 20+ が必要）。
+- `--register` は見つかった全 MCP クライアントに確認なしで接続します。`--no-register` なら設定を
+  表示するだけです。
+- 端末が無いときは入力を待ちません。`--non-interactive` と同じ動作になります。sudo のパスワードが
+  要る場面（Linux の apt、macOS の Homebrew）では、人が打つコマンドを表示して 1 で終わります。
+
+終わったら結果を確認します。`sdpm` が状態を表示し、
+`python3 ~/.sdpm/checkout/scripts/install/mcp_smoke.py ~/.local/bin/sdpm mcp` は MCP サーバーが
+応答すれば `OK: … 20 tools` と表示します。
 
 ## `sdpm` ランチャー
 
 ```
-sdpm                    状態: 版、プロファイル、入っている面、接続済みクライアント
+sdpm                    状態: 版、追う先、プロファイル、入っている面、接続済みクライアント
 sdpm webui              ブラウザ用 Web UI を起動して開く
+sdpm open DECK          デッキ（フォルダーか名前）をブラウザ用 Web UI で開く（動いていなければ起動）
 sdpm mcp                MCP サーバーを stdio で起動（ターミナルでの動作確認用）
 sdpm register [CLIENT]  MCP クライアントに接続（検出クライアントのチェックリスト。--yes, --dry-run）
 sdpm unregister         接続を解除
 sdpm mcp-config [CLIENT]  このマシンのパス入りでクライアント設定を表示（--json, --all）
-sdpm update [--with-webui]  main を取得して同期し、入っているものを再ビルド（Web UI の追加も）
+sdpm update [--with-webui] [--channel release|main]
+                        最新のリリース（または main）に移り、同期して入っているものを再ビルド
+                        （Web UI の追加も）。このコマンドと登録済みクライアントもそろえる
+                        （「更新とアンインストール」）
 sdpm doctor             環境チェック
 sdpm uninstall          ~/.sdpm・ランチャー・ショートカットを削除。登録解除も提案
 ```
 
-ランチャーは全 OS で同じです。`sdpm mcp` は人間用で、クライアントに渡す設定は `uv` と
-checkout を直接指します（次節）。
+ランチャーは全 OS で同じです。macOS と Linux では `~/.local/bin` に入ります。このディレクトリが `PATH` に
+無い場合はインストーラーが最後にそう表示するので、シェルの `PATH` に追加して新しいターミナルを開いて
+ください。Windows では `%USERPROFILE%\bin` に入り、インストーラーがユーザーの `PATH` に追加します。新しい
+ターミナルを開くと使えます。`sdpm mcp` は手でサーバーを確認するためのものです。クライアントに渡す
+設定は `uv` と checkout を直接指す（次節）ので、クライアント側でランチャーが `PATH` にある必要はありません。
 
 ## AI エージェントから使う（MCP）
 
-`sdpm register` は各クライアント自身の CLI で（Kiro CLI は SDPM が所有するエージェントファイルを
-作って）接続するので、既存の設定ファイルを手で編集しません:
+MCP（Model Context Protocol）は、AI エージェントがツールを呼び出すためのプロトコルです。SDPM は
+MCP サーバーなので、MCP に対応したエージェントならどれでもスライドを作れます。
+
+`sdpm register` は各クライアント自身の CLI で接続します。Kiro CLI には SDPM が所有するエージェント
+ファイルを作ります。既存の設定ファイルを手で編集する必要はありません。
 
 | クライアント | `sdpm register` がすること |
 |---|---|
-| Kiro CLI | 専用エージェント `~/.kiro/agents/sdpm.json` を書く（MCP サーバー、ツール、並列 composer のための `@sdpm` と `use_subagent` の信頼設定。prompt テキストは無し）— `kiro-cli chat --agent sdpm` か `/agent sdpm` で開始。他のセッションには何も足さない。`--agent-name` で別名、自作のエージェントファイルには触れない |
-| Claude Code | `claude mcp add --scope user sdpm -- …`。composer は Claude Code のサブエージェントとして動き、サーバーを継承します。sdpm ツールの承認は 1 回（「今後確認しない」）か、`claude --allowedTools "mcp__sdpm__*"` で起動。インストーラー以前の plugin `sdpm@sdpm` が残っていれば `sdpm register` が `claude plugin uninstall` を提案します — 残すと全ツールが二重に見えます |
+| Kiro CLI | 専用エージェント `~/.kiro/agents/sdpm.json` を書き込みます（MCP サーバー、ツール、並列コンポーザーのための `@sdpm` と `use_subagent` の信頼設定。prompt テキストは無し）。Kiro CLI の V2 と V3 のどちらも、このファイルをそのまま読み込みます。`kiro-cli chat --agent sdpm` か `/agent sdpm` で開始します。V3 では、別のエージェントから `sdpm` に委譲すると、sdpm のツールごとに承認を求められます。他のセッションには何も足しません。`--agent-name` で別名にできます。自分で書いたエージェントファイルには触れません。SDPM が書くファイルでも、ほかのツールが足した設定（ほかの MCP サーバー、そのツールと設定）は残します |
+| Claude Code | `claude mcp add --scope user sdpm -- …`。コンポーザーは Claude Code のサブエージェントとして動き、サーバーを引き継ぎます。sdpm ツールを 1 度承認する（「今後確認しない」）か、`claude --allowedTools "mcp__sdpm__*"` で起動します。旧 plugin `sdpm@sdpm` が残っていれば `sdpm register` が `claude plugin uninstall` を提案します。残すと全ツールが二重に見えます |
 | Visual Studio Code | `code --add-mcp …` |
 | Codex（CLI / IDE 拡張 / ChatGPT デスクトップアプリ） | `codex mcp add sdpm -- …` |
-| Cursor | 実パスで組み立てた `cursor://…/mcp/install` deep link を開く — 1 クリック。サブエージェント機構の無いクライアントでは 1 エージェントがグループごとに順に composer 役をこなします（役割文書に明記） |
-| Kiro IDE、その他 | JSON と書き込み先ファイルを表示（Kiro IDE は `~/.kiro/settings/mcp.json`） |
-| Claude Desktop | 代わりに [`sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) をダブルクリック |
+| Cursor | 実際のパスで組み立てた `cursor://…/mcp/install` のディープリンクを開きます。1 クリックで完了です。サブエージェントの無いクライアントでは、1 つのエージェントがグループごとに順にスライドを作ります |
+| Kiro IDE、その他 | JSON と、それを書き込むファイルを表示します（Kiro IDE は `~/.kiro/settings/mcp.json`） |
+| Claude Desktop | 代わりにリリースの [`sdpm.mcpb`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/releases/latest/download/sdpm.mcpb) を使います（ダブルクリック） |
 
-どの設定も同じ 1 行で、絶対パスです:
+どの設定も同じ項目で、絶対パスです。
 
 ```json
 {
   "mcpServers": {
     "sdpm": {
       "command": "/Users/you/.local/bin/uv",
-      "args": ["run", "--directory", "/Users/you/.sdpm/checkout/servers/local", "python", "server.py"]
+      "args": ["run", "--directory", "/Users/you/.sdpm/checkout/servers/local", "--frozen", "python", "server.py"]
     }
   }
 }
 ```
 
-絶対パスが重要です: Dock やスタートメニューから起動した GUI クライアントはシェルの `PATH` を
-引き継ぎません。Kiro CLI では同じブロックがエージェントファイルの中にあります。旧構成でグローバル
-`~/.kiro/settings/mcp.json` に SDPM が入っている場合、`sdpm register kiro-cli` がその項目（全セッションに
-ツールが載る）と、旧インストーラーが生成した `sdpm-composer` エージェントの削除を提案します。`sdpm mcp-config` があなたのパスを埋めたこのブロックを表示するので、上の表に
-無いクライアントにはそのまま貼ります。
+絶対パスにしているのは、Dock やスタートメニューから起動した GUI クライアントがシェルの `PATH` を
+引き継がないためです。Kiro CLI では同じブロックがエージェントファイルの中にあります。
+`sdpm mcp-config` があなたのパスを埋めたこのブロックを表示するので、上の表に無いクライアントには
+そのまま使えます。
 
-あとはエージェントにスライドを頼むだけです。最初に呼ばれる `start_presentation` が、作業を導く
-役割文書と使えるスタイル・テンプレートを返します — MCP サーバーだけで完全な構成です。モードを
-明示するにはサーバーの prompt を使います: `sdpm-vibe`（素材から質問なし）、`sdpm-spec`（対話で
-構成を固める）、`sdpm-style`、`sdpm-translate`（Claude Code `/mcp__sdpm__sdpm-vibe`、VS Code
-`/mcp.sdpm.sdpm-vibe`、Kiro CLI `/sdpm-vibe`）。
+インストーラーができる前から SDPM を使っていた場合は、[移行ガイド](../en/migration/README.md)（英語）を
+参照してください。
 
-スライドプレビューには LibreOffice と poppler が必要です。無くてもデッキは生成され、ビルド結果に
-`preview: {"status": "unavailable", "install": "…"}` として OS 別の導入コマンドが載り、
-エージェントがそれを伝えます。アイコンカタログが何らかの理由で無い場合は、サーバー初回起動時に
-バックグラウンドで取得されます。
+### 最初の依頼
+
+エージェントにスライドを頼みます。たとえば「新しく入った開発者向けに、イベント駆動アーキテクチャを
+紹介するスライドを 6 枚作って」。素材としてファイルを添付したり URL を貼ったりできます。エージェントは
+まずスペック（ブリーフ、スタイル、アウトライン）を書き、それからスライドを作ります。ほかに設定は
+要りません。
+
+エージェントの進め方を選ぶには、クライアントが表示するサーバーの prompt を使います。
+
+| prompt | 動作 |
+|---|---|
+| `sdpm-vibe` | **すばやく作成**: 質問せずに素材からデッキを作る |
+| `sdpm-spec` | **確認しながら作成**: 先に対話でデッキの構成を固める |
+| `sdpm-style` | 再利用できるスタイル（配色、フォント、スライドの見せ方）を作る |
+| `sdpm-translate` | PPTX デッキの別の言語のコピーを作る |
+
+クライアントごとの表示: Claude Desktop は「+」メニュー、Claude Code は `/mcp__sdpm__sdpm-vibe`、
+VS Code は `/mcp.sdpm.sdpm-vibe`、Kiro CLI は `/sdpm-vibe`。
+
+MCP Apps を表示するクライアントでは、スタイルの一覧を頼むとチャットの中にカードで並び、各スタイルのスライドも
+見られます。1 つを選ぶと、エージェントにそのスタイルを使うよう伝わります。
+
+同じクライアントでは、アウトラインの確認とできあがったデッキもチャットの中に Brief、Outline、Slides のタブで
+表示されます。スライドに描いたコメントとアウトラインの直しは、あなたのメッセージとしてエージェントに返ります。
+
+スライドのプレビューには LibreOffice と poppler が必要です。無くてもデッキは作れます。その場合、
+ビルド結果に `preview: {"status": "unavailable", "install": "…"}` として OS に合った導入コマンドが載り、
+エージェントがそれを伝えます。アイコンカタログが何らかの理由で無い場合は、サーバーが初回起動時に
+バックグラウンドで取得します。
 
 ## ブラウザから使う（Web UI）
 
-`sdpm webui` は Web UI をローカルモードで起動して開きます — `http://localhost:3000` の Next.js が
-Kiro CLI と ACP で話します。初回の前に `kiro-cli login` を 1 度実行してください。インストーラーは
-デスクトップショートカットも作ります。MCP のみ構成に Web UI を後から足すには
-`sdpm update --with-webui`。詳細: [Web UI ローカルモード](../../web-ui/README_ja.md#local-mode)。
-
-## AWS にデプロイする
-
-チーム向けのリモート MCP サーバーまたはホスト型 Web UI には
-[ワンクリックデプロイ](../en/deploy-cloudshell.md#one-click-deploy-recommended)を使用してください。
-推奨経路は AWS CloudShell から実行でき、ローカルの CDK / Docker は不要です。開発・デバッグ用の
-直接 CDK 手順は[開発者向けセットアップ](#開発者向けセットアップ)にあります。
-
-## 開発者向けセットアップ
-
-`~/.sdpm/checkout` ではなく自分の clone で作業するコントリビューター向け。
-
-### checkout からローカル MCP サーバー
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash -s -- --deps-only
-git clone https://github.com/aws-samples/sample-spec-driven-presentation-maker.git
-cd sample-spec-driven-presentation-maker
-uv sync
-(cd servers/local && uv sync)
-uv run python3 sdpm/scripts/download_aws_icons.py
-uv run python3 sdpm/scripts/download_material_icons.py
-make smoke        # ローカルサーバーに tools/list + start_presentation
-```
-
-インストール版と自分の clone は**両方持って**構いません。`~/.sdpm` はユーザーが動かすもの、clone は
-あなたが変更するもの。クライアントには clone を**インストール版の隣に**登録します:
-
-```bash
-make register-dev              # Kiro CLI: エージェント `sdpm-dev` → この checkout。他はクライアントごとに確認
-make register-dev AGENT=sdpm-x CLIENTS=kiro-cli   # worktree ごとに 1 エージェント、1 クライアントだけ
-make mcp-config-dev            # この checkout 用の設定を表示するだけ
-```
-
-`kiro-cli chat --agent sdpm-dev` で作業ツリー、`--agent sdpm` でインストール版が動きます。Web UI は登録不要です:
-`servers/local` を自分の `web-ui/` からの相対で解決するので、`cd web-ui && npm run dev:local` で clone の
-サーバーと ACP エージェントがホットリロード付きで動きます（`sdpm webui` が 3000 を使っていれば `PORT=3001`。
-逆にインストール版を動かすなら `SDPM_WEBUI_PORT`）。
-
-| | インストール版（ユーザーが使うもの） | 自分の clone |
-|---|---|---|
-| MCP（Kiro CLI） | `kiro-cli chat --agent sdpm` | `make register-dev` → `--agent sdpm-dev` |
-| Web UI | `sdpm webui` | `cd web-ui && npm run dev:local` |
-| 更新 | `sdpm update` | `git pull` — 編集は次のセッションから反映 |Claude Code の
-`--scope user` はスコープ内でサーバー名が 1 つなので、clone はプロジェクトスコープの登録か
-`claude --mcp-config …` のアドホック設定にし、user スコープの `sdpm` は置き換えないでください。
-
-### MCP を使わないエージェントスキル
-
-`sdpm/SKILL.md` は MCP 非対応のエージェント向けに CLI（`sdpm/scripts/pptx_builder.py`）を直接
-操作します。`sdpm/` をエージェントの skills ディレクトリにコピーまたはシンボリックリンクすれば、
-エンジン・参照資料・テンプレートがすべて含まれています。アーキテクチャ上の成果物であり、
-推奨経路ではありません。
-
-### リモート MCP サーバー（AWS）
-
-spec-driven-presentation-maker を Amazon Bedrock AgentCore Runtime 上のリモート MCP サーバーとしてデプロイします。
-
-> **💡 AWS へのデプロイは [推奨デプロイ手順](../en/deploy-cloudshell.md) を推奨します。**
-> `scripts/deploy.sh` は CloudShell と任意のローカル Linux/macOS から実行でき、CodeBuild 経由でデプロイされるため CDK/Docker のローカルインストールが不要です。本ページ以降の手順はローカル CDK を直接使う開発・デバッグ向けフローです。
-
-#### 設定
-
-```bash
-cd infra
-npm ci
-cp config.example.yaml config.yaml
-```
-
-`config.yaml` を編集して、デプロイするスタックを選択します。
-
-##### MCP Server のみ（最小構成）
-
-```yaml
-stacks:
-  data: true           # 必須 — DynamoDB + S3
-  runtime: true        # 必須 — AgentCore Runtime MCP Server
-  agent: false
-  webUi: false
-
-features:
-  enableInvocationLogging: false  # Bedrock Model Invocation Logging（任意）
-```
-
-#### デプロイ
-
-```bash
-# Docker Desktop 使用時
-npx cdk deploy --all
-
-# Finch 使用時（Docker Desktop なし）
-CDK_DOCKER=finch npx cdk deploy --all
-
-# CI/CD 環境（対話なし）
-CDK_DOCKER=finch npx cdk deploy --all --require-approval never
-```
-
-デプロイには 15〜30 分程度かかります。
-
-##### モデル ID の変更
-
-デフォルトでは `global.anthropic.claude-sonnet-4-6` が使用されます。別のモデルを使う場合は `infra/config.yaml` を編集:
-
-```yaml
-model:
-  modelId: "global.anthropic.claude-opus-4-6-v1"
-```
-
-またはデプロイ時にオーバーライド:
-
-```bash
-npx cdk deploy --all --context modelId=global.anthropic.claude-opus-4-6-v1
-```
-
-#### デプロイされるスタック
-
-| スタック | リソース |
-|---------|---------|
-| SdpmData | Amazon DynamoDB テーブル、S3 バケット（pptx + リソース）、リファレンスファイルを S3 にデプロイ |
-| SdpmRuntime | Amazon Bedrock AgentCore Runtime エンドポイント、ECR リポジトリ + Docker イメージ、Amazon Cognito M2M 認証 |
-
-#### テンプレートの登録
-
-CDK はテンプレートファイルを S3 にデプロイしますが、`list_templates` で表示するには Amazon DynamoDB への登録が必要です。
-詳細は[カスタムテンプレート — テンプレートの登録](../en/custom-template.md#layer-3-remote-mcp)を参照してください。
-
-#### デプロイの確認
-
-##### OAuth トークンの取得
-
-```bash
-TOKEN=$(curl -s -X POST \
-  "https://<CognitoDomain>.auth.<region>.amazoncognito.com/oauth2/token" \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -u "<M2MClientId>:<M2MClientSecret>" \
-  -d "grant_type=client_credentials&scope=sdpm/invoke" \
-  | python3 -c "import sys,json; print(json.load(sys.stdin)['access_token'])")
-```
-
-`CognitoDomain`、`M2MClientId`、`M2MClientSecret` は CDK 出力から取得してください。
-
-##### tools/list の呼び出し
-
-```bash
-ENCODED_ARN=$(python3 -c "import urllib.parse; print(urllib.parse.quote('<RuntimeArn>', safe=''))")
-
-curl -X POST \
-  "https://bedrock-agentcore.<region>.amazonaws.com/runtimes/${ENCODED_ARN}/invocations?qualifier=DEFAULT" \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "Authorization: Bearer $TOKEN" \
-  -d '{"jsonrpc":"2.0","method":"tools/list","params":{},"id":1}'
-```
-
-レスポンスにツール一覧が表示されれば成功です。
-
----
-
-### フルスタック（AWS）
-
-> **💡 推奨:** フルスタックのデプロイは [推奨デプロイ手順](../en/deploy-cloudshell.md) を利用してください（CloudShell と任意のローカル Linux/macOS で動作）。`./scripts/deploy.sh --region us-east-1` を実行するだけで、CDK/Docker のローカルインストールは不要です。
-
-`config.yaml` で `agent` と `webUi` を有効にしてデプロイすると、以下が追加されます。
-
-- Strands Agent（Amazon Bedrock AgentCore Runtime 上）
-- React Web UI（チャットインターフェース + デッキプレビュー）
-- JWT Bearer 認証（デフォルト Amazon Cognito、任意の OIDC IdP に対応）
-
-#### 設定
-
-```yaml
-stacks:
-  data: true
-  runtime: true
-  agent: true          # Strands Agent（AgentCore Runtime 上）
-  webUi: true          # React Web UI（S3 + CloudFront）
-
-features:
-  enableInvocationLogging: false
-```
-
-```bash
-npx cdk deploy --all
-```
-
-#### フルスタックで追加されるリソース
-
-| スタック | リソース |
-|---------|---------|
-| SdpmAuth | Amazon Cognito User Pool、ホスト UI |
-| SdpmAgent | Strands Agent（Amazon Bedrock AgentCore Runtime 上）、ECR イメージ |
-| SdpmWebUi | S3 バケット、Amazon CloudFront ディストリビューション、Amazon API Gateway、Lambda |
-
-#### 認証オプション
-
-##### デフォルト: Amazon Cognito User Pool
-
-`agent` または `webUi` を有効にすると、CDK が Amazon Cognito User Pool（ホスト UI 付き）を自動作成します。ユーザーは Web UI からサインインし、JWT がスタック全体に伝播されます。
-
-認証・認可モデルの設計詳細は[アーキテクチャ — 認証・認可モデル](../en/architecture.md#authentication-and-authorization-model)を参照してください。
-
-##### 外部 OIDC IdP
-
-自社の IdP（Entra ID、Auth0、Okta 等）を使う場合:
-
-1. AuthStack をスキップするか、Amazon Cognito の Federation 機能で外部 IdP を接続
-2. `config.yaml` に `oidcDiscoveryUrl` と `allowedClients` を設定
-3. Runtime の `customJwtAuthorizer` が OIDC 準拠の任意の発行者からの JWT を検証
-
-#### デプロイ後のエンドポイント確認
-
-デプロイスクリプトのログ監視が途中で中断した場合や、後からエンドポイントを確認したい場合は以下を実行してください。
-
-```bash
-bash scripts/show_endpoints.sh
-```
-
-デプロイ済みの CloudFormation スタックから CloudFront URL と Cognito サインアップ URL を表示します。
-
-#### Web UI の更新
-
-Web UI のコードを変更した場合、フル CDK デプロイなしで更新できます。
-
-```bash
-cd web-ui && npm run build && cd ..
-bash scripts/deploy_webui.sh
-```
-
-`aws-exports.json`（認証情報・API エンドポイント等）は CDK の Custom Resource が管理しています。
-スタック構成を変更した場合は `npx cdk deploy SdpmWebUi` を実行してください。
-
----
-
-
-## オプション機能
-
-### WAF IP アドレス制限
-
-`config.yaml` で `waf.allowedIpV4AddressRanges` および/または `waf.allowedIpV6AddressRanges` を設定すると、CloudFront と API Gateway へのアクセスを IP アドレスで制限できます。
-
-```yaml
-waf:
-  allowedIpV4AddressRanges:
-    - "10.0.0.0/8"
-    - "192.168.0.0/16"
-  allowedIpV6AddressRanges:
-    - "2001:db8::/32"
-```
-
-設定すると、CDK は以下を作成します:
-- **SdpmCloudFrontWaf** スタック（`us-east-1`、WAFv2 CLOUDFRONT スコープの要件）— CloudFront に関連付け
-- **リージョナル WAF**（デプロイリージョン）— API Gateway に関連付け
-
-デフォルトアクションは **Block** で、指定された IP 範囲のみアクセスが許可されます。`waf` セクションを省略した場合、WAF リソースは作成されません。
-
-> **⚠️ IPv6 に関する注意:** `allowedIpV4AddressRanges` のみ指定し `allowedIpV6AddressRanges` を省略した場合、IPv6 によるアクセスはすべてブロックされます。最近のブラウザは IPv6 を優先的に使用するため、IPv4 アドレスが許可されていても Web UI が「Loading authentication configuration...」のまま停止することがあります。デュアルスタック環境では必ず IPv4 と IPv6 の両方を指定してください。
-
-### セマンティックスライド検索
-
-Amazon Bedrock Knowledge Bases と Amazon S3 Vectors を用いた、デッキ横断のセマンティック検索を標準機能として提供します。追加の設定は不要です。
-
-### カスタムテンプレート・アセット
-
-独自の .pptx テンプレートやアイコンの追加方法は[カスタムテンプレートとアセット](../en/custom-template.md)を参照してください。
-
----
-
-## 注意事項
-
-### コスト
-
-コストの詳細は[コスト試算](../en/cost.md)を参照してください。開発・検証が終わったら `npx cdk destroy --all` でリソースを削除してください。
-
-### データ保持
-
-DataStack の Amazon DynamoDB テーブルと S3 バケットは `RemovalPolicy.RETAIN` が設定されています。`cdk destroy` してもデータは削除されません。手動で削除する必要があります。
-
----
+`sdpm webui` は Web UI をローカルモードで起動して開きます。ローカルモードは `http://localhost:3000`
+で動く Next.js アプリで、ACP（Agent Client Protocol。アプリから AI エージェントを動かすための
+プロトコル）で Kiro CLI と話します。初回の前に `kiro-cli login` を 1 度実行してください。GitHub、Google、
+AWS Builder ID、組織の IAM Identity Center のいずれかで Kiro にサインインします。AWS アカウントは不要で、
+Kiro には無料プランがあります（[Kiro の料金](https://kiro.dev/pricing/)）。インストーラーは
+デスクトップショートカットも作ります。MCP サーバーだけを入れた場合は、`sdpm update --with-webui` で
+後から Web UI を足せます。詳細: [Web UI ローカルモード](../../web-ui/README_ja.md#local-mode)。
+
+`sdpm open DECK` は 1 つのデッキ（フォルダー、またはデッキフォルダーの中の名前）を Web UI で開きます。
+Web UI が動いていなければ先に起動します。Web UI で話したことのあるデッキはその会話の続きになり、
+AI エージェントが作ったデッキはそのデッキの新しいチャットで開きます。AI エージェントはデッキを作ったときと
+組み上げたときにこのコマンドを伝えます。クライアントが自分でデッキを表示する場合（MCP Apps）は伝えません。
+
+### Web UI でできること
+
+- **進め方を選ぶ。** 最初のチャット画面で **すばやく作成**（質問なしで素材から初稿を作る）か
+  **確認しながら作成**（スライドを作る前にエージェントとストーリーを固める）を選びます。
+- **素材を渡す。** **+** メニューからファイルを一度に 5 つまで添付できます（PDF、DOCX、XLSX、PPTX、
+  テキストファイル、画像）。URL はメッセージに貼ります。
+- **テンプレート・スタイル・形式を選ぶ。** メッセージに `/` を入力すると、テンプレート、スタイル、
+  HTML 形式を選べます。
+- **スペックを追う。** デッキ画面には、スペックのパートごとにタブがあります: **ブリーフ**、
+  **アウトライン**、**アートディレクション**（スタイル）、**スライド**。
+- **スライドにコメントする。** 下の[スライドへのコメント](#スライドへのコメント)を参照してください。
+- **スタイルを管理する。** **スタイル** 画面には組み込みスタイルと自分のスタイルが並びます。
+  **AI で作成**、**AI で編集** でスタイルを作ったり直したりでき、組み込みスタイルをマイスタイルに
+  コピーしたり、スタイルファイルをインポート・エクスポートしたりできます。
+- **テンプレートを管理する。** **テンプレート** 画面には組み込みテンプレートが並び、自分の `.pptx` を
+  アップロードできます。どんな場面で使うかの説明も任意で付けられます。
+- **Kiro CLI のセッションから続ける。** このコンピューターで以前に `kiro-cli` でしたチャットから
+  デッキを始められます（[詳細](../../web-ui/README.md#continue-from-a-kiro-cli-session)、英語）。
+
+ローカルモードはデッキを `~/Documents/SDPM-Presentations` に保存します。別のフォルダーにするには
+`~/.config/sdpm/config.json` の `output_dir` を設定します（[ユーザー設定](custom-template.md#ユーザー設定)）。
+MCP サーバーと Web UI の両方がこの値を使います（変更したら Web UI を再起動します）。`SDPM_DECK_ROOT`、次に
+`SDPM_OUTPUT_DIR` を設定すると、そちらが優先されます。
+
+### スライドへのコメント
+
+直したい箇所をスライド上で直接示し、1 つの修正依頼として送れます。
+
+1. デッキを開き、プレビューの見出しにある **コメント** ツールをオンにします（`C` キーでも可）。
+2. ドラッグで範囲を囲むか、クリックで枠を置きます。枠には A、B、… と文字が付きます。
+3. どう直したいかを書きます。別の枠を指すには `@A` と書きます。
+4. 枠はチャット入力の上に集まります。**修正を依頼** を押すと、入力欄に書いた内容と一緒に送ります。
+
+エージェントはスライドごとにコンポーザーを割り当てて修正し、コメントの 1 つずつに返答します。
+コメントツールはデスクトップでのみ使えます（ローカルモードと AWS 構成の両方）。
+スタイル画面で自分のスタイルを開いても同じツールが使え、スタイルエージェントはコメントしたスライドだけを直します。
+
+![Web UI でスライドに置いたコメント枠と、チャット入力の上の修正依頼](../assets/screenshots/webui-comments.png)
+
+## HTML デッキ
+
+HTML・ブラウザ・reveal.js のデッキを頼む（またはメッセージに `@format:html` を入れる）と、
+エージェントは PPTX の代わりにブラウザで見せるプレゼンテーションを作ります。テンプレートとスタイルは
+PPTX と共通です。出力は `<deck>/output.html` の 1 ファイルで、オフラインで開けます。ブラウザでは
+`S` でノート付きのスピーカービュー、`F` で全画面、`Esc` でスライド一覧になります。PDF にするには
+`output.html?print-pdf` を開いてブラウザから印刷します。
+
+- テンプレートは初回の使用時に HTML 用に変換され、キャッシュされます。装飾（ロゴ、帯、背景画像）を
+  引き継ぐには LibreOffice と poppler が必要です。無くてもレイアウトとプレースホルダーは変換されます。
+  同梱テンプレートのように装飾の無いテンプレートでは、どちらも不要です。
+- Chrome か Edge が入っていれば、スライドを変更した `run_python` のたびに、そのスライドをヘッドレス
+  ブラウザで開きます。レイアウトの問題（重なり、はみ出し、領域外やテンプレート装飾の上に出た要素）と
+  JavaScript のエラーを警告で返し、確認したスライドごとに PNG プレビュー（`<deck>/preview/png/<slug>.png`、
+  `preview_files` で返却）を作ります。ブラウザが無ければ確認を飛ばし、1 行の警告で伝えます。
+  `SDPM_BROWSER` でブラウザの実行ファイルを指定できます（`none` で確認をオフ）。ローカルサーバーは
+  `output.html` と一緒に、スライドごとの静止サムネイル（`<deck>/preview/<slug>.html`）も書き出します。
+- PPTX 専用の機能（翻訳、PPTX 取り込み、手修正の同期）は HTML デッキでは使えません。
+- スライドで JavaScript を動かせます。Apache ECharts と D3 を同梱していて、使うデッキにだけ埋め込まれます。
+
+### Web UI で HTML デッキを使う
+
+最初のチャット画面で、送信前に **すばやく作成** / **確認しながら作成** の下にある **HTML で作成** を
+オンにするか、`/` を入力して **形式** の **HTML** を選びます。どちらもメッセージに `@format:html` が入り、
+外せる「HTML」チップとして表示されます。指定しなければ PPTX になります。
+
+HTML デッキのページには「HTML」バッジが付き、ページ内でデッキを再生します。スライド一覧には各スライドの
+静止サムネイルが並びます。ローカルの Web UI では見出しのボタンは **開く** の 1 つで、既定のブラウザで
+`output.html` を開きます。
+
+AWS 構成では見出しに 3 つのボタンがあります。
+
+- **発表**: 新しいタブでデッキを開きます。そのタブで `S` を押すとノート付きのスピーカービューになります。
+  アプリ内のプレーヤーでは使えず、このタブでだけ動きます。リンクの有効期限は 4 時間で、スピーカービューは
+  開くときにリンクを読み直すため、`S` は発表の始めのうちに押してください。
+- **PDF**: 新しいタブで印刷画面を開きます。ブラウザから印刷して PDF に保存します。
+- **HTML**（ダウンロードアイコン）: オフラインで開ける `output.html` の 1 ファイルを保存します。
+
+公開デッキは PPTX デッキと同じように使えます。デッキを閲覧できる人は、発表もダウンロードもできます。
+
+## 更新とアンインストール
+
+- `sdpm update` は最新のリリースに移り、入っているものを再ビルドします。
+  `sdpm update --with-webui` は MCP のみの構成に Web UI も足します。
+  - **版を下げません。** 最新のリリースより新しいところにいるインストール（`main` を追っていた
+    もの）は、そのコミットを含むリリースが出るまでその場にとどまり、その旨を 1 行で表示します
+    （`Staying on …: no release contains it yet`）。
+  - **追う先。** `sdpm update --channel main` で `main` にマージされた変更をすべて追います。
+    `sdpm update --channel release` で戻せます（リリースがそのコミットを含むまではその場に
+    とどまります）。選択は `~/.sdpm/state.json` に残ります。入っている版、プロファイル、
+    Kiro エージェントの名前、登録済みのクライアントも同じファイルにあります。
+  - **手元の変更。** `~/.sdpm/checkout` の追跡ファイルに変更があれば（前の版のツールが書き換えた
+    ものもあります）、チェックアウトを動かす前に git stash に退避します。捨てることはしません。
+    退避したファイルと、戻すための `git stash apply` のコマンドを表示します。
+  - **失敗しても環境を壊しません。** 新しい版の Python 環境や Web UI を用意できなかったときは、
+    元のコミットに戻してその環境を同期し直します（`Back on …, as before`）。Web UI はコミットが
+    変わったときだけビルドし直します。
+  - **終了コード**（スクリプトとエージェント向け。`sdpm update` は質問しません）: 0 更新した・最新・
+    とどまった、1 失敗（最後の行にインストールの状態が出ます）、2 使い方の誤り、130 中断。
+
+  続けて、インストールの残りもそろえます:
+  - `sdpm` コマンドを新しい版で置き換える
+  - SDPM が登録済みのクライアントに登録し直す（Kiro CLI のエージェントはインストール時に
+    決めた名前で、Claude Code、Codex）。クライアントを足すことはしません。SDPM が未登録の
+    クライアントが見つかれば名前を表示するので、`sdpm register` で足せます。VS Code と
+    Cursor は登録済みかどうかを返さないため、そのままにします。Claude Code や Codex の
+    `sdpm` サーバーが別のチェックアウト（`make register-dev`）を動かしている場合もそのままです
+  - 前の版が残し、もう使われないものを消す（`servers/local/.venv`、`sdpm/.venv`、旧 Kiro
+    インストーラーのファイル）
+  - CHANGELOG の Upgrading にあるローカルインストール向けの注記から、この更新の後にすること
+    があれば表示する
+
+  0.13.0 より前に入れた環境の `sdpm` コマンドは `main` を追います。その環境で最初に打つ
+  `sdpm update` は、古いコマンドで `main` を取得したあと新しいコードに渡し、元のコミットを含む
+  最新のリリースに移って、新しい `sdpm` コマンドを入れます。この動作を含む最初のリリースが出る
+  までは、取得した `main` にとどまります。`SDPM_LAUNCHER_DIR` を指定してインストールし、その
+  ディレクトリが `PATH` にない場合は、その更新のときにもう一度指定してください。
+- `sdpm uninstall` は `~/.sdpm`、ランチャー、ショートカットを削除し、MCP クライアントの接続解除も提案します。
+
+AWS アカウントからデプロイを削除するには、[アンインストール（AWS）](uninstall.md)を参照してください。
 
 ## トラブルシューティング
 
-### Docker ビルドが Finch で失敗する
+### `sdpm update` が止まる
 
-```bash
-export CDK_DOCKER=finch
+`sdpm` コマンドが 0.13.0 より前の版の環境では、取得の途中で次のように止まることがあります:
+
+```
+error: Your local changes to the following files would be overwritten by merge:
+        sdpm/uv.lock
+Please commit your changes or stash them before you merge.
+Aborting
+SDPM update failed while Fast-forwarding main (exit 1).
 ```
 
-### ECR 権限エラーでデプロイが失敗する
-
-Amazon Bedrock AgentCore Runtime が ECR からイメージを取得する際に権限エラーが発生する場合があります。通常は再デプロイで解決します。
-
-```bash
-npx cdk deploy --all
-```
-
-### list_templates にテンプレートが表示されない
-
-CDK デプロイ後に `upload_template.py` を実行してください。CDK は .pptx ファイルを S3 にデプロイしますが、Amazon DynamoDB レコードは作成しません。
-
-### .dockerignore が見つからない
-
-Docker ビルドが極端に遅い、またはディスク容量エラーで失敗する場合は、リポジトリルートに `.dockerignore` が存在し、`infra/cdk.out/` が含まれていることを確認してください。
-
-### Agent がワークフローに従わない
-
-Strands SDK v1.30.0 以降で `server_instructions` が自動注入されます。`strands-agents>=1.30.0` がインストールされているか確認してください。
-
-### Amazon CloudFront URL にアクセスすると白い画面が表示される
-
-`web-ui/build` が存在しない状態でデプロイした可能性があります。
+これらは、その版のツールが書き換えたファイルです（`sdpm/uv.lock` は uv、`web-ui/next-env.d.ts`
+は Web UI のビルド）。新しいコードが動く前に取得が止まるため、その update は自分では先に進めません。
+インストーラーをもう一度実行してください。変更を git stash に退避してから更新し、プロファイル、
+エージェントの名前、登録済みのクライアントは引き継ぎます。
 
 ```bash
-cd web-ui && npm run build && cd ..
-bash scripts/deploy_webui.sh
+curl -fsSL https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.sh | bash
 ```
 
----
+```powershell
+irm https://raw.githubusercontent.com/aws-samples/sample-spec-driven-presentation-maker/main/scripts/install/dist/install.ps1 | iex
+```
 
-## 関連ドキュメント
+または、自分で変更を退避してから更新し直します（`-c` のオプションは、git の利用者情報が
+未設定のマシンでも stash を作れるようにするためのものです）:
 
-- [アーキテクチャ](../en/architecture.md) — 4 層構成、データフロー、認証モデル
-- [カスタムテンプレート](../en/custom-template.md) — テンプレートとアセットの追加
-- [エージェント接続](../en/add-to-gateway.md) — MCP クライアントの接続方法
+```bash
+git -C ~/.sdpm/checkout -c user.name=sdpm -c user.email=sdpm@localhost stash && sdpm update
+```
+
+```powershell
+git -C $HOME\.sdpm\checkout -c user.name=sdpm -c user.email=sdpm@localhost stash; sdpm update
+```
+
+どちらでも捨てられるものはありません。退避したものは `git -C ~/.sdpm/checkout stash list` で
+確認できます。0.13.0 からは、`sdpm update` がこうした変更を自分で退避します。それでも止まる場合
+（「could not check out」）は、新しい版に入ったファイルと同じ場所に追跡されていないファイルが
+あります。git のメッセージにその名前が出ており、捨てられたものはありません。
+
+0.13.0 からのそのほかのメッセージ:
+
+- **`Could not prepare v… (see above). Back on v…, as before.`** 新しい版の環境を用意できません
+  でした（ネットワークのエラー、Windows では MCP クライアントや `sdpm webui` がファイルを開いて
+  いるなど）。インストールは元のままです。ファイルを開いているものを閉じて、もう一度
+  `sdpm update` を実行してください。戻る途中で止まったと表示された場合は、インストーラーを
+  もう一度実行してください。
+- **`… has commits origin/main does not have and cannot update itself`。** チェックアウトに独自の
+  コミットがあり、この更新の仕組みより前の版です。インストーラーをもう一度実行してください。
+- **`v… needs <tool> <version>+`。** そのリリースが新しいツールを求めています。入れてから
+  `sdpm update` を実行し直してください。何も変更していません。
+- **「Fetching main」での `! [rejected] … (would clobber existing tag)`。** 0.12 の環境の `sdpm`
+  コマンドはタグを置き換えずに取得するため、付け替えられたリリースのタグで止まります（公開した
+  タグは付け替えないので、起きないはずです）。インストーラーをもう一度実行してください。
+- **0.12 の `sdpm` コマンドでの最初の更新が、その同期かビルドで失敗した。** そのコマンドには
+  戻る手段がありません。もう一度 `sdpm update` を実行すると、同じ版で再試行します。
+
+## 次のステップ
+
+- [カスタムテンプレート・スタイル・アセット](custom-template.md): 自分の `.pptx`、スタイル、アイコンを使う
+- [デプロイガイド](../en/deploy-cloudshell.md)（英語）: チーム向けに AWS で動かす（ワンクリックデプロイ。ローカルの CDK / Docker 不要）
+- [開発者ガイド](../en/developer-guide.md)（英語）: checkout での開発、CDK でのデプロイ
+- [アーキテクチャ](../en/architecture.md)（英語）: 各部分の組み合わせ
+- [プログラムからの利用](programmatic-access.md): スクリプト・Lambda・Step Functions から自分としてデッキを作る（Cloud）

@@ -11,11 +11,16 @@
  * The aspect ratio adapts to the actual image dimensions (detected via
  * onLoad naturalWidth/naturalHeight). Falls back to 16/9 before the first
  * image has loaded.
+ *
+ * HTML deck previews (`preview/<slug>.html`) render in a `sandbox=""` iframe
+ * (HtmlSlideFrame) at the deck's `slideSize` instead of an <img>.
  */
 
 "use client"
 
 import { useState, useEffect } from "react"
+import { isHtmlPreview } from "@/lib/preview"
+import { HtmlSlideFrame } from "@/components/deck/HtmlSlideFrame"
 
 interface SlideThumbnailProps {
   src: string | null
@@ -30,10 +35,12 @@ interface SlideThumbnailProps {
   onAspectRatio?: (ratio: number) => void
   /** Called when the image fails to load (e.g. 403). */
   onError?: () => void
+  /** HTML decks: canvas size, which sets the thumbnail's aspect ratio. */
+  slideSize?: { width: number; height: number }
   children?: React.ReactNode
 }
 
-export function SlideThumbnail({ src, alt, index, onClick, className, updated, slug, onAspectRatio, onError, children }: SlideThumbnailProps) {
+export function SlideThumbnail({ src, alt, index, onClick, className, updated, slug, onAspectRatio, onError, slideSize, children }: SlideThumbnailProps) {
   const [aspectRatio, setAspectRatio] = useState<string>("16/9")
   // `shown` is the image currently on screen; `incoming` is a newer src still
   // loading. The old image stays until the new one is ready, then they crossfade,
@@ -69,6 +76,14 @@ export function SlideThumbnail({ src, alt, index, onClick, className, updated, s
       onAspectRatio?.(img.naturalWidth / img.naturalHeight)
     }
   }
+  const html = isHtmlPreview(src)
+  const slideWidth = slideSize?.width ?? 1920
+  const slideHeight = slideSize?.height ?? 1080
+  useEffect(() => {
+    if (html && slideWidth > 0 && slideHeight > 0) onAspectRatio?.(slideWidth / slideHeight)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [html, slideWidth, slideHeight])
+
   // Reveal stagger only for the first screenful; a 30-slide deck must not make
   // its last slide wait 1.8 s after it has loaded.
   const revealDelay = `${Math.min(index, 6) * 60}ms`
@@ -76,13 +91,17 @@ export function SlideThumbnail({ src, alt, index, onClick, className, updated, s
   return (
     <div
       className={`relative overflow-hidden rounded-lg ${updated || glow ? "slide-updated" : ""} ${className || ""}`}
-      style={{ aspectRatio }}
+      style={{ aspectRatio: html ? `${slideWidth}/${slideHeight}` : aspectRatio }}
       onClick={onClick}
       role={onClick ? "button" : undefined}
       tabIndex={onClick ? 0 : undefined}
       onKeyDown={onClick ? (e) => { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); onClick() } } : undefined}
       data-slide-id={slug}
     >
+      {html && src ? (
+        <HtmlSlideFrame src={src} title={alt} width={slideWidth} height={slideHeight} />
+      ) : (
+      <>
       {/* Skeleton layer — only before the first image has ever loaded */}
       {shown && !shown.loaded && <div className="slide-skeleton absolute inset-0" />}
 
@@ -131,6 +150,8 @@ export function SlideThumbnail({ src, alt, index, onClick, className, updated, s
           }}
           onError={() => { setIncoming(null); onError?.() }}
         />
+      )}
+      </>
       )}
 
       {children}

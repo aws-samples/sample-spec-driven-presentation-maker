@@ -13,6 +13,7 @@
  * 1. messageStart - Signals the beginning of a new assistant message
  * 2. contentBlockDelta - Contains incremental text content
  * 3. toolUse (custom) - Tool execution events from backend
+ * 4. taskStart / taskEnd (Cloud) - a background tool's dispatch and its settled result
  *
  * Tool events are passed to toolCallback as structured data,
  * NOT inserted into the completion text.
@@ -37,24 +38,50 @@ export const resetParserState = () => {
  * @param {string} currentCompletion - The accumulated completion text
  * @param {Function} updateCallback - Callback to update the UI with new text
  * @param {Function} [toolCallback] - Callback for tool use events: (toolName, toolUseData)
+ * @param {Function} [translateError] - Optional translator for error codes: (code) => string | undefined
  * @returns {string} Updated completion text
  */
-export const parseStreamingChunk = (line, currentCompletion, updateCallback, toolCallback) => {
+export const parseStreamingChunk = (line, currentCompletion, updateCallback, toolCallback, translateError) => {
   if (!line || !line.trim()) return currentCompletion;
   if (!line.startsWith('data: ')) return currentCompletion;
 
   const data = line.substring(6).trim();
   if (!data) return currentCompletion;
 
+  let json;
   try {
-    const json = JSON.parse(data);
+    json = JSON.parse(data);
+  } catch {
+    console.debug('Failed to parse streaming event:', data);
+    return currentCompletion;
+  }
+  return parseEvent(json, currentCompletion, updateCallback, toolCallback, translateError);
+};
 
+/**
+ * Apply one parsed agent event (an SSE line's JSON, or the `ev` of a WebSocket item).
+ * Events this parser does not know (the session's `work`, `turn`, `turnEnd`, `steer`,
+ * `composerNote`) leave the completion unchanged.
+ *
+ * @param {object} json - The event object
+ * @param {string} currentCompletion - The accumulated completion text
+ * @param {Function} updateCallback - Callback to update the UI with new text
+ * @param {Function} [toolCallback] - Callback for tool use events: (toolName, toolUseData)
+ * @param {Function} [translateError] - Optional translator for error codes: (code) => string | undefined
+ * @returns {string} Updated completion text
+ */
+export const parseEvent = (json, currentCompletion, updateCallback, toolCallback, translateError) => {
+  if (!json || typeof json !== 'object') return currentCompletion;
+  try {
     // Keep-alive
     if (json.keepalive) return currentCompletion;
 
-    // Agent-level error (e.g. Bedrock ValidationException, image/token limit exceeded)
+    // Agent-level error (e.g. Bedrock ValidationException, image/token limit exceeded).
+    // Appended as its own paragraph, never replacing the completion: it is the whole run's
+    // text, which earlier messages and tool card positions are sliced from.
     if (json.status === 'error' && json.error) {
-      const newCompletion = currentCompletion + `⚠️ ${agentErrorMessage(json.error, json.code)}`;
+      const notice = `⚠ ${agentErrorMessage(json.error, json.code, translateError)}`;
+      const newCompletion = currentCompletion ? `${currentCompletion}\n\n${notice}` : notice;
       updateCallback(newCompletion);
       return newCompletion;
     }
@@ -117,6 +144,40 @@ export const parseStreamingChunk = (line, currentCompletion, updateCallback, too
       return currentCompletion;
     }
 
+    // Background task dispatched (Cloud compose_slides): the tool keeps running after its
+    // turn, so the card gets a running task instead of a result.
+    if (json.taskStart) {
+      const { toolUseId, name, taskId } = json.taskStart;
+      if (toolCallback) {
+        toolCallback(name, { toolUseId, name, taskStarted: true, task: { id: taskId, state: 'running' } });
+      }
+      return currentCompletion;
+    }
+
+    // Background task settled: its result closes the card. A cancelled task, or a compose
+    // that stopped itself (report status "cancelled"), gets no status (the stopped look).
+    if (json.taskEnd) {
+      const { toolUseId, name, taskId, status, content } = json.taskEnd;
+      let parsedContent = {};
+      try {
+        if (content) parsedContent = JSON.parse(content);
+      } catch { /* content may not be JSON */ }
+      const cancelled = status === 'cancelled' || parsedContent?.status === 'cancelled';
+      const state = cancelled ? 'cancelled' : status === 'failed' ? 'failed' : 'completed';
+      if (toolCallback) {
+        toolCallback(name, {
+          toolUseId,
+          name,
+          status: cancelled ? undefined : state === 'failed' ? 'error' : 'success',
+          result: parsedContent,
+          rawResult: content,
+          completed: true,
+          task: { id: taskId, state },
+        });
+      }
+      return currentCompletion;
+    }
+
     // Message start — add separator between messages
     if (json.event?.messageStart?.role === 'assistant') {
       if (currentCompletion) {
@@ -136,7 +197,7 @@ export const parseStreamingChunk = (line, currentCompletion, updateCallback, too
 
     return currentCompletion;
   } catch {
-    console.debug('Failed to parse streaming event:', data);
+    console.debug('Failed to apply streaming event:', json);
     return currentCompletion;
   }
 };

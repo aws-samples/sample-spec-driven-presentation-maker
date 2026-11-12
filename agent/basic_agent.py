@@ -6,29 +6,38 @@ AI model outputs should be reviewed before use in production contexts.
 
 Uses Amazon Bedrock AgentCore Runtime for deployment.
 JWT Bearer authentication — caller's JWT is forwarded to MCP Server.
+Entries: /ws (WebSocket, the Web UI) and /invocations (HTTP streaming), both on the
+session runtime (session_runtime.py).
 
 # Security: AWS manages infrastructure security. You manage access control,
 # data classification, and IAM policies. See SECURITY.md for details.
 """
 
-import asyncio
 import base64
 import json
 import logging
-import os
 
 from bedrock_agentcore.runtime import BedrockAgentCoreApp
 
+import session_guard
+import session_runtime
+import stop_guard
+import ws_entry
 from errors import BAD_INPUT, AUTH, error_event
-from factory import create_agent
-from streaming import stream_agent
+from shared import snapshot_random
 
 logger = logging.getLogger("sdpm.agent")
 
-app = BedrockAgentCoreApp()
+# The lifespan installs the SIGTERM guard (stop_guard.py) in front of uvicorn's handler.
+app = BedrockAgentCoreApp(lifespan=stop_guard.lifespan)
 
-# Cancel registry: session_id → asyncio.Event.
-_cancel_events: dict[str, asyncio.Event] = {}
+# Sessions and their turns (session_runtime.py): a working session holds a HealthyBusy
+# task on /ping, and SIGTERM closes the sessions' clients.
+session_runtime.configure(session_runtime.BusyTracker(app.add_async_task, app.complete_async_task))
+
+# /ws: the Web UI's connection (ws_entry.py). /invocations below stays for Local and
+# external clients; both run on the same session runtime.
+app.websocket(ws_entry.handle)
 
 
 @app.entrypoint
@@ -44,6 +53,12 @@ async def agent_stream(payload, context):
     """
     user_query = payload.get("prompt")
     session_id = payload.get("runtimeSessionId")
+
+    # Text only: the agent framework also accepts content-block lists, which
+    # this entrypoint does not take from callers.
+    if user_query is not None and not isinstance(user_query, str):
+        yield error_event("Invalid field: prompt must be a string", code=BAD_INPUT)
+        return
 
     if not all([user_query, session_id]):
         yield error_event("Missing required fields: prompt or runtimeSessionId", code=BAD_INPUT)
@@ -71,41 +86,29 @@ async def agent_stream(payload, context):
         yield error_event("Could not extract user_id from JWT sub claim", code=AUTH)
         return
 
-    # Cancel previous request for the same session
-    prev_cancel = _cancel_events.get(session_id)
-    if prev_cancel is not None:
-        prev_cancel.set()
-        logger.info("Signalled previous request cancellation for session %s", session_id[:12])
+    # Only the session's owner gets in (session_guard.py); before the session registry,
+    # so a refused call never touches a running turn.
+    session_id, refusal = await session_guard.admit(session_id, getattr(context, "session_id", None), user_id)
+    if refusal is not None:
+        yield refusal
+        return
 
-    cancel = asyncio.Event()
-    _cancel_events[session_id] = cancel
+    mode = payload.get("mode", "spec")
+    async for event in session_runtime.http_turn(
+        session_id, user_id, jwt_token, user_query, mode,
+        payload.get("chatModelId"), payload.get("createModelId"),
+    ):
+        yield event
 
-    try:
-        os.environ["_CURRENT_SESSION_ID"] = session_id
-        mode = payload.get("mode", "spec")
-        requested_chat_model_id = payload.get("chatModelId") if isinstance(payload, dict) else None
-        requested_create_model_id = payload.get("createModelId") if isinstance(payload, dict) else None
-        agent, mcp_status = create_agent(
-            mode=mode,
-            user_id=user_id,
-            session_id=session_id,
-            jwt_token=jwt_token,
-            chat_model_id=requested_chat_model_id,
-            create_model_id=requested_create_model_id,
-        )
 
-        yield {"mcp_status": mcp_status}
-
-        async for event in stream_agent(agent, user_query, session_id, cancel):
-            yield event
-
-    except Exception as e:
-        logger.exception("Agent stream error for session %s", session_id[:12])
-        yield error_event(e)
-    finally:
-        if _cancel_events.get(session_id) is cancel:
-            del _cancel_events[session_id]
+def main(port: int = 8080) -> None:
+    # Before the server starts (and so before the V2 snapshot): ids and jitter drawn from
+    # the random module stay distinct across restored microVMs (shared/snapshot_random.py).
+    snapshot_random.install()
+    # Bounded graceful shutdown: on SIGTERM uvicorn would otherwise wait for the running
+    # /invocations without limit (see stop_guard.py).
+    app.run(port=port, timeout_graceful_shutdown=stop_guard.GRACEFUL_SHUTDOWN_S)
 
 
 if __name__ == "__main__":
-    app.run()
+    main()

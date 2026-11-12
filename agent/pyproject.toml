@@ -1,0 +1,24 @@
+[project]
+name = "sdpm-agent"
+version = "1.0.0"
+description = "spec-driven-presentation-maker Strands Agent — AgentCore Runtime container (Layer 4)"
+requires-python = ">=3.11"
+# AI model access requires appropriate IAM permissions and Bedrock model access grants.
+# Versions are locked in the workspace uv.lock (root); agent/Dockerfile installs from it.
+dependencies = [
+    "strands-agents[otel]>=1.47.0",
+    # <2: mcp 2.0 removes mcp.server.fastmcp (FastMCP); migration tracked in #301.
+    "mcp>=1.30.0,<2",
+    "bedrock-agentcore[strands-agents]>=1.0.6",
+    "aws-opentelemetry-distro>=0.10.0",
+    "awslabs.aws-pricing-mcp-server",
+    # web_fetch: decodes pages that declare no charset.
+    "charset-normalizer",
+    "html2text",
+    "pymupdf",
+    "partial-json-parser",
+]
+
+# An application, not a library: uv installs its dependencies, never builds it.
+[tool.uv]
+package = false

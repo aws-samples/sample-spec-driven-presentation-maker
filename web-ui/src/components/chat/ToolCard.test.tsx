@@ -16,6 +16,7 @@
 import { describe, it, expect } from "vitest"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { ToolCard, ToolCardCompact, TOOL_META, stripPrefix } from "./ToolCard"
+import { DeckFormatProvider } from "./DeckFormatContext"
 
 describe("ToolCard", () => {
   it("renders active state with cursor marker and agent name tag", () => {
@@ -101,6 +102,34 @@ describe("ToolCard", () => {
     expect(container.querySelector(".ledger-marker")).toBeNull()
   })
 
+  it("dispatches message_composer to a composer note", () => {
+    const { container, getByRole } = renderWithIntl(
+      <ToolCard name="message_composer" input={{ group: 2, text: "Use blue." }} isActive />
+    )
+    expect(container.querySelector(".ledger-marker")).toBeNull()
+    expect(getByRole("note").textContent).toContain("To composer 2")
+    expect(getByRole("note").textContent).toContain("Use blue.")
+    expect(getByRole("note").textContent).not.toContain("Not delivered")
+  })
+
+  it("marks a message_composer that did not reach a composer", () => {
+    const { container } = renderWithIntl(
+      <ToolCard name="message_composer" input={{ group: 2, text: "Use blue." }} status="error" />
+    )
+    expect(container.querySelector("[role='note']")?.textContent).toContain("Not delivered")
+  })
+
+  it("marks the Local server's not-delivered message_composer (its toolResult as compose-run.ts sends it)", () => {
+    // Local: the run's toolResult for a message no composer took ({message: "Not delivered"}, status error).
+    const { container } = renderWithIntl(
+      <ToolCard name="message_composer" input={{ group: 1, text: "Use the title 'Steered title'." }} status="error" result={{ message: "Not delivered" }} />
+    )
+    const note = container.querySelector("[role='note']")
+    expect(note?.getAttribute("aria-label")).toBe("Message with composer 1")
+    expect(note?.textContent).toContain("Not delivered")
+    expect(note?.textContent).toContain("Steered title")
+  })
+
   it("does not set aria-live on active (not yet complete)", () => {
     const { container } = renderWithIntl(
       <ToolCard name="get_deck" input={{ deck_id: "x" }} isActive />
@@ -126,6 +155,11 @@ describe("ToolCardCompact", () => {
     )
     const el = container.querySelector(".ledger-compact")
     expect(el!.textContent).toContain("file.md")
+  })
+
+  it("labels message_composer in English and Japanese", () => {
+    expect(renderWithIntl(<ToolCardCompact name="message_composer" />).container.textContent).toContain("Messaging a composer")
+    expect(renderWithIntl(<ToolCardCompact name="message_composer" />, { locale: "ja" }).container.textContent).toContain("コンポーザーに連絡")
   })
 
   it("renders small muted dot marker with agent color", () => {
@@ -156,5 +190,36 @@ describe("TOOL_META", () => {
     expect(TOOL_META.generate_pptx.category).toBe("produce")
     expect(TOOL_META.run_python.category).toBe("compute")
     expect(TOOL_META.hearing.category).toBe("hearing")
+  })
+})
+
+describe("generate_pptx label", () => {
+  it("says Finalizing HTML deck when the open deck is HTML", () => {
+    const { container } = renderWithIntl(
+      <DeckFormatProvider value="html"><ToolCard name="generate_pptx" input={{}} isActive /></DeckFormatProvider>
+    )
+    expect(container.textContent).toContain("Finalizing HTML deck")
+    const compact = renderWithIntl(
+      <DeckFormatProvider value="html"><ToolCardCompact name="generate_pptx" /></DeckFormatProvider>
+    )
+    expect(compact.container.textContent).toContain("Finalizing HTML deck")
+  })
+
+  it("says Finalizing HTML deck when the result is HTML", () => {
+    const { container } = renderWithIntl(
+      <ToolCard name="spec_driven_presentation_maker_generate_pptx" input={{}} status="success"
+        result={{ status: "completed", outputFormat: "html" }} />
+    )
+    expect(container.textContent).toContain("Finalizing HTML deck")
+  })
+
+  it("says Generating PPTX otherwise", () => {
+    const { container } = renderWithIntl(
+      <DeckFormatProvider value="pptx"><ToolCard name="generate_pptx" input={{}} isActive /></DeckFormatProvider>
+    )
+    expect(container.textContent).toContain("Generating PPTX")
+    expect(container.textContent).not.toContain("Finalizing HTML deck")
+    const plain = renderWithIntl(<ToolCardCompact name="generate_pptx" />)
+    expect(plain.container.textContent).toContain("Generating PPTX")
   })
 })

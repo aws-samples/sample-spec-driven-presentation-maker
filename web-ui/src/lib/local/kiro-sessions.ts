@@ -1,231 +1,127 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
-/** Local-only access to the kiro-cli session store. */
-import crypto from "crypto"
-import fs from "fs"
-import { promises as fsp } from "fs"
-import os from "os"
-import path from "path"
-import readline from "readline"
-
-import type {
-  KiroSessionSummary,
-  KiroSessionsResponse,
-  SessionOrigin,
-} from "./kiro-sessions.types"
-
-export const KIRO_SESSIONS_DIR = path.join(os.homedir(), ".kiro", "sessions", "cli")
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i
-const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000
-
-export interface SessionMeta {
-  session_id?: unknown
-  cwd?: unknown
-  updated_at?: unknown
-  title?: unknown
-  parent_session_id?: unknown
-  session_state?: { agent_name?: unknown } | null
-  [key: string]: unknown
-}
-
-interface SessionFilesOptions {
-  dir?: string
-}
-
-function sessionsDir(dir?: string): string {
-  return dir ?? process.env.SDPM_KIRO_SESSIONS_DIR ?? KIRO_SESSIONS_DIR
-}
-
-function assertSessionId(sessionId: string): void {
-  if (!UUID_RE.test(sessionId)) throw new Error("invalid kiro session ID")
-}
-
-function sessionPath(sessionId: string, extension: ".json" | ".jsonl", dir?: string): string {
-  assertSessionId(sessionId)
-  // Same defence layers as resolveDeckDir(): allow-list above, then a normalized
-  // prefix check on the resolved path so the file can only ever be a direct child
-  // of the sessions directory.
-  const root = path.resolve(sessionsDir(dir)) // nosemgrep: path-join-resolve-traversal — trusted config, not user input
-  const resolved = path.resolve(root, `${sessionId}${extension}`) // nosemgrep: path-join-resolve-traversal — UUID allow-list above, containment check below
-  if (!resolved.startsWith(root + path.sep) || path.dirname(resolved) !== root) {
-    throw new Error("invalid kiro session ID")
-  }
-  return resolved
-}
-
-function agentName(meta: SessionMeta): string | null {
-  const value = meta.session_state?.agent_name
-  return typeof value === "string" ? value : null
-}
-
-export function isCandidate(meta: SessionMeta): boolean {
-  const cwd = typeof meta.cwd === "string" ? meta.cwd : ""
-  const agent = agentName(meta)
-  return meta.parent_session_id == null
-    && !agent?.startsWith("sdpm-")
-    && !/[\\/]servers[\\/]local(?:[\\/]|$)/.test(cwd)
-}
-
-function promptText(entry: unknown): string | null {
-  if (!entry || typeof entry !== "object") return null
-  const record = entry as Record<string, unknown>
-  if (record.kind !== "Prompt") return null
-  const data = record.data
-  if (!data || typeof data !== "object") return null
-  const content = (data as Record<string, unknown>).content
-  if (!Array.isArray(content)) return null
-  for (const part of content) {
-    if (!part || typeof part !== "object") continue
-    const item = part as Record<string, unknown>
-    if (item.kind === "text" && typeof item.data === "string") return item.data
-  }
-  return null
-}
-
 /**
- * First user prompt in a `.jsonl` log, used only as a title fallback.
+ * Local-only catalog of kiro-cli's stored sessions, for "Continue from a kiro session".
  *
- * Stops at the first match: logs reach hundreds of MB, and listing must never
- * scale with their size. Everything else the picker shows comes from `.json`.
+ * The configured engine decides what is listed: the stores of every engine whose sessions it can
+ * open (`storedSessionAdapters`; each engine reads its own store in `acp/engines/<id>/`). The
+ * sessions are filtered first (sdpm's own sessions and sub-agent sessions only with "Show all"),
+ * then one row is kept per session id: the configured engine's own row over a row of a store it
+ * imports from (it continues its own copy), else the newer one. A store that cannot be read is
+ * reported in `unavailable` and the others are still listed.
  */
-async function readFirstPrompt(jsonlPath: string): Promise<string> {
-  let input: fs.ReadStream | null = null
-  try {
-    input = fs.createReadStream(jsonlPath, { encoding: "utf-8" })
-    const lines = readline.createInterface({ input, crlfDelay: Infinity })
-    for await (const line of lines) {
-      try {
-        const text = promptText(JSON.parse(line) as unknown)
-        if (text !== null) return text
-      } catch {
-        // An append interrupted mid-line must not hide otherwise valid sessions.
-      }
-    }
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error
-  } finally {
-    input?.destroy()
-  }
-  return ""
+import path from "path"
+
+import { storedSessionAdapters, type EngineId, type StoredSession } from "./acp/engine"
+import { readEngineConfig } from "./acp/engine-config"
+import { withEngineConnection } from "./acp-process"
+import type { KiroSessionSummary, KiroSessionsResponse } from "./kiro-sessions.types"
+
+const RECENT_WINDOW_MS = 24 * 60 * 60 * 1000
+const RECENT_COUNT = 3
+
+/** A session the picker lists by default: no sdpm agent, not started in servers/local, not a sub-agent's. */
+export function isCandidate(session: Pick<StoredSession, "cwd" | "agentName" | "subagent">): boolean {
+  return !session.subagent
+    && !session.agentName?.startsWith("sdpm-")
+    && !/[\\/]servers[\\/]local(?:[\\/]|$)/.test(session.cwd)
 }
 
-function firstCharacters(value: string, count: number): string {
-  return Array.from(value).slice(0, count).join("")
+interface Listing {
+  engine: EngineId
+  sessions: StoredSession[]
+  unavailable: EngineId[]
 }
 
-async function summarize(sessionId: string, meta: SessionMeta, dir?: string): Promise<KiroSessionSummary> {
-  const cwd = typeof meta.cwd === "string" ? meta.cwd : ""
-  const storedTitle = typeof meta.title === "string" ? meta.title : ""
-  const title = storedTitle.trim()
-    ? storedTitle
-    : firstCharacters(await readFirstPrompt(sessionPath(sessionId, ".jsonl", dir)), 60)
-  return {
-    sessionId,
-    title,
-    cwd,
-    project: path.basename(cwd),
-    updatedAt: typeof meta.updated_at === "string" ? meta.updated_at : "",
-    agentName: agentName(meta),
-  }
-}
+/** One listing per engine at a time: concurrent requests share it. */
+const inFlight = new Map<EngineId, Promise<Listing>>()
+/** The last listing's sessions by id (candidates' rows first), for `findSession`. */
+let cache: { engine: EngineId; sessions: Map<string, StoredSession> } | null = null
 
-function updatedTime(session: KiroSessionSummary): number {
+function updatedTime(session: { updatedAt: string }): number {
   const timestamp = Date.parse(session.updatedAt)
   return Number.isNaN(timestamp) ? 0 : timestamp
 }
 
-export async function listSessions(opts: { includeAll: boolean; dir?: string }): Promise<KiroSessionsResponse> {
-  const dir = sessionsDir(opts.dir)
-  let names: string[]
-  try {
-    names = await fsp.readdir(dir)
-  } catch (error) {
-    if ((error as NodeJS.ErrnoException).code === "ENOENT") return { groups: [], recent: [] }
-    throw error
-  }
-
-  const records = (await Promise.all(names
-    .filter((name) => name.endsWith(".json") && UUID_RE.test(name.slice(0, -5)))
-    .map(async (name) => {
-      const sessionId = name.slice(0, -5)
+/** Every stored session the engine can open, read from each store. */
+function readStores(engine: EngineId): Promise<Listing> {
+  const running = inFlight.get(engine)
+  if (running) return running
+  const listing = (async () => {
+    const env = { ...process.env, ...readEngineConfig().env }
+    const unavailable: EngineId[] = []
+    const stores = await Promise.all(storedSessionAdapters(engine).map(async (adapter) => {
       try {
-        // nosemgrep: path-join-resolve-traversal — `name` comes from readdir and passed the UUID filter above
-        const meta = JSON.parse(await fsp.readFile(path.join(dir, name), "utf-8")) as SessionMeta
-        return { meta, summary: await summarize(sessionId, meta, dir), candidate: isCandidate(meta) }
-      } catch {
-        return null
+        return await withEngineConnection(adapter.id, (connect) => adapter.listStoredSessions({ env, connect }))
+      } catch (error) {
+        console.warn("[kiro-sessions] could not list the %s sessions: %s", adapter.id, error instanceof Error ? error.message : String(error))
+        unavailable.push(adapter.id)
+        return []
       }
-    })))
-    .filter((record): record is NonNullable<typeof record> => record !== null)
-    .sort((a, b) => updatedTime(b.summary) - updatedTime(a.summary))
-
-  const grouped = new Map<string, KiroSessionSummary[]>()
-  for (const record of records) {
-    if (!opts.includeAll && !record.candidate) continue
-    const sessions = grouped.get(record.summary.cwd) ?? []
-    sessions.push(record.summary)
-    grouped.set(record.summary.cwd, sessions)
-  }
-
-  const groups = Array.from(grouped, ([cwd, sessions]) => ({
-    cwd,
-    project: sessions[0]?.project ?? path.basename(cwd),
-    sessions,
-  }))
-  const cutoff = Date.now() - RECENT_WINDOW_MS
-  const recent = records
-    .filter((record) => record.candidate && updatedTime(record.summary) >= cutoff)
-    .slice(0, 3)
-    .map((record) => record.summary)
-
-  return { groups, recent }
+    }))
+    return { engine, sessions: stores.flat(), unavailable }
+  })().finally(() => inFlight.delete(engine))
+  inFlight.set(engine, listing)
+  return listing
 }
 
-export async function forkSession(
-  sourceId: string,
-  opts: SessionFilesOptions = {},
-): Promise<{ newId: string; origin: SessionOrigin }> {
-  assertSessionId(sourceId)
-  const dir = sessionsDir(opts.dir)
-  const sourceJson = sessionPath(sourceId, ".json", dir)
-  const sourceJsonl = sessionPath(sourceId, ".jsonl", dir)
-  const meta = JSON.parse(await fsp.readFile(sourceJson, "utf-8")) as SessionMeta
-  const summary = await summarize(sourceId, meta, dir)
-  const newId = crypto.randomUUID()
-  const destinationJson = sessionPath(newId, ".json", dir)
-  const destinationJsonl = sessionPath(newId, ".jsonl", dir)
-  const forkedMeta: SessionMeta = {
-    ...meta,
-    session_id: newId,
-    // kiro-cli reads this as a plain string; an object makes `session/load` fail
-    // with "failed to parse session metadata" (the /chat load convention is the path or id).
-    imported_from: sourceId,
+/** One row per session id: the engine's own row over an imported store's, else the newer. */
+function dedupe(sessions: StoredSession[], engine: EngineId): StoredSession[] {
+  const kept = new Map<string, StoredSession>()
+  for (const session of sessions) {
+    const other = kept.get(session.sessionId)
+    if (!other) kept.set(session.sessionId, session)
+    else if (other.engine !== session.engine) {
+      if (session.engine === engine) kept.set(session.sessionId, session)
+    } else if (updatedTime(session) > updatedTime(other)) kept.set(session.sessionId, session)
   }
+  return [...kept.values()]
+}
 
-  try {
-    await fsp.writeFile(destinationJson, `${JSON.stringify(forkedMeta, null, 2)}\n`, { flag: "wx" })
-    await fsp.copyFile(sourceJsonl, destinationJsonl, fs.constants.COPYFILE_EXCL)
-  } catch (error) {
-    await Promise.allSettled([fsp.rm(destinationJson, { force: true }), fsp.rm(destinationJsonl, { force: true })])
-    throw error
-  }
-
+function summary(session: StoredSession): KiroSessionSummary {
   return {
-    newId,
-    origin: {
-      sourceSessionId: sourceId,
-      title: summary.title,
-      cwd: summary.cwd,
-      updatedAt: summary.updatedAt,
-      forkedAt: new Date().toISOString(),
-    },
+    sessionId: session.sessionId,
+    engine: session.engine,
+    title: session.title,
+    cwd: session.cwd,
+    project: path.basename(session.cwd),
+    updatedAt: session.updatedAt,
+    agentName: session.agentName,
   }
 }
 
-/** Remove only files created for a validated fork ID. */
-export async function removeForkedSession(sessionId: string, opts: SessionFilesOptions = {}): Promise<void> {
-  await Promise.allSettled([
-    fsp.rm(sessionPath(sessionId, ".json", opts.dir), { force: true }),
-    fsp.rm(sessionPath(sessionId, ".jsonl", opts.dir), { force: true }),
-  ])
+export async function listSessions(opts: { includeAll: boolean }): Promise<KiroSessionsResponse> {
+  const engine = readEngineConfig().engine
+  const listing = await readStores(engine)
+  const candidates = dedupe(listing.sessions.filter(isCandidate), engine)
+  const all = dedupe(listing.sessions, engine)
+  const sessions = new Map(candidates.map((session) => [session.sessionId, session]))
+  for (const session of all) if (!sessions.has(session.sessionId)) sessions.set(session.sessionId, session)
+  cache = { engine, sessions }
+
+  const listed = (opts.includeAll ? [...sessions.values()] : candidates).sort((a, b) => updatedTime(b) - updatedTime(a))
+  const grouped = new Map<string, KiroSessionSummary[]>()
+  for (const session of listed) {
+    const group = grouped.get(session.cwd) ?? []
+    group.push(summary(session))
+    grouped.set(session.cwd, group)
+  }
+  const groups = Array.from(grouped, ([cwd, rows]) => ({ cwd, project: rows[0]?.project ?? path.basename(cwd), sessions: rows }))
+  const cutoff = Date.now() - RECENT_WINDOW_MS
+  const recent = candidates
+    .filter((session) => updatedTime(session) >= cutoff)
+    .sort((a, b) => updatedTime(b) - updatedTime(a))
+    .slice(0, RECENT_COUNT)
+    .map(summary)
+
+  return { engine, groups, recent, ...(listing.unavailable.length ? { unavailable: listing.unavailable } : {}) }
+}
+
+/** A stored session the configured engine can open: from the last listing, else a fresh full one. */
+export async function findSession(sessionId: string): Promise<StoredSession | null> {
+  const engine = readEngineConfig().engine
+  const cached = cache?.engine === engine ? cache.sessions.get(sessionId) : undefined
+  if (cached) return cached
+  await listSessions({ includeAll: true })
+  return cache?.engine === engine ? cache.sessions.get(sessionId) ?? null : null
 }

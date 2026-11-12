@@ -13,9 +13,30 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: astral-sh/setup-uv@07a047e608db84b3d8c06cd9a7c7dcc9c355c18e # v10.3.2
+        with:
+          fetch-depth: 0
+      # Installs only ever move to tags on main (servers/local/checkout_update.py ignores the
+      # rest); a release for a tag cut elsewhere would strand whoever installed it.
+      - name: The tag is on main
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main || {
+            echo "release tags must be on main; delete this tag and tag a commit on main" >&2
+            exit 1
+          }
+      - name: Stable or pre-release
+        id: kind
+        run: |
+          if [[ "$GITHUB_REF_NAME" =~ ^v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$ ]]; then
+            echo "stable=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "stable=false" >> "$GITHUB_OUTPUT"
+          fi
+      - uses: astral-sh/setup-uv@68559e99cc807c1eb7e9238fd43a15bba460eec2 # v10.3.3
       - name: Build Claude Desktop MCPB
         run: bash scripts/build_mcpb.sh
+      - name: Release manifests
+        if: steps.kind.outputs.stable == 'true'
+        run: uv run --no-project --python ">=3.11" python scripts/release/manifest.py --tag "$GITHUB_REF_NAME" --out dist/manifests
       - name: Extract changelog section
         id: changelog
         run: |
@@ -30,15 +51,26 @@ jobs:
             echo "No CHANGELOG section found for $VERSION" >&2
             echo "_See [CHANGELOG.md](https://github.com/${GITHUB_REPOSITORY}/blob/main/CHANGELOG.md)._" > release_notes.md
           fi
+      # A re-run of this workflow gets past an existing release.
       - name: Create GitHub Release
         env:
           GH_TOKEN: ${{ github.token }}
+          STABLE: ${{ steps.kind.outputs.stable }}
         run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 && exit 0
+          prerelease=()
+          [[ "$STABLE" == "true" ]] || prerelease=(--prerelease)
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes-file release_notes.md \
-            --verify-tag
+            --verify-tag "${prerelease[@]}"
       - name: Upload Claude Desktop MCPB
         env:
           GH_TOKEN: ${{ github.token }}
         run: gh release upload "$GITHUB_REF_NAME" dist/sdpm.mcpb --clobber
+      # A replaced asset is a new asset: its download_count starts again at 0.
+      - name: Upload release manifests
+        if: steps.kind.outputs.stable == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$GITHUB_REF_NAME" dist/manifests/release-*.json --clobber

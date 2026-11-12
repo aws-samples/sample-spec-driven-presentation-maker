@@ -54,8 +54,9 @@ if [ -f "${CONFIG_FILE}" ]; then
   fi
 
   # Read enableInvocationLogging (new key), falling back to legacy `observability`
+  # (`features.observability: true`; the top-level `observability:` section has no value on its line)
   _eil=$(grep -E "^\s*enableInvocationLogging:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
-  _obs=$(grep -E "^\s*observability:" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
+  _obs=$(grep -E "^\s*observability:\s*[^[:space:]#]" "${CONFIG_FILE}" | head -1 | awk '{print $2}' | tr -d '"' || true)
   if [ -n "${_eil}" ]; then
     ENABLE_INVOCATION_LOGGING="${_eil}"
   elif [ -n "${_obs}" ]; then
@@ -206,6 +207,8 @@ SOURCE_ZIP="${TMPDIR}/source.zip"
 zip -r "${SOURCE_ZIP}" . \
   -x ".git/*" \
   -x ".kiro/*" \
+  -x ".agents/*" \
+  -x ".worktrees/*" \
   -x ".venv/*" \
   -x "venv/*" \
   -x "*/.venv/*" \

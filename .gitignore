@@ -95,3 +95,9 @@ output/
 desktop/src-tauri/gen/schemas/acl-manifests.json
 desktop/src-tauri/gen/schemas/desktop-schema.json
 desktop/src-tauri/gen/schemas/macOS-schema.json
+
+# git worktrees created by agent workflows
+.worktrees/
+# agent workflow scratch (plans, reviews, verification evidence); plugins/ stays tracked
+.agents/*
+!.agents/plugins/

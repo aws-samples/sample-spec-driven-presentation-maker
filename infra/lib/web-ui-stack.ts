@@ -31,7 +31,7 @@ import { CfnWebACLAssociation } from "aws-cdk-lib/aws-wafv2";
 import { Construct } from "constructs";
 import * as path from "path";
 import { CommonWebAcl } from "./construct/common-web-acl";
-import { AUTH_SSM_PARAMS } from "./auth-stack";
+import { AUTH_SSM_PARAMS, WEB_UI_SITE_URL_PARAM } from "./auth-stack";
 
 interface WebUiStackProps extends cdk.StackProps {
   /** Amazon DynamoDB table from DataStack. */
@@ -56,6 +56,11 @@ interface WebUiStackProps extends cdk.StackProps {
   allowedIpV4AddressRanges?: string[];
   /** Allowed IPv6 CIDR ranges for regional WAF. */
   allowedIpV6AddressRanges?: string[];
+  /**
+   * auth.programmaticClient is enabled: the REST API also accepts tokens of the
+   * programmatic client (its ID read from SSM, published by AuthStack).
+   */
+  programmaticClient?: boolean;
   /** Default model ID for the chat task (for "Default" badge in Settings). */
   defaultChatModelId: string;
   /** Default model ID for the create task (for "Default" badge in Settings). */
@@ -84,9 +89,6 @@ export class WebUiStack extends cdk.Stack {
     // Export/Import. See docs/internal/ssm-cross-stack-refs.md.
     const userPoolId = ssm.StringParameter.valueForStringParameter(
       this, AUTH_SSM_PARAMS.userPoolId,
-    );
-    const userPoolArn = ssm.StringParameter.valueForStringParameter(
-      this, AUTH_SSM_PARAMS.userPoolArn,
     );
     const webClientId = ssm.StringParameter.valueForStringParameter(
       this, AUTH_SSM_PARAMS.webClientId,
@@ -244,32 +246,20 @@ function handler(event) {
       runtime: lambda.Runtime.PYTHON_3_13,
       handler: "index.handler",
       code: lambda.Code.fromAsset(path.join(__dirname, "../.."), {
+        // scripts/bundle_api_lambda.sh is the one definition of the bundle
+        // (dependencies, api/, shared/, the sdpm engine); CI runs the same script.
         bundling: {
           image: lambda.Runtime.PYTHON_3_13.bundlingImage,
-          command: [
-            "bash", "-c",
-            "pip install -r /asset-input/api/requirements.txt -t /asset-output/ && " +
-            "cp -r /asset-input/api/* /asset-input/shared /asset-output/ && " +
-            "cp -r /asset-input/sdpm/sdpm /asset-output/sdpm",
-          ],
+          command: ["bash", "/asset-input/scripts/bundle_api_lambda.sh", "/asset-output"],
           local: {
             tryBundle(outputDir: string): boolean {
-              const { execSync } = require("child_process");
-              const root = path.join(__dirname, "../..");
+              const { execFileSync } = require("child_process");
+              const script = path.join(__dirname, "../..", "scripts", "bundle_api_lambda.sh");
               try {
-                execSync(
-                  `pip install -r ${root}/api/requirements.txt -t ${outputDir}/` +
-                  ` --platform manylinux2014_x86_64 --python-version 3.13 --only-binary=:all:`,
-                  { stdio: "inherit" },
-                );
+                execFileSync("bash", [script, outputDir], { stdio: "inherit" });
               } catch {
                 return false;  // fall back to docker bundling
               }
-              execSync(`cp -r ${root}/api/* ${outputDir}/`, { stdio: "inherit" });
-              execSync(`cp -r ${root}/shared ${outputDir}/shared`, { stdio: "inherit" });
-              // sdpm Engine — required by shared.ingest._convert_pptx for upload-time
-              // PPTX → deck conversion (deck.json + slides/*.json + template.pptx).
-              execSync(`cp -r ${root}/sdpm/sdpm ${outputDir}/sdpm`, { stdio: "inherit" });
               return true;
             },
           },
@@ -305,7 +295,7 @@ function handler(event) {
       apiLambda.addEnvironment("MEMORY_ID", props.memoryId);
       apiLambda.addToRolePolicy(new iam.PolicyStatement({
         actions: ["bedrock-agentcore:ListEvents"],
-        resources: ["*"],
+        resources: [`arn:aws:bedrock-agentcore:${this.region}:${this.account}:memory/${props.memoryId}`],
       }));
     }
 
@@ -345,8 +335,12 @@ function handler(event) {
     });
 
     const issuerUrl = `https://cognito-idp.${this.region}.amazonaws.com/${userPoolId}`;
+    // The programmatic client (auth.programmaticClient) is an audience only while enabled.
+    const jwtAudience = props.programmaticClient
+      ? [webClientId, ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.programmaticClientId)]
+      : [webClientId];
     const jwtAuthorizer = new apigatewayv2_authorizers.HttpJwtAuthorizer("CognitoJwt", issuerUrl, {
-      jwtAudience: [webClientId],
+      jwtAudience,
     });
 
     const lambdaIntegration = new apigatewayv2_integrations.HttpLambdaIntegration("ApiIntegration", apiLambda);
@@ -473,60 +467,24 @@ function handler(event) {
     });
     awsExports.node.addDependency(deployment);
 
-    // --- Add Amazon CloudFront URL to Amazon Cognito callback/logout URLs ---
-    // AllowedOAuthScopes always includes the MCP custom scope — AuthStack
-    // always publishes it. The SSM value is a CDK token so we construct
-    // the list inline here (Fn::Sub not needed because the SDK call accepts
-    // tokens directly).
-    const oauthScopes = ["openid", "profile", "email", mcpCustomScope];
-    new cr.AwsCustomResource(this, "UpdateCognitoCallbackUrls", {
-      onCreate: {
-        service: "CognitoIdentityServiceProvider",
-        action: "updateUserPoolClient",
-        parameters: {
-          UserPoolId: userPoolId,
-          ClientId: webClientId,
-          SupportedIdentityProviders: ["COGNITO"],
-          AllowedOAuthFlows: ["code"],
-          AllowedOAuthScopes: oauthScopes,
-          AllowedOAuthFlowsUserPoolClient: true,
-          CallbackURLs: ["http://localhost:3000", this.siteUrl],
-          LogoutURLs: ["http://localhost:3000", this.siteUrl],
-          ExplicitAuthFlows: [
-            "ALLOW_REFRESH_TOKEN_AUTH",
-            "ALLOW_USER_PASSWORD_AUTH",
-            "ALLOW_USER_SRP_AUTH",
-          ],
-        },
-        physicalResourceId: cr.PhysicalResourceId.of("cognito-callback-urls"),
-      },
-      onUpdate: {
-        service: "CognitoIdentityServiceProvider",
-        action: "updateUserPoolClient",
-        parameters: {
-          UserPoolId: userPoolId,
-          ClientId: webClientId,
-          SupportedIdentityProviders: ["COGNITO"],
-          AllowedOAuthFlows: ["code"],
-          AllowedOAuthScopes: oauthScopes,
-          AllowedOAuthFlowsUserPoolClient: true,
-          CallbackURLs: ["http://localhost:3000", this.siteUrl],
-          LogoutURLs: ["http://localhost:3000", this.siteUrl],
-          ExplicitAuthFlows: [
-            "ALLOW_REFRESH_TOKEN_AUTH",
-            "ALLOW_USER_PASSWORD_AUTH",
-            "ALLOW_USER_SRP_AUTH",
-          ],
-        },
-        physicalResourceId: cr.PhysicalResourceId.of("cognito-callback-urls"),
-      },
-      policy: cr.AwsCustomResourcePolicy.fromStatements([
-        new iam.PolicyStatement({
-          actions: ["cognito-idp:UpdateUserPoolClient"],
-          resources: [userPoolArn],
-        }),
-      ]),
+    // --- Amazon CloudFront URL on the Amazon Cognito WebClient ---
+    // AuthStack owns the WebClient, including its callback/logout URLs. It cannot
+    // reference the CloudFront URL (that would be a circular dependency), so this
+    // stack publishes the URL in SSM, and AuthStack's WebClientUrls function sets
+    // the URLs to exactly the dev URL and this site URL. The custom resource runs
+    // that function when the site URL is created or changes; AuthStack runs it
+    // after every change to the client.
+    const siteUrlParam = new ssm.StringParameter(this, "SiteUrlParam", {
+      parameterName: WEB_UI_SITE_URL_PARAM,
+      stringValue: this.siteUrl,
+      description: "Web UI CloudFront site URL (callback/logout URL on the Cognito WebClient)",
     });
+    const webClientUrls = new cdk.CustomResource(this, "WebClientUrls", {
+      serviceToken: ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.webClientUrlsFnArn),
+      resourceType: "Custom::WebClientUrls",
+      properties: { SiteUrl: this.siteUrl },
+    });
+    webClientUrls.node.addDependency(siteUrlParam);
 
     // --- WAF: CloudFront WebACL (from us-east-1 stack) ---
     if (props.webAclId) {

@@ -22,15 +22,22 @@ from pathlib import PurePosixPath
 from typing import Any
 
 import boto3
+from botocore.exceptions import ClientError, ReadTimeoutError
 
-from boto_config import LONG_CALL, SHORT_API
+from boto_config import LONG_CALL, SHORT_API, USER_CODE_TIMEOUT_S
 
 from storage import Storage
 
 logger = logging.getLogger(__name__)
 
+# Tool output when user code runs past LONG_CALL's read timeout.
+TIMED_OUT = (
+    f"Error: execution timed out ({USER_CODE_TIMEOUT_S}s). The code was stopped and "
+    "nothing it wrote was saved. Split the work into shorter steps."
+)
+
 # Files managed by the deck workspace — only these are synced back to S3.
-_WORKSPACE_PREFIXES = ("deck.json", "slides/", "specs/", "includes/", "attachments/")
+_WORKSPACE_PREFIXES = ("deck.json", "deck.css", "slides/", "specs/", "includes/", "attachments/", "reviews/")
 _IMMUTABLE_IMPORT_PREFIX = "attachments/imports/"
 
 
@@ -68,7 +75,12 @@ def list_files(subdir="."):
     d = _Path(subdir)
     if not d.is_dir():
         raise FileNotFoundError(f"Not a directory: {subdir}")
-    return sorted(f.name for f in d.iterdir() if f.is_file())
+    # Folders end with "/" (slides/), as on Local. __pycache__ is this module's own.
+    return sorted(
+        f.name + "/" if f.is_dir() else f.name
+        for f in d.iterdir()
+        if (f.is_dir() and f.name != "__pycache__") or f.is_file()
+    )
 '''
 
 # Prepended to every user code invocation so read_json / write_json / ...
@@ -133,13 +145,10 @@ def execute_in_sandbox(
 
         # Execute user code (prefixed with helper import so agents can use
         # read_json / write_json / ... without an explicit import).
-        response = exec_client.invoke_code_interpreter(
-            codeInterpreterIdentifier="aws.codeinterpreter.v1",
-            sessionId=session_id,
-            name="executeCode",
-            arguments={"language": "python", "code": _HELPERS_IMPORT + code},
-        )
-        output = _collect_stream(response)
+        output = run_user_code(exec_client, session_id, _HELPERS_IMPORT + code)
+        if output is None:
+            # The session is still busy with the code: skip the write-back.
+            return TIMED_OUT, [], [], []
 
         # Always write modified workspace files back to S3 — writes persist
         # unconditionally (diff-based, changed/new files only).
@@ -159,11 +168,52 @@ def execute_in_sandbox(
         return output, outline_warnings, lint_diagnostics, changed_paths
 
     finally:
+        stop_session(client, session_id)
+
+
+def run_user_code(exec_client: Any, session_id: str, code: str) -> str | None:
+    """Run user code in the session.
+
+    Args:
+        exec_client: Bedrock AgentCore client built with LONG_CALL.
+        session_id: Code Interpreter session ID.
+        code: Python code to execute, as sent to the sandbox.
+
+    Returns:
+        The code's text output, or None when it ran past USER_CODE_TIMEOUT_S.
+    """
+    try:
+        response = exec_client.invoke_code_interpreter(
+            codeInterpreterIdentifier="aws.codeinterpreter.v1",
+            sessionId=session_id,
+            name="executeCode",
+            arguments={"language": "python", "code": code},
+        )
+        return _collect_stream(response)
+    except ReadTimeoutError:
+        logger.warning(
+            "User code timed out after %ds in Code Interpreter session %s",
+            USER_CODE_TIMEOUT_S, session_id,
+        )
+        return None
+
+
+def stop_session(client: Any, session_id: str) -> None:
+    """Stop the session; a session the sandbox already ended is only logged.
+
+    Args:
+        client: Bedrock AgentCore client.
+        session_id: Code Interpreter session ID.
+    """
+    try:
         client.stop_code_interpreter_session(
             codeInterpreterIdentifier="aws.codeinterpreter.v1",
             sessionId=session_id,
         )
-        logger.info("Code Interpreter session stopped: %s", session_id)
+    except ClientError as e:
+        logger.warning("Code Interpreter session %s was already stopped: %s", session_id, e)
+        return
+    logger.info("Code Interpreter session stopped: %s", session_id)
 
 
 def _upload_deck_workspace(

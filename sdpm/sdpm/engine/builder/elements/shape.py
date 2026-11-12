@@ -10,6 +10,9 @@ from sdpm.utils.effects import apply_effects
 from sdpm.utils.text import _expand_styled_newlines
 
 _DEFAULTS = ELEMENT_DEFAULTS["shape"]
+# ST_PresetLineDashVal names not in the friendly dash map
+_OOXML_DASHES = ("lgDash", "dashDot", "lgDashDot", "lgDashDotDot",
+                 "sysDash", "sysDot", "sysDashDot", "sysDashDotDot")
 
 
 class ShapeMixin:
@@ -444,7 +447,8 @@ class ShapeMixin:
         }
         if dash_style in dash_map:
             shape.line.dash_style = dash_map[dash_style]
-        elif dash_style in ("sysDash", "sysDot", "sysDashDot", "sysDashDotDot"):
+        elif dash_style in _OOXML_DASHES:
+            # Raw OOXML names, as pptx_to_json writes them back
             from lxml import etree
             from pptx.oxml.ns import qn
             ln = shape.line._ln

@@ -31,8 +31,8 @@ def _role(tool: str) -> Part:
 
     The L4 agent decides roles itself, so the document goes to system at
     discovery time; interactive clients get the same text as a tool result.
-    Only the deck-independent part is placed here — per-user data (styles,
-    templates) would fragment the prompt cache.
+    Only the deck-independent part is placed here — per-user data (templates)
+    would fragment the prompt cache.
     """
     return Part(
         Source.mcp(tool, {}, pick="static.workflow"),
@@ -41,13 +41,13 @@ def _role(tool: str) -> Part:
     )
 
 
-# The environment start_presentation returns (styles, templates) is per user, so it
+# The environment start_presentation returns (templates) is per user, so it
 # goes into the system prompt *after* the cache point, next to the timestamp, and
 # never fragments the cached prefix. The orchestrator sees the same data an
 # interactive client's model sees after calling the entry tool.
 _ORCHESTRATOR_ENVIRONMENT = [
     Part(Source.file("wiring/environment"), target="system"),
-    Part(Source.mcp("start_presentation", {}, pick="styles,templates"), target="system", label="environment"),
+    Part(Source.mcp("start_presentation", {}, pick="templates"), target="system", label="environment"),
 ]
 
 
@@ -56,9 +56,9 @@ _ORCHESTRATOR_ENVIRONMENT = [
 #
 # Hand-edit sync (diff) is a CLI capability, not an MCP tool; the hand-edit-sync
 # guide says how to run it from a checkout.
-# start_* are deliberately absent: the role document is already in the system
-# prompt (and start_presentation's environment in the history), so exposing them
-# would only invite a redundant call.
+# start_* are deliberately absent: the role document and start_presentation's
+# environment are already in the system prompt, so exposing them would only
+# invite a redundant call.
 _DECK_TOOLS = [
     "init_deck_workspace", "analyze_template", "read_attachment",
     "list_styles", "apply_style",
@@ -112,6 +112,23 @@ _COMPOSER = ModeConfig(
     allowed_tools=_DECK_TOOLS,
 )
 
+# HTML composer: the html mode of the same entry tool (composer-html workflow +
+# slide HTML spec). compose_slides picks it for decks with outputFormat html.
+_HTML_COMPOSER = ModeConfig(
+    parts=[
+        Part(
+            Source.mcp("start_composing", {"mode": "html"}, pick="static.workflow"),
+            target="system", label="workflow:composer-html",
+        ),
+        Part(
+            Source.mcp("start_composing", {"mode": "html"}, pick="static.slide_spec"),
+            target="system", label="slide-html-spec",
+        ),
+    ],
+    use_composer=False,
+    allowed_tools=_DECK_TOOLS,
+)
+
 _STYLE_CREATOR = ModeConfig(
     parts=[
         _COMMON_LANGUAGE,
@@ -131,5 +148,6 @@ MODES: dict[str, ModeConfig] = {
     "vibe": _ORCHESTRATOR_FAST,
     "spec": _ORCHESTRATOR_DIALOGUE,
     "composer": _COMPOSER,
+    "html_composer": _HTML_COMPOSER,
     "style_creator": _STYLE_CREATOR,
 }

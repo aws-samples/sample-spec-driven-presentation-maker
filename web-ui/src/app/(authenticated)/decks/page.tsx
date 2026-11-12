@@ -27,8 +27,9 @@ import { SlideCarousel } from "@/components/deck/SlideCarousel"
 import { DeckActions } from "@/components/deck/DeckActions"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { ChatPanelShell } from "@/components/chat/ChatPanelShell"
+import { DeckFormatProvider } from "@/components/chat/DeckFormatContext"
 import { ChatPanelHandle } from "@/components/chat/ChatPanel"
-import { updateVisibility, shareDeck } from "@/services/deckService"
+import { updateVisibility } from "@/services/deckService"
 import { useIsMobile } from "@/hooks/UseMobile"
 import { useSwipe } from "@/hooks/useSwipe"
 import { useDeckList } from "@/hooks/useDeckList"
@@ -37,9 +38,10 @@ import { toast } from "sonner"
 import { useWorkspace } from "@/hooks/useWorkspace"
 import { Plus, MessageSquare, Image as ImageIcon, Star } from "lucide-react"
 import { useTranslations } from "next-intl"
-import { IS_LOCAL } from "@/lib/mode"
+import { IS_LOCAL, CloudOnly } from "@/lib/mode"
 import { buildToken } from "@/lib/slashToken"
 import { OutlineChatContext } from "@/components/deck/OutlineChatContext"
+import { ReviewProvider } from "@/components/review/ReviewProvider"
 
 export default function DecksPage() {
   const t = useTranslations("decksPage")
@@ -96,6 +98,16 @@ export default function DecksPage() {
     () => setActiveTab("chat"),
   )
 
+  /* ── Comment tool: one state for the preview and the chat ── */
+  const reviewDeckId = ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null
+  const deckSlides = ws.deck?.slides
+  const reviewSlugs = useMemo(
+    () => (deckSlides ?? []).filter((s) => s.previewUrl || s.composeUrl).map((s) => s.slug),
+    [deckSlides],
+  )
+  const { setChatOpen, setChatTab } = ws
+  const openReviewChat = useCallback(() => { setChatOpen(true); setChatTab("deck") }, [setChatOpen, setChatTab])
+
   /** Handle inline style selection — insert a `@style:<name>` token into chat input. */
   const handleStyleSelect = useCallback((name: string) => {
     chatRef.current?.insertAtCursor(buildToken({ kind: "style", name }))
@@ -109,6 +121,15 @@ export default function DecksPage() {
   /* ── Render ── */
   return (
     <OutlineChatContext.Provider value={outlineChatBridge}>
+    <ReviewProvider
+      deckId={reviewDeckId}
+      slugs={reviewSlugs}
+      slideSize={ws.deck?.slideSize}
+      enabled={!!ws.deck && ws.isWorkspace && ws.canChat && !isMobile}
+      agentBusy={agentIsLoading}
+      openChat={openReviewChat}
+      idToken={idToken}
+    >
     <AppShell
       deckName={ws.isWorkspace && ws.deck ? ws.deck.name : undefined}
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
@@ -148,6 +169,7 @@ export default function DecksPage() {
               <div ref={isMobile ? swipeRef : undefined} className="h-full">
                 {isMobile && ws.canChat && activeTab === "chat" ? (
                   /* Mobile chat tab — ChatPanelShell renders inline on mobile */
+                  <DeckFormatProvider value={ws.deck?.outputFormat}>
                   <ChatPanelShell
                     open={true}
                     onClose={() => setActiveTab("preview")}
@@ -163,6 +185,7 @@ export default function DecksPage() {
                     onLoadingChange={setAgentIsLoading}
                     inline
                   />
+                  </DeckFormatProvider>
                 ) : (
                   // Local: defer SlideCarousel mount until deck data loads so
                   // hadSlidesOnMount captures the real slide count, not the
@@ -176,6 +199,10 @@ export default function DecksPage() {
                     deckId={ws.isNew ? ws.createdDeckId || undefined : ws.activeDeckId!}
                     deckName={ws.deck?.name}
                     pptxUrl={ws.deck?.pptxUrl}
+                    outputFormat={ws.deck?.outputFormat}
+                    htmlUrl={ws.deck?.htmlUrl}
+                    slideSize={ws.deck?.slideSize}
+                    scriptWarnings={ws.deck?.scriptWarnings}
                     isLoading={ws.waitingForPng || false}
                     scrollToSlide={ws.scrollToSlide}
                     onScrollComplete={() => ws.setScrollToSlide("")}
@@ -200,6 +227,8 @@ export default function DecksPage() {
                           >
                             <Star className={`h-4 w-4 ${list.favoriteIds.has(ws.activeDeckId!) ? "fill-current" : ""}`} />
                           </button>
+                          {/* Visibility (private / internal) is a Cloud feature: Local decks are never shared */}
+                          <CloudOnly>
                           {ws.isOwner && (
                             <DeckActions
                               visibility={ws.deck?.visibility}
@@ -208,17 +237,9 @@ export default function DecksPage() {
                                 await updateVisibility(ws.activeDeckId, v, idToken)
                                 ws.setDeck({ ...ws.deck, visibility: v })
                               }}
-                              onShare={async (sub, action, alias) => {
-                                if (!idToken || !ws.activeDeckId) return { collaborators: [], collaboratorAliases: {} }
-                                const result = await shareDeck(ws.activeDeckId, sub, idToken, action, alias)
-                                if (ws.deck) ws.setDeck({ ...ws.deck, collaborators: result.collaborators, collaboratorAliases: result.collaboratorAliases })
-                                return result
-                              }}
-                              idToken={idToken}
-                              collaborators={ws.deck?.collaborators}
-                              collaboratorAliases={ws.deck?.collaboratorAliases}
                             />
                           )}
+                          </CloudOnly>
                         </div>
                       ) : undefined
                     }
@@ -261,6 +282,7 @@ export default function DecksPage() {
 
         {/* Chat Panel (persistent, desktop) — hidden on mobile workspace chat tab */}
         {!(isMobile && ws.isWorkspace && ws.canChat && activeTab === "chat") && (
+          <DeckFormatProvider value={ws.deck?.outputFormat}>
           <ChatPanelShell
             open={ws.chatOpen}
             onClose={() => ws.setChatOpen(false)}
@@ -275,6 +297,7 @@ export default function DecksPage() {
             onWorkflowPhase={setWorkflowPhase}
             onLoadingChange={setAgentIsLoading}
           />
+          </DeckFormatProvider>
         )}
       </div>
 
@@ -326,6 +349,7 @@ export default function DecksPage() {
       )}
 
     </AppShell>
+    </ReviewProvider>
     </OutlineChatContext.Provider>
   )
 }

@@ -30,6 +30,36 @@ def test_local_run_python_rejects_missing_deck(tmp_path: Path) -> None:
     assert "output" not in result
 
 
+def test_local_run_python_names_decks_that_end_with_the_name(tmp_path: Path, monkeypatch) -> None:
+    tools = _local_sandbox_tools()
+    root = tmp_path / "decks"
+    for name in ("20261101-0900-zt-intro", "20261108-0001-zt-intro", "20261108-0002-not-zt-intro-x", "20261105-1200-other"):
+        (root / name).mkdir(parents=True)
+    for i in range(6):
+        (root / f"2026100{i}-0000-many").mkdir()
+    monkeypatch.delenv("SDPM_DECK_ROOT", raising=False)
+    monkeypatch.setenv("SDPM_OUTPUT_DIR", str(root))
+
+    error = json.loads(tools.run_python("calc", "print(1)", "decks/zt-intro"))["error"]
+    assert "deck directory not found" in error
+    newest, older = str(root / "20261108-0001-zt-intro"), str(root / "20261101-0900-zt-intro")
+    assert error.endswith(f"Decks with that name: {newest}, {older}")
+    assert "other" not in error and "not-zt-intro-x" not in error
+
+    # The full folder name under the wrong parent finds the folder itself.
+    error = json.loads(tools.run_python("calc", "print(1)", "/elsewhere/20261105-1200-other"))["error"]
+    assert error.endswith(str(root / "20261105-1200-other"))
+
+    # At most five, newest first.
+    error = json.loads(tools.run_python("calc", "print(1)", "many"))["error"]
+    listed = error.split("Decks with that name: ")[1].split(", ")
+    assert listed == [str(root / f"2026100{i}-0000-many") for i in (5, 4, 3, 2, 1)]
+
+    # No match: the error says nothing more.
+    error = json.loads(tools.run_python("calc", "print(1)", "nothing-like-it"))["error"]
+    assert "Decks with that name" not in error
+
+
 def test_local_run_python_runs_inside_existing_deck(tmp_path: Path) -> None:
     tools = _local_sandbox_tools()
     (tmp_path / "deck.json").write_text("{}")

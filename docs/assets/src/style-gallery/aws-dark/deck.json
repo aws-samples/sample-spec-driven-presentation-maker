@@ -1,0 +1,14 @@
+{
+  "template": "blank-dark",
+  "fonts": {
+    "halfwidth": "Arial",
+    "fullwidth": "Hiragino Sans"
+  },
+  "defaultTextColor": "#FFFFFF",
+  "slideSize": {
+    "width": 1920,
+    "height": 1080,
+    "ptPerPx": 0.5
+  },
+  "defaultBackground": "#161D26"
+}

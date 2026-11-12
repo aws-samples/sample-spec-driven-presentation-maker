@@ -17,29 +17,13 @@ trap 'rm -rf "$tmp"' EXIT
   echo '#!/usr/bin/env bash'
   echo '# shellcheck disable=SC1091,SC2016,SC2059'
   tail -n +2 "$ROOT/lib/tui.sh"
-  cat <<'EMBED_START'
-
-SDPM_LAUNCHER_CONTENT=''
-IFS= read -r -d '' SDPM_LAUNCHER_CONTENT <<'__SDPM_LAUNCHER__' || true
-EMBED_START
-  cat "$ROOT/launcher.sh"
-  cat <<'EMBED_END'
-__SDPM_LAUNCHER__
-EMBED_END
+  # The launcher is not embedded: the installed version's own tree writes it (finish).
   tail -n +2 "$ROOT/install.sh"
 } > "$tmp/install.sh"
 chmod +x "$tmp/install.sh"
 
 awk '{ print; if ($0 == "# __INSTALL_BODY_BELOW__") exit }' "$ROOT/install.ps1" > "$tmp/install.ps1"
 cat "$ROOT/lib/tui.ps1" >> "$tmp/install.ps1"
-cat >> "$tmp/install.ps1" <<'PS_EMBED_START'
-
-$script:EmbeddedLauncher = @'
-PS_EMBED_START
-cat "$ROOT/launcher.ps1" >> "$tmp/install.ps1"
-cat >> "$tmp/install.ps1" <<'PS_EMBED_END'
-'@
-PS_EMBED_END
 awk 'found { print } $0 == "# __INSTALL_BODY_BELOW__" { found=1 }' "$ROOT/install.ps1" >> "$tmp/install.ps1"
 
 if [[ "$CHECK" == "1" ]]; then

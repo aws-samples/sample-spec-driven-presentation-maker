@@ -25,6 +25,7 @@ from pathlib import Path
 from unittest.mock import MagicMock
 
 import pytest
+from botocore.exceptions import ClientError, ReadTimeoutError
 
 _root = Path(__file__).resolve().parent.parent
 _local = str(_root / "servers" / "local")
@@ -121,6 +122,23 @@ class TestLocalRunPython:
         assert calls == []
         assert "pptx" not in out
 
+    def test_reads_a_review_file_without_building(self, deck_dir: Path, monkeypatch):
+        """Composers read the Web UI's change request (reviews/<id>.json) like any deck file."""
+        calls = self._patch_generate(monkeypatch)
+        (deck_dir / "reviews").mkdir()
+        (deck_dir / "reviews" / "20261101-102000-a1b2.json").write_text(
+            json.dumps({"id": "20261101-102000-a1b2", "comments": [{"name": "A", "slide": "title"}]})
+        )
+        out = json.loads(
+            sandbox_tools.run_python(
+                purpose="read change request",
+                code='print(read_json("reviews/20261101-102000-a1b2.json")["comments"][0]["name"])',
+                deck_id=str(deck_dir),
+            )
+        )
+        assert out["output"].strip() == "A"
+        assert calls == []
+
     def test_non_build_write_persists_without_build(self, deck_dir: Path, monkeypatch):
         calls = self._patch_generate(monkeypatch)
         json.loads(
@@ -214,6 +232,132 @@ class TestLocalLintRewriteGuard:
         # Second read-only run: content now stable → no further rebuild
         json.loads(sandbox_tools.run_python(purpose="read only", code='print("noop")', deck_id=str(deck_dir)))
         assert len(calls) == 1
+
+
+# ---------------------------------------------------------------------------
+# Local: HTML decks (deck.json outputFormat html) rebuild output.html instead
+# ---------------------------------------------------------------------------
+
+
+_HTML_OUTLINE = """# Deck
+
+- [title] Hello
+  - body: Greeting
+  - visual: A title
+  - evidence: brief Sources 1
+"""
+
+_TITLE_HTML = '<section data-layout="Title Slide"><h1 data-ph="title">Hello</h1></section>\n'
+
+
+@pytest.fixture()
+def html_deck(tmp_path: Path) -> Path:
+    import sdpm.api
+
+    deck = Path(sdpm.api.init("html", output_dir=tmp_path / "html-deck", output_format="html")["output_dir"])
+    sdpm.api.apply_style(deck_dir=str(deck), style="typographic", template="blank-light")
+    (deck / "specs" / "outline.md").write_text(_HTML_OUTLINE, encoding="utf-8")
+    return deck
+
+
+class TestLocalRunPythonHtml:
+    _patch_generate = TestLocalRunPython._patch_generate
+
+    def _run(self, deck: Path, code: str, measure_slides=None) -> dict:
+        return json.loads(sandbox_tools.run_python(
+            purpose="html", code=code, deck_id=str(deck), measure_slides=measure_slides))
+
+    def test_slide_write_builds_output_html_not_pptx(self, html_deck: Path, monkeypatch):
+        calls = self._patch_generate(monkeypatch)
+        out = self._run(html_deck, f'write_text("slides/title.html", {_TITLE_HTML!r})')
+        assert calls == []
+        assert (html_deck / "output.html").is_file()
+        assert out["html"] == str(html_deck / "output.html")
+        assert "pptx" not in out and not (html_deck / "output.pptx").exists()
+        assert out["affected"] == ["title"]
+
+    def test_measure_returns_report_and_browser_skip(self, html_deck: Path, monkeypatch):
+        calls = self._patch_generate(monkeypatch)
+        self._run(html_deck, f'write_text("slides/title.html", {_TITLE_HTML!r})')
+        out = self._run(html_deck, 'print("noop")', measure_slides=["title"])
+        assert calls == []
+        assert "title: OK" in out["measure"]
+        assert out["preview"]["status"] == "unavailable"
+        assert out["preview"]["reason"] == "browser-skipped"
+        assert out["browser_check"]["status"] == "skipped"
+
+    def test_slide_change_without_browser_says_check_skipped(self, html_deck: Path, monkeypatch):
+        """SDPM_BROWSER=none (conftest): output.html is built, and the warnings say that
+        layout / JS / PNG were not checked."""
+        from sdpm.engine.html.browser import DISABLED_NOTE
+
+        self._patch_generate(monkeypatch)
+        out = self._run(html_deck, f'write_text("slides/title.html", {_TITLE_HTML!r})')
+        assert (html_deck / "output.html").is_file()
+        assert out["browser_check"] == {"status": "skipped", "slides": 0, "note": DISABLED_NOTE}
+        assert f"output.html: {DISABLED_NOTE}" in out["warnings"]
+        assert any(w.startswith("output.html: Browser check skipped: ") for w in out["warnings"])
+        assert out["preview_files"] == []
+
+    def test_browser_findings_and_pngs_come_back(self, html_deck: Path, monkeypatch):
+        from sdpm.engine.html import browser_check
+
+        self._patch_generate(monkeypatch)
+        seen: list[list[str]] = []
+
+        def fake_check(output_html, slugs, *, png_dir, **_kw):
+            seen.append(list(slugs))
+            png_dir.mkdir(parents=True, exist_ok=True)
+            (png_dir / "title.png").write_bytes(b"\x89PNG")
+            diag = {"slug": "title", "rule": "overflow", "message": "overflow: data-ph=\"title\" content"}
+            return {"status": "issues", "browser": "Fake", "seconds": 0.1, "slides": 1, "checked": ["title"],
+                    "findings": {"title": [diag]}, "errors": [], "pngs": {"title": str(png_dir / "title.png")},
+                    "timings": {}}
+
+        monkeypatch.setattr(browser_check, "check_deck", fake_check)
+        out = self._run(html_deck, f'write_text("slides/title.html", {_TITLE_HTML!r})', measure_slides=["title"])
+        assert seen == [["title"]]
+        assert 'title: overflow: data-ph="title" content' in out["warnings"]
+        assert "[overflow]" in out["measure"] and "browser: issues (Fake, 0.1 s)" in out["measure"]
+        assert out["preview_files"] == [str(html_deck / "preview" / "png" / "title.png")]
+        assert "preview" not in out
+
+    def test_readonly_run_does_not_rebuild(self, html_deck: Path, monkeypatch):
+        self._patch_generate(monkeypatch)
+        out = self._run(html_deck, 'print("noop")')
+        assert "html" not in out and not (html_deck / "output.html").exists()
+
+    def test_deck_css_write_rebuilds(self, html_deck: Path, monkeypatch):
+        self._patch_generate(monkeypatch)
+        self._run(html_deck, f'write_text("slides/title.html", {_TITLE_HTML!r})')
+        (html_deck / "output.html").unlink()
+        out = self._run(html_deck, 'write_text("deck.css", ".card { padding: 8px; }")')
+        assert (html_deck / "output.html").is_file()
+        assert out["affected"] == ["title"]  # deck.css is deck-wide
+
+    def test_snapshot_watches_html_files(self, html_deck: Path):
+        before = sandbox_tools._build_snapshot(html_deck)
+        (html_deck / "slides" / "title.html").write_text("<section></section>")
+        after = sandbox_tools._build_snapshot(html_deck)
+        assert after != before and "slides/title.html" in after
+        (html_deck / "deck.css").write_text(".x{}")
+        assert "deck.css" in sandbox_tools._build_snapshot(html_deck)
+        assert "specs/art-direction.html" in after
+
+    def test_pptx_snapshot_ignores_art_direction_and_deck_css(self, deck_dir: Path):
+        (deck_dir / "specs" / "art-direction.html").write_text("<html></html>")
+        (deck_dir / "deck.css").write_text(".x{}")
+        (deck_dir / "slides" / "stray.html").write_text("<section></section>")
+        snap = sandbox_tools._build_snapshot(deck_dir)
+        assert "deck.css" not in snap and "specs/art-direction.html" not in snap
+        assert "slides/stray.html" not in snap
+
+    def test_invalid_output_format_stops_the_build(self, deck_dir: Path, monkeypatch):
+        calls = self._patch_generate(monkeypatch)
+        out = self._run(deck_dir, 'write_json("deck.json", {"template": "t.pptx", "outputFormat": "htlm"})')
+        assert "htlm" in out["errors"]["outputFormat"]
+        assert calls == []
+        assert not (deck_dir / "output.pptx").exists()
 
 
 # ---------------------------------------------------------------------------
@@ -320,28 +464,93 @@ remote_server = importlib.util.module_from_spec(_spec)
 _spec.loader.exec_module(remote_server)
 
 
+class TestRemoteUserCodeTimeout:
+    """A hung user-code call ends at LONG_CALL's read timeout with a normal result,
+    and stopping a session the sandbox already ended never replaces that result."""
+
+    @pytest.fixture()
+    def clients(self, monkeypatch):
+        from boto_config import LONG_CALL
+
+        exec_mock, api_mock = MagicMock(), MagicMock()
+        api_mock.start_code_interpreter_session.return_value = {"sessionId": "S1"}
+        api_mock.stop_code_interpreter_session.side_effect = ClientError(
+            {"Error": {"Code": "ConflictException", "Message": "Session already terminated"}},
+            "StopCodeInterpreterSession",
+        )
+        monkeypatch.setattr(
+            remote_sandbox.boto3, "client",
+            lambda *a, config=None, **k: exec_mock if config is LONG_CALL else api_mock,
+        )
+        return exec_mock, api_mock
+
+    def test_limit_is_120s_and_never_retried(self):
+        from boto_config import LONG_CALL
+
+        assert LONG_CALL.read_timeout == 120
+        assert LONG_CALL.retries["total_max_attempts"] == 1
+        assert "max_attempts" not in LONG_CALL.retries
+        assert remote_sandbox.TIMED_OUT.startswith("Error: execution timed out (120s)")
+
+    def test_timeout_on_invoke_returns_timed_out(self, clients):
+        exec_mock, api_mock = clients
+        exec_mock.invoke_code_interpreter.side_effect = ReadTimeoutError(endpoint_url="https://x")
+        out = remote_sandbox.execute_in_sandbox(code="x", storage=_FakeStorage(), region="r", deck_id=None)
+        assert out == (remote_sandbox.TIMED_OUT, [], [], [])
+        api_mock.stop_code_interpreter_session.assert_called_once()
+
+    def test_timeout_while_reading_the_stream_returns_timed_out(self, clients):
+        exec_mock, api_mock = clients
+
+        def stream():
+            raise ReadTimeoutError(endpoint_url="https://x")
+            yield  # pragma: no cover
+
+        exec_mock.invoke_code_interpreter.return_value = {"stream": stream()}
+        out = remote_sandbox.execute_in_sandbox(code="x", storage=_FakeStorage(), region="r", deck_id=None)
+        assert out == (remote_sandbox.TIMED_OUT, [], [], [])
+        api_mock.stop_code_interpreter_session.assert_called_once()
+
+    def test_failed_stop_keeps_the_output(self, clients, monkeypatch):
+        monkeypatch.setattr(remote_sandbox, "_collect_stream", lambda _resp: "ok")
+        out = remote_sandbox.execute_in_sandbox(code="x", storage=_FakeStorage(), region="r", deck_id=None)
+        assert out == ("ok", [], [], [])
+
+    def test_style_python_timeout_returns_timed_out_without_read_back(self, clients, monkeypatch):
+        exec_mock, api_mock = clients
+        exec_mock.invoke_code_interpreter.side_effect = ReadTimeoutError(endpoint_url="https://x")
+        monkeypatch.setattr(remote_server, "_get_user_id", lambda: "u" * 8)
+        out = json.loads(remote_server.run_style_python(purpose="p", code="x"))
+        assert out == {"output": remote_sandbox.TIMED_OUT}
+        # Only the setup call ran on the session; no style.html read-back.
+        assert api_mock.invoke_code_interpreter.call_count == 1
+        api_mock.stop_code_interpreter_session.assert_called_once()
+
+    def test_style_python_sends_code_without_the_deck_helpers(self, clients, monkeypatch):
+        exec_mock, _ = clients
+        monkeypatch.setattr(remote_sandbox, "_collect_stream", lambda _resp: "ok")
+        monkeypatch.setattr(remote_server, "_get_user_id", lambda: "u" * 8)
+        remote_server.run_style_python(purpose="p", code="x")
+        assert exec_mock.invoke_code_interpreter.call_args.kwargs["arguments"]["code"] == "x"
+
+
 class TestPostProcessingPlan:
-    """The contract matrix, as a pure decision table."""
+    """The contract matrix, as a pure decision table (sdpm.api.pptx_refresh_plan)."""
 
     @pytest.mark.parametrize(
         "changed,measure,expected",
         [
-            (False, None, {"build": False, "artifact": False, "verify": False}),
-            (True, None, {"build": True, "artifact": True, "verify": False}),
-            (False, ["a"], {"build": True, "artifact": False, "verify": True}),
-            (True, ["a"], {"build": True, "artifact": True, "verify": True}),
+            ([], None, {"build": False, "artifact": False, "verify": False}),
+            (["specs/brief.md"], None, {"build": False, "artifact": False, "verify": False}),
+            (["slides/a.json"], None, {"build": True, "artifact": True, "verify": False}),
+            (["specs/brief.md"], ["a"], {"build": True, "artifact": False, "verify": True}),
+            (["specs/outline.md"], ["a"], {"build": True, "artifact": True, "verify": True}),
         ],
     )
     def test_matrix(self, changed, measure, expected):
-        assert remote_server._post_processing_plan(changed, measure) == expected
+        from sdpm.api import pptx_refresh_plan
 
-    def test_build_relevant_paths(self):
-        assert remote_server._build_relevant("deck.json")
-        assert remote_server._build_relevant("slides/title.json")
-        assert remote_server._build_relevant("includes/code.json")
-        assert remote_server._build_relevant("specs/outline.md")
-        assert not remote_server._build_relevant("specs/brief.md")
-        assert not remote_server._build_relevant("attachments/x/data.csv")
+        assert pptx_refresh_plan(changed, measure) == expected
 
 
 class TestRemoteCheckSpecs:
@@ -515,43 +724,70 @@ class _ArtifactStorage(_FakeStorage):
 
 @pytest.fixture()
 def remote_rig(monkeypatch, tmp_path):
-    """Monkeypatched harness to exercise run_python's real branch wiring."""
-    calls = {"prepare": 0, "build": 0, "measure": 0, "export_svg": 0}
+    """The real run_python wiring and the real sdpm.api.refresh_pptx on a one-slide
+    workspace; LibreOffice is faked (tests/fake_libreoffice.py)."""
+    import shutil
+    import tempfile
+
+    import fake_libreoffice
+    import sdpm.api
+    import sdpm.engine.preview.measure as measure_mod
+    import tools.generate as gen_mod
+
     storage = _ArtifactStorage()
+    office = fake_libreoffice.install(monkeypatch)
+
+    class _Calls(dict):
+        """prepare / build (full) / measure counts; export_svg comes from the fake soffice."""
+
+        def __getitem__(self, key):
+            if key == "export_svg":
+                return office.calls.count(("soffice", "svg"))
+            return super().__getitem__(key)
+
+        def __eq__(self, other):
+            return {**self, "export_svg": self["export_svg"]} == other
+
+    calls = _Calls(prepare=0, build=0, measure=0)
 
     def fake_execute(code, storage, region, deck_id=None, persist_writes=True, files=None):
         return ("ok", [], [], fake_execute.changed_paths)
 
     fake_execute.changed_paths = []
+    fake_execute.slides = {"a": {"layout": "Blank", "elements": []}}
 
     def fake_prepare(deck_id, user_id, storage):
         calls["prepare"] += 1
-        return tmp_path, [{"id": "a"}], {}
+        ws = Path(tempfile.mkdtemp(dir=tmp_path))
+        (ws / "slides").mkdir()
+        (ws / "specs").mkdir()
+        shutil.copy(_root / "sdpm" / "templates" / "blank-dark.pptx", ws / "template.pptx")
+        (ws / "deck.json").write_text(json.dumps({"template": "blank-dark"}))
+        (ws / "specs" / "outline.md").write_text("".join(f"- [{s}] {s}\n" for s in fake_execute.slides))
+        slides = []
+        for slug, data in fake_execute.slides.items():
+            (ws / "slides" / f"{slug}.json").write_text(json.dumps(data))
+            slides.append({**data, "id": slug})
+        kwargs = {"template_path": ws / "template.pptx", "custom_template": True, "base_dir": ws,
+                  "fonts": {"fullwidth": "Noto Sans JP", "halfwidth": "Arial"}, "default_text_color": "#FFFFFF"}
+        return ws, slides, kwargs
 
-    def fake_build(tmpdir, slides, build_kwargs):
-        calls["build"] += 1
-        p = tmp_path / "out.pptx"
-        p.write_bytes(b"pptx")
-        return p, []
+    real_generate = sdpm.api.generate
 
-    def fake_measure(tmpdir, pptx_path, page_numbers, page_to_slug=None):
+    def counting_generate(*args, **kwargs):
+        if kwargs.get("only_slugs") is None:
+            calls["build"] += 1
+        return real_generate(*args, **kwargs)
+
+    real_measure = measure_mod.measure_from_svg
+
+    def counting_measure(*args, **kwargs):
         calls["measure"] += 1
-        return "{}"
-
-    def fake_export_svg(tmpdir, pptx_path):
-        calls["export_svg"] += 1
-        return tmp_path / "measure.svg"  # never created → compose skipped
-
-    import tools.generate as gen_mod
+        return real_measure(*args, **kwargs)
 
     monkeypatch.setattr(gen_mod, "_prepare_workspace", fake_prepare)
-    monkeypatch.setattr(gen_mod, "generate_previews", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lo")))
-    monkeypatch.setattr(
-        gen_mod, "generate_previews_for_pages", lambda *a, **k: (_ for _ in ()).throw(RuntimeError("no lo"))
-    )
-    monkeypatch.setattr(remote_server, "_build_pptx", fake_build)
-    monkeypatch.setattr(remote_server, "_run_measure", fake_measure)
-    monkeypatch.setattr(remote_server, "_export_svg", fake_export_svg)
+    monkeypatch.setattr(sdpm.api, "generate", counting_generate)
+    monkeypatch.setattr(measure_mod, "measure_from_svg", counting_measure)
     monkeypatch.setattr(remote_server, "_storage", storage)
     monkeypatch.setattr(remote_server, "_check_deck_access", lambda *a, **k: None)
     monkeypatch.setattr(remote_server, "_get_user_id", lambda: "user1")
@@ -585,6 +821,16 @@ class TestRemoteRunPythonBranching:
         assert calls == {"prepare": 0, "build": 0, "measure": 0, "export_svg": 0}
         assert storage.uploads == {} and "measure" not in out
 
+    def test_timeout_with_measure_builds_nothing(self, remote_rig, monkeypatch):
+        fake_execute, storage, calls = remote_rig
+        monkeypatch.setattr(
+            remote_server.sandbox_mod, "execute_in_sandbox",
+            lambda *a, **k: (remote_sandbox.TIMED_OUT, [], [], []),
+        )
+        out = self._run(measure_slides=["a"])
+        assert out == {"output": remote_sandbox.TIMED_OUT}
+        assert calls == {"prepare": 0, "build": 0, "measure": 0, "export_svg": 0}
+
     def test_change_without_measure_builds_artifact_and_rerenders(self, remote_rig):
         fake_execute, storage, calls = remote_rig
         fake_execute.changed_paths = ["slides/a.json"]
@@ -596,9 +842,14 @@ class TestRemoteRunPythonBranching:
         # Artifact refreshed
         assert any(k.startswith("pptx/d1/") for k in storage.uploads)
         assert storage.deck_updates and "pptxS3Key" in storage.deck_updates[0]
-        # The changed slide is re-rendered (compose + preview) in the background
+        # The changed slide is re-rendered (compose + preview) in the background,
+        # LibreOffice included: the call itself does not wait on the SVG export.
         assert len(fake_execute.background) == 1
         assert "a" in out["previewHint"]
+        assert calls["export_svg"] == 0
+        fake_execute.background[0]()
+        assert calls["export_svg"] >= 1
+        assert any(k.startswith("decks/d1/compose/a_") for k in storage.uploads)
 
     def test_non_slide_change_without_measure_renders_nothing(self, remote_rig):
         fake_execute, storage, calls = remote_rig
@@ -621,8 +872,19 @@ class TestRemoteRunPythonBranching:
         fake_execute.changed_paths = ["slides/a.json"]
         out = self._run(measure_slides=["a"])
         assert calls["build"] == 1 and calls["measure"] == 1
+        assert calls["export_svg"] == 1  # measurement needs the render in the call
         assert "measure" in out
         assert any(k.startswith("pptx/d1/") for k in storage.uploads)
+        fake_execute.background[0]()
+        assert calls["export_svg"] == 1  # the background reuses it
+
+    def test_failed_render_promises_no_previews(self, remote_rig):
+        fake_execute, storage, calls = remote_rig
+        fake_execute.changed_paths = ["slides/a.json"]
+        fake_execute.slides = {"a": {"layout": "Blank", "elements": [{"type": "image", "src": "assets:none/missing"}]}}
+        out = self._run(measure_slides=["a"])
+        assert "Missing assets" in out["pptx_error"] and "Missing assets" in out["measure"]
+        assert "previewHint" not in out
 
     def test_artifact_failure_surfaces_and_compensates(self, remote_rig):
         fake_execute, storage, calls = remote_rig
@@ -651,38 +913,19 @@ class TestRemoteRunPythonBranching:
 
 
 
-def test_remote_compose_output_includes_regions(remote_rig, monkeypatch, tmp_path):
+_REGION_SLIDE = {
+    "layout": "Blank",
+    "elements": [
+        {"_comment": "content region", "x": 80, "y": 90, "width": 1200, "height": 800},
+    ],
+}
+
+
+def test_remote_compose_output_includes_regions(remote_rig, monkeypatch):
     monkeypatch.setattr(remote_server, "_run_in_background", lambda target, *, name: target())
     fake_execute, storage, calls = remote_rig
     fake_execute.changed_paths = ["specs/brief.md"]
-    slide = {
-        "id": "a",
-        "elements": [
-            {"_comment": "content region", "x": 80, "y": 90, "width": 1200, "height": 800},
-        ],
-    }
-
-    import tools.compose as compose_mod
-    import tools.generate as generate_mod
-
-    def fake_prepare(deck_id, user_id, storage):
-        calls["prepare"] += 1
-        return tmp_path, [slide], {}
-
-    monkeypatch.setattr(generate_mod, "_prepare_workspace", fake_prepare)
-    monkeypatch.setattr(compose_mod, "extract_optimized_defs", lambda path: {"version": 1, "defs": ""})
-    monkeypatch.setattr(
-        compose_mod,
-        "split_slide_components",
-        lambda path, slide_num: {
-            "version": 1,
-            "viewBox": "0 0 1920 1080",
-            "bgFill": "#000",
-            "bgSvg": None,
-            "components": [],
-        },
-    )
-    (tmp_path / "measure.svg").write_text("<svg />", encoding="utf-8")
+    fake_execute.slides = {"a": _REGION_SLIDE}
 
     remote_server.run_python(
         purpose="verify a",
@@ -702,39 +945,12 @@ def test_remote_compose_output_includes_regions(remote_rig, monkeypatch, tmp_pat
     ]
 
 
-def test_remote_compose_is_deferred_until_background_task_runs(remote_rig, monkeypatch, tmp_path):
+def test_remote_compose_is_deferred_until_background_task_runs(remote_rig, monkeypatch):
     deferred = []
     monkeypatch.setattr(remote_server, "_run_in_background", lambda target, *, name: deferred.append(target))
     fake_execute, storage, calls = remote_rig
     fake_execute.changed_paths = ["specs/brief.md"]
-    slide = {
-        "id": "a",
-        "elements": [
-            {"_comment": "content region", "x": 80, "y": 90, "width": 1200, "height": 800},
-        ],
-    }
-
-    import tools.compose as compose_mod
-    import tools.generate as generate_mod
-
-    def fake_prepare(deck_id, user_id, storage):
-        calls["prepare"] += 1
-        return tmp_path, [slide], {}
-
-    monkeypatch.setattr(generate_mod, "_prepare_workspace", fake_prepare)
-    monkeypatch.setattr(compose_mod, "extract_optimized_defs", lambda path: {"version": 1, "defs": ""})
-    monkeypatch.setattr(
-        compose_mod,
-        "split_slide_components",
-        lambda path, slide_num: {
-            "version": 1,
-            "viewBox": "0 0 1920 1080",
-            "bgFill": "#000",
-            "bgSvg": None,
-            "components": [],
-        },
-    )
-    (tmp_path / "measure.svg").write_text("<svg />", encoding="utf-8")
+    fake_execute.slides = {"a": _REGION_SLIDE}
 
     out = json.loads(
         remote_server.run_python(
@@ -787,3 +1003,32 @@ def test_get_preview_waits_for_pending_background_previews(monkeypatch):
     t1 = _time.monotonic()
     remote_server._wait_for_pending_previews("d9", timeout=5)
     assert _time.monotonic() - t1 < 0.05
+
+
+# ---------------------------------------------------------------------------
+# list_files: folders end with "/" on Local and Remote
+# ---------------------------------------------------------------------------
+
+
+class TestListFiles:
+    _EXPECTED_ROOT = ["deck.json", "includes/", "slides/", "specs/"]
+
+    def test_local_lists_folders_with_a_slash(self, deck_dir: Path):
+        code = 'print(list_files())\nprint(list_files("slides"))'
+        out = json.loads(sandbox_tools.run_python("list", code, str(deck_dir)))
+        root, slides = out["output"].splitlines()
+        assert root == repr(self._EXPECTED_ROOT)
+        assert slides == repr(["title.json"])
+
+    def test_remote_helper_matches_local(self, deck_dir: Path, tmp_path_factory, monkeypatch):
+        import importlib.util
+
+        helpers = tmp_path_factory.mktemp("helpers") / "_sdpm_helpers.py"
+        helpers.write_text(remote_sandbox._HELPERS_PY, encoding="utf-8")
+        spec = importlib.util.spec_from_file_location("_sdpm_helpers_test", helpers)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        (deck_dir / "__pycache__").mkdir()  # left by importing _sdpm_helpers in the sandbox
+        monkeypatch.chdir(deck_dir)
+        assert module.list_files() == self._EXPECTED_ROOT
+        assert module.list_files("slides") == ["title.json"]

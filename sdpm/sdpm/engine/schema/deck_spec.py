@@ -4,11 +4,14 @@
 
 from __future__ import annotations
 
+import json
 import re
 from copy import deepcopy
-from typing import Any
+from pathlib import Path
+from typing import Any, Literal
 
 from sdpm.engine.schema.lint_outline import lint_outline
+from sdpm.engine.schema.slugs import OUTLINE_LINE_RE, OUTLINE_SLUG_RE
 
 DECK_JSON_SKELETON: dict[str, Any] = {
     "template": "",
@@ -17,15 +20,15 @@ DECK_JSON_SKELETON: dict[str, Any] = {
     "slideSize": {},
 }
 
-# Optional runtime features are written into new workspaces but are not part of
-# the required legacy skeleton. Existing decks without them remain valid.
-DECK_JSON_OPTIONAL_DEFAULTS: dict[str, Any] = {
-    "animations": {"enabled": False},
-    "transitions": {"enabled": False},
-}
+# deck.json "outputFormat" values. Absent means "pptx"; the field is written only for
+# HTML decks so PPTX deck.json stays unchanged (not part of DECK_JSON_SKELETON).
+#
+# The animation and transition switches follow the same rule and for the same reason:
+# a new deck.json carries neither, because an absent switch already reads as off
+# (resolve_enabled) and test_api_init_pptx_deck_json_is_byte_identical pins what a new
+# PPTX deck.json contains. A deck opts in by adding the switch itself.
+OUTPUT_FORMATS: tuple[str, ...] = ("pptx", "html")
 
-_SLIDE_RE = re.compile(r"^-\s+\[([^\]]+)\]\s+.+")
-_VALID_SLUG_RE = re.compile(r"^[a-z0-9-]+$")
 _SUB_ITEM_RE = re.compile(r"^\s{2,}-\s+(body|visual|evidence)\s*:")
 _COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 _REQUIRED_SUB_ITEMS = ("body", "visual", "evidence")
@@ -35,8 +38,6 @@ def complete_deck_skeleton(deck: dict) -> dict:
     """Return a copy of deck with every deck.json skeleton field present."""
     completed = deepcopy(deck)
     for key, default in DECK_JSON_SKELETON.items():
-        completed.setdefault(key, deepcopy(default))
-    for key, default in DECK_JSON_OPTIONAL_DEFAULTS.items():
         completed.setdefault(key, deepcopy(default))
 
     fonts = completed.get("fonts")
@@ -50,6 +51,81 @@ def complete_deck_skeleton(deck: dict) -> dict:
     return completed
 
 
+def new_deck_json(output_format: str = "pptx") -> dict[str, Any]:
+    """deck.json of a new deck: the skeleton, plus ``"outputFormat": "html"`` for HTML decks.
+
+    Raises ValueError for any output_format other than "pptx" or "html".
+    """
+    if output_format not in OUTPUT_FORMATS:
+        raise ValueError(f'output_format must be "pptx" or "html", got {output_format!r}')
+    deck = complete_deck_skeleton(DECK_JSON_SKELETON)
+    if output_format == "html":
+        deck["outputFormat"] = "html"
+    return deck
+
+
+_HTML_BUILD_FILES = frozenset({"deck.json", "specs/outline.md", "specs/art-direction.html", "deck.css"})
+_HTML_SLIDE_RE = re.compile(r"^slides/[^/]+\.html$")
+
+
+def is_html_build_input(rel: str) -> bool:
+    """True when a deck-relative path is an input of the HTML build (a rebuild is due).
+
+    deck.json, specs/outline.md, specs/art-direction.html, deck.css and slides/*.html.
+    """
+    rel = (rel or "").replace("\\", "/")
+    if rel.startswith("./"):
+        rel = rel[2:]
+    return rel in _HTML_BUILD_FILES or bool(_HTML_SLIDE_RE.match(rel))
+
+
+_PPTX_BUILD_FILES = frozenset({"deck.json", "presentation.json", "specs/outline.md"})
+
+
+def is_pptx_build_input(rel: str) -> bool:
+    """True when a deck-relative path is an input of the PPTX build (a rebuild is due).
+
+    deck.json, presentation.json, specs/outline.md, slides/* and includes/*.
+    """
+    rel = (rel or "").replace("\\", "/")
+    if rel.startswith("./"):
+        rel = rel[2:]
+    return rel in _PPTX_BUILD_FILES or rel.startswith(("slides/", "includes/"))
+
+
+def deck_output_format(deck_json: Any) -> Literal["pptx", "html"]:
+    """Return the deck's output format: "pptx" when outputFormat is absent or None, or
+    when deck.json is not an object.
+
+    Raises ValueError naming the value when outputFormat is anything other than
+    "pptx" or "html".
+    """
+    if not isinstance(deck_json, dict):
+        return "pptx"
+    value = deck_json.get("outputFormat")
+    if value is None:
+        return "pptx"
+    if value == "pptx":
+        return "pptx"
+    if value == "html":
+        return "html"
+    raise ValueError(f'deck.json outputFormat must be "pptx" or "html", got {value!r}')
+
+
+def read_deck_format(deck_dir: str | Path) -> Literal["pptx", "html"]:
+    """Output format of the deck in ``deck_dir``, read from its deck.json.
+
+    "pptx" when deck.json is missing, unreadable, not JSON or not an object (the PPTX
+    build then reports the problem). Raises ValueError for an explicit invalid
+    outputFormat, which stops every build.
+    """
+    try:
+        deck_json = json.loads((Path(deck_dir) / "deck.json").read_text(encoding="utf-8"))
+    except (OSError, ValueError):
+        return "pptx"
+    return deck_output_format(deck_json)
+
+
 def _is_non_empty(value: object) -> bool:
     return isinstance(value, str) and bool(value.strip())
 
@@ -61,8 +137,8 @@ def _is_positive_number(value: object) -> bool:
 def _outline_slugs(lines: list[str]) -> list[str]:
     slugs: list[str] = []
     for line in lines:
-        match = _SLIDE_RE.match(line.strip())
-        if match and _VALID_SLUG_RE.fullmatch(match.group(1)):
+        match = OUTLINE_LINE_RE.match(line.strip())
+        if match and OUTLINE_SLUG_RE.fullmatch(match.group(1)):
             slugs.append(match.group(1))
     return slugs
 
@@ -84,7 +160,7 @@ def _outline_structure_warnings(lines: list[str]) -> list[str]:
 
     for line_number, line in enumerate(lines, 1):
         stripped = line.strip()
-        slide_match = _SLIDE_RE.match(stripped)
+        slide_match = OUTLINE_LINE_RE.match(stripped)
         if slide_match:
             finish_slide()
             current = (line_number, slide_match.group(1))
@@ -137,6 +213,13 @@ def validate_specs(
     ):
         errors.append("deck.json defaultBackground must match #RRGGBB")
 
+    output_format: str | None = None
+    if "outputFormat" in deck_json:
+        try:
+            output_format = deck_output_format(deck_json)
+        except ValueError:
+            errors.append('deck.json outputFormat must be "pptx" or "html"')
+
     from sdpm.engine.timing import validate_deck_switches
 
     errors.extend(f"deck.json {diagnostic.path}: {diagnostic.message}" for diagnostic in validate_deck_switches(deck_json))
@@ -175,9 +258,13 @@ def validate_specs(
     if "[TBD]" in outline_text:
         warnings.append("outline.md contains [TBD]")
 
-    return {
+    result: dict[str, Any] = {
         "ok": not errors,
         "errors": errors,
         "warnings": warnings,
         "slugs": slugs,
     }
+    # PPTX results keep exactly {ok, errors, warnings, slugs}; consumers read absence as pptx.
+    if output_format == "html":
+        result["outputFormat"] = "html"
+    return result

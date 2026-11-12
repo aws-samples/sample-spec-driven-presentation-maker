@@ -1,5 +1,3 @@
-[EN](../en/architecture.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
-
 # Architecture
 
 This document describes spec-driven-presentation-maker's overall architecture, data flow, authentication and authorization model,
@@ -9,16 +7,49 @@ data model, CDK stack structure, and deployment patterns.
 
 ## 4-Layer Architecture
 
-spec-driven-presentation-maker consists of 4 layers.
-Each layer is a thin wrapper around the previous one — use only the layers you need.
+spec-driven-presentation-maker consists of 4 layers. The engine and the tool contract
+(`sdpm.tools`) sit in the middle. The local server (Layer 2) and the remote server
+(Layer 3) both bind that same contract; neither wraps the other. Layer 4 (agent, Web UI,
+API) uses the remote server. Use only the layers you need.
 
 ![4layer-architecture](../assets/4layer-architecture-en.png)
 
 ### Dependency Direction
 
-Dependencies always flow top-down.
+Python imports point inward: the servers import `sdpm.tools`, which imports the engine and
+knowledge. The core imports nothing from the servers or from `shared`.
 
 ![dependency-direction](../assets/dependency-direction-en.png)
+
+---
+
+## Entry tools, prompts and role documents
+
+```
+sdpm/        Engine (json <-> pptx) + Knowledge (references, assets, templates)
+             references/workflows/ — role documents (orchestrator, composer, style,
+             translate), delivered to any MCP client by the start_* entry tools
+servers/     local (stdio, no AWS) / remote (HTTP, S3 + DynamoDB) — thin binds of one tool contract
+             local/client_config.py wires the server into MCP clients (sdpm register)
+scripts/install/   installer + `sdpm` launcher for macOS / Linux / Windows; scripts/mcpb/ the Claude Desktop bundle
+agent/ api/ infra/ web-ui/   Optional AWS cloud stack (Strands Agent, REST API, CDK, React UI)
+```
+
+Each role (orchestrator, composer, style, translate) has one document in
+`sdpm/references/workflows/`. The composer has one per output format: `composer.md` (PPTX)
+and `composer-html.md` (HTML). A role's entry tool (`start_presentation`, `start_composing`,
+`start_style`, `start_translation`) returns that document plus what the role reads first,
+such as the style and template lists or the deck's specs.
+
+An agent does not need to pick a mode: asking for slides makes it call `start_presentation`
+and follow the document. The `sdpm-*` prompts (`sdpm-vibe`, `sdpm-spec`, `sdpm-style`,
+`sdpm-translate`) let a user choose explicitly. Each prompt only names its role's entry tool;
+the behaviour itself lives in `sdpm/references/workflows/`, in one place. The spawner
+chooses the composer's mode when it dispatches one: `start_composing(..., mode="pptx"|"html")`.
+
+Everything an agent needs (tools, workflows, guides, role behaviour) is served by the MCP
+server. Nothing lives on the client side: a client only holds the one line that starts the
+server, and `sdpm register` writes that line.
 
 ---
 
@@ -27,6 +58,7 @@ Dependencies always flow top-down.
 The core presentation engine. No network, no AWS, no MCP — just Python.
 
 - **sdpm/sdpm/engine/** — json↔pptx conversion: builder, converter, layout engine, schema lint, preview, checks, diff, analyzer
+- **sdpm/sdpm/engine/html/** — HTML output mode: converts a .pptx template to `theme.css` / `template.json` / decoration SVGs, assembles slide HTML files into a single offline `output.html` (vendored reveal.js under `sdpm/vendor/revealjs/`), and runs the static slide checks
 - **sdpm/sdpm/knowledge/** — knowledge retrieval: references (guides/workflows/examples) and asset search
 - **sdpm/sdpm/tools/** — the MCP tool contract: every tool's name, schema, docstring, and logic defined once; both servers register these functions directly
 - **sdpm/references/** — workflows (role documents: orchestrator/composer/style/translate),
@@ -59,20 +91,33 @@ The same `sdpm.tools` contract bound to an HTTP transport, with storage swapped 
 
 ```
 MCP Client → AgentCore Runtime → MCP Server Container
-                                   ├── 20 MCP tools
+                                   ├── 20 MCP tools (21 with search_slides)
                                    ├── LibreOffice (PPTX → PDF/SVG)
                                    ├── DynamoDB (decks, templates)
                                    ├── S3 (PPTX, previews, references, assets)
-                                   └── Code Interpreter (optional)
+                                   └── Code Interpreter (run_python)
 ```
 
-Additional tools over Layer 2:
-- `read_attachment` — Read content from an attached file (PDF, DOCX, XLSX, PPTX, text, images) with byte-offset paging
-- `import_attachment` — Import attached files into the deck workspace
-- `apply_style` — Apply a named style preset to a deck
-- `run_python` — Execute Python in Amazon Bedrock AgentCore Code Interpreter sandbox (edit deck workspace, analyze data)
-- `search_slides` — Semantic slide search via Amazon Bedrock Knowledge Base (optional)
+Differences from Layer 2:
+- `get_preview` — returns the preview images of a deck's slides (remote only; the local server returns previews from `run_python` as `preview_files`)
+- `run_python` — runs in an Amazon Bedrock AgentCore Code Interpreter sandbox instead of a local process
+- `search_slides` — semantic slide search through an Amazon Bedrock Knowledge Base, registered only when one is configured
+- `start_translation` is not bound: the translate workflow runs scripts from a checkout
 
+HTML decks (`deck.json` `outputFormat: "html"`) use the same tools with these differences:
+
+| Tool | HTML deck behaviour |
+|------|---------------------|
+| `init_deck_workspace` | `output_format="html"` creates an HTML deck (default `pptx`) and returns `format_notes` (guide `html-deck`) for the orchestrator |
+| `start_composing` | `mode="html"` returns the HTML composer document, the template converted for HTML and the deck's `deck.css` |
+| `run_python` | After a change to an HTML build input, rebuilds `output.html` and the changed slides' thumbnails, runs the browser check on the changed slides (and `measure_slides`) and uploads thumbnails and PNGs under `html/` |
+| `generate_pptx` | Finalizes the deck as HTML: full build, every thumbnail, deck record update, knowledge-base sync (`search_slides` indexes HTML slides); no browser check (every slide was checked when it was written) |
+| `get_preview` | Returns the PNGs the browser check made (`html/{deckId}/png/{slug}_{epoch}.png`); a slug without one gets a text line |
+
+The remote build reads and updates the deck record under the caller's user id, as the PPTX
+build does. `run_python` / `generate_pptx` need the owner role (see
+[Authorization](#authorization-role-based-access-control)), so only the deck owner rebuilds an
+HTML deck on S3.
 ### Storage
 
 ```
@@ -87,6 +132,10 @@ S3 (pptx bucket):
   decks/{deckId}/includes/          — code block JSON
   decks/{deckId}/compose/           — per-slide SVG compose JSON (for Web UI animation)
   previews/{deckId}/{slideId}.png   — slide previews
+  html/{deckId}/{uuid}.html         — HTML deck output.html (DynamoDB htmlS3Key)
+  html/{deckId}/preview/{slug}_{epoch}.html — HTML slide thumbnails (latest epoch wins)
+  template-html-cache/{cacheKey}/   — template HTML conversion (theme.css, template.json,
+                                      layouts/*.svg); expires after 30 days
 
 S3 (resource bucket):
   references/                       — examples, workflows, guides
@@ -100,8 +149,10 @@ Using `run_python(deck_id=...)` loads the entire deck workspace into the sandbox
 The agent can read and write files using standard Python file I/O (`open`, `json.load`, etc.); modified files are written back to S3 automatically after every execution.
 
 ```
-deck.json           — deck metadata (template, fonts, defaultTextColor)
+deck.json           — deck metadata (template, fonts, defaultTextColor, outputFormat)
 slides/{slug}.json  — per-slide data (one file per slide, slug from outline)
+slides/{slug}.html  — per-slide HTML fragment (HTML decks)
+deck.css            — shared slide CSS (HTML decks)
 specs/brief.md          — briefing (audience, purpose, key messages)
 specs/outline.md        — one line per slide: - [slug] message
 specs/art-direction.html — visual design direction (HTML style guide)
@@ -113,7 +164,7 @@ includes/           — code block JSON files
 - JWT Bearer authentication via Amazon Bedrock AgentCore Runtime's `customJwtAuthorizer`
 - Default is Amazon Cognito User Pool; supports any OIDC-compliant IdP
 - User identity: JWT `sub` claim propagated through the entire stack
-- Authorization: role-based per deck (owner / collaborator / viewer)
+- Authorization: role-based per deck (owner / viewer)
 
 ### Preview Generation
 
@@ -133,7 +184,7 @@ generate_pptx:
 
 The agent uses `get_preview` to retrieve preview images and visually review slides.
 
-The compose pipeline (step 6–7) extracts optimized SVG components per slide and uploads them as JSON to S3. The Web UI uses these to render animated slide transitions without re-fetching full preview images.
+The compose pipeline (step 6–7) extracts optimized SVG components per slide and uploads them as JSON to S3. The Web UI uses these to render animated slide transitions without re-fetching full preview images. The extraction and the per-component change marking live in `sdpm.engine.preview.compose` and are shared by both servers; the local server writes the same JSON to `compose/` in the deck directory.
 
 Compose data and preview images follow the change, not the measure list: after `run_python`,
 every slide the written files can alter is re-rendered — the edited `slides/<slug>.json`, slides
@@ -141,11 +192,103 @@ that reference a changed `includes/` file, slides that inherit from an affected 
 `override`, and every slide when `deck.json` or `specs/outline.md` changed
 (`sdpm.engine.schema.affected_slugs`) — plus the `measure_slides` slugs.
 
+For PPTX decks this post-processing is one core function, `sdpm.api.refresh_pptx`: the
+`output.pptx` build, the partial build of the slides to render (with their `override`
+bases) and its SVG export, the measurement, and the compose payloads and PNGs
+(`PptxRefresh.compose()` / `previews()`). Both servers only do the I/O around it: the local
+server writes `compose/` and `preview/` in the deck directory; the remote server materializes
+the S3 workspace, uploads the PPTX artifact and finishes the render (unless `measure_slides`
+needs it in the call), the WebP previews and the compose upload in the background.
+
+### HTML Deck Security
+
+An HTML deck runs scripts, so it is never served from the Web UI's origin:
+
+- `output.html` carries a Content-Security-Policy `<meta>` that allows only the engine's own
+  scripts (reveal.js, the notes plugin, the config and the speaker view), the bundled
+  libraries a deck declares (ECharts, D3) and each slide's inline scripts, all by sha256
+  hash computed at assembly, plus `data:` images, fonts and media; `connect-src` and
+  `form-action` are `'none'`. A script added to `output.html` afterwards, a `<script src>`,
+  an `on*` handler or a `javascript:` URL does not run. It also sets
+  `<meta name="referrer" content="no-referrer">` so slide links do not leak the signed URL.
+  Thumbnails carry a CSP without scripts.
+- Slide scripts can still navigate or open tabs: no CSP directive stops that. The static
+  checks warn on `location`, `window.open`, `top.` and external URLs in slide scripts
+  (`script-external`), and the deck always plays in the sandboxed iframe described below.
+  The checks also flag `RTCPeerConnection` and `stun:` / `turn:` URLs. In the cloud each
+  build keeps these findings (slide and kind: navigation, popup, external URL, WebRTC) on the
+  deck record (`htmlScriptExternal`); `GET /decks/{id}` returns them as `scriptWarnings`
+  and the deck page shows a warning next to Present / Download, on public decks too.
+- After each build that changes slides, the browser check (`sdpm.engine.html.browser_check`)
+  opens `output.html` in a browser over the DevTools protocol, shows each changed slide with
+  every fragment and finished animations, measures placeholders, regions and blocks (layout
+  rules in `layout_judge.py`), collects JS errors and captures a 1280 px PNG. The browser
+  comes from a seam in the core, `sdpm.engine.html.browser`: `SDPM_BROWSER=none` turns it
+  off, then a source registered by an adapter, then `SDPM_BROWSER=<path>`, then an
+  auto-detected Chrome / Edge. Locally that is headless Chrome or Edge with networking
+  disabled (proxy to a closed port, host resolution off, no non-proxied WebRTC), a throwaway
+  profile and `--remote-debugging-port=0`, so DevTools listens on 127.0.0.1 at a random port.
+  In the cloud, `servers/remote/tools/agentcore_browser.py` registers AgentCore Browser
+  (`aws.browser.v1`): it starts a session sized to the deck, connects to the automation
+  stream with SigV4-signed headers and always stops the session. The AWS code lives in
+  `servers/remote` because dependencies point inward and the core never imports boto3. Both
+  sources fail every `http(s)://` and `ws(s)://` request of the page, navigations included
+  (the DevTools `Fetch` domain; `Network.setBlockedURLs` lets top-level navigations through
+  in AgentCore Browser), and close pages the deck opens before they load; a browser that rejects the block fails the check before any slide
+  runs. WebRTC and WebTransport do not go through `Fetch`, so before any deck code runs a
+  guard (`Page.addScriptToEvaluateOnNewDocument`, also sent to every iframe target the page
+  attaches) removes the WebRTC constructors and `WebTransport` and makes `window.open`
+  return null. After the deck loads, a probe looks for those names in the page, a new
+  iframe, a `srcdoc` iframe and `window.open`; any name still reachable fails the check before any slide
+  runs. The result's `network_blocked` is true only when the `Fetch` block was accepted and
+  the probe passed. A canary run against AgentCore Browser in ap-northeast-1
+  (`scripts/verify_agentcore_browser_egress.py`) confirmed both: WebRTC was unavailable to
+  the slide and `network_blocked` was true. DNS resolution hints (`dns-prefetch`,
+  `preconnect`) are not proven blocked there; the canary did not test DNS egress. The runtime role gets `bedrock-agentcore:StartBrowserSession`,
+  `StopBrowserSession` and `ConnectBrowserAutomationStream` on the
+  `aws.browser.v1` ARN only. A check that is skipped, stopped by a slide that navigates the
+  page away (the slide helper logs `pagehide`), or does not finish within
+  `min(30 + 3 × slides, 110)` s adds a one-line `output.html: Browser check …` warning.
+- HTML objects live under `html/` in the deck bucket. No CloudFront behaviour serves
+  `html/*` and the CloudFront OAC bucket-policy grant does not include it.
+- The API returns S3 presigned URLs on the bucket's regional host (a different origin from
+  the Web UI), with `text/html; charset=utf-8`: the in-app view and thumbnails for 900 s in
+  `GET /decks/{id}`, and `GET /decks/{id}/html?purpose=present` (14400 s, inline) or
+  `purpose=download` (900 s, attachment). Both go through the deck's `read` authorization.
+- The Web UI plays the deck in an iframe with `sandbox="allow-scripts allow-popups
+  allow-popups-to-escape-sandbox"` (no `allow-same-origin`, so it gets an opaque origin; no
+  `allow-top-navigation`) and renders thumbnails in `sandbox=""` iframes. The engine gives
+  every external link `target="_blank" rel="noopener noreferrer"`; the escape token lets
+  the linked site load normally in its new tab, while the deck stays sandboxed. Present
+  opens a new tab with `opener` cleared.
+- The local Web UI serves `output.html` with `Content-Security-Policy: sandbox allow-scripts
+  allow-popups allow-popups-to-escape-sandbox` and thumbnails with
+  `Content-Security-Policy: sandbox`, both `nosniff`.
+
+Accepted risks:
+
+- The Present URL is a presigned bearer link valid for 4 hours. Anyone holding it can open
+  the deck until it expires, even after the deck is made private or its permissions change.
+  4 hours is the shortest expiry that still covers a presentation; the in-app view and
+  downloads use 900 s.
+- All HTML decks are served from one origin, the deck bucket's regional host. This is
+  bounded by reads that each need their own signature, `connect-src 'none'` in every deck,
+  and the player iframe's sandbox without `allow-same-origin`, which gives each deck an
+  opaque origin.
+- In the cloud browser check (AgentCore Browser), DNS resolution hints (`dns-prefetch`,
+  `preconnect`) are not proven blocked; the egress canary does not test DNS. A slide's
+  script could leak a short value through a DNS lookup during the check. Every other
+  channel the canary probes is blocked, and a published deck keeps `connect-src 'none'`.
+
 ### Text Measurement
 
 The `run_python(measure_slides=[...])` parameter triggers LibreOffice SVG export to measure text bounding boxes,
 enabling overflow detection during the Build loop without visual review. Measurement (overflow,
-layout bias, invalid layouts) covers only those slugs.
+layout bias, invalid layouts) covers only those slugs. The result is the same on both servers:
+`measure` (the text report, with a "⚠ Layout issues" section when the judge finds collisions,
+overflow or low contrast; `{"error": …}` JSON when nothing could be measured),
+`warnings.layoutBias` and `warnings.build` (the measured pages' build warnings) and
+`errors.<slug>.invalidLayout`.
 
 ---
 
@@ -158,7 +301,9 @@ A reference implementation of a full-stack application.
 - **API** — Lambda-backed REST API (deck CRUD, file upload, chat history)
 - **Auth** — Amazon Cognito User Pool with hosted UI
 
-The agent's system prompt is minimal — workflow knowledge is dynamically retrieved from MCP Server Instructions, making the MCP Server the single source of truth.
+The agent fetches its role documents through the entry tools (`start_presentation`, `start_composing`, `start_style`) and places them in its system prompt, so the MCP server stays the single source of truth for workflow text. The agent itself has no `start_*` tools. Its `compose_slides` tool runs `check_specs` and then dispatches one composer agent per group it is given, up to 10 at a time. The agent calls it twice: once for the layout pass over all slides, then once for the content groups, which run in parallel.
+
+The agent runs every session on a session runtime (`agent/session_runtime.py`) behind two entries: `/ws`, the Web UI's WebSocket (`prompt`, `steer`, `cancel`, `resume`, `prepare`, `ping`), and `/invocations`, HTTP streaming for Local and external clients. A session keeps its MCP clients, Agent and Memory session manager across turns, with the JWT swapped per turn. While a turn runs the session is working: it holds HealthyBusy on `/ping`, a message sent then is a steer that reaches the running turn and is stored in Memory where it arrived, and every event is numbered so a client that reconnects gets what it missed. Only the stop button, a 60-minute watchdog and SIGTERM stop a turn; a disconnect does not. `compose_slides` runs as a background task of the orchestrator: the call returns at once, the session stays working while the composers write, and the report reaches the orchestrator in a turn the session starts for it when none runs.
 
 ---
 
@@ -171,13 +316,15 @@ The agent's system prompt is minimal — workflow knowledge is dynamically retri
 
 ### Slide Generation Steps
 
-1. User describes the presentation content via chat
-2. Agent calls MCP Server tools to create a deck (`init_deck_workspace`)
-3. Analyzes the template and retrieves available layouts (`analyze_template`)
-4. Following workflow files, designs briefing → art direction → outline (persisted to `specs/`)
-5. Builds slides (`run_python` to edit files in the workspace)
-6. Generates PPTX (`generate_pptx`) → saved to S3, previews generated synchronously
-7. Retrieves preview images for review (`get_preview`)
+1. The user describes the presentation in the chat, with attachments or URLs
+2. The agent creates a deck (`init_deck_workspace`, PPTX or HTML)
+3. Writes the brief (`specs/brief.md`)
+4. Applies a template and a style (`apply_style`, writes `specs/art-direction.html` and `deck.json`)
+5. Writes the outline (`specs/outline.md`)
+6. Validates the specs (`check_specs`)
+7. Composes the slides (`compose_slides`): a layout pass over all slides, then content groups in parallel
+8. Reviews the previews (`get_preview`) and dispatches a composer for any slide to change
+9. Finalizes the deck (`generate_pptx`), saved to S3 with previews
 
 ---
 
@@ -202,22 +349,21 @@ Access is controlled per deck (presentation).
 
 ```
 1. Is the user the deck creator?     → owner
-2. Is there a sharing record?        → collaborator
-3. Is the deck set to public?        → viewer
-4. None of the above                 → none (access denied)
+2. Is the deck set to public?        → viewer
+3. None of the above                 → none (access denied)
 ```
 
 #### Permission Matrix
 
-| Action | owner | collaborator | viewer | none |
-|---|:---:|:---:|:---:|:---:|
-| read (view deck info) | ✅ | ✅ | ✅ | — |
-| preview (get preview images) | ✅ | ✅ | ✅ | — |
-| edit_slide (edit slides) | ✅ | ✅ | — | — |
-| generate_pptx (generate PPTX) | ✅ | ✅ | — | — |
-| update (update deck info) | ✅ | — | — | — |
-| delete_deck (delete deck) | ✅ | — | — | — |
-| change_visibility (change public setting) | ✅ | — | — | — |
+| Action | owner | viewer | none |
+|---|:---:|:---:|:---:|
+| read (view deck info) | ✅ | ✅ | — |
+| preview (get preview images) | ✅ | ✅ | — |
+| edit_slide (edit slides) | ✅ | — | — |
+| generate_pptx (generate PPTX) | ✅ | — | — |
+| update (update deck info) | ✅ | — | — |
+| delete_deck (delete deck) | ✅ | — | — |
+| change_visibility (change public setting) | ✅ | — | — |
 
 Authorization logic is centralized in `shared/authz.py`, used by both the API and MCP Server.
 To add custom roles (e.g., team-based access), modify the `resolve_role` function.
@@ -231,24 +377,54 @@ To add custom roles (e.g., team-based access), modify the `resolve_role` functio
 | Category | Tool | Description |
 |----------|------|-------------|
 | Prompts | `sdpm-vibe`, `sdpm-spec`, `sdpm-style`, `sdpm-translate` | User-invoked (slash-command) entry points; `vibe` / `spec` set the interaction mode |
-| Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate) |
-| Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template` | Create deck workspace, validate specs, apply style, analyze template |
-| Generation | `generate_pptx`, `get_preview` | Generate PPTX, get preview |
+| Entry | `start_presentation`, `start_composing`, `start_style`, `start_translation` | Role document + what the role reads first (orchestrator, composer, style, translate). `start_composing(mode="pptx"\|"html")` picks the composer document for the deck's output format |
+| Workflow | `init_deck_workspace`, `check_specs`, `apply_style`, `analyze_template`, `show_deck` | Create deck workspace (`output_format="pptx"\|"html"`), validate specs, apply style, analyze template. In MCP Apps clients `check_specs` also shows the deck viewer on its Outline tab with the check results, and `show_deck` (listed to MCP Apps clients only) shows it on the Slides tab. The local stdio server adds `note_for_user`, a sentence for the user that names `sdpm open <deck>`, to the `init_deck_workspace` result when the Web UI is installed and the client did not declare MCP Apps |
+| Generation | `generate_pptx` | Generate PPTX (local `generate_pptx` refuses HTML decks; `run_python` builds them). Carries `note_for_user` under the same conditions |
+| Attachments | `read_attachment`, `import_attachment` | Read an attached file (PDF, DOCX, XLSX, PPTX, text, images) with byte-offset paging; import it into the deck workspace |
+| Sandbox | `run_python`, `run_style_python` | Run Python against the deck workspace in a local process (edits, measuring, previews returned as `preview_files`); the style variant for the style workflow |
 | Assets | `search_assets`, `list_templates` | Search icons (empty query = discovery), list templates |
-| References | `list_styles` | Bundled and user styles |
+| References | `list_styles` | Bundled and user styles. For a client that declares MCP Apps, the result shows as a style gallery in the chat; the user's pick comes back as their message |
 | References | `read_guides` | Design rules, guides, and the slide JSON spec (`slide-json-spec`) |
-| Layout | `grid` | CSS Grid coordinate calculation |
+| Layout | `grid`, `arch_diagram` | CSS Grid coordinate calculation; architecture diagram layout |
 | Utility | `code_to_slide` | Code highlighting |
 
-### Layer 3 Additional Tools
+**MCP Apps.** `sdpm.tools.apps` registers the style gallery view (`ui://sdpm/style-gallery-<hash>.html`,
+`text/html;profile=mcp-app`) on `list_styles`, and `app_action`, the app-only tool the view calls for
+previews. `app_action` is listed only for clients that declare `io.modelcontextprotocol/ui`, in
+initialize or in the request's `_meta`; the initialize result declares the extension too. Both servers
+register it; the remote reads the user's own styles from S3. A client without MCP Apps gets the same
+text result as before.
+
+The deck viewer (`ui://sdpm/deck-viewer-<hash>.html`) hangs on `check_specs`, which opens it on the
+Outline tab, and on `show_deck(deck_id)`, which opens it on Slides; one view holds the Brief, Outline
+and Slides tabs and a **Refresh** button. It reads the deck through `app_action` (`deck`: brief,
+outline, check result and slide list; `slide_preview`: one slide as compose SVG parts, the newest
+`compose/<slug>_<epoch>.json` with only the defs it references, or a JPEG of the preview image when
+there is none), with each server's
+storage passed in as a `DeckAccess` (`servers/local/deck_access.py` reads the deck directory,
+`servers/remote/tools/deck_access.py` reads S3 after the caller's `read` permission check). Slide
+comments go through `submit_review`, which writes `reviews/<id>.json` with `shared/review.py` (the
+Web UI's review contract, `edit_slide` permission on the remote) and returns the Web UI's review
+message; the view sends it with `ui/message`. Outline edits go through `outline_edit`, which writes
+nothing and returns the edit as a unified diff for the agent to apply, also sent with `ui/message`.
+`show_deck` is listed with `app_action`: only to clients that declare MCP Apps. The `check_specs`
+result is unchanged.
+
+The remote server runs stateless HTTP and keeps no initialize params, so it lists `app_action` and
+`show_deck` only to a client that declares MCP Apps in each request's `_meta`
+(`io.modelcontextprotocol/clientCapabilities`), which no host in use today sends.
+`tools/call` does not check the listing, so the view still loads previews wherever the host passes
+its calls through. A host that passes only calls to listed tools shows the remote gallery's cards with
+names and descriptions, a "Previews could not be loaded" line, and a working **Use this style**.
+
+### Layer 3 Differences
 
 | Tool | Description |
 |------|-------------|
-| `read_attachment` | Read content from an attached file with byte-offset paging |
-| `import_attachment` | Import attached files into the deck workspace |
-| `apply_style` | Apply a named style preset to a deck |
-| `run_python` | Execute Python in Code Interpreter sandbox |
-| `search_slides` | Semantic slide search (optional, requires Amazon Bedrock KB) |
+| `get_preview` | Preview images of a deck's slides (remote only) |
+| `run_python` | Runs in an Amazon Bedrock AgentCore Code Interpreter sandbox |
+| `search_slides` | Semantic slide search; registered only when an Amazon Bedrock Knowledge Base is configured |
+| `start_translation` | Not bound: the translate workflow needs a checkout |
 
 ### Agent-Level Tools (Layer 4)
 
@@ -271,6 +447,10 @@ Deliberate asymmetries between surfaces — these are design decisions, not gaps
   MCP schema tokens and are the only operability for agents without MCP
   support, so overlap with MCP tools is acceptable — they are two adapters
   over the same engine.
+- **HTML output mode adds no MCP tool.** `run_python` rebuilds `output.html`
+  through `sdpm.api.refresh_html` after every change to an HTML deck, the CLI
+  has `generate_html` for the no-MCP path, and on the remote server
+  `generate_pptx` finalizes an HTML deck as HTML (see Layer 3).
 - **`search_slides` redesign is deferred.** The KB-backed search tool is kept
   as-is on Layer 3; rethinking it (scope, index lifecycle) is a separate
   theme, tracked outside the attachment/tool-cleanup work.
@@ -300,24 +480,25 @@ Deliberate asymmetries between surfaces — these are design decisions, not gaps
 
 Select which stacks to enable in `config.yaml` for incremental deployment.
 
-### Pattern 1: Layer 3 Only (MCP Server)
+### Pattern 1: MCP server only (Layer 3)
 
-Minimum deployment. Connect directly from MCP clients.
+Minimum deployment. Connect directly from MCP clients. Slide previews are built in the MCP
+server container, so agents can review slides visually. One-Click Deploy calls this
+`layer3`.
 
-### Pattern 2: Layer 3 + PNG Preview
+### Pattern 2: Full stack (Layer 4)
 
-Enables agents to visually review slides.
+Complete deployment including the Web UI. Create slides through the browser chat.
+One-Click Deploy calls this `layer4`.
 
-### Pattern 3: Full Stack (Layer 4)
-
-Complete deployment including Web UI. Create slides via browser chat.
-
-For `config.yaml` examples and deployment instructions, see [Getting Started — Layer 3](getting-started.md#layer-3-remote-mcp-server-aws).
+For `config.yaml` examples and deployment instructions, see the [Developer guide — Remote MCP server](developer-guide.md#remote-mcp-server-aws).
 
 ---
 
 ## Related Documents
 
-- [Getting Started](getting-started.md) — Setup and deployment instructions
+- [Getting Started](getting-started.md) — install and use SDPM (AI agent, Web UI, HTML decks)
+- [Developer guide](developer-guide.md) — checkout setup and CDK deployment
+- [Security](security.md) — what the AWS stack sets up and what to review
 - [Custom Templates](custom-template.md) — Adding templates and assets
 - [Connecting Agents](add-to-gateway.md) — MCP client connection guide

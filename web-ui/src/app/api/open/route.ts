@@ -8,6 +8,7 @@ import { execFile } from "child_process"
 import path from "path"
 import fs from "fs"
 import { DECK_ROOT } from "@/lib/local/deck-paths"
+import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 /** Only allow safe characters in path segments to prevent traversal/injection. */
 const SAFE_SEGMENT = /^[a-zA-Z0-9_\-][a-zA-Z0-9_\-.]*$/
@@ -25,6 +26,8 @@ function validateSegment(input: unknown): string | null {
 }
 
 export async function POST(req: Request) {
+  const refused = rejectCrossSite(req)
+  if (refused) return refused
   const body = await req.json()
 
   const safeDeckId = validateSegment(body.deckId)

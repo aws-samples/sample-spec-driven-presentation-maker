@@ -701,7 +701,7 @@ def _import_document(
     check_deadline: Any,
 ) -> None:
     """Import a document, resuming from verified extracted outputs."""
-    from shared.ingest import convert_file
+    from sdpm.tools.attachment.ingest import convert_file
 
     extracted_dir = staging / "extracted"
     if "extract_text" not in completed_stages:

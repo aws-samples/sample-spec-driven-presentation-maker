@@ -23,6 +23,38 @@ global_settings:
         catalog (search_assets names). Vector geometry, not credentials.
       expiration: "2027-09-27"
 
+    - rule_id: "SECRET-BASE64-HIGH-ENTROPY-STRING"
+      path: "tests/test_html_csp.py"
+      reason: >
+        SPEAKER_VIEW_HASH_6_0_2 pins the public CSP sha256 hash of the reveal.js 6.0.2
+        speaker-view script, so a vendor update that changes the script fails the test.
+        A digest of public code, not a credential.
+      expiration: "2027-10-31"
+
+    - rule_id: "SECRET-BASE64-HIGH-ENTROPY-STRING"
+      path: "web-ui/src/test/fixtures/acp/*.jsonl"
+      reason: >
+        Captured kiro-cli ACP output replayed by acp-contract.test.ts. The flagged values
+        are opaque tool-call ids (toolu_bdrk_…) and session UUIDs from a local test run,
+        not credentials.
+      expiration: "2027-11-05"
+
+    - rule_id: "SECRET-HEX-HIGH-ENTROPY-STRING"
+      path: "web-ui/src/test/fixtures/acp/*.jsonl"
+      reason: >
+        Captured kiro-cli ACP output replayed by acp-contract.test.ts. The flagged values
+        are short hex strings the model wrote into its answer in a local test run (the
+        composer captures), not credentials.
+      expiration: "2027-11-08"
+
+    - rule_id: "SECRET-HEX-HIGH-ENTROPY-STRING"
+      path: "web-ui/src/test/fixtures/composeResult.json"
+      reason: >
+        Shared compose-report fixture read by compose-report.test.ts and its pytest
+        counterpart (tests/test_agent_background.py). The flagged values are made-up
+        12-hex-digit task ids (the shape compose_dispatch.py gives them), not credentials.
+      expiration: "2027-11-08"
+
     # --- CFn Custom Resource: urlopen to pre-signed ResponseURL ---
     # Standard pattern for CloudFormation custom resources.
     # The URL is the CFn-provided ResponseURL, not user-controlled.
@@ -85,10 +117,11 @@ global_settings:
       expiration: "2027-03-29"
 
     - rule_id: "javascript.lang.security.detect-child-process.detect-child-process"
-      path: "web-ui/src/lib/local/acp-process.ts"
+      path: "web-ui/src/lib/local/acp/transport.ts"
       reason: >
-        spawn launches the local ACP agent process on the developer's machine.
-        Command path comes from hardcoded config, not user input. Local mode only.
+        spawn launches the local ACP agent process (kiro-cli) on the developer's machine.
+        Command and args come from the Local ACP config, not user input, and are passed
+        as an argument array without a shell. Local mode only.
       expiration: "2027-03-29"
 
     - rule_id: "javascript.lang.security.detect-child-process.detect-child-process"
@@ -99,14 +132,29 @@ global_settings:
         runs on developer's machine.
       expiration: "2027-03-29"
 
-    # --- Bandit B108: /tmp usage in local/container code ---
+    # --- MCP Apps view bridge: postMessage to the host frame ---
+    # MCP Apps hosts render a view in a sandboxed iframe (opaque origin) under a host frame
+    # whose origin each host picks, so the view has no origin to name or compare. The
+    # bridge identifies its peer by frame instead: it sends only to window.parent and drops
+    # every message whose ev.source is not window.parent.
 
-    - rule_id: "B108"
-      path: "agent/modes/composer.py"
+    - rule_id: "javascript.browser.security.wildcard-postmessage-configuration.wildcard-postmessage-configuration"
+      path: "sdpm/sdpm/tools/apps/views/bridge.js"
       reason: >
-        /tmp/compose_stops is used for inter-agent stop signalling inside
-        a Fargate container. Not shared with untrusted processes.
-      expiration: "2027-03-29"
+        The host frame's origin differs per MCP Apps host and is unknown to the view, so no
+        target origin can be named. Messages go only to window.parent, the host that
+        embedded the view and supplied the data it sends back.
+      expiration: "2027-11-09"
+
+    - rule_id: "javascript.browser.security.insufficient-postmessage-origin-validation.insufficient-postmessage-origin-validation"
+      path: "sdpm/sdpm/tools/apps/views/bridge.js"
+      reason: >
+        The listener returns unless ev.source === window.parent, which pins the sender to
+        the embedding host frame. An origin allowlist is not possible because the host
+        frame's origin differs per MCP Apps host.
+      expiration: "2027-11-09"
+
+    # --- Bandit B108: /tmp usage in local/container code ---
 
     - rule_id: "B108"
       path: "servers/local/server_acp.py"
@@ -318,6 +366,20 @@ global_settings:
         Uses public.ecr.aws/docker/library/python:3.13-slim from
         ECR Public Gallery. This is the official Python image mirror on ECR.
       expiration: "2027-03-29"
+
+    # --- uv workspace members: dependency cooldown lives in Dependabot ---
+    # Members declare `[tool.uv] package = false` (applications, not libraries), which
+    # trips the uv cooldown rule. A uv-level `exclude-newer` applies to every resolution,
+    # including security fixes: on 2026-11-01 it would have moved pypdf back from 6.21.4
+    # to the vulnerable 6.21.2. The cooldown is enforced where it can tell the two apart:
+    # .github/dependabot.yml (cooldown 7 days for version updates; security updates skip it).
+
+    - rule_id: "package_managers.uv.uv-missing-dependency-cooldown.uv-missing-dependency-cooldown"
+      path: "**/pyproject.toml"
+      reason: >
+        Cooldown is Dependabot's (7 days, version updates only) so security fixes are
+        never held back; uv exclude-newer would block them for every resolution.
+      expiration: "2027-11-01"
 
     # --- GitHub Actions workflow_dispatch inputs ---
     # blog-draft.yml requires user-provided PR numbers to select which PRs

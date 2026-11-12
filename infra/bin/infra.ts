@@ -21,12 +21,13 @@ import * as fs from "fs";
 import * as yaml from "yaml";
 import * as path from "path";
 import { DataStack } from "../lib/data-stack";
-import { AuthStack } from "../lib/auth-stack";
+import { AuthStack, normalizeProgrammaticClient } from "../lib/auth-stack";
 import { RuntimeStack } from "../lib/runtime-stack";
 import { AgentStack } from "../lib/agent-stack";
 import { WebUiStack } from "../lib/web-ui-stack";
 import { CloudFrontWafStack } from "../lib/cloudfront-waf-stack";
 import { MODEL_METADATA } from "../lib/model-metadata";
+import { parseLogRetentionDays } from "../lib/construct/runtime-observability";
 
 // Load deployment configuration
 const configPath = path.join(__dirname, "../config.yaml");
@@ -50,16 +51,42 @@ let oidcDiscoveryUrl: string | undefined;
 let allowedClients: string[];
 let authStack: AuthStack | undefined;
 
+// Programmatic client (opt-in, default Cognito only): a native-app client for the
+// user's own automation. Fails synth when enabled together with an external IdP.
+const programmaticClient = normalizeProgrammaticClient(
+  config.auth?.programmaticClient,
+  !(externalOidc && externalClients),
+);
+
 if (externalOidc && externalClients) {
   // Customer-provided IdP — no AuthStack needed
   oidcDiscoveryUrl = externalOidc;
   allowedClients = externalClients;
+  if (config.auth?.selfSignUp !== undefined || config.auth?.allowedEmailDomains !== undefined) {
+    console.warn(
+      "[config] `auth.selfSignUp` / `auth.allowedEmailDomains` apply to the default Cognito user pool only " +
+      "and are ignored with auth.oidcDiscoveryUrl. Manage sign-up in your IdP.",
+    );
+  }
 } else {
   // Default Amazon Cognito (demo/quickstart)
+  // Self sign-up is off unless auth.selfSignUp is true; users are then created
+  // by an administrator. auth.allowedEmailDomains limits self sign-up to those domains.
+  const selfSignUp = config.auth?.selfSignUp ?? false;
+  if (typeof selfSignUp !== "boolean") {
+    throw new Error("Config error: auth.selfSignUp must be true or false.");
+  }
+  const allowedEmailDomains = config.auth?.allowedEmailDomains ?? [];
+  if (!Array.isArray(allowedEmailDomains) || allowedEmailDomains.some((d: unknown) => typeof d !== "string")) {
+    throw new Error("Config error: auth.allowedEmailDomains must be a list of domain names.");
+  }
   authStack = new AuthStack(app, "SdpmAuth", {
     env,
     description: "Spec-Driven Presentation Maker - Auth (uksb-ynuz0lkrea)(tag:auth)",
     mcpCallbackUrls: config.auth?.mcpCallbackUrls,
+    selfSignUp,
+    allowedEmailDomains,
+    programmaticClient,
   });
   // In AuthStack mode, downstream stacks read Auth values (oidcDiscoveryUrl,
   // WebClient ID, MCP custom scope, etc.) from SSM Parameter Store published
@@ -93,6 +120,9 @@ if (config.features?.observability !== undefined) {
 
 const enableTransactionSearch = config.features?.enableTransactionSearch === true;
 
+// Retention of the AgentCore runtime log groups (created by the service, not by CloudFormation).
+const runtimeLogRetention = parseLogRetentionDays(config.observability?.logRetentionDays);
+
 const data = new DataStack(app, "SdpmData", { env, enableInvocationLogging, enableTransactionSearch, description: "Spec-Driven Presentation Maker - Data (uksb-ynuz0lkrea)(tag:data)" });
 
 const runtime = new RuntimeStack(app, "SdpmRuntime", {
@@ -115,6 +145,7 @@ const runtime = new RuntimeStack(app, "SdpmRuntime", {
   vectorIndexName: data.vectorIndexName || undefined,
   useAuthStack: !!authStack,
   enableDCR: config.auth?.enableDCR !== false,
+  logRetention: runtimeLogRetention,
 });
 // When AuthStack is present, explicitly declare the dependency so that SSM
 // parameters published by AuthStack exist before RuntimeStack reads them.
@@ -218,15 +249,15 @@ if (config.stacks?.agent) {
   const agent = new AgentStack(app, "SdpmAgent", {
     env,
     description: "Spec-Driven Presentation Maker - Agent (uksb-ynuz0lkrea)(tag:agent)",
-    table: data.table,
-    pptxBucket: data.pptxBucket,
     mcpRuntimeArn: runtime.runtimeArn,
     oidcDiscoveryUrl: authStack ? undefined : oidcDiscoveryUrl,
     allowedClients,
     useAuthStack: !!authStack,
+    programmaticClient: !!programmaticClient,
     chatModelId: defaultChatModelId,
     createModelId: defaultCreateModelId,
     allowedModelIds,
+    logRetention: runtimeLogRetention,
   });
   // AgentStack reads the WebClient ID from SSM in AuthStack mode.
   // Ensure AuthStack deploys first.
@@ -253,6 +284,7 @@ if (config.stacks?.agent) {
       webAclId: cloudFrontWafStack?.webAclArn,
       allowedIpV4AddressRanges,
       allowedIpV6AddressRanges,
+      programmaticClient: !!programmaticClient,
       defaultChatModelId,
       defaultCreateModelId,
       allowedModels,

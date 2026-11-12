@@ -4,10 +4,7 @@
 
 from __future__ import annotations
 
-import re
-
-_SLUG_RE = re.compile(r"^[a-z0-9-]+$")
-_LINE_RE = re.compile(r"^-\s+\[([^\]]+)\]\s+.+")
+from sdpm.engine.schema.slugs import OUTLINE_LINE_RE, OUTLINE_SLUG_RE
 
 
 def lint_outline(text: str) -> list[dict]:
@@ -22,11 +19,11 @@ def lint_outline(text: str) -> list[dict]:
         stripped = line.strip()
         if not stripped or stripped.startswith("#"):
             continue
-        m = _LINE_RE.match(stripped)
+        m = OUTLINE_LINE_RE.match(stripped)
         if not m:
             continue
         slug = m.group(1)
-        if not _SLUG_RE.match(slug):
+        if not OUTLINE_SLUG_RE.fullmatch(slug):
             diagnostics.append({"line": i, "rule": "slug-pattern"})
         elif slug in seen_slugs:
             diagnostics.append({"line": i, "rule": "slug-duplicate"})

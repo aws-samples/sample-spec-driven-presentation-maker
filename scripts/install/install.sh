@@ -14,8 +14,9 @@ CHECKOUT="$SDPM_HOME/checkout"
 LAUNCHER_DIR="${SDPM_LAUNCHER_DIR:-$HOME/.local/bin}"
 DEPS_ONLY=0
 PROFILE="${SDPM_PROFILE:-}"          # full | mcp ; asked interactively when empty
-REGISTER="${SDPM_REGISTER:-ask}"     # ask | yes | no
-export SDPM_AGENT_NAME="${SDPM_AGENT_NAME:-sdpm}"   # name of the Kiro CLI agent
+REGISTER="${SDPM_REGISTER:-default}" # default | yes | no
+AGENT_NAME="${SDPM_AGENT_NAME:-}"    # the Kiro CLI agent; passed on only when given
+CHANNEL="${SDPM_CHANNEL:-}"          # release | main; passed on only when given
 NON_INTERACTIVE="${SDPM_NON_INTERACTIVE:-0}"
 SKIP_LIBREOFFICE="${SDPM_SKIP_LIBREOFFICE:-0}"
 SKIP_SHORTCUT="${SDPM_SKIP_SHORTCUT:-0}"
@@ -30,9 +31,12 @@ Options:
   --mcp-only           Install the MCP server only (no Node.js, no Web UI)
   --register           Register the MCP server with every detected client without asking
   --agent-name NAME    Name of the Kiro CLI agent (default: sdpm)
+  --channel CHANNEL    release (default: the latest release) or main (every merged change)
+                       Over an existing install, its profile, agent name and channel are kept
   --no-register        Skip client registration (print the configuration instead)
   --deps-only          Install git, uv, LibreOffice, and poppler only
   --non-interactive    Accept dependency installation prompts; default profile: full
+                       (also the behaviour without a terminal: nothing waits for input)
   --skip-libreoffice   Do not check or install LibreOffice
   --skip-shortcut      Do not create a desktop shortcut
   -h, --help           Show this help
@@ -44,6 +48,7 @@ Environment:
   SDPM_REPO_URL             Clone source (default: the GitHub repository; CI/testing)
   SDPM_REGISTER=yes|no      Same as --register / --no-register
   SDPM_AGENT_NAME           Same as --agent-name
+  SDPM_CHANNEL=release|main Same as --channel
   SDPM_NON_INTERACTIVE=1    Same as --non-interactive
   SDPM_SKIP_LIBREOFFICE=1   Same as --skip-libreoffice
   SDPM_SKIP_SHORTCUT=1      Same as --skip-shortcut
@@ -55,7 +60,8 @@ while [[ $# -gt 0 ]]; do
     --full) PROFILE=full ;;
     --mcp-only) PROFILE=mcp ;;
     --register) REGISTER=yes ;;
-    --agent-name) shift; SDPM_AGENT_NAME="${1:?--agent-name needs a value}" ;;
+    --agent-name) shift; AGENT_NAME="${1:?--agent-name needs a value}" ;;
+    --channel) shift; CHANNEL="${1:?--channel needs release or main}" ;;
     --no-register) REGISTER=no ;;
     --deps-only) DEPS_ONLY=1 ;;
     --non-interactive) NON_INTERACTIVE=1 ;;
@@ -66,6 +72,30 @@ while [[ $# -gt 0 ]]; do
   esac
   shift
 done
+
+case "$CHANNEL" in ""|release|main) ;; *) echo "--channel must be release or main, not '$CHANNEL'." >&2; exit 2 ;; esac
+case "$PROFILE" in ""|full|mcp) ;; *) echo "SDPM_PROFILE must be full or mcp, not '$PROFILE'." >&2; exit 2 ;; esac
+case "$REGISTER" in default|ask) REGISTER=default ;; yes|no) ;;
+  *) echo "SDPM_REGISTER must be yes or no, not '$REGISTER'." >&2; exit 2 ;; esac
+
+# The one rule for asking anything: stdout is a terminal and /dev/tty opens. Under
+# `curl | bash` stdin is the script, so it says nothing; an agent captures stdout. Without
+# a terminal the installer runs exactly as with --non-interactive and never waits.
+prompt_allowed() { [[ "$NON_INTERACTIVE" != "1" && -t 1 ]] && { : </dev/tty; } 2>/dev/null; }
+prompt_allowed || NON_INTERACTIVE=1
+
+# Over an existing install, keep its profile unless told otherwise. An old sdpm command can
+# write .profile=full after state.json said mcp (`sdpm update --with-webui`); full wins.
+recorded_profile() {
+  local legacy="" recorded=""
+  [[ -f "$SDPM_HOME/.profile" ]] && legacy="$(cat "$SDPM_HOME/.profile" 2>/dev/null || true)"
+  [[ "$legacy" == "full" ]] && { echo full; return; }
+  [[ -f "$SDPM_HOME/state.json" ]] &&
+    recorded="$(sed -nE 's/^[[:space:]]*"profile":[[:space:]]*"(full|mcp)".*/\1/p' "$SDPM_HOME/state.json" | head -1)"
+  [[ -n "$recorded" ]] && { echo "$recorded"; return; }
+  case "$legacy" in full|mcp) echo "$legacy" ;; esac
+}
+[[ -n "$PROFILE" ]] || PROFILE="$(recorded_profile)"
 
 SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]:-$0}")"
 if ! SCRIPT_DIR="$(cd "$SCRIPT_DIR" 2>/dev/null && pwd)"; then
@@ -94,6 +124,9 @@ if [[ "$OS_TYPE" == "linux" ]] && ! has_command apt-get; then
   exit 1
 fi
 
+# PATH as the user's shell has it, before this run adds to it: the completion screen says
+# whether the launcher directory still needs adding.
+ORIG_PATH="$PATH"
 refresh_path() {
   export PATH="$HOME/.local/bin:$LAUNCHER_DIR:$PATH"
   if [[ "$OS_TYPE" == "macos" ]] && has_command brew; then
@@ -107,6 +140,27 @@ apt_command() {
   elif has_command sudo; then printf 'sudo env DEBIAN_FRONTEND=noninteractive apt-get';
   else echo "sudo is required to install apt packages." >&2; return 1
   fi
+}
+
+# Before the first step that needs sudo (apt on Linux, the Homebrew install on macOS): with
+# a terminal, ask for the password once, outside the spinner; without one, never wait on
+# it: print what a person has to run and stop. Root needs no sudo.
+SUDO_READY=0
+ensure_sudo() {
+  local commands="$1"
+  [[ "$SUDO_READY" == "1" || $(id -u) -eq 0 ]] && return 0
+  # shellcheck disable=SC2024 # sudo -v reads the password from the terminal, as intended
+  if has_command sudo; then
+    if ! prompt_allowed; then
+      if sudo -n true 2>/dev/null; then SUDO_READY=1; return 0; fi
+    elif sudo -v </dev/tty; then SUDO_READY=1; return 0
+    fi
+  fi
+  echo "" >&2
+  if has_command sudo; then echo "sudo needs a password, and nobody can type it here. Run this, then the installer again:" >&2
+  else echo "sudo is required to install these packages. Run this as root, then the installer again:" >&2; fi
+  printf '%s\n' "$commands" | sed 's/^/  /' >&2
+  exit 1
 }
 
 DEP_NAMES=(); DEP_VERSIONS=(); DEP_FOUND=(); DEP_REASONS=(); DEP_HELP=()
@@ -221,6 +275,21 @@ install_missing_dependencies() {
     exit 0
   fi
   TOTAL_STEPS=$((TOTAL_STEPS + ${#indexes[@]}))
+  local apt_packages="" node_line="" name
+  for i in "${indexes[@]}"; do
+    name="${DEP_NAMES[i]}"
+    case "$name" in
+      Homebrew) ensure_sudo '/bin/bash -c "$(curl -fsSL https://raw.githubusercontent.com/Homebrew/install/HEAD/install.sh)"' ;;
+      git) apt_packages+=" git" ;;
+      poppler) apt_packages+=" poppler-utils" ;;
+      LibreOffice) apt_packages+=" libreoffice" ;;
+      Node.js) apt_packages+=" nodejs"; node_line="curl -fsSL https://deb.nodesource.com/setup_20.x | sudo bash -" ;;
+    esac
+  done
+  if [[ "$OS_TYPE" == "linux" && -n "$apt_packages" ]]; then
+    ensure_sudo "${node_line:+$node_line
+}sudo apt-get update && sudo apt-get install -y${apt_packages}"
+  fi
   for i in "${indexes[@]}"; do
     case "${DEP_NAMES[i]}" in
       Homebrew) install_homebrew ;;
@@ -234,13 +303,17 @@ install_missing_dependencies() {
   done
 }
 
+EXISTING=0   # 1: this run is over an install that exists (its manifest counts as an update)
+
 setup_checkout() {
   start_step "Downloading SDPM" "$CHECKOUT"
   mkdir -p "$SDPM_HOME"
   if [[ -d "$CHECKOUT/.git" ]]; then
-    if run_with_spinner "git -C '$CHECKOUT' fetch --tags --prune origin main && git -C '$CHECKOUT' checkout main && git -C '$CHECKOUT' pull --ff-only origin main"; then
-      complete_step "SDPM checkout updated ($LAST_ELAPSED)"
-    else fail_step "SDPM update failed" "$LAST_LOG" "$REPO_HELP"; exit 1; fi
+    EXISTING=1
+    # The sdpm command's fetch: origin's main and tags, local tags mirroring origin's.
+    if run_with_spinner "git -C '$CHECKOUT' fetch --quiet --prune origin '+refs/heads/main:refs/remotes/origin/main' '+refs/tags/*:refs/tags/*'"; then
+      complete_step "SDPM fetched ($LAST_ELAPSED)"
+    else fail_step "SDPM fetch failed" "$LAST_LOG" "$REPO_HELP"; exit 1; fi
   elif [[ -e "$CHECKOUT" ]]; then
     fail_step "$CHECKOUT exists but is not a git checkout" "Move it aside and retry." "$REPO_HELP"; exit 1
   elif run_with_spinner "git clone --branch main --single-branch '$REPO_URL' '$CHECKOUT'"; then
@@ -248,43 +321,30 @@ setup_checkout() {
   else fail_step "SDPM clone failed" "$LAST_LOG" "$REPO_HELP"; exit 1; fi
 }
 
-setup_packages() {
-  start_step "Syncing the MCP server environment" "servers/local"
-  if run_with_spinner "uv sync --directory '$CHECKOUT/servers/local'"; then complete_step "MCP server ready ($LAST_ELAPSED)"
-  else fail_step "uv sync failed" "$LAST_LOG" "$REPO_HELP/blob/main/docs/en/getting-started.md"; exit 1; fi
-  echo "$PROFILE" > "$SDPM_HOME/.profile"
-  echo "$SDPM_AGENT_NAME" > "$SDPM_HOME/.agent-name"
-  local uv_path; uv_path="$(command -v uv)"   # absolute; symlinks kept (brew's bin/uv is the stable path)
-  echo "$uv_path" > "$SDPM_HOME/.uv-path"
-  [[ "$PROFILE" == "full" ]] || return 0
-
-  start_step "Installing Web UI dependencies" "npm ci"
-  if run_with_spinner "npm ci" "$CHECKOUT/web-ui"; then complete_step "Web UI dependencies installed ($LAST_ELAPSED)"
-  else fail_step "npm ci failed" "$LAST_LOG" "$REPO_HELP/tree/main/web-ui"; exit 1; fi
-
-  start_step "Building Web UI" "NEXT_PUBLIC_MODE=local npm run build"
-  if run_with_spinner "NEXT_PUBLIC_MODE=local npm run build" "$CHECKOUT/web-ui"; then complete_step "Local Web UI built ($LAST_ELAPSED)"
-  else fail_step "Local Web UI build failed" "$LAST_LOG" "$REPO_HELP/tree/main/web-ui"; exit 1; fi
-}
-
-setup_icon_set() {
-  local name="$1" manifest="$2" script="$3"
-  if [[ -f "$manifest" ]]; then
-    start_step "$name icons" "already available"; complete_step "$name icons skipped"; return
+# main's checkout_update.py (this installer is main's code too), run before anything is
+# checked out: it picks the latest release (or main), moves the checkout there, then hands
+# over to that version's own setup: Python environment, Web UI, icons, the sdpm command,
+# clients, state.json. Its output is not wrapped, so uv, npm and the client picker show as
+# they are.
+SETUP_STATUS=0
+hand_off() {
+  local tmp uv_path args
+  uv_path="$(command -v uv)"   # absolute; symlinks kept (brew's bin/uv is the stable path)
+  tmp=$(mktemp -d) || { SETUP_STATUS=1; return; }
+  args=(--checkout "$CHECKOUT" --uv "$uv_path" install --launcher "$LAUNCHER_DIR/sdpm"
+        --register "$REGISTER" --profile "$PROFILE")
+  [[ "$EXISTING" == "1" ]] || args+=(--new-checkout)
+  [[ -n "$AGENT_NAME" ]] && args+=(--agent-name "$AGENT_NAME")
+  [[ -n "$CHANNEL" ]] && args+=(--channel "$CHANNEL")
+  [[ "$NON_INTERACTIVE" == "1" ]] && args+=(--non-interactive)
+  echo ""
+  if git -C "$CHECKOUT" --work-tree="$tmp" restore --source=refs/remotes/origin/main --worktree -- servers/local/checkout_update.py; then
+    "$uv_path" run --no-project --isolated --python ">=3.11" python "$tmp/servers/local/checkout_update.py" "${args[@]}"
+    SETUP_STATUS=$?
+  else
+    SETUP_STATUS=1
   fi
-  start_step "Downloading $name icons" "official icon source"
-  if run_with_spinner "uv run --directory '$CHECKOUT/sdpm' python '$script'"; then complete_step "$name icons downloaded ($LAST_ELAPSED)"
-  else fail_step "$name icon download failed; retry after installation" "$LAST_LOG" "$REPO_HELP"; fi
-}
-
-setup_launcher() {
-  start_step "Installing sdpm command" "$LAUNCHER_DIR/sdpm"
-  mkdir -p "$LAUNCHER_DIR"
-  if [[ -n "${SDPM_LAUNCHER_CONTENT:-}" ]]; then printf '%s\n' "$SDPM_LAUNCHER_CONTENT" > "$LAUNCHER_DIR/sdpm"
-  elif [[ -f "$SCRIPT_DIR/launcher.sh" ]]; then cp "$SCRIPT_DIR/launcher.sh" "$LAUNCHER_DIR/sdpm"
-  else fail_step "Launcher source is missing" "" "$REPO_HELP"; exit 1; fi
-  chmod +x "$LAUNCHER_DIR/sdpm"
-  complete_step "sdpm command installed"
+  rm -rf "$tmp"
 }
 
 setup_shortcut() {
@@ -320,29 +380,14 @@ choose_profile() {
   if [[ "$SURFACE_WEBUI" == "1" ]]; then PROFILE=full; else PROFILE=mcp; fi
 }
 
-REGISTER_FAILED=0
-
-# The register step prints its own result table (✓ registered / – skipped / ✗ failed),
-# which is the part of the completion screen that matters; nothing else repeats it.
-register_clients() {
-  echo ""
-  if [[ "$REGISTER" == "no" ]]; then
-    echo "  Skipping client registration (--no-register). Later: sdpm register"; return 0
-  fi
-  if [[ "$REGISTER" == "yes" ]]; then
-    "$LAUNCHER_DIR/sdpm" register --yes || REGISTER_FAILED=1
-    return 0
-  fi
-  if [[ "$NON_INTERACTIVE" == "1" ]]; then
-    echo "  Non-interactive: clients were not registered. Later: sdpm register   (or re-run with --register)"
-    return 0
-  fi
-  "$LAUNCHER_DIR/sdpm" register || REGISTER_FAILED=1
-}
-
+# The client table above (✓ registered / – skipped / ✗ failed) is the part that matters;
+# nothing here repeats it.
 show_completion() {
+  local profile
+  profile="$(recorded_profile)"; profile="${profile:-$PROFILE}"
+  echo ""
   printf "  ${C_GREEN}SDPM is installed${C_RESET} in $CHECKOUT\n\n"
-  if [[ "$PROFILE" == "full" ]]; then
+  if [[ "$profile" == "full" ]]; then
     echo "    Browser:   sdpm webui"
     kiro-cli whoami >/dev/null 2>&1 || echo "               (the Web UI uses Kiro CLI — run 'kiro-cli login' once first)"
   else
@@ -350,11 +395,11 @@ show_completion() {
   fi
   echo "    Agents:    ask for slides in a registered client (table above)"
   echo "    Later:     sdpm  ·  sdpm register  ·  sdpm update  ·  sdpm uninstall"
-  if [[ ":$PATH:" != *":$LAUNCHER_DIR:"* ]]; then
+  if [[ ":$ORIG_PATH:" != *":$LAUNCHER_DIR:"* ]]; then
     printf "    ${C_YELLOW}Add %s to PATH to run 'sdpm' directly.${C_RESET}\n" "$LAUNCHER_DIR"
   fi
-  if [[ "$REGISTER_FAILED" == "1" ]]; then
-    printf "    ${C_YELLOW}Some client registrations failed (see above). Fix them with 'sdpm register <client>'.${C_RESET}\n"
+  if [[ "$SETUP_STATUS" == "4" ]]; then
+    printf "    ${C_YELLOW}Some steps did not finish (see above). Fix client registrations with 'sdpm register <client>'.${C_RESET}\n"
     exit 1
   fi
 }
@@ -365,20 +410,21 @@ main() {
   scan_dependencies
   TOTAL_STEPS=0
   if [[ "$DEPS_ONLY" != "1" ]]; then
-    TOTAL_STEPS=5
-    [[ "$PROFILE" == "full" ]] && TOTAL_STEPS=$((TOTAL_STEPS + 2 + (SKIP_SHORTCUT == 1 ? 0 : 1)))
+    TOTAL_STEPS=1
+    [[ "$PROFILE" == "full" && "$SKIP_SHORTCUT" != "1" ]] && TOTAL_STEPS=2
   fi
   install_missing_dependencies
   if [[ "$DEPS_ONLY" == "1" ]]; then
     echo ""; printf "  ${C_GREEN}Dependency setup complete.${C_RESET}\n"; uv --version; return
   fi
   setup_checkout
-  setup_packages
-  setup_icon_set "AWS Architecture" "$CHECKOUT/sdpm/assets/aws/manifest.json" "$CHECKOUT/sdpm/scripts/download_aws_icons.py"
-  setup_icon_set "Material Symbols" "$CHECKOUT/sdpm/assets/material/manifest.json" "$CHECKOUT/sdpm/scripts/download_material_icons.py"
-  setup_launcher
+  hand_off
+  if [[ "$SETUP_STATUS" != "0" && "$SETUP_STATUS" != "4" ]]; then
+    echo ""
+    fail_step "SDPM setup failed (see above)" "" "$REPO_HELP/blob/main/docs/en/getting-started.md#sdpm-update-stops"
+    exit "$SETUP_STATUS"
+  fi
   [[ "$PROFILE" == "full" ]] && setup_shortcut
-  register_clients
   show_completion
 }
 

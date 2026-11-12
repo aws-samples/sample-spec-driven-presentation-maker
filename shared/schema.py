@@ -16,6 +16,18 @@ instead of hardcoding key strings.
 # ---------------------------------------------------------------------------
 
 
+def user_pk(user_id: str) -> str:
+    """Partition key for everything a user owns (decks, pins, templates, notes).
+
+    Args:
+        user_id: User identifier (JWT sub).
+
+    Returns:
+        PK string in format USER#{user_id}.
+    """
+    return f"USER#{user_id}"
+
+
 def deck_pk(user_id: str) -> str:
     """Partition key for a user's deck records.
 
@@ -25,7 +37,7 @@ def deck_pk(user_id: str) -> str:
     Returns:
         PK string in format USER#{user_id}.
     """
-    return f"USER#{user_id}"
+    return user_pk(user_id)
 
 
 def deck_sk(deck_id: str) -> str:
@@ -40,18 +52,6 @@ def deck_sk(deck_id: str) -> str:
     return f"DECK#{deck_id}"
 
 
-def shared_pk(user_id: str) -> str:
-    """Partition key for shared deck access records.
-
-    Args:
-        user_id: User identifier of the collaborator.
-
-    Returns:
-        PK string in format SHARED#{user_id}.
-    """
-    return f"SHARED#{user_id}"
-
-
 def fav_sk(deck_id: str) -> str:
     """Sort key for a favorite record.
 
@@ -64,16 +64,39 @@ def fav_sk(deck_id: str) -> str:
     return f"FAV#{deck_id}"
 
 
-def template_pk(template_id: str) -> str:
-    """Partition key for a template record.
+# ---------------------------------------------------------------------------
+# User library keys (style pins, templates, builtin-template notes)
+# ---------------------------------------------------------------------------
 
-    Args:
-        template_id: Template identifier.
+STYLE_PINS_SK = "STYLE_PINS"
+USER_TEMPLATE_SK_PREFIX = "TEMPLATE#"
+BUILTIN_NOTE_SK_PREFIX = "BUILTIN_NOTE#"
+BUILTIN_TEMPLATE_SK = "META"
 
-    Returns:
-        PK string in format TEMPLATE#{template_id}.
-    """
-    return f"TEMPLATE#{template_id}"
+
+def style_pins_key(user_id: str) -> dict[str, str]:
+    """Primary key of the user's pinned-style list (attribute ``pinned_styles``)."""
+    return {"PK": user_pk(user_id), "SK": STYLE_PINS_SK}
+
+
+def user_template_sk(name: str) -> str:
+    """Sort key of a user template record: TEMPLATE#{name}."""
+    return f"{USER_TEMPLATE_SK_PREFIX}{name}"
+
+
+def user_template_key(user_id: str, name: str) -> dict[str, str]:
+    """Primary key of a user template record."""
+    return {"PK": user_pk(user_id), "SK": user_template_sk(name)}
+
+
+def builtin_note_key(user_id: str, name: str) -> dict[str, str]:
+    """Primary key of the user's note on a builtin template: BUILTIN_NOTE#{name}."""
+    return {"PK": user_pk(user_id), "SK": f"{BUILTIN_NOTE_SK_PREFIX}{name}"}
+
+
+def builtin_template_key(name: str) -> dict[str, str]:
+    """Primary key of the shared analysis-cache row of a builtin template."""
+    return {"PK": f"TEMPLATE#{name}", "SK": BUILTIN_TEMPLATE_SK}
 
 
 # ---------------------------------------------------------------------------
@@ -82,7 +105,6 @@ def template_pk(template_id: str) -> str:
 
 DECK_SK_PREFIX = "DECK#"
 FAV_SK_PREFIX = "FAV#"
-TEMPLATE_PK_PREFIX = "TEMPLATE#"
 
 
 # ---------------------------------------------------------------------------
@@ -140,8 +162,8 @@ def extract_fav_id(sk: str) -> str:
 def theme_hints_ddb_item(theme_hints: dict | None) -> dict:
     """Build the DynamoDB ``themeHints`` attribute from a ConversionResult.
 
-    Tolerates ``theme_hints=None`` (shared.ingest continues with a warning
-    when theme extraction fails) so a successful conversion is never
+    Tolerates ``theme_hints=None`` (sdpm.tools.attachment.ingest continues
+    with a warning when theme extraction fails) so a successful conversion is never
     reported as failed. DynamoDB rejects native floats, so
     ``backgroundLuminance`` is round-tripped via ``str(Decimal)``.
 

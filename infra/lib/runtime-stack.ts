@@ -17,11 +17,15 @@ import * as dynamodb from "aws-cdk-lib/aws-dynamodb";
 import * as ecr_assets from "aws-cdk-lib/aws-ecr-assets";
 import * as iam from "aws-cdk-lib/aws-iam";
 import * as lambda from "aws-cdk-lib/aws-lambda";
+import * as logs from "aws-cdk-lib/aws-logs";
 import * as s3 from "aws-cdk-lib/aws-s3";
 import * as ssm from "aws-cdk-lib/aws-ssm";
 import { Construct } from "constructs";
 import * as path from "path";
 import { AUTH_SSM_PARAMS } from "./auth-stack";
+import { RuntimeResourcePolicy } from "./construct/runtime-resource-policy";
+import { agentCoreServicePrincipal } from "./construct/agentcore-principal";
+import { RUNTIME_OTEL_ENVIRONMENT, runtimeLogRetention } from "./construct/runtime-observability";
 
 interface RuntimeStackProps extends cdk.StackProps {
   /** Amazon DynamoDB table from DataStack. */
@@ -53,6 +57,8 @@ interface RuntimeStackProps extends cdk.StackProps {
   useAuthStack: boolean;
   /** Enable Dynamic Client Registration (RFC 7591) for external MCP clients. Default: true. */
   enableDCR?: boolean;
+  /** Retention of the runtime's log group (observability.logRetentionDays). Default: 30 days. */
+  logRetention?: logs.RetentionDays;
 }
 
 export class RuntimeStack extends cdk.Stack {
@@ -70,8 +76,9 @@ export class RuntimeStack extends cdk.Stack {
     });
 
     // --- IAM Role for Runtime ---
+    // Trust: only AgentCore resources of this account (confused-deputy guard).
     const runtimeRole = new iam.Role(this, "RuntimeRole", {
-      assumedBy: new iam.ServicePrincipal("bedrock-agentcore.amazonaws.com"),
+      assumedBy: agentCoreServicePrincipal(this),
       description: "Execution role for spec-driven-presentation-maker AgentCore Runtime",
     });
 
@@ -98,34 +105,17 @@ export class RuntimeStack extends cdk.Stack {
       actions: ["logs:CreateLogStream", "logs:PutLogEvents"],
       resources: [`arn:aws:logs:${this.region}:${this.account}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`],
     }));
+    // ECR pull: the image repository is granted below (image.repository.grant);
+    // GetAuthorizationToken has no resource scope.
     runtimeRole.addToPolicy(
       new iam.PolicyStatement({
-        actions: [
-          "ecr:GetDownloadUrlForLayer",
-          "ecr:BatchGetImage",
-          "ecr:GetAuthorizationToken",
-        ],
+        actions: ["ecr:GetAuthorizationToken"],
         resources: ["*"],
       })
     );
 
-    // CloudWatch Logs / X-Ray / Metrics — required for AgentCore Runtime observability
+    // X-Ray / Metrics — required for AgentCore Runtime observability
     // https://docs.aws.amazon.com/bedrock-agentcore/latest/devguide/runtime-permissions.html
-    runtimeRole.addToPolicy(
-      new iam.PolicyStatement({
-        actions: [
-          "logs:CreateLogGroup",
-          "logs:CreateLogStream",
-          "logs:PutLogEvents",
-          "logs:DescribeLogGroups",
-          "logs:DescribeLogStreams",
-        ],
-        resources: [
-          `arn:aws:logs:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:log-group:/aws/bedrock-agentcore/runtimes/*`,
-          `arn:aws:logs:${cdk.Aws.REGION}:${cdk.Aws.ACCOUNT_ID}:log-group:/aws/bedrock-agentcore/runtimes/*:log-stream:*`,
-        ],
-      })
-    );
     runtimeRole.addToPolicy(
       new iam.PolicyStatement({
         actions: [
@@ -167,14 +157,17 @@ export class RuntimeStack extends cdk.Stack {
       })
     );
 
-    // --- AWS Marketplace permissions (required for Bedrock model subscriptions) ---
+    // --- Browser permissions (browser check of HTML decks: servers/remote/tools/agentcore_browser.py) ---
     runtimeRole.addToPolicy(
       new iam.PolicyStatement({
         actions: [
-          "aws-marketplace:ViewSubscriptions",
-          "aws-marketplace:Subscribe",
+          "bedrock-agentcore:StartBrowserSession",
+          "bedrock-agentcore:StopBrowserSession",
+          "bedrock-agentcore:ConnectBrowserAutomationStream",
         ],
-        resources: ["*"],
+        resources: [
+          `arn:aws:bedrock-agentcore:${cdk.Aws.REGION}:aws:browser/aws.browser.v1`,
+        ],
       })
     );
 
@@ -231,6 +224,12 @@ export class RuntimeStack extends cdk.Stack {
     const runtime = new bedrockagentcore.CfnRuntime(this, "SdpmRuntime", {
       agentRuntimeName: "sdpm",
       roleArn: runtimeRole.roleArn,
+      // V2 restores each microVM from a snapshot taken after startup: the server's
+      // startup preload and its once-per-process LibreOffice warm-up assume it
+      // (servers/remote/server.py). Each new version builds a new snapshot (about
+      // 4 minutes), so the environment below holds no per-deploy value: a deploy
+      // that changes neither the image nor the configuration creates no version.
+      platformVersion: "V2",
       agentRuntimeArtifact: {
         containerConfiguration: {
           containerUri: image.imageUri,
@@ -254,11 +253,14 @@ export class RuntimeStack extends cdk.Stack {
         KB_SSM_PARAM: props.kbSsmParamName ?? "",
         VECTOR_BUCKET_NAME: props.vectorBucketName ?? "",
         VECTOR_INDEX_NAME: props.vectorIndexName ?? "",
-        DEPLOY_TIMESTAMP: new Date().toISOString(),
+        ...RUNTIME_OTEL_ENVIRONMENT,
       },
       description: "spec-driven-presentation-maker MCP Server — AI-powered presentation generation",
     });
     runtime.node.addDependency(defaultPolicy);
+
+    // Retention of the log group AgentCore creates for this runtime (observability.logRetentionDays).
+    runtimeLogRetention(this, "SdpmRuntimeLogRetention", runtime.attrAgentRuntimeId, props.logRetention);
 
     const endpoint = new bedrockagentcore.CfnRuntimeEndpoint(
       this,
@@ -270,6 +272,13 @@ export class RuntimeStack extends cdk.Stack {
       }
     );
     endpoint.addDependency(runtime);
+
+    // Allow only invoke and stop on the runtime and its endpoints. The agent and
+    // the McpHttpApi proxy reach this runtime with InvokeAgentRuntime only.
+    new RuntimeResourcePolicy(this, "SdpmRuntimeResourcePolicy", {
+      runtimeArn: runtime.attrAgentRuntimeArn,
+      endpointArns: { SdpmEndpoint: endpoint.attrAgentRuntimeEndpointArn },
+    });
 
     // --- Outputs ---
     this.runtimeArn = runtime.attrAgentRuntimeArn;

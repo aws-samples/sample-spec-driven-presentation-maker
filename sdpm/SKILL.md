@@ -29,6 +29,7 @@ CLI-only operations without a contract name:
 |---|---|
 | Preview slides as PNG | `scripts/pptx_builder.py preview` |
 | Measure text bounding boxes | `scripts/pptx_builder.py measure` |
+| Build output.html for an HTML deck | `scripts/pptx_builder.py generate_html <deck>` |
 | Import an existing PPTX to JSON | `scripts/pptx_to_json.py` |
 | Start a deck translation | `scripts/translate_extract.py <deck> --target-lang <lang>` |
 | Apply filled translations | `scripts/translate_apply.py <deck>-<lang>` |
@@ -38,6 +39,11 @@ CLI-only operations without a contract name:
 There is no MCP session here — deck files (`deck.json`, `specs/`, `slides/`) are read
 and written directly with normal file I/O. Everything the workflows describe as a tool
 call (`read_text`, `write_file`, etc.) is just that: open the path, read or write it.
+
+HTML decks (deck.json `outputFormat` `html`; composer: `start composing --mode html`) have
+no `run_python` post-processing here — run `generate_html <deck>` after writing slides. It
+also checks every slide in a local Chrome / Edge (layout, JS errors) when one is installed;
+`measure <deck>` reports those checks and `preview <deck>` writes PNGs to `preview/png/`.
 
 ## Start here
 

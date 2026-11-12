@@ -5,7 +5,7 @@
 Layer 4 Web UI for [Spec-Driven Presentation Maker](../README.md).
 A React-based chat interface for creating presentations through conversational AI — design your spec, then let the agent build the slides.
 
-![Chat UI](readme-imgs/fast-chat-screenshot.png)
+![The deck page: the slides on the left, the chat with a change request and the agent's reply on the right](../docs/assets/screenshots/webui-deck.png)
 
 ---
 
@@ -16,7 +16,6 @@ A React-based chat interface for creating presentations through conversational A
 - **Tailwind CSS v4** / shadcn/ui / Radix UI
 - **react-oidc-context** — Cognito OIDC authentication
 - **react-markdown** + remark-gfm — Markdown rendering
-- **react-dropzone** — File upload
 - **sonner** — Toast notifications
 - **PWA** — Service Worker + Web App Manifest
 
@@ -84,11 +83,23 @@ Open [http://localhost:3000](http://localhost:3000) (Next.js picks the next free
 
 ### How it works
 
-Setting `NEXT_PUBLIC_MODE=local` enables the Next.js API Routes under `src/app/api/` and spawns `kiro-cli acp --agent sdpm-orchestrator` per active deck. The canonical agent definitions live under [`servers/local/.kiro/acp-agents/`](../servers/local/.kiro/acp-agents/) and share the MCP toolset from [`servers/local/server_acp.py`](../servers/local/server_acp.py).
+Setting `NEXT_PUBLIC_MODE=local` enables the Next.js API Routes under `src/app/api/` and spawns `kiro-cli acp --agent-engine v3` per active chat, with the session in its agent's mode (`sdpm-orchestrator` for decks; kiro-cli 3.0 or later). The canonical agent definitions live under [`servers/local/.kiro/acp-agents/`](../servers/local/.kiro/acp-agents/) and share the MCP toolset from [`servers/local/server_acp.py`](../servers/local/server_acp.py). Before each new chat, `servers/local/.kiro/agents/` is regenerated from them, in a form both kiro-cli engines read, and left as it is when nothing changed.
+
+To run on kiro-cli's V2 engine instead (`kiro-cli acp --agent sdpm-orchestrator`), open Settings → **Agent engine** and pick V2, or write `{"version": 2, "engine": "v2"}` to `servers/local/.sdpm/acp-config.json`. The choice takes effect from the next message.
+
+Rules in `~/.kiro/steering` that are always included reach the sdpm agents' context, under V3 as under V2.
+
+### Compose in the background
+
+The orchestrator dispatches the composers with `compose_slides` and ends its turn, as on Cloud: the Local server starts them, the chat stays usable while they write the slides, and the Compose card follows each group. When the direction changes, ask in the chat; the orchestrator passes it to a running composer with `message_composer`. When every group has finished, the orchestrator gets the report and tells you the deck is ready. Stop ends the composers, and closing the tab does not: the deck still completes, and the reopened deck shows the result. Each composer runs in its own kiro-cli, up to four at a time, about 0.5 GB each and up to about 0.7 GB while it renders previews. This works on V3 and V2.
+
+### Model and effort
+
+The pill above the chat input shows the chat's model (and, on V3, its effort) and opens a menu to change them. A change applies to this chat's kiro session: at once when the chat is idle, otherwise from your next message. On V3 you choose the model and, for models that have them, the effort level; on V2 only the model. kiro-cli keeps the choice with the session, so a reopened deck continues on it. Settings → **Model** stays the default for new chats; the composers follow the chat's choice. The list comes from the last kiro-cli session that reported one (`servers/local/.sdpm/acp-models.json`), so neither the pill nor Settings starts kiro-cli; on a first run the pill appears after the first reply.
 
 ### Continue from a kiro-cli session
 
-Any chat you had in `kiro-cli` on this machine can become the starting point of a deck. The empty chat shows your sessions from the last 24 hours as cards; the **+** menu → **Continue from kiro session** opens the full list grouped by project. Picking one forks the session into a new ID (the original files under `~/.kiro/sessions/cli/` are never modified), loads it into the orchestrator, and the agent immediately replies with what the work was about and one question — who the audience is and how long the talk is. A chip above the chat shows which session the deck was forked from.
+Any chat you had in `kiro-cli` on this machine can become the starting point of a deck. The empty chat shows your sessions from the last 24 hours as cards; the **+** menu → **Continue from a kiro session** opens the full list grouped by project, newest first. Each session has a small badge for the agent engine that saved it: with the agent engine set to V3, the list has kiro-cli's V3 sessions (from kiro-cli's own session list) and the earlier V2 sessions (`~/.kiro/sessions/cli/`, or `$KIRO_HOME/sessions/cli/`); with V2, only the V2 sessions. Picking one forks it into a new session with the configured engine (on V3, kiro-cli imports a V2 session and forks it; on V2, the session's files are copied), loads it into the orchestrator, and the agent immediately replies with what the work was about and one question — who the audience is and how long the talk is. The original session is never changed. A chip above the chat shows which session the deck was forked from.
 
 ---
 
@@ -242,9 +253,10 @@ OIDC authentication flow — `AuthProvider` wraps the Cognito OIDC context, `Aut
 
 | Document | Description |
 |---|---|
-| [Getting Started](../docs/en/getting-started.md) | Full setup guide for all layers |
+| [Getting Started](../docs/en/getting-started.md) | User guide: install, AI agent, Web UI, HTML decks |
+| [Developer guide](../docs/en/developer-guide.md) | Checkout setup and CDK deployment |
 | [Architecture](../docs/en/architecture.md) | 4-layer design, data flow, auth model |
-| [Recommended Deploy](../docs/en/deploy-cloudshell.md) | Recommended path for AWS deployments (CloudShell or local) |
+| [Deploy guide](../docs/en/deploy-cloudshell.md) | Recommended path for AWS deployments (CloudShell or local) |
 
 ---
 

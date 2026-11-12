@@ -14,7 +14,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { listKiroSessions } from "@/services/kiroSessionsService"
-import type { KiroSessionGroup, KiroSessionSummary } from "@/lib/local/kiro-sessions.types"
+import type { KiroSessionSummary, KiroSessionsResponse } from "@/lib/local/kiro-sessions.types"
+import { EngineBadge } from "./EngineBadge"
 
 interface SessionPickerDialogProps {
   open: boolean
@@ -39,7 +40,7 @@ export function SessionPickerDialog({ open, onOpenChange, onSelect }: SessionPic
   const locale = useLocale()
   const [query, setQuery] = useState("")
   const [showAll, setShowAll] = useState(false)
-  const [groups, setGroups] = useState<KiroSessionGroup[]>([])
+  const [listing, setListing] = useState<KiroSessionsResponse | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(false)
   const [reloadKey, setReloadKey] = useState(0)
@@ -54,7 +55,7 @@ export function SessionPickerDialog({ open, onOpenChange, onSelect }: SessionPic
     setLoading(true)
     setError(false)
     listKiroSessions(showAll, controller.signal)
-      .then((data) => setGroups(data.groups))
+      .then((data) => setListing(data))
       .catch((err: unknown) => {
         if (!(err instanceof DOMException && err.name === "AbortError")) setError(true)
       })
@@ -72,6 +73,7 @@ export function SessionPickerDialog({ open, onOpenChange, onSelect }: SessionPic
     }
   }, [open])
 
+  const groups = useMemo(() => listing?.groups ?? [], [listing])
   const filteredGroups = useMemo(() => {
     const normalized = query.trim().toLocaleLowerCase()
     if (!normalized) return groups
@@ -227,7 +229,10 @@ export function SessionPickerDialog({ open, onOpenChange, onSelect }: SessionPic
                         className={`flex min-h-14 w-full items-center gap-3 rounded-lg px-3 py-2 text-left motion-safe:transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal ${active ? "bg-brand-teal-soft" : "hover:bg-background-hover"}`}
                       >
                         <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-foreground">{session.title}</span>
+                          <span className="flex min-w-0 items-center gap-2">
+                            <span className="truncate text-sm font-medium text-foreground">{session.title}</span>
+                            <EngineBadge engine={session.engine} />
+                          </span>
                           <span className="mt-0.5 block text-xs text-foreground-muted">
                             {relativeTime(session.updatedAt, locale)}
                           </span>
@@ -242,8 +247,10 @@ export function SessionPickerDialog({ open, onOpenChange, onSelect }: SessionPic
           )}
         </div>
 
-        <div className="border-t border-border px-5 py-3 text-xs text-foreground-muted">
-          {t("keyboardHint")}
+        <div className="space-y-1 border-t border-border px-5 py-3 text-xs text-foreground-muted">
+          {!loading && !error && listing?.engine === "v2" && <p>{t("v3SessionsHidden")}</p>}
+          {!loading && !error && listing?.unavailable?.includes("v3") && <p>{t("engineUnavailable")}</p>}
+          <p>{t("keyboardHint")}</p>
         </div>
       </DialogContent>
     </Dialog>

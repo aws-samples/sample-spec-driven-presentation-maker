@@ -42,7 +42,6 @@ from sdpm.engine.layout import (  # noqa: F401
     optimize_order,
 )
 from sdpm.engine.layout.render import render_architecture
-from sdpm.engine.preview.backend import _is_wsl
 from sdpm.utils.effects import apply_effects  # noqa: F401
 from sdpm.utils.image import apply_image_effects, resolve_image_path  # noqa: F401
 from sdpm.utils.io import read_json, write_json
@@ -74,9 +73,32 @@ def _resolve_template(data, input_path):
     sys.exit(1)
 
 
+def _html_deck_dir(input_path):
+    """The deck directory when ``input_path`` is an HTML deck (deck.json outputFormat html).
+
+    An unreadable deck.json keeps the PPTX path; an explicit invalid outputFormat stops the
+    command with exit code 1.
+    """
+    from sdpm.engine.schema import read_deck_format
+
+    if not input_path or input_path == "-" or not Path(input_path).is_dir():
+        return None
+    try:
+        output_format = read_deck_format(input_path)
+    except ValueError as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+    return Path(input_path) if output_format == "html" else None
+
+
 def cmd_generate(args):
     """Generate PPTX from JSON."""
     from sdpm.api import generate
+
+    if _html_deck_dir(args.input) is not None:
+        print("This deck is an HTML deck: no PPTX is built. "
+              f"Build output.html with: generate_html {args.input}", file=sys.stderr)
+        sys.exit(1)
 
     try:
         result = generate(
@@ -199,6 +221,16 @@ def cmd_preview(args):
     if args.pages:
         pages_list = [int(p.strip()) for p in args.pages.split(",")]
 
+    html_deck = _html_deck_dir(args.input)
+    if html_deck is not None:
+        result = _refresh_html_pages(html_deck, pages_list)
+        for path in result.get("preview_files", []):
+            print(f"Generated: {path}")
+        note = (result.get("browser_check") or {}).get("note")
+        if note:
+            print(note)
+        return
+
     try:
         result = api_preview(
             json_path=args.input,
@@ -227,6 +259,11 @@ def cmd_measure(args):
     if args.pages:
         slides_list = [int(p.strip()) for p in args.pages.split(",")]
 
+    html_deck = _html_deck_dir(args.input)
+    if html_deck is not None:
+        _measure_html(html_deck, slides_list)
+        return
+
     try:
         result = measure(
             json_path=args.input,
@@ -240,6 +277,59 @@ def cmd_measure(args):
         sys.exit(1)
 
     print(result)
+
+
+def _refresh_html_pages(deck_dir, pages):
+    """HTML deck: rebuild <deck>/output.html and check the given pages (default: all)
+    in a browser (sdpm.api.refresh_html). Exits on a build error."""
+    from sdpm.api import parse_outline_slugs, refresh_html
+
+    present = [s for s in parse_outline_slugs(deck_dir / "specs" / "outline.md")
+               if (deck_dir / "slides" / f"{s}.html").is_file()]
+    slugs = [present[p - 1] for p in pages if 1 <= p <= len(present)] if pages else present
+    result = refresh_html(deck_dir, measure_slides=slugs or None)
+    if "html_error" in result:
+        print(f"Error: {result['html_error']}", file=sys.stderr)
+        sys.exit(1)
+    return result
+
+
+def _measure_html(deck_dir, pages):
+    """HTML deck: rebuild <deck>/output.html, check the pages in a browser, print the report."""
+    result = _refresh_html_pages(deck_dir, pages)
+    print(result.get("measure", "Checks:\n  no slides"))
+
+
+def cmd_generate_html(args):
+    """Assemble an HTML deck into one offline output.html."""
+    from sdpm.api import generate_html
+
+    try:
+        result = generate_html(args.input, args.output, check_slides=_html_slugs(args.input))
+    except (FileNotFoundError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"Generated: {Path(result['output_path']).resolve()} ({result['bytes']} bytes)")
+    for line in result["slides"]:
+        print(line)
+    for w in result["warnings"]:
+        print(f"  {w}")
+    decorations = result.get("decorations")
+    if decorations:
+        print(f"  {decorations['note']}")
+    browser = result.get("browser_check")
+    if browser and not browser.get("note"):  # a note is already among the warnings
+        print(f"  Browser check: {browser['status']} ({browser.get('browser')}, {browser.get('seconds', 0)} s)")
+    for path in result.get("preview_files", []):
+        print(f"  PNG: {path}")
+
+
+def _html_slugs(deck_dir):
+    """Every slug of the outline (generate_html checks the ones it builds)."""
+    from sdpm.api import parse_outline_slugs
+
+    return parse_outline_slugs(Path(deck_dir) / "specs" / "outline.md")
 
 
 def cmd_search_assets(args):
@@ -306,11 +396,10 @@ def cmd_list_styles(args):
     """List design styles (user-local + bundled) with their HTML paths.
 
     Mirrors the ``list_styles`` tool: pinned + user styles by default,
-    ``--all`` for every bundled style. Opens the browser gallery unless
-    ``--no-browse``. Apply a style by copying its HTML to ``specs/art-direction.html``.
+    ``--all`` for every bundled style. Text only. Apply a style by copying its HTML to
+    ``specs/art-direction.html``.
     """
     from sdpm.api import _find_style_in_dirs, get_styles_dirs
-    from sdpm.knowledge.reference import open_styles_gallery
     from sdpm import tools
 
     styles_dirs = get_styles_dirs()
@@ -321,8 +410,6 @@ def cmd_list_styles(args):
         print(f"  {st['name']:<24} [{st['source']}]{pin}  {path}  — {st['description']}")
     if result.get("other_styles"):
         print(f"# Hidden by pins (pass --all): {', '.join(result['other_styles'])}", file=sys.stderr)
-    if not args.no_browse:
-        open_styles_gallery(styles_dirs)
 
 
 def cmd_start(args):
@@ -335,7 +422,7 @@ def cmd_start(args):
     if role == "presentation":
         payload = tools.start_presentation()
     elif role == "composing":
-        payload = tools.start_composing(args.deck or "", args.slugs or None)
+        payload = tools.start_composing(args.deck or "", args.slugs or None, mode=args.mode)
     elif role == "style":
         payload = tools.start_style(args.base or "")
     elif role == "translation":
@@ -368,41 +455,31 @@ def cmd_guides(args):
             print(f"# {e}", file=sys.stderr)
 
 
-def _get_documents_dir():
-    """Get output base directory from config, with WSL fallback."""
-    try:
-        from sdpm.config import get_output_dir
-        return get_output_dir()
-    except Exception:
-        pass
-    import subprocess
-    if _is_wsl():
-        try:
-            result = subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                ["/mnt/c/Windows/System32/WindowsPowerShell/v1.0/powershell.exe", "-Command",
-                 "[Environment]::GetFolderPath('MyDocuments')"],
-                capture_output=True, timeout=10)
-            win_path = result.stdout.decode("cp932", errors="replace").strip()
-            if win_path:
-                wsl = subprocess.run(["wslpath", win_path], capture_output=True, text=True)  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-                if wsl.returncode == 0:
-                    return Path(wsl.stdout.strip()) / "SDPM-Presentations"
-        except Exception:
-            pass
-    return Path.home() / "Documents" / "SDPM-Presentations"
-
-
 def cmd_init(args):
     from sdpm.api import init
-    result = init(
-        name=args.name or "",
-        output_dir=args.output if hasattr(args, 'output') and args.output else None,
-    )
+    from sdpm.entry import format_notes
+    output_format = getattr(args, 'output_format', None) or "pptx"
+    try:
+        result = init(
+            name=args.name or "",
+            output_dir=args.output if hasattr(args, 'output') and args.output else None,
+            output_format=output_format,
+        )
+    except ValueError as e:
+        print(f"Error: {e} To choose the folder, pass it with -o/--output.", file=sys.stderr)
+        sys.exit(1)
     print(f"output_dir:  {result['output_dir']}")
     print(f"deck_json:   {result['deck_json']}")
     for f in result["workspace"]:
         if f.startswith("specs/"):
             print(f"specs:       {Path(result['output_dir']) / f}")
+    # Same notes the init_deck_workspace tool returns as format_notes (HTML only).
+    notes = format_notes(output_format)
+    if notes:
+        print("\nformat_notes:\n")
+        print(notes)
+
+
 def cmd_code_block(args):
     """Generate elements JSON for a syntax-highlighted code block."""
     from sdpm.api import code_block
@@ -640,6 +717,10 @@ def main():
     p_gen.add_argument("--transition-mode", default="inherit",
                        help="Slide transitions: inherit|on|off (overrides deck.json transitions.enabled)")
 
+    p_html = subparsers.add_parser("generate_html", help="Build output.html for an HTML deck (deck.json outputFormat html)")
+    p_html.add_argument("input", help="Deck directory")
+    p_html.add_argument("-o", "--output", help="Output HTML path (default: <deck>/output.html)")
+
     p_prev = subparsers.add_parser("preview", help="Export slides as PNG images")
     p_prev.add_argument("input", help="Input JSON file")
     p_prev.add_argument("-p", "--pages", help="Pages to export (e.g. 1,3,5)")
@@ -681,7 +762,6 @@ def main():
 
     p_ls = subparsers.add_parser("list_styles", help="List design styles (user-local + bundled)")
     p_ls.add_argument("--all", action="store_true", help="Include styles hidden by pins")
-    p_ls.add_argument("--no-browse", action="store_true", help="Don't open the browser gallery")
 
     p_start = subparsers.add_parser("start", help="Role entry payload: role document + what the role reads first")
     p_start.add_argument("role", choices=["presentation", "composing", "style", "translation"])
@@ -689,6 +769,8 @@ def main():
     p_start.add_argument("--slugs", nargs="*", help="Assigned slugs (composing)")
     p_start.add_argument("--base", help="Base style name (style)")
     p_start.add_argument("--language", help="Target language (translation)")
+    p_start.add_argument("--mode", choices=["pptx", "html"], default="pptx",
+                         help="Composer mode: pptx (slide JSON) or html (slide HTML) (composing)")
     p_start.add_argument("--workflow-only", action="store_true", help="Print only the role document")
 
     p_gd = subparsers.add_parser("read_guides", help="List or show guide documents")
@@ -697,6 +779,8 @@ def main():
     p_init = subparsers.add_parser("init_deck_workspace", help="Create an empty deck workspace (deck.json, slides/, specs/)")
     p_init.add_argument("name", nargs="?", help="Presentation name (e.g. 'my-proposal')")
     p_init.add_argument("-o", "--output", help="Output directory (overrides default)")
+    p_init.add_argument("--output-format", choices=["pptx", "html"], default="pptx",
+                        help="Deck output format (html only when an HTML / browser deck is wanted)")
 
     p_layout = subparsers.add_parser("arch_diagram", help="Compute layout coordinates from logical structure JSON")
 
@@ -742,6 +826,8 @@ def main():
 
     if args.command == "generate_pptx":
         cmd_generate(args)
+    elif args.command == "generate_html":
+        cmd_generate_html(args)
     elif args.command == "preview":
         cmd_preview(args)
     elif args.command == "storyboard":

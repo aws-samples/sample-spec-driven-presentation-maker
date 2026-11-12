@@ -75,15 +75,14 @@ class TestRemoteListStyles:
         assert len(result["styles"]) > 0
         assert all(s["source"] == "builtin" for s in result["styles"])
         # No user_id → storage must not be touched
-        storage.list_files.assert_not_called()
+        storage.list_user_styles.assert_not_called()
+        storage.get_style_pins.assert_not_called()
 
     def test_user_styles_merged(self):
         storage = MagicMock()
-        storage.pptx_bucket = "bucket"
-        storage.list_files.return_value = ["user-styles/u1/my-style.html"]
-        storage.download_file_from_pptx_bucket.return_value = (
-            b"<html><head><title>My Style</title></head></html>"
-        )
+        storage.list_user_styles.return_value = [
+            {"name": "my-style", "description": "My Style", "source": "user"},
+        ]
         storage.get_style_pins.return_value = []
         result = remote_list_styles(storage=storage, user_id="u1", include_all=True)
         user = [s for s in result["styles"] if s["source"] == "user"]
@@ -93,8 +92,7 @@ class TestRemoteListStyles:
 
     def test_pinned_filter_reports_hidden_builtin_names(self):
         storage = MagicMock()
-        storage.pptx_bucket = "bucket"
-        storage.list_files.return_value = []
+        storage.list_user_styles.return_value = []
         all_builtin = remote_list_styles(storage=storage, user_id="", include_all=True)["styles"]
         assert len(all_builtin) >= 2
         pinned, *others = [s["name"] for s in all_builtin]
@@ -104,3 +102,17 @@ class TestRemoteListStyles:
         assert [s["name"] for s in result["styles"]] == [pinned]
         assert result["other_styles"] == others
         assert "hint" in result
+
+    def test_user_style_replaces_bundled_style_of_same_name(self):
+        storage = MagicMock()
+        all_builtin = remote_list_styles(storage=storage, user_id="", include_all=True)["styles"]
+        shadowed = all_builtin[0]["name"]
+        storage.list_user_styles.return_value = [
+            {"name": shadowed, "description": "Mine", "source": "user"},
+        ]
+        storage.get_style_pins.return_value = []
+
+        styles = remote_list_styles(storage=storage, user_id="u1", include_all=True)["styles"]
+        same = [s for s in styles if s["name"] == shadowed]
+        assert same == [{"name": shadowed, "description": "Mine", "source": "user", "pinned": False}]
+        assert len(styles) == len(all_builtin)

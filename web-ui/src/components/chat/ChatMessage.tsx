@@ -3,7 +3,8 @@
 /**
  * ChatMessage — Renders a single chat message with tool indicators.
  *
- * User messages: right-aligned bubble.
+ * User messages: right-aligned bubble; a change request message (`[review:<id>]` plus its
+ * JSON block, built by the server) renders as the 修正依頼 card (ReviewRequestCard) instead.
  * Assistant messages: left-aligned bubble with Markdown rendering.
  * Tool indicators appear below the message bubble:
  *   - Latest tool is remains visible
@@ -18,17 +19,19 @@
 
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import Markdown from "react-markdown"
 import type { Components } from "react-markdown"
 import remarkGfm from "remark-gfm"
-import { ChevronRight, Sparkles, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
+import { ChevronRight, CodeXml, Sparkles, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
 import { ToolCard, ToolCardCompact } from "./ToolCard"
 import { HearingCard } from "./HearingCard"
 import { SnippetBlock } from "./SnippetBlock"
 import { batchGetSlidePreviewUrls } from "@/services/deckService"
 import { SLASH_TOKEN_SOURCE } from "@/lib/slashToken"
 import { useTranslations } from "next-intl"
+import { parseReviewMessage } from "@/lib/review/marker"
+import { ReviewRequestCard } from "@/components/review/ReviewRequestCard"
 
 type HearingQuestion = { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }
 
@@ -40,6 +43,7 @@ function extractQuestions(input: Record<string, unknown>): HearingQuestion[] {
 }
 
 const MENTION_RE = new RegExp(`(@Page\\s\\d+|@\\[[^\\]]+\\]|${SLASH_TOKEN_SOURCE})`)
+const FORMAT_HTML_TOKEN_RE = /^@format:(?:html|"html")$/
 const SLIDE_PREVIEW_RE = /\[slide-preview:([a-f0-9]+):([a-z0-9][a-z0-9_-]*)\]/g
 const COLOR_CODE_RE = /(#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3}))\b/g
 
@@ -60,6 +64,17 @@ function renderInlinePreviews(text: string, urls: Record<string, string>): strin
   })
 }
 
+/** Sent-message chip for the `@format:html` token (label shared with the input chip). */
+function FormatHtmlChip() {
+  const t = useTranslations("slashPicker")
+  return (
+    <span className="inline-flex items-center gap-1 rounded-md border border-border bg-foreground/[0.03] px-1.5 py-0.5 align-middle text-xs font-medium text-foreground">
+      <CodeXml className="h-3 w-3" aria-hidden="true" />
+      {t("formatHtml")}
+    </span>
+  )
+}
+
 /**
  * Highlight @Page N and @[DeckName] mentions within a text string,
  * and render inline color swatches next to hex color codes (#RGB / #RRGGBB).
@@ -72,6 +87,9 @@ function highlightMentions(text: string): (string | React.JSX.Element)[] {
   const COMBINED_RE = new RegExp(`(@Page\\s\\d+|@\\[[^\\]]+\\]|${SLASH_TOKEN_SOURCE}|#(?:[0-9a-fA-F]{6}|[0-9a-fA-F]{3})\\b)`, "g")
   const parts = text.split(COMBINED_RE)
   return parts.map((part, i) => {
+    if (FORMAT_HTML_TOKEN_RE.test(part)) {
+      return <FormatHtmlChip key={i} />
+    }
     if (MENTION_RE.test(part)) {
       return <span key={i} className="text-blue-400 font-medium">{part}</span>
     }
@@ -142,6 +160,8 @@ export interface ToolUse {
   result?: Record<string, unknown>
   /** Streaming progress messages from tool (e.g. compose_slides sub-agent progress). */
   streamMessages?: Record<string, unknown>[]
+  /** Cloud: the tool runs as a background task (compose_slides); running until `taskEnd`. */
+  task?: { id?: string; state: "running" | "completed" | "failed" | "cancelled" }
 }
 
 export type MessageBlock = { type: "text"; text: string } | { type: "tool"; tool: ToolUse }
@@ -157,17 +177,20 @@ interface ChatMessageProps {
   isStreaming?: boolean
   /** Cognito ID token for fetching slide previews. */
   idToken?: string
-  /** Session ID — forwarded to ComposeCard for soft-stop calls. */
-  sessionId?: string
-  /** Cognito Access Token — forwarded to ComposeCard for soft-stop (client_id claim lives on the access token). */
-  accessToken?: string
   /** Callback to send a message (used by HearingCard). */
   onSend?: (text: string) => void
   /** Whether hearing cards should be disabled (a new message was sent). */
   hearingDisabled?: boolean
+  /** Deck of this chat; a change request card numbers the slides only for the open deck. */
+  deckId?: string
+  /** Cloud: the session works, so a tool with a running background task is active in any message. */
+  sessionWorking?: boolean
 }
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, sessionId, accessToken, onSend, hearingDisabled = false }: ChatMessageProps) {
+/** A tool whose background task still runs while the session works (Cloud compose). */
+const runsInBackground = (tool: ToolUse, sessionWorking: boolean) => sessionWorking && tool.task?.state === "running"
+
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, onSend, hearingDisabled = false, deckId, sessionWorking = false }: ChatMessageProps) {
   const t = useTranslations("chat")
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
@@ -187,6 +210,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
   // Strip compact v1 attachment markers from display text
   cleanContent = cleanContent.replace(/\[Attached:\s*[^\]]+\]\n*/g, "").trim()
   const allSnippets = [...inlineSnippets, ...snippets]
+  const reviewRequest = useMemo(() => (isUser ? parseReviewMessage(content) : null), [isUser, content])
   const outlineDiff = cleanContent.match(/^([^\n]+)\n\n```diff\n([\s\S]*?)\n```([\s\S]*)$/)
   const isOutlineEdit = cleanContent.startsWith("📝") ||
     cleanContent.startsWith("I manually edited outline.md.") ||
@@ -246,8 +270,25 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
           <Sparkles className="h-3 w-3 text-foreground-secondary" />
         </div>
       )}
-      <div className={isUser ? "max-w-[85%]" : "flex-1 min-w-0"}>
-        {isUser ? (
+      <div className={isUser ? (reviewRequest ? "w-[94%]" : "max-w-[85%]") : "flex-1 min-w-0"}>
+        {reviewRequest ? (
+          /* 修正依頼 card (attachment chips above it, as on the bubble) */
+          <div>
+            {attachments.length > 0 && (
+              <div className="flex flex-wrap justify-end gap-1.5 mb-2">
+                {attachments.map((att, i) => (
+                  <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] border border-border/40 bg-background/30">
+                    {att.fileType.startsWith("image/")
+                      ? <ImageIcon className="h-3 w-3 text-blue-400" />
+                      : <FileTextIcon className="h-3 w-3 text-orange-400" />}
+                    <span className="max-w-[140px] truncate">{att.fileName}</span>
+                  </span>
+                ))}
+              </div>
+            )}
+            <ReviewRequestCard request={reviewRequest} deckId={deckId} />
+          </div>
+        ) : isUser ? (
           /* User bubble */
           <div className="text-sm leading-relaxed break-words px-3.5 py-2.5 rounded-2xl rounded-br-md bg-brand-teal-soft border border-brand-teal/15">
             {attachments.length > 0 && (
@@ -301,15 +342,12 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 <ToolCard
                   key={block.tool.toolUseId}
                   name={block.tool.name}
-                  toolUseId={block.tool.toolUseId}
                   input={block.tool.input}
                   status={block.tool.status}
                   result={block.tool.result}
-                  isActive={isStreaming && !block.tool.status && (i === blocks.length - 1 || (block.tool.streamMessages?.length ?? 0) > 0)}
+                  isActive={(isStreaming && !block.tool.status && (i === blocks.length - 1 || (block.tool.streamMessages?.length ?? 0) > 0)) || runsInBackground(block.tool, sessionWorking)}
                   streamMessages={block.tool.streamMessages}
-                  sessionId={sessionId}
                   idToken={idToken}
-                  accessToken={accessToken}
                 />
               )
             )}
@@ -353,15 +391,12 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                 {latestTool && (
                   <ToolCard
                     name={latestTool.name}
-                    toolUseId={latestTool.toolUseId}
                     input={latestTool.input}
                     status={latestTool.status}
                     result={latestTool.result}
-                    isActive={isStreaming && !latestTool.status}
+                    isActive={(isStreaming && !latestTool.status) || runsInBackground(latestTool, sessionWorking)}
                     streamMessages={latestTool.streamMessages}
-                    sessionId={sessionId}
                     idToken={idToken}
-                    accessToken={accessToken}
                   />
                 )}
                 {olderTools.length > 0 && (

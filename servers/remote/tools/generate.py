@@ -71,46 +71,6 @@ def generate_previews(pptx_path: Path, output_dir: Path) -> list[Path]:
     return webp_files
 
 
-def generate_previews_for_pages(pptx_path: Path, output_dir: Path, pages: list[int]) -> dict[int, Path]:
-    """Render only ``pages`` (1-based) to WebP.
-
-    LibreOffice still exports the whole deck to PDF (there is no page
-    selection), but pdftoppm and the WebP encode run per requested page
-    instead of for every slide — for a 13-slide deck with 2 measured slugs
-    that is 1s instead of 9s locally.
-
-    Returns {page: webp_path}; pages beyond the PDF are skipped.
-    """
-    from PIL import Image
-
-    env = os.environ.copy()
-    env["HOME"] = str(output_dir)
-    t0 = time.monotonic()
-    subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-        ["soffice", "--headless", "--convert-to", "pdf", "--outdir", str(output_dir), str(pptx_path)],
-        env=env, capture_output=True, text=True, timeout=120, check=True,
-    )
-    logger.info("soffice pdf export took %.1fs (%s)", time.monotonic() - t0, pptx_path.name)
-    pdf_path = output_dir / pptx_path.with_suffix(".pdf").name
-    if not pdf_path.exists():
-        raise FileNotFoundError("LibreOffice did not produce PDF")
-
-    out: dict[int, Path] = {}
-    for page in sorted(set(pages)):
-        stem = output_dir / f"slide-{page}"
-        r = subprocess.run(  # nosec B603 # nosemgrep: python.lang.security.audit.dangerous-subprocess-use-audit
-            ["pdftoppm", "-png", "-r", "200", "-f", str(page), "-l", str(page), "-singlefile", str(pdf_path), str(stem)],
-            capture_output=True, text=True, timeout=120, check=False,
-        )
-        png_path = stem.with_suffix(".png")
-        if r.returncode != 0 or not png_path.exists():
-            continue  # page out of range
-        webp_path = png_path.with_suffix(".webp")
-        Image.open(png_path).save(webp_path, "WEBP", quality=85)
-        out[page] = webp_path
-    return out
-
-
 def _assemble_slides(tmpdir: Path) -> list[dict]:
     """Assemble slide list from workspace directory.
 
@@ -353,14 +313,51 @@ def _prepare_workspace(
         dest.write_bytes(storage.download_file_from_pptx_bucket(key))
 
     # Download asset manifests + referenced icons
+    slide_text = json.dumps(slides)
+    refs = set(re.findall(r'(?:assets:|icons:)([^"]+)', slide_text))
+    materialize_assets(refs, storage, tmpdir)
+
+    # Resolve template
+    template_path = materialize_template(deck_id, user_id, presentation, storage, tmpdir)
+
+    # Fonts
+    fonts = presentation.get("fonts") or deck.get("fonts")
+    if not fonts or not fonts.get("fullwidth"):
+        fonts = extract_fonts(template_path)
+
+    return tmpdir, slides, {
+        "template_path": template_path,
+        "custom_template": True,
+        "fonts": fonts,
+        "base_dir": tmpdir,
+        "default_text_color": presentation.get("defaultTextColor"),
+    }
+
+
+def pin_workspace_build_config(tmpdir: Path, build_kwargs: dict) -> None:
+    """Rewrite the workspace deck.json so ``sdpm.api`` builds with exactly what
+    ``_prepare_workspace`` materialized (template file, fonts, text color)."""
+    deck_meta = json.loads((tmpdir / "deck.json").read_text(encoding="utf-8"))
+    deck_meta["template"] = str(Path(build_kwargs["template_path"]).name)
+    deck_meta["fonts"] = build_kwargs["fonts"]
+    if build_kwargs.get("default_text_color"):
+        deck_meta["defaultTextColor"] = build_kwargs["default_text_color"]
+    (tmpdir / "deck.json").write_text(json.dumps(deck_meta, ensure_ascii=False), encoding="utf-8")
+
+
+def materialize_assets(refs: set[str], storage: Storage, dest_dir: Path) -> None:
+    """Download the asset manifests and the assets ``refs`` name into ``dest_dir/assets``.
+
+    ``refs`` are asset references without the ``assets:`` / ``icons:`` prefix
+    (``source/name``). Points the engine's asset lookup at ``dest_dir/assets``.
+    """
+    tmpdir = dest_dir
     assets_dir = tmpdir / "assets"
     asset_keys = storage.list_files(prefix="assets/")
     for key in [k for k in asset_keys if k.endswith("manifest.json")]:
         dest = tmpdir / key
         dest.parent.mkdir(parents=True, exist_ok=True)
         dest.write_bytes(storage.download_file(key=key))
-    slide_text = json.dumps(slides)
-    refs = set(re.findall(r'(?:assets:|icons:)([^"]+)', slide_text))
     for source_dir in assets_dir.iterdir() if assets_dir.exists() else []:
         manifest_path = source_dir / "manifest.json"
         if not manifest_path.exists():
@@ -386,10 +383,23 @@ def _prepare_workspace(
     _assets_mod.ICON_LOCAL_DIR = assets_dir
     _assets_mod._manifest_cache = None
 
-    # Resolve template
+
+def materialize_template(
+    deck_id: str,
+    user_id: str,
+    deck_meta: dict,
+    storage: Storage,
+    dest_dir: Path,
+) -> Path:
+    """Download the template deck.json names into ``dest_dir/template.pptx``.
+
+    Resolution order: an imported bundle template, the historical deck-root
+    template.pptx, a user template, a builtin template, and blank-dark when the
+    deck names none. A named template that cannot be found raises ValueError.
+    """
     template_key = ""
-    template_path = tmpdir / "template.pptx"
-    tmpl_name = presentation.get("template", "")
+    template_path = dest_dir / "template.pptx"
+    tmpl_name = deck_meta.get("template", "")
     # New imports reference the immutable bundle template directly.
     if isinstance(tmpl_name, str) and tmpl_name.startswith("attachments/imports/"):
         if ".." in PurePosixPath(tmpl_name).parts or not tmpl_name.endswith("/deck/template.pptx"):
@@ -443,19 +453,7 @@ def _prepare_workspace(
         if not template_key:
             template_key = "templates/blank-dark.pptx"
         template_path.write_bytes(storage.download_file(key=template_key))
-
-    # Fonts
-    fonts = presentation.get("fonts") or deck.get("fonts")
-    if not fonts or not fonts.get("fullwidth"):
-        fonts = extract_fonts(template_path)
-
-    return tmpdir, slides, {
-        "template_path": template_path,
-        "custom_template": True,
-        "fonts": fonts,
-        "base_dir": tmpdir,
-        "default_text_color": presentation.get("defaultTextColor"),
-    }
+    return template_path
 
 
 def generate_pptx(
@@ -500,16 +498,7 @@ def generate_pptx(
     tmpdir, slides, build_kwargs = _prepare_workspace(deck_id, user_id, storage)
     _t_prepare = time.monotonic() - _t0
     try:
-        # Rewrite deck.json so api.generate resolves exactly what the
-        # workspace materialized (template file, fonts, text color).
-        deck_meta = json.loads((tmpdir / "deck.json").read_text(encoding="utf-8"))
-        deck_meta["template"] = str(Path(build_kwargs["template_path"]).name)
-        deck_meta["fonts"] = build_kwargs["fonts"]
-        if build_kwargs.get("default_text_color"):
-            deck_meta["defaultTextColor"] = build_kwargs["default_text_color"]
-        (tmpdir / "deck.json").write_text(
-            json.dumps(deck_meta, ensure_ascii=False), encoding="utf-8"
-        )
+        pin_workspace_build_config(tmpdir, build_kwargs)
 
         out = tmpdir / "output.pptx"
         gen_result = api_generate(

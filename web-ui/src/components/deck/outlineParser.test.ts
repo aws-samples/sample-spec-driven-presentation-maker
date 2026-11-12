@@ -1,16 +1,11 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * outlineParser tests — discriminated union parsing, state resolution,
- * backward compatibility, and view mode derivation.
+ * outlineParser tests — discriminated union parsing and backward compatibility.
  */
 
 import { describe, it, expect } from "vitest"
-import {
-  parseOutline,
-  resolveStates,
-  getSlideEntries,
-} from "./outlineParser"
+import { parseOutline } from "./outlineParser"
 import type { OutlineEntry, SlideEntry, SectionEntry, ProseEntry } from "./outlineParser"
 
 describe("outlineParser", () => {
@@ -185,106 +180,11 @@ describe("outlineParser", () => {
     })
   })
 
-  describe("resolveStates — slide state resolution", () => {
-    it("marks skeleton for slides with no sub-items", () => {
-      const entries = parseOutline("- [s1] A\n- [s2] B\n- [s3] C")
-      const states = resolveStates(entries)
-      expect(states.get(0)).toBe("skeleton")
-      expect(states.get(1)).toBe("skeleton")
-      expect(states.get(2)).toBe("skeleton")
-    })
-
-    it("marks the last enriched slide as active", () => {
-      const md = [
-        "- [s1] A",
-        "  - body: Hello",
-        "- [s2] B",
-        "  - evidence: Data",
-        "- [s3] C",
-      ].join("\n")
-      const entries = parseOutline(md)
-      const states = resolveStates(entries)
-      expect(states.get(0)).toBe("done")
-      expect(states.get(1)).toBe("active")
-      expect(states.get(2)).toBe("skeleton")
-    })
-
-    it("marks earlier enriched slides as done", () => {
-      const md = [
-        "- [s1] A",
-        "  - body: X",
-        "- [s2] B",
-        "  - body: Y",
-        "- [s3] C",
-        "  - body: Z",
-      ].join("\n")
-      const entries = parseOutline(md)
-      const states = resolveStates(entries)
-      expect(states.get(0)).toBe("done")
-      expect(states.get(1)).toBe("done")
-      expect(states.get(2)).toBe("active")
-    })
-
-    it("does not assign states to non-slide entries", () => {
-      const md = "## Section\n- [s1] Slide\n  - body: Hello\nSome prose"
-      const entries = parseOutline(md)
-      const states = resolveStates(entries)
-      // Only the slide entry (index 1) gets a state
-      expect(states.has(0)).toBe(false) // section
-      expect(states.has(1)).toBe(true)  // slide
-      expect(states.has(2)).toBe(false) // prose
-      expect(states.get(1)).toBe("active")
-    })
-
-    it("handles interleaved sections and slides", () => {
-      const md = [
-        "## Part 1",
-        "- [s1] A",
-        "  - body: Done",
-        "## Part 2",
-        "- [s2] B",
-        "  - evidence: Active",
-        "- [s3] C",
-      ].join("\n")
-      const entries = parseOutline(md)
-      const states = resolveStates(entries)
-      // entries: [section(0), slide(1), section(2), slide(3), slide(4)]
-      expect(states.get(1)).toBe("done")
-      expect(states.get(3)).toBe("active")
-      expect(states.get(4)).toBe("skeleton")
-    })
-
-    it("preserves backward compatibility: single enriched slide is active", () => {
-      const entries = parseOutline("- [only] Single\n  - body: Hello")
-      const states = resolveStates(entries)
-      expect(states.get(0)).toBe("active")
-    })
-  })
-
-  describe("getSlideEntries — utility", () => {
-    it("extracts only slide entries from mixed array", () => {
-      const md = "## Section\n- [s1] Slide\nProse line\n- [s2] Slide2"
-      const entries = parseOutline(md)
-      const slides = getSlideEntries(entries)
-      expect(slides).toHaveLength(2)
-      expect(slides[0].slug).toBe("s1")
-      expect(slides[1].slug).toBe("s2")
-    })
-
-    it("returns empty array when no slides exist", () => {
-      const md = "## Section\nJust prose"
-      const entries = parseOutline(md)
-      const slides = getSlideEntries(entries)
-      expect(slides).toHaveLength(0)
-    })
-  })
-
   describe("backward compatibility — old OutlineSlide[] consumers", () => {
     it("slide entries have all fields expected by legacy consumers", () => {
       const md = "- [intro] Welcome\n  - body: Hello\n  - evidence: Data"
       const entries = parseOutline(md)
-      const slides = getSlideEntries(entries)
-      const slide = slides[0]
+      const slide = entries.find((e): e is SlideEntry => e.type === "slide")!
       // Legacy interface fields
       expect(slide).toHaveProperty("slug")
       expect(slide).toHaveProperty("message")

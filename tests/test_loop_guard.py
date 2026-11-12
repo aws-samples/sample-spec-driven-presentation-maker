@@ -1,16 +1,7 @@
 # SPDX-License-Identifier: MIT-0
-from types import ModuleType, SimpleNamespace
-import sys
+from types import SimpleNamespace
 
-strands = ModuleType("strands")
-hooks = ModuleType("strands.hooks")
-events = ModuleType("strands.hooks.events")
-events.AfterToolCallEvent = object
-sys.modules.setdefault("strands", strands)
-sys.modules.setdefault("strands.hooks", hooks)
-sys.modules.setdefault("strands.hooks.events", events)
-
-from agent.resilience import LoopGuard  # noqa: E402
+from agent.resilience import LoopGuard
 
 
 class _Agent:

@@ -2,8 +2,11 @@
 // SPDX-License-Identifier: MIT-0
 /** Local Pin API — toggle pin state for a style in state.json. */
 import { getState, updateState } from "@/lib/local/sdpmPaths"
+import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 export async function POST(req: Request) {
+  const refused = rejectCrossSite(req)
+  if (refused) return refused
   const { name, pinned } = await req.json() as { name: string; pinned: boolean }
   if (!name || typeof pinned !== "boolean") {
     return Response.json({ error: "name and pinned required" }, { status: 400 })

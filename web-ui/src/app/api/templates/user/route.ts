@@ -5,6 +5,7 @@ import fs from "fs"
 import path from "path"
 import { execFileSync } from "child_process"
 import { getUserConfigDir, getState, updateState, SDPM_ROOT } from "@/lib/local/sdpmPaths"
+import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 /** servers/local directory (uv-managed venv with sdpm deps). */
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
@@ -14,6 +15,8 @@ function getUserTemplatesDir(): string {
 }
 
 export async function POST(req: Request) {
+  const refused = rejectCrossSite(req)
+  if (refused) return refused
   const formData = await req.formData()
   const file = formData.get("file") as File | null
   const description = (formData.get("description") as string) || ""

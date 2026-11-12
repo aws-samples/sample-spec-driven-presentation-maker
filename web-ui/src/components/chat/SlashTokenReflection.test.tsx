@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
-import type { PickerItem } from "@/lib/slashToken"
+import { FORMAT_HTML_ITEM, type PickerItem } from "@/lib/slashToken"
 import { SlashTokenReflection } from "./SlashTokenReflection"
 
 const items: PickerItem[] = [
@@ -83,5 +83,18 @@ describe("SlashTokenReflection", () => {
       start: 4,
       end: 17,
     })
+  })
+
+  it("renders @format:html as an HTML chip that can be removed", () => {
+    const onRemove = vi.fn()
+    renderWithIntl(
+      <SlashTokenReflection text="@format:html a launch deck" items={[...items, FORMAT_HTML_ITEM]} onRemove={onRemove} />,
+    )
+
+    expect(screen.getByText("HTML")).toBeTruthy()
+    expect(screen.queryByText("Format")).toBeNull()
+    expect(screen.queryByTitle("This template or style is unavailable")).toBeNull()
+    fireEvent.click(screen.getByRole("button", { name: "Remove Format HTML" }))
+    expect(onRemove).toHaveBeenCalledWith({ kind: "format", name: "html", start: 0, end: 12 })
   })
 })

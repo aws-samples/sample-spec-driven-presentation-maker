@@ -19,6 +19,52 @@ import { parseAttachedMarkers } from "@/lib/attachmentMarker"
 /** Strip internal sdpm marker comments from persisted text. */
 const MARKER_RE = /<!--sdpm:[^>]*-->\n?/g
 
+/** Strands' background-task management tool: its synthetic get delivers a background result. */
+const MANAGE_TOOL = "strands_manage_background_task"
+
+/** A composer's report as the orchestrator received it (agent/session_runtime.py Session.report). */
+const COMPOSER_NOTE_RE = /<composer_note group="(\d+)"(?: slugs="([^"]*)")?>([\s\S]*?)<\/composer_note>/g
+
+/** A background result as the agent delivers it (agent/background.py result_block): hidden. */
+const COMPOSE_RESULT_RE = /<compose_result(?: [a-z_]+="[^"]*")*>[\s\S]*?<\/compose_result>/g
+
+/** Session.report escapes a note's text and slugs (Python's html.escape); undo it. */
+function unescapeNote(s: string): string {
+  return s.replace(/&(lt|gt|quot|#x27|amp);/g, (_, name: string) =>
+    ({ lt: "<", gt: ">", quot: '"', "#x27": "'", amp: "&" })[name] ?? "")
+}
+
+/**
+ * Text the agent received as a user message: composer notes become note messages, the
+ * rest user messages, in order; a delivered background result is dropped. Text without a note gives one user message, as before.
+ */
+function messagesFromText(raw: string): Message[] {
+  const text = raw.includes("<compose_result") ? raw.replace(COMPOSE_RESULT_RE, "").trim() : raw
+  const notes = [...text.matchAll(COMPOSER_NOTE_RE)]
+  if (notes.length === 0) {
+    const message = userMessageFromText(text)
+    return message.content.trim() ? [message] : []
+  }
+  const out: Message[] = []
+  const pushText = (part: string) => {
+    const message = userMessageFromText(part.trim())
+    if (message.content.trim()) out.push(message)
+  }
+  let at = 0
+  for (const note of notes) {
+    pushText(text.slice(at, note.index))
+    out.push({
+      role: "assistant", content: "", toolUses: [],
+      composerNote: {
+        group: Number(note[1]), ...(note[2] ? { slugs: unescapeNote(note[2]) } : {}), text: unescapeNote(note[3].trim()),
+      },
+    })
+    at = (note.index ?? 0) + note[0].length
+  }
+  pushText(text.slice(at))
+  return out
+}
+
 /** Detect the Local-mode format: messages already carry toolUses. */
 export function isLocalHistoryFormat(history: ChatMessage[]): boolean {
   return (history[0] as unknown as Record<string, unknown>)?.toolUses !== undefined
@@ -33,6 +79,7 @@ export function parseLocalHistory(history: ChatMessage[]): Message[] {
       content: (typeof raw.content === "string" ? raw.content : "") as string,
       toolUses: (raw.toolUses as ToolUse[]) || [],
       blocks: (raw.blocks as ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[]) || undefined,
+      ...(typeof raw.localNotice === "string" ? { localNotice: raw.localNotice } : {}),
     }
   })
 }
@@ -51,10 +98,18 @@ function parseAttachments(text: string): { fileName: string; fileType: string }[
  *
  * User messages containing toolResult blocks are folded into the preceding
  * assistant message's matching toolUse (status + result), not emitted as
- * standalone messages.
+ * standalone messages. Their text blocks are messages the user sent while the
+ * agent worked (steers, folded in where they reached it): each becomes a user
+ * message at that position.
+ *
+ * Background compose (Cloud): a delivered result (`<compose_result>` user text) is dropped,
+ * and so is the `strands_manage_background_task` call and toolResult that delivered one
+ * before (older sessions); the compose card keeps its dispatch result. A
+ * `<composer_note>` becomes a note message.
  */
 export function parseCloudHistory(history: ChatMessage[]): Message[] {
   const parsed: Message[] = []
+  const hiddenTools = new Set<string>()
   for (const m of history) {
     let text = ""
     const toolUses: ToolUse[] = []
@@ -65,11 +120,14 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
     } else if (Array.isArray(m.content)) {
       const contentBlocks = m.content as unknown as Record<string, unknown>[]
       if (m.role === "user" && contentBlocks.some((b) => b.toolResult)) {
+        const steers: string[] = []
         for (const block of contentBlocks) {
           const b = block
+          if (typeof b.text === "string") steers.push(b.text)
           if (b.toolResult) {
             const tr = b.toolResult as Record<string, unknown>
             const tuId = tr.toolUseId as string
+            if (hiddenTools.has(tuId)) continue
             const status = (tr.status as string) || "success"
             let resultText = ""
             for (const c of (tr.content as Record<string, unknown>[]) || []) {
@@ -95,6 +153,7 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
             }
           }
         }
+        for (const steer of steers) parsed.push(...messagesFromText(steer))
         continue
       }
 
@@ -102,6 +161,10 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
         const b = block
         if (b.toolUse) {
           const tu = b.toolUse as Record<string, unknown>
+          if (tu.name === MANAGE_TOOL) {
+            hiddenTools.add((tu.toolUseId as string) || "")
+            continue
+          }
           toolUses.push({
             toolUseId: (tu.toolUseId as string) || "",
             name: (tu.name as string) || "",
@@ -114,6 +177,10 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
       }
     }
     if (!text.trim() && toolUses.length === 0) continue
+    if (m.role === "user") {
+      parsed.push(...messagesFromText(text))
+      continue
+    }
     const blocks: ({ type: "text"; text: string } | { type: "tool"; tool: ToolUse })[] = []
     if (m.role === "assistant" && Array.isArray(m.content)) {
       for (const block of m.content) {
@@ -122,6 +189,7 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
           blocks.push({ type: "text", text: b.text as string })
         } else if (b.toolUse) {
           const tu = b.toolUse as Record<string, unknown>
+          if (tu.name === MANAGE_TOOL) continue
           blocks.push({ type: "tool", tool: {
             toolUseId: (tu.toolUseId as string) || "",
             name: (tu.name as string) || "",
@@ -130,15 +198,93 @@ export function parseCloudHistory(history: ChatMessage[]): Message[] {
         }
       }
     }
-    const attachments = m.role === "user" ? parseAttachments(text) : []
     parsed.push({
       role: m.role as "user" | "assistant",
       content: text,
       toolUses,
       blocks: blocks.length > 0 ? blocks : undefined,
       snippets: snippets.length > 0 ? snippets : undefined,
-      ...(attachments.length > 0 ? { attachments } : {}),
     })
   }
   return parsed
+}
+
+/** A user message for raw text the agent received (markers stripped, attachment chips derived). */
+export function userMessageFromText(text: string): Message {
+  const content = text.replace(MARKER_RE, "")
+  const attachments = parseAttachments(content)
+  return { role: "user", content, toolUses: [], ...(attachments.length > 0 ? { attachments } : {}) }
+}
+
+/** The text a raw user message opens with (its string content or its first text block). */
+function openingText(m: ChatMessage): string | undefined {
+  if (typeof m.content === "string") return m.content
+  if (!Array.isArray(m.content)) return undefined
+  const blocks = m.content as unknown as Record<string, unknown>[]
+  if (blocks.some((b) => b.toolResult)) return undefined
+  const first = blocks.find((b) => typeof b.text === "string")
+  return first ? (first.text as string) : undefined
+}
+
+/**
+ * The history before the user message that opened a work period (`prompt`, exactly as
+ * the agent received it): the last user message that opens with that text. The whole
+ * history when there is none (the prompt is not stored yet).
+ */
+export function cutAtPrompt(history: ChatMessage[], prompt: string): ChatMessage[] {
+  for (let i = history.length - 1; i >= 0; i--) {
+    if (history[i].role === "user" && openingText(history[i]) === prompt) return history.slice(0, i)
+  }
+  return history
+}
+
+/**
+ * The text the user typed, from a prompt as ChatPanel.handleSend sent it: without the sdpm
+ * markers, the leading `[Attached:…]` lines and their blank line, and the trailing snippets.
+ */
+function typedText(prompt: string): string {
+  let text = prompt.replace(MARKER_RE, "")
+  if (text.startsWith("[Attached:")) {
+    const end = text.indexOf("\n\n")
+    text = end < 0 ? "" : text.slice(end + 2)
+  }
+  const snippets = text.indexOf("\n\n---snippet---\n")
+  return snippets < 0 ? text : text.slice(0, snippets)
+}
+
+/**
+ * Local mode: the messages before the user message that opened a work period. `.chat.json`
+ * keeps the typed text and the period's prompt is the text sent, so a user message matches
+ * either. The last match wins; the whole list when there is none (the prompt is not saved yet).
+ */
+export function cutLocalAtPrompt(messages: Message[], prompt: string): Message[] {
+  if (!prompt) return messages
+  const typed = typedText(prompt)
+  for (let i = messages.length - 1; i >= 0; i--) {
+    const m = messages[i]
+    if (m.role === "user" && (m.content === prompt || m.content === typed)) return messages.slice(0, i)
+  }
+  return messages
+}
+
+/**
+ * A task still `running` in a history while nothing runs was stopped with its work: mark it
+ * cancelled, in `toolUses` and in `blocks`. The same array when no task runs.
+ */
+export function settleStaleTasks(messages: Message[]): Message[] {
+  const settle = (tool: ToolUse): ToolUse =>
+    tool.task?.state === "running" ? { ...tool, task: { ...tool.task, state: "cancelled" } } : tool
+  let changed = false
+  const next = messages.map((m) => {
+    const running = m.toolUses.some((t) => t.task?.state === "running")
+      || !!m.blocks?.some((b) => b.type === "tool" && b.tool.task?.state === "running")
+    if (!running) return m
+    changed = true
+    return {
+      ...m,
+      toolUses: m.toolUses.map(settle),
+      ...(m.blocks ? { blocks: m.blocks.map((b) => (b.type === "tool" ? { ...b, tool: settle(b.tool) } : b)) } : {}),
+    }
+  })
+  return changed ? next : messages
 }

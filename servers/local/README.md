@@ -20,7 +20,7 @@ uv run python server.py
   "mcpServers": {
     "spec-driven-presentation-maker": {
       "command": "uv",
-      "args": ["run", "--directory", "/path/to/spec-driven-presentation-maker/servers/local", "python", "server.py"]
+      "args": ["run", "--directory", "/path/to/spec-driven-presentation-maker/servers/local", "--frozen", "python", "server.py"]
     }
   }
 }
@@ -31,7 +31,7 @@ uv run python server.py
 | Tool | Description |
 |------|-------------|
 | prompts `sdpm-vibe` `sdpm-spec` `sdpm-style` `sdpm-translate` | Slash-command entry points (fast / dialogue mode, style, translation) |
-| `start_presentation` | Entry point — orchestrator role document + styles, templates, output dir |
+| `start_presentation` | Entry point — orchestrator role document + templates, output dir |
 | `start_composing` | Composer entry — role document, slide spec, and the deck's specs and assigned slides |
 | `start_style` | Style entry — role document, style catalogue, a base style's HTML |
 | `start_translation` | Translate entry — role document, slide spec, source deck shape |
@@ -46,6 +46,8 @@ uv run python server.py
 | `read_guides` | Read guide documents (incl. `slide-json-spec`) |
 | `code_to_slide` | Generate code block elements JSON |
 | `grid` | CSS Grid coordinate calculation |
+| `compose_slides` | Web UI only (`server_acp.py` with `SDPM_LOCAL_COMPOSE=1`): dispatch composers in the background; the Local Web UI runs them and reports back |
+| `message_composer` | Web UI only (same condition): pass a message to a running composer |
 
 ## Requirements
 

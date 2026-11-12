@@ -15,18 +15,32 @@ _SPPR_ORDER = [
     'noFill', 'solidFill', 'gradFill', 'blipFill', 'pattFill', 'grpFill',
     'ln', 'effectLst', 'effectDag', 'scene3d', 'sp3d', 'extLst',
 ]
+# CT_LineProperties child order: the builders append arrowheads and system
+# dashes, which put tailEnd before headEnd or prstDash after both.
+_LN_ORDER = [
+    'noFill', 'solidFill', 'gradFill', 'pattFill', 'prstDash', 'custDash',
+    'round', 'bevel', 'miter', 'headEnd', 'tailEnd', 'extLst',
+]
 
 
-def normalize_sppr_order(sp_pr) -> None:
-    """Reorder spPr children into schema sequence (stable within a tag)."""
-    rank = {tag: i for i, tag in enumerate(_SPPR_ORDER)}
-    children = list(sp_pr)
+def _sort_children(el, order) -> None:
+    """Reorder el's children into the given tag sequence (stable within a tag)."""
+    rank = {tag: i for i, tag in enumerate(order)}
+    children = list(el)
     ordered = sorted(children, key=lambda c: rank.get(c.tag.split('}')[-1], len(rank)))
     if ordered != children:
         for c in children:
-            sp_pr.remove(c)
+            el.remove(c)
         for c in ordered:
-            sp_pr.append(c)
+            el.append(c)
+
+
+def normalize_sppr_order(sp_pr) -> None:
+    """Reorder spPr children, and those of its a:ln, into schema sequence."""
+    _sort_children(sp_pr, _SPPR_ORDER)
+    for ln in sp_pr:
+        if ln.tag.split('}')[-1] == 'ln':
+            _sort_children(ln, _LN_ORDER)
 
 
 def _gradient_angle_to_ooxml(angle_deg: float) -> int:

@@ -1,0 +1,8 @@
+{
+  "template": "blank-light.pptx",
+  "fonts": {
+    "fullwidth": "Arial",
+    "halfwidth": "Arial"
+  },
+  "defaultTextColor": "#1F2937"
+}

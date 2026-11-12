@@ -9,6 +9,7 @@ Architecture (ports-and-adapters):
 
 Modules:
     pipeline    — Main orchestrator: read/import dispatch
+    ingest      — Document conversion (PDF/DOCX/XLSX/PPTX → Markdown/JSON)
     paging      — UTF-8 byte paging with line numbering
     source      — Source validation and type detection
     fetcher     — Secure URL fetcher with DNS/IP pinning

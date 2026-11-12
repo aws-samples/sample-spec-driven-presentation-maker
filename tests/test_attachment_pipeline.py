@@ -202,6 +202,60 @@ class TestSourceValidation:
         with pytest.raises(SourceValidationError):
             validate_cloud_source("uploads/user/../admin/file", "user")
 
+    _UPLOAD = "12345678-1234-1234-1234-123456789abc"
+
+    def test_classify_upload_handle(self):
+        from sdpm.tools.attachment.source import classify_source
+        assert classify_source(f"uploads/{self._UPLOAD}/report.pdf") == "s3_key"
+
+    def test_resolve_handle_builds_key_from_caller(self):
+        from sdpm.tools.attachment.source import resolve_cloud_source
+        resolved = resolve_cloud_source(f"uploads/{self._UPLOAD}/report.pdf", "u1")
+        assert resolved.key == f"uploads/u1/{self._UPLOAD}/report.pdf"
+        assert resolved.handle == f"uploads/{self._UPLOAD}/report.pdf"
+
+    def test_resolve_previous_form_of_caller_is_normalized(self):
+        from sdpm.tools.attachment.source import resolve_cloud_source
+        resolved = resolve_cloud_source(f"uploads/u1/{self._UPLOAD}/report.pdf", "u1")
+        assert resolved.key == f"uploads/u1/{self._UPLOAD}/report.pdf"
+        assert resolved.handle == f"uploads/{self._UPLOAD}/report.pdf"
+
+    def test_resolve_previous_form_of_other_user_is_denied_without_the_id(self):
+        from sdpm.tools.attachment.errors import SourceAccessDenied
+        from sdpm.tools.attachment.source import resolve_cloud_source
+
+        other = "u-OTHER-9c1d"
+        with pytest.raises(SourceAccessDenied) as caught:
+            resolve_cloud_source(f"uploads/{other}/{self._UPLOAD}/report.pdf", "u1")
+        assert other not in json.dumps(caught.value.to_dict())
+        assert "u1" not in caught.value.message
+
+    @pytest.mark.parametrize("source", [
+        "uploads/12345678-1234-1234-1234-123456789abc/..",
+        "uploads/12345678-1234-1234-1234-123456789abc/a..b.pdf",
+        "uploads/12345678-1234-1234-1234-123456789abc/r\x01.pdf",
+        "uploads/12345678-1234-1234-1234-123456789abc/r\\x.pdf",
+        "uploads/u-SECRET/../12345678-1234-1234-1234-123456789abc/r.pdf",
+        "uploads/not-a-uuid/r.pdf",
+        "uploads/12345678-1234-1234-1234-123456789abc/",
+    ])
+    def test_resolve_rejects_unsafe_sources_without_echoing(self, source):
+        from sdpm.tools.attachment.errors import SourceValidationError
+        from sdpm.tools.attachment.source import resolve_cloud_source
+
+        with pytest.raises(SourceValidationError) as caught:
+            resolve_cloud_source(source, "u1")
+        assert source not in caught.value.message
+        assert "SECRET" not in caught.value.message
+
+    @pytest.mark.parametrize("user_id", ["", "a/b", "..", "u\x00"])
+    def test_resolve_rejects_unusable_caller_ids(self, user_id):
+        from sdpm.tools.attachment.errors import SourceValidationError
+        from sdpm.tools.attachment.source import resolve_cloud_source
+
+        with pytest.raises(SourceValidationError):
+            resolve_cloud_source(f"uploads/{self._UPLOAD}/report.pdf", user_id)
+
     def test_sanitize_filename_basic(self):
         from sdpm.tools.attachment.source import sanitize_filename
         assert sanitize_filename("report.pdf") == "report.pdf"

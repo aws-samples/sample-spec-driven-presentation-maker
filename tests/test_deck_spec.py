@@ -10,10 +10,12 @@ from pathlib import Path
 
 import pytest
 
-from sdpm.api import check_specs
+from sdpm.api import check_specs, init
 from sdpm.engine.schema.deck_spec import (
     DECK_JSON_SKELETON,
+    OUTPUT_FORMATS,
     complete_deck_skeleton,
+    deck_output_format,
     validate_specs,
 )
 
@@ -51,13 +53,14 @@ def test_complete_deck_skeleton_fills_fields_without_mutating_input() -> None:
 
     completed = complete_deck_skeleton(original)
 
+    # The animation and transition switches are deliberately absent: an absent switch
+    # already reads as off, and test_api_init_pptx_deck_json_is_byte_identical pins what a
+    # new PPTX deck.json contains — the same rule outputFormat follows.
     assert completed == {
         "template": "custom",
         "fonts": {"fullwidth": "", "halfwidth": "Inter"},
         "defaultTextColor": "",
         "slideSize": {},
-        "animations": {"enabled": False},
-        "transitions": {"enabled": False},
         "extra": 1,
     }
     assert original == {"template": "custom", "fonts": {"halfwidth": "Inter"}, "extra": 1}
@@ -214,3 +217,189 @@ def test_api_check_specs_reports_missing_files(tmp_path: Path) -> None:
         "warnings": [],
         "slugs": [],
     }
+
+
+@pytest.mark.parametrize(
+    "deck,expected",
+    [({}, "pptx"), ({"outputFormat": None}, "pptx"), ({"outputFormat": "pptx"}, "pptx"),
+     ({"outputFormat": "html"}, "html")],
+)
+def test_deck_output_format_default_and_explicit(deck: dict, expected: str) -> None:
+    assert deck_output_format(deck) == expected
+    assert OUTPUT_FORMATS == ("pptx", "html")
+
+
+@pytest.mark.parametrize("value", ["HTML", "pdf", "", 1])
+def test_deck_output_format_rejects_unknown_value(value: object) -> None:
+    with pytest.raises(ValueError, match="outputFormat"):
+        deck_output_format({"outputFormat": value})
+
+
+def test_validate_specs_rejects_invalid_output_format() -> None:
+    deck = deepcopy(_VALID_DECK)
+    deck["outputFormat"] = "pdf"
+    result = _validate(deck=deck)
+    assert 'deck.json outputFormat must be "pptx" or "html"' in result["errors"]
+    assert result["ok"] is False
+    assert "outputFormat" not in result
+
+
+def test_validate_specs_reports_output_format_only_for_html_decks() -> None:
+    deck = deepcopy(_VALID_DECK)
+    deck["outputFormat"] = "pptx"
+    assert _validate(deck=deck, assigned_slugs=["intro"]) == {
+        "ok": True, "errors": [], "warnings": [], "slugs": ["intro"],
+    }
+    deck["outputFormat"] = "html"
+    assert _validate(deck=deck, assigned_slugs=["intro"]) == {
+        "ok": True, "errors": [], "warnings": [], "slugs": ["intro"], "outputFormat": "html",
+    }
+
+
+def test_api_check_specs_reports_html_output_format(tmp_path: Path) -> None:
+    deck_dir = tmp_path / "deck"
+    (deck_dir / "specs").mkdir(parents=True)
+    (deck_dir / "deck.json").write_text(
+        json.dumps({**_VALID_DECK, "outputFormat": "html"}), encoding="utf-8"
+    )
+    (deck_dir / "specs" / "outline.md").write_text(_VALID_OUTLINE, encoding="utf-8")
+
+    assert check_specs(deck_dir)["outputFormat"] == "html"
+
+
+def test_api_init_default_writes_unchanged_skeleton(tmp_path: Path) -> None:
+    result = init("deck", output_dir=tmp_path / "pptx")
+    written = Path(result["deck_json"]).read_text(encoding="utf-8")
+    expected = complete_deck_skeleton(DECK_JSON_SKELETON)
+    assert json.loads(written) == expected
+    assert "outputFormat" not in written
+
+    explicit = init("deck", output_dir=tmp_path / "explicit", output_format="pptx")
+    assert Path(explicit["deck_json"]).read_text(encoding="utf-8") == written
+
+
+def test_api_init_html_writes_output_format(tmp_path: Path) -> None:
+    result = init("deck", output_dir=tmp_path / "html", output_format="html")
+    data = json.loads(Path(result["deck_json"]).read_text(encoding="utf-8"))
+    assert data == {**complete_deck_skeleton(DECK_JSON_SKELETON), "outputFormat": "html"}
+    assert deck_output_format(data) == "html"
+
+
+def test_api_init_rejects_unknown_output_format(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="output_format"):
+        init("deck", output_dir=tmp_path / "bad", output_format="pdf")
+    assert not (tmp_path / "bad").exists()
+
+
+@pytest.mark.parametrize("name", ["/abs/deck", "sub/deck", "..\\deck", "C:\\decks\\deck"])
+def test_api_init_rejects_a_path_as_the_name(tmp_path: Path, monkeypatch, name: str) -> None:
+    """The deck folder is <timestamp>-<name> one level under the deck root; a path in the
+    name is refused before anything is created (it used to nest the path under the root)."""
+    root = tmp_path / "root"
+    monkeypatch.setenv("SDPM_DECK_ROOT", str(root))
+    with pytest.raises(ValueError, match="without a path"):
+        init(name)
+    assert not root.exists()
+
+
+def test_api_init_puts_a_named_deck_one_level_under_the_deck_root(tmp_path: Path, monkeypatch) -> None:
+    monkeypatch.setenv("SDPM_DECK_ROOT", str(tmp_path))
+    deck = Path(init("lambda-overview")["output_dir"])
+    assert deck.parent == tmp_path and deck.name.endswith("-lambda-overview")
+
+
+_PPTX_DECK_JSON_BYTES = (
+    b'{\n  "template": "",\n  "fonts": {\n    "fullwidth": "",\n    "halfwidth": ""\n  },\n'
+    b'  "defaultTextColor": "",\n  "slideSize": {}\n}\n'
+)
+
+
+def test_api_init_pptx_deck_json_is_byte_identical(tmp_path: Path) -> None:
+    result = init("deck", output_dir=tmp_path / "pptx")
+    assert Path(result["deck_json"]).read_bytes() == _PPTX_DECK_JSON_BYTES
+
+
+def test_new_deck_json() -> None:
+    from sdpm.engine.schema import new_deck_json
+
+    assert new_deck_json() == complete_deck_skeleton(DECK_JSON_SKELETON)
+    assert new_deck_json("pptx") == new_deck_json()
+    assert "outputFormat" not in new_deck_json("pptx")
+    assert new_deck_json("html") == {**complete_deck_skeleton(DECK_JSON_SKELETON), "outputFormat": "html"}
+    new_deck_json()["fonts"]["fullwidth"] = "changed"  # a fresh copy each call
+    assert DECK_JSON_SKELETON["fonts"]["fullwidth"] == ""
+    with pytest.raises(ValueError, match="output_format"):
+        new_deck_json("pdf")
+
+
+@pytest.mark.parametrize("rel, expected", [
+    ("deck.json", True),
+    ("specs/outline.md", True),
+    ("specs/art-direction.html", True),
+    ("deck.css", True),
+    ("slides/intro.html", True),
+    ("./slides/intro.html", True),
+    ("slides\\intro.html", True),
+    ("slides/intro.json", False),
+    ("slides/sub/intro.html", False),
+    ("specs/brief.md", False),
+    ("output.html", False),
+    ("preview/intro.html", False),
+    ("images/a.png", False),
+    ("", False),
+])
+def test_is_html_build_input(rel: str, expected: bool) -> None:
+    from sdpm.engine.schema import is_html_build_input
+
+    assert is_html_build_input(rel) is expected
+
+
+@pytest.mark.parametrize("rel, expected", [
+    ("deck.json", True),
+    ("presentation.json", True),
+    ("specs/outline.md", True),
+    ("slides/title.json", True),
+    ("./slides/title.json", True),
+    ("slides\\title.json", True),
+    ("includes/code.json", True),
+    ("specs/brief.md", False),
+    ("specs/art-direction.html", False),
+    ("deck.css", False),
+    ("attachments/x/data.csv", False),
+    ("output.pptx", False),
+    ("", False),
+])
+def test_is_pptx_build_input(rel: str, expected: bool) -> None:
+    from sdpm.engine.schema import is_pptx_build_input
+
+    assert is_pptx_build_input(rel) is expected
+
+
+@pytest.mark.parametrize("payload", [[], "deck", 3, None])
+def test_deck_output_format_treats_a_non_object_as_pptx(payload: object) -> None:
+    assert deck_output_format(payload) == "pptx"
+
+
+@pytest.mark.parametrize("text, expected", [
+    (None, "pptx"),  # no deck.json
+    ("{not json", "pptx"),
+    ("[]", "pptx"),
+    ("{}", "pptx"),
+    ('{"outputFormat": "pptx"}', "pptx"),
+    ('{"outputFormat": "html"}', "html"),
+])
+def test_read_deck_format(tmp_path: Path, text: str | None, expected: str) -> None:
+    from sdpm.engine.schema import read_deck_format
+
+    if text is not None:
+        (tmp_path / "deck.json").write_text(text, encoding="utf-8")
+    assert read_deck_format(tmp_path) == expected
+    assert read_deck_format(str(tmp_path)) == expected
+
+
+def test_read_deck_format_rejects_an_invalid_output_format(tmp_path: Path) -> None:
+    from sdpm.engine.schema import read_deck_format
+
+    (tmp_path / "deck.json").write_text('{"outputFormat": "htlm"}', encoding="utf-8")
+    with pytest.raises(ValueError, match="htlm"):
+        read_deck_format(tmp_path)

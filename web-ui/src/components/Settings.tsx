@@ -4,10 +4,15 @@
 
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet"
 import { Switch } from "@/components/ui/switch"
+import { LocalEngineSetting } from "@/components/LocalEngineSetting"
 import { ModelPicker } from "@/components/ModelPicker"
 import { usePreferences } from "@/hooks/usePreferences"
 import { getAllowedModels, getDefaultChatModelId, getDefaultCreateModelId } from "@/lib/allowedModels"
 import { IS_LOCAL } from "@/lib/mode"
+import {
+  getAgentDefinitions, listLocalModels, updateAgentSelection,
+  type AgentDefinition, type AgentSelection, type LocalModel,
+} from "@/services/localService"
 import { toast } from "sonner"
 import { notifyError } from "@/lib/errors"
 import { useLocale, type Locale } from "@/i18n/LocaleProvider"
@@ -41,64 +46,48 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
   const defaultCreateId = useMemo(() => getDefaultCreateModelId(), [])
 
   // ── Local: agent definition selection ──
-  interface AgentDef { fileName: string; name: string; description: string }
-  interface AgentSelection { orchestrator: string; composer: string; style: string; translate: string; model?: string }
-  const [agentDefs, setAgentDefs] = useState<AgentDef[]>([])
+  const [agentDefs, setAgentDefs] = useState<AgentDefinition[]>([])
   const [agentSelection, setAgentSelection] = useState<AgentSelection>({ orchestrator: "", composer: "", style: "", translate: "" })
-  const [localModels, setLocalModels] = useState<{ modelId: string; displayName: string; description?: string }[]>([])
+  const [localModels, setLocalModels] = useState<LocalModel[]>([])
 
   useEffect(() => {
     if (!IS_LOCAL || !open) return
-    fetch("/api/agent/definitions").then((r) => r.json()).then((d) => {
-      setAgentDefs(d.agents || [])
-      setAgentSelection(d.selection || {})
-    }).catch((err) => notifyError("Failed to load agent definitions", err))
-    fetch("/api/agent/models").then((r) => r.json()).then((d) => {
-      setLocalModels((d.available || []).map((m: { modelId: string; name: string; description?: string }) => ({
-        modelId: m.modelId, displayName: m.name, description: m.description,
-      })))
-    }).catch((err) => notifyError("Failed to load model list", err))
-  }, [open])
+    getAgentDefinitions().then((d) => {
+      setAgentDefs(d.agents)
+      setAgentSelection(d.selection)
+    }).catch((err) => notifyError(t("errorLoadAgents"), err))
+    listLocalModels().then(setLocalModels).catch((err) => notifyError(t("errorLoadModels"), err))
+  }, [open, t])
 
   const onAgentChange = useCallback((role: keyof AgentSelection, fileName: string) => {
     const prev = { ...agentSelection }
     const next = { ...agentSelection, [role]: fileName }
     setAgentSelection(next)
     const def = agentDefs.find((a) => a.fileName === fileName)
-    fetch("/api/agent/definitions", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ [role]: fileName }),
-    }).then((r) => {
-      if (!r.ok) throw new Error()
-      toast.success(`${role} agent updated`, {
-        description: `Now using ${def?.name || fileName}. Takes effect on next chat — current chat is not affected.`,
+    updateAgentSelection({ [role]: fileName }).then(() => {
+      toast.success(t("agentUpdated", { role }), {
+        description: t("agentUpdatedDescription", { name: def?.name || fileName }),
       })
     }).catch(() => {
       setAgentSelection(prev)
-      toast.error(`Failed to update ${role} agent`)
+      toast.error(t("errorUpdateAgent", { role }))
     })
-  }, [agentSelection, agentDefs])
+  }, [agentSelection, agentDefs, t])
 
   const onLocalModelChange = useCallback((modelId: string | undefined) => {
     const prev = { ...agentSelection }
     const next = { ...agentSelection, model: modelId }
     setAgentSelection(next)
-    fetch("/api/agent/definitions", {
-      method: "PUT",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ model: modelId || null }),
-    }).then((r) => {
-      if (!r.ok) throw new Error()
+    updateAgentSelection({ model: modelId || null }).then(() => {
       const m = localModels.find((a) => a.modelId === modelId)
-      toast.success(m ? `Model: ${m.displayName}` : "Model: default", {
-        description: "Takes effect on next chat.",
+      toast.success(m ? t("localModelUpdated", { name: m.displayName }) : t("localModelDefault"), {
+        description: t("takesEffectNextChat"),
       })
     }).catch(() => {
       setAgentSelection(prev)
-      toast.error("Failed to update model")
+      toast.error(t("errorUpdateModel"))
     })
-  }, [agentSelection, localModels])
+  }, [agentSelection, localModels, t])
 
   // Silently drop stale selections (admin may have removed the model from config).
   useEffect(() => {
@@ -113,16 +102,16 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
   const onChatChange = (id: string | undefined) => {
     setChatModelId(id)
     const m = id ? allowed.find((a) => a.modelId === id) : undefined
-    toast.success(m ? `Chat: ${m.displayName}` : "Chat: default")
+    toast.success(m ? t("chatModelUpdated", { name: m.displayName }) : t("chatModelDefault"))
   }
 
   const onCreateChange = (id: string | undefined) => {
     setCreateModelId(id)
     if (id === undefined) {
-      toast.success("Create: default")
+      toast.success(t("createModelDefault"))
     } else {
       const m = composable.find((a) => a.modelId === id)
-      if (m) toast.success(`Create: ${m.displayName}`)
+      if (m) toast.success(t("createModelUpdated", { name: m.displayName }))
     }
   }
 
@@ -134,6 +123,9 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
         </SheetHeader>
 
         <div className="flex flex-col gap-4 px-5 pb-6 overflow-y-auto flex-1 min-h-0">
+          {/* ── Agent engine (Local only) ── */}
+          {IS_LOCAL && <LocalEngineSetting open={open} />}
+
           {/* ── Agents (Local only) ── */}
           {IS_LOCAL && agentDefs.length > 0 && (
             <section
@@ -145,10 +137,10 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                   id="agent-heading"
                   className="text-xs font-semibold uppercase tracking-wider text-muted-foreground"
                 >
-                  Agents
+                  {t("agents")}
                 </h3>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Choose which agent definition each role uses.
+                  {t("agentsDescription")}
                 </p>
               </div>
               <div className="flex flex-col gap-3">
@@ -171,7 +163,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                         value={agentSelection[role] || undefined}
                         onChange={(id) => id && onAgentChange(role, id)}
                         triggerId={`agent-${role}`}
-                        ariaLabel={`Select ${role} agent`}
+                        ariaLabel={t("selectAgent", { role })}
                       />
                     </div>
                   )
@@ -182,15 +174,15 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                       htmlFor="agent-model"
                       className="mb-1.5 block text-xs font-medium text-foreground"
                     >
-                      Model
+                      {t("agentModel")}
                     </label>
                     <ModelPicker
                       models={localModels}
                       value={agentSelection.model || undefined}
                       onChange={onLocalModelChange}
-                      inheritLabel="Default"
+                      inheritLabel={t("agentModelDefault")}
                       triggerId="agent-model"
-                      ariaLabel="Select agent model"
+                      ariaLabel={t("selectAgentModel")}
                     />
                   </div>
                 )}

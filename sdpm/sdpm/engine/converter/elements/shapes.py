@@ -312,6 +312,9 @@ def extract_freeform_element(shape, theme_colors=None, color_mapping=None, build
         # Line
         line_info = _extract_line_from_xml(sp_pr, theme_colors, color_mapping)
         elem.update(line_info)
+        dash = extract_line_dash(shape)
+        if dash:
+            elem["dashStyle"] = dash
 
         # Line opacity
         ln = sp_pr.find(f'.//{{{_NS["a"]}}}ln')
@@ -394,14 +397,15 @@ def extract_shape_element(shape, theme_colors=None, color_mapping=None, theme_st
                         if fmla.startswith('val '):
                             adjs.append(round(int(fmla.split()[1]) / 100000, 5))
                     prst_name = prst_geom.get('prst')
-                    if prst_name == 'arc' and len(adjs) >= 2:
+                    if prst_name in ('arc', 'blockArc') and len(adjs) >= 2:
                         # Raw adj are angles in 60000ths of a degree, but the
                         # builder's arc API is [startDeg, sweepDeg] — feeding
-                        # raw values drew a 353° ring as ~40%.
+                        # raw values drew a 353° ring as ~40%. blockArc keeps
+                        # its third value (thickness) as is.
                         start_deg = round(adjs[0] * 100000 / 60000, 3)
                         end_deg = round(adjs[1] * 100000 / 60000, 3)
                         sweep = round((end_deg - start_deg) % 360, 3)
-                        adjs = [start_deg, sweep]
+                        adjs = [start_deg, sweep, *adjs[2:]]
                     if adjs:
                         elem["adjustments"] = adjs
         except Exception:
@@ -491,9 +495,9 @@ def extract_shape_element(shape, theme_colors=None, color_mapping=None, theme_st
             dash = extract_line_dash(shape)
             if dash:
                 elem["dashStyle"] = dash
-            # Arrow heads
+            # Arrow heads (shape JSON names them arrowStart / arrowEnd)
             if ln_xml is not None:
-                for attr, tag in [("headEnd", "headEnd"), ("tailEnd", "tailEnd")]:
+                for attr, tag in [("arrowStart", "headEnd"), ("arrowEnd", "tailEnd")]:
                     el = ln_xml.find(f'{{{_NS["a"]}}}{tag}')
                     if el is not None and el.get('type') and el.get('type') != 'none':
                         elem[attr] = el.get('type')

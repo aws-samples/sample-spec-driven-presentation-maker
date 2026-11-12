@@ -6,16 +6,17 @@
   },
   "scripts": {
     "build": "tsc",
+    "test": "TS_NODE_TRANSPILE_ONLY=1 node --require ts-node/register --test test/*.test.ts",
     "cdk": "cdk"
   },
   "devDependencies": {
-    "@types/node": "^26.6.5",
-    "aws-cdk": "^2.1146.1",
+    "@types/node": "^26.6.6",
+    "aws-cdk": "^2.1147.0",
     "ts-node": "^10.9.0",
     "typescript": "~5.9.3"
   },
   "dependencies": {
-    "aws-cdk-lib": "^2.274.0",
+    "aws-cdk-lib": "^2.275.0",
     "constructs": "^10.8.1",
     "yaml": "^2.9.0"
   }

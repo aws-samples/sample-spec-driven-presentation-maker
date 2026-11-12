@@ -1,5 +1,3 @@
-[EN](../en/cost.md) | [JA (日本語ドキュメントは Getting Started のみ)](../ja/getting-started.md)
-
 # Cost Estimates
 
 Estimated AWS costs when deploying SDPM.
@@ -42,6 +40,7 @@ Fixed costs continue to accrue even when SDPM is not in use. If you no longer ne
 
 ## Related documents
 
-- [Getting Started](getting-started.md) — Deployment architecture and options
+- [Developer guide](developer-guide.md) — Local CDK deployment and options
+- [Security](security.md) — What the AWS stack sets up
 - [Recommended Deploy Guide](deploy-cloudshell.md) — Deployment steps (CloudShell or local shell)
 - [Uninstall Guide](uninstall.md) — Resource cleanup

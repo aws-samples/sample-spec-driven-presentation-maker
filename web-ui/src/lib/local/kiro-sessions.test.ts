@@ -1,170 +1,167 @@
-import { afterEach, beforeEach, describe, expect, it } from "vitest"
-import fs from "fs"
-import os from "os"
-import path from "path"
+// @vitest-environment node
+// Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+// SPDX-License-Identifier: MIT-0
+/**
+ * The session catalog: on V3 both stores newest first, on V2 only V2's (kiro-cli never started
+ * for it); filter first, then one row per id (the engine's own row over an imported store's, the
+ * newer of two of one store); "Show all"; groups and recent cards; a store that cannot be read
+ * leaves the others listed with `unavailable`; findSession from the last listing or a fresh one;
+ * concurrent listings share one.
+ */
 
-import { forkSession, isCandidate, listSessions, type SessionMeta } from "./kiro-sessions"
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
-const IDS = {
-  recent: "11111111-1111-4111-8111-111111111111",
-  older: "22222222-2222-4222-8222-222222222222",
-  child: "33333333-3333-4333-8333-333333333333",
-  sdpm: "44444444-4444-4444-8444-444444444444",
-  local: "55555555-5555-4555-8555-555555555555",
-  missingParent: "66666666-6666-4666-8666-666666666666",
-}
+import type { StoredSession } from "./acp/engine"
 
-let tmp: string
+const mocks = vi.hoisted(() => ({
+  engine: "v3" as "v2" | "v3",
+  stores: { v2: [] as StoredSession[], v3: [] as StoredSession[] },
+  failing: new Set<string>(),
+  connects: 0,
+  listings: 0,
+}))
 
-function prompt(text: string): string {
-  return JSON.stringify({ version: "v1", kind: "Prompt", data: { content: [{ kind: "text", data: text }] } })
-}
-
-function writeSession(id: string, meta: SessionMeta, lines: string[] = []): void {
-  fs.writeFileSync(path.join(tmp, `${id}.json`), JSON.stringify({ session_id: id, ...meta }, null, 2)) // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
-  fs.writeFileSync(path.join(tmp, `${id}.jsonl`), lines.join("\n") + (lines.length ? "\n" : "")) // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
-}
-
-beforeEach(() => {
-  tmp = fs.mkdtempSync(path.join(os.tmpdir(), "kiro-sessions-"))
+vi.mock("./acp/engine-config", () => ({ readEngineConfig: () => ({ engine: mocks.engine, env: {} }) }))
+vi.mock("./acp-process", () => ({
+  withEngineConnection: async (_engine: string, fn: (connect: () => Promise<unknown>) => Promise<unknown>) => fn(async () => { mocks.connects++; return {} }),
+}))
+vi.mock("./acp/engine", () => {
+  const adapter = (id: "v2" | "v3", openableBy: string[]) => ({
+    id,
+    sessionsOpenableBy: openableBy,
+    listStoredSessions: async (ctx: { connect: () => Promise<unknown> }) => {
+      mocks.listings++
+      if (id === "v3") await ctx.connect()
+      await new Promise((r) => setImmediate(r))
+      if (mocks.failing.has(id)) throw new Error(`${id} store unreadable`)
+      return mocks.stores[id]
+    },
+  })
+  const adapters = [adapter("v2", ["v2", "v3"]), adapter("v3", ["v3"])]
+  return { storedSessionAdapters: (engine: string) => adapters.filter((a) => a.sessionsOpenableBy.includes(engine)) }
 })
 
-afterEach(() => {
-  fs.rmSync(tmp, { recursive: true, force: true })
+const ago = (ms: number) => new Date(Date.now() - ms).toISOString()
+const HOUR = 3_600_000
+
+function session(sessionId: string, engine: "v2" | "v3", fields: Partial<StoredSession> = {}): StoredSession {
+  return { sessionId, engine, title: sessionId, cwd: "/work/alpha", updatedAt: ago(HOUR), agentName: null, ...fields }
+}
+
+let catalog: typeof import("./kiro-sessions")
+
+beforeEach(async () => {
+  mocks.engine = "v3"
+  mocks.stores = { v2: [], v3: [] }
+  mocks.failing.clear()
+  mocks.connects = 0
+  mocks.listings = 0
+  vi.resetModules()
+  catalog = await import("./kiro-sessions")
 })
+
+afterEach(() => { vi.restoreAllMocks() })
+
+const ids = (response: Awaited<ReturnType<typeof catalog.listSessions>>) => response.groups.flatMap((g) => g.sessions.map((s) => `${s.engine}:${s.sessionId}`))
 
 describe("isCandidate", () => {
-  it("accepts a missing parent_session_id as top-level", () => {
-    expect(isCandidate({ cwd: "/work/project", session_state: { agent_name: "kiro_default" } })).toBe(true)
-  })
-
-  it("excludes child, SDPM-agent, and servers/local sessions", () => {
-    expect(isCandidate({ cwd: "/work/project", parent_session_id: IDS.recent })).toBe(false)
-    expect(isCandidate({ cwd: "/work/project", parent_session_id: null, session_state: { agent_name: "sdpm-orchestrator" } })).toBe(false)
-    expect(isCandidate({ cwd: "/work/repo/servers/local", parent_session_id: null })).toBe(false)
-    expect(isCandidate({ cwd: "/work/repo/servers/local/fixtures", parent_session_id: null })).toBe(false)
+  it("accepts a user's session and refuses sub-agent, sdpm-agent and servers/local sessions", () => {
+    expect(catalog.isCandidate({ cwd: "/work/project", agentName: "kiro_default" })).toBe(true)
+    expect(catalog.isCandidate({ cwd: "/work/project", agentName: null, subagent: true })).toBe(false)
+    expect(catalog.isCandidate({ cwd: "/work/project", agentName: "sdpm-orchestrator" })).toBe(false)
+    expect(catalog.isCandidate({ cwd: "/work/repo/servers/local", agentName: null })).toBe(false)
+    expect(catalog.isCandidate({ cwd: "/work/repo/servers/local/fixtures", agentName: null })).toBe(false)
   })
 })
 
 describe("listSessions", () => {
-  it("filters candidates, groups by cwd, sorts newest first, and returns recent three", async () => {
-    const now = Date.now()
-    writeSession(IDS.recent, {
-      cwd: "/work/alpha",
-      updated_at: new Date(now - 1_000).toISOString(),
-      title: "",
-      parent_session_id: null,
-      session_state: { agent_name: "kiro_default" },
-    }, [prompt("A title recovered from the first prompt that is deliberately longer than sixty characters total"), prompt("second")])
-    writeSession(IDS.older, {
-      cwd: "/work/alpha",
-      updated_at: new Date(now - 2_000).toISOString(),
-      title: "Older",
-      parent_session_id: null,
-    }, [prompt("one")])
-    writeSession(IDS.missingParent, {
-      cwd: "/work/beta",
-      updated_at: new Date(now - 3_000).toISOString(),
-      title: "Missing parent key",
-    }, [prompt("one"), JSON.stringify({ kind: "Prompt", data: { content: [] } }), JSON.stringify({ kind: "AssistantMessage", data: {} })])
-    writeSession(IDS.child, {
-      cwd: "/work/alpha",
-      updated_at: new Date(now - 500).toISOString(),
-      title: "Child",
-      parent_session_id: IDS.recent,
-    })
-    writeSession(IDS.sdpm, {
-      cwd: "/work/alpha",
-      updated_at: new Date(now - 400).toISOString(),
-      title: "SDPM",
-      parent_session_id: null,
-      session_state: { agent_name: "sdpm-style" },
-    })
-    writeSession(IDS.local, {
-      cwd: "/work/repo/servers/local",
-      updated_at: new Date(now - 300).toISOString(),
-      title: "Local server",
-      parent_session_id: null,
-    })
-
-    const result = await listSessions({ includeAll: false, dir: tmp })
-
-    expect(result.groups.map((group) => group.cwd)).toEqual(["/work/alpha", "/work/beta"])
-    expect(result.groups[0].sessions.map((session) => session.sessionId)).toEqual([IDS.recent, IDS.older])
-    expect(result.groups[0].sessions[0]).toMatchObject({
-      project: "alpha",
-      title: "A title recovered from the first prompt that is deliberately",
-    })
-    expect(result.groups[0].sessions[0]).not.toHaveProperty("messageCount")
-    expect(result.groups[1].sessions[0].title).toBe("Missing parent key")
-    expect(result.recent.map((session) => session.sessionId)).toEqual([IDS.recent, IDS.older, IDS.missingParent])
-
-    const all = await listSessions({ includeAll: true, dir: tmp })
-    expect(all.groups.flatMap((group) => group.sessions)).toHaveLength(6)
-    expect(all.recent).toHaveLength(3)
+  it("on V3 lists both stores newest first, grouped by cwd, with the recent cards", async () => {
+    mocks.stores.v3 = [session("sess_a", "v3", { updatedAt: ago(1000), cwd: "/work/alpha" }), session("sess_old", "v3", { updatedAt: ago(48 * HOUR), cwd: "/work/beta" })]
+    mocks.stores.v2 = [session("u-b", "v2", { updatedAt: ago(2000), cwd: "/work/beta" }), session("u-c", "v2", { updatedAt: ago(3000), cwd: "/work/alpha" })]
+    const result = await catalog.listSessions({ includeAll: false })
+    expect(result.engine).toBe("v3")
+    expect(result.unavailable).toBeUndefined()
+    expect(result.groups.map((g) => [g.project, g.sessions.map((s) => s.sessionId)])).toEqual([["alpha", ["sess_a", "u-c"]], ["beta", ["u-b", "sess_old"]]])
+    expect(result.recent.map((s) => s.sessionId)).toEqual(["sess_a", "u-b", "u-c"])
+    expect(result.groups[0].sessions[0]).toMatchObject({ engine: "v3", project: "alpha" })
   })
 
-  it("does not read the log when the stored title is present", async () => {
-    const titled = "77777777-7777-4777-8777-777777777777"
-    writeSession(titled, { cwd: "/work/gamma", updated_at: new Date().toISOString(), title: "Stored" })
-    // A directory where the log should be: reading it would throw EISDIR.
-    fs.rmSync(path.join(tmp, `${titled}.jsonl`)) // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
-    fs.mkdirSync(path.join(tmp, `${titled}.jsonl`)) // nosemgrep: path-join-resolve-traversal — test fixture in tmpdir
-
-    const result = await listSessions({ includeAll: false, dir: tmp })
-    expect(result.recent.map((session) => session.title)).toEqual(["Stored"])
+  it("on V2 lists only V2's store, without kiro-cli", async () => {
+    mocks.engine = "v2"
+    mocks.stores.v3 = [session("sess_a", "v3")]
+    mocks.stores.v2 = [session("u-b", "v2")]
+    const result = await catalog.listSessions({ includeAll: false })
+    expect(result.engine).toBe("v2")
+    expect(ids(result)).toEqual(["v2:u-b"])
+    expect(mocks.connects).toBe(0)
   })
 
-  it("takes the title from the first prompt, skipping malformed and non-prompt lines", async () => {
-    writeSession(IDS.recent, { cwd: "/work/delta", updated_at: new Date().toISOString(), title: "  " }, [
-      "{malformed",
-      JSON.stringify({ kind: "AssistantMessage", data: {} }),
-      prompt("first"),
-      prompt("second"),
-    ])
+  it("filters before it dedupes: V3's copy in servers/local does not hide the user's V2 row; a listed V3 row hides it", async () => {
+    mocks.stores.v3 = [
+      session("u-1", "v3", { cwd: "/repo/servers/local", updatedAt: ago(10) }),
+      session("u-2", "v3", { cwd: "/work/alpha", updatedAt: ago(20) }),
+    ]
+    mocks.stores.v2 = [session("u-1", "v2", { updatedAt: ago(HOUR) }), session("u-2", "v2", { updatedAt: ago(HOUR) })]
+    expect(ids(await catalog.listSessions({ includeAll: false }))).toEqual(["v3:u-2", "v2:u-1"])
+    // Show all lists each id once too, as the user's row.
+    const all = await catalog.listSessions({ includeAll: true })
+    expect(ids(all)).toEqual(["v3:u-2", "v2:u-1"])
+  })
 
-    const result = await listSessions({ includeAll: false, dir: tmp })
-    expect(result.recent[0].title).toBe("first")
+  it("keeps the newer of two V3 rows of one session (imported into two workspaces)", async () => {
+    mocks.stores.v3 = [session("u-1", "v3", { cwd: "/work/a", updatedAt: ago(HOUR) }), session("u-1", "v3", { cwd: "/work/b", updatedAt: ago(10) })]
+    const result = await catalog.listSessions({ includeAll: false })
+    expect(result.groups.map((g) => g.cwd)).toEqual(["/work/b"])
+  })
+
+  it("lists sdpm's own and sub-agent sessions only with Show all", async () => {
+    mocks.stores.v3 = [session("sess_sdpm", "v3", { agentName: "sdpm-orchestrator" }), session("sess_user", "v3", { agentName: "vibe", updatedAt: ago(2 * HOUR) })]
+    mocks.stores.v2 = [session("u-child", "v2", { subagent: true })]
+    expect(ids(await catalog.listSessions({ includeAll: false }))).toEqual(["v3:sess_user"])
+    const all = await catalog.listSessions({ includeAll: true })
+    expect(ids(all).sort()).toEqual(["v2:u-child", "v3:sess_sdpm", "v3:sess_user"])
+    expect(all.recent.map((s) => s.sessionId)).toEqual(["sess_user"])
+  })
+
+  it("lists V2's sessions with unavailable v3 when V3's store cannot be read", async () => {
+    vi.spyOn(console, "warn").mockImplementation(() => {})
+    mocks.failing.add("v3")
+    mocks.stores.v2 = [session("u-b", "v2")]
+    const result = await catalog.listSessions({ includeAll: false })
+    expect(ids(result)).toEqual(["v2:u-b"])
+    expect(result.unavailable).toEqual(["v3"])
+  })
+
+  it("shares one listing between concurrent requests", async () => {
+    mocks.stores.v3 = [session("sess_a", "v3")]
+    const [a, b] = await Promise.all([catalog.listSessions({ includeAll: false }), catalog.listSessions({ includeAll: true })])
+    expect(ids(a)).toEqual(ids(b))
+    expect(mocks.listings).toBe(2) // one per store
+    await catalog.listSessions({ includeAll: false })
+    expect(mocks.listings).toBe(4)
   })
 })
 
-describe("forkSession", () => {
-  it("rewrites only fork metadata and byte-copies the log without changing the source", async () => {
-    const meta: SessionMeta = {
-      cwd: "/work/source",
-      updated_at: "2026-09-22T12:00:00.000Z",
-      title: "Source session",
-      parent_session_id: null,
-      session_state: { agent_name: "sa-dev" },
-      custom_field: { keep: true },
-    }
-    writeSession(IDS.recent, meta, [prompt("first"), "{malformed", prompt("second")])
-    const sourceJsonBefore = fs.readFileSync(path.join(tmp, `${IDS.recent}.json`))
-    const sourceJsonlBefore = fs.readFileSync(path.join(tmp, `${IDS.recent}.jsonl`))
+describe("findSession", () => {
+  it("finds a listed session from the last listing, else lists again", async () => {
+    mocks.stores.v2 = [session("u-1", "v2", { title: "Source" })]
+    await catalog.listSessions({ includeAll: false })
+    mocks.stores.v2 = []
+    expect(await catalog.findSession("u-1")).toMatchObject({ sessionId: "u-1", engine: "v2", title: "Source" })
+    expect(mocks.listings).toBe(2)
 
-    const { newId, origin } = await forkSession(IDS.recent, { dir: tmp })
-    const forkMeta = JSON.parse(fs.readFileSync(path.join(tmp, `${newId}.json`), "utf-8"))
-
-    expect(forkMeta).toMatchObject({
-      ...meta,
-      session_id: newId,
-      imported_from: IDS.recent,
-    })
-    expect(fs.readFileSync(path.join(tmp, `${newId}.jsonl`))).toEqual(sourceJsonlBefore)
-    expect(fs.readFileSync(path.join(tmp, `${IDS.recent}.json`))).toEqual(sourceJsonBefore)
-    expect(fs.readFileSync(path.join(tmp, `${IDS.recent}.jsonl`))).toEqual(sourceJsonlBefore)
-    expect(origin).toMatchObject({
-      sourceSessionId: IDS.recent,
-      title: "Source session",
-      cwd: "/work/source",
-      updatedAt: "2026-09-22T12:00:00.000Z",
-    })
-    expect(Date.parse(origin.forkedAt)).not.toBeNaN()
-    expect(fs.existsSync(path.join(tmp, `${newId}.history`))).toBe(false)
+    expect(await catalog.findSession("sess_new")).toBeNull()
+    expect(mocks.listings).toBe(4)
+    mocks.stores.v3 = [session("sess_new", "v3")]
+    expect(await catalog.findSession("sess_new")).toMatchObject({ engine: "v3" })
   })
 
-  it("rejects non-UUID source IDs before filesystem access", async () => {
-    await expect(forkSession("../escape", { dir: tmp })).rejects.toThrow("invalid kiro session ID")
-    expect(fs.readdirSync(tmp)).toEqual([])
+  it("prefers the user's row to sdpm's copy, and lists again after an engine switch", async () => {
+    mocks.stores.v3 = [session("u-1", "v3", { cwd: "/repo/servers/local", updatedAt: ago(10) })]
+    mocks.stores.v2 = [session("u-1", "v2", { cwd: "/work/alpha" })]
+    expect(await catalog.findSession("u-1")).toMatchObject({ engine: "v2", cwd: "/work/alpha" })
+    mocks.engine = "v2"
+    mocks.stores.v2 = []
+    expect(await catalog.findSession("u-1")).toBeNull()
   })
 })

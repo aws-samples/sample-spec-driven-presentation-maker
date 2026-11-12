@@ -25,10 +25,12 @@ interface StyleChatShellProps {
   styleId: string
   styleName: string
   onStyleWritten?: () => void
-  onStyleSaved?: (saved: { title: string; filename: string }) => void
+  onStyleSaved?: (saved: { title?: string; filename: string }) => void
+  /** Reports whether the style agent is working. */
+  onLoadingChange?: (loading: boolean) => void
 }
 
-export function StyleChatShell({ open, onClose, styleId, styleName, onStyleWritten, onStyleSaved }: StyleChatShellProps) {
+export function StyleChatShell({ open, onClose, styleId, styleName, onStyleWritten, onStyleSaved, onLoadingChange }: StyleChatShellProps) {
   const t = useTranslations("styleChat")
   const panelRef = useRef<HTMLElement>(null)
   const [panelWidth, setPanelWidth] = useState(() => {
@@ -143,6 +145,7 @@ export function StyleChatShell({ open, onClose, styleId, styleName, onStyleWritt
                 styleId={styleId}
                 onStyleWritten={onStyleWritten}
                 onStyleSaved={onStyleSaved}
+                onLoadingChange={onLoadingChange}
               />
             </div>
           </div>

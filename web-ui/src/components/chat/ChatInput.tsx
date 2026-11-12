@@ -5,7 +5,7 @@
  *
  * Extracted from ChatPanel.tsx. Handles:
  * - Textarea that grows with its content (react-textarea-autosize, 1–5 rows) and IME-safe composition
- * - Send/Stop button toggle
+ * - Send and Stop buttons (Stop replaces Send while loading, unless `canSendWhileLoading`)
  * - PlusMenu (file attach + snippet)
  * - AttachmentPreview + SnippetInput
  * - FileDropZone wrapper
@@ -34,10 +34,18 @@ import { SlashPickerPopup, slashOptionId } from "./SlashPickerPopup"
 import { SlashTokenReflection } from "./SlashTokenReflection"
 
 export interface ChatInputProps {
-  /** Called with the final message text, uploaded files, snippets, and attachment metadata. */
-  onSend: (text: string, uploadedFiles: UploadedFile[], snippets: { label: string; text: string }[], attachments: { fileName: string; fileType: string }[]) => void
+  /**
+   * Called with the final message text, uploaded files, snippets, and attachment metadata.
+   * Return (or resolve to) `false` to keep the input, attachments and snippets (e.g. the send failed).
+   */
+  onSend: (text: string, uploadedFiles: UploadedFile[], snippets: { label: string; text: string }[], attachments: { fileName: string; fileType: string }[]) => void | false | Promise<void | false>
   isLoading: boolean
   onStop: () => void
+  /**
+   * While loading, still offer Send next to Stop (Cloud: a message sent while the agent
+   * works is a steer). Without it, Stop replaces Send while loading.
+   */
+  canSendWhileLoading?: boolean
   disabled?: boolean
   placeholder?: string
   /** idToken for file upload. */
@@ -46,20 +54,22 @@ export interface ChatInputProps {
   sessionId?: string
   /** Deck ID for file upload context. */
   deckId?: string
-  /** Slot for additional UI above the textarea row (e.g., Options panel, @mentions overlay). */
+  /** Slot for additional UI above the textarea row (e.g., Options panel). */
   children?: ReactNode
+  /** Rendered first inside the input box, above attachments (e.g. the review draft bar). */
+  topSlot?: ReactNode
+  /**
+   * Replaces the icon send button with a labelled one that can send an empty input
+   * (the caller has something else to send); `blocked` disables it, and so does
+   * `canSend` returning false for the current input.
+   */
+  sendOverride?: { label: string; blocked: boolean; canSend?: (input: string) => boolean }
   /** Opens the Local-only kiro session picker. */
   onContinueFromSession?: () => void
   /** Disabled once this chat already has messages. */
   continueFromSessionDisabled?: boolean
-  /** Stop button tooltip override. */
-  stopTitle?: string
   /** Called on every input change (e.g., for @mention detection). */
   onInputChange?: (value: string) => void
-  /** Overlay rendered inside the textarea's relative container (e.g., MentionOverlay). */
-  textareaOverlay?: ReactNode
-  /** Additional className for the textarea element (e.g., text-transparent for overlay mode). */
-  textareaClassName?: string
   /** Template/style candidates. Omit to disable the slash picker. */
   slashItems?: PickerItem[]
   slashLoading?: boolean
@@ -71,15 +81,17 @@ export interface ChatInputProps {
 
 export interface ChatInputHandle {
   insertAtCursor: (text: string) => void
+  /** Replace the whole input (e.g. the HTML format pill); keeps focus, caret at the end. */
+  replaceText: (next: string) => void
   focus: () => void
-  /** Ref to the internal textarea element (for MentionOverlay positioning). */
+  /** Ref to the internal textarea element. */
   textareaRef: React.RefObject<HTMLTextAreaElement | null>
   /** Programmatically add files (for external drop zones). */
   addFiles: (files: File[]) => void
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, isLoading, onStop, disabled, placeholder, idToken, sessionId, children, onContinueFromSession, continueFromSessionDisabled, stopTitle, onInputChange, textareaOverlay, textareaClassName, slashItems, slashLoading, onSlashOpen, onTextareaFocus },
+  { onSend, isLoading, onStop, canSendWhileLoading = false, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, onInputChange, slashItems, slashLoading, onSlashOpen, onTextareaFocus },
   ref,
 ) {
   const t = useTranslations("chatInput")
@@ -106,10 +118,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     }, 400)
   }, [])
 
+  // Every programmatic change goes through here so `onInputChange` mirrors the
+  // textarea exactly (picker inserts, example prompts, send reset, pill toggle).
+  const updateInput = useCallback((next: string) => {
+    setInput(next)
+    onInputChange?.(next)
+  }, [onInputChange])
+
   const picker = useSlashPicker({
     textareaRef,
     value: input,
-    setValue: setInput,
+    setValue: updateInput,
     items: slashItems ?? [],
     onInserted: handleSlashInserted,
   })
@@ -134,13 +153,23 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       const after = input.slice(end)
       const next = before + text + after
       const pos = start + text.length
-      setInput(next)
+      updateInput(next)
       // Programmatic inserts bypass onChange, so feed the slash picker here too
       // (e.g. the empty-state hint inserts "/" to open it).
       if (slashEnabled) picker.onInputChange(next, pos)
       requestAnimationFrame(() => {
         ta.focus()
         ta.setSelectionRange(pos, pos)
+      })
+    },
+    replaceText(next: string) {
+      updateInput(next)
+      picker.close()
+      const ta = textareaRef.current
+      if (!ta) return
+      requestAnimationFrame(() => {
+        ta.focus()
+        ta.setSelectionRange(next.length, next.length)
       })
     },
     focus() {
@@ -151,7 +180,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
       handleFilesRef.current(fakeList)
     },
     textareaRef,
-  }), [input, picker, slashEnabled])
+  }), [input, picker, slashEnabled, updateInput])
 
   const handleFiles = useCallback((files: FileList) => {
     const currentCount = attachments.length
@@ -195,16 +224,20 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
   const removeSlashToken = useCallback((match: TokenMatch) => {
     const end = input[match.end] === " " ? match.end + 1 : match.end
     const next = input.slice(0, match.start) + input.slice(end)
-    setInput(next)
-    onInputChange?.(next)
+    updateInput(next)
     requestAnimationFrame(() => {
       textareaRef.current?.focus()
       textareaRef.current?.setSelectionRange(match.start, match.start)
     })
-  }, [input, onInputChange])
+  }, [input, updateInput])
+
+  const hasContent = !!input.trim() || attachments.length > 0 || snippets.length > 0
+  // Loading blocks sending (and attaching) only when Send is not offered while loading.
+  const sendBlocked = isLoading && !canSendWhileLoading
+  const canSend = sendOverride ? !sendOverride.blocked && (sendOverride.canSend?.(input) ?? true) : hasContent
 
   const handleSend = async () => {
-    if ((!input.trim() && attachments.length === 0 && snippets.length === 0) || isLoading || disabled) return
+    if (!canSend || sendBlocked || disabled) return
 
     // Upload pending attachments
     const uploadedFiles: UploadedFile[] = []
@@ -236,8 +269,16 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     const sentSnippets = snippets.map((s) => ({ label: t("textSnippet"), text: s.text }))
     const sentAttachments = uploadedFiles.map((f) => ({ fileName: f.fileName, fileType: f.fileType }))
 
-    onSend(input, uploadedFiles, sentSnippets, sentAttachments)
-    setInput("")
+    // Await only an async onSend so a plain one keeps clearing the input in the same tick.
+    const sent = onSend(input, uploadedFiles, sentSnippets, sentAttachments)
+    const result = sent instanceof Promise ? await sent : sent
+    if (result === false) {
+      // Keep everything for a retry; files uploaded just now are uploaded again with it.
+      const uploadedIds = new Set(attachments.filter((a) => a.status === "pending").map((a) => a.id))
+      setAttachments((prev) => prev.map((a) => (uploadedIds.has(a.id) ? { ...a, status: "pending" as const, source: undefined } : a)))
+      return
+    }
+    updateInput("")
     picker.close()
     setAttachments([])
     setSnippets([])
@@ -251,7 +292,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
 
   const handleKeyDown = (e: KeyboardEvent<HTMLTextAreaElement>) => {
     if (getIsComposing(e)) return
-    const canSendNow = input.trim() || attachments.length > 0 || snippets.length > 0
+    const canSendNow = canSend
     const sendWithEnter = (() => { try { return JSON.parse(localStorage.getItem("sdpm-prefs") || "{}").sendWithEnter ?? false } catch { return false } })()
 
     if (sendWithEnter) {
@@ -267,10 +308,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
     }
   }
 
-  const canSend = input.trim() || attachments.length > 0 || snippets.length > 0
-
   return (
-    <FileDropZone onFiles={handleFiles} onLongTextPaste={handleSnippetConfirm} pasteDisabled={snippetOpen} disabled={isLoading} className="relative">
+    <FileDropZone onFiles={handleFiles} onLongTextPaste={handleSnippetConfirm} pasteDisabled={snippetOpen} disabled={sendBlocked} className="relative">
       <SnippetInput
         open={snippetOpen}
         onClose={() => { setSnippetOpen(false); setEditingSnippetId(null) }}
@@ -284,6 +323,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           className="rounded-xl border border-border bg-background-raised search-glow"
           data-landed={landed ? "" : undefined}
         >
+          {topSlot}
+
           <AttachmentPreview
             attachments={attachments}
             snippets={snippets}
@@ -304,7 +345,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               onSnippetRequest={handleSnippetRequest}
               onContinueFromSession={onContinueFromSession}
               continueFromSessionDisabled={continueFromSessionDisabled}
-              disabled={isLoading}
+              disabled={sendBlocked}
             />
 
             <div className="flex-1 relative">
@@ -314,9 +355,8 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 maxRows={5}
                 value={input}
                 onChange={(e) => {
-                  setInput(e.target.value)
+                  updateInput(e.target.value)
                   if (slashEnabled) picker.onInputChange(e.target.value, e.target.selectionStart)
-                  onInputChange?.(e.target.value)
                 }}
                 onKeyDown={(e) => {
                   if (slashEnabled && picker.onKeyDown(e, getIsComposing(e))) return
@@ -333,21 +373,29 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 aria-activedescendant={slashEnabled && picker.open && picker.filtered[picker.activeIndex]
                   ? slashOptionId(slashListboxId, picker.activeIndex)
                   : undefined}
-                className={`w-full bg-transparent resize-none text-sm py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground leading-relaxed font-[inherit] tracking-[inherit] ${textareaClassName ?? ""}`}
+                className="w-full bg-transparent resize-none text-sm py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground leading-relaxed font-[inherit] tracking-[inherit]"
                 autoFocus
               />
-              {textareaOverlay}
             </div>
 
-            {isLoading ? (
+            {isLoading && (
               <button
                 type="button"
                 onClick={onStop}
-                title={stopTitle ?? t("stopGeneration")}
+                title={t("stopGeneration")}
                 className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-foreground/10 hover:bg-foreground/20"
-                aria-label={stopTitle ?? t("stopGeneration")}
+                aria-label={t("stopGeneration")}
               >
                 <Square className="h-3 w-3 fill-current" />
+              </button>
+            )}
+            {sendBlocked ? null : sendOverride ? (
+              <button
+                type="submit"
+                disabled={!canSend}
+                className="flex-none h-7 rounded-lg px-3 text-sm font-semibold whitespace-nowrap bg-human text-human-ink transition-opacity disabled:opacity-35 touch-target"
+              >
+                {sendOverride.label}
               </button>
             ) : (
               <button

@@ -13,8 +13,9 @@ _LOCAL = str(_ROOT / "servers" / "local")
 if _LOCAL not in sys.path:
     sys.path.insert(0, _LOCAL)
 
-import compose  # noqa: E402
 import sandbox_tools  # noqa: E402
+
+import sdpm.engine.preview.compose as compose  # noqa: E402
 
 
 def test_local_compose_output_includes_regions(tmp_path: Path, monkeypatch):
@@ -68,7 +69,7 @@ def test_local_compose_output_includes_regions(tmp_path: Path, monkeypatch):
     def fake_run(command, *args, **kwargs):
         if command and command[0] == "/fake/soffice":
             outdir = Path(command[command.index("--outdir") + 1])
-            (outdir / "measure.svg").write_text("<svg />", encoding="utf-8")
+            (outdir / f"{Path(command[-1]).stem}.svg").write_text("<svg />", encoding="utf-8")  # LibreOffice: <input stem>.svg
             return subprocess.CompletedProcess(command, 0, "", "")
         return original_run(command, *args, **kwargs)
 
@@ -135,7 +136,7 @@ def _detected_render_rig(tmp_path: Path, monkeypatch, slides: dict[str, dict]) -
     def fake_run(command, *args, **kwargs):
         if command and command[0] == "/fake/soffice":
             outdir = Path(command[command.index("--outdir") + 1])
-            (outdir / "iso.svg").write_text("<svg />", encoding="utf-8")
+            (outdir / f"{Path(command[-1]).stem}.svg").write_text("<svg />", encoding="utf-8")  # LibreOffice: <input stem>.svg
             return subprocess.CompletedProcess(command, 0, "", "")
         return original_run(command, *args, **kwargs)
 

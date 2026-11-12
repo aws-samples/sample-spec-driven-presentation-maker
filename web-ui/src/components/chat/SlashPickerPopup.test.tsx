@@ -4,7 +4,7 @@
 import { afterEach, describe, expect, it, vi } from "vitest"
 import { cleanup, fireEvent, screen } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
-import type { PickerItem } from "@/lib/slashToken"
+import { FORMAT_HTML_ITEM, type PickerItem } from "@/lib/slashToken"
 import { SlashPickerPopup, type SlashPickerPopupProps } from "./SlashPickerPopup"
 
 vi.mock("@/hooks/UseMobile", () => ({ useIsMobile: () => false }))
@@ -53,13 +53,27 @@ afterEach(() => {
 })
 
 describe("SlashPickerPopup", () => {
+  it("renders the Format section last with the localized HTML option", () => {
+    const all = [...items, FORMAT_HTML_ITEM]
+    const onSelect = vi.fn()
+    renderPopup({ items: all, filtered: all, activeIndex: 2, onSelect })
+
+    const styleHeading = screen.getByText("Style")
+    const formatHeading = screen.getByText("Format")
+    expect(styleHeading.compareDocumentPosition(formatHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
+    const option = screen.getByRole("option", { name: /HTML/ })
+    expect(option.textContent).toContain("Present in a browser. Can't be edited in PowerPoint.")
+    fireEvent.click(option)
+    expect(onSelect).toHaveBeenCalledWith(FORMAT_HTML_ITEM)
+  })
+
   it("renders non-empty sections in template then style order", () => {
     renderPopup()
 
     const templateHeading = screen.getByText("Template")
     const styleHeading = screen.getByText("Style")
     expect(templateHeading.compareDocumentPosition(styleHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
-    expect(screen.getByRole("listbox", { name: "Template and style suggestions" }).id).toBe("slash-listbox")
+    expect(screen.getByRole("listbox", { name: "Template, style and format suggestions" }).id).toBe("slash-listbox")
   })
 
   it("hides an empty section and marks custom items", () => {

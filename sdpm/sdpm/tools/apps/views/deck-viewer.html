@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en" data-app="sdpm-deck-viewer">
+<head>
+<meta charset="utf-8">
+<meta name="color-scheme" content="light dark">
+<title>sdpm deck</title>
+<style>
+:root{--bg:var(--color-background-primary,#fff);--fg:var(--color-text-primary,#1d1d1f);--muted:var(--color-text-secondary,#666);--line:var(--color-border-primary,#ddd);--thumb:var(--color-background-secondary,#eee);--accent:#2f6fed;--human:#e8590c;--bad:#c92a2a;--good:#2b8a3e}
+*{box-sizing:border-box}
+html,body{margin:0;background:var(--bg);color:var(--fg);font:14px/1.5 system-ui,-apple-system,"Segoe UI",sans-serif}
+#app{padding:12px}
+header{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+header .spacer{flex:1}
+#deck-name{font-size:12px;color:var(--muted);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;max-width:40%}
+button{font:inherit;font-size:12px;padding:4px 10px;border-radius:6px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+button.primary{background:var(--accent);border-color:var(--accent);color:#fff}
+button:disabled{opacity:.5;cursor:default}
+button[role="tab"][aria-selected="true"]{border-color:var(--accent);color:var(--accent);font-weight:600}
+[hidden]{display:none!important}
+#status{font-size:12px;color:var(--muted);margin-top:8px;min-height:18px}
+pre{white-space:pre-wrap;font:13px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;margin:0}
+#check{border:1px solid var(--line);border-radius:6px;padding:6px 10px;margin-bottom:10px;font-size:12px}
+#check[data-ok="true"]{border-color:var(--good)}
+#check[data-ok="false"]{border-color:var(--bad)}
+#check strong{font-size:14px}
+#check ul{margin:4px 0 0;padding-left:18px}
+#check li.error{color:var(--bad)}
+.entry-section{font-weight:600;margin:12px 0 4px}
+.entry-prose{font-size:12px;color:var(--muted);margin:4px 0}
+.entry-slide{border:1px solid var(--line);border-radius:6px;padding:6px 8px;margin-bottom:6px;cursor:pointer}
+.entry-slide:hover{border-color:var(--accent)}
+.slug{font:11px ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted)}
+.sub{font-size:12px;color:var(--muted)}
+.row{display:flex;gap:6px;flex-wrap:wrap;margin-top:8px}
+textarea{width:100%;font:13px/1.5 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:6px}
+#slides{display:grid;grid-template-columns:minmax(180px,1fr) 3fr;gap:12px}
+#slide-list{display:flex;flex-direction:column;gap:4px;max-height:640px;overflow:auto}
+.slide-item{text-align:left;display:block;width:100%;padding:6px 8px}
+.slide-item[aria-current="true"]{border-color:var(--accent)}
+.slide-item .msg{font-size:12px;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.slide-item .state{font-size:11px;color:var(--muted)}
+#stage-bar{display:flex;gap:6px;align-items:center;margin-bottom:6px}
+#stage-title{font-weight:600;flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#stage{position:relative;width:100%;aspect-ratio:16/9;background:var(--thumb);border-radius:6px;overflow:hidden;user-select:none;touch-action:none;cursor:crosshair}
+#stage img{position:absolute;inset:0;width:100%;height:100%;display:block;pointer-events:none}
+#stage iframe{position:absolute;inset:0;width:100%;height:100%;border:0;display:block;pointer-events:none;background:transparent}
+#stage .none{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:4px;color:var(--muted);font-size:12px;text-align:center;padding:12px}
+.frame{position:absolute;border:2px solid var(--human);background:rgba(232,89,12,.08);pointer-events:none}
+.frame b{position:absolute;top:-2px;left:-2px;background:var(--human);color:#fff;font-size:11px;padding:0 5px}
+#comments{display:flex;flex-direction:column;gap:6px;margin-top:8px}
+#comments label{display:flex;gap:6px;align-items:center;font-size:12px}
+#comments label b{color:var(--human)}
+#comments input{flex:1;font:inherit;font-size:13px;padding:3px 6px;color:var(--fg);background:var(--bg);border:1px solid var(--line);border-radius:4px}
+.hint{font-size:12px;color:var(--muted)}
+</style>
+</head>
+<body>
+<div id="app">
+  <header>
+    <div role="tablist">
+      <button role="tab" data-tab="brief" aria-selected="false">Brief</button>
+      <button role="tab" data-tab="outline" aria-selected="true">Outline</button>
+      <button role="tab" data-tab="slides" aria-selected="false">Slides</button>
+    </div>
+    <span class="spacer"></span>
+    <span id="deck-name"></span>
+    <button id="open-file" hidden>Open file</button>
+    <button id="open-folder" hidden>Open folder</button>
+    <button id="fullscreen" hidden>Full screen</button>
+    <button id="refresh" disabled>Refresh</button>
+  </header>
+
+  <section id="panel-brief" role="tabpanel" hidden><pre id="brief"></pre></section>
+
+  <section id="panel-outline" role="tabpanel">
+    <div id="check" hidden></div>
+    <div id="outline-view">
+      <div id="outline"></div>
+      <div class="row">
+        <button id="outline-edit" disabled>Edit outline</button>
+        <button class="primary" id="outline-ok" disabled>Outline looks good</button>
+      </div>
+    </div>
+    <div id="outline-editor" hidden>
+      <textarea id="outline-text" rows="24" spellcheck="false" aria-label="specs/outline.md"></textarea>
+      <div class="row">
+        <button class="primary" id="outline-send">Send outline edits</button>
+        <button id="outline-cancel">Cancel</button>
+      </div>
+    </div>
+  </section>
+
+  <section id="panel-slides" role="tabpanel" hidden>
+    <div id="slides">
+      <div id="slide-list"></div>
+      <div>
+        <div id="stage-bar">
+          <span id="stage-title"></span>
+          <button id="prev" aria-label="Previous slide">‹</button>
+          <button id="next" aria-label="Next slide">›</button>
+        </div>
+        <div id="stage"><div class="none">Select a slide</div></div>
+        <div class="hint" id="image-note" hidden></div>
+        <div class="hint">Drag on the preview to mark a part of the slide, then write what to change.</div>
+        <div id="comments"></div>
+        <textarea id="note" rows="2" aria-label="Note for the whole request" placeholder="Note for the whole request (optional)"></textarea>
+        <div class="row"><button class="primary" id="send-comments">Send comments</button></div>
+      </div>
+    </div>
+  </section>
+
+  <div id="status" role="status"></div>
+</div>
+<script>
+/*__SDPM_BRIDGE__*/
+</script>
+<script>
+// The deck viewer: Brief / Outline / Slides of one deck. The deck comes from app_action
+// (action "deck"), each slide preview from action "slide_preview" (compose SVG drawn in a
+// sandboxed srcdoc frame, or a JPEG); comments are saved with "submit_review" and outline
+// edits turned into a diff with "outline_edit", and both go back to the conversation with
+// ui/message. On a server that offers "open" (the deck payload's "open"), the header opens
+// the deck's built file or its folder on the user's machine. The view's own DOM is built
+// with textContent.
+(function () {
+  "use strict";
+  var bridge = window.sdpmBridge;
+  var MAX_COMMENTS = 100;
+  var MIN_FRAME = 8;
+  var CONFIRM = "The outline in specs/outline.md looks good to me as it is. Continue with the next step.";
+  var deckId = null;
+  var data = null;
+  var tab = null;
+  var current = null;
+  var frames = [];
+  var previews = {};
+  var drag = null;
+  var editBase = null;
+  var loading = false;
+  var leftFullscreen = false;
+  var $ = function (s) { return document.querySelector(s); };
+
+  function status(text) { $("#status").textContent = text || ""; }
+
+  function el(tag, cls, text) {
+    var e = document.createElement(tag);
+    if (cls) e.className = cls;
+    if (text != null) e.textContent = text;
+    return e;
+  }
+
+  function errorText(r) {
+    var first = ((r && r.content) || [])[0];
+    return (first && first.text) || "error";
+  }
+
+  // A tool result's JSON: structuredContent, its "result" string (the remote server), or the text.
+  function payload(result) {
+    var sc = result && result.structuredContent;
+    try {
+      if (sc && typeof sc.result === "string") return JSON.parse(sc.result);
+      if (sc && typeof sc === "object") return sc;
+      var first = ((result && result.content) || [])[0];
+      if (first && first.type === "text") return JSON.parse(first.text);
+    } catch (e) { /* not JSON */ }
+    return {};
+  }
+
+  // --- tabs --------------------------------------------------------------------------
+
+  function showTab(name) {
+    tab = name;
+    document.querySelectorAll('button[role="tab"]').forEach(function (b) {
+      b.setAttribute("aria-selected", b.dataset.tab === name ? "true" : "false");
+    });
+    ["brief", "outline", "slides"].forEach(function (n) { $("#panel-" + n).hidden = n !== name; });
+    if (name === "slides" && data && !current && data.slides.length) select(firstShown(), false);
+    bridge.reportSize();
+  }
+  document.querySelectorAll('button[role="tab"]').forEach(function (b) {
+    b.onclick = function () { showTab(b.dataset.tab); };
+  });
+
+  // --- check banner ------------------------------------------------------------------
+
+  function showCheck(check) {
+    var box = $("#check");
+    if (!check || typeof check.ok !== "boolean") { box.hidden = true; return; }
+    box.hidden = false;
+    box.textContent = "";
+    box.dataset.ok = check.ok ? "true" : "false";
+    var errors = check.errors || [];
+    var warnings = check.warnings || [];
+    box.appendChild(el("strong", null, check.ok
+      ? "check_specs passed" + (warnings.length ? " with " + warnings.length + " warnings" : "")
+      : "check_specs found " + errors.length + (errors.length === 1 ? " error" : " errors")));
+    if (!errors.length && !warnings.length) return;
+    var list = el("ul");
+    errors.forEach(function (t) { list.appendChild(el("li", "error", t)); });
+    warnings.forEach(function (t) { list.appendChild(el("li", "warning", t)); });
+    box.appendChild(list);
+  }
+
+  // --- render ------------------------------------------------------------------------
+
+  function renderBrief() {
+    $("#brief").textContent = data.brief != null ? data.brief : "No brief yet (specs/brief.md).";
+  }
+
+  function renderOutline() {
+    var box = $("#outline");
+    box.textContent = "";
+    if (data.outline_text == null) box.appendChild(el("div", "entry-prose", "No outline yet (specs/outline.md)."));
+    data.outline.forEach(function (e) {
+      if (e.type === "section") { box.appendChild(el("div", "entry-section", e.title)); return; }
+      if (e.type === "prose") { box.appendChild(el("div", "entry-prose", e.text)); return; }
+      var c = el("div", "entry-slide");
+      c.dataset.slug = e.slug;
+      c.appendChild(el("div", "slug", e.slug));
+      c.appendChild(el("div", "msg", e.message));
+      e.subItems.forEach(function (s) { c.appendChild(el("div", "sub", s.key + ": " + s.value)); });
+      c.onclick = function () {
+        if (!slideOf(e.slug)) return;
+        showTab("slides");
+        select(e.slug, true);
+      };
+      box.appendChild(c);
+    });
+    showCheck(data.check);
+    $("#outline-edit").disabled = false;
+    $("#outline-ok").disabled = !(data.check && data.check.ok);
+  }
+
+  function slideOf(slug) {
+    for (var i = 0; data && i < data.slides.length; i++) if (data.slides[i].slug === slug) return data.slides[i];
+    return null;
+  }
+
+  function firstShown() {
+    for (var i = 0; i < data.slides.length; i++) if (data.slides[i].preview) return data.slides[i].slug;
+    return data.slides[0].slug;
+  }
+
+  function slideState(s) {
+    if (!s.built) return "not composed yet";
+    return s.preview ? "" : "no preview yet";
+  }
+
+  function renderSlides() {
+    var list = $("#slide-list");
+    list.textContent = "";
+    data.slides.forEach(function (s, i) {
+      var b = el("button", "slide-item");
+      b.dataset.slug = s.slug;
+      b.setAttribute("aria-current", s.slug === current ? "true" : "false");
+      b.appendChild(el("div", "slug", (i + 1) + ". " + s.slug));
+      b.appendChild(el("div", "msg", s.message));
+      var state = slideState(s);
+      if (state) b.appendChild(el("div", "state", state));
+      b.onclick = function () { select(s.slug, true); };
+      list.appendChild(b);
+    });
+    if (!data.slides.length) list.appendChild(el("div", "hint", "The outline has no slides yet."));
+    if (current && !slideOf(current)) current = null;
+    frames = frames.filter(function (f) { return slideOf(f.slide); });
+    if (current) select(current, false);
+    else if (tab === "slides" && data.slides.length) select(firstShown(), false);
+    else drawComments();
+  }
+
+  function render() {
+    $("#deck-name").textContent = data.deck_id;
+    $("#deck-name").title = data.deck_id;
+    var w = data.slide_size[0], h = data.slide_size[1];
+    $("#stage").style.aspectRatio = w + " / " + h;
+    renderOpen();
+    renderBrief();
+    if ($("#outline-editor").hidden) renderOutline();
+    else showCheck(data.check);
+    renderSlides();
+    bridge.reportSize();
+  }
+
+  // --- loading -----------------------------------------------------------------------
+
+  function canCall() {
+    if (bridge.hostCapabilities.serverTools) return true;
+    status("This host does not pass tool calls from views, so the deck cannot be shown here.");
+    return false;
+  }
+
+  function load(quiet) {
+    if (!deckId) { status("This host did not pass the deck to the view."); return; }
+    if (loading || !canCall()) return;
+    loading = true;
+    $("#refresh").disabled = true;
+    if (!quiet) status("Loading the deck…");
+    bridge.callTool("app_action", { action: "deck", deck_id: deckId }).then(function (r) {
+      if (!r || r.isError) { status("Could not load the deck: " + errorText(r)); return; }
+      data = r.structuredContent || payload(r);
+      render();
+      status("");
+    }, function (e) {
+      status("The host refused the call: " + e.message);
+    }).catch(function (e) {
+      status("Could not show the deck: " + e.message);
+    }).then(function () {
+      loading = false;
+      $("#refresh").disabled = false;
+    });
+  }
+
+  $("#refresh").onclick = function () { load(false); };
+
+  // --- open the file or folder (a server that offers it) -----------------------------
+
+  var OPEN_UNAVAILABLE = { file: "The deck has no built file yet.", folder: "Only a deck folder in the deck root opens from here." };
+
+  function renderOpen() {
+    var can = data && data.open;
+    ["file", "folder"].forEach(function (target) {
+      var b = $("#open-" + target);
+      b.hidden = !can;
+      b.disabled = !(can && can[target]);
+      b.title = can && !can[target] ? OPEN_UNAVAILABLE[target] : "";
+    });
+  }
+
+  function openTarget(target) {
+    if (!deckId || !canCall()) return;
+    var b = $("#open-" + target);
+    b.disabled = true;
+    bridge.callTool("app_action", { action: "open", deck_id: deckId, target: target }).then(function (r) {
+      if (!r || r.isError) { status("Could not open it: " + errorText(r)); return; }
+      status("Opened " + ((r.structuredContent || {}).name || target) + ".");
+    }, function (e) {
+      status("The host refused the call: " + e.message);
+    }).then(renderOpen);
+  }
+
+  $("#open-file").onclick = function () { openTarget("file"); };
+  $("#open-folder").onclick = function () { openTarget("folder"); };
+
+  // --- slides ------------------------------------------------------------------------
+
+  function stageClear(blanked) {
+    var st = $("#stage");
+    Array.prototype.slice.call(st.children).forEach(function (c) { if (!c.classList.contains("frame")) c.remove(); });
+    var note = $("#image-note");
+    note.hidden = !blanked;
+    note.textContent = blanked
+      ? "This host does not show embedded images, so " + blanked + (blanked === 1 ? " image is" : " images are") + " left empty on this slide."
+      : "";
+    return st;
+  }
+
+  function stageMessage(lines) {
+    var st = stageClear(0);
+    var box = el("div", "none");
+    lines.forEach(function (t) { if (t) box.appendChild(el("div", null, t)); });
+    st.insertBefore(box, st.firstChild);
+  }
+
+  function stageImage(src, slug) {
+    var st = stageClear(0);
+    var img = document.createElement("img");
+    img.alt = slug;
+    img.src = src;
+    st.insertBefore(img, st.firstChild);
+  }
+
+  function stageSvg(shown, slug) {
+    var st = stageClear(shown.blanked);
+    var frame = document.createElement("iframe");
+    frame.setAttribute("sandbox", ""); // the slide is static SVG: no scripts, no same-origin
+    frame.setAttribute("title", slug);
+    frame.setAttribute("tabindex", "-1");
+    frame.srcdoc = shown.doc;
+    st.insertBefore(frame, st.firstChild);
+  }
+
+  // --- compose SVG -------------------------------------------------------------------
+
+  var DATA_IMAGE = /^data:image\/[a-z0-9.+-]+;base64,[A-Za-z0-9+\/=\s]+$/i;
+  var LINKS = ["href", "xlink:href", "src"];
+  var SLIDE_CSS = "html,body{margin:0;height:100%;overflow:hidden;background:transparent}svg{display:block;width:100%;height:100%}";
+
+  // A slide's compose parts as one static SVG in its final state (what the Web UI's live
+  // preview ends on), parsed as HTML the way the Web UI parses them. An image whose data the
+  // host redacted (anything but a base64 data: URI) is left empty and counted; a reference
+  // outside the slide is dropped, so nothing is fetched. DOMParser documents run no scripts
+  // and load nothing.
+  function slideDoc(p) {
+    var vb = String(p.viewBox || "").trim().split(/[\s,]+/).map(Number);
+    if (vb.length !== 4 || !(vb[2] > 0 && vb[3] > 0)) return null;
+    var text = "<svg>" + (p.defs || "") + "<g>" + (p.bgSvg || "") + "</g>" +
+      (p.components || []).map(function (c) { return "<g>" + c + "</g>"; }).join("") + "</svg>";
+    var svg = new DOMParser().parseFromString(text, "text/html").body.firstElementChild;
+    if (!svg || svg.localName !== "svg") return null;
+    svg.setAttribute("viewBox", vb.join(" "));
+    svg.setAttribute("preserveAspectRatio", "xMidYMid");
+    if (!p.bgSvg) {
+      var rect = svg.ownerDocument.createElementNS(svg.namespaceURI, "rect");
+      rect.setAttribute("x", String(vb[0]));
+      rect.setAttribute("y", String(vb[1]));
+      rect.setAttribute("width", String(vb[2]));
+      rect.setAttribute("height", String(vb[3]));
+      rect.setAttribute("fill", p.bgFill || "#000");
+      svg.querySelector(":scope > g").appendChild(rect);
+    }
+    var blanked = 0;
+    Array.prototype.forEach.call(svg.querySelectorAll("*"), function (node) {
+      var emptied = false;
+      LINKS.forEach(function (name) {
+        var value = node.getAttribute(name);
+        if (value == null) return;
+        if (node.localName === "image") {
+          if (DATA_IMAGE.test(value)) return;
+          emptied = true;
+        } else if (value.charAt(0) === "#") {
+          return;
+        }
+        node.removeAttribute(name);
+      });
+      if (emptied) blanked++;
+    });
+    return {
+      doc: '<!DOCTYPE html><html><head><meta charset="utf-8"><style>' + SLIDE_CSS + "</style></head><body>" + svg.outerHTML + "</body></html>",
+      blanked: blanked
+    };
+  }
+
+  function showCached(cached, slug) {
+    if (cached.kind === "svg") stageSvg(cached, slug);
+    else stageImage(cached.src, slug);
+  }
+
+  function noPreview(s) {
+    if (!s.built) return stageMessage(["Not composed yet"]);
+    var env = data.preview_environment;
+    if (env && env.status === "unavailable") {
+      return stageMessage([
+        "No preview yet: this machine cannot make slide previews.",
+        env.missing && env.missing.length ? "Missing: " + env.missing.join(", ") : "",
+        env.install ? "Install: " + env.install : "",
+        env.note || ""
+      ]);
+    }
+    stageMessage(["No preview yet"]);
+  }
+
+  function showPreview(s) {
+    if (!s.preview) return noPreview(s);
+    var cached = previews[s.slug];
+    if (cached && cached.stamp === s.preview) return showCached(cached, s.slug);
+    stageMessage(["Loading the preview…"]);
+    if (!canCall()) return;
+    bridge.callTool("app_action", { action: "slide_preview", deck_id: deckId, slug: s.slug }).then(function (r) {
+      if (current !== s.slug) return;
+      if (!r || r.isError) { stageMessage(["Could not load the preview: " + errorText(r)]); return; }
+      var p = r.structuredContent || {};
+      if (!p.available) { stageMessage(["No preview yet"]); return; }
+      var shown;
+      if (p.kind === "svg") {
+        shown = slideDoc(p);
+        if (!shown) { stageMessage(["Could not draw this slide."]); return; }
+        shown.kind = "svg";
+      } else {
+        shown = { kind: "image", src: "data:" + p.mimeType + ";base64," + p.data };
+      }
+      shown.stamp = p.stamp;
+      previews[s.slug] = shown;
+      showCached(shown, s.slug);
+      bridge.reportSize();
+    }, function (e) {
+      if (current === s.slug) stageMessage(["The host refused the call: " + e.message]);
+    });
+  }
+
+  function select(slug, byUser) {
+    var s = slideOf(slug);
+    if (!s) return;
+    current = slug;
+    document.querySelectorAll(".slide-item").forEach(function (b) {
+      b.setAttribute("aria-current", b.dataset.slug === slug ? "true" : "false");
+    });
+    var index = data.slides.indexOf(s);
+    $("#stage-title").textContent = (index + 1) + ". " + s.message;
+    $("#prev").disabled = index <= 0;
+    $("#next").disabled = index >= data.slides.length - 1;
+    showPreview(s);
+    drawComments();
+    if (byUser && !leftFullscreen && bridge.hostContext.displayMode !== "fullscreen" && bridge.canDisplay("fullscreen")) {
+      setDisplay("fullscreen");
+    }
+  }
+
+  function step(delta) {
+    if (!data || !current) return;
+    var i = data.slides.indexOf(slideOf(current)) + delta;
+    if (i >= 0 && i < data.slides.length) select(data.slides[i].slug, false);
+  }
+  $("#prev").onclick = function () { step(-1); };
+  $("#next").onclick = function () { step(1); };
+
+  // --- full screen -------------------------------------------------------------------
+
+  function fullscreenButton() {
+    var b = $("#fullscreen");
+    b.hidden = !bridge.canDisplay("fullscreen");
+    b.textContent = bridge.hostContext.displayMode === "fullscreen" ? "Exit full screen" : "Full screen";
+  }
+
+  function setDisplay(mode) {
+    return bridge.requestDisplayMode(mode).then(fullscreenButton, function () { fullscreenButton(); });
+  }
+
+  $("#fullscreen").onclick = function () {
+    var leaving = bridge.hostContext.displayMode === "fullscreen";
+    leftFullscreen = leaving;
+    setDisplay(leaving ? "inline" : "fullscreen");
+  };
+
+  // --- frames and comments -----------------------------------------------------------
+
+  function frameName(i) {
+    var name = "";
+    for (var n = i + 1; n > 0; n = Math.floor((n - 1) / 26)) name = String.fromCharCode(65 + (n - 1) % 26) + name;
+    return name;
+  }
+
+  function nextName() {
+    var used = {};
+    frames.forEach(function (f) { used[f.name] = true; });
+    for (var i = 0; ; i++) if (!used[frameName(i)]) return frameName(i);
+  }
+
+  function toSlide(ev) {
+    var r = $("#stage").getBoundingClientRect();
+    var w = data.slide_size[0], h = data.slide_size[1];
+    var x = Math.round((ev.clientX - r.left) / r.width * w);
+    var y = Math.round((ev.clientY - r.top) / r.height * h);
+    return [Math.min(w, Math.max(0, x)), Math.min(h, Math.max(0, y))];
+  }
+
+  function rectOf(a, b) {
+    var x = Math.min(a[0], b[0]), y = Math.min(a[1], b[1]);
+    return [x, y, Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1])];
+  }
+
+  function placeFrame(div, rect) {
+    var w = data.slide_size[0], h = data.slide_size[1];
+    div.style.left = (rect[0] / w * 100) + "%";
+    div.style.top = (rect[1] / h * 100) + "%";
+    div.style.width = (rect[2] / w * 100) + "%";
+    div.style.height = (rect[3] / h * 100) + "%";
+  }
+
+  var stage = $("#stage");
+  stage.addEventListener("pointerdown", function (ev) {
+    var s = current && slideOf(current);
+    if (!s || !s.built || ev.button !== 0) return;
+    if (frames.length >= MAX_COMMENTS) { status("A request holds at most " + MAX_COMMENTS + " comments."); return; }
+    drag = { from: toSlide(ev), box: el("div", "frame") };
+    stage.appendChild(drag.box);
+    placeFrame(drag.box, rectOf(drag.from, drag.from));
+    stage.setPointerCapture(ev.pointerId);
+  });
+  stage.addEventListener("pointermove", function (ev) {
+    if (drag) placeFrame(drag.box, rectOf(drag.from, toSlide(ev)));
+  });
+  function endDrag(ev, keep) {
+    if (!drag) return;
+    var rect = rectOf(drag.from, toSlide(ev));
+    drag.box.remove();
+    drag = null;
+    if (!keep || rect[2] < MIN_FRAME || rect[3] < MIN_FRAME) return;
+    var name = nextName();
+    frames.push({ name: name, slide: current, rect: rect, text: "" });
+    drawComments();
+    var input = document.querySelector('input[data-frame="' + name + '"]');
+    if (input) input.focus();
+  }
+  stage.addEventListener("pointerup", function (ev) { endDrag(ev, true); });
+  stage.addEventListener("pointercancel", function (ev) { endDrag(ev, false); });
+
+  function drawComments() {
+    document.querySelectorAll("#stage .frame").forEach(function (f) { f.remove(); });
+    var list = $("#comments");
+    list.textContent = "";
+    frames.forEach(function (f) {
+      if (f.slide === current) {
+        var d = el("div", "frame");
+        d.appendChild(el("b", null, f.name));
+        placeFrame(d, f.rect);
+        $("#stage").appendChild(d);
+      }
+      var label = el("label");
+      label.appendChild(el("b", null, f.name));
+      label.appendChild(el("span", "slug", f.slide));
+      var input = document.createElement("input");
+      input.dataset.frame = f.name;
+      input.value = f.text;
+      input.maxLength = 2000;
+      input.setAttribute("aria-label", "Comment " + f.name);
+      input.oninput = function () { f.text = input.value; };
+      label.appendChild(input);
+      var remove = el("button", null, "×");
+      remove.setAttribute("aria-label", "Remove " + f.name);
+      remove.onclick = function (e) {
+        e.preventDefault();
+        frames = frames.filter(function (x) { return x !== f; });
+        drawComments();
+      };
+      label.appendChild(remove);
+      list.appendChild(label);
+    });
+    $("#send-comments").disabled = !frames.length;
+    bridge.reportSize();
+  }
+
+  function say(text, done) {
+    return bridge.sendMessage(text).then(function (r) {
+      if (r && r.isError) { status("The host did not accept the message."); return; }
+      status(done);
+      return true;
+    }, function (e) { status("Could not send the message: " + e.message); });
+  }
+
+  $("#send-comments").onclick = function () {
+    if (!frames.length) { status("Draw a frame on a slide first."); return; }
+    if (!canCall()) return;
+    var note = $("#note").value.trim();
+    var review = {
+      note: note || null,
+      comments: frames.map(function (f) { return { name: f.name, slide: f.slide, rect: f.rect.slice(), text: f.text }; })
+    };
+    var button = $("#send-comments");
+    button.disabled = true;
+    status("Saving the comments…");
+    bridge.callTool("app_action", { action: "submit_review", deck_id: deckId, review: review }).then(function (r) {
+      if (!r || r.isError) { status("Could not save the comments: " + errorText(r)); return; }
+      var saved = r.structuredContent || {};
+      return say(saved.message, "Sent review " + saved.id + " to the agent.").then(function (ok) {
+        if (!ok) return;
+        frames = [];
+        $("#note").value = "";
+      });
+    }, function (e) {
+      status("The host refused the call: " + e.message);
+    }).then(drawComments);
+  };
+
+  // --- outline -----------------------------------------------------------------------
+
+  function editing(on) {
+    $("#outline-view").hidden = on;
+    $("#outline-editor").hidden = !on;
+    bridge.reportSize();
+  }
+
+  $("#outline-edit").onclick = function () {
+    if (!data) return;
+    editBase = data.outline_text || "";
+    $("#outline-text").value = editBase;
+    editing(true);
+    $("#outline-text").focus();
+  };
+  $("#outline-cancel").onclick = function () { editing(false); renderOutline(); };
+  $("#outline-send").onclick = function () {
+    var text = $("#outline-text").value;
+    // A textarea gives LF line ends; compare the loaded text the same way (a CRLF outline).
+    if (text === editBase.replace(/\r\n?/g, "\n")) { status("The outline is unchanged."); return; }
+    if (!canCall()) return;
+    var button = $("#outline-send");
+    button.disabled = true;
+    bridge.callTool("app_action", { action: "outline_edit", deck_id: deckId, base: editBase, text: text }).then(function (r) {
+      if (!r || r.isError) { status("Could not prepare the edit: " + errorText(r)); return; }
+      var edit = r.structuredContent || {};
+      return say(edit.message, "Sent the outline edits to the agent (+" + edit.added + " −" + edit.deleted + " lines).").then(function (ok) {
+        if (ok) { editing(false); renderOutline(); }
+      });
+    }, function (e) {
+      status("The host refused the call: " + e.message);
+    }).then(function () { button.disabled = false; });
+  };
+  $("#outline-ok").onclick = function () { say(CONFIRM, "Sent: " + CONFIRM); };
+
+  // --- start -------------------------------------------------------------------------
+
+  function start() {
+    if (data || loading) return;
+    bridge.ready.then(function () { fullscreenButton(); load(false); });
+  }
+
+  bridge.onToolInput(function (input) {
+    var id = input && input.arguments && input.arguments.deck_id;
+    if (typeof id === "string" && id && !deckId) {
+      deckId = id;
+      if (tab) start();
+    }
+  });
+
+  bridge.onToolResult(function (result) {
+    if (result && result.isError) {
+      showTab(tab || "outline");
+      status(errorText(result));
+      return;
+    }
+    var p = payload(result);
+    if (typeof p.deck_id === "string" && p.deck_id) deckId = p.deck_id;
+    if (typeof p.ok === "boolean") showCheck(p);
+    if (!tab) showTab(p.tab === "slides" || p.tab === "brief" ? p.tab : "outline");
+    if (deckId) start();
+    else bridge.ready.then(function () { if (!deckId) status("This host did not pass the deck to the view."); });
+  });
+
+  bridge.ready.then(fullscreenButton, function (e) { status("The host did not start this view: " + e.message); });
+})();
+</script>
+</body>
+</html>

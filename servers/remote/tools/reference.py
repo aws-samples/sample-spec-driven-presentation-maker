@@ -7,18 +7,32 @@ tool contract (:mod:`sdpm.tools`) from bundled data baked into the image.
 Only user styles are infrastructure-dependent (S3 + DynamoDB pins).
 """
 
-import re
+import functools
 from typing import Any
 
+from shared.user_library import merge_styles
 from storage import Storage
+
+
+@functools.lru_cache(maxsize=1)
+def bundled_styles() -> tuple[dict[str, str], ...]:
+    """The bundled styles (references/examples/styles/), read once.
+
+    They are baked into the image and cannot change while the process runs;
+    server.py reads them at startup, so the platform V2 snapshot holds them.
+    """
+    from sdpm.knowledge.reference import BUNDLED_STYLES_DIR, list_styles as _list_bundled_styles
+
+    return tuple({**s, "source": "builtin"} for s in _list_bundled_styles(BUNDLED_STYLES_DIR))
 
 
 def list_styles(storage: Storage, user_id: str = "", include_all: bool = False) -> dict[str, Any]:
     """List available design styles with pin/source metadata.
 
     Combines bundled styles (references/examples/styles/, baked into the
-    image) and user styles (user-styles/{user_id}/ on S3). Uses Engine
-    filter_styles() for filtering.
+    image) and user styles (user-styles/{user_id}/ on S3), one entry per name:
+    a user style replaces the bundled style of the same name (the same rule as
+    Local and the Web UI). Uses Engine build_styles_listing() for filtering.
 
     Args:
         storage: Storage backend instance.
@@ -30,41 +44,17 @@ def list_styles(storage: Storage, user_id: str = "", include_all: bool = False) 
         Dict with styles list (name, description, pinned, source). When the pin
         filter hid some styles, also other_styles (names) and a hint.
     """
-    from sdpm.knowledge.reference import (
-        BUNDLED_STYLES_DIR,
-        build_styles_listing,
-        list_styles as _list_bundled_styles,
-    )
+    from sdpm.knowledge.reference import build_styles_listing
 
-    # 1. Builtin styles from bundled data
-    builtin_styles = [
-        {**s, "source": "builtin"} for s in _list_bundled_styles(BUNDLED_STYLES_DIR)
-    ]
+    # 1. Builtin styles from bundled data (copies: the cached entries stay as read)
+    builtin_styles = [dict(s) for s in bundled_styles()]
 
-    # 2. User styles from pptx bucket
-    user_styles: list[dict[str, str]] = []
-    if user_id:
-        user_prefix = f"user-styles/{user_id}/"
-        user_files = storage.list_files(prefix=user_prefix, bucket=storage.pptx_bucket)
-        for f in user_files:
-            if not f.endswith(".html"):
-                continue
-            name = f.removeprefix(user_prefix).removesuffix(".html")
-            description = ""
-            try:
-                content = storage.download_file_from_pptx_bucket(key=f).decode("utf-8")
-                m = re.search(r"<title>(.*?)</title>", content, re.IGNORECASE)
-                if m:
-                    description = m.group(1).strip()
-            except Exception:
-                pass
-            user_styles.append({"name": name, "description": description, "source": "user"})
-
-    # 3. Get pins
+    # 2. User styles and pins (pptx bucket + DDB)
+    user_styles: list[dict] = []
     pinned_names: list[str] = []
     if user_id:
+        user_styles = storage.list_user_styles(user_id)
         pinned_names = storage.get_style_pins(user_id)
 
-    # 4. Build payload via Engine (filter + hidden-style names/hint)
-    all_styles = user_styles + builtin_styles
-    return build_styles_listing(all_styles, pinned_names, include_all)
+    # 3. Build payload via Engine (filter + hidden-style names/hint)
+    return build_styles_listing(merge_styles(user_styles, builtin_styles), pinned_names, include_all)

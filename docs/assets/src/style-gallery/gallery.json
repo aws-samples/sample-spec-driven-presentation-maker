@@ -1,0 +1,14 @@
+{
+  "out": "docs/assets/style-gallery-en.png",
+  "columns": 4,
+  "tile_width": 640,
+  "tiles": [
+    {"deck": "hero/deck-en", "slug": "spec-first", "label": "agent-spectrum"},
+    {"deck": "style-gallery/newspaper", "slug": "spec-first", "label": "newspaper"},
+    {"deck": "style-gallery/aws-dark", "slug": "spec-first", "label": "aws-dark"},
+    {"deck": "style-gallery/neo-brutalist", "slug": "spec-first", "label": "neo-brutalist"},
+    {"deck": "style-gallery/bento", "slug": "spec-first", "label": "bento"},
+    {"deck": "style-gallery/duotone", "slug": "spec-first", "label": "duotone"},
+    {"deck": "style-gallery/swiss-poster", "slug": "spec-first", "label": "swiss-poster"}
+  ]
+}

@@ -7,7 +7,10 @@
  * All requests require a Cognito ID token for authorization.
  */
 
+import { IS_LOCAL } from "@/lib/mode"
+import { loadRuntimeConfig } from "@/lib/runtimeConfig"
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
+import type { ReviewSubmission } from "@/lib/review/schema"
 
 export interface DeckSummary {
   deckId: string
@@ -17,7 +20,6 @@ export interface DeckSummary {
   thumbnailUrl: string | null
   owner?: string
   visibility?: "public" | "private"
-  collaborators?: string[]
   pptxUrl?: string | null
 }
 
@@ -26,7 +28,6 @@ export interface SlidePreview {
   previewUrl: string | null
   composeUrl?: string | null
   updatedAt: string
-  slideJson?: string
 }
 
 export interface SpecFiles {
@@ -50,15 +51,28 @@ export interface DeckDetail {
   sessionOrigin?: SessionOrigin
   visibility?: "public" | "private"
   isOwner?: boolean
-  role?: "owner" | "collaborator" | "viewer"
+  role?: "owner" | "viewer"
   ownerAlias?: string
-  collaborators?: string[]
-  collaboratorAliases?: Record<string, string>
+  /** deck.json `outputFormat`; PPTX responses omit it, so a missing value means "pptx". */
+  outputFormat?: "pptx" | "html"
+  /** HTML decks: in-app view URL of output.html (cloud: 15-minute presigned URL), null until built. */
+  htmlUrl?: string | null
+  /** Canvas size in slide px from deck.json (default 1920x1080); every deck. */
+  slideSize?: { width: number; height: number }
+  /** HTML decks: slides whose script can send data outside the deck (static check). */
+  scriptWarnings?: ScriptWarning[]
 }
 
-const IS_LOCAL = process.env.NEXT_PUBLIC_MODE === 'local'
+/** How a slide script can reach outside an HTML deck (static check `script-external`). */
+export type ScriptWarningKind = "navigation" | "popup" | "external-url" | "webrtc"
 
-let apiBaseUrl = ""
+export interface ScriptWarning {
+  slug: string
+  kinds: ScriptWarningKind[]
+}
+
+/** Why an HTML deck URL is requested: Present / PDF (inline, 4 hours) or Download (attachment). */
+export type HtmlUrlPurpose = "present" | "download"
 
 /** Session-level cache for slide preview presigned URLs. */
 const previewUrlCache = new Map<string, string | null>()
@@ -71,12 +85,8 @@ const previewUrlCache = new Map<string, string | null>()
  */
 async function getApiBaseUrl(): Promise<string> {
   if (IS_LOCAL) return "/api/"
-  if (apiBaseUrl) return apiBaseUrl
-
-  const response = await fetch("/aws-exports.json")
-  const config = await response.json()
-  apiBaseUrl = config.apiBaseUrl || ""
-  return apiBaseUrl
+  const config = await loadRuntimeConfig()
+  return config.apiBaseUrl || ""
 }
 
 /**
@@ -130,6 +140,26 @@ export async function getDeck(deckId: string, idToken: string): Promise<DeckDeta
 }
 
 /**
+ * Fetch a presigned output.html URL for an HTML deck (cloud only; local opens the file instead).
+ *
+ * @param deckId - Deck identifier
+ * @param purpose - "present" (inline) or "download" (attachment)
+ * @param idToken - Cognito ID token for API Gateway authorization
+ * @returns The presigned URL and its lifetime in seconds
+ * @throws Error when the deck is not readable or not built yet
+ */
+export async function fetchHtmlUrl(deckId: string, purpose: HtmlUrlPurpose, idToken: string): Promise<{ url: string; expiresIn: number }> {
+  const base = await getApiBaseUrl()
+  const response = await fetch(`${base}decks/${encodeURIComponent(deckId)}/html?purpose=${purpose}`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  if (!response.ok) throw new Error(`Failed to get HTML URL: ${response.status}`)
+  const data = (await response.json()) as { url?: string; expiresIn?: number }
+  if (!data.url) throw new Error("No HTML URL returned")
+  return { url: data.url, expiresIn: data.expiresIn ?? 0 }
+}
+
+/**
  * Update allowed fields on a deck (e.g. chatSessionId).
  *
  * @param deckId - Deck identifier
@@ -137,6 +167,8 @@ export async function getDeck(deckId: string, idToken: string): Promise<DeckDeta
  * @param idToken - Cognito ID token
  */
 export async function patchDeck(deckId: string, updates: Record<string, string>, idToken: string): Promise<void> {
+  // Local mode links the chat session in the invoke route (.session); there is no PATCH route.
+  if (IS_LOCAL) return
   const base = await getApiBaseUrl()
   await fetch(`${base}decks/${deckId}`, {
     method: "PATCH",
@@ -176,24 +208,39 @@ export async function putOutline(deckId: string, content: string, idToken: strin
   }
 }
 
+/** The server's `error` message, else `HTTP <status>`. */
+async function responseError(response: Response): Promise<string> {
+  try {
+    const data = (await response.json()) as { error?: string }
+    if (data.error) return data.error
+  } catch {
+    /* non-JSON error body */
+  }
+  return `HTTP ${response.status}`
+}
+
 /**
- * Fetch deck with slideJson included (for JSON download).
+ * Create a change request from the comment tool's frames: the server writes
+ * `reviews/<id>.json` for the composers and returns the chat message to send as-is.
+ * Same URL shape in cloud (Lambda) and local (API Route) modes.
  *
  * @param deckId - Deck identifier
- * @param idToken - Cognito ID token
- * @returns Deck detail with slideJson populated
+ * @param submission - Note and comments (rects in slide px, integers)
+ * @param idToken - Cognito ID token (ignored in local mode)
+ * @returns The review id and the chat message
+ * @throws Error with the server's message when the request is rejected
  */
-export async function getDeckWithJson(deckId: string, idToken: string): Promise<DeckDetail> {
+export async function createReview(deckId: string, submission: ReviewSubmission, idToken: string): Promise<{ id: string; message: string }> {
   const base = await getApiBaseUrl()
-  const response = await fetch(`${base}decks/${deckId}?include=slideJson`, {
-    headers: { Authorization: `Bearer ${idToken}` },
+  const response = await fetch(`${base}decks/${deckId}/reviews`, {
+    method: "POST",
+    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(submission),
   })
-
-  if (!response.ok) {
-    throw new Error(`Failed to get deck: ${response.status}`)
-  }
-
-  return response.json()
+  if (!response.ok) throw new Error(await responseError(response))
+  const data = (await response.json()) as { id?: unknown; message?: unknown }
+  if (typeof data.id !== "string" || typeof data.message !== "string") throw new Error("Invalid review response")
+  return { id: data.id, message: data.message }
 }
 
 export interface SlideSearchResult {
@@ -300,69 +347,6 @@ export async function listPublicDecks(idToken: string): Promise<DeckSummary[]> {
   const data = await response.json()
   return data.decks
 }
-
-/**
- * Share or unshare a deck with a collaborator.
- *
- * @param deckId - Deck identifier
- * @param collaboratorId - User sub to share with
- * @param idToken - Cognito ID token
- * @param action - "add" or "remove"
- * @returns Updated collaborators list
- */
-export async function shareDeck(deckId: string, collaboratorId: string, idToken: string, action: "add" | "remove" = "add", collaboratorAlias?: string): Promise<{collaborators: string[], collaboratorAliases: Record<string, string>}> {
-  const base = await getApiBaseUrl()
-  const resp = await fetch(`${base}decks/${deckId}/share`, {
-    method: "POST",
-    headers: { Authorization: `Bearer ${idToken}`, "Content-Type": "application/json" },
-    body: JSON.stringify({ collaboratorId, action, collaboratorAlias }),
-  })
-  if (!resp.ok) return { collaborators: [], collaboratorAliases: {} }
-  const data = await resp.json()
-  return { collaborators: data.collaborators || [], collaboratorAliases: data.collaboratorAliases || {} }
-}
-
-/**
- * List decks shared with the current user.
- *
- * @param idToken - Cognito ID token
- * @returns Array of shared deck summaries
- */
-export async function listSharedDecks(idToken: string): Promise<DeckSummary[]> {
-  if (IS_LOCAL) return []
-  const base = await getApiBaseUrl()
-  const response = await fetch(`${base}decks/shared`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  })
-  if (!response.ok) return []
-  const data = await response.json()
-  return data.decks
-}
-
-export interface UserSearchResult {
-  sub: string
-  alias: string
-  email: string
-}
-
-/**
- * Search users by alias/email prefix for share autocomplete.
- *
- * @param query - Search query (min 2 chars)
- * @param idToken - Cognito ID token
- * @returns Array of matching users
- */
-export async function searchUsers(query: string, idToken: string): Promise<UserSearchResult[]> {
-  if (query.length < 2) return []
-  const base = await getApiBaseUrl()
-  const response = await fetch(`${base}users/search?q=${encodeURIComponent(query)}`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  })
-  if (!response.ok) return []
-  const data = await response.json()
-  return data.users || []
-}
-
 
 /**
  * Soft-delete a deck.
@@ -500,21 +484,37 @@ export async function fetchStyles(idToken: string): Promise<StyleEntry[]> {
   })) as StyleEntry[]
 }
 
+async function fetchStyleDetail(name: string, idToken: string): Promise<{ fullHtml?: string; html?: string } | null> {
+  const base = await getApiBaseUrl()
+  const res = await fetch(`${base}styles/${encodeURIComponent(name)}`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  if (!res.ok) return null
+  return res.json()
+}
+
 /**
- * Fetch full HTML for a single style.
+ * Fetch the stored HTML of a single style (Export / Copy): icons stay references.
  *
  * @param name - Style name
  * @param idToken - Cognito ID token for API Gateway authorization
  * @returns Full HTML string, or empty string on error
  */
 export async function fetchStyleHtml(name: string, idToken: string): Promise<string> {
-  const base = await getApiBaseUrl()
-  const res = await fetch(`${base}styles/${encodeURIComponent(name)}`, {
-    headers: { Authorization: `Bearer ${idToken}` },
-  })
-  if (!res.ok) return ""
-  const data = await res.json()
-  return data.fullHtml || ""
+  const data = await fetchStyleDetail(name, idToken)
+  return data?.fullHtml || ""
+}
+
+/**
+ * Fetch the display HTML of a single style: the catalog icons it references, drawn in.
+ *
+ * @param name - Style name
+ * @param idToken - Cognito ID token for API Gateway authorization
+ * @returns Display HTML (the stored HTML from an API without `html`), or empty string on error
+ */
+export async function fetchStylePreviewHtml(name: string, idToken: string): Promise<string> {
+  const data = await fetchStyleDetail(name, idToken)
+  return data?.html || data?.fullHtml || ""
 }
 
 
@@ -614,7 +614,7 @@ export async function downloadTemplate(name: string, idToken: string): Promise<v
     throw new Error(data.error || "No download URL returned")
   }
   // Direct navigation — Content-Disposition on the presigned URL triggers download.
-  // Same approach as deck PPTX download (WorkspaceView.tsx), no CORS needed.
+  // No CORS needed.
   window.location.href = data.downloadUrl
 }
 

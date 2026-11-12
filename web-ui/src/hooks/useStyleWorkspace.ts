@@ -4,25 +4,32 @@
  * useStyleWorkspace — Hash routing for the /styles page.
  *
  * Mirrors useWorkspace (decks) but much simpler: no polling, no deck state.
- * Hash values: "" (list), "#create" (new style), "#{name}" (preview).
+ * Hash values: "" (list), "#/create" (new style), "#{name}" (preview). A style name
+ * never holds "/", so every name, "create" included, has its own preview hash.
  *
  * Preview HTML is resolved from the preloaded styles array (passed via
  * setStyles) to eliminate the /styles/{name} fetch round-trip. Falls back to
- * fetchStyleHtml only when the style is not in the preloaded set (e.g.
+ * fetchStylePreviewHtml only when the style is not in the preloaded set (e.g.
  * direct navigation via URL hash before the list has loaded).
+ *
+ * refreshPreview (the agent saved the style) always fetches: the preloaded array still holds
+ * the style as it was before the save, so resolving from it showed every save one save late.
+ * The current preview stays on screen until the new HTML arrives.
  */
 
 "use client"
 
 import { useEffect, useState, useCallback, useRef } from "react"
-import { fetchStyleHtml, type StyleEntry } from "@/services/deckService"
+import { fetchStylePreviewHtml, type StyleEntry } from "@/services/deckService"
 
 export type StyleView = { mode: "list" } | { mode: "preview"; name: string } | { mode: "create" }
 
-function parseHash(hash: string): StyleView {
+const CREATE_HASH = "/create"
+
+export function parseHash(hash: string): StyleView {
   const raw = hash.replace("#", "")
   if (!raw) return { mode: "list" }
-  if (raw === "create") return { mode: "create" }
+  if (raw === CREATE_HASH) return { mode: "create" }
   return { mode: "preview", name: decodeURIComponent(raw) }
 }
 
@@ -34,6 +41,8 @@ export function useStyleWorkspace(idToken: string | undefined) {
   const [previewLoading, setPreviewLoading] = useState(false)
   const [previewVersion, setPreviewVersion] = useState(0)
   const stylesRef = useRef<StyleEntry[]>([])
+  /** Set by refreshPreview: the next resolve fetches instead of reading stylesRef. */
+  const fetchNextRef = useRef(false)
 
   /** Provide the preloaded styles array so preview can resolve locally. */
   const setStyles = useCallback((styles: StyleEntry[]) => {
@@ -51,24 +60,31 @@ export function useStyleWorkspace(idToken: string | undefined) {
   useEffect(() => {
     if (view.mode !== "preview" || !idToken) { setPreviewHtml(""); return }
 
+    const refreshing = fetchNextRef.current
+    fetchNextRef.current = false
+
     // Try resolving from preloaded styles (instant, no round-trip)
-    const cached = stylesRef.current.find(s => s.name === view.name)
+    const cached = refreshing ? undefined : stylesRef.current.find(s => s.name === view.name)
     if (cached?.html) {
       setPreviewHtml(cached.html)
       setPreviewLoading(false)
       return
     }
 
-    // Fallback: fetch from server (e.g. direct URL navigation before list loaded)
+    // Fetch from server: after a save, or before the list has loaded (direct URL navigation)
     let cancelled = false
-    setPreviewLoading(true)
-    fetchStyleHtml(view.name, idToken).then(html => {
-      if (!cancelled) { setPreviewHtml(html); setPreviewLoading(false) }
+    if (!refreshing) setPreviewLoading(true)
+    fetchStylePreviewHtml(view.name, idToken).then(html => {
+      if (cancelled) return
+      // A failed refresh ("") keeps the preview that is on screen.
+      if (html || !refreshing) setPreviewHtml(html)
+      setPreviewLoading(false)
     })
     return () => { cancelled = true }
   }, [view, idToken, previewVersion])
 
   const refreshPreview = useCallback(() => {
+    fetchNextRef.current = true
     setPreviewVersion(v => v + 1)
   }, [])
 
@@ -83,7 +99,7 @@ export function useStyleWorkspace(idToken: string | undefined) {
   }, [])
 
   const navigateToCreate = useCallback(() => {
-    window.location.hash = "create"
+    window.location.hash = CREATE_HASH
   }, [])
 
   return {

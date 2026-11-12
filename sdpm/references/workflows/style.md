@@ -93,7 +93,7 @@ component, and say in its comment what it is for; a decoration without a job doe
 the style.
 
 Define the optional roles the style is for and leave the rest out. Every style draws diagrams —
-the slide JSON spec's Visual forms are available to every deck — so what a style decides is how
+the forms of the `visual-forms` guide are available to every deck — so what a style decides is how
 they look here: the node, the connector, the icon, the marker.
 
 **Shape classes.** When a component uses a shape other than a rectangle, give it a class named
@@ -168,13 +168,11 @@ The demo slides are read as coordinates, so the format is constrained:
   `--fs-slide-title` (40pt → 192 px), and `--content-top` sits below it. One-line titles leave
   the second line empty; content never moves up to fill it.
 - No emoji anywhere — the PPTX renderer has no emoji fonts. Icons come from `search_assets`.
-- Icons are inline SVG, because the gallery renders the file on its own (relative asset paths do
-  not resolve there). One line directly after `<body>` holds the symbols the file uses —
-  `<svg width="0" height="0" style="position:absolute" aria-hidden="true"><symbol id="material/hub" viewBox="0 -960 960 960"><path d="…"/></symbol>…</svg>` —
-  with each `id` the `search_assets` name, `<source>/<name>`, and the path copied from that
-  asset, so the JSON `src` is `assets:` + the id. Draw one with
-  `<svg class="icon"><use href="#material/hub"/></svg>`; its colour is `fill` from a token (the
-  JSON `iconColor`). Multi-colour service icons (`aws/…`) keep their own colours.
+- Icons are references to the asset catalog. Draw one with
+  `<svg class="icon"><use href="#<source>/<name>"/></svg>`, the id being the `search_assets`
+  name, so the JSON `src` is `assets:` + the id. The file holds only these references; the
+  gallery and the Web UI draw each shape from the catalog. Its colour is `fill` from a token
+  (the JSON `iconColor`). Multi-colour service icons (`aws/…`) keep their own colours.
 
 ## Writing the rules
 
@@ -211,13 +209,27 @@ The demo slides are read as coordinates, so the format is constrained:
 
 ## Working procedure
 
-- If the request starts with `[Style: <name>]`, that is the file name to save under; otherwise
-  derive a short kebab-case name.
-- Save with `write_style(name, html)` in `run_style_python`; it stores the file in the user's
-  style store (locally `~/.config/sdpm/styles/`), where `list_styles()` and the gallery pick it
-  up. Each write is immediately visible, so write incrementally — `:root` and the cover first,
-  then parts in order — and refine.
+- If the request starts with `[Style: <name>]`, the user has that style open: save under that
+  name. When the user asks to change one of their own styles, save under that style's name.
+  For a new style, name it yourself before the first write: a short kebab-case name for what
+  the style is for, one no style in the catalogue already has. Keep that name for the whole
+  session.
+- The first write already carries the final `<title>` (the name and its paragraph), and each
+  later write keeps the paragraph true to the style as it grows: `list_styles()` and the
+  gallery show the style by both from the moment it is saved.
+- Save through `run_style_python`; its description says how the style file is read and written
+  in this environment. Every save goes to the user's style store (locally
+  `~/.config/sdpm/styles/`), where `list_styles()` and the gallery pick it up at once.
+- Build the style one slide per save. The first save holds the final `<title>`, `:root` and
+  the cover; each later save adds the next `.slide` in order, together with the CSS and the
+  `Component:` comments of the components that slide is the first to use. A change rewrites
+  only the slides it touches and keeps the rest of the file as it is. Each save stays small
+  enough to finish in one call, and the user sees the style grow in the gallery.
 - `analyze_template(...)` reads a reference PPTX's theme; `read_guides(["import-pptx"])` when
   the reference deck should be inspected slide by slide.
 - Token choices must survive conversion to PPTX: when the environment offers it, apply the
   style to a sample deck, build and preview before finishing.
+- A change request from the style preview lists the commented slides by number and title,
+  each comment with its frame in slide px and its text. Change only the slides that carry a
+  comment and keep every other slide as it is, then save the style, and reply with what
+  changed for each comment, by name.

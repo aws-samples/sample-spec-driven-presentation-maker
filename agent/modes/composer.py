@@ -2,11 +2,13 @@
 # SPDX-License-Identifier: MIT-0
 """Composer agent: compose_slides tool with parallel execution, prefetch, and post-build."""
 
+import asyncio
+import contextlib
 import json
 import logging
 import os
 import queue
-import time
+import threading
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 
@@ -14,45 +16,16 @@ from strands import Agent, tool as strands_tool
 from strands.hooks.events import AfterInvocationEvent, AfterToolCallEvent, BeforeToolCallEvent
 from strands.types.tools import ToolContext
 
+from compose_messaging import COMPOSER_MESSAGE_PREFIX, make_report_tool
 from composition import resolve_parts
 from cost_logger import log_slides_composed, log_usage
 from message_hooks import LiftToolResultImages
 from modes import MODES  # imported lazily in compose_slides if needed
-from resilience import call_tool_with_retry
+from resilience import TURN_STOP_KEY, call_tool_with_retry, gate_tool_call
+from steer_inbox import SteerInbox
 
 logger = logging.getLogger("sdpm.agent")
 
-
-# Soft-stop signal: the webui cancel button sends InvokeAgentRuntimeCommand
-# to `touch /tmp/compose_stops/{parent_tool_use_id}` inside this microVM.
-# The BeforeToolCallEvent hook polls for that file and, on hit, feeds the
-# STOP_PROMPT to the LLM as the cancelled tool's result so the composer
-# winds down with a plain-text partial summary.
-_STOP_SIGNAL_DIR = "/tmp/compose_stops"
-# NOTE: Do NOT include markers like "[SYSTEM INTERRUPT]" or phrases such as
-# "the user has requested" here. Claude's anti-prompt-injection heuristic
-# flags those as hijack attempts coming from tool output and ignores them —
-# the composer then keeps calling tools. A plain, tool-layer-style message
-# is honoured on the first hit and the agent wraps up naturally.
-STOP_PROMPT = (
-    "Operation cancelled by the user. Do not retry. "
-    "Stop invoking tools and respond with a brief plain-text summary of "
-    "what was completed, what was in progress, and any context useful for resuming later."
-)
-
-# Time budget per slide — when exceeded, nudge the composer to wrap up polishing
-# and finish any unwritten slides. Injected into tool results (non-disruptive).
-_SECONDS_PER_SLIDE = int(os.environ.get("COMPOSER_SECONDS_PER_SLIDE", "90"))
-BUDGET_PROMPT = (
-    "Time budget reached. If any assigned slides are still unwritten, "
-    "finish them with a rough-but-coherent draft. "
-    "Do NOT polish slides that are already written — stop measuring and refining. "
-    "Do NOT call generate_pptx or get_preview — they are slow polish tools. "
-    "If a tool just failed, do NOT retry the same call — accept a rough draft "
-    "for that slide and move on. "
-    "Once all slides exist, respond with a brief summary noting what is done "
-    "and what could use another pass."
-)
 
 # Stop a composer that is stuck in a failure loop. After this many consecutive
 # tool errors, the next tool call is cancelled and the LLM is told to stop and
@@ -66,14 +39,15 @@ ERROR_LIMIT_PROMPT = (
 )
 
 
-def _is_compose_stopped(parent_tool_use_id: str) -> bool:
-    try:
-        return os.path.exists(os.path.join(_STOP_SIGNAL_DIR, parent_tool_use_id))
-    except Exception:
-        return False
+def _start_composing_args(deck_id: str, assigned_slugs: list[str], mode: str | None) -> dict:
+    """start_composing arguments; ``mode`` is sent only for HTML decks (PPTX calls stay as before)."""
+    arguments: dict = {"deck_id": deck_id, "assigned_slugs": assigned_slugs}
+    if mode == "html":
+        arguments["mode"] = "html"
+    return arguments
 
 
-def _start_composing(mcp_client, deck_id: str, assigned_slugs: list[str]) -> dict:
+def _start_composing(mcp_client, deck_id: str, assigned_slugs: list[str], mode: str | None = None) -> dict:
     """Call the composer's entry tool and return its ``deck`` part.
 
     The same call an interactive composer makes first; here it is made on the
@@ -84,7 +58,7 @@ def _start_composing(mcp_client, deck_id: str, assigned_slugs: list[str]) -> dic
         mcp_client,
         tool_use_id=f"prefetch-{uuid.uuid4().hex[:8]}",
         name="start_composing",
-        arguments={"deck_id": deck_id, "assigned_slugs": assigned_slugs},
+        arguments=_start_composing_args(deck_id, assigned_slugs, mode),
     )
     if result.get("status") == "error":
         raise RuntimeError(f"start_composing failed for deck {deck_id}: {result.get('content')}")
@@ -99,7 +73,9 @@ def _start_composing(mcp_client, deck_id: str, assigned_slugs: list[str]) -> dic
     raise RuntimeError(f"start_composing returned no payload for deck {deck_id}")
 
 
-def _replay_start_composing(deck_id: str, assigned_slugs: list[str], deck: dict) -> list[dict]:
+def _replay_start_composing(
+    deck_id: str, assigned_slugs: list[str], deck: dict, mode: str | None = None,
+) -> list[dict]:
     """assistant toolUse + user toolResult pair for a start_composing call already made."""
     tool_use_id = f"prefill-{uuid.uuid4().hex[:8]}"
     return [
@@ -110,7 +86,7 @@ def _replay_start_composing(deck_id: str, assigned_slugs: list[str], deck: dict)
                 {"toolUse": {
                     "toolUseId": tool_use_id,
                     "name": "start_composing",
-                    "input": {"deck_id": deck_id, "assigned_slugs": assigned_slugs},
+                    "input": _start_composing_args(deck_id, assigned_slugs, mode),
                 }},
             ],
         },
@@ -125,7 +101,7 @@ def _replay_start_composing(deck_id: str, assigned_slugs: list[str], deck: dict)
     ]
 
 
-def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None, model_id: str = "", user_id: str = "", session_id: str = ""):
+def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, extra_tools=None, model_id: str = "", user_id: str = "", session_id: str = "", messaging=None):
     """Create compose_slides tool with closed-over MCP servers and model.
 
     Args:
@@ -140,6 +116,9 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         user_id: Cognito user ID, propagated to composer trace attributes and
             usage logs for per-user measurement.
         session_id: Runtime session ID, propagated alongside user_id.
+        messaging: Optional compose_messaging.ComposeMessaging. Each composer then gets an
+            inbox the orchestrator's message_composer reaches, and a
+            report_to_orchestrator tool.
     """
     _extra_tools = extra_tools or []
     mcp_client = mcp_servers[0] if mcp_servers else None
@@ -150,10 +129,18 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         context=True,
         description=(
             "Dispatch composer agents for the groups given — one independent composer "
-            "per group, writing slides/<slug>.json. Runs only what you pass: the layout "
+            "per group, writing each slide's file (slides/<slug>.json, or .html in an "
+            "HTML deck). Runs only what you pass: the layout "
             "pass and the content pass are separate calls. "
             f"Up to {max_concurrency} groups run concurrently. "
             "Use this once outline.md is finalized.\n\n"
+            "It runs in the background: the call returns at once, and its report is "
+            "delivered to you automatically when the composers finish. Until the report "
+            "arrives the composers are still writing the slides, so after dispatching, "
+            "tell the user in a sentence what is being composed and end your turn (or do "
+            "other work the user asked for that does not need these slides). You are woken "
+            "with the report; that is the time to look at the slides with get_preview. "
+            "While it runs, message_composer reaches a running composer.\n\n"
             "The composer reads specs/ (brief, outline, art-direction) for all content "
             "and design decisions. The instruction only needs to specify which slides "
             "to compose. Add user requests or review feedback if applicable, but do NOT "
@@ -212,17 +199,37 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
     async def compose_slides(deck_id: str, slide_groups: list, tool_context: ToolContext):
         """Compose slides by delegating to composer agents.
 
-        Loads the canonical composer workflow, then injects deck-specific context.
-        Runs groups in parallel. Async generator: yields progress dicts, then returns final result str.
+        Runs as a background task of the orchestrator (background.py): the call returns a
+        dispatch notice at once, and Strands delivers the report into the history when
+        this generator ends. Async generator: yields progress dicts, then the report str.
+
+        Cancelled (a stop of the session's work, the task timeout, shutdown): sets the stop
+        event first, so the composers and the pool below stop without being waited for.
         """
+        # The session's stop event. Not tool_context.cancel_signal: Strands clears that one
+        # when the parent invocation ends, and a cancelled compose returns without waiting
+        # for its composers, so they would miss the cancel and run on (and write) alone.
+        stop: threading.Event = tool_context.invocation_state.get(TURN_STOP_KEY, tool_context.cancel_signal)
+        tool_use_id = tool_context.tool_use.get("toolUseId", "")
+        async with contextlib.aclosing(_compose(deck_id, slide_groups, stop, tool_use_id)) as items:
+            try:
+                async for item in items:
+                    yield item
+            except (asyncio.CancelledError, GeneratorExit):
+                stop.set()
+                raise
+
+    async def _compose(deck_id: str, slide_groups: list, stop: threading.Event, tool_use_id: str = ""):
+        """compose_slides' work: loads the canonical composer workflow, injects deck-specific
+        context and runs the groups in parallel."""
         # LLM sometimes passes slide_groups as a JSON string instead of a list
         if isinstance(slide_groups, str):
             slide_groups = json.loads(slide_groups)
-        parent_tool_use_id = tool_context.tool_use["toolUseId"]
 
         # Validate the deck specification once before launching composers.
         spec_warnings: list[str] = []
         outline_slugs: list[str] = []
+        html_deck = False
         if mcp_client:
             assigned_slugs = [slug for group in slide_groups for slug in group["slugs"]]
             check_result = call_tool_with_retry(
@@ -249,6 +256,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
 
             spec_warnings = list(spec_result.get("warnings") or [])
             outline_slugs = list(spec_result.get("slugs") or [])
+            html_deck = (spec_result.get("outputFormat") or "pptx") == "html"
             if not spec_result.get("ok"):
                 yield json.dumps({
                     "status": "error",
@@ -270,7 +278,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         try:
             # Prefetch static composer parts (role prompt + refs) via composition
             yield {"status": "prefetching", "message": "Loading references..."}
-            composer_cfg = MODES["composer"]
+            composer_cfg = MODES["html_composer" if html_deck else "composer"]
+            compose_mode = "html" if html_deck else None
             composer_system, composer_history = resolve_parts(
                 composer_cfg.parts, mcp_client=mcp_client, context={}
             )
@@ -283,32 +292,30 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
 
             progress_q: queue.Queue = queue.Queue()
 
-            def run_group(gi: int, group: dict) -> dict:
-                """Run a single composer group in a thread."""
+            def run_group(gi: int, group: dict, inbox=None) -> dict:
+                """Run a single composer group in a thread (``inbox``: its messages from
+                the orchestrator)."""
                 slugs_label = ", ".join(group["slugs"])
-                # Early exit: cancelled before we even started
-                if _is_compose_stopped(parent_tool_use_id):
-                    return {"slugs": [], "response": "skipped (cancelled)"}
+                if stop.is_set():
+                    return {"slugs": [], "response": "cancelled"}
                 progress_q.put_nowait({"group": gi + 1, "total_groups": len(slide_groups), "slugs": slugs_label, "status": "starting"})
 
                 # The composer's history opens like an interactive composer's session:
                 # the spawn instruction, then its own start_composing call with the
                 # deck payload as the result. The run continues from there.
-                deck_part = _start_composing(mcp_client, deck_id, group["slugs"]) if mcp_client else {}
+                deck_part = _start_composing(mcp_client, deck_id, group["slugs"], compose_mode) if mcp_client else {}
                 opening: list[dict] = [{
                     "role": "user",
                     "content": [{"text": (
                         f"deck_id: {deck_id}\n"
                         f"assigned_slugs: {', '.join(group['slugs'])}\n"
-                        f"task_instruction: {group['instruction']}"
+                        + ("mode: html\n" if compose_mode == "html" else "")
+                        + f"task_instruction: {group['instruction']}"
                     )}],
                 }]
                 if deck_part:
-                    opening.extend(_replay_start_composing(deck_id, group["slugs"], deck_part))
+                    opening.extend(_replay_start_composing(deck_id, group["slugs"], deck_part, compose_mode))
 
-                # Time budget: slug_count * seconds-per-slide. Periodic nudge (1st then every 3rd) to stop polishing.
-                deadline = time.time() + len(group["slugs"]) * _SECONDS_PER_SLIDE
-                budget_nudge_count = 0
                 consecutive_errors = 0
 
                 last_tool_id = ""
@@ -357,6 +364,11 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 if _group_mcp is not None:
                     _group_tools[0] = _group_mcp  # replace Presentation Maker MCP
                 _group_tools.extend(_extra_tools)
+                if inbox is not None:
+                    _group_tools.append(make_report_tool(messaging, tool_use_id, gi + 1, group["slugs"]))
+                    inbox_kwargs = {"plugins": [SteerInbox(inbox, stopped=stop.is_set, prefix=COMPOSER_MESSAGE_PREFIX)]}
+                else:
+                    inbox_kwargs = {}
 
                 composer = Agent(
                     system_prompt=[
@@ -377,18 +389,11 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                         "model.id": model_id,
                         "purpose": "compose",
                     },
+                    **inbox_kwargs,
                 )
                 composer.hooks.add_callback(AfterInvocationEvent, log_usage)
 
                 async def _before_tool(event: BeforeToolCallEvent):
-                    # Soft-stop: if the user cancelled this compose_slides
-                    # invocation, hand the LLM the STOP_PROMPT instead of
-                    # executing the tool. The model is instructed to emit a
-                    # plain-text partial summary and stop calling tools, so
-                    # the composer loop terminates naturally.
-                    if _is_compose_stopped(parent_tool_use_id):
-                        event.cancel_tool = STOP_PROMPT
-                        return
                     if consecutive_errors >= ERROR_LIMIT:
                         event.cancel_tool = ERROR_LIMIT_PROMPT
                         return
@@ -402,23 +407,6 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 async def _after_tool(event: AfterToolCallEvent):
                     tu = event.tool_use
                     is_err = isinstance(event.result, dict) and event.result.get("status") == "error"
-                    # Time-budget nudge: append BUDGET_PROMPT periodically to keep
-                    # the composer reminded. Injected into both success and error
-                    # tool results (same text for both — LLM selects the relevant
-                    # guidance from context). 1st hit + every 3rd after.
-                    nonlocal budget_nudge_count
-                    if time.time() > deadline:
-                        budget_nudge_count += 1
-                        if budget_nudge_count == 1 or budget_nudge_count % 3 == 0:
-                            if isinstance(event.result, dict):
-                                content = list(event.result.get("content") or [])
-                                content.append({"text": f"\n\n[Budget notice] {BUDGET_PROMPT}"})
-                                event.result = {**event.result, "content": content}
-                        if budget_nudge_count == 1:
-                            progress_q.put_nowait({
-                                "group": gi + 1, "slugs": slugs_label,
-                                "status": "budget_reached",
-                            })
                     # Consecutive tool-error tripwire: after ERROR_LIMIT failures
                     # in a row, the next _before_tool call will cancel the tool
                     # and hand the LLM ERROR_LIMIT_PROMPT. Success resets.
@@ -438,6 +426,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                         "toolStatus": "error" if is_err else "success",
                     })
 
+                composer.hooks.add_callback(BeforeToolCallEvent, gate_tool_call)
                 composer.hooks.add_callback(BeforeToolCallEvent, _before_tool)
                 composer.hooks.add_callback(AfterToolCallEvent, _after_tool)
 
@@ -453,7 +442,16 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 try:
                     for attempt in range(max_retries + 1):
                         try:
-                            response = composer(None)  # continue from the opening history
+                            # continue from the opening history; the turn's stop event cancels it
+                            response = composer(None, cancel_signal=stop)
+                            # Nothing is sent to the composer from here on; a message that
+                            # came after its last step still reaches it.
+                            late = messaging.close(tool_use_id, gi + 1) if inbox is not None else []
+                            if late and not stop.is_set():
+                                response = composer([{"text": COMPOSER_MESSAGE_PREFIX + text} for _, text in late],
+                                                    cancel_signal=stop)
+                            if stop.is_set():
+                                return {"slugs": [], "response": "cancelled"}
                             if guard.cancelled:
                                 progress_q.put_nowait({
                                     "group": gi + 1, "slugs": slugs_label,
@@ -463,7 +461,7 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                             progress_q.put_nowait({"group": gi + 1, "slugs": slugs_label, "status": "done"})
                             return {"slugs": group["slugs"], "response": str(response)}
                         except Exception as e:
-                            if attempt < max_retries:
+                            if attempt < max_retries and not stop.is_set():
                                 progress_q.put_nowait({
                                     "group": gi + 1, "slugs": slugs_label,
                                     "status": "retrying", "attempt": attempt + 1, "error": str(e),
@@ -478,42 +476,60 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                         except Exception:
                             logger.warning("group MCP stop failed", exc_info=True)
 
-            # Launch all groups in thread pool (skip if already cancelled during prefetch)
-            if _is_compose_stopped(parent_tool_use_id):
-                pass  # fall through to report assembly with status: cancelled
-            else:
-                with ThreadPoolExecutor(max_workers=max_concurrency) as pool:
-                    futures = {pool.submit(run_group, gi, g): gi for gi, g in enumerate(slide_groups)}
+            def run_messaged_group(gi: int, group: dict) -> dict:
+                """run_group with the group's inbox registered while it runs."""
+                if messaging is None:
+                    return run_group(gi, group)
+                inbox = messaging.register(tool_use_id, gi + 1, group["slugs"], stopped=stop.is_set)
+                try:
+                    return run_group(gi, group, inbox)
+                finally:
+                    messaging.unregister(tool_use_id, gi + 1)
 
-                    while futures:
-                        while not progress_q.empty():
-                            try:
-                                yield progress_q.get_nowait()
-                            except queue.Empty:
-                                break
+            # Launch all groups in thread pool
+            pool = ThreadPoolExecutor(max_workers=max_concurrency)
+            try:
+                futures = {pool.submit(run_messaged_group, gi, g): gi for gi, g in enumerate(slide_groups)}
 
-                        done_futures = [f for f in futures if f.done()]
-                        for f in done_futures:
-                            gi = futures.pop(f)
-                            group = slide_groups[gi]
-                            slugs_label = ", ".join(group["slugs"])
-                            try:
-                                result = f.result()
-                                generated.extend(result["slugs"])
-                                done_count += len(result["slugs"])
-                                summaries[slugs_label] = result["response"]
-                                yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
-                            except Exception as e:
-                                errors.append({
-                                    "group_index": gi + 1,
-                                    "slugs": group["slugs"],
-                                    "instruction": group.get("instruction", ""),
-                                    "error": str(e),
-                                })
-                                yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(e)}
+                while futures and not stop.is_set():
+                    while not progress_q.empty():
+                        try:
+                            yield progress_q.get_nowait()
+                        except queue.Empty:
+                            break
 
-                        if futures:
-                            time.sleep(0.2)
+                    done_futures = [f for f in futures if f.done()]
+                    for f in done_futures:
+                        gi = futures.pop(f)
+                        group = slide_groups[gi]
+                        slugs_label = ", ".join(group["slugs"])
+                        try:
+                            result = f.result()
+                            generated.extend(result["slugs"])
+                            done_count += len(result["slugs"])
+                            summaries[slugs_label] = result["response"]
+                            yield {"group": gi + 1, "slugs": slugs_label, "status": "done", "done": done_count, "total": total}
+                        except Exception as e:
+                            errors.append({
+                                "group_index": gi + 1,
+                                "slugs": group["slugs"],
+                                "instruction": group.get("instruction", ""),
+                                "error": str(e),
+                            })
+                            yield {"group": gi + 1, "slugs": slugs_label, "status": "error", "error": str(e)}
+
+                    if futures:
+                        # await, not time.sleep: the turn's event loop keeps running
+                        # (Strands' cancel watcher, keepalives) while composers work.
+                        await asyncio.sleep(0.2)
+            except (asyncio.CancelledError, GeneratorExit):
+                stop.set()  # before the finally: shut the pool down without waiting
+                raise
+            finally:
+                # Cancelled: leave without waiting. A composer thread can be blocked in a
+                # model stream read or a tool call; it stops on its own at the next check
+                # of the stop event, and the write gate covers a process that is stopping.
+                pool.shutdown(wait=not stop.is_set(), cancel_futures=stop.is_set())
 
             while not progress_q.empty():
                 try:
@@ -537,8 +553,9 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                     })
 
         # Post-compose: build PPTX + assemble report
-        yield {"status": "building", "message": "Building final PPTX..."}
-        cancelled = _is_compose_stopped(parent_tool_use_id)
+        cancelled = stop.is_set()
+        if not cancelled:
+            yield {"status": "building", "message": "Building the HTML deck..." if html_deck else "Building final PPTX..."}
         partial = bool(errors) and bool(generated)
         report = {
             "status": "cancelled" if cancelled else ("partial" if partial else ("failed" if errors else "completed")),
@@ -555,8 +572,10 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
         )
         if cancelled:
             report["notice"] = (
-                "Stopped by user cancellation. Do NOT retry automatically — "
-                "ask the user how to proceed (resume, adjust scope, or abandon)."
+                "Stopped: the turn was cancelled, and the deck was not built. "
+                "generated_slides lists the groups that finished; slides of the other "
+                "groups may be missing or incomplete. Do not call compose_slides again "
+                "unless the user asks."
             )
         elif errors:
             failed_slugs = sorted({s for e in errors for s in e["slugs"]})
@@ -568,8 +587,8 @@ def make_compose_slides(mcp_servers: list, model, composer_mcp_factory=None, ext
                 "groups (reuse each group's slugs and instruction from failed_groups)."
             )
 
-        if generated and mcp_client:
-            # Generate PPTX
+        if generated and mcp_client and not cancelled:
+            # Finalize the deck (generate_pptx: PPTX, or output.html for an HTML deck)
             try:
                 build_result = call_tool_with_retry(
                     mcp_client,
