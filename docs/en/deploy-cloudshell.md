@@ -84,7 +84,7 @@ Because CodeBuild runs the build and deployment, you don't need a local CDK or D
 - **AdministratorAccess** or equivalent permissions in the target account (for first deployment)
 - One of the following working environments
     - AWS CloudShell (opened in the target deployment region)
-    - Local Linux / macOS / WSL with `bash`, `git`, the `aws` CLI, and valid AWS credentials
+    - Local Linux / macOS / WSL with `bash`, `git`, the `aws` CLI (v2 2.34.8 or later), and valid AWS credentials
 
 ### Quick Start
 
@@ -157,6 +157,48 @@ cp infra/config.example.yaml infra/config.yaml
 ```bash
 ./scripts/deploy.sh --region us-east-1 --destroy
 ```
+
+### Source bucket
+
+`deploy.sh` zips the repository and uploads it to an S3 bucket that CodeBuild reads the source
+from. The bucket is `sdpm-deploy-<account-id>-<region>-an`, in the
+[S3 account regional namespace](https://docs.aws.amazon.com/AmazonS3/latest/userguide/gpbucketnamespaces.html):
+only your account can create a bucket with that name. Every S3 call `deploy.sh` makes against
+the bucket passes `--expected-bucket-owner <account-id>`, and the script stops before uploading
+anything when the bucket belongs to another account or cannot be created.
+
+When `deploy.sh` creates the bucket, it turns on all four S3 Block Public Access settings and
+adds a lifecycle rule that deletes source zips (`source/`) after 7 days. A bucket that already
+exists keeps its configuration. Because of the 7-day expiry, **Retry build** in the CodeBuild
+console fails for a build older than 7 days; run `deploy.sh` again instead.
+
+Creating the bucket needs AWS CLI v2 2.34.8 or later. The account regional namespace is not
+available in Middle East (Bahrain) and Middle East (UAE); `deploy.sh` stops there and does not
+fall back to another bucket name.
+
+One-Click Deploy clones the repository inside CodeBuild and uses no source bucket.
+
+#### If you deployed with deploy.sh before v0.14.1
+
+Earlier versions uploaded the source to `sdpm-deploy-<account-id>-<region>` (no `-an` suffix)
+without checking the bucket owner.
+
+- Deployed stacks are unaffected and need no redeploy: the source bucket is used only while
+  `deploy.sh` runs.
+- The next `deploy.sh` run creates the new `-an` bucket. The old bucket is no longer used and
+  can be deleted.
+- Check who owns the old bucket:
+
+  ```bash
+  aws s3api head-bucket --bucket sdpm-deploy-<account-id>-<region> --expected-bucket-owner <account-id>
+  ```
+
+  - Success: the bucket is yours. Delete it when you no longer need it
+    (`aws s3 rb s3://sdpm-deploy-<account-id>-<region> --force`).
+  - `403 Forbidden`: the bucket may belong to another account. Review the build history of the
+    `sdpm-deploy` CodeBuild project (the source location of each build) and the CloudTrail
+    activity of the `sdpm-deploy-role` IAM role, and rotate credentials as needed.
+  - `404 Not Found`: there is no such bucket; nothing to do.
 
 ## Monitor Deployment Progress
 
@@ -307,6 +349,22 @@ rm -rf ~/sample-spec-driven-presentation-maker
 **--enable-invocation-logging warns "already configured"**
 
 Bedrock Model Invocation Logging allows only one configuration per account/region. If an existing configuration is found, `deploy.sh` will display a warning with the existing log group name and automatically skip the MIL setup. The deployment continues with Invocation Logging disabled to preserve the existing configuration. To use SDPM's Invocation Logging, first remove the existing MIL configuration manually, then re-run with `--enable-invocation-logging`.
+
+**deploy.sh stops: "Source bucket … is not owned by account … or cannot be accessed."**
+
+`head-bucket` on the [source bucket](#source-bucket) failed with an error other than 404, so
+`deploy.sh` stopped before uploading. A `403` means the bucket belongs to another account or
+your credentials cannot read it: check that you are signed in to the intended account and that
+your role has S3 permissions for `sdpm-deploy-<account-id>-<region>-an`.
+
+**deploy.sh stops: the source bucket cannot be created in the account regional namespace**
+
+- `The AWS CLI is too old to create a bucket in the S3 account regional namespace.`: update to
+  AWS CLI v2 2.34.8 or later (`aws --version` shows the installed version) and run `deploy.sh`
+  again.
+- `Could not create source bucket … in the S3 account regional namespace in <region>.`: the
+  line after it is the S3 error. The namespace is not available in Middle East (Bahrain) and
+  Middle East (UAE); deploy to another Region.
 
 ## Estimated Monthly Cost
 
