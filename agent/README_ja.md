@@ -175,7 +175,7 @@ docker build -t sdpm-agent .
 ### 実行
 
 ```bash
-docker run -p 8080:8080 sdpm-agent
+docker run -p 127.0.0.1:8080:8080 sdpm-agent
 ```
 
 - ポート: `8080`
