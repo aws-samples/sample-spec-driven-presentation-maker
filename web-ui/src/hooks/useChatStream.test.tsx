@@ -3,8 +3,8 @@
 /**
  * A Local 409 session conflict is shown as its own translated message instead of the
  * generic "Sorry, something went wrong". A Local stream's session notice lands on the reply.
- * A send while the invoke runs is a steer into it, shown where the turn's stream reports it
- * accepted; Stop marks an unread one not delivered. Turn events drive `turnActive`; a resume
+ * A send while the invoke runs is a steer into it, queued until the turn's stream reports it
+ * delivered and then shown there; Stop marks an unread one not delivered. Turn events drive `turnActive`; a resume
  * follows the chat's work period (a send during it is a steer into it, Stop ends it).
  */
 
@@ -127,7 +127,7 @@ function captureInvoke() {
 const roles = (messages: Message[]) => messages.map((m) => `${m.role}:${m.content}`)
 
 describe("useChatStream steer (local)", () => {
-  it("sends a message while the invoke runs into its session and shows it where the stream accepted it", async () => {
+  it("sends a message while the invoke runs into its session, queues it and shows it where kiro-cli read it", async () => {
     const run = captureInvoke()
     const { result } = renderHook(() => useChatStream({ sessionId: "K1", mode: "vibe", deckId: "d1" }), { wrapper })
     let first: Promise<boolean> | undefined
@@ -146,24 +146,32 @@ describe("useChatStream steer (local)", () => {
       run.handlers!.onSession.onEvent({ steer: { id, text: "stop counting", state: "accepted" } }, { own: true })
       run.handlers!.onStreamUpdate("one two three")
     })
-    expect(roles(result.current.messages)).toEqual(["user:count", "assistant:one two", "user:stop counting", "assistant: three"])
-    expect(result.current.messages[2]).toMatchObject({ steerId: id, steerState: "accepted" })
+    expect(roles(result.current.messages)).toEqual(["user:count", "assistant:one two three"])
+    expect(result.current.steerQueue).toEqual([expect.objectContaining({ id, state: "waiting", display: "stop counting" })])
 
-    act(() => { run.handlers!.onSession.onEvent({ steer: { id, state: "delivered" } }, { own: true }) })
-    expect(result.current.messages[2].steerState).toBe("delivered")
+    act(() => {
+      run.handlers!.onSession.onEvent({ steer: { id, state: "delivered" } }, { own: true })
+      run.handlers!.onStreamUpdate("one two three. Stopped.")
+    })
+    expect(roles(result.current.messages)).toEqual(["user:count", "assistant:one two three", "user:stop counting", "assistant:. Stopped."])
+    expect(result.current.messages[2].steerId).toBe(id)
+    expect(result.current.steerQueue).toEqual([])
     await act(async () => { run.finish!(); await first })
     expect(result.current.isLoading).toBe(false)
   })
 
-  it("keeps the input and tells the user when kiro-cli does not take the message", async () => {
+  it("drops the card and tells the user when kiro-cli does not take the message", async () => {
     const run = captureInvoke()
     const { result } = renderHook(() => useChatStream({ sessionId: "K1", mode: "vibe", deckId: "d1" }), { wrapper })
     act(() => { void result.current.sendMessage("count") })
     steerLocalAgent.mockRejectedValueOnce(Object.assign(new Error("Steer failed: 409"), { code: "session_idle" }))
+    const onSteerFailed = vi.fn()
     let ok: boolean | undefined
-    await act(async () => { ok = await result.current.sendMessage("more") })
+    await act(async () => { ok = await result.current.sendMessage("more", undefined, undefined, undefined, { onSteerFailed }) })
     expect(ok).toBe(false)
     expect(notifyError).toHaveBeenCalledWith(en.chat.steerFailed, expect.any(Error))
+    expect(onSteerFailed).toHaveBeenCalledTimes(1)
+    expect(result.current.steerQueue).toEqual([])
     expect(roles(result.current.messages)).toEqual(["user:count", "assistant:"])
     await act(async () => { run.finish!() })
   })
@@ -183,8 +191,9 @@ describe("useChatStream steer (local)", () => {
     })
     stopLocalAgent.mockResolvedValueOnce(undefined)
     act(() => result.current.stopGeneration())
-    expect(result.current.messages.find((m) => m.steerId === read)?.steerNotDelivered).toBeUndefined()
-    expect(result.current.messages.find((m) => m.steerId === unread)?.steerNotDelivered).toBe(true)
+    expect(result.current.messages.find((m) => m.steerId === read)).toMatchObject({ role: "user", content: "read me" })
+    expect(result.current.messages.some((m) => m.steerId === unread)).toBe(false)
+    expect(result.current.steerQueue).toEqual([expect.objectContaining({ id: unread, state: "notDelivered", inputText: "and me" })])
     await act(async () => { run.finish!() })
   })
 })
@@ -281,7 +290,7 @@ describe("useChatStream resume (local)", () => {
     const saved: Message[] = [
       ...history.slice(0, 3),
       { role: "assistant", content: "head and tail", toolUses: [] },
-      { role: "user", content: "also this", toolUses: [], steerId: "s1", steerState: "delivered" },
+      { role: "user", content: "also this", toolUses: [], steerId: "s1" },
       { role: "assistant", content: "More", toolUses: [] },
     ]
     const run = captureResume()
@@ -297,11 +306,29 @@ describe("useChatStream resume (local)", () => {
       run.handlers!.onSession.onEvent({ turn: { id: "t1", why: "prompt", text: "make it" } }, { own: false })
       run.handlers!.onStreamUpdate("tail")
       run.handlers!.onSession.onEvent({ steer: { id: "s1", text: "also this", state: "accepted" } }, { own: false })
+      run.handlers!.onSession.onEvent({ steer: { id: "s1", state: "delivered" } }, { own: false })
       run.handlers!.onStreamUpdate("tailMore")
     })
     expect(cut).toHaveBeenCalledTimes(1)
     expect(cut).toHaveBeenCalledWith("make it")
     expect(roles(result.current.messages)).toEqual(["user:earlier", "assistant:earlier reply", "user:make it", "assistant:tail", "user:also this", "assistant:More"])
+    await act(async () => { run.finish!(); await done })
+  })
+
+  it("shows a steer the replayed period has not read as a card, once", async () => {
+    const run = captureResume()
+    const { result } = render()
+    let done: Promise<boolean | undefined> | undefined
+    act(() => { done = result.current.resume(() => []) })
+    act(() => {
+      run.handlers!.onResumeAck({ working: true })
+      run.handlers!.onSession.onEvent({ turn: { id: "t1", why: "prompt", text: "make it" } }, { own: false })
+      run.handlers!.onStreamUpdate("On it")
+      run.handlers!.onSession.onEvent({ steer: { id: "s1", text: "also this", state: "accepted" } }, { own: false })
+      run.handlers!.onSession.onEvent({ steer: { id: "s1", text: "also this", state: "accepted" } }, { own: false })
+    })
+    expect(result.current.steerQueue).toEqual([expect.objectContaining({ id: "s1", state: "waiting", display: "also this" })])
+    expect(roles(result.current.messages)).toEqual(["user:make it", "assistant:On it"])
     await act(async () => { run.finish!(); await done })
   })
 

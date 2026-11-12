@@ -185,12 +185,14 @@ interface ChatMessageProps {
   deckId?: string
   /** Cloud: the session works, so a tool with a running background task is active in any message. */
   sessionWorking?: boolean
+  /** A steer the agent read just now: its bubble is highlighted briefly. */
+  arrived?: boolean
 }
 
 /** A tool whose background task still runs while the session works (Cloud compose). */
 const runsInBackground = (tool: ToolUse, sessionWorking: boolean) => sessionWorking && tool.task?.state === "running"
 
-export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, onSend, hearingDisabled = false, deckId, sessionWorking = false }: ChatMessageProps) {
+export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [], attachments = [], isStreaming = false, idToken, onSend, hearingDisabled = false, deckId, sessionWorking = false, arrived = false }: ChatMessageProps) {
   const t = useTranslations("chat")
   const isUser = role === "user"
   const [expanded, setExpanded] = useState(false)
@@ -290,7 +292,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
           </div>
         ) : isUser ? (
           /* User bubble */
-          <div className="text-sm leading-relaxed break-words px-3.5 py-2.5 rounded-2xl rounded-br-md bg-brand-teal-soft border border-brand-teal/15">
+          <div className={`text-sm leading-relaxed break-words px-3.5 py-2.5 rounded-2xl rounded-br-md bg-brand-teal-soft border border-brand-teal/15${arrived ? " steer-arrived" : ""}`}>
             {attachments.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
                 {attachments.map((att, i) => (

@@ -1,15 +1,16 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * useChatStream in Cloud mode: a send while the session works is a steer, shown where the
- * agent accepted it; stop sends a cancel; resume rebuilds a working session after a reload.
+ * useChatStream in Cloud mode: a send while the session works is a steer, queued until the
+ * agent reads it and then shown where it read it; stop sends a cancel; resume rebuilds a
+ * working session after a reload.
  */
 
 import { beforeEach, describe, expect, it, vi } from "vitest"
 import { act, renderHook } from "@testing-library/react"
 import { intlWrapper } from "@/test/renderWithIntl"
 import en from "../../messages/en.json"
-import type { Message } from "./useChatStream"
+import type { Message, QueuedSteer } from "./useChatStream"
 
 const { invokeAgentCore, steerAgentCore, cancelAgentCore, resumeAgentCore, notifyError } = vi.hoisted(() => ({
   invokeAgentCore: vi.fn(), steerAgentCore: vi.fn(), cancelAgentCore: vi.fn(), resumeAgentCore: vi.fn(), notifyError: vi.fn(),
@@ -59,8 +60,17 @@ beforeEach(() => {
   vi.clearAllMocks()
 })
 
+const queue = (steers: QueuedSteer[]) => steers.map((s) => `${s.state}:${s.display}`)
+
+/** A steer request the test answers: `resolve` / `reject` it. */
+function deferredSteer() {
+  const answer: { resolve?: (v: unknown) => void; reject?: (e: Error) => void } = {}
+  steerAgentCore.mockImplementationOnce(() => new Promise((resolve, reject) => Object.assign(answer, { resolve, reject })))
+  return answer
+}
+
 describe("useChatStream (Cloud) steer", () => {
-  it("sends a message while working as a steer and shows it where it was accepted", async () => {
+  it("queues a steer until the agent reads it, then shows it there and splits the reply", async () => {
     const run = captureInvoke()
     const { result } = renderStream()
     let first: Promise<boolean> | undefined
@@ -72,27 +82,117 @@ describe("useChatStream (Cloud) steer", () => {
     })
     expect(result.current.isLoading).toBe(true)
 
-    steerAgentCore.mockResolvedValueOnce({ id: "x", as: "steer" })
-    let ok: boolean | undefined
-    await act(async () => { ok = await result.current.sendMessage("use blue", undefined, undefined, undefined, { displayContent: "use blue" }) })
-    expect(ok).toBe(true)
+    const answer = deferredSteer()
+    let sent: Promise<boolean> | undefined
+    act(() => { sent = result.current.sendMessage("use blue", undefined, undefined, undefined, { displayContent: "use blue" }) })
     expect(invokeAgentCore).toHaveBeenCalledTimes(1)
     expect(steerAgentCore).toHaveBeenCalledWith("S1", "use blue", "at", expect.any(String))
-    // Not shown until the agent accepted it.
+    // Sending: a card, not a bubble.
+    expect(queue(result.current.steerQueue)).toEqual(["sending:use blue"])
     expect(roles(result.current.messages)).toEqual(["user:make a deck", "assistant:Working on it."])
 
+    let ok: boolean | undefined
+    await act(async () => { answer.resolve!({ id: "x", as: "steer" }); ok = await sent })
+    expect(ok).toBe(true)
+    expect(queue(result.current.steerQueue)).toEqual(["waiting:use blue"])
+
     const steerId = steerAgentCore.mock.calls[0][3] as string
+    // Accepted: still waiting, and the reply goes on in the same message.
     act(() => {
       h.onSession.onEvent({ steer: { id: steerId, text: "use blue", state: "accepted" } }, { own: true })
-      h.onStreamUpdate("Working on it. Blue it is.")
+      h.onStreamUpdate("Working on it. Still going.")
     })
+    expect(queue(result.current.steerQueue)).toEqual(["waiting:use blue"])
+    expect(roles(result.current.messages)).toEqual(["user:make a deck", "assistant:Working on it. Still going."])
+
+    // Delivered: the card leaves, the bubble goes where the agent read it, the reply splits there.
+    act(() => {
+      h.onSession.onEvent({ steer: { id: steerId, state: "delivered", how: "fold" } }, { own: true })
+      h.onStreamUpdate("Working on it. Still going. Blue it is.")
+    })
+    expect(result.current.steerQueue).toEqual([])
     expect(roles(result.current.messages)).toEqual([
-      "user:make a deck", "assistant:Working on it.", "user:use blue", "assistant: Blue it is.",
+      "user:make a deck", "assistant:Working on it. Still going.", "user:use blue", "assistant: Blue it is.",
     ])
     expect(result.current.messages[2].steerId).toBe(steerId)
+    expect(result.current.arrivedSteerIds.has(steerId)).toBe(true)
 
     await act(async () => { run.finish!(); await first })
     expect(result.current.isLoading).toBe(false)
+  })
+
+  it("stops highlighting a delivered steer after a moment", async () => {
+    vi.useFakeTimers()
+    try {
+      const run = captureInvoke()
+      const { result } = renderStream()
+      act(() => { void result.current.sendMessage("go") })
+      steerAgentCore.mockResolvedValueOnce({ id: "x", as: "steer" })
+      await act(async () => { await result.current.sendMessage("more") })
+      const steerId = steerAgentCore.mock.calls[0][3] as string
+      act(() => {
+        run.handlers!.onSession.onEvent({ steer: { id: steerId, text: "more", state: "accepted" } }, { own: true })
+        run.handlers!.onSession.onEvent({ steer: { id: steerId, state: "delivered", how: "turn" } }, { own: true })
+      })
+      expect(result.current.arrivedSteerIds.has(steerId)).toBe(true)
+      act(() => { vi.advanceTimersByTime(2500) })
+      expect(result.current.arrivedSteerIds.size).toBe(0)
+      await act(async () => { run.finish!() })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it("stacks several steers in sent order and shows them in that order when read together", async () => {
+    const run = captureInvoke()
+    const { result } = renderStream()
+    act(() => { void result.current.sendMessage("go") })
+    const h = run.handlers!
+    act(() => { h.onStreamUpdate("Working.") })
+    steerAgentCore.mockResolvedValue({ id: "x", as: "steer" })
+    await act(async () => { await result.current.sendMessage("first") })
+    await act(async () => { await result.current.sendMessage("second") })
+    await act(async () => { await result.current.sendMessage("third") })
+    const [a, b, c] = steerAgentCore.mock.calls.map((call) => call[3] as string)
+    act(() => {
+      h.onSession.onEvent({ steer: { id: a, text: "first", state: "accepted" } }, { own: true })
+      h.onSession.onEvent({ steer: { id: b, text: "second", state: "accepted" } }, { own: true })
+      h.onSession.onEvent({ steer: { id: c, text: "third", state: "accepted" } }, { own: true })
+    })
+    expect(queue(result.current.steerQueue)).toEqual(["waiting:first", "waiting:second", "waiting:third"])
+
+    // The next step takes the first two (SteerInbox drains in order); the third waits on.
+    act(() => {
+      h.onSession.onEvent({ steer: { id: a, state: "delivered", how: "turn" } }, { own: true })
+      h.onSession.onEvent({ steer: { id: b, state: "delivered", how: "turn" } }, { own: true })
+      h.onSession.onEvent({ turn: { id: "t2", why: "steer", text: "first\n\nsecond" } }, { own: true })
+      h.onStreamUpdate("Working.On both.")
+    })
+    expect(roles(result.current.messages)).toEqual(["user:go", "assistant:Working.", "user:first", "user:second", "assistant:On both."])
+    expect(queue(result.current.steerQueue)).toEqual(["waiting:third"])
+    await act(async () => { run.finish!() })
+  })
+
+  it("shows a steer sent from another tab as a card, then as a bubble where it was read", async () => {
+    const run = captureInvoke()
+    const { result } = renderStream()
+    act(() => { void result.current.sendMessage("go") })
+    const h = run.handlers!
+    act(() => {
+      h.onStreamUpdate("Working.")
+      h.onSession.onEvent({ steer: { id: "other", text: "[Attached: a.png (image/png)]\n\nfrom the other tab", state: "accepted" } }, { own: false })
+    })
+    expect(result.current.steerQueue).toEqual([expect.objectContaining({ id: "other", state: "waiting", inputText: "from the other tab" })])
+    expect(roles(result.current.messages)).toEqual(["user:go", "assistant:Working."])
+    act(() => {
+      h.onSession.onEvent({ steer: { id: "other", state: "delivered", how: "fold" } }, { own: false })
+      h.onStreamUpdate("Working. Got it.")
+    })
+    expect(result.current.steerQueue).toEqual([])
+    expect(result.current.messages[2]).toMatchObject({ role: "user", steerId: "other" })
+    expect(result.current.messages[2].content).toContain("from the other tab")
+    expect(result.current.messages[3].content).toBe(" Got it.")
+    await act(async () => { run.finish!() })
   })
 
   it("updates a tool card started before the steer in place when it completes after it", async () => {
@@ -109,6 +209,7 @@ describe("useChatStream (Cloud) steer", () => {
     const steerId = steerAgentCore.mock.calls[0][3] as string
     act(() => {
       h.onSession.onEvent({ steer: { id: steerId, text: "shorter please", state: "accepted" } }, { own: true })
+      h.onSession.onEvent({ steer: { id: steerId, state: "delivered", how: "fold" } }, { own: true })
       h.onToolUse("compose_slides", { toolUseId: "t1", completed: true, status: "success", result: { ok: true } })
       h.onStreamUpdate("Composing.Done, shorter.")
     })
@@ -137,6 +238,7 @@ describe("useChatStream (Cloud) steer", () => {
     const steerId = steerAgentCore.mock.calls[0][3] as string
     act(() => {
       h.onSession.onEvent({ steer: { id: steerId, text: "shorter please", state: "accepted" } }, { own: true })
+      h.onSession.onEvent({ steer: { id: steerId, state: "delivered", how: "fold" } }, { own: true })
       parseEvent({ status: "error", error: "boom", code: "throttled" }, completion, update, h.onToolUse)
     })
     const notice = `⚠ ${agentErrorMessage("boom", "throttled")}`
@@ -150,19 +252,45 @@ describe("useChatStream (Cloud) steer", () => {
     await act(async () => { run.finish!() })
   })
 
-  it("keeps the input and tells the user when the steer is not accepted", async () => {
+  it("drops the card, tells the user and calls onSteerFailed when the steer is not accepted", async () => {
     const run = captureInvoke()
     const { result } = renderStream()
     act(() => { void result.current.sendMessage("go") })
-    steerAgentCore.mockRejectedValueOnce(new Error("timeout"))
+    const answer = deferredSteer()
+    const onSteerFailed = vi.fn()
+    let sent: Promise<boolean> | undefined
+    act(() => { sent = result.current.sendMessage("more", undefined, undefined, undefined, { onSteerFailed }) })
+    expect(queue(result.current.steerQueue)).toEqual(["sending:more"])
     let ok: boolean | undefined
-    await act(async () => { ok = await result.current.sendMessage("more") })
+    await act(async () => { answer.reject!(new Error("timeout")); ok = await sent })
     expect(ok).toBe(false)
     expect(notifyError).toHaveBeenCalledWith(en.chat.steerFailed, expect.any(Error))
+    expect(onSteerFailed).toHaveBeenCalledTimes(1)
+    expect(result.current.steerQueue).toEqual([])
+    expect(roles(result.current.messages)).toEqual(["user:go", "assistant:"])
     await act(async () => { run.finish!() })
   })
 
-  it("marks a steer the stop discarded", async () => {
+  it("keeps a steer the stream accepted when its answer is lost", async () => {
+    const run = captureInvoke()
+    const { result } = renderStream()
+    act(() => { void result.current.sendMessage("go") })
+    const answer = deferredSteer()
+    const onSteerFailed = vi.fn()
+    let sent: Promise<boolean> | undefined
+    act(() => { sent = result.current.sendMessage("more", undefined, undefined, undefined, { onSteerFailed }) })
+    const steerId = steerAgentCore.mock.calls[0][3] as string
+    act(() => { run.handlers!.onSession.onEvent({ steer: { id: steerId, text: "more", state: "accepted" } }, { own: true }) })
+    let ok: boolean | undefined
+    await act(async () => { answer.reject!(new Error("timeout")); ok = await sent })
+    expect(ok).toBe(true)
+    expect(onSteerFailed).not.toHaveBeenCalled()
+    expect(notifyError).not.toHaveBeenCalled()
+    expect(queue(result.current.steerQueue)).toEqual(["waiting:more"])
+    await act(async () => { run.finish!() })
+  })
+
+  it("keeps a steer the stop discarded as not delivered until it is dismissed", async () => {
     const run = captureInvoke()
     const { result } = renderStream()
     act(() => { void result.current.sendMessage("go") })
@@ -173,8 +301,24 @@ describe("useChatStream (Cloud) steer", () => {
       run.handlers!.onSession.onEvent({ steer: { id: steerId, text: "more", state: "accepted" } }, { own: true })
       run.handlers!.onSession.onEvent({ steer: { id: steerId, state: "discarded", how: "cancelled" } }, { own: true })
     })
-    expect(result.current.messages.find((m) => m.steerId === steerId)?.steerNotDelivered).toBe(true)
+    expect(queue(result.current.steerQueue)).toEqual(["notDelivered:more"])
+    expect(result.current.messages.some((m) => m.steerId === steerId)).toBe(false)
     await act(async () => { run.finish!() })
+    expect(queue(result.current.steerQueue)).toEqual(["notDelivered:more"])
+    act(() => result.current.dismissSteer(steerId))
+    expect(result.current.steerQueue).toEqual([])
+  })
+
+  it("marks a steer the work ended without reading not delivered", async () => {
+    const run = captureInvoke()
+    const { result } = renderStream()
+    let first: Promise<boolean> | undefined
+    act(() => { first = result.current.sendMessage("go") })
+    steerAgentCore.mockResolvedValueOnce({ id: "x", as: "steer" })
+    await act(async () => { await result.current.sendMessage("more") })
+    expect(queue(result.current.steerQueue)).toEqual(["waiting:more"])
+    await act(async () => { run.finish!(); await first })
+    expect(queue(result.current.steerQueue)).toEqual(["notDelivered:more"])
   })
 
   it("shows a steer that became a turn at its turn", async () => {
@@ -186,6 +330,7 @@ describe("useChatStream (Cloud) steer", () => {
     const steerId = steerAgentCore.mock.calls[0][3] as string
     act(() => { run.handlers!.onSession.onEvent({ turn: { id: steerId, why: "prompt", text: "and then" } }, { own: true }) })
     expect(roles(result.current.messages)).toEqual(["user:go", "user:and then", "assistant:"])
+    expect(result.current.steerQueue).toEqual([])
     await act(async () => { run.finish!() })
   })
 })
@@ -234,7 +379,7 @@ describe("useChatStream (Cloud) background compose", () => {
     expect(result.current.turnActive).toBe(false)
     const [, card, steer, after] = result.current.messages
     expect(card.toolUses[0]).toMatchObject({ task: { state: "running" }, streamMessages: [{ status: "starting", group: 1 }] })
-    expect(steer).toMatchObject({ role: "user", content: "use blue", steerState: "delivered" })
+    expect(steer).toMatchObject({ role: "user", content: "use blue", steerId })
     expect(after).toMatchObject({ role: "assistant", toolUses: [] })
 
     act(() => {
@@ -283,15 +428,17 @@ describe("useChatStream (Cloud) background compose", () => {
     await act(async () => { run.finish!() })
   })
 
-  it("marks a steer accepted until it is delivered", async () => {
+  it("keeps a steer queued between turns until it is delivered", async () => {
     const { result, run, h } = dispatch()
     steerAgentCore.mockResolvedValueOnce({ id: "x", as: "steer" })
     await act(async () => { await result.current.sendMessage("more") })
     const steerId = steerAgentCore.mock.calls[0][3] as string
     act(() => { h.onSession.onEvent({ steer: { id: steerId, text: "more", state: "accepted" } }, { own: true }) })
-    expect(result.current.messages.find((m) => m.steerId === steerId)?.steerState).toBe("accepted")
-    act(() => { h.onSession.onEvent({ steer: { id: steerId, state: "delivered", how: "fold" } }, { own: true }) })
-    expect(result.current.messages.find((m) => m.steerId === steerId)?.steerState).toBe("delivered")
+    expect(queue(result.current.steerQueue)).toEqual(["waiting:more"])
+    expect(result.current.messages.some((m) => m.steerId === steerId)).toBe(false)
+    act(() => { h.onSession.onEvent({ steer: { id: steerId, state: "delivered", how: "turn" } }, { own: true }) })
+    expect(result.current.steerQueue).toEqual([])
+    expect(result.current.messages.find((m) => m.steerId === steerId)).toMatchObject({ role: "user", content: "more" })
     await act(async () => { run.finish!() })
   })
 })

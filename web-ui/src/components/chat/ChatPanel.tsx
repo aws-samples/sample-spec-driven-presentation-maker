@@ -3,7 +3,8 @@
 /**
  * ChatPanel — Chat interface orchestrator.
  *
- * Delegates streaming to useChatStream, input to ChatInput.
+ * Delegates streaming to useChatStream, input to ChatInput, the steers the agent has not read
+ * yet to SteerQueue (above the input).
  * Retains: history loading, resume after a reload or on a reopened deck, @mentions, Options,
  * side effects.
  */
@@ -20,10 +21,11 @@ import { deckSessionId, isOwnerPrefixed } from "@/lib/sessionId"
 import { getChatHistory, patchDeck, type ChatMessage as ChatHistoryMessage } from "@/services/deckService"
 import * as localService from "@/services/localService"
 import type { UploadedFile } from "@/services/uploadService"
-import { useChatStream, type Message, type ToolUseCallbackData } from "@/hooks/useChatStream"
+import { useChatStream, type Message, type SendMessageOptions, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { useSlashPickerItems } from "@/hooks/useSlashPickerItems"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage } from "./ChatMessage"
+import { SteerQueue } from "./SteerQueue"
 import { ComposerNoteCard } from "./ComposerNoteCard"
 import { McpStatusBar } from "./McpStatusBar"
 import { FileDropZone } from "./FileDropZone"
@@ -425,6 +427,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     uploadedFiles: UploadedFile[],
     snippets: { label: string; text: string }[],
     attachments: { fileName: string; fileType: string }[],
+    steer?: Pick<SendMessageOptions, "inputText" | "onSteerFailed">,
   ): Promise<boolean> => {
     if (!configLoaded) return Promise.resolve(false)
 
@@ -441,12 +444,26 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       fullMessage = `<!--sdpm:include_images=true-->\n${fullMessage}`
     }
 
-    return stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments, { displayContent: text })
+    return stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments, { displayContent: text, ...steer })
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [configLoaded, deckId, fetchWebImages, stream.sendMessage])
 
   /**
-   * Send from the input. With comments waiting, the server first writes the review file and
+   * Put a steer's text back into the input: after the text there, when it has some. Later than
+   * ChatInput clearing the input after the send it came from.
+   */
+  const putBackIntoInput = useCallback((text: string) => {
+    setTimeout(() => {
+      const input = chatInputRef.current
+      if (!input || !text.trim()) return
+      const current = input.textareaRef.current?.value ?? ""
+      input.replaceText(current.trim() ? `${current.trimEnd()}\n\n${text}` : text)
+    }, 0)
+  }, [])
+
+  /**
+   * Send from the input, which clears at once. A steer that could not be sent puts its text
+   * back into the input. With comments waiting, the server first writes the review file and
    * returns the chat message (the typed text as `note`, comments, file path, instructions,
    * `[review:<id>]`), which is sent as-is and also shown (Local .chat.json keeps the display
    * text). A failed write keeps the comments and the typed text (`false` keeps the input). A
@@ -462,9 +479,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     if (!configLoaded) return false
     const r = reviewRef.current
     if (!hasReviewDrafts || !r) {
-      // Agent working: a steer. A steer that was not accepted keeps the input.
-      if (stream.isLoading) return (await handleSend(text, uploadedFiles, snippets, attachments)) ? undefined : false
-      handleSend(text, uploadedFiles, snippets, attachments)
+      void handleSend(text, uploadedFiles, snippets, attachments, { inputText: text, onSteerFailed: () => putBackIntoInput(text) })
       return
     }
     let created: SubmittedReview
@@ -474,7 +489,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       notifyError(tReview("sendFailed"), err)
       return false
     }
-    void handleSend(created.message, uploadedFiles, snippets, attachments).then((ok) => {
+    void handleSend(created.message, uploadedFiles, snippets, attachments, { inputText: text }).then((ok) => {
       if (ok) return
       created.restore()
       // Later than ChatInput clearing the input after this send.
@@ -483,7 +498,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
         if (text.trim() && input && !input.textareaRef.current?.value.trim()) input.replaceText(text)
       }, 100)
     })
-  }, [configLoaded, hasReviewDrafts, handleSend, tReview, stream.isLoading])
+  }, [configLoaded, hasReviewDrafts, handleSend, putBackIntoInput, tReview])
 
   const isLoading = stream.isLoading || forkingSession !== null
   // A send while the agent works is a steer. Local: only into this panel's own invoke or the
@@ -648,14 +663,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                   onSend={(text: string) => handleSend(text, [], [], [])}
                   hearingDisabled={i < lastUserIdx}
                   deckId={deckId}
+                  arrived={!!msg.steerId && stream.arrivedSteerIds.has(msg.steerId)}
                 />
-                )}
-                {msg.steerNotDelivered ? (
-                  <p className="mt-1 text-right text-xs text-foreground-muted">{t("steerNotDelivered")}</p>
-                ) : msg.steerState && (
-                  <p className="mt-1 text-right text-xs text-foreground-muted">
-                    {msg.steerState === "delivered" ? t("steerDelivered") : t("steerPending")}
-                  </p>
                 )}
               </div>
             ))
@@ -675,6 +684,15 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           {t("backgroundWorking")}
         </p>
       )}
+
+      <SteerQueue
+        steers={stream.steerQueue}
+        onBackToInput={(steer, text) => {
+          stream.dismissSteer(steer.id)
+          putBackIntoInput(text)
+        }}
+        onDismiss={stream.dismissSteer}
+      />
 
       {/* Input area */}
       <ChatInput

@@ -20,6 +20,18 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   and are sent together, and the style agent changes only the commented slides. Desktop,
   Local mode and the AWS stack.
 
+### Changed
+
+- **Messages sent while the agent works wait above the input until the agent reads them.**
+  In the Web UI chat (decks and styles), such a message clears the input at once and shows
+  as a card above it: "Sending…", then waiting for the agent's next step. Several stack in
+  sent order, including ones sent from another tab. When the agent reads one, the card
+  becomes a normal message at that point in the chat, the reply continues below it, and the
+  bubble is highlighted briefly; the "Sent while the agent works" / "Read by the agent"
+  labels are gone. A message the agent never got (stopped first) stays as a "Not delivered"
+  card with "Back to input" and dismiss. If the message cannot be sent, its text goes back
+  into the input. Local mode and the AWS stack.
+
 ### Fixed
 
 - **Chart titles keep their font colour and size when a deck is read back.** `pptx_to_json`
