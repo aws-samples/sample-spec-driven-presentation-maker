@@ -207,6 +207,8 @@ SOURCE_ZIP="${TMPDIR}/source.zip"
 zip -r "${SOURCE_ZIP}" . \
   -x ".git/*" \
   -x ".kiro/*" \
+  -x ".agents/*" \
+  -x ".worktrees/*" \
   -x ".venv/*" \
   -x "venv/*" \
   -x "*/.venv/*" \
