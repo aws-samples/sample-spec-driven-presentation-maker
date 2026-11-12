@@ -147,8 +147,9 @@ def http_json(url: str, form: dict | None = None, token: str | None = None) -> d
         headers["Content-Type"] = "application/x-www-form-urlencoded"
     if token:
         headers["Authorization"] = f"Bearer {token}"
-    request = urllib.request.Request(url, data=body, headers=headers)
-    with urllib.request.urlopen(request, timeout=30) as resp:  # noqa: S310 - HTTPS checked above
+    # The scheme is checked above (HTTPS only), so urllib cannot open file:// or custom schemes.
+    request = urllib.request.Request(url, data=body, headers=headers)  # nosec B310
+    with urllib.request.urlopen(request, timeout=30) as resp:  # nosec B310 # nosemgrep: python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected
         return json.loads(resp.read())
 
 

@@ -299,7 +299,7 @@ token lasts its full validity, and the runner never has to write the secret.
   with AWS KMS; with a customer managed key, the key policy limits who can decrypt). Never
   put it in the repository, in environment variables of shared systems, or in a container
   image.
-- **Least privilege.** Only the runner's role may read the secret: `GetSecretValue` on that
+- **Least privilege.** Only the runner's role may read the stored token, with `GetSecretValue` on that
   one secret ARN. Your own credentials write it at `login`.
 - **Never log tokens.** The reference client prints no token and no authorization code. Do
   not log the secret value, the token endpoint responses or the `/ws` URL with its
