@@ -55,6 +55,34 @@ global_settings:
         12-hex-digit task ids (the shape compose_dispatch.py gives them), not credentials.
       expiration: "2027-11-08"
 
+    # --- Animation catalog provenance: commit SHAs and a corpus digest ---
+    # The catalog records which commit of each external reference was read and a digest of
+    # the fixture corpus the facts were checked against, so the attribution is verifiable
+    # and a changed upstream fails the test. Public identifiers, deliberately published.
+
+    - rule_id: "SECRET-HEX-HIGH-ENTROPY-STRING"
+      path: "scripts/animation_catalog/generate.py"
+      reason: >
+        PROVENANCE_REFERENCES pins the git commit of each external reference read while
+        deriving the animation catalog (office-kit/pptx, ChristopherVR/ooxml) and the
+        sha256 of the fixture corpus the facts were checked against. Public commit ids and
+        a digest of public files, not credentials.
+      expiration: "2027-11-13"
+
+    - rule_id: "SECRET-HEX-HIGH-ENTROPY-STRING"
+      path: "sdpm/references/catalogs/powerpoint-animation-catalog.json"
+      reason: >
+        The generated catalog's provenance block, carrying the same commit ids and corpus
+        digest as generate.py so a reader can check the attribution without the generator.
+      expiration: "2027-11-13"
+
+    - rule_id: "SECRET-HEX-HIGH-ENTROPY-STRING"
+      path: "tests/test_animation_catalog.py"
+      reason: >
+        test_catalog_provenance_names_every_external_reference_without_vendoring asserts
+        those commit ids, which is the point: a silently changed provenance block fails.
+      expiration: "2027-11-13"
+
     # --- CFn Custom Resource: urlopen to pre-signed ResponseURL ---
     # Standard pattern for CloudFormation custom resources.
     # The URL is the CFn-provided ResponseURL, not user-controlled.
