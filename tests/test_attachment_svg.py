@@ -29,8 +29,13 @@ def _check(tmp_path, body: str, *, wrap: bool = True) -> None:
     '<rect fill="&#117;rl(https://example.invalid/p.svg#g)"/>',
     r"<style>rect{fill:\75rl(https://example.invalid/p.svg#g)}</style>",
     '<image href="&#104;ttps://example.invalid/a.png"/>',
+    '<image href="data:image/svg+xml;base64,PHN2Zy8+"/>',
+    '<image xlink:href=" DATA:image/SVG+xml,%3Csvg/%3E"/>',
+    '<defs><g id="s"/></defs><use href="data:image/png;base64,iVBORw0KGgo=#s"/>',
+    '<a href="data:image/png;base64,iVBORw0KGgo="><text>x</text></a>',
 ], ids=["import", "style-url", "style-image-set", "style-attr", "fill-attr", "stroke-attr",
-        "data-url", "entity-encoded", "css-escape", "entity-href"])
+        "data-url", "entity-encoded", "css-escape", "entity-href",
+        "nested-svg-image", "nested-svg-xlink", "data-url-use", "data-url-link"])
 def test_references_outside_the_document_are_rejected(tmp_path, body):
     with pytest.raises(SourceValidationError, match="external resource"):
         _check(tmp_path, body)
@@ -77,7 +82,13 @@ def test_malformed_svg_is_rejected(tmp_path):
     '<metadata><rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"/></metadata>'
     '<sodipodi:namedview xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd" pagecolor="#ffffff"/>'
     '<text font-family="\'Amazon Ember\', sans-serif">Q4: 42% → 58%</text>',
-], ids=["illustrator-classes", "local-paint-servers", "local-links", "animation", "metadata"])
+    # Inkscape on Windows: a path in editor metadata is not CSS
+    '<g xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"'
+    ' inkscape:export-filename="C:\\Users\\me\\icon.png" inkscape:label="Layer 1"/>',
+    # a raster image embedded in a filter
+    '<filter id="f"><feImage href="data:image/png;base64,iVBORw0KGgo="/></filter>',
+], ids=["illustrator-classes", "local-paint-servers", "local-links", "animation", "metadata",
+        "inkscape-windows-path", "filter-image"])
 def test_ordinary_svg_passes(tmp_path, body):
     _check(tmp_path, body)
 
@@ -97,3 +108,8 @@ def test_generated_qr_code_passes(tmp_path):
     svg = tmp_path / "qr.svg"
     svg.write_bytes(generate_qr_svg("https://example.com/deck?id=1", color="#FF9900"))
     enforce_content_limits(svg, "image/svg+xml")
+
+
+def test_css_escape_in_a_presentation_attribute_is_rejected(tmp_path):
+    with pytest.raises(SourceValidationError, match="external resource"):
+        _check(tmp_path, '<rect fill="\\75rl(https://example.invalid/p.svg#g)"/>')
