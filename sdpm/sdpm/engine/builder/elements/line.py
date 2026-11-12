@@ -292,26 +292,6 @@ class LineMixin:
             connector.line.width = Pt(line_width)
 
         # Apply dash style
-        dash_style = elem.get("dashStyle")
-        if dash_style:
-            from pptx.enum.dml import MSO_LINE_DASH_STYLE
-            dash_map = {
-                "solid": MSO_LINE_DASH_STYLE.SOLID,
-                "dash": MSO_LINE_DASH_STYLE.DASH,
-                "dot": MSO_LINE_DASH_STYLE.ROUND_DOT,
-                "dash_dot": MSO_LINE_DASH_STYLE.DASH_DOT,
-                "dash_dot_dot": MSO_LINE_DASH_STYLE.DASH_DOT_DOT,
-                "long_dash": MSO_LINE_DASH_STYLE.LONG_DASH,
-                "long_dash_dot": MSO_LINE_DASH_STYLE.LONG_DASH_DOT,
-                "square_dot": MSO_LINE_DASH_STYLE.SQUARE_DOT,
-            }
-            if dash_style in dash_map:
-                connector.line.dash_style = dash_map[dash_style]
-            elif dash_style in ("sysDash", "sysDot", "sysDashDot", "sysDashDotDot"):
-                from lxml import etree
-                from pptx.oxml.ns import qn
-                ln = connector.line._ln
-                prstDash = etree.SubElement(ln, qn('a:prstDash'))
-                prstDash.set('val', dash_style)
+        self._apply_dash_style(connector, elem)
     
 

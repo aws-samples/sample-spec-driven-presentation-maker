@@ -36,6 +36,23 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - The animated slide preview no longer shows a layout placeholder's prompt text (the
   Title Slide layout's "Subtitle") behind a slide, whether or not the slide fills that
   placeholder in. The thumbnails never showed it.
+- **Arrowheads and system dashes are written in the order the file format requires.** Shapes,
+  freeforms and polylines wrote the end arrowhead before the start one, and lines with a
+  `sys*` `dashStyle` wrote the dash after the arrowheads. Out-of-order line properties are
+  ones PowerPoint may ignore; they are now sorted into schema order.
+- **Paragraph line spacing comes before bullets.** A textbox paragraph with both a `list` and
+  `lineSpacingPct` wrote the spacing after the bullet properties, out of schema order.
+- **Block arcs keep their angles when a deck is read back.** `pptx_to_json` converted `arc`
+  adjustments back to `[start, sweep]` but returned `block_arc` ones raw, so rebuilding the
+  JSON drew a different ring.
+- **Shape arrowheads survive a read-back.** `pptx_to_json` wrote a shape's arrowheads as
+  `headEnd` / `tailEnd` (the freeform keys), which the shape builder does not read, so
+  rebuilding the JSON dropped them. Shapes now get `arrowStart` / `arrowEnd`.
+- **Dash styles survive a read-back.** `pptx_to_json` writes a line's dash under its OOXML
+  name (`lgDash`, `dashDot`, `lgDashDot`, …), but the builder accepted only the friendly
+  names and the `sys*` ones, so rebuilding the JSON drew those lines solid. Freeforms lost
+  their dash entirely: it was never extracted. The builder now accepts every OOXML preset
+  dash name, and freeforms extract `dashStyle`.
 - **Creating a style in the Web UI no longer stops with "The model took too long to
   respond".** The style author wrote the whole style in one tool call, and the model sent
   nothing for longer than the 120-second read timeout while it wrote. The author now saves
