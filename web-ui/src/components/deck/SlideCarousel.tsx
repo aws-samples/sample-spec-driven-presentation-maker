@@ -127,6 +127,17 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   }
   if (dupUrls.length) console.warn("[SlideCarousel] same composeUrl used for multiple slides:", dupUrls, urlBySlug)
   const { viewMode, setViewMode } = usePreferences()
+  const [presenterIndex, setPresenterIndex] = useState(0)
+  const presenterCount = slidesWithPreview.length
+  useEffect(() => {
+    if (viewMode !== "presenter" || presenterCount === 0) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "ArrowRight") setPresenterIndex((i) => Math.min(i + 1, presenterCount - 1))
+      else if (e.key === "ArrowLeft") setPresenterIndex((i) => Math.max(i - 1, 0))
+    }
+    window.addEventListener("keydown", onKey)
+    return () => window.removeEventListener("keydown", onKey)
+  }, [viewMode, presenterCount])
   const review = useReview()
   const reviewOn = !!review?.enabled && slidesWithPreview.length > 0
   const [playerHover, setPlayerHover] = useState(false)
