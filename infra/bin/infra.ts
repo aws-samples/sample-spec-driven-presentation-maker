@@ -21,7 +21,7 @@ import * as fs from "fs";
 import * as yaml from "yaml";
 import * as path from "path";
 import { DataStack } from "../lib/data-stack";
-import { AuthStack } from "../lib/auth-stack";
+import { AuthStack, normalizeProgrammaticClient } from "../lib/auth-stack";
 import { RuntimeStack } from "../lib/runtime-stack";
 import { AgentStack } from "../lib/agent-stack";
 import { WebUiStack } from "../lib/web-ui-stack";
@@ -51,6 +51,13 @@ let oidcDiscoveryUrl: string | undefined;
 let allowedClients: string[];
 let authStack: AuthStack | undefined;
 
+// Programmatic client (opt-in, default Cognito only): a native-app client for the
+// user's own automation. Fails synth when enabled together with an external IdP.
+const programmaticClient = normalizeProgrammaticClient(
+  config.auth?.programmaticClient,
+  !(externalOidc && externalClients),
+);
+
 if (externalOidc && externalClients) {
   // Customer-provided IdP — no AuthStack needed
   oidcDiscoveryUrl = externalOidc;
@@ -79,6 +86,7 @@ if (externalOidc && externalClients) {
     mcpCallbackUrls: config.auth?.mcpCallbackUrls,
     selfSignUp,
     allowedEmailDomains,
+    programmaticClient,
   });
   // In AuthStack mode, downstream stacks read Auth values (oidcDiscoveryUrl,
   // WebClient ID, MCP custom scope, etc.) from SSM Parameter Store published
@@ -245,6 +253,7 @@ if (config.stacks?.agent) {
     oidcDiscoveryUrl: authStack ? undefined : oidcDiscoveryUrl,
     allowedClients,
     useAuthStack: !!authStack,
+    programmaticClient: !!programmaticClient,
     chatModelId: defaultChatModelId,
     createModelId: defaultCreateModelId,
     allowedModelIds,
@@ -275,6 +284,7 @@ if (config.stacks?.agent) {
       webAclId: cloudFrontWafStack?.webAclArn,
       allowedIpV4AddressRanges,
       allowedIpV6AddressRanges,
+      programmaticClient: !!programmaticClient,
       defaultChatModelId,
       defaultCreateModelId,
       allowedModels,

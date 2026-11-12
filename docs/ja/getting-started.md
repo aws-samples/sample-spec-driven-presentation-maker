@@ -380,3 +380,4 @@ git -C $HOME\.sdpm\checkout -c user.name=sdpm -c user.email=sdpm@localhost stash
 - [デプロイガイド](../en/deploy-cloudshell.md)（英語）: チーム向けに AWS で動かす（ワンクリックデプロイ。ローカルの CDK / Docker 不要）
 - [開発者ガイド](../en/developer-guide.md)（英語）: checkout での開発、CDK でのデプロイ
 - [アーキテクチャ](../en/architecture.md)（英語）: 各部分の組み合わせ
+- [プログラムからの利用](programmatic-access.md): スクリプト・Lambda・Step Functions から自分としてデッキを作る（Cloud）

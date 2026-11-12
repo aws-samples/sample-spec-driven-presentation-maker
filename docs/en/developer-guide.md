@@ -220,6 +220,10 @@ subdomain you want. Users created by an administrator are not checked.
 `allowedEmailDomains` without `selfSignUp: true` fails the synth. Switching either setting
 updates the user pool in place; existing users keep their accounts.
 
+To run your own automation (scripts, cron, Lambda, Step Functions) that creates decks as
+you, turn on the programmatic client (`auth.programmaticClient`, off by default); see
+[Programmatic Access](programmatic-access.md).
+
 #### External OIDC IdP
 
 To use your own IdP (Entra ID, Auth0, Okta and others):

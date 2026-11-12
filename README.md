@@ -218,6 +218,7 @@ other industries.
 | [Architecture](docs/en/architecture.md) | Layers, data flow, auth model, MCP tool reference |
 | [Connecting Agents](docs/en/add-to-gateway.md) | Connect MCP clients and gateways to SDPM |
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | Use SDPM from chat platforms |
+| [Programmatic Access](docs/en/programmatic-access.md) | Create decks as yourself from scripts, Lambda or Step Functions |
 | [Web UI](web-ui/README.md) | The React Web UI, Local mode and Cloud mode |
 | [Contributing](CONTRIBUTING.md) | How to send a change |
 

@@ -85,6 +85,11 @@ sample cannot set safe defaults for them. Evaluate each one before production us
    ([Connecting Agents](add-to-gateway.md#connection-method-b-static-client-registration-authmcpcallbackurls)).
 9. **Bedrock model and region**: if data residency matters, avoid cross-region inference
    profiles.
+10. **Programmatic client** (`auth.programmaticClient`, default off): when on, a public
+    Cognito client lets a signed-in user's automation act as that user from a refresh token
+    (default validity 90 days, no rotation). Whoever holds the token can do everything the
+    user can do in the chat until it expires. Keep tokens in Secrets Manager with
+    least-privilege read access ([Programmatic Access](programmatic-access.md#security-notes)).
 
 ### AgentCore runtime platform versions
 

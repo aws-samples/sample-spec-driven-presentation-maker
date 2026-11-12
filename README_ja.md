@@ -215,6 +215,7 @@ IT などの業界別シナリオを収録しています。
 | [Architecture](docs/en/architecture.md) | レイヤー構成、データフロー、認証モデル、MCP ツール一覧 |
 | [Connecting Agents](docs/en/add-to-gateway.md) | MCP クライアントやゲートウェイからの接続 |
 | [Teams & Slack Integration](docs/en/teams-slack-integration.md) | チャットツールからの利用 |
+| [プログラムからの利用](docs/ja/programmatic-access.md) | スクリプト・Lambda・Step Functions から自分としてデッキを作る |
 | [Web UI](web-ui/README_ja.md) | React 製 Web UI、ローカルモードとクラウドモード |
 | [Contributing](CONTRIBUTING.md) | 変更を送る手順 |
 
