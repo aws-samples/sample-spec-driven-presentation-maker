@@ -15,6 +15,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **Imported DOCX and XLSX tables keep their cells intact.** A `|` or a line break inside a
+  table cell split the cell in the Markdown that `import_attachment` writes: DOCX cells
+  were escaped twice, XLSX cells not at all. Both now go through the same escaping as PDF
+  tables (`\|`, line breaks as spaces).
 - **Cloud: a deck keeps its chat history when the tab closes during creation.** The link
   from a deck to the chat that created it (`chatSessionId`) was written only by the
   browser after the deck appeared; closing the tab or a failed request before then left

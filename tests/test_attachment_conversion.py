@@ -378,7 +378,6 @@ class TestMarkdownTableCells:
             table.cell(r, c).text = text
         doc.save(str(tmp_path / "t.docx"))
         md = ingest.convert_file(tmp_path / "t.docx", tmp_path / "out").markdown
-        # Escaped in _convert_docx and again in _rows_to_md_table: "a\\|b" ends the cell at the pipe.
         assert "| a\\|b | x |" in md
 
     def test_xlsx_pipe_and_newline_in_a_cell_stay_in_the_cell(self, tmp_path):
