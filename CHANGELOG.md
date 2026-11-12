@@ -13,6 +13,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Added
+
+- **Comment on your own styles in the Web UI.** On the Styles page, the Comment tool (`C`)
+  frames areas of a style's slides like on a deck; the frames collect above the style chat
+  and are sent together, and the style agent changes only the commented slides. Desktop,
+  Local mode and the AWS stack.
+
 ### Fixed
 
 - **Chart titles keep their font colour and size when a deck is read back.** `pptx_to_json`

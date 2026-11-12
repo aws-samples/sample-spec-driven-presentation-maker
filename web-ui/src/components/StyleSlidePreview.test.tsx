@@ -4,9 +4,15 @@
  * StyleSlidePreview tests — splitStyleSlides pure function + component rendering.
  */
 
-import { describe, it, expect, afterEach, beforeAll, afterAll } from "vitest"
+import { describe, it, expect, afterEach, beforeAll, afterAll, vi } from "vitest"
 import { screen, cleanup } from "@testing-library/react"
 import { render } from "@testing-library/react"
+import { renderWithIntl } from "@/test/renderWithIntl"
+
+vi.mock("sonner", () => ({ toast: Object.assign(vi.fn(), { dismiss: vi.fn() }) }))
+vi.mock("@/services/deckService", () => ({ createReview: vi.fn() }))
+
+import { ReviewProvider } from "@/components/review/ReviewProvider"
 import { splitStyleSlides, StyleSlidePreview, buildCoverDoc } from "./StyleSlidePreview"
 
 afterEach(cleanup)
@@ -211,5 +217,41 @@ describe("StyleSlidePreview component", () => {
     expect(iframes[0].title).toBe("Style Preview")
 
     Element.prototype.getBoundingClientRect = originalGBCR
+  })
+
+  describe("comment layers", () => {
+    const html = `<html><head></head><body>
+<div class="slide cover">S1</div>
+<div class="slide body">S2</div>
+<div class="slide closing">S3</div>
+</body></html>`
+    const originalGBCR = Element.prototype.getBoundingClientRect
+    beforeAll(() => {
+      Element.prototype.getBoundingClientRect = function () {
+        return { width: 600, height: 400, top: 0, left: 0, bottom: 400, right: 600, x: 0, y: 0, toJSON: () => ({}) }
+      }
+    })
+    afterAll(() => { Element.prototype.getBoundingClientRect = originalGBCR })
+
+    const renderInProvider = (commentable: boolean) => renderWithIntl(
+      <ReviewProvider deckId="style:brand-blue" slugs={["1", "2", "3"]} enabled agentBusy={false} openChat={() => {}}>
+        <StyleSlidePreview html={html} loading={false} commentable={commentable} />
+      </ReviewProvider>,
+    )
+
+    it("draws one layer per slide, keyed by its number, when commentable", () => {
+      const { container } = renderInProvider(true)
+      const layers = [...container.querySelectorAll("[data-review-layer]")].map(el => el.getAttribute("data-review-layer"))
+      expect(layers).toEqual(["1", "2", "3"])
+      const slides = [...container.querySelectorAll("[data-review-slide]")].map(el => el.getAttribute("data-review-slide"))
+      expect(slides).toEqual(["1", "2", "3"])
+    })
+
+    it("draws nothing of the comment tool without commentable (the deck page's spec preview)", () => {
+      const { container } = renderInProvider(false)
+      expect(container.querySelectorAll("iframe")).toHaveLength(3)
+      expect(container.querySelector("[data-review-layer]")).toBeNull()
+      expect(container.querySelector("[data-review-slide]")).toBeNull()
+    })
   })
 })

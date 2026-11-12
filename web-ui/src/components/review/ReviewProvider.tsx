@@ -1,7 +1,7 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ReviewProvider — the single owner of the comment tool's state on the deck screen.
+ * ReviewProvider — the single owner of the comment tool's state on the deck and style screens.
  *
  * The preview (SlideCarousel → ReviewSlideLayer / ReviewCommentCard) and the chat (draft bar,
  * request card, send) both read and change it through `useReview()`, which returns null on
@@ -15,6 +15,10 @@
  * except whether the hint was seen. Nothing here reads the review files.
  *
  * Frames are keyed by their name (`A`).
+ *
+ * The deck screen sends a request through the API, which writes a review file and returns the
+ * chat message (`createReview`); the style screen passes `createRequest`, which builds the
+ * message in the browser (no file).
  */
 
 "use client"
@@ -133,6 +137,7 @@ const UNDO_MS = 5000
 const FOCUS_OPEN_DELAY_MS = 380
 
 export interface ReviewProviderProps {
+  /** Id of the surface the drafts belong to (a deck id, or `style:<name>`); the drafts' storage key. */
   deckId: string | null
   slugs: string[]
   slideSize?: SlideSize
@@ -140,10 +145,12 @@ export interface ReviewProviderProps {
   agentBusy: boolean
   openChat: () => void
   idToken?: string
+  /** Builds the request in place of `createReview` (the API review file). */
+  createRequest?: (submission: ReviewSubmission) => Promise<{ id: string; message: string }>
   children: ReactNode
 }
 
-export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, openChat, idToken, children }: ReviewProviderProps) {
+export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, openChat, idToken, createRequest, children }: ReviewProviderProps) {
   const t = useTranslations("review")
   const [core, setCore] = useState<Core>(() => initCore(undefined))
   const coreRef = useRef(core)
@@ -156,8 +163,8 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
   const stableSlugs = useMemo(() => (slugKey ? slugKey.split(" ") : []), [slugKey])
 
   // Latest props for callbacks that outlive a render (fetches, timers).
-  const live = useRef({ openChat, idToken, slugs: stableSlugs, size, t })
-  useEffect(() => { live.current = { openChat, idToken, slugs: stableSlugs, size, t } })
+  const live = useRef({ openChat, idToken, slugs: stableSlugs, size, t, createRequest })
+  useEffect(() => { live.current = { openChat, idToken, slugs: stableSlugs, size, t, createRequest } })
 
   const editorText = useRef<string | null>(null)
   const undoTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -350,7 +357,7 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
     const c = coreRef.current
     const forDeck = c.deckId
     if (!forDeck) throw new Error("No deck is open")
-    const { slugs: currentSlugs, size: currentSize, idToken: token } = live.current
+    const { slugs: currentSlugs, size: currentSize, idToken: token, createRequest: build } = live.current
     const slugSet = new Set(currentSlugs)
     const frames = c.drafts.filter(d => slugSet.has(d.slide))
     if (!frames.length) throw new Error("No frames to send")
@@ -359,7 +366,7 @@ export function ReviewProvider({ deckId, slugs, slideSize, enabled, agentBusy, o
       note: stripWhitespace(note) || null,
       comments: frames.map(d => ({ name: d.name, slide: d.slide, rect: roundRect(d.rect, currentSize), text: stripWhitespace(d.text) })),
     }
-    const created = await createReview(forDeck, submission, token ?? "")
+    const created = build ? await build(submission) : await createReview(forDeck, submission, token ?? "")
     const sent = new Set(frames.map(f => f.name))
     update(cur => {
       if (cur.deckId !== forDeck) return cur
