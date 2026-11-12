@@ -312,6 +312,9 @@ def extract_freeform_element(shape, theme_colors=None, color_mapping=None, build
         # Line
         line_info = _extract_line_from_xml(sp_pr, theme_colors, color_mapping)
         elem.update(line_info)
+        dash = extract_line_dash(shape)
+        if dash:
+            elem["dashStyle"] = dash
 
         # Line opacity
         ln = sp_pr.find(f'.//{{{_NS["a"]}}}ln')

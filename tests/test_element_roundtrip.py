@@ -172,7 +172,10 @@ class TestShapeLine:
         out = _one(tmp_path, _shape(line="#FFFFFF", lineWidth=3))
         assert (out["line"], out["lineWidth"]) == ("#FFFFFF", 3.0)
 
-    @pytest.mark.parametrize("dash", ["dash", "dot", "square_dot", "sysDashDot"])
+    @pytest.mark.parametrize("dash", [
+        "dash", "dot", "square_dot", "sysDashDot",
+        "dash_dot", "dash_dot_dot", "long_dash", "long_dash_dot",
+    ])
     def test_dash_style_survives_a_second_build(self, tmp_path, dash):
         # The extractor writes the OOXML name (dot → sysDot); what matters is
         # that rebuilding the extracted JSON draws the same dash.
@@ -295,6 +298,10 @@ class TestFreeform:
         out = _one(tmp_path, _freeform(gradient=GRADIENT, line="#FFFFFF", path=CLOSED_PATH))
         assert out["gradient"]["angle"] == 45
 
+    @pytest.mark.parametrize("dash", ["dash", "long_dash"])
+    def test_dash_style_survives_a_second_build(self, tmp_path, dash):
+        _assert_dash_stable(tmp_path, _freeform(line="#FFFFFF", dashStyle=dash, path=CLOSED_PATH))
+
     def test_text_survives(self, tmp_path):
         out = _one(tmp_path, _freeform(fill="#FF0000", path=CLOSED_PATH, text="hi",
                                        fontColor="#00FF00", align="right", verticalAlign="bottom"))
@@ -352,7 +359,7 @@ class TestConnector:
         assert (out["arrowStart"], out["arrowEnd"]) == ("oval", "stealth")
         assert (out["arrowEndWidth"], out["arrowStartLength"]) == ("lg", "sm")
 
-    @pytest.mark.parametrize("dash", ["dash", "dot", "sysDot"])
+    @pytest.mark.parametrize("dash", ["dash", "dot", "sysDot", "dash_dot", "long_dash"])
     def test_dash_style_survives_a_second_build(self, tmp_path, dash):
         _assert_dash_stable(tmp_path, _line(dashStyle=dash))
 

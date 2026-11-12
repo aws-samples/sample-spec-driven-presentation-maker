@@ -41,6 +41,11 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **Shape arrowheads survive a read-back.** `pptx_to_json` wrote a shape's arrowheads as
   `headEnd` / `tailEnd` (the freeform keys), which the shape builder does not read, so
   rebuilding the JSON dropped them. Shapes now get `arrowStart` / `arrowEnd`.
+- **Dash styles survive a read-back.** `pptx_to_json` writes a line's dash under its OOXML
+  name (`lgDash`, `dashDot`, `lgDashDot`, …), but the builder accepted only the friendly
+  names and the `sys*` ones, so rebuilding the JSON drew those lines solid. Freeforms lost
+  their dash entirely: it was never extracted. The builder now accepts every OOXML preset
+  dash name, and freeforms extract `dashStyle`.
 
 ## [0.15.0] - 2026-11-12
 
