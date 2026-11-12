@@ -18,6 +18,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **Chart titles keep their font colour and size when a deck is read back.** `pptx_to_json`
   looked for the title font only on the title's first run, but generated charts (and many
   others) set it on the paragraph, so `titleFontColor` and `titleFontSize` were dropped.
+- **Pie and donut charts keep their slice colours after a `--minimal` conversion.** The
+  converter writes slice colours as `pointColors`, but the builder read only `colors` for pie
+  and donut charts, so rebuilding such JSON fell back to the theme palette. Both keys work
+  now (`colors` wins when both are given).
 
 ## [0.15.0] - 2026-11-12
 

@@ -331,9 +331,13 @@ class ChartMixin:
             rgb = RGBColor.from_string(color_str)
     
             if chart_type in ("pie", "donut"):
+                s0 = series_defs[0] if series_defs else {}
+                pc = s0.get("colors") or []
+                # pointColors is what the converter emits for pie/donut
+                pt_map = s0.get("pointColors") or {}
                 for j, point in enumerate(series.points):
-                    pc = series_defs[0].get("colors", []) if series_defs else []
-                    c = pc[j].lstrip("#") if j < len(pc) else default_series_colors[j % len(default_series_colors)]
+                    c = pc[j] if j < len(pc) else pt_map.get(str(j), pt_map.get(j))
+                    c = c.lstrip("#") if c else default_series_colors[j % len(default_series_colors)]
                     point.format.fill.solid()
                     point.format.fill.fore_color.rgb = RGBColor.from_string(c)
             elif chart_type == "line":
