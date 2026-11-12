@@ -22,6 +22,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   converter writes slice colours as `pointColors`, but the builder read only `colors` for pie
   and donut charts, so rebuilding such JSON fell back to the theme palette. Both keys work
   now (`colors` wins when both are given).
+- The animated slide preview in the Web UI shows a picture that appears more than once in
+  the deck, such as a logo on the slide master or one picture on several slides. LibreOffice
+  exports every repeat as a reference to an image it never names, so only the first copy
+  was drawn; the thumbnails were unaffected.
+- The animated slide preview no longer shows a layout placeholder's prompt text (the
+  Title Slide layout's "Subtitle") behind a slide, whether or not the slide fills that
+  placeholder in. The thumbnails never showed it.
 
 ## [0.15.0] - 2026-11-12
 

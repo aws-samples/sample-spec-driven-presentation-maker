@@ -112,6 +112,52 @@ _TEXT_LENGTH_SVG = """\
 """
 
 
+# LibreOffice writes a bitmap once as <image> and later copies as <use href="#bitmap(N)">
+# without giving the <image> that id (seen with LibreOffice 26.2): here the same logo on two
+# master pages, and the same picture on two slides (second one moved right by 2778).
+_IMG = "data:image/jpeg;base64,/9j/4AAQ"
+_BITMAP_USE_SVG = f"""\
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns:ooo="http://xml.openoffice.org/svg/export" viewBox="0 0 28000 15750">
+  <defs>
+    <g id="ooo:meta_slides">
+      <g id="ooo:meta_slide_0" ooo:master="m1"/>
+      <g id="ooo:meta_slide_1" ooo:master="m2"/>
+    </g>
+  </defs>
+  <defs>
+    <g id="m1" class="Master_Slide">
+      <g class="Background"><path fill="rgb(255,255,255)" d="M0,0 h28000 v15750 h-28000 z"/></g>
+      <g class="BackgroundObjects"><g class="Graphic"><g>
+        <rect class="BoundingBox" x="0" y="0" width="8467" height="4763"/>
+        <image x="0" y="0" width="8467" height="4763" preserveAspectRatio="none" xlink:href="{_IMG}"/>
+      </g></g></g>
+    </g>
+    <g id="m2" class="Master_Slide">
+      <g class="Background"><path fill="rgb(255,255,255)" d="M0,0 h28000 v15750 h-28000 z"/></g>
+      <g class="BackgroundObjects"><g class="Graphic"><g>
+        <rect class="BoundingBox" x="0" y="0" width="8467" height="4763"/>
+        <use xlink:href="#bitmap(3415900103)"/>
+      </g></g></g>
+    </g>
+  </defs>
+  <g class="Slide"><g class="Page"/></g>
+  <g class="Slide"><g class="Page">
+    <g class="Graphic"><g>
+      <rect class="BoundingBox" x="2778" y="2778" width="5556" height="3125"/>
+      <image x="2778" y="2778" width="5556" height="3125" preserveAspectRatio="none" xlink:href="{_IMG}"/>
+    </g></g>
+  </g></g>
+  <g class="Slide"><g class="Page">
+    <g class="Graphic"><g>
+      <rect class="BoundingBox" x="5556" y="2778" width="5556" height="3125"/>
+      <use transform="translate(-2778, 0)" xlink:href="#bitmap(767664673)"/>
+    </g></g>
+  </g></g>
+</svg>
+"""
+
+
 def _write_svg(content: str) -> Path:
     """Write SVG to a temp file and return its path."""
     f = tempfile.NamedTemporaryFile(suffix=".svg", mode="w", delete=False)
@@ -173,6 +219,89 @@ class TestSplitSlideComponentsRootAttrs:
         tree = load_svg(svg_path)
         extract_optimized_defs(tree)
         assert split_slide_components(tree, 0) == split_slide_components(svg_path, 0)
+
+
+class TestDanglingBitmapUse:
+    """A repeated bitmap LibreOffice wrote as a <use> with no target is drawn again."""
+
+    def test_master_background_logo_on_second_master(self):
+        result = split_slide_components(_write_svg(_BITMAP_USE_SVG), 2)
+
+        assert "<use" not in result["bgSvg"]
+        assert 'x="0" y="0" width="8467" height="4763"' in result["bgSvg"]
+        assert "data:image/" in result["bgSvg"]
+
+    def test_repeated_picture_on_slide(self):
+        svg = split_slide_components(_write_svg(_BITMAP_USE_SVG), 2)["components"][0]["svg"]
+
+        assert "<use" not in svg
+        assert 'x="5556" y="2778" width="5556" height="3125"' in svg
+
+    def test_ambiguous_source_left_alone(self):
+        """Two different earlier images fit the geometry: no guess is made."""
+        first = f'<image x="0" y="0" width="8467" height="4763" preserveAspectRatio="none" xlink:href="{_IMG}"/>'
+        other = _BITMAP_USE_SVG.replace(first, first + first.replace(_IMG, "data:image/jpeg;base64,AAAA"), 1)
+        tree = load_svg(_write_svg(other))
+        uses = tree.getroot().findall(".//{http://www.w3.org/2000/svg}use")
+
+        assert [u.get("{http://www.w3.org/1999/xlink}href") for u in uses] == ["#bitmap(3415900103)"]
+
+
+class TestLayoutPlaceholderPrompt:
+    """A layout placeholder's prompt text never reaches the slide background."""
+
+    # LibreOffice keeps the Title Slide layout's subtitle placeholder (with its prompt text)
+    # in the master page's BackgroundObjects; footer chrome there is real slide content.
+    _SVG = """\
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:ooo="http://xml.openoffice.org/svg/export"
+     viewBox="0 0 28000 15750">
+  <defs>
+    <g id="ooo:meta_slides">
+      <g id="ooo:meta_slide_0" ooo:master="m1"/>
+      <g id="ooo:meta_slide_1" ooo:master="m1"/>
+    </g>
+  </defs>
+  <defs>
+    <g id="m1" class="Master_Slide">
+      <g class="Background"><path fill="rgb(0,0,0)" d="M0,0 h28000 v15750 h-28000 z"/></g>
+      <g class="BackgroundObjects">
+        <g class="Graphic"><g><rect class="BoundingBox" x="0" y="0" width="10" height="10"/>
+          <path fill="red" d="M0,0 h10 v10 h-10 z"/></g></g>
+        <g class="com.sun.star.presentation.SubtitleShape"><g id="id13">
+          <rect class="BoundingBox" x="1905" y="10795" width="27112" height="2153"/>
+          <text><tspan>Subtitle</tspan></text></g></g>
+        <g class="DateTime"><g><text><tspan>11/12/26</tspan></text></g></g>
+        <g class="Footer"><g><text><tspan>Confidential</tspan></text></g></g>
+        <g class="PageNumber"><g><text><tspan>7</tspan></text></g></g>
+      </g>
+    </g>
+  </defs>
+  <g class="Slide"><g class="Page"/></g>
+  <g class="Slide"><g class="Page"/></g>
+  <g class="Slide"><g class="Page">
+    <g class="com.sun.star.presentation.SubtitleShape"><g>
+      <rect class="BoundingBox" x="1905" y="10795" width="27112" height="2153"/>
+      <text><tspan>Real subtitle</tspan></text></g></g>
+  </g></g>
+</svg>
+"""
+
+    def test_empty_subtitle_prompt_not_in_background(self):
+        result = split_slide_components(_write_svg(self._SVG), 1)
+
+        assert "Subtitle" not in result["bgSvg"]
+        assert 'fill="red"' in result["bgSvg"]
+
+    def test_filled_subtitle_prompt_not_under_slide_text(self):
+        result = split_slide_components(_write_svg(self._SVG), 2)
+
+        assert "Subtitle" not in result["bgSvg"]
+        assert [c["text"] for c in result["components"]] == ["Real subtitle"]
+
+    def test_footer_chrome_kept(self):
+        bg = split_slide_components(_write_svg(self._SVG), 1)["bgSvg"]
+
+        assert "11/12/26" in bg and "Confidential" in bg and ">7<" in bg
 
 
 class TestTextLengthStripped:
