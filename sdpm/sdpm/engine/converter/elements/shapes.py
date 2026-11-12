@@ -492,9 +492,9 @@ def extract_shape_element(shape, theme_colors=None, color_mapping=None, theme_st
             dash = extract_line_dash(shape)
             if dash:
                 elem["dashStyle"] = dash
-            # Arrow heads
+            # Arrow heads (shape JSON names them arrowStart / arrowEnd)
             if ln_xml is not None:
-                for attr, tag in [("headEnd", "headEnd"), ("tailEnd", "tailEnd")]:
+                for attr, tag in [("arrowStart", "headEnd"), ("arrowEnd", "tailEnd")]:
                     el = ln_xml.find(f'{{{_NS["a"]}}}{tag}')
                     if el is not None and el.get('type') and el.get('type') != 'none':
                         elem[attr] = el.get('type')

@@ -38,6 +38,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **Block arcs keep their angles when a deck is read back.** `pptx_to_json` converted `arc`
   adjustments back to `[start, sweep]` but returned `block_arc` ones raw, so rebuilding the
   JSON drew a different ring.
+- **Shape arrowheads survive a read-back.** `pptx_to_json` wrote a shape's arrowheads as
+  `headEnd` / `tailEnd` (the freeform keys), which the shape builder does not read, so
+  rebuilding the JSON dropped them. Shapes now get `arrowStart` / `arrowEnd`.
 
 ## [0.15.0] - 2026-11-12
 

@@ -195,6 +195,11 @@ class TestShapeTransformAndLink:
     def test_link_survives(self, tmp_path):
         assert _one(tmp_path, _shape(link="https://example.com"))["link"] == "https://example.com"
 
+    def test_arrow_heads_survive(self, tmp_path):
+        out = _one(tmp_path, _shape(shape="arc", fill="none", line="#FFFFFF",
+                                    arrowStart="triangle", arrowEnd="oval"))
+        assert (out["arrowStart"], out["arrowEnd"]) == ("triangle", "oval")
+
     def test_no_theme_style_when_effects_off(self, tmp_path):
         (sp,) = _built_shapes(tmp_path, [_shape(_noEffects=True)])
         assert sp._element.find(f"{_P}style") is None
