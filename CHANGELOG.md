@@ -13,6 +13,24 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Added
+
+- **Cloud: programmatic access, for automation that creates decks as you.** A new opt-in
+  Cognito app client (`auth.programmaticClient` in `infra/config.yaml`, off by default;
+  default Cognito user pool only) lets a script, cron job, Lambda function or Step
+  Functions state machine create decks as the signed-in user: public client,
+  authorization code + PKCE, callback `http://127.0.0.1:8765`, refresh tokens valid for
+  `refreshTokenValidityDays` (default 90) without rotation. When on, the Agent Runtime and
+  the REST API accept the client's ID; when off, nothing changes. `GET /decks` items now
+  carry the owner's `chatSessionId`, so a client finds the deck its session created with
+  one call. A reference client (`examples/programmatic-client/`) signs in once in a
+  browser, keeps the refresh token in a 0600 file or AWS Secrets Manager, starts a deck
+  (`run`) and reports it (`status`): `running` until the session's work period has ended,
+  then `done` when the deck has a PPTX, or `needs_input`, `failed` or `cancelled`.
+  [Programmatic Access](docs/en/programmatic-access.md)
+  ([日本語](docs/ja/programmatic-access.md)) describes the contract and a Lambda + Step
+  Functions setup. (#574)
+
 ### Fixed
 
 - **Cloud: a deck keeps its chat history when the tab closes during creation.** The link

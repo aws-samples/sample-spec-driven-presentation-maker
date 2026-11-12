@@ -56,6 +56,11 @@ interface WebUiStackProps extends cdk.StackProps {
   allowedIpV4AddressRanges?: string[];
   /** Allowed IPv6 CIDR ranges for regional WAF. */
   allowedIpV6AddressRanges?: string[];
+  /**
+   * auth.programmaticClient is enabled: the REST API also accepts tokens of the
+   * programmatic client (its ID read from SSM, published by AuthStack).
+   */
+  programmaticClient?: boolean;
   /** Default model ID for the chat task (for "Default" badge in Settings). */
   defaultChatModelId: string;
   /** Default model ID for the create task (for "Default" badge in Settings). */
@@ -330,8 +335,12 @@ function handler(event) {
     });
 
     const issuerUrl = `https://cognito-idp.${this.region}.amazonaws.com/${userPoolId}`;
+    // The programmatic client (auth.programmaticClient) is an audience only while enabled.
+    const jwtAudience = props.programmaticClient
+      ? [webClientId, ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.programmaticClientId)]
+      : [webClientId];
     const jwtAuthorizer = new apigatewayv2_authorizers.HttpJwtAuthorizer("CognitoJwt", issuerUrl, {
-      jwtAudience: [webClientId],
+      jwtAudience,
     });
 
     const lambdaIntegration = new apigatewayv2_integrations.HttpLambdaIntegration("ApiIntegration", apiLambda);

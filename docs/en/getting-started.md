@@ -401,3 +401,4 @@ Other messages from 0.13.0 on:
 - [Deploy guide](deploy-cloudshell.md): run SDPM on AWS for a team (One-Click Deploy, no local CDK or Docker)
 - [Developer guide](developer-guide.md): work from a checkout, deploy with CDK
 - [Architecture](architecture.md): how the parts fit together
+- [Programmatic Access](programmatic-access.md): create decks as yourself from scripts, Lambda or Step Functions (Cloud)

@@ -75,6 +75,8 @@ def test_list_public_has_no_owner_id(monkeypatch, index):  # noqa: F811
     assert [d["deckId"] for d in result["decks"]] == ["d1"]
     assert OWNER not in json.dumps(result)
     assert "createdBy" not in result["decks"][0]
+    assert SESSION not in json.dumps(result)
+    assert "chatSessionId" not in result["decks"][0]
 
 
 def test_deck_summary_has_no_created_by(index):  # noqa: F811

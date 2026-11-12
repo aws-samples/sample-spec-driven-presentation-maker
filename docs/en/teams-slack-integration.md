@@ -98,6 +98,9 @@ To call the Agent from a bot with the `client_credentials` flow, add the client 
 > is the client ID. Every deck the bot creates is owned by that client ID (a service
 > account), not by the Slack or Teams user who asked for it, and every user of the bot
 > works on the same set of decks.
+>
+> For automation that creates decks as one particular person (your own bot, for example),
+> use the programmatic client instead: see [Programmatic Access](programmatic-access.md).
 
 With the client in place, the bot gets a token like this:
 

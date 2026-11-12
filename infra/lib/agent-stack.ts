@@ -43,6 +43,11 @@ interface AgentStackProps extends cdk.StackProps {
    * reference to AuthStack that would trigger a cross-stack CFN export.
    */
   useAuthStack: boolean;
+  /**
+   * auth.programmaticClient is enabled: also accept the programmatic client ID
+   * (read from SSM, published by AuthStack). AuthStack mode only.
+   */
+  programmaticClient?: boolean;
   /** Bedrock model ID for the chat (conversation/planning) task. */
   chatModelId?: string;
   /** Bedrock model ID for the create (generation) task. */
@@ -207,9 +212,15 @@ export class AgentStack extends cdk.Stack {
 
     // When AuthStack is in play, read the WebClient ID from SSM and include it
     // in the allowedClients list. This avoids direct AuthStack construct
-    // references that would trigger cross-stack CFN exports.
+    // references that would trigger cross-stack CFN exports. The programmatic
+    // client (auth.programmaticClient) is added only while it is enabled.
     const allowedClients = props.useAuthStack
-      ? [ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.webClientId)]
+      ? [
+          ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.webClientId),
+          ...(props.programmaticClient
+            ? [ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.programmaticClientId)]
+            : []),
+        ]
       : props.allowedClients;
     const discoveryUrl = props.useAuthStack
       ? ssm.StringParameter.valueForStringParameter(this, AUTH_SSM_PARAMS.oidcDiscoveryUrl)
