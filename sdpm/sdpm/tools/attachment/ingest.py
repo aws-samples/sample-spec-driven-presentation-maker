@@ -238,14 +238,16 @@ def _convert_pdf(file_path: Path, output_dir: Path, images_dir: Path) -> Convers
     )
 
 
+def _md_cell(text: str | None) -> str:
+    """One Markdown table cell: '|' escaped, line breaks as spaces."""
+    return re.sub(r"\r\n|\r|\n", " ", (text or "").replace("|", "\\|"))
+
+
 def _rows_to_md_table(rows: list[list]) -> str:
-    """Convert table rows to Markdown table string."""
+    """Convert table rows (raw cell text) to Markdown table string."""
     if not rows:
         return ""
-    # Sanitize cells
-    clean = []
-    for row in rows:
-        clean.append([(cell or "").replace("|", "\\|").replace("\n", " ") for cell in row])
+    clean = [[_md_cell(cell) for cell in row] for row in rows]
 
     header = "| " + " | ".join(clean[0]) + " |"
     sep = "| " + " | ".join("---" for _ in clean[0]) + " |"
@@ -315,8 +317,7 @@ def _convert_docx(file_path: Path, output_dir: Path, images_dir: Path) -> Conver
             table = Table(element, doc)
             rows: list[list[str]] = []
             for row in table.rows:
-                cells = [cell.text.strip().replace("|", "\\|").replace("\n", " ") for cell in row.cells]
-                rows.append(cells)
+                rows.append([cell.text.strip() for cell in row.cells])  # escaped by _rows_to_md_table
             if rows:
                 lines.append(_rows_to_md_table(rows))
                 lines.append("")
@@ -375,16 +376,8 @@ def _convert_xlsx(file_path: Path, output_dir: Path, images_dir: Path) -> Conver
             rows = list(ws.iter_rows(values_only=True))
             if not rows:
                 continue
-            lines: list[str] = [f"## {ws.title}"]
-            # Header
-            header = [str(c) if c is not None else "" for c in rows[0]]
-            lines.append("| " + " | ".join(header) + " |")
-            lines.append("| " + " | ".join("---" for _ in header) + " |")
-            # Data rows
-            for row in rows[1:]:
-                cells = [str(c) if c is not None else "" for c in row]
-                lines.append("| " + " | ".join(cells) + " |")
-            md_parts.append("\n".join(lines))
+            cells = [[str(c) if c is not None else "" for c in row] for row in rows]
+            md_parts.append(f"## {ws.title}\n{_rows_to_md_table(cells)}")
     finally:
         wb.close()
 
