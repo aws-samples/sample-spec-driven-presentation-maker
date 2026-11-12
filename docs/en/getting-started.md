@@ -243,6 +243,8 @@ You can mark what to change directly on the slides and send it as one change req
 
 The agent sends one composer per slide to make the changes and replies to each comment.
 The Comment tool is available on desktop only, in Local mode and on the AWS stack.
+The same tool works on your own styles from the Styles page, and the style agent changes
+only the slides you commented on.
 
 ![Comment frames on a slide in the Web UI, with the change request above the chat input](../assets/screenshots/webui-comments.png)
 

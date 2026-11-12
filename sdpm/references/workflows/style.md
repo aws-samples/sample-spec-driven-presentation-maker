@@ -225,3 +225,7 @@ The demo slides are read as coordinates, so the format is constrained:
   the reference deck should be inspected slide by slide.
 - Token choices must survive conversion to PPTX: when the environment offers it, apply the
   style to a sample deck, build and preview before finishing.
+- A change request from the style preview lists the commented slides by number and title,
+  each comment with its frame in slide px and its text. Change only the slides that carry a
+  comment and keep every other slide as it is, then save the style, and reply with what
+  changed for each comment, by name.
