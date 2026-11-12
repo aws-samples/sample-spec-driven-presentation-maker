@@ -29,6 +29,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - The animated slide preview no longer shows a layout placeholder's prompt text (the
   Title Slide layout's "Subtitle") behind a slide, whether or not the slide fills that
   placeholder in. The thumbnails never showed it.
+- The style preview shows the agent's latest save right away. It used to redraw from the
+  style list loaded before that save, so each change appeared only after the next save or a
+  reload.
 
 ## [0.15.0] - 2026-11-12
 
