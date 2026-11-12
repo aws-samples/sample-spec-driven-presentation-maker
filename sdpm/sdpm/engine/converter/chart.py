@@ -37,19 +37,22 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
         try:
             elem["title"] = chart.chart_title.text_frame.text
             # Extract title font color if explicit
-            runs = chart.chart_title.text_frame.paragraphs[0].runs
-            if runs:
-                from pptx.oxml.ns import qn as _qn
-                rPr = runs[0]._r.find(_qn('a:rPr'))
-                if rPr is not None:
-                    sf = rPr.find(_qn('a:solidFill'))
-                    if sf is not None:
-                        srgb = sf.find(_qn('a:srgbClr'))
-                        if srgb is not None:
-                            elem["titleFontColor"] = _hex(srgb)
-                    sz = rPr.get('sz')
-                    if sz:
-                        elem["titleFontSize"] = int(sz) // 100
+            from pptx.oxml.ns import qn as _qn
+            para = chart.chart_title.text_frame.paragraphs[0]
+            runs = para.runs
+            rPr = runs[0]._r.find(_qn('a:rPr')) if runs else None
+            if rPr is None:
+                # paragraph.font (what the builder sets) lives in pPr/defRPr
+                rPr = para._p.find(f"{_qn('a:pPr')}/{_qn('a:defRPr')}")
+            if rPr is not None:
+                sf = rPr.find(_qn('a:solidFill'))
+                if sf is not None:
+                    srgb = sf.find(_qn('a:srgbClr'))
+                    if srgb is not None:
+                        elem["titleFontColor"] = _hex(srgb)
+                sz = rPr.get('sz')
+                if sz:
+                    elem["titleFontSize"] = int(sz) // 100
         except Exception:
             pass
 
