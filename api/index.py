@@ -246,19 +246,21 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
     return extras
 
 
-def _deck_summary(item: Dict, extras: Dict[str, Dict]) -> Dict[str, Any]:
+def _deck_summary(item: Dict, extras: Dict[str, Dict], owner: bool = False) -> Dict[str, Any]:
     """Build a consistent deck summary dict from a DDB item.
 
     Args:
         item: DDB deck record.
         extras: Output of _get_deck_extras.
+        owner: The caller owns the deck; adds its ``chatSessionId`` (None when the
+            deck has no chat link), so a client can find the deck its session created.
 
     Returns:
         Deck summary dict with all standard fields.
     """
     deck_id = extract_deck_id(item["SK"])
     ex = extras.get(deck_id, {})
-    return {
+    summary = {
         "deckId": deck_id,
         "name": item.get("name", "Untitled"),
         "slideCount": item.get("slideCount", 0),
@@ -266,6 +268,9 @@ def _deck_summary(item: Dict, extras: Dict[str, Dict]) -> Dict[str, Any]:
         "thumbnailUrl": ex.get("thumbnailUrl"),
         "visibility": item.get("visibility", "private"),
     }
+    if owner:
+        summary["chatSessionId"] = _chat_session_id(item)
+    return summary
 
 
 # ---------------------------------------------------------------------------
@@ -814,7 +819,7 @@ def list_decks() -> Dict[str, Any]:
     )
     favorite_ids = [extract_fav_id(item["SK"]) for item in fav_resp.get("Items", [])]
 
-    decks = [_deck_summary(item, extras) for item in items]
+    decks = [_deck_summary(item, extras, owner=True) for item in items]
     decks.sort(key=lambda d: d["updatedAt"], reverse=True)
     return {"decks": decks, "favoriteIds": favorite_ids}
 
