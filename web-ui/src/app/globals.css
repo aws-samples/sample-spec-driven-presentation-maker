@@ -1202,6 +1202,19 @@ body {
   animation: msg-assistant-enter 0.3s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
+/* A steer the agent just read: its bubble glows once where it landed */
+@keyframes steer-arrived {
+  0%   { box-shadow: 0 0 0 0 color-mix(in oklch, var(--brand) 0%, transparent); }
+  20%  { box-shadow: 0 0 0 3px color-mix(in oklch, var(--brand) 35%, transparent); }
+  100% { box-shadow: 0 0 0 6px color-mix(in oklch, var(--brand) 0%, transparent); }
+}
+.steer-arrived {
+  animation: steer-arrived 1.6s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .steer-arrived { animation: none; outline: 2px solid color-mix(in oklch, var(--brand) 35%, transparent); outline-offset: 1px; }
+}
+
 /* --- AnimatedSlidePreview keyframes --- */
 @keyframes asp-wf-drag {
   0%   { clip-path: inset(0 100% 100% 0); }
