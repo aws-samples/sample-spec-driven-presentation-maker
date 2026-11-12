@@ -21,6 +21,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **Local Web UI: deck files are served with `nosniff` and a sandbox CSP.** Images, JSON
   and PPTX files from a deck (`/api/preview/…`) now carry the same kind of protection the
   HTML previews already had.
+- **Local Web UI: `npm run start` listens on 127.0.0.1 only.** Started by hand, `next start`
+  used to listen on every interface; `sdpm webui` already passed `--hostname 127.0.0.1`.
 - **Cloud: a deck keeps its chat history when the tab closes during creation.** The link
   from a deck to the chat that created it (`chatSessionId`) was written only by the
   browser after the deck appeared; closing the tab or a failed request before then left

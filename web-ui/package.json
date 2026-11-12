@@ -8,7 +8,7 @@
     "dev:local": "NEXT_PUBLIC_MODE=local next dev --turbopack --hostname 127.0.0.1",
     "build": "node scripts/next-build.mjs",
     "build:cloud": "bash -c 'trap \"mv src/app/_api src/app/api 2>/dev/null; mv src/_proxy.ts src/proxy.ts 2>/dev/null\" EXIT; mv src/app/api src/app/_api && mv src/proxy.ts src/_proxy.ts && next build'",
-    "start": "next start",
+    "start": "next start --hostname 127.0.0.1",
     "lint": "eslint src/",
     "lint:fix": "eslint src/ --fix",
     "test": "vitest run",
