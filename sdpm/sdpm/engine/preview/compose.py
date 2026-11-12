@@ -49,13 +49,72 @@ def _strip_fonts(defs_el: etree._Element) -> None:
         font.getparent().remove(font)
 
 
+XLINK_HREF = "{http://www.w3.org/1999/xlink}href"
+_BITMAP_REF_RE = re.compile(r"#bitmap\(\d+\)")
+_TRANSLATE_RE = re.compile(r"translate\(\s*(-?[\d.]+)[\s,]+(-?[\d.]+)\s*\)")
+_SCALE_RE = re.compile(r"scale\(\s*(-?[\d.eE+-]+)[\s,]+(-?[\d.eE+-]+)\s*\)")
+
+
+def _repair_bitmap_refs(root: etree._Element) -> None:
+    """Replace LibreOffice's dangling ``<use xlink:href="#bitmap(N)">`` with the image it means.
+
+    LibreOffice writes a bitmap's first occurrence as an inline ``<image>`` and every later
+    occurrence of the same bitmap (the same logo on another layout, the same picture on
+    another slide) as ``<use xlink:href="#bitmap(N)" transform="translate(source - point)
+    scale(size / source)">``, but never gives the first ``<image>`` that id, so the copies draw
+    nothing. The source is the earlier ``<image>`` whose rect, run through that transform,
+    lands on the shape's BoundingBox. Ambiguous or unmatched references are left as they are.
+    """
+    images = []  # (x, y, w, h, href) of inline images, in document order
+    for el in root.iter(f"{{{SVG_NS}}}image", f"{{{SVG_NS}}}use"):
+        if el.tag == f"{{{SVG_NS}}}image":
+            try:
+                images.append(tuple(float(el.get(a, "")) for a in ("x", "y", "width", "height"))
+                              + (el.get(XLINK_HREF),))
+            except ValueError:
+                pass
+            continue
+        ref = el.get(XLINK_HREF, "")
+        if not _BITMAP_REF_RE.fullmatch(ref) or root.find(f".//*[@id='{ref[1:]}']") is not None:
+            continue
+        bbox = el.getparent().find(f"{{{SVG_NS}}}rect[@class='BoundingBox']")
+        if bbox is None:
+            continue
+        try:
+            box = tuple(float(bbox.get(a, "")) for a in ("x", "y", "width", "height"))
+        except ValueError:
+            continue
+        transform = el.get("transform", "")
+        t = _TRANSLATE_RE.search(transform)
+        s = _SCALE_RE.search(transform)
+        sx, sy = (float(s.group(1)), float(s.group(2))) if s else (1.0, 1.0)
+        matches = []
+        for x, y, w, h, href in images:
+            # No translate means LibreOffice placed the copy at the origin.
+            px, py = (x - float(t.group(1)), y - float(t.group(2))) if t else (0.0, 0.0)
+            rect = (px, py, w * sx, h * sy)
+            if href and all(abs(a - b) <= 2 for a, b in zip(rect, box)):
+                matches.append((rect, href))
+        if len({href for _, href in matches}) != 1:
+            continue
+        (px, py, pw, ph), href = matches[0]
+        image = etree.Element(f"{{{SVG_NS}}}image", {
+            "x": f"{px:g}", "y": f"{py:g}", "width": f"{pw:g}", "height": f"{ph:g}",
+            "preserveAspectRatio": "none", XLINK_HREF: href,
+        })
+        image.tail = el.tail
+        el.getparent().replace(el, image)
+
+
 def load_svg(svg_path: Path) -> etree._ElementTree:
     """Parse a LibreOffice SVG once so several extractions can share the tree."""
-    return etree.parse(str(svg_path))
+    tree = etree.parse(str(svg_path))
+    _repair_bitmap_refs(tree.getroot())
+    return tree
 
 
 def _as_tree(svg: "Path | etree._ElementTree") -> etree._ElementTree:
-    return svg if isinstance(svg, etree._ElementTree) else etree.parse(str(svg))
+    return svg if isinstance(svg, etree._ElementTree) else load_svg(svg)
 
 
 def count_slides(svg_path: "Path | etree._ElementTree") -> int:
