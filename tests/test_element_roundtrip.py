@@ -106,6 +106,14 @@ class TestShapePresets:
                                     adjustments=[0, 90, False]))
         assert out["adjustments"] == [270.0, 90.0]
 
+    def test_block_arc_round_trip_is_stable(self, tmp_path):
+        elem = _shape(shape="block_arc", adjustments=[270, "50%", 0.2])
+        out = _one(tmp_path / "rt", elem)
+        assert out["adjustments"] == [270.0, 180.0, 0.2]
+        (first,) = _built_shapes(tmp_path / "first", [elem])
+        (second,) = _built_shapes(tmp_path / "second", [out])
+        assert list(second.adjustments) == list(first.adjustments)
+
 
 class TestArcAdjustmentConversion:
     """``_convert_arc_adjustments``: [start, sweep, …] → OOXML adj (deg × 0.6)."""

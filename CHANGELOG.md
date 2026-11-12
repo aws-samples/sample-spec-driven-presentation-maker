@@ -35,6 +35,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   ones PowerPoint may ignore; they are now sorted into schema order.
 - **Paragraph line spacing comes before bullets.** A textbox paragraph with both a `list` and
   `lineSpacingPct` wrote the spacing after the bullet properties, out of schema order.
+- **Block arcs keep their angles when a deck is read back.** `pptx_to_json` converted `arc`
+  adjustments back to `[start, sweep]` but returned `block_arc` ones raw, so rebuilding the
+  JSON drew a different ring.
 
 ## [0.15.0] - 2026-11-12
 

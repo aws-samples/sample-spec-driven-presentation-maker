@@ -394,14 +394,15 @@ def extract_shape_element(shape, theme_colors=None, color_mapping=None, theme_st
                         if fmla.startswith('val '):
                             adjs.append(round(int(fmla.split()[1]) / 100000, 5))
                     prst_name = prst_geom.get('prst')
-                    if prst_name == 'arc' and len(adjs) >= 2:
+                    if prst_name in ('arc', 'blockArc') and len(adjs) >= 2:
                         # Raw adj are angles in 60000ths of a degree, but the
                         # builder's arc API is [startDeg, sweepDeg] — feeding
-                        # raw values drew a 353° ring as ~40%.
+                        # raw values drew a 353° ring as ~40%. blockArc keeps
+                        # its third value (thickness) as is.
                         start_deg = round(adjs[0] * 100000 / 60000, 3)
                         end_deg = round(adjs[1] * 100000 / 60000, 3)
                         sweep = round((end_deg - start_deg) % 360, 3)
-                        adjs = [start_deg, sweep]
+                        adjs = [start_deg, sweep, *adjs[2:]]
                     if adjs:
                         elem["adjustments"] = adjs
         except Exception:
