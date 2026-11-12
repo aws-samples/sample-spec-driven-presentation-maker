@@ -38,6 +38,64 @@ export interface AuthStackProps extends cdk.StackProps {
    * case-insensitive match; subdomains are not included.
    */
   allowedEmailDomains?: string[];
+  /**
+   * The programmatic client (`auth.programmaticClient`), or undefined for none.
+   * See `normalizeProgrammaticClient`.
+   */
+  programmaticClient?: ProgrammaticClientSettings;
+}
+
+/** Settings of the programmatic client, validated by `normalizeProgrammaticClient`. */
+export interface ProgrammaticClientSettings {
+  /** How long a refresh token stays valid, in days. */
+  refreshTokenValidityDays: number;
+}
+
+/**
+ * The programmatic client's only callback and logout URL. The reference client
+ * (examples/programmatic-client) listens here on loopback for the one redirect of
+ * its sign-in. Cognito matches the URL exactly, port included.
+ */
+export const PROGRAMMATIC_CLIENT_CALLBACK_URL = "http://127.0.0.1:8765";
+
+/** Default refresh-token validity of the programmatic client. */
+export const PROGRAMMATIC_CLIENT_DEFAULT_REFRESH_DAYS = 90;
+
+/**
+ * Validate `auth.programmaticClient` and return its settings, or undefined when
+ * the block is absent or `enabled` is not true. Throws a config error for a
+ * malformed block, for a refresh-token validity outside Cognito's 1–3650 days,
+ * and for an enabled block with an external IdP (`useAuthStack: false`), which
+ * has no Cognito user pool to hold the client.
+ */
+export function normalizeProgrammaticClient(
+  raw: unknown,
+  useAuthStack: boolean,
+): ProgrammaticClientSettings | undefined {
+  if (raw === undefined || raw === null) return undefined;
+  if (typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error("Config error: auth.programmaticClient must be a mapping (enabled, refreshTokenValidityDays).");
+  }
+  const block = raw as { enabled?: unknown; refreshTokenValidityDays?: unknown };
+  const enabled = block.enabled ?? false;
+  if (typeof enabled !== "boolean") {
+    throw new Error("Config error: auth.programmaticClient.enabled must be true or false.");
+  }
+  if (!enabled) return undefined;
+  if (!useAuthStack) {
+    throw new Error(
+      "Config error: auth.programmaticClient needs the default Cognito user pool and does not work with " +
+      "auth.oidcDiscoveryUrl (external IdP). Remove auth.programmaticClient, or remove auth.oidcDiscoveryUrl " +
+      "to use the default Cognito user pool.",
+    );
+  }
+  const days = block.refreshTokenValidityDays ?? PROGRAMMATIC_CLIENT_DEFAULT_REFRESH_DAYS;
+  if (typeof days !== "number" || !Number.isInteger(days) || days < 1 || days > 3650) {
+    throw new Error(
+      "Config error: auth.programmaticClient.refreshTokenValidityDays must be a whole number of days from 1 to 3650.",
+    );
+  }
+  return { refreshTokenValidityDays: days };
 }
 
 /** One DNS name: labels of letters, digits and inner hyphens, at least two labels. */
@@ -80,6 +138,8 @@ export const AUTH_SSM_PARAMS = {
   oidcDiscoveryUrl: "/sdpm/auth/oidc-discovery-url",
   /** ARN of the function that sets the WebClient's callback/logout URLs. */
   webClientUrlsFnArn: "/sdpm/auth/web-client-urls-fn-arn",
+  /** Programmatic client ID; published only while auth.programmaticClient is enabled. */
+  programmaticClientId: "/sdpm/auth/programmatic-client-id",
 } as const;
 
 /**
@@ -226,6 +286,34 @@ export class AuthStack extends cdk.Stack {
         })
       : undefined;
 
+    // Programmatic client (auth.programmaticClient): an OAuth native-app client
+    // (RFC 8252) for the user's own automation. Public (no secret), code flow with
+    // PKCE, one loopback callback. Its refresh token stands in for the user in
+    // unattended runs, so its lifetime is its own setting; rotation stays off.
+    // The Agent runtime and the REST API accept its ID (AgentStack, WebUiStack);
+    // the MCP runtime checks the sdpm-mcp/invoke scope only.
+    // SRP stays allowed for the sign-in pages; plain-password API sign-in does not.
+    const programmatic = props?.programmaticClient;
+    const programmaticClient = programmatic
+      ? this.userPool.addClient("ProgrammaticClient", {
+          authFlows: { userSrp: true },
+          oAuth: {
+            flows: { authorizationCodeGrant: true },
+            scopes: [
+              cognito.OAuthScope.OPENID,
+              cognito.OAuthScope.PROFILE,
+              cognito.OAuthScope.EMAIL,
+              cognito.OAuthScope.resourceServer(mcpResourceServer, mcpScope),
+            ],
+            callbackUrls: [PROGRAMMATIC_CLIENT_CALLBACK_URL],
+            logoutUrls: [PROGRAMMATIC_CLIENT_CALLBACK_URL],
+          },
+          supportedIdentityProviders: [cognito.UserPoolClientIdentityProvider.COGNITO],
+          generateSecret: false,
+          refreshTokenValidity: cdk.Duration.days(programmatic.refreshTokenValidityDays),
+        })
+      : undefined;
+
     const issuer = `https://cognito-idp.${this.region}.amazonaws.com/${this.userPool.userPoolId}`;
     this.oidcDiscoveryUrl = `${issuer}/.well-known/openid-configuration`;
     this.clientId = this.userPoolClient.userPoolClientId;
@@ -272,12 +360,22 @@ export class AuthStack extends cdk.Stack {
       stringValue: this.oidcDiscoveryUrl,
       description: "OIDC discovery URL for JWT authorizers",
     });
+    if (programmaticClient) {
+      new ssm.StringParameter(this, "ProgrammaticClientIdParam", {
+        parameterName: AUTH_SSM_PARAMS.programmaticClientId,
+        stringValue: programmaticClient.userPoolClientId,
+        description: "Programmatic Cognito app client ID (auth.programmaticClient)",
+      });
+    }
 
     // --- Outputs ---
     new cdk.CfnOutput(this, "UserPoolId", { value: this.userPool.userPoolId });
     new cdk.CfnOutput(this, "UserPoolClientId", { value: this.clientId });
     if (mcpClient) {
       new cdk.CfnOutput(this, "McpClientId", { value: this.mcpClientId });
+    }
+    if (programmaticClient) {
+      new cdk.CfnOutput(this, "ProgrammaticClientId", { value: programmaticClient.userPoolClientId });
     }
     new cdk.CfnOutput(this, "OidcDiscoveryUrl", { value: this.oidcDiscoveryUrl });
 

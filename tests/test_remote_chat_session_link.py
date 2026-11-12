@@ -146,3 +146,31 @@ def test_get_chat_refuses_a_session_that_is_not_the_decks_chat(index, monkeypatc
     result, memory = _get_chat(index, monkeypatch, [{"createdInMcpSession": UUID, "createdBy": SUB}], UUID)
     assert result == {"messages": []}
     assert memory.calls == []
+
+
+class _ListTable:
+    """The deck query returns ``items``; the favorites query returns none."""
+
+    def __init__(self, items):
+        self.results = [items, []]
+
+    def query(self, **kwargs):
+        return {"Items": self.results.pop(0)}
+
+
+def test_list_decks_carries_the_owners_chat_link(index, monkeypatch):  # noqa: F811
+    # A programmatic client finds the deck its session created with this one call.
+    items = [
+        {"SK": index.deck_sk("d1"), "updatedAt": "3", "chatSessionId": "linked", "createdBy": SUB},
+        {"SK": index.deck_sk("d2"), "updatedAt": "2", "createdInMcpSession": OWN, "createdBy": SUB},
+        {"SK": index.deck_sk("d3"), "updatedAt": "1", "createdInMcpSession": UUID, "createdBy": SUB},
+        {"SK": index.deck_sk("d4"), "updatedAt": "0", "createdBy": SUB},
+    ]
+    monkeypatch.setattr(index, "table", _ListTable(items))
+    index.app.current_event = _Event(SUB)
+
+    result = index.list_decks()
+
+    assert {d["deckId"]: d["chatSessionId"] for d in result["decks"]} == {
+        "d1": "linked", "d2": OWN, "d3": None, "d4": None,
+    }

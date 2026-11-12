@@ -89,6 +89,12 @@ model:
 #   Checked by a Cognito Pre sign-up Lambda trigger; exact match, case-insensitive.
 #   Subdomains are not included: list each one. Omit or leave empty for any domain.
 #
+# programmaticClient: an OAuth client for your own automation (scripts, cron, Lambda,
+#   Step Functions) that creates decks as the signed-in user. Off by default; default
+#   Cognito user pool only. Public client, authorization code + PKCE, callback
+#   http://127.0.0.1:8765. refreshTokenValidityDays: how long one browser sign-in lasts
+#   (1-3650, default 90). See docs/en/programmatic-access.md.
+#
 # auth:
 #   enableDCR: true
 #   mcpCallbackUrls:
@@ -97,6 +103,9 @@ model:
 #   selfSignUp: false
 #   allowedEmailDomains:
 #     - example.com
+#   programmaticClient:
+#     enabled: false
+#     refreshTokenValidityDays: 90
 
 # WAF IP address restriction (optional).
 # When specified, only the listed IP ranges can access CloudFront and API Gateway.
