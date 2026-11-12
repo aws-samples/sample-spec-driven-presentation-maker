@@ -25,7 +25,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   carry the owner's `chatSessionId`, so a client finds the deck its session created with
   one call. A reference client (`examples/programmatic-client/`) signs in once in a
   browser, keeps the refresh token in a 0600 file or AWS Secrets Manager, starts a deck
-  (`run`) and reports it (`status`). [Programmatic Access](docs/en/programmatic-access.md)
+  (`run`) and reports it (`status`): `running` until the session's work period has ended,
+  then `done` when the deck has a PPTX, or `needs_input`, `failed` or `cancelled`.
+  [Programmatic Access](docs/en/programmatic-access.md)
   ([日本語](docs/ja/programmatic-access.md)) describes the contract and a Lambda + Step
   Functions setup. (#574)
 

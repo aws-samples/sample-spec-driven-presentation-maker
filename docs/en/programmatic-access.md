@@ -71,8 +71,8 @@ and takes three settings of its own, as options or environment variables:
 `login` saves these three settings (no token) in
 `~/.config/sdpm-programmatic-client/config.json`, so later commands need no options.
 
-Every command prints one JSON object. Exit codes: `0` done, `1` error, `2` usage, `3` the
-refresh token is expired, revoked or invalid (sign in again).
+Every command prints one JSON object. Exit codes: `0` success (whatever the `state`),
+`1` error, `2` usage, `3` the refresh token is expired, revoked or invalid (sign in again).
 
 ### login
 
@@ -116,12 +116,29 @@ Write the prompt so the agent does not need to ask anything: nobody is there to 
 
 ```bash
 uv run sdpm_client.py status c6c289e49e9c05b2-0f8c6a4e-...
-# {"sessionId": "...", "state": "done", "deckId": "...", "name": "...", "slideCount": 4, "hasPptx": true, "pptxUrl": "https://..."}
+# {"sessionId": "...", "state": "done", "working": false, "how": "finished", "reclaimed": false,
+#  "deckId": "...", "name": "...", "slideCount": 4, "hasPptx": true, "pptxUrl": "https://..."}
 ```
 
-`state` is `pending` (no deck yet), `in_progress` (the deck exists, no PPTX yet) or `done`
-(the PPTX exists). On dev a deck of 3–5 slides took 2–7 minutes; poll every minute or less
-often. `pptxUrl` is a signed download link that expires after a short time.
+`status` asks the session whether its work period has ended and how, then reads the deck.
+`state` is one of:
+
+| `state` | Meaning |
+|---|---|
+| `running` | The agent is still working. A PPTX may already exist, but the agent can still change it or rebuild it under a new name. |
+| `done` | The work period ended normally and the deck has a PPTX. |
+| `needs_input` | The work period ended normally without a PPTX. Most likely the agent asked a question: open the deck's chat in the Web UI. |
+| `failed` | The work period ended on an error, the one-hour limit, or a restart of the agent. |
+| `cancelled` | Someone pressed stop in the Web UI. |
+
+Every state except `running` is final. Poll once a minute or less often, and stop at a
+final state. On dev a deck of 3 slides took 4–6 minutes. Take `pptxUrl` from the
+`done` answer: it is a signed download link that expires after a short time.
+
+The agent releases a session 15 minutes after the last connection to it (`"reclaimed":
+true`). Nobody is working on a released session, so `status` reports `done` when its deck
+has a PPTX and `needs_input` when it has none. Asking about a released session starts a
+new agent instance for it, which takes about 2 seconds.
 
 ## The contract
 
@@ -155,17 +172,38 @@ another user's prefix.
   `{"ctl": "error", "code": "...", "error": "..."}`.
 - Disconnecting never cancels the job. To stay connected and watch instead, send
   `{"type": "ping"}` at least every 25 seconds and turn off the WebSocket library's
-  protocol pings. The job has finished when an event arrives with
-  `"ev": {"work": {"state": "idle"}}`. Events can come grouped in `{"batch": [...]}`
-  frames or split across `{"chunk": ...}` frames.
+  protocol pings. The job's work period has ended when an event arrives with
+  `"ev": {"work": {"state": "idle", "how": "..."}}`. Events can come grouped in
+  `{"batch": [...]}` frames or split across `{"chunk": ...}` frames that concatenate to the
+  event's JSON.
 
-**Finding the deck and knowing it is done (REST, `Authorization: Bearer <ID token>`).**
+**Knowing the job has ended (`/ws`).** The job is complete when the session's work period
+has ended, not when the deck first has a PPTX: the agent can keep working after that and
+rebuild the PPTX under a new name. The orchestrator's `turnEnd` event is not the end
+either: slide composing continues in the background after it.
+
+- Connect to the session's URL as above and send `{"type": "resume", "from_seq": <n>}`.
+  The agent answers `{"ctl": "resumeAck", "working": ..., "head": ..., "replay_from": ...}`,
+  then sends the session's events numbered after `n` (`{"seq": ..., "ev": ...}`) in the
+  current or last work period.
+- `"working": true`: the job is still running.
+- `"working": false` with `"head"` above 0: the period has ended, and its last event is
+  `{"work": {"state": "idle", "how": "..."}}`. Send `resume` again with `from_seq` a few
+  below `head` to read it. `how` is `finished`, `cancelled`, `error`, `watchdog` (the
+  one-hour limit) or `sigterm` (the agent restarted). If the replay holds no such event,
+  treat the job as still running.
+- `"working": false` with `"head": 0`: the agent no longer holds the session (released after
+  being idle). Nobody is working on it.
+- Ask no more often than once a minute. Each connection to a released session starts an
+  agent instance for it.
+
+**Finding the deck (REST, `Authorization: Bearer <ID token>`).**
 
 - `GET <apiBaseUrl>/decks`: the items carry `chatSessionId`; the job's deck is the one
   whose `chatSessionId` equals the job's session id.
-- `GET <apiBaseUrl>/decks/<deckId>`: `slideCount` and `pptxUrl`.
-- The job is complete when the deck has a PPTX (`pptxUrl` is set). The orchestrator's
-  `turnEnd` event is not completion: slide composing continues in the background after it.
+- `GET <apiBaseUrl>/decks/<deckId>`: `slideCount` and `pptxUrl` (set when the deck has a
+  PPTX). Read it after the work period has ended, and take the download link from that
+  answer.
 
 ## Lambda and Step Functions
 
@@ -189,15 +227,16 @@ def handler(event, context):
     return sdpm.job_status(settings, event["sessionId"])
 ```
 
-Set the timeout to 2 minutes. The execution role needs `secretsmanager:GetSecretValue` on
+Set the timeout to 3 minutes. The execution role needs `secretsmanager:GetSecretValue` on
 that one secret (and `kms:Decrypt` on its key when it is a customer managed key), and
 nothing else: the function calls SDPM with your tokens over HTTPS, not with IAM. If the
 deployment restricts IP addresses with WAF, the function's outbound addresses must be
 allowed.
 
-**State machine.** Start the job, poll once a minute until the deck has a PPTX, and send an
-alert when the refresh token has expired. A refused refresh token raises
-`RefreshTokenExpired`, which Step Functions sees as the error name:
+**State machine.** Start the job, poll once a minute while it is `running`, succeed on
+`done`, fail on any other final state, and send an alert when the refresh token has
+expired. A refused refresh token raises `RefreshTokenExpired`, which Step Functions sees as
+the error name:
 
 ```json
 {
@@ -224,10 +263,14 @@ alert when the refresh token has expired. A refused refresh token raises
     },
     "Done?": {
       "Type": "Choice",
-      "Choices": [{ "Variable": "$.state", "StringEquals": "done", "Next": "Done" }],
-      "Default": "Wait"
+      "Choices": [
+        { "Variable": "$.state", "StringEquals": "done", "Next": "Done" },
+        { "Variable": "$.state", "StringEquals": "running", "Next": "Wait" }
+      ],
+      "Default": "NotDone"
     },
     "Done": { "Type": "Succeed" },
+    "NotDone": { "Type": "Fail", "Error": "DeckNotDone", "Cause": "needs_input, failed or cancelled: open the deck's chat in the Web UI" },
     "SignInAgain": {
       "Type": "Task",
       "Resource": "arn:aws:states:::sns:publish",

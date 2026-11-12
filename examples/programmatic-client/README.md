@@ -18,11 +18,13 @@ uv run sdpm_client.py login --site https://xxxx.cloudfront.net --client-id <Prog
 
 # unattended
 uv run sdpm_client.py run "Make a 3-slide deck about ... Do not ask questions."
-uv run sdpm_client.py status <sessionId>
+uv run sdpm_client.py status <sessionId>   # once a minute until it is no longer "running"
 ```
 
-Every command prints one JSON object. Exit codes: `0` done, `1` error, `2` usage, `3` the
-refresh token is expired, revoked or invalid (run `login` again).
+Every command prints one JSON object. Exit codes: `0` success (whatever the `state`),
+`1` error, `2` usage, `3` the refresh token is expired, revoked or invalid (run `login`
+again).
 
 `tests/test_programmatic_client.py` covers the session id rule, the loopback-only listener,
-the token file mode and the exit code for a refused refresh token.
+the token file mode, the exit code for a refused refresh token, and how `status` reads the
+session's work period (`running`, `done`, `needs_input`, `failed`, `cancelled`).

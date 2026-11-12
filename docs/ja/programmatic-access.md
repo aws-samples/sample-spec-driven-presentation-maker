@@ -74,8 +74,8 @@ aws cloudformation describe-stacks --stack-name SdpmAuth \
 `~/.config/sdpm-programmatic-client/config.json` に保存するので、以降のコマンドには
 オプションが要りません。
 
-どのコマンドも JSON オブジェクトを 1 つ出力します。終了コード: `0` 完了、`1` エラー、
-`2` 使い方の誤り、`3` リフレッシュトークンが期限切れ・失効・無効（もう一度サインイン）。
+どのコマンドも JSON オブジェクトを 1 つ出力します。終了コード: `0` 成功（`state` によらず）、
+`1` エラー、`2` 使い方の誤り、`3` リフレッシュトークンが期限切れ・失効・無効（もう一度サインイン）。
 
 ### login
 
@@ -119,13 +119,29 @@ uv run sdpm_client.py run "<トピック> についてチーム向けの 3 枚�
 
 ```bash
 uv run sdpm_client.py status c6c289e49e9c05b2-0f8c6a4e-...
-# {"sessionId": "...", "state": "done", "deckId": "...", "name": "...", "slideCount": 4, "hasPptx": true, "pptxUrl": "https://..."}
+# {"sessionId": "...", "state": "done", "working": false, "how": "finished", "reclaimed": false,
+#  "deckId": "...", "name": "...", "slideCount": 4, "hasPptx": true, "pptxUrl": "https://..."}
 ```
 
-`state` は `pending`（デッキがまだない）、`in_progress`（デッキはあるが PPTX はまだ）、
-`done`（PPTX がある）のいずれかです。dev 環境では 3〜5 枚のデッキに 2〜7 分かかりました。
-確認は 1 分おき以上の間隔で行ってください。`pptxUrl` は短時間で期限が切れる署名付きの
-ダウンロードリンクです。
+`status` はセッションに作業期間が終わったか、どう終わったかを問い合わせてから、デッキを
+読みます。`state` は次のいずれかです:
+
+| `state` | 意味 |
+|---|---|
+| `running` | エージェントがまだ作業しています。PPTX がすでにあっても、エージェントはそれを変更したり、別の名前で作り直したりすることがあります。 |
+| `done` | 作業期間が正常に終わり、デッキに PPTX があります。 |
+| `needs_input` | 作業期間は正常に終わりましたが、PPTX がありません。エージェントが質問している可能性が高いので、Web UI でデッキのチャットを開いてください。 |
+| `failed` | 作業期間がエラー、1 時間の上限、またはエージェントの再起動で終わりました。 |
+| `cancelled` | Web UI で誰かが停止を押しました。 |
+
+`running` 以外はすべて最終状態です。確認は 1 分おき以上の間隔で行い、最終状態になったら
+やめてください。dev 環境では 3 枚のデッキに 4〜6 分かかりました。`pptxUrl` は `done` の
+応答から取ってください。短時間で期限が切れる署名付きのダウンロードリンクです。
+
+エージェントはセッションへの最後の接続から 15 分後にそのセッションを解放します（`"reclaimed":
+true`）。解放されたセッションでは誰も作業していないので、`status` はデッキに PPTX があれば
+`done`、なければ `needs_input` を返します。解放されたセッションに問い合わせると、そのための
+エージェントのインスタンスが新しく起動し、2 秒ほどかかります。
 
 ## 契約
 
@@ -159,17 +175,36 @@ ID トークン（有効期限 60 分）が返ります。`/ws` にはアクセ�
   `{"ctl": "error", "code": "...", "error": "..."}` を返します。
 - 切断してもジョブは止まりません。接続したまま見届ける場合は、`{"type": "ping"}` を 25 秒以内の
   間隔で送り、WebSocket ライブラリのプロトコル ping は無効にします。
-  `"ev": {"work": {"state": "idle"}}` のイベントが届いたらジョブは終わっています。イベントは
-  `{"batch": [...]}` フレームにまとめて届くことも、`{"chunk": ...}` フレームに分割されて届く
-  こともあります。
+  `"ev": {"work": {"state": "idle", "how": "..."}}` のイベントが届いたら、ジョブの作業期間は
+  終わっています。イベントは `{"batch": [...]}` フレームにまとめて届くことも、つなげると
+  イベントの JSON になる `{"chunk": ...}` フレームに分割されて届くこともあります。
 
-**デッキを見つけて完了を知る（REST、`Authorization: Bearer <ID トークン>`）。**
+**ジョブの終わりを知る（`/ws`）。** ジョブが完了するのは、デッキに初めて PPTX ができたとき
+ではなく、セッションの作業期間が終わったときです。エージェントはその後も作業を続け、PPTX を
+別の名前で作り直すことがあります。オーケストレーターの `turnEnd` イベントも終わりでは
+ありません。スライドの作成はその後もバックグラウンドで続きます。
+
+- 上と同じセッションの URL に接続し、`{"type": "resume", "from_seq": <n>}` を送ります。
+  エージェントは `{"ctl": "resumeAck", "working": ..., "head": ..., "replay_from": ...}` を
+  返し、続けて現在または直前の作業期間のうち `n` より後の番号のイベント
+  （`{"seq": ..., "ev": ...}`）を送ります。
+- `"working": true`: ジョブはまだ動いています。
+- `"working": false` で `"head"` が 0 より大きい: 作業期間は終わっていて、最後のイベントが
+  `{"work": {"state": "idle", "how": "..."}}` です。`from_seq` を `head` より少し小さくして
+  `resume` をもう一度送ると読めます。`how` は `finished`、`cancelled`、`error`、
+  `watchdog`（1 時間の上限）、`sigterm`（エージェントの再起動）のいずれかです。このイベントが
+  再送されてこない場合は、ジョブはまだ動いているものとして扱ってください。
+- `"working": false` で `"head": 0`: エージェントはもうそのセッションを保持していません
+  （作業がないまま時間が経って解放されました）。誰も作業していません。
+- 問い合わせは 1 分に 1 回までにします。解放されたセッションへの接続のたびに、そのための
+  エージェントのインスタンスが起動します。
+
+**デッキを見つける（REST、`Authorization: Bearer <ID トークン>`）。**
 
 - `GET <apiBaseUrl>/decks`: 各項目に `chatSessionId` があります。`chatSessionId` がジョブの
   セッション ID と一致するデッキが、そのジョブのデッキです。
-- `GET <apiBaseUrl>/decks/<deckId>`: `slideCount` と `pptxUrl`。
-- デッキに PPTX がある（`pptxUrl` が入っている）とき、ジョブは完了しています。オーケストレーターの
-  `turnEnd` イベントは完了ではありません。スライドの作成はその後もバックグラウンドで続きます。
+- `GET <apiBaseUrl>/decks/<deckId>`: `slideCount` と `pptxUrl`（デッキに PPTX があるときに
+  入ります）。作業期間が終わった後に読み、ダウンロードリンクはその応答から取ってください。
 
 ## Lambda と Step Functions
 
@@ -193,13 +228,13 @@ def handler(event, context):
     return sdpm.job_status(settings, event["sessionId"])
 ```
 
-タイムアウトは 2 分にします。実行ロールに必要なのは、そのシークレット 1 つへの
+タイムアウトは 3 分にします。実行ロールに必要なのは、そのシークレット 1 つへの
 `secretsmanager:GetSecretValue`（カスタマーマネージドキーで暗号化しているならそのキーへの
 `kms:Decrypt`）だけです。関数は IAM ではなく、あなたのトークンを使って HTTPS で SDPM を呼びます。
 デプロイが WAF で IP アドレスを制限している場合は、関数の送信元アドレスを許可してください。
 
-**ステートマシン。** ジョブを開始し、デッキに PPTX ができるまで 1 分おきに確認し、リフレッシュ
-トークンが期限切れならアラートを送ります。拒否されたリフレッシュトークンは
+**ステートマシン。** ジョブを開始し、`running` の間は 1 分おきに確認し、`done` なら成功、
+それ以外の最終状態なら失敗とし、リフレッシュトークンが期限切れならアラートを送ります。拒否されたリフレッシュトークンは
 `RefreshTokenExpired` を送出し、Step Functions はそれをエラー名として受け取ります:
 
 ```json
@@ -227,10 +262,14 @@ def handler(event, context):
     },
     "Done?": {
       "Type": "Choice",
-      "Choices": [{ "Variable": "$.state", "StringEquals": "done", "Next": "Done" }],
-      "Default": "Wait"
+      "Choices": [
+        { "Variable": "$.state", "StringEquals": "done", "Next": "Done" },
+        { "Variable": "$.state", "StringEquals": "running", "Next": "Wait" }
+      ],
+      "Default": "NotDone"
     },
     "Done": { "Type": "Succeed" },
+    "NotDone": { "Type": "Fail", "Error": "DeckNotDone", "Cause": "needs_input, failed or cancelled: open the deck's chat in the Web UI" },
     "SignInAgain": {
       "Type": "Task",
       "Resource": "arn:aws:states:::sns:publish",
