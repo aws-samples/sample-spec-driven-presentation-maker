@@ -139,6 +139,26 @@ export async function getDeck(deckId: string, idToken: string): Promise<DeckDeta
   return response.json()
 }
 
+/** Speaker notes per slide slug, parsed from the deck's presentation.json (slideJson). */
+export type SpeakerNotes = Record<string, string | null>
+
+/**
+ * Fetch speaker notes for every slide from the deck's presentation.json.
+ * Callers fetch this once per deck; returns an empty map on failure.
+ */
+export async function getSpeakerNotes(deckId: string, idToken: string): Promise<SpeakerNotes> {
+  const base = await getApiBaseUrl()
+  const url = IS_LOCAL ? `/api/decks/${deckId}?include=slideJson` : `${base}decks/${deckId}?include=slideJson`
+  const response = await fetch(url, IS_LOCAL ? {} : { headers: { Authorization: `Bearer ${idToken}` } })
+  if (!response.ok) return {}
+  const data = (await response.json()) as { slideJson?: { slides?: { slug?: string; notes?: string }[] } }
+  const notes: SpeakerNotes = {}
+  for (const slide of data.slideJson?.slides ?? []) {
+    if (slide.slug) notes[slide.slug] = slide.notes ?? null
+  }
+  return notes
+}
+
 /**
  * Fetch a presigned output.html URL for an HTML deck (cloud only; local opens the file instead).
  *
