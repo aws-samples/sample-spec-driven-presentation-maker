@@ -221,7 +221,12 @@ def split_slide_components(svg_path: "Path | etree._ElementTree", slide_num: int
                         bo_g = master_g.find(f"{{{SVG_NS}}}g[@class='BackgroundObjects']")
                         if bo_g is not None:
                             for child in bo_g:
-                                if child.get("visibility") != "hidden":
+                                # Layout placeholders (com.sun.star.presentation.SubtitleShape, ...)
+                                # carry the layout's prompt text; LibreOffice hides only the title
+                                # and outline ones on master pages, and slides never draw them.
+                                # DateTime / Footer / PageNumber have their own classes.
+                                if (child.get("visibility") != "hidden"
+                                        and not child.get("class", "").startswith("com.sun.star.presentation.")):
                                     _propagate_root_attrs(child, root_attrs)
                                     parts.append(etree.tostring(child, encoding="unicode"))
                         if parts:

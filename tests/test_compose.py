@@ -247,6 +247,63 @@ class TestDanglingBitmapUse:
         assert [u.get("{http://www.w3.org/1999/xlink}href") for u in uses] == ["#bitmap(3415900103)"]
 
 
+class TestLayoutPlaceholderPrompt:
+    """A layout placeholder's prompt text never reaches the slide background."""
+
+    # LibreOffice keeps the Title Slide layout's subtitle placeholder (with its prompt text)
+    # in the master page's BackgroundObjects; footer chrome there is real slide content.
+    _SVG = """\
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:ooo="http://xml.openoffice.org/svg/export"
+     viewBox="0 0 28000 15750">
+  <defs>
+    <g id="ooo:meta_slides">
+      <g id="ooo:meta_slide_0" ooo:master="m1"/>
+      <g id="ooo:meta_slide_1" ooo:master="m1"/>
+    </g>
+  </defs>
+  <defs>
+    <g id="m1" class="Master_Slide">
+      <g class="Background"><path fill="rgb(0,0,0)" d="M0,0 h28000 v15750 h-28000 z"/></g>
+      <g class="BackgroundObjects">
+        <g class="Graphic"><g><rect class="BoundingBox" x="0" y="0" width="10" height="10"/>
+          <path fill="red" d="M0,0 h10 v10 h-10 z"/></g></g>
+        <g class="com.sun.star.presentation.SubtitleShape"><g id="id13">
+          <rect class="BoundingBox" x="1905" y="10795" width="27112" height="2153"/>
+          <text><tspan>Subtitle</tspan></text></g></g>
+        <g class="DateTime"><g><text><tspan>11/12/26</tspan></text></g></g>
+        <g class="Footer"><g><text><tspan>Confidential</tspan></text></g></g>
+        <g class="PageNumber"><g><text><tspan>7</tspan></text></g></g>
+      </g>
+    </g>
+  </defs>
+  <g class="Slide"><g class="Page"/></g>
+  <g class="Slide"><g class="Page"/></g>
+  <g class="Slide"><g class="Page">
+    <g class="com.sun.star.presentation.SubtitleShape"><g>
+      <rect class="BoundingBox" x="1905" y="10795" width="27112" height="2153"/>
+      <text><tspan>Real subtitle</tspan></text></g></g>
+  </g></g>
+</svg>
+"""
+
+    def test_empty_subtitle_prompt_not_in_background(self):
+        result = split_slide_components(_write_svg(self._SVG), 1)
+
+        assert "Subtitle" not in result["bgSvg"]
+        assert 'fill="red"' in result["bgSvg"]
+
+    def test_filled_subtitle_prompt_not_under_slide_text(self):
+        result = split_slide_components(_write_svg(self._SVG), 2)
+
+        assert "Subtitle" not in result["bgSvg"]
+        assert [c["text"] for c in result["components"]] == ["Real subtitle"]
+
+    def test_footer_chrome_kept(self):
+        bg = split_slide_components(_write_svg(self._SVG), 1)["bgSvg"]
+
+        assert "11/12/26" in bg and "Confidential" in bg and ">7<" in bg
+
+
 class TestTextLengthStripped:
     """textLength / lengthAdjust are removed so WebKit does not squash glyphs."""
 
