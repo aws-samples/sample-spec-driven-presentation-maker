@@ -13,6 +13,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Added
+
+- **Comment on your own styles in the Web UI.** On the Styles page, the Comment tool (`C`)
+  frames areas of a style's slides like on a deck; the frames collect above the style chat
+  and are sent together, and the style agent changes only the commented slides. Desktop,
+  Local mode and the AWS stack.
+
 ### Fixed
 
 - **Chart titles keep their font colour and size when a deck is read back.** `pptx_to_json`
@@ -46,6 +53,18 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   names and the `sys*` ones, so rebuilding the JSON drew those lines solid. Freeforms lost
   their dash entirely: it was never extracted. The builder now accepts every OOXML preset
   dash name, and freeforms extract `dashStyle`.
+- **Creating a style in the Web UI no longer stops with "The model took too long to
+  respond".** The style author wrote the whole style in one tool call, and the model sent
+  nothing for longer than the 120-second read timeout while it wrote. The author now saves
+  the style one slide at a time (the cover first, then each slide with the components it
+  introduces, and a change rewrites only its slides), and every agent waits up to 600
+  seconds for the model's next output.
+- The style preview shows the agent's latest save right away. It used to redraw from the
+  style list loaded before that save, so each change appeared only after the next save or a
+  reload.
+- The style chat empties its input as soon as a message is sent. It used to keep the text
+  until the agent finished its reply; a message sent while the agent works and not taken by
+  it still stays in the input.
 
 ## [0.15.0] - 2026-11-12
 

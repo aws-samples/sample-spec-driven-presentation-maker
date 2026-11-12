@@ -7,6 +7,11 @@
  * - No hash: style list grid
  * - #/create: new style (chat open, no file until the agent saves it)
  * - #{name}: style preview (user styles get the chat panel)
+ *
+ * On a user style's preview (desktop), the comment tool frames areas of its slides like on a
+ * deck: the page's ReviewProvider keys the drafts by `style:<name>` and the slides by number,
+ * the frames collect in the style chat, and its send builds the request message in the browser
+ * (`createStyleReview`, no review file).
  */
 
 "use client"
@@ -19,8 +24,13 @@ import { AppShell } from "@/components/AppShell"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
 import { fetchStyles, fetchStyleHtml, pinStyle, saveUserStyle, deleteUserStyle, renameUserStyle, type StyleEntry } from "@/services/deckService"
 import { StyleSlidePreview } from "@/components/StyleSlidePreview"
-import { buildCoverDoc } from "@/components/StyleSlidePreview"
+import { buildCoverDoc, splitStyleSlides } from "@/components/StyleSlidePreview"
 import { StyleChatShell } from "@/components/chat/StyleChatShell"
+import { ReviewProvider, useReview } from "@/components/review/ReviewProvider"
+import { ReviewToolButton } from "@/components/review/ReviewToolButton"
+import { useIsMobile } from "@/hooks/UseMobile"
+import { createStyleReview, styleSlideKeys } from "@/lib/review/style"
+import type { ReviewSubmission } from "@/lib/review/schema"
 import { Star, Trash2, Palette, Download, Sparkles, Copy, MessageSquare, Pencil, MoreHorizontal } from "lucide-react"
 
 export default function StylesPage() {
@@ -41,6 +51,19 @@ export default function StylesPage() {
   const [chatOpen, setChatOpen] = useState(false)
   // The style a new-style chat saved, so its workspace keeps the chat before the list has it.
   const [sessionStyle, setSessionStyle] = useState<string | null>(null)
+  const isMobile = useIsMobile()
+  const [styleAgentBusy, setStyleAgentBusy] = useState(false)
+  const openChat = useCallback(() => setChatOpen(true), [])
+
+  // Comment tool: the preview's slides, keyed "1".."N"; a request reads the current HTML.
+  const split = useMemo(
+    () => (ws.view.mode === "preview" && ws.previewHtml ? splitStyleSlides(ws.previewHtml) : null),
+    [ws.view.mode, ws.previewHtml],
+  )
+  const slideKeys = useMemo(() => styleSlideKeys(split?.slides.length ?? 0), [split])
+  const slidesRef = useRef<string[]>([])
+  useEffect(() => { slidesRef.current = split?.slides ?? [] }, [split])
+  const createRequest = useCallback(async (s: ReviewSubmission) => createStyleReview(s, slidesRef.current), [])
 
   const showToast = (message: string, type: "success" | "error" = "success") => {
     setToast({ message, type })
@@ -146,14 +169,23 @@ export default function StylesPage() {
 
   const userStyles = styles.filter(s => s.source === "user")
   const builtinStyles = styles.filter(s => s.source === "builtin")
+  const reviewEnabled = ws.view.mode === "preview" && !!ws.styleName && isUserStyle && !!split && !ws.previewLoading && !isMobile
 
   return (
+    <ReviewProvider
+      deckId={ws.view.mode === "preview" && ws.styleName ? `style:${ws.styleName}` : null}
+      slugs={slideKeys}
+      enabled={reviewEnabled}
+      agentBusy={styleAgentBusy}
+      openChat={openChat}
+      createRequest={createRequest}
+    >
     <AppShell
       deckName={ws.isWorkspace && ws.styleName ? ws.styleName : undefined}
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
     >
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 overflow-y-auto">
+        <div className="flex-1 overflow-y-auto" data-slide-scroller>
         {loading ? (
           /* ── Loading skeleton ── */
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
@@ -191,6 +223,7 @@ export default function StylesPage() {
               </button>
               {isUserStyle && (
                 <>
+                  <PreviewCommentButton />
                   <button
                     onClick={() => setChatOpen(true)}
                     className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium text-brand-teal hover:text-brand-teal-bright border border-brand-teal/25 hover:border-brand-teal/40 bg-brand-teal/[0.06] hover:bg-brand-teal/[0.1] transition-colors"
@@ -214,7 +247,7 @@ export default function StylesPage() {
                 </button>
               )}
             </div>
-            <StyleSlidePreview html={ws.previewHtml} loading={ws.previewLoading} />
+            <StyleSlidePreview html={ws.previewHtml} loading={ws.previewLoading} commentable />
           </div>
         ) : ws.view.mode === "create" ? (
           /* ── New style: the chat is open; the style appears once the agent saves it ── */
@@ -331,6 +364,7 @@ export default function StylesPage() {
             styleId={ws.styleName ?? ""}
             styleName={ws.styleName ?? ""}
             onStyleWritten={() => ws.refreshPreview()}
+            onLoadingChange={setStyleAgentBusy}
             onStyleSaved={async (saved) => {
               const name = saved.filename.replace(/\.html$/i, "")
               // A new style's first save names it: open its preview with this chat. Read the
@@ -366,7 +400,15 @@ export default function StylesPage() {
         </div>
       )}
     </AppShell>
+    </ReviewProvider>
   )
+}
+
+/** The comment tool's toggle in the preview header, while the tool is available. */
+function PreviewCommentButton() {
+  const review = useReview()
+  if (!review?.enabled) return null
+  return <ReviewToolButton on={review.toolOn} onClick={review.toggleTool} />
 }
 
 /** Style card for the /styles list page. */

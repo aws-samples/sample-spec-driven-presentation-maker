@@ -217,11 +217,19 @@ The demo slides are read as coordinates, so the format is constrained:
 - The first write already carries the final `<title>` (the name and its paragraph), and each
   later write keeps the paragraph true to the style as it grows: `list_styles()` and the
   gallery show the style by both from the moment it is saved.
-- Save with `write_style(name, html)` in `run_style_python`; it stores the file in the user's
-  style store (locally `~/.config/sdpm/styles/`), where `list_styles()` and the gallery pick it
-  up. Each write is immediately visible, so write incrementally — `:root` and the cover first,
-  then parts in order — and refine.
+- Save through `run_style_python`; its description says how the style file is read and written
+  in this environment. Every save goes to the user's style store (locally
+  `~/.config/sdpm/styles/`), where `list_styles()` and the gallery pick it up at once.
+- Build the style one slide per save. The first save holds the final `<title>`, `:root` and
+  the cover; each later save adds the next `.slide` in order, together with the CSS and the
+  `Component:` comments of the components that slide is the first to use. A change rewrites
+  only the slides it touches and keeps the rest of the file as it is. Each save stays small
+  enough to finish in one call, and the user sees the style grow in the gallery.
 - `analyze_template(...)` reads a reference PPTX's theme; `read_guides(["import-pptx"])` when
   the reference deck should be inspected slide by slide.
 - Token choices must survive conversion to PPTX: when the environment offers it, apply the
   style to a sample deck, build and preview before finishing.
+- A change request from the style preview lists the commented slides by number and title,
+  each comment with its frame in slide px and its text. Change only the slides that carry a
+  comment and keep every other slide as it is, then save the style, and reply with what
+  changed for each comment, by name.

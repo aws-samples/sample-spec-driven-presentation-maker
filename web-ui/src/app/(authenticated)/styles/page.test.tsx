@@ -27,7 +27,9 @@ vi.mock("@/hooks/useAuth", () => {
   const auth = { isAuthenticated: true, user: { id_token: "tok", profile: { sub: "u1" } } }
   return { useAuth: () => auth }
 })
+vi.mock("@/hooks/UseMobile", () => ({ useIsMobile: () => false }))
 vi.mock("@/services/deckService", () => ({
+  createReview: vi.fn(),
   fetchStyles: vi.fn(async () => listed.styles),
   fetchStylePreviewHtml: vi.fn(async () => ""),
   fetchStyleHtml: vi.fn(async () => ""),
@@ -42,6 +44,7 @@ vi.mock("@/components/AppShell", () => ({
 vi.mock("@/components/StyleSlidePreview", () => ({
   StyleSlidePreview: () => null,
   buildCoverDoc: () => "",
+  splitStyleSlides: () => null,
 }))
 vi.mock("@/components/chat/StyleChatShell", async () => {
   const { useEffect } = await import("react")

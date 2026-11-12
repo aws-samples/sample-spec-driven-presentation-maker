@@ -274,14 +274,23 @@ def connect_clients(handle, cfg, then: Callable[[], None] | None = None) -> tupl
     return _prewarm_mcp_clients(built, names, required_flags, then=critical_path)
 
 
+# Longest silence allowed on a Bedrock stream. A model writing one large tool argument
+# (a style, a slide's code) sends nothing until the argument is complete; strands'
+# default of 120 s cut such turns off (2026-11-12, Opus 5.5 writing a style).
+BEDROCK_READ_TIMEOUT_S = 600
+
+
 def build_model(model_id: str, composer: bool = False):
     if not composer:
-        return BedrockModel(**build_model_kwargs(model_id))
+        return BedrockModel(
+            **build_model_kwargs(model_id),
+            boto_client_config=BotocoreConfig(read_timeout=BEDROCK_READ_TIMEOUT_S),
+        )
     return BedrockModel(
         **build_model_kwargs(model_id),
         boto_client_config=BotocoreConfig(
             user_agent_extra="strands-agents",
-            read_timeout=120,
+            read_timeout=BEDROCK_READ_TIMEOUT_S,
             retries={"max_attempts": 5, "mode": "adaptive"},
         ),
     )
