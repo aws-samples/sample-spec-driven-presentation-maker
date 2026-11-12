@@ -477,6 +477,7 @@ def enforce_content_limits(path: Path, media_type: str) -> None:
             target = match.group(1).strip().lower()
             if not target.startswith("#") and not target.startswith("data:image/"):
                 raise SourceValidationError("SVG contains an external resource reference")
+        _check_svg_tree(text)
         return
 
     if media_type in {"image/png", "image/jpeg", "image/gif", "image/webp"}:
@@ -552,6 +553,58 @@ def enforce_content_limits(path: Path, media_type: str) -> None:
             raise
         except Exception as error:
             raise SourceValidationError(f"Invalid PDF: {error}")
+
+
+_SVG_ANIMATION_TAGS = frozenset({"set", "animate", "animatetransform", "animatemotion", "animatecolor"})
+# CSS functions that load a resource from a string argument (no url() needed).
+_CSS_RESOURCE_FUNCTION = re.compile(r"(?<![\w-])(?:-webkit-)?(?:image-set|image|cross-fade|src)\(")
+_CSS_URL = re.compile(r"(?<![\w-])url\(\s*['\"]?\s*(.)?")
+
+
+def _check_svg_css(value: str) -> None:
+    """Reject CSS that can reach outside the document; url() may only name '#id'.
+
+    Applied to <style> text and to every attribute value, since presentation attributes
+    (fill, stroke, filter, ...) are CSS values too. Backslashes are refused because CSS
+    escapes would let a function or at-rule name be spelled around these checks.
+    """
+    lowered = value.lower()
+    if "\\" in lowered or "@import" in lowered or _CSS_RESOURCE_FUNCTION.search(lowered):
+        raise SourceValidationError("SVG contains an external resource reference")
+    for match in _CSS_URL.finditer(lowered):
+        if match.group(1) != "#":
+            raise SourceValidationError("SVG contains an external resource reference")
+
+
+def _check_svg_tree(text: str) -> None:
+    """Element-level SVG checks on the parsed document (entities decoded, PIs dropped)."""
+    from defusedxml.ElementTree import ParseError, fromstring
+
+    try:
+        root = fromstring(text.encode("utf-8"))
+    except (ParseError, ValueError) as error:
+        raise SourceValidationError(f"SVG is not well-formed XML: {error}")
+
+    for element in root.iter():
+        if not isinstance(element.tag, str):
+            continue
+        tag = element.tag.rsplit("}", 1)[-1].lower()
+        for name, value in element.attrib.items():
+            local = name.rsplit("}", 1)[-1].lower()
+            if local.startswith("on"):
+                raise SourceValidationError("SVG contains unsafe active content")
+            if local == "href":
+                target = value.strip().lower()
+                if not target.startswith("#") and not target.startswith("data:image/"):
+                    raise SourceValidationError("SVG contains an external resource reference")
+                continue
+            _check_svg_css(value)
+        if tag in _SVG_ANIMATION_TAGS:
+            animated = element.get("attributeName", "").rsplit(":", 1)[-1].strip().lower()
+            if animated == "href" or animated.startswith("on"):
+                raise SourceValidationError("SVG contains unsafe active content")
+        if tag == "style":
+            _check_svg_css("".join(element.itertext()))
 
 
 def get_canonical_extension(media_type: str) -> str:

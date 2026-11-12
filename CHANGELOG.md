@@ -15,6 +15,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **Attachments: stricter SVG content checks.** `read_attachment` / `import_attachment`
+  now parse an SVG before accepting it and refuse more kinds of content that refers to
+  something outside the file.
 - **Cloud: a deck keeps its chat history when the tab closes during creation.** The link
   from a deck to the chat that created it (`chatSessionId`) was written only by the
   browser after the deck appeared; closing the tab or a failed request before then left
