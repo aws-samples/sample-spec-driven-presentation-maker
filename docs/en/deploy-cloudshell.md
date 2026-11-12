@@ -178,7 +178,7 @@ fall back to another bucket name.
 
 One-Click Deploy clones the repository inside CodeBuild and uses no source bucket.
 
-#### If you deployed with deploy.sh before v0.14.1
+#### If you deployed with deploy.sh before the account-scoped source bucket
 
 Earlier versions uploaded the source to `sdpm-deploy-<account-id>-<region>` (no `-an` suffix)
 without checking the bucket owner.
