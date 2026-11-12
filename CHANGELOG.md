@@ -35,6 +35,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   the style one slide at a time (the cover first, then each slide with the components it
   introduces, and a change rewrites only its slides), and every agent waits up to 600
   seconds for the model's next output.
+- The style chat empties its input as soon as a message is sent. It used to keep the text
+  until the agent finished its reply; a message sent while the agent works and not taken by
+  it still stays in the input.
 
 ## [0.15.0] - 2026-11-12
 
