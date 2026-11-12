@@ -29,6 +29,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - The animated slide preview no longer shows a layout placeholder's prompt text (the
   Title Slide layout's "Subtitle") behind a slide, whether or not the slide fills that
   placeholder in. The thumbnails never showed it.
+- **Arrowheads and system dashes are written in the order the file format requires.** Shapes,
+  freeforms and polylines wrote the end arrowhead before the start one, and lines with a
+  `sys*` `dashStyle` wrote the dash after the arrowheads. Out-of-order line properties are
+  ones PowerPoint may ignore; they are now sorted into schema order.
 
 ## [0.15.0] - 2026-11-12
 

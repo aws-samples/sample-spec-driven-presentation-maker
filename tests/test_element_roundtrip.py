@@ -372,6 +372,25 @@ class TestPolyline:
         assert [(c["x"], c["y"]) for c in out["path"]] == [(0, 0), (200, 0)]
 
 
+class TestLinePropertiesOrder:
+    """a:ln children follow the schema sequence (PowerPoint drops what does not)."""
+
+    _ORDER = ["solidFill", "prstDash", "headEnd", "tailEnd"]
+
+    @pytest.mark.parametrize("elem", [
+        _shape(line="#FFFFFF", arrowStart="triangle", arrowEnd="oval", dashStyle="sysDash"),
+        _freeform(line="#FFFFFF", headEnd="triangle", tailEnd="oval", dashStyle="sysDash",
+                  path=CLOSED_PATH[:2]),
+        _line(arrowStart="triangle", arrowEnd="stealth", dashStyle="sysDot"),
+        _line(points=[[0, 0], [100, 50], [200, 0]], arrowStart="oval", arrowEnd="triangle"),
+    ], ids=["shape", "freeform", "connector", "polyline"])
+    def test_ln_children_in_schema_order(self, tmp_path, elem):
+        (sp,) = _built_shapes(tmp_path, [elem])
+        tags = _tags(sp._element.spPr.find(f"{_A}ln"))
+        assert tags == [t for t in self._ORDER if t in tags]
+        assert {"headEnd", "tailEnd"} <= set(tags)
+
+
 # ── textbox ──────────────────────────────────────────────────────────────
 
 def _textbox(**props) -> dict:
