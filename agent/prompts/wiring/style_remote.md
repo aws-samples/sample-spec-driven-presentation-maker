@@ -15,8 +15,12 @@ Workspace layout:
 
 Usage patterns:
 - Read a reference: `run_style_python(code="html = open('ref/report.html').read(); print(html[:500])", ref_styles=["report"])`
-- Create/edit the style: `run_style_python(code="open('style.html','w').write(html)", style_name="<name>")`
-- Read back for incremental edits: `run_style_python(code="print(open('style.html').read())", style_name="<name>")`
+- First save (title, `:root`, cover): `run_style_python(code="open('style.html','w').write(html)", style_name="<name>")`
+- Add the next slide: `run_style_python(code="p='style.html'; h=open(p).read(); i=h.rindex('</body>'); open(p,'w').write(h[:i]+slide+h[i:])", style_name="<name>")`
+  — `slide` holds that one `.slide` plus the CSS and comments it introduces; put new CSS into the
+  existing `<style>` the same way.
+- Change a slide: read `style.html`, replace that slide's part of the string, write it back.
+- Read back: `run_style_python(code="print(open('style.html').read())", style_name="<name>")`
 
 `<name>` is the style's name: the one in `[Style: <name>]` when the user's first
 message carries it, otherwise the name you chose for a new style. Pass it as the

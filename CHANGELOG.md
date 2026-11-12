@@ -29,6 +29,12 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - The animated slide preview no longer shows a layout placeholder's prompt text (the
   Title Slide layout's "Subtitle") behind a slide, whether or not the slide fills that
   placeholder in. The thumbnails never showed it.
+- **Creating a style in the Web UI no longer stops with "The model took too long to
+  respond".** The style author wrote the whole style in one tool call, and the model sent
+  nothing for longer than the 120-second read timeout while it wrote. The author now saves
+  the style one slide at a time (the cover first, then each slide with the components it
+  introduces, and a change rewrites only its slides), and every agent waits up to 600
+  seconds for the model's next output.
 
 ## [0.15.0] - 2026-11-12
 
