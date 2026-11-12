@@ -14,7 +14,7 @@ export type TextScale = 90 | 100 | 110 | 125
 
 interface Prefs {
   sendWithEnter: boolean
-  viewMode: "full" | "grid"
+  viewMode: "full" | "presenter" | "grid"
   fetchWebImages: boolean
   agentMode: "spec" | "vibe"
   textScale: TextScale
@@ -71,7 +71,7 @@ export function usePreferences() {
     sendWithEnter: prefs.sendWithEnter,
     setSendWithEnter: useCallback((v: boolean) => update({ sendWithEnter: v }), [update]),
     viewMode: prefs.viewMode,
-    setViewMode: useCallback((v: "full" | "grid") => update({ viewMode: v }), [update]),
+    setViewMode: useCallback((v: "full" | "presenter" | "grid") => update({ viewMode: v }), [update]),
     fetchWebImages: prefs.fetchWebImages,
     setFetchWebImages: useCallback((v: boolean) => update({ fetchWebImages: v }), [update]),
     agentMode: prefs.agentMode,
