@@ -4,6 +4,7 @@
 from pathlib import Path
 
 from sdpm.knowledge.assets import resolve_asset_path
+from sdpm.utils import xml_safe
 
 
 def resolve_image_path(src: str, theme: str = "light") -> Path:
@@ -146,5 +147,5 @@ def apply_image_effects(pic_element, elem_def):
             blip = blip_fill.find(qn('a:blip'))
             if blip is not None:
                 for effect_xml in blip_effects:
-                    effect_el = etree.fromstring(effect_xml)
+                    effect_el = xml_safe.fromstring(effect_xml)
                     blip.insert(0, effect_el)

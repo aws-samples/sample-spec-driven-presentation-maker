@@ -19,6 +19,8 @@ from pathlib import Path
 from lxml import etree
 from PIL import Image
 
+from sdpm.utils import xml_safe
+
 logger = logging.getLogger("sdpm.compose")
 
 SVG_NS = "http://www.w3.org/2000/svg"
@@ -108,7 +110,7 @@ def _repair_bitmap_refs(root: etree._Element) -> None:
 
 def load_svg(svg_path: Path) -> etree._ElementTree:
     """Parse a LibreOffice SVG once so several extractions can share the tree."""
-    tree = etree.parse(str(svg_path))
+    tree = xml_safe.parse(svg_path, allow_doctype=True)
     _repair_bitmap_refs(tree.getroot())
     return tree
 
@@ -274,9 +276,8 @@ def referenced_defs(defs: str, fragments: "list[str]") -> str:
     wanted = set().union(*(_local_refs(f) for f in fragments)) if fragments else set()
     if not wanted or not defs:
         return ""
-    parser = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False)
     try:
-        root = etree.fromstring(f'<svg xmlns="{SVG_NS}">{defs}</svg>', parser)
+        root = xml_safe.fromstring(f'<svg xmlns="{SVG_NS}">{defs}</svg>')
     except etree.XMLSyntaxError:
         return defs
     by_id = {el.get("id"): el for el in root.iter() if isinstance(el.tag, str) and el.get("id")}

@@ -19,7 +19,7 @@ import re
 from dataclasses import dataclass
 from pathlib import Path
 
-from lxml import etree
+from sdpm.utils import xml_safe
 
 SVG_NS = "http://www.w3.org/2000/svg"
 
@@ -347,7 +347,7 @@ def judge_from_svg(
         Dict mapping slide number (1-based) to issues. Slides with no
         issues are omitted.
     """
-    tree = etree.parse(str(svg_path))  # noqa: S320
+    tree = xml_safe.parse(svg_path, allow_doctype=True)
     root = tree.getroot()
     slide_bg = _slide_background(root)
 

@@ -17,6 +17,7 @@ from pptx import Presentation
 
 from sdpm.api import generate
 from sdpm.engine.converter.pipeline import pptx_to_json
+from sdpm.engine.schema.chart import chart_fingerprint
 from sdpm.engine.schema.minimal import minimize
 from test_roundtrip import _make_deck, _roundtrip
 
@@ -297,15 +298,20 @@ class TestBarAndLineStyle:
         smooth = chart._chartSpace.find(f".//{_C}ser/{_C}smooth")
         assert smooth is not None and smooth.get("val") == "1"
 
-    @pytest.mark.xfail(strict=True, reason="extractor does not read c:smooth back into 'smooth'")
     def test_smooth_round_trips(self, tmp_path):
         ch = _one_chart(tmp_path, chartType="line", categories=["A", "B"],
                         series=[{"name": "s", "values": [1, 2]}], smooth=True)
         assert ch.get("smooth") is True
 
+    def test_not_smooth_is_not_recorded(self, tmp_path):
+        ch = _one_chart(tmp_path, chartType="line", categories=["A", "B"],
+                        series=[{"name": "s", "values": [1, 2]}])
+        assert "smooth" not in ch
+
 
 class TestRebuildFromExtracted:
-    """The extractor keeps the whole chart XML in ``_chartXml``; rebuilding restores it."""
+    """The extractor keeps the whole chart XML in ``_chartXml``; rebuilding restores it
+    while the structured fields still match ``_chartFingerprint``."""
 
     def test_second_round_trip_is_stable(self, tmp_path):
         first = _one_chart(tmp_path / "a", chartType="bar", categories=["A", "B", "C"], series=TWO_SERIES,
@@ -324,7 +330,6 @@ class TestRebuildFromExtracted:
         again = _one_chart(tmp_path / "b", **props)
         assert again["_chartUserShapes"] == drawing
 
-    @pytest.mark.xfail(strict=True, reason="_chartXml wins over edited categories/values on rebuild")
     def test_edited_values_win_over_chart_xml(self, tmp_path):
         first = _one_chart(tmp_path / "a", chartType="bar", categories=["A", "B"],
                            series=[{"name": "s", "values": [1, 2]}])
@@ -335,12 +340,164 @@ class TestRebuildFromExtracted:
         assert again["categories"] == ["X", "Y"]
         assert again["series"][0]["values"] == [7, 9]
 
+    def test_edited_title_and_color_win_over_chart_xml(self, tmp_path):
+        first = _one_chart(tmp_path / "a", chartType="line", categories=["A", "B"], title="Old",
+                           series=[{"name": "s", "values": [1, 2], "color": "#FF0000"}], smooth=True)
+        props = {k: v for k, v in first.items() if k != "type"}
+        props["title"] = "New"
+        props["series"][0]["color"] = "#00FF00"
+        again = _one_chart(tmp_path / "b", **props)
+        assert again["title"] == "New"
+        assert again["series"][0]["color"] == "#00FF00"
+        assert again["smooth"] is True
+
+    def _tagged(self, tmp_path: Path) -> dict:
+        """Extracted chart whose _chartXml title differs from its JSON title."""
+        out = _one_chart(tmp_path, chartType="bar", categories=["A", "B"], title="JSON",
+                         series=[{"name": "s", "values": [1, 2]}])
+        assert ">JSON<" in out["_chartXml"]
+        out["_chartXml"] = out["_chartXml"].replace(">JSON<", ">FROM_XML<")
+        return {k: v for k, v in out.items() if k != "type"}
+
+    def test_unedited_chart_restores_chart_xml(self, tmp_path):
+        props = self._tagged(tmp_path / "a")
+        props["x"] += 50  # geometry is not chart content
+        props["series"][0]["values"] = [1.0, 2.0]  # same numbers, other spelling
+        assert _one_chart(tmp_path / "b", **props)["title"] == "FROM_XML"
+
+    def test_chart_xml_without_fingerprint_is_restored(self, tmp_path):
+        # JSON extracted before the fingerprint existed keeps the old behaviour
+        props = self._tagged(tmp_path / "a")
+        del props["_chartFingerprint"]
+        props["title"] = "Edited"
+        assert _one_chart(tmp_path / "b", **props)["title"] == "FROM_XML"
+
+    def test_edit_skips_chart_xml(self, tmp_path):
+        props = self._tagged(tmp_path / "a")
+        props["title"] = "Edited"
+        assert _one_chart(tmp_path / "b", **props)["title"] == "Edited"
+
+    def test_fingerprint_survives_the_written_json(self, tmp_path):
+        # what an agent edits is the slide file on disk, not the in-memory dict
+        deck = _make_deck(tmp_path, [_chart(chartType="line", categories=["A", "B"], smooth=True,
+                                            series=[{"name": "s", "values": [1.5, 2]}])])
+        generate(deck, output_path=tmp_path / "out.pptx")
+        pptx_to_json(tmp_path / "out.pptx", tmp_path / "x")
+        [slide_file] = (tmp_path / "x" / "slides").glob("slide-*.json")
+        [ch] = _charts(json.loads(slide_file.read_text()))
+        assert ch["_chartFingerprint"] == chart_fingerprint(ch)
+
     def test_broken_chart_xml_falls_back_to_normal_build(self, tmp_path, capsys):
         ch = _one_chart(tmp_path, chartType="line", categories=["A", "B"],
                         series=[{"name": "s", "values": [1, 2], "color": "#00FF00"}], _chartXml="<not xml")
         assert "chart XML restore failed" in capsys.readouterr().err
         assert ch["chartType"] == "line"
         assert ch["series"][0]["color"] == "#00FF00"
+
+    def test_user_shapes_survive_an_edit(self, tmp_path):
+        props = self._tagged(tmp_path / "a")
+        props["_chartUserShapes"] = _USER_SHAPES
+        props["title"] = "Edited"
+        again = _one_chart(tmp_path / "b", **props)
+        assert again["title"] == "Edited"  # built from its JSON
+        assert again["_chartUserShapes"] == _USER_SHAPES
+
+    def test_built_chart_is_rebuildable(self, tmp_path):
+        ch = _one_chart(tmp_path, chartType="bar", categories=["A"], series=[{"name": "s", "values": [1]}])
+        assert "_chartRebuildable" not in ch
+
+
+_USER_SHAPES = ('<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" '
+                'xmlns:cdr="http://schemas.openxmlformats.org/drawingml/2006/chartDrawing"/>')
+
+
+def _plot_tags(pptx: Path) -> list[str]:
+    """Plot element names (barChart, areaChart…) of the chart on a PPTX's last slide."""
+    [frame] = [s for s in list(Presentation(str(pptx)).slides)[-1].shapes if s.has_chart]
+    plot_area = frame.chart._chartSpace.find(f".//{_C}plotArea")
+    return [el.tag.removeprefix(_C) for el in plot_area if el.tag.endswith("Chart")]
+
+
+def _foreign_chart_pptx(path: Path, kind: str) -> Path:
+    """A one-chart PPTX of a kind sdpm's chartType cannot describe."""
+    from copy import deepcopy
+
+    from pptx.chart.data import CategoryChartData
+    from pptx.enum.chart import XL_CHART_TYPE
+    from pptx.util import Inches
+
+    def add(prs, chart_type):
+        data = CategoryChartData()
+        data.categories = ["A", "B"]
+        data.add_series("s", (1, 2))
+        slide = prs.slides.add_slide(prs.slide_layouts[-1])
+        return slide.shapes.add_chart(chart_type, Inches(1), Inches(1), Inches(6), Inches(4), data).chart
+
+    template = Path(__file__).parent.parent / "sdpm" / "templates" / "blank-dark.pptx"
+    prs = Presentation(str(template))
+    if kind == "combo":
+        # a clustered column chart with a line plot on the same axes
+        chart = add(prs, XL_CHART_TYPE.COLUMN_CLUSTERED)
+        line = deepcopy(add(Presentation(str(template)), XL_CHART_TYPE.LINE)._chartSpace.find(f".//{_C}lineChart"))
+        bar = chart._chartSpace.find(f".//{_C}barChart")
+        for mine, theirs in zip(line.findall(f"{_C}axId"), bar.findall(f"{_C}axId")):
+            mine.set("val", theirs.get("val"))
+        bar.addnext(line)
+    else:
+        add(prs, {"area": XL_CHART_TYPE.AREA, "radar": XL_CHART_TYPE.RADAR,
+                  "stacked100": XL_CHART_TYPE.COLUMN_STACKED_100}[kind])
+    prs.save(str(path))
+    return path
+
+
+class TestChartsTheJsonCannotDescribe:
+    """A chart read back as a type chartType does not have (area, radar, 100% stacked,
+    combo) keeps its ``_chartXml`` when edited, instead of turning into a bar chart."""
+
+    def _extract(self, tmp_path: Path, kind: str) -> tuple[dict, list[str]]:
+        tmp_path.mkdir(parents=True)
+        source = _foreign_chart_pptx(tmp_path / "in.pptx", kind)
+        out = pptx_to_json(source, tmp_path / "x")
+        [ch] = _charts(out["slides"][-1])
+        return ch, _plot_tags(source)
+
+    def _build(self, tmp_path: Path, elem: dict) -> tuple[dict, list[str]]:
+        deck = _make_deck(tmp_path, [elem])
+        result = generate(deck, output_path=tmp_path / "out.pptx")
+        return result, _plot_tags(tmp_path / "out.pptx")
+
+    @pytest.mark.parametrize("kind", ["area", "radar", "stacked100", "combo"])
+    def test_edited_chart_keeps_its_type(self, tmp_path, kind):
+        ch, original = self._extract(tmp_path / "a", kind)
+        assert ch["_chartRebuildable"] is False
+        ch["series"][0]["values"] = [5, 6]
+        result, plots = self._build(tmp_path / "b", ch)
+        assert plots == original
+        rules = [d["rule"] for d in result.get("errors", {}).get("lintDiagnostics", [])]
+        assert "chart-edit-ignored" in rules
+
+    def test_unedited_chart_has_no_diagnostic(self, tmp_path):
+        ch, original = self._extract(tmp_path / "a", "area")
+        result, plots = self._build(tmp_path / "b", ch)
+        assert plots == original
+        assert "errors" not in result
+
+    def test_without_chart_xml_it_is_built_from_json(self, tmp_path):
+        ch, _ = self._extract(tmp_path / "a", "area")
+        ch["series"][0]["values"] = [5, 6]
+        del ch["_chartXml"]
+        result, plots = self._build(tmp_path / "b", ch)
+        assert plots == ["barChart"]
+        assert "errors" not in result
+
+    def test_empty_chart_keeps_its_xml(self, tmp_path):
+        ch = _one_chart(tmp_path / "a", chartType="line", series=[])
+        assert ch["_chartRebuildable"] is False
+        ch["series"][0]["values"] = [5]  # the dummy series the extractor adds
+        _, plots = self._build(tmp_path / "b", {k: v for k, v in ch.items()})
+        assert plots == ["lineChart"]
+        [frame] = [s for s in Presentation(str(tmp_path / "b" / "out.pptx")).slides[0].shapes if s.has_chart]
+        assert frame.chart._chartSpace.findall(f".//{_C}ser") == []
 
 
 class TestInvalidInput:
