@@ -97,6 +97,20 @@ def _dispatch_shape(shape, theme_colors=None, color_mapping=None, theme_styles=N
             elem = extract_shape_element(shape, theme_colors, color_mapping, theme_styles, builder_text_color=builder_text_color)
     return elem, img_counter
 
+def _scale_table_tracks(elem, sx, sy):
+    """Scale a table's colWidths/rowHeights with its frame.
+
+    The builder sizes columns and rows from these lists, not from width/height,
+    so a table in a scaled group (ext != chExt) must carry them in slide space.
+    """
+    if elem.get("type") != "table":
+        return
+    if elem.get("colWidths"):
+        elem["colWidths"] = [round(w * sx) for w in elem["colWidths"]]
+    if elem.get("rowHeights"):
+        elem["rowHeights"] = [round(h * sy) for h in elem["rowHeights"]]
+
+
 def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_styles=None, output_dir=None, slide_idx=0, img_counter=0, builder_text_color=None):
     """Extract group as element dict with nested elements.
     
@@ -247,6 +261,7 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
                         sub_elem["y"] = round(abs_y / emu_per_px)
                         sub_elem["width"] = round(sub_shape.width * scale_x / emu_per_px)
                         sub_elem["height"] = round(sub_shape.height * scale_y / emu_per_px)
+                        _scale_table_tracks(sub_elem, scale_x, scale_y)
                         # For freeform in group: drop raw path XML, let builder reconstruct
                         # from px coords (which match the group-scaled shape size)
                         if sub_elem.get("type") == "freeform":
@@ -282,6 +297,7 @@ def extract_group_element(shape, theme_colors=None, color_mapping=None, theme_st
                                         el["width"] = round(el["width"] * sx)
                                     if "height" in el:
                                         el["height"] = round(el["height"] * sy)
+                                    _scale_table_tracks(el, sx, sy)
                                     if el.get("type") == "freeform":
                                         if el.get("_widthEmu"):
                                             el["_widthEmu"] = round(el["_widthEmu"] * sx)

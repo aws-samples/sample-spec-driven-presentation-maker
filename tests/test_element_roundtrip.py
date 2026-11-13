@@ -19,6 +19,7 @@ from pptx import Presentation
 
 from sdpm.api import generate
 from sdpm.engine.builder.elements.shape import ShapeMixin
+from sdpm.engine.converter.pipeline import pptx_to_json
 from test_roundtrip import _make_deck, _plain_text, _roundtrip
 
 _A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
@@ -503,6 +504,59 @@ class TestGroup:
         ]}])
         kinds = sorted(e["type"] for e in slide["elements"])
         assert kinds == ["line", "shape", "shape", "textbox"]
+
+    def test_table_and_video_children_round_trip(self, tmp_path):
+        deck = _make_deck(tmp_path, [{"type": "group", "elements": [
+            {"_comment": "section marker"},
+            {"type": "table", "x": 100, "y": 100, "width": 600, "height": 200,
+             "colWidths": [200, 400], "headers": ["A", "B"], "rows": [["1", "2"]]},
+            {"type": "video", "src": "media/v.mp4",
+             "x": 800, "y": 100, "width": 320, "height": 180},
+        ]}])
+        (deck / "media").mkdir()
+        (deck / "media" / "v.mp4").write_bytes(b"FAKE_MP4")
+        out = tmp_path / "out.pptx"
+        generate(deck, output_path=out)
+        slide = pptx_to_json(out, tmp_path / "extracted")["slides"][0]
+
+        (table,) = _of_type(slide, "table")
+        assert (table["x"], table["y"], table["width"]) == (100, 100, 600)
+        assert table["colWidths"] == [200, 400]
+        assert [_plain_text(h["text"]) for h in table["headers"]] == ["A", "B"]
+        (video,) = _of_type(slide, "video")
+        assert (video["x"], video["y"], video["width"], video["height"]) == (800, 100, 320, 180)
+        assert (tmp_path / "extracted" / video["src"]).read_bytes() == b"FAKE_MP4"
+
+    def test_raw_shape_child_is_injected(self, tmp_path):
+        prs = Presentation()
+        tb = prs.slides.add_slide(prs.slide_layouts[6]).shapes.add_textbox(0, 0, 914400, 457200)
+        tb.text_frame.text = "verbatim"
+        xml = etree.tostring(tb._element, encoding="unicode")
+        shapes = _built_shapes(tmp_path, [{"type": "group", "elements": [
+            {"type": "rawShape", "_shapeXml": xml}]}])
+        assert [s.text_frame.text for s in shapes] == ["verbatim"]
+
+    def test_unknown_child_type_warns(self, tmp_path, capsys):
+        assert _built_shapes(tmp_path, [{"type": "group", "elements": [{"type": "nope"}]}]) == []
+        assert "unknown element type 'nope' inside group" in capsys.readouterr().err
+
+    def test_table_tracks_scale_with_the_group(self, tmp_path):
+        # A group whose ext is twice its chExt: the table's columns and rows
+        # must come back in slide space, like its frame.
+        src = tmp_path / "src.pptx"
+        prs = Presentation()
+        shapes = prs.slides.add_slide(prs.slide_layouts[6]).shapes
+        tbl = shapes.add_table(2, 2, 914400, 914400, 3657600, 914400)
+        grp = shapes.add_group_shape([tbl])
+        ext = grp._element.find(f"{_P}grpSpPr/{_A}xfrm/{_A}ext")
+        ext.set("cx", str(int(ext.get("cx")) * 2))
+        ext.set("cy", str(int(ext.get("cy")) * 2))
+        prs.save(str(src))
+
+        (group,) = pptx_to_json(src, tmp_path / "x")["slides"][0]["elements"]
+        (table,) = group["elements"]
+        assert sum(table["colWidths"]) == table["width"]
+        assert sum(table["rowHeights"]) == table["height"]
 
     def test_raw_group_xml_is_injected(self, tmp_path):
         src = tmp_path / "src.pptx"
