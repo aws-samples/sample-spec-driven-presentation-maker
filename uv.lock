@@ -3251,7 +3251,7 @@ requires-dist = [
     { name = "mcp", specifier = ">=2.3.0,<3" },
     { name = "partial-json-parser" },
     { name = "pymupdf" },
-    { name = "strands-agents", extras = ["otel"], specifier = ">=1.47.0" },
+    { name = "strands-agents", extras = ["otel"], specifier = ">=1.56.0" },
 ]
 
 [[package]]

@@ -6,7 +6,9 @@ requires-python = ">=3.11"
 # AI model access requires appropriate IAM permissions and Bedrock model access grants.
 # Versions are locked in the workspace uv.lock (root); agent/Dockerfile installs from it.
 dependencies = [
-    "strands-agents[otel]>=1.47.0",
+    # >=1.56.0: the floor bedrock-agentcore's [strands-agents] extra set for its memory
+    # integration (session_manager), which the agent uses.
+    "strands-agents[otel]>=1.56.0",
     "mcp>=2.3.0,<3",
     # No [strands-agents] extra: it caps mcp <2, and strands-agents is declared above.
     "bedrock-agentcore>=1.0.6",
