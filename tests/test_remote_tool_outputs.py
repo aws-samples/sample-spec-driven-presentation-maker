@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT-0
 """Remote MCP tools: the declared return type matches what the tool returns.
 
-FastMCP builds each tool's output schema from its return annotation and validates
+MCPServer builds each tool's output schema from its return annotation and validates
 the result against it, so a tool declared ``-> str`` that returns a dict fails on
 every call (read_attachment did, 2026-10-08 → 2026-11). The first test drives
 read_attachment through a real MCP client session; the second checks every
@@ -22,7 +22,7 @@ import typing
 from pathlib import Path
 from unittest.mock import patch
 
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp.client import Client
 
 _ROOT = Path(__file__).resolve().parents[1]
 _SERVER = _ROOT / "servers" / "remote" / "server.py"
@@ -67,7 +67,7 @@ def test_read_attachment_over_mcp_returns_structured_result() -> None:
     source = "uploads/123e4567-e89b-12d3-a456-426614174000/report.txt"
 
     async def call():
-        async with create_connected_server_and_client_session(remote_server.mcp) as session:
+        async with Client(remote_server.mcp, mode="legacy") as session:
             return await session.call_tool("read_attachment", {"source": source})
 
     with (
@@ -76,9 +76,9 @@ def test_read_attachment_over_mcp_returns_structured_result() -> None:
     ):
         result = asyncio.run(call())
 
-    assert not result.isError, result.content[0].text
-    assert result.structuredContent["header"]["fileName"] == "report.txt"
-    assert "hello" in result.structuredContent["body"]
+    assert not result.is_error, result.content[0].text
+    assert result.structured_content["header"]["fileName"] == "report.txt"
+    assert "hello" in result.structured_content["body"]
     assert json.loads(result.content[0].text)["header"]["source"] == source
 
 

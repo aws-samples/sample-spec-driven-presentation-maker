@@ -93,7 +93,7 @@ updates:
     cooldown:
       default-days: 7
     # pyproject.toml holds the supported ranges, uv.lock the exact versions; an
-    # update moves the lock inside the range. A deliberate cap (mcp <2, #301) is
+    # update moves the lock inside the range. A deliberate cap (such as mcp <2 until #301) is
     # therefore the one place that stops a major — no ignore entry needed. It also
     # avoids dependabot-core #15786 (grouped updates rewriting unrelated
     # requirements in a member's pyproject.toml).
