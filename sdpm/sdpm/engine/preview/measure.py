@@ -5,7 +5,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from lxml import etree
+from sdpm.utils import xml_safe
 
 # Placeholder classes to exclude from measurement
 _EXCLUDE_CLASSES = {"DateTime", "Footer", "PageNumber", "Header"}
@@ -38,7 +38,7 @@ def measure_from_svg(
     Returns:
         Dict mapping slide number (1-based) to list of ElementBBox.
     """
-    tree = etree.parse(str(svg_path))  # noqa: S320
+    tree = xml_safe.parse(svg_path, allow_doctype=True)
     root = tree.getroot()
 
     # Read viewBox for coordinate conversion

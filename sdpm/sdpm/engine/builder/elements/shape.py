@@ -6,6 +6,7 @@ from pptx.dml.color import RGBColor
 from pptx.enum.shapes import MSO_SHAPE
 from pptx.util import Pt
 from sdpm.engine.schema.defaults import ELEMENT_DEFAULTS
+from sdpm.utils import xml_safe
 from sdpm.utils.effects import apply_effects
 from sdpm.utils.text import _expand_styled_newlines
 
@@ -258,7 +259,7 @@ class ShapeMixin:
                 from pptx.oxml.ns import qn
                 txBody = tf._txBody
                 old_lst = txBody.find(qn('a:lstStyle'))
-                new_lst = etree.fromstring(lst_style_xml)
+                new_lst = xml_safe.fromstring(lst_style_xml)
                 if old_lst is not None:
                     txBody.replace(old_lst, new_lst)
                 else:
@@ -583,7 +584,7 @@ class ShapeMixin:
                 # Use raw pathLst XML if available (lossless roundtrip)
                 raw_path_xml = elem.get("_pathLstXml")
                 if raw_path_xml:
-                    path_lst = etree.fromstring(raw_path_xml)
+                    path_lst = xml_safe.fromstring(raw_path_xml)
                     cust_geom.append(path_lst)
                 else:
                     path_lst = etree.SubElement(cust_geom, f'{{{ns_a}}}pathLst')
@@ -625,7 +626,7 @@ class ShapeMixin:
         elif custom_geom:
             try:
                 custom_geom_clean = custom_geom.replace('ns0:', 'a:').replace('xmlns:ns0=', 'xmlns:a=')
-                cust_geom_elem = etree.fromstring(custom_geom_clean)
+                cust_geom_elem = xml_safe.fromstring(custom_geom_clean)
                 sp_pr = shape._element.spPr
                 
                 for prst_geom in sp_pr.findall(qn('a:prstGeom')):

@@ -594,11 +594,14 @@ def _check_svg_href(tag: str, value: str) -> None:
 
 
 def _check_svg_tree(text: str) -> None:
-    """Element-level SVG checks on the parsed document (entities decoded, PIs dropped)."""
+    """Element-level SVG checks on the parsed document (DTDs refused, PIs dropped)."""
     from defusedxml.ElementTree import ParseError, fromstring
+    from defusedxml.common import DefusedXmlException
 
     try:
-        root = fromstring(text.encode("utf-8"))
+        root = fromstring(text.encode("utf-8"), forbid_dtd=True)
+    except DefusedXmlException:
+        raise SourceValidationError("SVG contains unsafe active content")
     except (ParseError, ValueError) as error:
         raise SourceValidationError(f"SVG is not well-formed XML: {error}")
 

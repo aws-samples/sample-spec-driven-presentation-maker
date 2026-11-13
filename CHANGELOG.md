@@ -13,6 +13,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Security
+
+- **One explicit XML parser for content from outside the repository.** Template and
+  imported PPTX parts, the XML fragments a slide JSON carries for round trips, and SVG
+  files are parsed through `sdpm.utils.xml_safe`, which states its settings instead of
+  relying on the installed lxml's defaults: no entity substitution, no DTD loading, no
+  network access, normal size limits. A document that declares entities is refused, and
+  so is a DOCTYPE outside SVG. Attached SVGs are also parsed with DTDs refused.
+
 ## [0.17.0] - 2026-11-13
 
 The Web UI question card asks one question at a time: chips across the top show every
