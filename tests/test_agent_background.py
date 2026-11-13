@@ -199,15 +199,18 @@ def test_a_call_to_the_manage_tool_by_name_is_refused_and_the_task_keeps_running
     async def run():
         agent = _agent(PolicyModel(policy), [fake_compose(0.4)])
         await agent.invoke_async("make a deck")
-        working = [t["status"] for t in background.tasks(agent)]
+        dispatched = [t["status"] for t in background.tasks(agent)]
+        await _until(lambda: [t["status"] for t in background.tasks(agent)] == ["working"])
         await _until(lambda: background.undelivered(agent))
-        return agent, working
+        return agent, dispatched
 
-    agent, working = asyncio.run(run())
+    agent, dispatched = asyncio.run(run())
 
     refused = [r for m in agent.messages for r in tool_results(m)][-1]
     assert refused["status"] == "error" and "delivered automatically" in result_text(refused)
-    assert working == ["working"]
+    # Strands publishes "working" from its runtime thread after the dispatch ack, so the
+    # turn can end while the snapshot still says "queued"; run() waited for "working".
+    assert dispatched in (["queued"], ["working"]), "the refused cancel did not touch the task"
     assert [t["status"] for t in background.undelivered(agent)] == ["completed"]
 
 
@@ -245,7 +248,8 @@ def test_cancel_all_cancels_a_pending_task():
     async def run():
         agent = _agent(PolicyModel(compose_policy), [fake_compose(10.0), lookup])
         await agent.invoke_async("make a deck")
-        assert [t["status"] for t in background.pending(agent)] == ["working"]
+        # "working" is published from Strands' runtime thread, possibly after the turn ends.
+        await _until(lambda: [t["status"] for t in background.pending(agent)] == ["working"])
         started = time.monotonic()
         await background.cancel_all(agent)
         await _until(lambda: not background.pending(agent), timeout=2)
