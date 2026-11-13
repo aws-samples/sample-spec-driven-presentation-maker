@@ -17,6 +17,7 @@ from pptx import Presentation
 
 from sdpm.api import generate
 from sdpm.engine.converter.pipeline import pptx_to_json
+from sdpm.engine.schema.chart import chart_fingerprint
 from sdpm.engine.schema.minimal import minimize
 from test_roundtrip import _make_deck, _roundtrip
 
@@ -297,15 +298,20 @@ class TestBarAndLineStyle:
         smooth = chart._chartSpace.find(f".//{_C}ser/{_C}smooth")
         assert smooth is not None and smooth.get("val") == "1"
 
-    @pytest.mark.xfail(strict=True, reason="extractor does not read c:smooth back into 'smooth'")
     def test_smooth_round_trips(self, tmp_path):
         ch = _one_chart(tmp_path, chartType="line", categories=["A", "B"],
                         series=[{"name": "s", "values": [1, 2]}], smooth=True)
         assert ch.get("smooth") is True
 
+    def test_not_smooth_is_not_recorded(self, tmp_path):
+        ch = _one_chart(tmp_path, chartType="line", categories=["A", "B"],
+                        series=[{"name": "s", "values": [1, 2]}])
+        assert "smooth" not in ch
+
 
 class TestRebuildFromExtracted:
-    """The extractor keeps the whole chart XML in ``_chartXml``; rebuilding restores it."""
+    """The extractor keeps the whole chart XML in ``_chartXml``; rebuilding restores it
+    while the structured fields still match ``_chartFingerprint``."""
 
     def test_second_round_trip_is_stable(self, tmp_path):
         first = _one_chart(tmp_path / "a", chartType="bar", categories=["A", "B", "C"], series=TWO_SERIES,
@@ -324,7 +330,6 @@ class TestRebuildFromExtracted:
         again = _one_chart(tmp_path / "b", **props)
         assert again["_chartUserShapes"] == drawing
 
-    @pytest.mark.xfail(strict=True, reason="_chartXml wins over edited categories/values on rebuild")
     def test_edited_values_win_over_chart_xml(self, tmp_path):
         first = _one_chart(tmp_path / "a", chartType="bar", categories=["A", "B"],
                            series=[{"name": "s", "values": [1, 2]}])
@@ -334,6 +339,53 @@ class TestRebuildFromExtracted:
         again = _one_chart(tmp_path / "b", **props)
         assert again["categories"] == ["X", "Y"]
         assert again["series"][0]["values"] == [7, 9]
+
+    def test_edited_title_and_color_win_over_chart_xml(self, tmp_path):
+        first = _one_chart(tmp_path / "a", chartType="line", categories=["A", "B"], title="Old",
+                           series=[{"name": "s", "values": [1, 2], "color": "#FF0000"}], smooth=True)
+        props = {k: v for k, v in first.items() if k != "type"}
+        props["title"] = "New"
+        props["series"][0]["color"] = "#00FF00"
+        again = _one_chart(tmp_path / "b", **props)
+        assert again["title"] == "New"
+        assert again["series"][0]["color"] == "#00FF00"
+        assert again["smooth"] is True
+
+    def _tagged(self, tmp_path: Path) -> dict:
+        """Extracted chart whose _chartXml title differs from its JSON title."""
+        out = _one_chart(tmp_path, chartType="bar", categories=["A", "B"], title="JSON",
+                         series=[{"name": "s", "values": [1, 2]}])
+        assert ">JSON<" in out["_chartXml"]
+        out["_chartXml"] = out["_chartXml"].replace(">JSON<", ">FROM_XML<")
+        return {k: v for k, v in out.items() if k != "type"}
+
+    def test_unedited_chart_restores_chart_xml(self, tmp_path):
+        props = self._tagged(tmp_path / "a")
+        props["x"] += 50  # geometry is not chart content
+        props["series"][0]["values"] = [1.0, 2.0]  # same numbers, other spelling
+        assert _one_chart(tmp_path / "b", **props)["title"] == "FROM_XML"
+
+    def test_chart_xml_without_fingerprint_is_restored(self, tmp_path):
+        # JSON extracted before the fingerprint existed keeps the old behaviour
+        props = self._tagged(tmp_path / "a")
+        del props["_chartFingerprint"]
+        props["title"] = "Edited"
+        assert _one_chart(tmp_path / "b", **props)["title"] == "FROM_XML"
+
+    def test_edit_skips_chart_xml(self, tmp_path):
+        props = self._tagged(tmp_path / "a")
+        props["title"] = "Edited"
+        assert _one_chart(tmp_path / "b", **props)["title"] == "Edited"
+
+    def test_fingerprint_survives_the_written_json(self, tmp_path):
+        # what an agent edits is the slide file on disk, not the in-memory dict
+        deck = _make_deck(tmp_path, [_chart(chartType="line", categories=["A", "B"], smooth=True,
+                                            series=[{"name": "s", "values": [1.5, 2]}])])
+        generate(deck, output_path=tmp_path / "out.pptx")
+        pptx_to_json(tmp_path / "out.pptx", tmp_path / "x")
+        [slide_file] = (tmp_path / "x" / "slides").glob("slide-*.json")
+        [ch] = _charts(json.loads(slide_file.read_text()))
+        assert ch["_chartFingerprint"] == chart_fingerprint(ch)
 
     def test_broken_chart_xml_falls_back_to_normal_build(self, tmp_path, capsys):
         ch = _one_chart(tmp_path, chartType="line", categories=["A", "B"],

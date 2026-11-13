@@ -31,6 +31,21 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   remote server refuses a request body over 4 MiB with HTTP 413. Cloud deployments
   redeploy SdpmRuntime and SdpmAgent to pick it up.
 
+### Fixed
+
+- **Edits to a read-back chart show up in the rebuilt PPTX.** `pptx_to_json` keeps each
+  chart's original XML in `_chartXml` so an unedited chart rebuilds exactly, but the builder
+  restored that XML even after the chart's JSON (values, categories, series names and
+  colours, title, axes, labels) had been edited, so the edits were lost. The converter now
+  also writes `_chartFingerprint`, and the builder restores `_chartXml` only while the
+  chart's fields still match it; an edited chart is built from its JSON (styling the JSON
+  does not describe, and text drawn over the chart, is not kept then). Moving or resizing a
+  chart counts as unedited. JSON converted before this change has no fingerprint and
+  rebuilds as before; convert the PPTX again to edit its charts.
+- **Smooth line charts read back as `smooth: true`.** The converter did not read `c:smooth`,
+  so a smooth line chart rebuilt from `--minimal` JSON came back with straight segments.
+  Local mode and the AWS stack (SdpmRuntime).
+
 ## [0.17.0] - 2026-11-13
 
 The Web UI question card asks one question at a time: chips across the top show every

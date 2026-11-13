@@ -4,6 +4,8 @@
 from pptx.dml.color import RGBColor
 from pptx.util import Pt
 
+from sdpm.engine.schema.chart import chart_fingerprint
+
 
 class ChartMixin:
     """Mixin providing chart element methods."""
@@ -74,8 +76,12 @@ class ChartMixin:
         graphic_frame = slide.shapes.add_chart(xl_type, x, y, w, h, chart_data)
         chart = graphic_frame.chart
 
-        # Restore original chart styling for perfect roundtrip
-        if elem.get("_chartXml"):
+        # Restore original chart styling for perfect roundtrip, unless the
+        # structured fields were edited since extraction (fingerprint differs).
+        # JSON without a fingerprint (extracted before it existed) keeps restoring.
+        fingerprint = elem.get("_chartFingerprint")
+        edited = fingerprint is not None and fingerprint != chart_fingerprint(elem)
+        if elem.get("_chartXml") and not edited:
             try:
                 from lxml import etree
                 from pptx.oxml.ns import qn
