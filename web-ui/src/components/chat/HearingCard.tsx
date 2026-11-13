@@ -57,6 +57,9 @@ export function HearingCard({ questions, streaming = false, disabled = false, on
   const advanceTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
   const otherInput = useRef<HTMLInputElement>(null)
   const focusOther = useRef(false)
+  const root = useRef<HTMLDivElement>(null)
+  /** Focus was inside the card when the step changed: keep it there once the step renders. */
+  const keepFocus = useRef(false)
 
   useEffect(() => () => {
     if (advanceTimer.current) clearTimeout(advanceTimer.current)
@@ -67,7 +70,16 @@ export function HearingCard({ questions, streaming = false, disabled = false, on
       focusOther.current = false
       otherInput.current.focus()
     }
+    if (keepFocus.current) {
+      keepFocus.current = false
+      // The focused row or field belonged to the previous step and is gone.
+      if (root.current && !root.current.contains(document.activeElement)) root.current.focus({ preventScroll: true })
+    }
   })
+
+  const noteFocus = () => {
+    keepFocus.current = !!root.current?.contains(document.activeElement)
+  }
 
   const headerOf = (q: HearingQuestion, i: number) => q.header || fallbackHeader(q.text) || t("questionNumber", { n: i + 1 })
   const anyAnswered = questions.some((q) => isAnswered(q, answers[q.id]))
@@ -110,7 +122,10 @@ export function HearingCard({ questions, streaming = false, disabled = false, on
   }
   const goTo = (i: number) => {
     clearTimer()
-    setStep(Math.max(0, Math.min(i, questions.length - 1)))
+    const next = Math.max(0, Math.min(i, questions.length - 1))
+    if (next === index) return
+    noteFocus()
+    setStep(next)
   }
   const update = (id: string, patch: (a: HearingAnswer) => Partial<HearingAnswer>) =>
     setAnswers((prev) => {
@@ -143,6 +158,7 @@ export function HearingCard({ questions, streaming = false, disabled = false, on
       const at = index
       advanceTimer.current = setTimeout(() => {
         advanceTimer.current = null
+        noteFocus()
         setStep((s) => (s === at ? at + 1 : s))
       }, ADVANCE_DELAY_MS)
     }
@@ -214,6 +230,7 @@ export function HearingCard({ questions, streaming = false, disabled = false, on
 
   return (
     <div
+      ref={root}
       role="form"
       aria-label={t("agentQuestions")}
       tabIndex={0}

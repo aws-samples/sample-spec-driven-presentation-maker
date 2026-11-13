@@ -144,6 +144,38 @@ describe("HearingCard", () => {
     expect(screen.getByText("What goes in?")).toBeTruthy()
   })
 
+  it("keeps focus in the card when a picked row moves on, so keys still work", () => {
+    renderCard()
+    const row = screen.getByRole("radio", { name: /^Engineers/ })
+    row.focus()
+    fireEvent.click(row)
+    advanceTimers()
+    expect(screen.getByText("What goes in?")).toBeTruthy()
+    expect(document.activeElement).toBe(card())
+    fireEvent.keyDown(card(), { key: "1" })
+    expect(screen.getByRole("checkbox", { name: /^Diagram/ }).getAttribute("aria-checked")).toBe("true")
+  })
+
+  it("keeps focus in the card when Enter in the Other field moves on", () => {
+    renderCard()
+    card().focus()
+    fireEvent.keyDown(card(), { key: "3" })
+    const field = screen.getByRole("textbox", { name: "Who is it for? — Other" })
+    fireEvent.change(field, { target: { value: "Partners" } })
+    fireEvent.keyDown(field, { key: "Enter" })
+    expect(document.activeElement).toBe(card())
+    fireEvent.keyDown(card(), { key: "2" })
+    expect(screen.getByRole("checkbox", { name: /^Costs/ }).getAttribute("aria-checked")).toBe("true")
+  })
+
+  it("does not take focus on a step change when focus was outside the card", () => {
+    renderCard()
+    fireEvent.click(screen.getByRole("radio", { name: /^Engineers/ }))
+    advanceTimers()
+    expect(screen.getByText("What goes in?")).toBeTruthy()
+    expect(document.activeElement).toBe(document.body)
+  })
+
   it("cannot submit with no answers", () => {
     const { onSubmit } = renderCard({ questions: [QUESTIONS[2]] })
     expect(screen.getByRole("button", { name: "Submit" })).toHaveProperty("disabled", true)
