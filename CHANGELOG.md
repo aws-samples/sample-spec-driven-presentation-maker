@@ -13,6 +13,22 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-11-12
+
+You can now ask for changes to your own styles by commenting on their slides, as on a deck,
+and download a deck's PPTX straight from the deck list.
+Creating a style no longer times out: the style author saves one slide at a time, and the
+preview shows each save right away. A message sent while the agent works waits as a card
+above the input until the agent reads it. Slide previews show the template's background
+pictures again, and several chart and shape properties survive a read-back.
+
+### Upgrading from 0.15
+
+**Cloud deployments.**
+
+- Deploy all stacks (`scripts/deploy.sh`), in any order. Nothing in `infra/config.yaml`
+  changes.
+
 ### Added
 
 - **Comment on your own styles in the Web UI.** On the Styles page, the Comment tool (`C`)
@@ -98,8 +114,7 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   style list loaded before that save, so each change appeared only after the next save or a
   reload.
 - The style chat empties its input as soon as a message is sent. It used to keep the text
-  until the agent finished its reply; a message sent while the agent works and not taken by
-  it still stays in the input.
+  until the agent finished its reply.
 
 ## [0.15.0] - 2026-11-12
 
@@ -2265,7 +2280,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.16.0...HEAD
+[0.16.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.0...v0.13.0
