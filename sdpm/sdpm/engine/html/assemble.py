@@ -32,7 +32,9 @@ resource is ``data:``. ``AssembleResult.previews`` holds one static document per
 (no script at all, every fragment shown) for thumbnails.
 
 External links (``<a href="http(s)://…">``) get ``target="_blank" rel="noopener
-noreferrer"`` so they open in a new tab instead of replacing the deck.
+noreferrer"`` so they open in a new tab instead of replacing the deck. Unless deck.json
+sets ``"autoSpacing": false``, slide text gets the CJK↔Latin spaces the PPTX builder
+inserts (``sdpm.engine.html.spacing``); the slide files keep the text as written.
 """
 
 from __future__ import annotations
@@ -65,6 +67,7 @@ from sdpm.engine.html.slide_js import (
     library_script,
     wrap_slide_script,
 )
+from sdpm.engine.html.spacing import space_section
 from sdpm.engine.html.template import TemplateHtml, css_string
 from sdpm.utils import xml_safe
 
@@ -707,6 +710,7 @@ def assemble_deck(
     deck_dir: Path,
     deck_css: str | None = None,
     lang: str | None = None,
+    auto_spacing: bool = True,
 ) -> AssembleResult:
     """Build the single-file reveal.js deck.
 
@@ -722,6 +726,9 @@ def assemble_deck(
         deck_dir: deck root; deck-relative image paths resolve against it.
         deck_css: deck-root deck.css text, embedded once, unscoped.
         lang: ``<html lang>`` (omitted when None).
+        auto_spacing: deck.json ``autoSpacing`` — insert half-width spaces between CJK and
+            Latin text in the output (``sdpm.engine.html.spacing``), as the PPTX builder
+            does; the slide files are not changed. False keeps the text as written.
 
     Returns:
         AssembleResult(html, bytes, layouts_used, warnings, slugs, previews, line_map,
@@ -776,6 +783,8 @@ def assemble_deck(
         used_libraries.update(declared_libraries(section))
         _process_media(section, number, resolver, slug, inline)
         _external_links_new_tab(section)
+        if auto_spacing:
+            space_section(section)
         layout = parsed.layout
         if layout and layout in layouts_by_name and layout not in layouts_used:
             layouts_used.append(layout)
