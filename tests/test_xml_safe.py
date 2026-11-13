@@ -8,8 +8,8 @@ import pytest
 from lxml import etree
 
 from sdpm.tools.attachment.errors import SourceValidationError
-from sdpm.tools.attachment.source import enforce_content_limits
 from sdpm.utils import xml_safe
+from sdpm.utils.svg import get_svg_dimensions
 
 _SVG_NS = "http://www.w3.org/2000/svg"
 _SVG11_DOCTYPE = ('<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '
@@ -69,12 +69,60 @@ def test_caller_parser_is_used():
     assert [etree.QName(el).localname for el in root] == ["g"]
 
 
-def test_utf16_svg_attachment_is_refused(tmp_path):
-    # Attached SVGs must be UTF-8 (test_attachment_validation pins the error type).
-    svg = tmp_path / "x.svg"
-    svg.write_bytes(_encode(f'<svg xmlns="{_SVG_NS}"/>', "utf-16"))
-    with pytest.raises(UnicodeDecodeError):
-        enforce_content_limits(svg, "image/svg+xml")
+# Adobe Illustrator declares its namespace URIs as entities inside the SVG 1.1 DOCTYPE.
+_ILLUSTRATOR_SVG = (
+    '<!DOCTYPE svg PUBLIC "-//W3C//DTD SVG 1.1//EN" '
+    '"http://www.w3.org/Graphics/SVG/1.1/DTD/svg11.dtd" [\n'
+    '\t<!ENTITY ns_extend "http://ns.adobe.com/Extensibility/1.0/">\n'
+    '\t<!ENTITY ns_ai "http://ns.adobe.com/AdobeIllustrator/10.0/">\n'
+    '\t<!ENTITY label "Hello">\n'
+    ']>\n'
+    f'<svg xmlns:x="&ns_extend;" xmlns:i="&ns_ai;" xmlns="{_SVG_NS}" '
+    'width="120px" height="80px" viewBox="0 0 120 80">'
+    '<text>a &label; b<tspan/>c &label;</text></svg>'
+)
+
+
+@pytest.mark.parametrize("encoding", ["utf-8", "utf-16"])
+def test_illustrator_svg_entities_are_expanded(encoding):
+    root = xml_safe.fromstring(_encode(_ILLUSTRATOR_SVG, encoding), allow_doctype=True)
+    assert root.nsmap["x"] == "http://ns.adobe.com/Extensibility/1.0/"
+    assert root.nsmap["i"] == "http://ns.adobe.com/AdobeIllustrator/10.0/"
+    text = root[0]
+    assert text.text == "a Hello b"
+    assert text[0].tail == "c Hello"
+    assert b"&" not in etree.tostring(root)
+
+
+def test_illustrator_svg_file_has_its_size(tmp_path):
+    path = tmp_path / "artwork.svg"
+    path.write_text(_ILLUSTRATOR_SVG, encoding="utf-8")
+    assert get_svg_dimensions(path) == (120, 80)
+
+
+def test_entities_are_refused_outside_svg():
+    with pytest.raises(xml_safe.UnsafeXMLError, match="entity declarations"):
+        xml_safe.fromstring(_ILLUSTRATOR_SVG)
+
+
+@pytest.mark.parametrize("decl", [
+    '<!ENTITY e "<g/>">',
+    '<!ENTITY e "&#60;g/&#62;">',
+    f'<!ENTITY e "{"x" * (xml_safe.MAX_ENTITY_LENGTH + 1)}">',
+    "".join(f'<!ENTITY e{i} "x">' for i in range(xml_safe.MAX_ENTITIES + 1)),
+    '<!ENTITY e SYSTEM "logo.gif" NDATA gif>',
+], ids=["markup", "char-ref-markup", "too-long", "too-many", "unparsed"])
+def test_svg_entities_must_be_plain_text(decl):
+    with pytest.raises(xml_safe.UnsafeXMLError):
+        xml_safe.fromstring(f'<!DOCTYPE svg [{decl}]><svg xmlns="{_SVG_NS}"/>', allow_doctype=True)
+
+
+def test_file_errors_name_the_file(tmp_path):
+    path = tmp_path / "part.xml"
+    path.write_text(_EXTERNAL, encoding="utf-8")
+    with pytest.raises(xml_safe.UnsafeXMLError) as info:
+        xml_safe.parse(path)
+    assert str(info.value) == f"XML entity declarations are not accepted: {path}"
 
 
 def test_attached_svg_dtd_is_refused_by_the_parser(tmp_path):
