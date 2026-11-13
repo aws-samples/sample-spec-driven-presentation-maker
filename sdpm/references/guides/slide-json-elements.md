@@ -130,7 +130,7 @@ Expands an external JSON file's elements array. Draw order is controlled by posi
 - `src`: `assets:SOURCE/NAME`, `icons:NAME` (backward compatible), `qr:URL`, file path, relative path
 - `height`: omit to maintain aspect ratio
 - `fit`: `"contain"` (default) | `"cover"` | `"stretch"` — controls sizing when both width and height are specified
-  - `contain`: maintain aspect ratio, fit within the box (may leave gaps)
+  - `contain`: maintain aspect ratio, fit within the box, centered (may leave even gaps on two sides)
   - `cover`: maintain aspect ratio, fill the box (excess is cropped via PowerPoint trim)
   - `stretch`: ignore aspect ratio, fill the box exactly
 - `labelSize`: default 11

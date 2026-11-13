@@ -13,6 +13,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Fixed
+
+- **`fit: "contain"` images sit in the middle of their box.** When a picture's aspect ratio
+  differed from its `width` × `height` box, the PPTX placed it at the box's top-left corner
+  and left the whole gap below or to the right. It is now centered in the box, as CSS
+  `object-fit: contain` does; `cover` and `stretch` are unchanged.
+
 ## [0.16.0] - 2026-11-12
 
 You can now ask for changes to your own styles by commenting on their slides, as on a deck,

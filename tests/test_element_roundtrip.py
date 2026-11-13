@@ -546,6 +546,10 @@ class TestArchGroup:
 
 # ── image ────────────────────────────────────────────────────────────────
 
+def _px(n: int) -> int:
+    return n * 6350  # EMU per px on the default 1920-wide slide
+
+
 def _image(src: Path | str, **props) -> dict:
     return {"type": "image", "src": str(src), "x": 100, "y": 100, **props}
 
@@ -555,6 +559,34 @@ class TestImageFit:
         out = _one(tmp_path, _image(_png(tmp_path / "wide.png"), width=200, height=200, fit="contain"))
         assert (out["width"], out["height"]) == (200, 100)
         assert "padding within the box" in capsys.readouterr().err
+
+    def test_contain_centers_wide_image_vertically(self, tmp_path):
+        # Like CSS object-fit: contain (object-position 50% 50%): the gap is
+        # split evenly, not left below the picture.
+        out = _one(tmp_path, _image(_png(tmp_path / "wide.png"), width=200, height=200, fit="contain"))
+        assert (out["x"], out["y"], out["width"], out["height"]) == (100, 150, 200, 100)
+
+    def test_contain_centers_tall_image_horizontally(self, tmp_path):
+        out = _one(tmp_path, _image(_png(tmp_path / "tall.png", (200, 400)), width=200, height=200,
+                                    fit="contain"))
+        assert (out["x"], out["y"], out["width"], out["height"]) == (150, 100, 100, 200)
+
+    def test_contain_centers_svg(self, tmp_path):
+        svg = tmp_path / "wide.svg"
+        svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48" '
+                       'viewBox="0 0 96 48"><path fill="#000" d="M0 0h96v48H0z"/></svg>')
+        (pic,) = _built_shapes(tmp_path, [_image(svg, width=200, height=200, fit="contain",
+                                                 iconColor="none")])
+        box_top, box_h = _px(100), _px(200)
+        assert pic.height < box_h
+        assert abs((pic.top - box_top) - ((box_top + box_h) - (pic.top + pic.height))) <= 1
+
+    def test_contain_centered_label_sits_under_the_picture(self, tmp_path):
+        shapes = _built_shapes(tmp_path, [_image(_png(tmp_path / "wide.png"), width=200, height=200,
+                                                 fit="contain", label="Wide")])
+        pic, label = shapes
+        assert label.top > pic.top + pic.height
+        assert label.top < _px(100 + 200)  # inside the requested box, not below it
 
     def test_cover_crops_both_sides_evenly(self, tmp_path):
         out = _one(tmp_path, _image(_png(tmp_path / "wide.png"), width=200, height=200, fit="cover"))
