@@ -355,11 +355,12 @@ import os
 # Step 4 wrote rendered slide previews here
 preview_files = sorted(p for p in os.listdir("previews") if p.endswith(".png"))
 sample = preview_files[:6]  # cover + a few content slides
-all_pixels = []
+pixel_counts = Counter()
 for f in sample:
     img = Image.open(os.path.join("previews", f)).convert("RGB").resize((150, 150))
-    all_pixels.extend(img.getdata())
-common = Counter(all_pixels).most_common(20)
+    for count, rgb in img.getcolors(maxcolors=150 * 150):
+        pixel_counts[rgb] += count
+common = pixel_counts.most_common(20)
 # Convert RGB tuples to #RRGGBB hex
 swatches = ["#{:02X}{:02X}{:02X}".format(r, g, b) for (r, g, b), _ in common]
 print("Top 20 hex by pixel frequency:", swatches)
