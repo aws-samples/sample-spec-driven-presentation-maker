@@ -99,6 +99,7 @@
     "openFolder": "フォルダを開く",
     "openPptx": "PPTX を開く",
     "downloadPptx": "PPTX をダウンロード",
+    "downloadPptxAria": "PPTX をダウンロード: {name}",
     "makePrivate": "非公開にする",
     "makeInternal": "社内公開にする",
     "delete": "削除",
@@ -494,6 +495,7 @@
     "bulkDeleteDescriptionLocal": "選択したデッキのフォルダを即時に削除します。この操作は元に戻せません。",
     "errorUpdateVisibility": "公開範囲を更新できませんでした",
     "errorDeleteDeck": "デッキを削除できませんでした",
+    "errorDownloadPptx": "PPTX をダウンロードできませんでした",
     "errorLoadDecks": "デッキを読み込めませんでした"
   },
   "mcp": {

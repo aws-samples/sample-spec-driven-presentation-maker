@@ -34,6 +34,13 @@ pictures again, and several chart and shape properties survive a read-back.
   frames areas of a style's slides like on a deck; the frames collect above the style chat
   and are sent together, and the style agent changes only the commented slides. Desktop,
   Local mode and the AWS stack.
+- **Download a deck's PPTX from the deck list.** Each deck card's menu (`…`) has
+  "Download PPTX", which saves the file as `<deck title>.pptx` without opening the deck; it
+  is greyed out until the deck has a built PPTX (and for HTML decks). Works on the My Decks,
+  Favorites and Internal tabs. In Local mode "Open PPTX" stays next to it. The deck list
+  response carries `hasPptx` instead of a URL; the link is signed only when you click
+  (`GET /decks/{id}/pptx`, same read permission as opening the deck). Local mode and the
+  AWS stack.
 
 ### Changed
 
@@ -56,6 +63,15 @@ pictures again, and several chart and shape properties survive a read-back.
   colour, and a slide that hides the master's shapes (`hideMasterShapes`) no longer shows
   them in the preview. Existing decks pick it up when their slides are rendered again (for
   example, ask the agent to re-measure every slide). Local mode and the AWS stack (SdpmRuntime).
+- **A downloaded PPTX is named after the deck.** The Web UI saved it under a random
+  `<uuid>.pptx` (its storage key); it is now `<deck title>.pptx`, Japanese and other
+  non-ASCII titles included (path separators, quotes and control characters are dropped,
+  the name is cut at 120 characters, and an empty title gives `deck.pptx`). The download
+  still comes through CloudFront (inside its WAF): the signed link carries the file name,
+  and a new cache policy for `pptx/*` passes it on to S3. AWS stack (deploy SdpmWebUi;
+  Local mode too, for the download from the deck list).
+- **Enter on a deck card's menu button opens the menu, not the deck.** The key also reached
+  the card (and so did keys pressed in its menu), which opened the deck instead.
 - **Chart titles keep their font colour and size when a deck is read back.** `pptx_to_json`
   looked for the title font only on the title's first run, but generated charts (and many
   others) set it on the paragraph, so `titleFontColor` and `titleFontSize` were dropped.

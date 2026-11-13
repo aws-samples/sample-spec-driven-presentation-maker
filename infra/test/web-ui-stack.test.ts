@@ -77,3 +77,28 @@ test("this stack cannot change the WebClient", () => {
     .flatMap((s) => [s.Action].flat());
   assert.ok(!actions.some((a) => /^cognito-idp:(UpdateUserPoolClient|\*)$/.test(a)), JSON.stringify(actions));
 });
+
+test("pptx/* forwards response-content-disposition; previews/* and decks/*/* keep the preview policy", () => {
+  // api/index.py signs response-content-disposition into the PPTX URL so S3 names the
+  // download after the deck; only a cache policy's query strings reach the origin.
+  const policies = t.findResources("AWS::CloudFront::CachePolicy");
+  const idOf = (name: string) => {
+    const found = Object.entries(policies).filter(([, p]) => p.Properties.CachePolicyConfig.Name === name);
+    assert.equal(found.length, 1, name);
+    return found[0];
+  };
+  const [pptxId, pptx] = idOf("sdpm-pptx-cache");
+  const [previewId, preview] = idOf("sdpm-preview-cache");
+  const qs = (p: typeof pptx) => p.Properties.CachePolicyConfig.ParametersInCacheKeyAndForwardedToOrigin.QueryStringsConfig;
+  assert.deepEqual(qs(pptx), { QueryStringBehavior: "whitelist", QueryStrings: ["_t", "response-content-disposition"] });
+  assert.deepEqual(qs(preview), { QueryStringBehavior: "whitelist", QueryStrings: ["_t"] });
+
+  const [dist] = Object.values(t.findResources("AWS::CloudFront::Distribution"));
+  const behaviours = dist.Properties.DistributionConfig.CacheBehaviors as Array<{ PathPattern: string; CachePolicyId: { Ref: string }; TrustedKeyGroups: unknown[] }>;
+  const policyOf = (pattern: string) => behaviours.find((b) => b.PathPattern === pattern)!.CachePolicyId.Ref;
+  assert.equal(policyOf("pptx/*"), pptxId);
+  assert.equal(policyOf("previews/*"), previewId);
+  assert.equal(policyOf("decks/*/*"), previewId);
+  // Still signed URLs only.
+  assert.equal(behaviours.find((b) => b.PathPattern === "pptx/*")!.TrustedKeyGroups.length, 1);
+});

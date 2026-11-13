@@ -16,6 +16,7 @@
  * @param props.onOpen - Callback when card is clicked to open workspace
  * @param props.onToggleFavorite - Callback to toggle favorite status
  * @param props.onDelete - Callback to delete deck (owner only)
+ * @param props.onDownload - Callback to download the PPTX; the item is disabled while `deck.hasPptx` is false
  */
 
 "use client"
@@ -42,7 +43,10 @@ interface DeckCardProps {
   onToggleFavorite?: (deckId: string, action: "add" | "remove") => void
   onDelete?: (deckId: string) => void
   onToggleVisibility?: (deckId: string, visibility: "public" | "private") => void
+  /** Download the built PPTX (disabled until the deck has one). */
   onDownload?: (deckId: string) => void
+  /** Local: open output.pptx with the default app. */
+  onOpenPptx?: (deckId: string) => void
   onOpenFolder?: (deckId: string) => void
   /** Show the hover checkbox and allow this card to join a selection. */
   selectable?: boolean
@@ -53,7 +57,7 @@ interface DeckCardProps {
 }
 
 export function DeckCard({
-  deck, index, isFavorite = false, isOwner = true, onOpen, onToggleFavorite, onDelete, onToggleVisibility, onDownload, onOpenFolder,
+  deck, index, isFavorite = false, isOwner = true, onOpen, onToggleFavorite, onDelete, onToggleVisibility, onDownload, onOpenPptx, onOpenFolder,
   selectable = false, selectionMode = false, selected = false, onSelectToggle,
 }: DeckCardProps) {
   const t = useTranslations("deckCard")
@@ -66,6 +70,9 @@ export function DeckCard({
     onOpen(deck.deckId)
   }
   function handleCardKeyDown(e: React.KeyboardEvent) {
+    // Keys pressed on the card's own controls (and its menu, which bubbles here through the
+    // portal) belong to them: Enter on "Deck actions" opens the menu, not the deck.
+    if (e.target !== e.currentTarget) return
     if (canSelect && selectionMode && (e.key === "Enter" || e.key === " ")) {
       e.preventDefault()
       toggle(e.shiftKey)
@@ -161,10 +168,20 @@ export function DeckCard({
                 {t("openFolder")}
               </DropdownMenuItem>
             )}
+            {onOpenPptx && IS_LOCAL && (
+              <DropdownMenuItem disabled={!deck.hasPptx} onSelect={() => onOpenPptx(deck.deckId)}>
+                <FolderOpen className="h-3.5 w-3.5" />
+                {t("openPptx")}
+              </DropdownMenuItem>
+            )}
             {onDownload && (
-              <DropdownMenuItem onClick={() => onDownload(deck.deckId)}>
-                {IS_LOCAL ? <FolderOpen className="h-3.5 w-3.5" /> : <Download className="h-3.5 w-3.5" />}
-                {IS_LOCAL ? t("openPptx") : t("downloadPptx")}
+              <DropdownMenuItem
+                disabled={!deck.hasPptx}
+                onSelect={() => onDownload(deck.deckId)}
+                aria-label={t("downloadPptxAria", { name: deck.name })}
+              >
+                <Download className="h-3.5 w-3.5" />
+                {t("downloadPptx")}
               </DropdownMenuItem>
             )}
             <CloudOnly>
