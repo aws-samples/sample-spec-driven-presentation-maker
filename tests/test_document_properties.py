@@ -66,10 +66,21 @@ def test_app_statistics_and_custom_properties_are_dropped(tmp_path, template):
 
 def test_user_template_keeps_its_custom_properties(tmp_path):
     # A user template's custom properties (e.g. a sensitivity label) are the user's policy.
+    # Re-saving gives a template with the same custom.xml but bytes of its own.
     user_template = tmp_path / "corporate.pptx"
-    shutil.copy(BUNDLED[0], user_template)
+    Presentation(str(BUNDLED[0])).save(str(user_template))
+    assert user_template.read_bytes() != BUNDLED[0].read_bytes()
     assert len(_part(user_template, "docProps/custom.xml")) > 0
 
     out = _build(tmp_path, user_template)
     assert len(_part(out, "docProps/custom.xml")) > 0
     assert Presentation(str(out)).core_properties.last_modified_by == ""
+
+
+@pytest.mark.parametrize("template", BUNDLED, ids=lambda t: t.name)
+def test_copied_bundled_template_still_counts_as_bundled(tmp_path, template):
+    # The remote server downloads a bundled template from S3 into <tmpdir>/template.pptx.
+    copy = tmp_path / "template.pptx"
+    shutil.copy(template, copy)
+    custom = _part(_build(tmp_path, copy), "docProps/custom.xml")
+    assert custom is None or len(custom) == 0

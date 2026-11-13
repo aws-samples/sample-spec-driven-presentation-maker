@@ -10,7 +10,9 @@ modified dates and revision (``core.xml``), the template's slide titles and word
 A user template's custom properties (for example a sensitivity label the organisation
 applies) stay on the deck: they are the user's policy, not leftover authoring data.
 """
+import hashlib
 from datetime import datetime, timezone
+from functools import lru_cache
 from pathlib import Path
 
 from lxml import etree
@@ -35,9 +37,22 @@ _APP_DROP = (
 )
 
 
+def _sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes(), usedforsecurity=False).hexdigest()
+
+
+@lru_cache(maxsize=1)
+def _bundled_digests() -> frozenset[str]:
+    return frozenset(_sha256(p) for p in TEMPLATES_DIR.glob("*.pptx"))
+
+
 def is_bundled_template(template_path: Path) -> bool:
-    """True when the template is one of the templates shipped in ``sdpm/templates``."""
-    return Path(template_path).resolve().parent == TEMPLATES_DIR.resolve()
+    """True when the template's bytes are one of the templates shipped in ``sdpm/templates``.
+
+    Compared by content, not location: the remote server downloads the bundled templates
+    from S3 (uploaded unchanged from ``sdpm/templates``) into a temp ``template.pptx``.
+    """
+    return _sha256(Path(template_path)) in _bundled_digests()
 
 
 def reset_document_properties(prs, *, bundled: bool) -> None:
