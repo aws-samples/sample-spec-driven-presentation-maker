@@ -74,6 +74,23 @@ class TestChartTypes:
         assert ch["chartType"] == "line"
         assert ch.get("markers", True) is markers
 
+    @pytest.mark.parametrize("markers", [True, False])
+    def test_radar_markers(self, tmp_path, markers):
+        ch = _one_chart(tmp_path, chartType="radar", markers=markers,
+                        categories=["Cost", "Speed", "Safety"], series=TWO_SERIES)
+        assert ch["chartType"] == "radar"
+        assert ch.get("markers", True) is markers
+        assert ch["categories"] == ["Cost", "Speed", "Safety"]
+        assert [s["name"] for s in ch["series"]] == ["p50", "p99"]
+        assert [s["values"] for s in ch["series"]] == [[12, 45, 89], [34, 120, 250]]
+        assert "_chartRebuildable" not in ch
+
+    def test_radar_builds_a_radar_chart(self, tmp_path):
+        chart = _built_chart(tmp_path, chartType="radar", categories=["A", "B", "C"],
+                             series=[{"name": "s", "values": [1, 2, 3]}])
+        assert chart._chartSpace.find(f".//{_C}radarChart") is not None
+        assert chart._chartSpace.find(f".//{_C}barChart") is None
+
     def test_pie(self, tmp_path):
         ch = _one_chart(tmp_path, chartType="pie", categories=["A", "B", "C"],
                         series=[{"name": "share", "values": [20, 30, 50]}])
@@ -122,6 +139,11 @@ class TestColors:
         ch = _one_chart(tmp_path, chartType="line", categories=["A", "B"],
                         series=[{"name": "s", "values": [1, 2], "color": "#00FF00"}])
         assert ch["series"][0]["color"] == "#00FF00"
+
+    def test_radar_series_colors(self, tmp_path):
+        ch = _one_chart(tmp_path, chartType="radar", categories=["A", "B", "C"], series=TWO_SERIES)
+        assert ch["chartType"] == "radar"
+        assert [s["color"] for s in ch["series"]] == ["#FF9900", "#41B3FF"]
 
     def test_default_colors_are_distinct_theme_colors(self, tmp_path):
         ch = _one_chart(tmp_path, chartType="bar", categories=["A"],
@@ -235,6 +257,13 @@ class TestAxes:
     def test_default_axes_have_value_gridlines(self, tmp_path):
         ch = _one_chart(tmp_path, chartType="line", categories=["A", "B"], series=[{"name": "s", "values": [1, 2]}])
         assert "valueAxis" not in ch  # gridlines on, no scaling: nothing to record
+
+    def test_radar_value_axis_scale(self, tmp_path):
+        ch = _one_chart(tmp_path, chartType="radar", categories=["A", "B", "C"],
+                        series=[{"name": "s", "values": [1, 2, 3]}],
+                        valueAxis={"min": 0, "max": 5, "majorUnit": 1})
+        assert ch["chartType"] == "radar"
+        assert ch["valueAxis"] == {"min": 0, "max": 5, "majorUnit": 1}
 
     def test_gridline_and_axis_style(self, tmp_path):
         chart = _built_chart(tmp_path, chartType="bar", categories=["A", "B"],
@@ -406,6 +435,30 @@ class TestRebuildFromExtracted:
         ch = _one_chart(tmp_path, chartType="bar", categories=["A"], series=[{"name": "s", "values": [1]}])
         assert "_chartRebuildable" not in ch
 
+    def test_edited_radar_is_built_from_json(self, tmp_path):
+        (tmp_path / "a").mkdir()
+        source = _foreign_chart_pptx(tmp_path / "a" / "in.pptx", "radar")
+        [ch] = _charts(pptx_to_json(source, tmp_path / "a" / "x")["slides"][-1])
+        assert ch["chartType"] == "radar"
+        assert ch["markers"] is False
+        assert "_chartRebuildable" not in ch
+        ch["series"][0]["values"] = [5, 6]
+        deck = _make_deck(tmp_path / "b", [ch])
+        result = generate(deck, output_path=tmp_path / "b" / "out.pptx")
+        assert "errors" not in result
+        assert _plot_tags(tmp_path / "b" / "out.pptx") == ["radarChart"]
+        [again] = _charts(pptx_to_json(tmp_path / "b" / "out.pptx", tmp_path / "c")["slides"][-1])
+        assert again["series"][0]["values"] == [5, 6]
+
+    def test_unedited_radar_keeps_its_series_lines(self, tmp_path):
+        (tmp_path / "a").mkdir()
+        source = _foreign_chart_pptx(tmp_path / "a" / "in.pptx", "radar")
+        [ch] = _charts(pptx_to_json(source, tmp_path / "a" / "x")["slides"][-1])
+        deck = _make_deck(tmp_path / "b", [ch])
+        generate(deck, output_path=tmp_path / "b" / "out.pptx")
+        [frame] = [s for s in Presentation(str(tmp_path / "b" / "out.pptx")).slides[0].shapes if s.has_chart]
+        assert frame.chart._chartSpace.find(f".//{_C}ser/{_C}spPr/{_A}ln") is None
+
 
 _USER_SHAPES = ('<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" '
                 'xmlns:cdr="http://schemas.openxmlformats.org/drawingml/2006/chartDrawing"/>')
@@ -451,8 +504,8 @@ def _foreign_chart_pptx(path: Path, kind: str) -> Path:
 
 
 class TestChartsTheJsonCannotDescribe:
-    """A chart read back as a type chartType does not have (area, radar, 100% stacked,
-    combo) keeps its ``_chartXml`` when edited, instead of turning into a bar chart."""
+    """A chart read back as a type chartType does not have (area, 100% stacked, combo)
+    keeps its ``_chartXml`` when edited, instead of turning into a bar chart."""
 
     def _extract(self, tmp_path: Path, kind: str) -> tuple[dict, list[str]]:
         tmp_path.mkdir(parents=True)
@@ -466,7 +519,7 @@ class TestChartsTheJsonCannotDescribe:
         result = generate(deck, output_path=tmp_path / "out.pptx")
         return result, _plot_tags(tmp_path / "out.pptx")
 
-    @pytest.mark.parametrize("kind", ["area", "radar", "stacked100", "combo"])
+    @pytest.mark.parametrize("kind", ["area", "stacked100", "combo"])
     def test_edited_chart_keeps_its_type(self, tmp_path, kind):
         ch, original = self._extract(tmp_path / "a", kind)
         assert ch["_chartRebuildable"] is False

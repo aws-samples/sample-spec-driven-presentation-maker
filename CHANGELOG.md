@@ -24,6 +24,14 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   Illustrator does for its namespace URIs; external, nested or markup-bearing entities are
   refused. A refused file is named in the error. Attached SVGs are also parsed with DTDs
   refused.
+### Added
+
+- **Radar charts** (`chartType: "radar"`, #621). A radar chart takes the same categories and
+  series as a line chart; `markers` (default on), series `color`, `style.lineWidth` /
+  `style.markerSize` and `valueAxis` (`min` / `max` / `majorUnit` / `gridlines`, the radial
+  scale) work as for `line`. `pptx_to_json` reads a radar chart back as `radar`, so an
+  edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
+  New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
 ### Changed
 
 - **The MCP servers run on MCP Python SDK 2.x** (`mcp>=2.3,<3`, was `<2`; #301). The local
@@ -62,8 +70,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   chart's fields still match it; an edited chart is built from its JSON, keeping the text
   drawn over it (`_chartUserShapes`) but not the styling the JSON does not describe. Moving
   or resizing a chart counts as unedited. A chart whose type or combination of plots
-  `chartType` cannot describe (area, radar, 100% stacked, a column chart with a line plot,
-  and so on) is marked `_chartRebuildable: false` and keeps its original chart when edited;
+  `chartType` cannot describe (area, filled radar, 100% stacked, a column chart with a line
+  plot, and so on) is marked `_chartRebuildable: false` and keeps its original chart when edited;
   the build reports `chart-edit-ignored` for it, and deleting `_chartXml` builds it from its
   JSON instead. JSON converted before this change has no fingerprint and rebuilds as before;
   convert the PPTX again to edit its charts. Local mode and the AWS stack (SdpmRuntime).
