@@ -15,8 +15,25 @@ def is_fullwidth(char):
             or 0x20000 <= cp <= 0x2FA1F)  # CJK拡張
 
 
+def is_cjk_punctuation(char):
+    """CJK punctuation and full-width symbols (、。・「」／（）：〜 …): characters that
+    take no space next to half-width text. Letter-like marks (々 〆 〇 ー) are not
+    punctuation."""
+    cp = ord(char)
+    if char in '々〆〇':
+        return False
+    return (0x3000 <= cp <= 0x303F       # CJK記号・句読点（、。「」〜 など）
+            or cp == 0x30FB              # 中黒（・）
+            or 0xFE30 <= cp <= 0xFE4F    # CJK互換形
+            or 0xFF01 <= cp <= 0xFF0F    # ！＂＃＄％＆＇（）＊＋，－．／
+            or 0xFF1A <= cp <= 0xFF20    # ：；＜＝＞？＠
+            or 0xFF3B <= cp <= 0xFF40    # ［＼］＾＿｀
+            or 0xFF5B <= cp <= 0xFF65    # ｛｜｝～ と半角の句読点（｡｢｣､･）
+            or 0xFFE0 <= cp <= 0xFFE6)   # 全角通貨等
+
+
 def normalize_spacing(text):
-    """半角と全角の間に半角スペースを挿入（括弧内側は除外）"""
+    """半角と全角の間に半角スペースを挿入（括弧内側・日本語の約物の隣は除外）"""
     open_br = set('([{「『（【〔《〈')
     close_br = set(')]}」』）】〕》〉')
     quotes = set('"\'`')
@@ -25,7 +42,8 @@ def normalize_spacing(text):
         return '\x21' <= c <= '\x7e'
 
     def is_wide(c):
-        return is_fullwidth(c) and c not in open_br and c not in close_br
+        return (is_fullwidth(c) and not is_cjk_punctuation(c)
+                and c not in open_br and c not in close_br)
 
     quote_positions = {q: [] for q in quotes}
     for i, ch in enumerate(text):
@@ -319,7 +337,7 @@ def _parse_non_link_styles(text, auto_spacing=True):
             return '\x21' <= c <= '\x7e'
 
         def is_wide(c: str) -> bool:
-            return is_fullwidth(c)
+            return is_fullwidth(c) and not is_cjk_punctuation(c)
 
         if (is_ascii(last_ch) and is_wide(first_ch)) or (is_wide(last_ch) and is_ascii(first_ch)):
             segments[i]["text"] = cur_text + ' '
