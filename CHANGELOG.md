@@ -15,7 +15,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [0.16.0] - 2026-11-12
 
-You can now ask for changes to your own styles by commenting on their slides, as on a deck.
+You can now ask for changes to your own styles by commenting on their slides, as on a deck,
+and download a deck's PPTX straight from the deck list.
 Creating a style no longer times out: the style author saves one slide at a time, and the
 preview shows each save right away. A message sent while the agent works waits as a card
 above the input until the agent reads it. Slide previews show the template's background
