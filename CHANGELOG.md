@@ -29,6 +29,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **Local Web UI: the question card shows again.** kiro-cli (engine V3) sends an MCP
+  tool's input either wrapped as `{tool_id, arguments}` or as the arguments themselves; the
+  Local Web UI read only the wrapped form, so a direct call reached the chat with an empty
+  input and the question card never showed. Both forms are read now. Local mode only.
 - **The `blank-light` title layout's subtitle prompt reads "Subtitle".** It read
   "Sustitle"; it now matches `blank-dark`. Only the empty-placeholder prompt changes —
   layout and placeholder names, and existing decks, are untouched.
