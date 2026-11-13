@@ -22,7 +22,8 @@ override-group head they inherit from, marked `readonly`). These are current. Wh
 read is the parts of the style your slides use and the parts of the brief's Sources your
 slides need.
 Treat `body` and `visual` as the intent to realise: choose the layout, dimensions and decoration,
-and refine wording as needed. Facts come from the brief and its sources.
+and refine wording as needed. Facts come from the brief and its sources. For a Japanese deck,
+the wording follows `read_guides(["writing-ja"])`.
 
 ## What SDPM needs you to know
 
