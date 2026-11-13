@@ -13,6 +13,20 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+## [0.17.0] - 2026-11-13
+
+The Web UI question card asks one question at a time: chips across the top show every
+question, each option has a one-line description, and the agent's recommendation carries a
+"Recommended" badge. The card shows again in the Local Web UI. `fit: "contain"` images sit
+in the middle of their box, and tables and videos inside a group survive a read-back.
+
+### Upgrading from 0.16
+
+**Cloud deployments.**
+
+- Deploy all stacks (`scripts/deploy.sh`), in any order, and the Web UI
+  (`scripts/deploy_webui.sh`). Nothing in `infra/config.yaml` changes.
+
 ### Changed
 
 - **The Web UI question card shows one question at a time.** Header chips across the top
@@ -2315,7 +2329,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.16.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.13.0...v0.14.0
