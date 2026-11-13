@@ -88,6 +88,12 @@ describe("tools", () => {
     expect(t.translate(builtin)).toEqual([{ type: "tool_use", id: "t2", name: "Read File", input: { path: "/x" } }])
   })
 
+  it("takes a direct MCP call's input from rawInput itself (no tool_id wrapper)", () => {
+    const q0 = { header: "Theme", type: "free_text", text: "What is it about?" }
+    const call = update({ sessionUpdate: "tool_call", toolCallId: "t1", title: "@sdpm/hearing", status: "pending", rawInput: { q0 }, ...kiro({ serverName: "sdpm", toolOrigin: "default" }) })
+    expect(t.translate(call)).toEqual([{ type: "tool_use", id: "t1", name: "hearing", input: { q0 } }])
+  })
+
   it("reads a result from content[] without a response, and keeps a non-JSON result empty", () => {
     t.translate(mcpCall("t1", "x"))
     const done = update({ sessionUpdate: "tool_call_update", toolCallId: "t1", status: "completed", content: [{ type: "content", content: { type: "text", text: "{\"ok\":true}" } }], ...kiro({ serverName: "sdpm" }) })
