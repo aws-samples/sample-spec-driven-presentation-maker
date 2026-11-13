@@ -34,6 +34,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **Slide previews show the template's background pictures again.** On a slide with its
+  own background, which every slide of a styled deck has (`defaultBackground`), the Web UI
+  preview and the MCP Apps viewer drew only the solid colour and left out the layout's
+  pictures, logo and footer that the PNG thumbnail shows. They are now drawn over that
+  colour, and a slide that hides the master's shapes (`hideMasterShapes`) no longer shows
+  them in the preview. Existing decks pick it up when their slides are rendered again (for
+  example, ask the agent to re-measure every slide). Local mode and the AWS stack (SdpmRuntime).
 - **Chart titles keep their font colour and size when a deck is read back.** `pptx_to_json`
   looked for the title font only on the title's first run, but generated charts (and many
   others) set it on the paragraph, so `titleFontColor` and `titleFontSize` were dropped.

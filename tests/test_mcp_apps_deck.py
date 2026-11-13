@@ -224,8 +224,8 @@ def test_the_svg_payload_carries_no_base64_outside_its_embedded_images() -> None
         text = json.dumps(deck.slide_preview("d1", slug, fake.access()), ensure_ascii=False)
         images += len(_DATA_IMAGE.findall(text))
         assert not _BASE64_RUN.search(_DATA_IMAGE.sub("", text)), slug
-        assert MASTER_IMAGE_ID not in text
-    assert images == 1  # the cover's own image
+        assert MASTER_IMAGE_ID in text  # the layout's picture, drawn over the slide's own fill
+    assert images == 3  # the master's picture on each slide, and the cover's own image
 
 
 def test_deck_view_lists_the_compose_stamp() -> None:
