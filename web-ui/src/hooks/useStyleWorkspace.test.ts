@@ -8,7 +8,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, renderHook, waitFor } from "@testing-library/react"
+import { act, cleanup, renderHook, waitFor } from "@testing-library/react"
 
 const { fetchStylePreviewHtml } = vi.hoisted(() => ({ fetchStylePreviewHtml: vi.fn(async (..._args: unknown[]) => "") }))
 vi.mock("@/services/deckService", () => ({ fetchStylePreviewHtml }))
@@ -28,6 +28,9 @@ async function openCalm() {
 describe("useStyleWorkspace preview", () => {
   beforeEach(() => { vi.clearAllMocks() })
   afterEach(async () => {
+    // Unmount first: vitest runs without globals, so Testing Library's auto-cleanup is off.
+    // A hook still mounted here would re-render on the hashchange below, after jsdom is gone.
+    cleanup()
     window.location.hash = ""
     await new Promise((resolve) => setTimeout(resolve, 0))
   })
