@@ -165,7 +165,11 @@ def _write_state(config_home: Path, state: dict) -> Path:
 
 
 def test_builtin_notes_migrate_from_legacy_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
-    """Legacy notes move out of template_metadata["builtin:<name>"] once, keeping the cache."""
+    """Legacy notes move out of template_metadata["builtin:<name>"] once, keeping the cache.
+
+    A legacy note wins over the new section: after the move only a <= 0.17 install
+    writes there, so it is the newer edit.
+    """
     import json
 
     from sdpm.config import get_builtin_template_notes
@@ -174,28 +178,46 @@ def test_builtin_notes_migrate_from_legacy_cache(monkeypatch: pytest.MonkeyPatch
     monkeypatch.setattr("sys.platform", "linux")
     path = _write_state(tmp_path, {
         "pinned_styles": ["report"],
-        "builtin_template_notes": {"kept": "New note"},
+        "builtin_template_notes": {"edited": "Moved note", "kept": "Kept note"},
         "template_metadata": {
             "builtin:blank-dark": {"description": " Old note ", "layout_count": 7},
-            "builtin:kept": {"description": "Older duplicate"},
+            "builtin:edited": {"description": "Edited by an older install"},
             "builtin:empty": {"description": ""},
             "my-brand": {"description": "User template note"},
         },
     })
 
-    assert get_builtin_template_notes() == {"kept": "New note", "blank-dark": "Old note"}
+    assert get_builtin_template_notes() == {"edited": "Edited by an older install", "kept": "Kept note", "blank-dark": "Old note"}
 
     state = json.loads(path.read_text())
-    assert state["builtin_template_notes"] == {"kept": "New note", "blank-dark": "Old note"}
+    assert state["builtin_template_notes"] == {"edited": "Edited by an older install", "kept": "Kept note", "blank-dark": "Old note"}
     assert state["template_metadata"] == {
         "builtin:blank-dark": {"layout_count": 7},
-        "builtin:kept": {},
+        "builtin:edited": {},
         "builtin:empty": {},
         "my-brand": {"description": "User template note"},
     }
     assert state["pinned_styles"] == ["report"]
+    assert [p.name for p in path.parent.iterdir()] == ["state.json"]  # no temp file left behind
     # Second read: nothing left to migrate, same result.
-    assert get_builtin_template_notes() == {"kept": "New note", "blank-dark": "Old note"}
+    assert get_builtin_template_notes() == {"edited": "Edited by an older install", "kept": "Kept note", "blank-dark": "Old note"}
+
+
+def test_builtin_notes_read_only_config_dir(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """When state.json cannot be rewritten, the notes are still returned and the file is untouched."""
+    from sdpm.config import get_builtin_template_notes
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr("sys.platform", "linux")
+    path = _write_state(tmp_path, {"template_metadata": {"builtin:blank-dark": {"description": "Old note"}}})
+    before = path.read_text()
+
+    def _deny(*_args: object, **_kwargs: object) -> None:
+        raise PermissionError("read-only")
+
+    monkeypatch.setattr("sdpm.config._write_state", _deny)
+    assert get_builtin_template_notes() == {"blank-dark": "Old note"}
+    assert path.read_text() == before
 
 
 def test_builtin_notes_missing_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:

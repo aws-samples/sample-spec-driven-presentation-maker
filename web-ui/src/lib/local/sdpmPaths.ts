@@ -62,7 +62,23 @@ export function updateState(key: string, value: unknown): void {
   const p = getStateJsonPath()
   const state = fs.existsSync(p) ? JSON.parse(fs.readFileSync(p, "utf-8")) : {}
   state[key] = value
-  fs.writeFileSync(p, JSON.stringify(state, null, 2))
+  writeState(p, state)
+}
+
+/**
+ * Write state.json atomically (temp file in the same directory, then rename): the local
+ * MCP server and this Web UI share the file, so a reader must never see it half written.
+ * Mirrors sdpm.config._write_state.
+ */
+function writeState(p: string, state: Record<string, unknown>): void {
+  const tmp = path.join(path.dirname(p), `.state.${process.pid}.${Date.now()}.tmp`)
+  try {
+    fs.writeFileSync(tmp, JSON.stringify(state, null, 2))
+    fs.renameSync(tmp, p)
+  } catch (e) {
+    fs.rmSync(tmp, { force: true })
+    throw e
+  }
 }
 
 /**
@@ -71,6 +87,9 @@ export function updateState(key: string, value: unknown): void {
  * cloud's `BUILTIN_NOTE#<name>` items. Notes still in the legacy location
  * (`template_metadata["builtin:<name>"].description`, ≤ 0.17) are moved here
  * on first read; sdpm.config.get_builtin_template_notes does the same in Python.
+ * A legacy note wins over one already in the new section (only a ≤ 0.17 install writes
+ * the legacy location after the move, so it is the newer edit). The rewrite is best
+ * effort: a read-only config dir still gets its notes.
  */
 export function getBuiltinTemplateNotes(): Record<string, string> {
   const state = getState()
@@ -82,13 +101,17 @@ export function getBuiltinTemplateNotes(): Record<string, string> {
     const note = entry.description
     delete entry.description
     const name = key.slice("builtin:".length)
-    if (typeof note === "string" && note.trim() && !(name in notes)) notes[name] = note.trim()
+    if (typeof note === "string" && note.trim()) notes[name] = note.trim()
     migrated = true
   }
   if (migrated) {
     state.builtin_template_notes = notes
     state.template_metadata = metadata
-    fs.writeFileSync(getStateJsonPath(), JSON.stringify(state, null, 2))
+    try {
+      writeState(getStateJsonPath(), state)
+    } catch {
+      // Read-only config dir: return the notes without the rewrite.
+    }
   }
   return notes
 }

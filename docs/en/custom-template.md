@@ -217,8 +217,8 @@ The script handles S3 upload, template analysis, and Amazon DynamoDB metadata re
 
 In the cloud Web UI, each user can add a private note to builtin and user templates from the Templates page. The agent considers these notes—including intended use cases, preferences, and default-use requests—when proposing or selecting a template.
 The local Web UI offers the same notes. Builtin-template notes are stored in
-`~/.config/sdpm/state.json` under `builtin_template_notes`, where the CLI and the local MCP
-server read them too.
+`state.json` under `builtin_template_notes` (`~/.config/sdpm/state.json` on macOS/Linux,
+`%APPDATA%/sdpm/state.json` on Windows), where the CLI and the local MCP server read them too.
 
 ---
 

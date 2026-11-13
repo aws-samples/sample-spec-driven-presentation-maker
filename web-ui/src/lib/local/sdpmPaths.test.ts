@@ -97,28 +97,29 @@ describe("builtin template notes", () => {
     fs.rmSync(tmp, { recursive: true, force: true })
   })
 
-  it("moves legacy notes out of the analysis cache once", () => {
+  it("moves legacy notes out of the analysis cache once (a legacy note is the newer edit)", () => {
     fs.writeFileSync(statePath, JSON.stringify({
       pinned_styles: ["report"],
-      builtin_template_notes: { kept: "New note" },
+      builtin_template_notes: { edited: "Moved note", kept: "Kept note" },
       template_metadata: {
         "builtin:blank-dark": { description: " Old note ", layout_count: 7 },
-        "builtin:kept": { description: "Older duplicate" },
+        "builtin:edited": { description: "Edited by an older install" },
         "builtin:empty": { description: "" },
         "my-brand": { description: "User template note" },
       },
     }))
 
-    expect(getBuiltinTemplateNotes()).toEqual({ kept: "New note", "blank-dark": "Old note" })
+    expect(getBuiltinTemplateNotes()).toEqual({ edited: "Edited by an older install", kept: "Kept note", "blank-dark": "Old note" })
     const state = JSON.parse(fs.readFileSync(statePath, "utf-8"))
     expect(state.template_metadata).toEqual({
       "builtin:blank-dark": { layout_count: 7 },
-      "builtin:kept": {},
+      "builtin:edited": {},
       "builtin:empty": {},
       "my-brand": { description: "User template note" },
     })
     expect(state.pinned_styles).toEqual(["report"])
-    expect(getBuiltinTemplateNotes()).toEqual({ kept: "New note", "blank-dark": "Old note" })
+    expect(fs.readdirSync(path.dirname(statePath))).toEqual(["state.json"]) // no temp file left behind
+    expect(getBuiltinTemplateNotes()).toEqual({ edited: "Edited by an older install", kept: "Kept note", "blank-dark": "Old note" })
   })
 
   it("sets and clears a note without touching the cache", () => {
@@ -129,5 +130,20 @@ describe("builtin template notes", () => {
     const state = JSON.parse(fs.readFileSync(statePath, "utf-8"))
     expect(state.builtin_template_notes).toEqual({})
     expect(state.template_metadata).toEqual({ "builtin:a": { layout_count: 3 } })
+  })
+
+  it("returns the notes when state.json cannot be rewritten", () => {
+    const original = JSON.stringify({ template_metadata: { "builtin:a": { description: "Old note" } } })
+    fs.writeFileSync(statePath, original)
+    const rename = vi.spyOn(fs, "renameSync").mockImplementation(() => {
+      throw Object.assign(new Error("read-only"), { code: "EACCES" })
+    })
+    try {
+      expect(getBuiltinTemplateNotes()).toEqual({ a: "Old note" })
+    } finally {
+      rename.mockRestore()
+    }
+    expect(fs.readFileSync(statePath, "utf-8")).toBe(original)
+    expect(fs.readdirSync(path.dirname(statePath))).toEqual(["state.json"])
   })
 })
