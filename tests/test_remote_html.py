@@ -568,7 +568,7 @@ def test_run_python_html_checked_slide_without_png_loses_its_old_png(server, sto
 
 
 def test_get_preview_html_deck_returns_pngs(server, storage, monkeypatch):
-    from mcp.server.fastmcp.utilities.types import Image
+    from mcp.server.mcpserver import Image
 
     _no_pptx(monkeypatch)
     _fake_check(monkeypatch)
@@ -593,7 +593,7 @@ def test_get_preview_html_deck_png_gone_before_download(server, storage, monkeyp
 
 
 def test_get_preview_html_deck_latest_png_wins(server, storage):
-    from mcp.server.fastmcp.utilities.types import Image
+    from mcp.server.mcpserver import Image
 
     storage.objects["html/d1/png/cover_100.png"] = b"not a png"
     storage.objects["html/d1/png/cover_200.png"] = _png_bytes()
@@ -863,7 +863,7 @@ def test_remote_tool_count_unchanged():
         spec.loader.exec_module(module)
     tools = asyncio.run(module.mcp.list_tools())
     assert {t.name for t in tools} == without_kb | {"search_slides"}
-    params = {t.name: set(t.inputSchema.get("properties", {})) for t in tools}
+    params = {t.name: set(t.input_schema.get("properties", {})) for t in tools}
     assert "output_format" in params["init_deck_workspace"]
     assert "mode" in params["start_composing"]
 

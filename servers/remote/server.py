@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""FastMCP Streamable HTTP server for Amazon Bedrock AgentCore Runtime (main entry point).
+"""MCP Streamable HTTP server for Amazon Bedrock AgentCore Runtime (main entry point).
 
 Security: AWS manages infrastructure security. You manage access control,
 data classification, and IAM policies. See SECURITY.md for details.
@@ -29,7 +29,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent.parent / "sdpm"))
 import boto3  # noqa: E402
 from pydantic import Field  # noqa: E402
 from boto_config import LONG_CALL, SHORT_API  # noqa: E402
-from mcp.server.fastmcp import FastMCP  # noqa: E402
+from mcp.server.mcpserver import MCPServer  # noqa: E402
 
 from shared.authz import authorize  # noqa: E402
 from shared import user_library  # noqa: E402
@@ -42,6 +42,7 @@ from tools import init as init_mod  # noqa: E402
 from tools import code_block as code_block_mod  # noqa: E402
 
 from sdpm import tools as contract  # noqa: E402
+from sdpm.tools import tool_errors  # noqa: E402
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 logger = logging.getLogger("sdpm.mcp")
@@ -58,12 +59,19 @@ To create or edit slides, call `start_presentation()` first; a composer calls
 `start_composing(deck_id, assigned_slugs)` first.
 """
 
-mcp = FastMCP(
+mcp = MCPServer(
     "spec-driven-presentation-maker",
-    host="0.0.0.0",
-    stateless_http=True,
     instructions=_INSTRUCTIONS,
 )
+tool_errors.install(mcp)
+
+# Transport settings live on the app (mcp 2.x), built in __main__. ``host="0.0.0.0"`` is the
+# address uvicorn binds inside the AgentCore Runtime container (unchanged from mcp 1.x); the
+# SDK also reads it to decide on DNS-rebinding protection, which it enables only for a
+# loopback host, so the app keeps accepting the Runtime's Host header as before. The
+# Runtime's JWT authorizer authenticates callers; _CaptureHeadersMiddleware binds a session
+# to its owner.
+_HTTP_APP_OPTIONS = {"host": "0.0.0.0", "stateless_http": True}
 
 
 def _run_in_background(target, *, name: str) -> None:
@@ -114,11 +122,12 @@ def _wait_for_pending_previews(deck_id: str, timeout: float = 90.0) -> None:
 def offloaded_tool(fn):
     """Register ``fn`` as an MCP tool that runs in a worker thread.
 
-    FastMCP calls synchronous tool functions directly on the event loop, so a
-    tool that spends a minute in LibreOffice stalls every other request on
+    mcp 1.x called synchronous tool functions directly on the event loop, so a
+    tool that spends a minute in LibreOffice stalled every other request on
     this server — including AgentCore's ``/ping`` health check, which then
     marks the session unhealthy and terminates it mid-run. Offloading keeps
-    the loop free. ``asyncio.to_thread`` copies the current contextvars, so
+    the loop free (mcp 2.x offloads sync tools itself; the explicit offload keeps the
+    behaviour independent of that). ``asyncio.to_thread`` copies the current contextvars, so
     the per-request headers (user id) remain visible inside the tool.
 
     The original function is returned unchanged so it stays callable (and
@@ -134,7 +143,7 @@ def offloaded_tool(fn):
     _runner.__name__ = fn.__name__
     _runner.__qualname__ = fn.__qualname__
     _runner.__doc__ = fn.__doc__
-    _runner.__signature__ = inspect.signature(fn)  # FastMCP reads the schema from this
+    _runner.__signature__ = inspect.signature(fn)  # MCPServer reads the schema from this
     _runner.__annotations__ = dict(getattr(fn, "__annotations__", {}))
     mcp.tool()(_runner)
     return fn
@@ -1631,6 +1640,6 @@ if __name__ == "__main__":
     # retry jitter drawn from the random module stay distinct across restored microVMs.
     snapshot_random.install()
 
-    app = mcp.streamable_http_app()
+    app = mcp.streamable_http_app(**_HTTP_APP_OPTIONS)
     app.add_middleware(_CaptureHeadersMiddleware)
     uvicorn.run(app, host="0.0.0.0", port=8000)

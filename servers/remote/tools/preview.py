@@ -5,7 +5,7 @@
 import io
 import logging
 
-from mcp.server.fastmcp.utilities.types import Image
+from mcp.server.mcpserver import Image
 from PIL import Image as PILImage
 
 from storage import Storage

@@ -89,7 +89,7 @@ def any_server_tools(request, local_tools, acp_tools, remote_tools):
 def test_every_argument_carries_a_description(any_server_tools):
     missing = []
     for name, tool in any_server_tools.items():
-        for prop, schema in tool.inputSchema.get("properties", {}).items():
+        for prop, schema in tool.input_schema.get("properties", {}).items():
             if not schema.get("description"):
                 missing.append(f"{name}.{prop}")
     assert not missing, missing
@@ -107,7 +107,7 @@ def test_description_budget(any_server_tools):
         if len(t.description or "") > _DESC_MAX.get(n, _DESC_MAX_DEFAULT)
     }
     assert not over, over
-    sizes = {n: len(t.description or "") + len(json.dumps(t.inputSchema, ensure_ascii=False)) for n, t in any_server_tools.items()}
+    sizes = {n: len(t.description or "") + len(json.dumps(t.input_schema, ensure_ascii=False)) for n, t in any_server_tools.items()}
     assert sum(sizes.values()) <= _TOTAL_MAX, (sum(sizes.values()), sorted(sizes.items(), key=lambda kv: -kv[1]))
 
 
@@ -131,7 +131,7 @@ def test_hearing_matches_the_cloud_tool(acp_tools):
     spec.loader.exec_module(module)
 
     cloud = module.hearing.tool_spec["inputSchema"]["json"]
-    local = acp_tools["hearing"].inputSchema
+    local = acp_tools["hearing"].input_schema
     for schema in (cloud, local):
         assert set(schema["properties"]) == {"q0", "q1", "q2", "q3"}
         assert schema["required"] == ["q0"]

@@ -22,7 +22,7 @@ from pathlib import Path
 from unittest.mock import patch
 
 import pytest
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp.client import Client
 
 _ROOT = Path(__file__).resolve().parents[1]
 
@@ -96,7 +96,7 @@ def _fresh_local_stage_cache():
 
 def _call(storage: _Storage, tool: str, arguments: dict, user: str = SENTINEL):
     async def run():
-        async with create_connected_server_and_client_session(remote_server.mcp) as session:
+        async with Client(remote_server.mcp, mode="legacy") as session:
             return await session.call_tool(tool, arguments)
 
     with (
@@ -108,7 +108,7 @@ def _call(storage: _Storage, tool: str, arguments: dict, user: str = SENTINEL):
 
 
 def _seen_by_agent(result) -> str:
-    return json.dumps([c.model_dump(mode="json") for c in result.content]) + json.dumps(result.structuredContent)
+    return json.dumps([c.model_dump(mode="json") for c in result.content]) + json.dumps(result.structured_content)
 
 
 def _png() -> bytes:
@@ -128,9 +128,9 @@ def test_read_text_uses_caller_key_and_returns_the_handle(source):
 
     result = _call(storage, "read_attachment", {"source": source})
 
-    assert not result.isError, result.content[0].text
-    assert result.structuredContent["header"]["source"] == HANDLE
-    assert "hello" in result.structuredContent["body"]
+    assert not result.is_error, result.content[0].text
+    assert result.structured_content["header"]["source"] == HANDLE
+    assert "hello" in result.structured_content["body"]
     assert KEY in storage.read_keys
     assert SENTINEL not in _seen_by_agent(result)
 
@@ -141,9 +141,9 @@ def test_read_image_uses_caller_key_and_returns_the_handle():
 
     result = _call(storage, "read_attachment", {"source": f"uploads/{UPLOAD}/photo.png"})
 
-    assert not result.isError, result.content[0].text
-    assert result.structuredContent["kind"] == "image"
-    assert result.structuredContent["source"] == f"uploads/{UPLOAD}/photo.png"
+    assert not result.is_error, result.content[0].text
+    assert result.structured_content["kind"] == "image"
+    assert result.structured_content["source"] == f"uploads/{UPLOAD}/photo.png"
     assert key in storage.read_keys
     assert SENTINEL not in _seen_by_agent(result)
 
@@ -154,7 +154,7 @@ def test_read_another_users_handle_reads_only_the_callers_prefix():
 
     result = _call(storage, "read_attachment", {"source": HANDLE})
 
-    assert result.structuredContent["code"] == "SOURCE_NOT_FOUND"
+    assert result.structured_content["code"] == "SOURCE_NOT_FOUND"
     assert storage.read_keys == [KEY]
     seen = _seen_by_agent(result)
     assert SENTINEL not in seen and "secret" not in seen
@@ -165,7 +165,7 @@ def test_read_previous_form_of_another_user_is_denied_without_ids():
 
     result = _call(storage, "read_attachment", {"source": f"uploads/{OTHER}/{UPLOAD}/report.txt"})
 
-    assert result.structuredContent["code"] == "SOURCE_ACCESS_DENIED"
+    assert result.structured_content["code"] == "SOURCE_ACCESS_DENIED"
     assert storage.read_keys == []
     seen = _seen_by_agent(result)
     assert SENTINEL not in seen and OTHER not in seen
@@ -183,7 +183,7 @@ def test_read_storage_failure_does_not_name_the_key():
 
     result = _call(_Failing({KEY: (b"hello\n", "text/plain")}), "read_attachment", {"source": HANDLE})
 
-    assert result.isError
+    assert result.is_error
     assert "attachment-cache/v1/<user>/" in result.content[0].text
     assert SENTINEL not in _seen_by_agent(result)
 
@@ -305,6 +305,6 @@ def test_run_style_python_rejects_a_style_name_that_is_not_a_file_stem():
     with patch.object(remote_server.boto3, "client", lambda *a, **k: _CodeInterpreter()):
         result = _call(storage, "run_style_python", {"purpose": "edit", "code": "pass", "style_name": "../other/mine"})
 
-    assert result.isError
+    assert result.is_error
     assert "Invalid style name" in result.content[0].text
     assert not storage.objects

@@ -17,7 +17,7 @@ from pathlib import Path
 
 import anyio
 import pytest
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 from mcp.shared.memory import create_client_server_memory_streams
 
 AGENT_DIR = Path(__file__).resolve().parents[1] / "agent"
@@ -47,23 +47,23 @@ AWS_MCP_SERVER_TOOLS = [
 API_TOOLS = {"aws___run_script", "aws___get_presigned_url", "aws___get_tasks"}
 
 
-def _server_with(names: list[str]) -> FastMCP:
-    server = FastMCP("fake-aws-mcp")
+def _server_with(names: list[str]) -> MCPServer:
+    server = MCPServer("fake-aws-mcp")
     for name in names:
         server.add_tool(lambda: "", name=name, description=name)
     return server
 
 
-def _in_memory_transport(server: FastMCP):
-    """A streamablehttp_client stand-in connected to *server* in memory."""
+def _in_memory_transport(server: MCPServer):
+    """A streamable_http_client stand-in connected to *server* in memory."""
 
     @asynccontextmanager
     async def transport():
-        low = server._mcp_server
+        low = server._lowlevel_server
         async with create_client_server_memory_streams() as (client_streams, server_streams):
             async with anyio.create_task_group() as tg:
                 tg.start_soon(lambda: low.run(*server_streams, low.create_initialization_options()))
-                yield client_streams[0], client_streams[1], lambda: None
+                yield client_streams[0], client_streams[1]
                 tg.cancel_scope.cancel()
 
     return transport()
@@ -76,11 +76,11 @@ def _knowledge_tool_names(monkeypatch, server_tools: list[str]) -> tuple[list[st
 
     seen: dict = {}
 
-    def fake_streamablehttp_client(**kwargs):
-        seen.update(kwargs)
+    def fake_streamable_http_client(url, **kwargs):
+        seen.update(kwargs, url=url)
         return _in_memory_transport(_server_with(server_tools))
 
-    monkeypatch.setattr(mcp_clients, "streamablehttp_client", fake_streamablehttp_client)
+    monkeypatch.setattr(mcp_clients, "streamable_http_client", fake_streamable_http_client)
     index = [name for name, _ in factory.MCP_DEFS].index("AWS Knowledge")
     client = factory._MCP_FACTORIES[index]("jwt", session_id="s1")
     try:

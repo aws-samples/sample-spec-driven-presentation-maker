@@ -87,63 +87,44 @@ def isolated_config(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
     return tmp_path
 
 
-class _Client(ClientSession):
-    """A client whose initialize declares ``extensions`` (what an MCP Apps host sends)."""
-
-    def __init__(self, *args, extensions: dict | None = None, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._extensions = extensions
-        self.initialize_result: types.InitializeResult | None = None
-
-    async def initialize(self) -> types.InitializeResult:
-        extra = {"extensions": self._extensions} if self._extensions is not None else {}
-        self.initialize_result = await self.send_request(
-            types.ClientRequest(types.InitializeRequest(params=types.InitializeRequestParams(
-                protocolVersion=types.LATEST_PROTOCOL_VERSION,
-                capabilities=types.ClientCapabilities(**extra),
-                clientInfo=types.Implementation(name="apps-test", version="1"),
-            ))),
-            types.InitializeResult,
-        )
-        await self.send_notification(types.ClientNotification(types.InitializedNotification()))
-        return self.initialize_result
-
-
 def _session(server, extensions, calls):
-    """Run ``calls(session)`` against the server in memory; return what it returns.
+    """Run ``calls(session)`` against the server; return what it returns. The client's
+    initialize declares ``extensions`` (what an MCP Apps host sends); ``session.init`` is
+    the initialize result.
 
-    A server with ``stateless_http`` (the remote) runs as it does in production: every HTTP
-    request gets a fresh stateless session, so ``initialize`` goes to one session and
-    ``calls`` run in another that never saw the client's initialize params.
+    The local server runs in memory. The remote one runs as in production: its stateless
+    streamable-HTTP app, so every request is served by a fresh connection and ``calls``
+    never reach the one that saw the client's initialize params.
     """
-    low = server.mcp._mcp_server
-    stateless = server.mcp.settings.stateless_http
+    run = _over_http if hasattr(server, "_HTTP_APP_OPTIONS") else _in_memory
+    return asyncio.run(run(server, extensions, calls))
 
-    async def connect(work):
-        async with create_client_server_memory_streams() as (client_streams, server_streams):
-            async with anyio.create_task_group() as tg:
-                tg.start_soon(lambda: low.run(*server_streams, low.create_initialization_options(), stateless=stateless))
-                async with _Client(*client_streams, extensions=extensions) as session:
-                    out = await work(session)
-                tg.cancel_scope.cancel()
-        return out
 
-    async def run():
-        if not stateless:
-            async def both(session):
-                await session.initialize()
-                return await calls(session)
+async def _in_memory(server, extensions, calls):
+    low = server.mcp._lowlevel_server
+    async with create_client_server_memory_streams() as (client_streams, server_streams):
+        async with anyio.create_task_group() as tg:
+            tg.start_soon(lambda: low.run(*server_streams, low.create_initialization_options()))
+            async with ClientSession(*client_streams, extensions=extensions) as session:
+                session.init = await session.initialize()
+                out = await calls(session)
+            tg.cancel_scope.cancel()
+    return out
 
-            return await connect(both)
-        initialize_result = await connect(lambda session: session.initialize())
 
-        async def fresh(session):
-            session.initialize_result = initialize_result
-            return await calls(session)
+async def _over_http(server, extensions, calls):
+    import httpx2
+    from mcp.client.streamable_http import streamable_http_client
 
-        return await connect(fresh)
-
-    return asyncio.run(run())
+    app = server.mcp.streamable_http_app(**server._HTTP_APP_OPTIONS)
+    app.add_middleware(server._CaptureHeadersMiddleware)
+    url = "http://runtime.invalid/mcp"
+    async with server.mcp.session_manager.run():
+        async with httpx2.AsyncClient(transport=httpx2.ASGITransport(app=app)) as http:
+            async with streamable_http_client(url, http_client=http) as (read, write):
+                async with ClientSession(read, write, extensions=extensions) as session:
+                    session.init = await session.initialize()
+                    return await calls(session)
 
 
 def _listed(server, extensions=None, params=None) -> dict[str, types.Tool]:
@@ -192,25 +173,25 @@ def test_a_client_with_mcp_apps_sees_the_app_tool(which, declaration, request) -
         listed = _listed(server, None, _PER_REQUEST)
     tool = listed[apps.APP_TOOL]
     assert tool.meta == {"ui": {"visibility": ["app"]}}
-    props = tool.inputSchema["properties"]
+    props = tool.input_schema["properties"]
     assert all(p.get("description") for p in props.values()), props
     actions = ["style_previews", "deck", "slide_preview", "submit_review", "outline_edit"]
     # Only the local server opens a deck's file or folder for the user.
     assert props["action"]["enum"] == actions + (["open"] if which == "local" else [])
     assert ("open:" in tool.description) == (which == "local")
     assert props["target"]["enum"] == ["file", "folder"]
-    assert tool.inputSchema["required"] == ["action"]
+    assert tool.input_schema["required"] == ["action"]
     # Hosts check a view's arguments against inputSchema before passing the call on, and
     # Kiro Crew's gateway refuses a schema with anyOf/oneOf/allOf ("failing closed").
-    assert not {"anyOf", "oneOf", "allOf"} & _keywords(tool.inputSchema)
+    assert not {"anyOf", "oneOf", "allOf"} & _keywords(tool.input_schema)
     assert len(tool.description) <= 560
 
     show = listed[apps.DECK_TOOL]
     uri = apps.view_uri(apps.DECK_VIEWER)
     assert show.meta == {"ui": {"resourceUri": uri}, "ui/resourceUri": uri}
     assert len(show.description) <= 560
-    assert show.inputSchema["required"] == ["deck_id"]
-    assert show.inputSchema["properties"]["deck_id"]["description"]
+    assert show.input_schema["required"] == ["deck_id"]
+    assert show.input_schema["properties"]["deck_id"]["description"]
 
 
 def _keywords(schema) -> set[str]:
@@ -222,7 +203,7 @@ def _keywords(schema) -> set[str]:
 
 
 def test_the_stateless_remote_lists_the_app_tool_only_per_request(remote) -> None:
-    assert remote.mcp.settings.stateless_http
+    assert remote._HTTP_APP_OPTIONS["stateless_http"]
     for name in apps.UI_ONLY_TOOLS:
         assert name not in _listed(remote, _UI)
         assert name in _listed(remote, None, _PER_REQUEST)
@@ -233,12 +214,23 @@ def test_the_stateless_remote_lists_the_app_tool_only_per_request(remote) -> Non
 
 
 def test_initialize_declares_the_extension(server) -> None:
-    async def calls(session):
-        return session.initialize_result
+    # mcp 2.x sends a capability only in the protocol version that defines it: the
+    # 2026-07-28 server/discover result carries extensions, a 2025 initialize result does
+    # not (hosts negotiate MCP Apps by the client's declaration there).
+    from mcp.client import Client
 
-    caps = _session(server, None, calls).capabilities
-    extensions = getattr(caps, "extensions", None) or (caps.model_extra or {}).get("extensions")
-    assert extensions[apps.UI_EXTENSION]["mimeTypes"] == [apps.APP_MIME]
+    async def discover():
+        async with Client(server.mcp) as client:
+            return client.protocol_version, client.server_capabilities
+
+    version, caps = asyncio.run(discover())
+    assert version == "2026-07-28"
+    assert caps.extensions[apps.UI_EXTENSION]["mimeTypes"] == [apps.APP_MIME]
+
+    async def calls(session):
+        return session.init
+
+    assert _session(server, None, calls).capabilities.extensions is None
 
 
 @pytest.mark.parametrize("view", [apps.GALLERY, apps.DECK_VIEWER])
@@ -250,9 +242,9 @@ def test_the_view_resources(server, view) -> None:
 
     listed, read = _session(server, None, calls)
     entry = next(r for r in listed.resources if str(r.uri) == uri)
-    assert entry.mimeType == apps.APP_MIME
+    assert entry.mime_type == apps.APP_MIME
     content = read.contents[0]
-    assert content.mimeType == apps.APP_MIME
+    assert content.mime_type == apps.APP_MIME
     assert content.meta == {"ui": {"prefersBorder": True}}
     assert content.text == apps.view_html(view)
 
@@ -286,9 +278,9 @@ def remote_user(remote, monkeypatch: pytest.MonkeyPatch):
 
 
 def _previews(call: types.CallToolResult) -> dict:
-    assert not call.isError, call.content
+    assert not call.is_error, call.content
     assert call.content[0].text.endswith("style previews")
-    return call.structuredContent
+    return call.structured_content
 
 
 @pytest.mark.parametrize("extensions", [None, _UI])
@@ -313,7 +305,7 @@ def test_style_previews(server, extensions, request) -> None:
 def test_app_action_refuses_bad_arguments(server, arguments, request) -> None:
     if server is request.getfixturevalue("remote"):
         request.getfixturevalue("remote_user")
-    assert _call(server, apps.APP_TOOL, arguments).isError
+    assert _call(server, apps.APP_TOOL, arguments).is_error
 
 
 def test_an_odd_name_goes_to_missing_and_the_batch_still_renders(server, request) -> None:
@@ -341,7 +333,7 @@ def test_remote_previews_read_the_users_style_first(remote, remote_user) -> None
 
 def test_remote_previews_need_a_signed_in_user(remote) -> None:
     call = _call(remote, apps.APP_TOOL, {"action": "style_previews", "names": ["report"]})
-    assert call.isError
+    assert call.is_error
 
 
 # --- list_styles stays today's result ---------------------------------------------------
@@ -350,16 +342,16 @@ def test_remote_previews_need_a_signed_in_user(remote) -> None:
 @pytest.mark.parametrize("include_all", [False, True])
 def test_local_list_styles_is_the_contracts_result(local, include_all) -> None:
     call = _call(local, "list_styles", {"include_all": include_all})
-    assert not call.isError
+    assert not call.is_error
     expected = tools.list_styles(include_all=include_all)
-    assert call.structuredContent == expected
+    assert call.structured_content == expected
     assert json.loads(call.content[0].text) == expected
 
 
 def test_remote_list_styles_is_the_same_json_text(remote, remote_user) -> None:
     storage, _ = remote_user
     call = _call(remote, "list_styles", {})
-    assert not call.isError
+    assert not call.is_error
     from tools import reference
 
     expected = json.dumps(reference.list_styles(storage=storage, user_id="u1"), ensure_ascii=False)
@@ -424,8 +416,8 @@ def _act(server, arguments, extensions=None) -> types.CallToolResult:
 
 
 def _ok(call: types.CallToolResult) -> dict:
-    assert not call.isError, call.content
-    return call.structuredContent
+    assert not call.is_error, call.content
+    return call.structured_content
 
 
 @pytest.mark.parametrize("extensions", [None, _UI])
@@ -513,7 +505,7 @@ def test_local_submit_review_writes_the_review_file(local, local_deck) -> None:
 
 def test_local_submit_review_refuses_an_unbuilt_slide(local, local_deck) -> None:
     review = {"note": None, "comments": [{"name": "A", "slide": _slugs()[-1], "rect": [0, 0, 10, 10], "text": "x"}]}
-    assert _act(local, {"action": "submit_review", "deck_id": str(local_deck), "review": review}).isError
+    assert _act(local, {"action": "submit_review", "deck_id": str(local_deck), "review": review}).is_error
     assert (local_deck / "reviews" / "old.json").exists()
 
 
@@ -539,11 +531,11 @@ def test_local_outline_edit_returns_a_diff_and_writes_nothing(local, local_deck)
 ])
 def test_local_deck_actions_refuse_bad_arguments(local, local_deck, arguments) -> None:
     arguments = {k: (str(local_deck) if v == "DECK" else v) for k, v in arguments.items()}
-    assert _act(local, arguments).isError
+    assert _act(local, arguments).is_error
 
 
 def test_local_show_deck_needs_a_deck(local, tmp_path) -> None:
-    assert _call(local, apps.DECK_TOOL, {"deck_id": str(tmp_path / "none")}).isError
+    assert _call(local, apps.DECK_TOOL, {"deck_id": str(tmp_path / "none")}).is_error
 
 
 def test_local_check_specs_result_is_unchanged(local, local_deck) -> None:
@@ -607,7 +599,7 @@ def test_local_open_file_needs_a_built_output(local, root_deck, launched) -> Non
     deck_id = str(root_deck)
     assert _ok(_act(local, {"action": "deck", "deck_id": deck_id}))["open"] == {"file": False, "folder": True}
     call = _act(local, {"action": "open", "deck_id": deck_id, "target": "file"})
-    assert call.isError and "no built file yet" in call.content[0].text
+    assert call.is_error and "no built file yet" in call.content[0].text
     assert launched == []
 
 
@@ -618,7 +610,7 @@ def test_local_deck_with_a_bad_format_still_loads_and_opens_its_folder(local, ro
     got = _ok(_act(local, {"action": "deck", "deck_id": deck_id}))
     assert got["open"] == {"file": False, "folder": True}
     assert got["check"]["ok"] is False and any("outputFormat" in e for e in got["check"]["errors"])
-    assert _act(local, {"action": "open", "deck_id": deck_id, "target": "file"}).isError
+    assert _act(local, {"action": "open", "deck_id": deck_id, "target": "file"}).is_error
     _ok(_act(local, {"action": "open", "deck_id": deck_id, "target": "folder"}))
     assert [argv[-1] for argv in launched] == [_real(root_deck)]
 
@@ -641,7 +633,7 @@ def test_local_open_refuses_a_deck_outside_the_deck_root(local, root_deck, outsi
     assert climbed.resolve() == outside_deck.resolve()
     for deck_id in (str(outside_deck), str(climbed), str(root), str(root / "missing")):
         for target in ("file", "folder"):
-            assert _act(local, {"action": "open", "deck_id": deck_id, "target": target}).isError, (deck_id, target)
+            assert _act(local, {"action": "open", "deck_id": deck_id, "target": target}).is_error, (deck_id, target)
     assert launched == []
 
 
@@ -653,15 +645,15 @@ def test_local_open_refuses_links_out_of_the_root(local, root_deck, outside_deck
     except OSError:
         pytest.skip("this user cannot create symlinks")
     for target in ("file", "folder"):
-        assert _act(local, {"action": "open", "deck_id": str(link), "target": target}).isError, target
+        assert _act(local, {"action": "open", "deck_id": str(link), "target": target}).is_error, target
     assert _ok(_act(local, {"action": "deck", "deck_id": str(root_deck)}))["open"] == {"file": False, "folder": True}
-    assert _act(local, {"action": "open", "deck_id": str(root_deck), "target": "file"}).isError
+    assert _act(local, {"action": "open", "deck_id": str(root_deck), "target": "file"}).is_error
     assert launched == []
 
 
 def test_local_open_refuses_a_bad_target(local, root_deck, launched) -> None:
     for target in ("deck.json", "../x", ""):
-        assert _act(local, {"action": "open", "deck_id": str(root_deck), "target": target}).isError
+        assert _act(local, {"action": "open", "deck_id": str(root_deck), "target": target}).is_error
     assert launched == []
 
 
@@ -671,7 +663,7 @@ def test_local_open_without_xdg_open_says_so(local, root_deck, launched, monkeyp
     monkeypatch.setattr(local.deck_access, "sys", SimpleNamespace(platform="linux"))
     monkeypatch.setattr(local.deck_access, "shutil", SimpleNamespace(which=lambda name: None))
     call = _act(local, {"action": "open", "deck_id": str(root_deck), "target": "folder"})
-    assert call.isError and "xdg-open" in call.content[0].text
+    assert call.is_error and "xdg-open" in call.content[0].text
     assert launched == []
 
 
@@ -805,13 +797,13 @@ def test_remote_submit_review(remote, remote_deck) -> None:
     {"action": "outline_edit", "deck_id": "other", "base": "a", "text": "b"},
 ])
 def test_remote_deck_actions_need_permission(remote, remote_deck, arguments) -> None:
-    assert _act(remote, arguments).isError
-    assert _call(remote, apps.DECK_TOOL, {"deck_id": "other"}).isError
+    assert _act(remote, arguments).is_error
+    assert _call(remote, apps.DECK_TOOL, {"deck_id": "other"}).is_error
 
 
 def test_remote_check_specs_result_is_unchanged(remote, remote_deck) -> None:
     call = _call(remote, "check_specs", {"deck_id": "d1"})
-    assert not call.isError
+    assert not call.is_error
     assert json.loads(call.content[0].text) == json.loads(remote.check_specs("d1"))
 
 
@@ -820,5 +812,5 @@ def test_remote_offers_no_open(remote, remote_deck) -> None:
     _, checks = remote_deck
     assert _ok(_act(remote, {"action": "deck", "deck_id": "d1"}))["open"] is None
     for target in ("file", "folder"):
-        assert _act(remote, {"action": "open", "deck_id": "d1", "target": target}).isError
+        assert _act(remote, {"action": "open", "deck_id": "d1", "target": target}).is_error
     assert checks == [("d1", "read")]

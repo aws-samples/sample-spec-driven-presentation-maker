@@ -24,15 +24,19 @@ ICON = b'<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M0
 
 def _params(extensions=None) -> types.InitializeRequestParams:
     extra = {"extensions": extensions} if extensions is not None else {}
+    try:
+        capabilities = types.ClientCapabilities(**extra)
+    except ValueError:  # mcp 2.x types refuse an odd shape; the rule must still say no
+        return SimpleNamespace(capabilities=SimpleNamespace(extensions=extensions))
     return types.InitializeRequestParams(
         protocolVersion=types.LATEST_PROTOCOL_VERSION,
-        capabilities=types.ClientCapabilities(**extra),
+        capabilities=capabilities,
         clientInfo=types.Implementation(name="t", version="1"),
     )
 
 
-def _meta(extensions) -> types.RequestParams.Meta:
-    return types.RequestParams.Meta(**{apps.CLIENT_CAPABILITIES_META: {"extensions": extensions}})
+def _meta(extensions) -> dict:
+    return {apps.CLIENT_CAPABILITIES_META: {"extensions": extensions}}
 
 
 @pytest.mark.parametrize(("extensions", "expected"), [
@@ -64,7 +68,7 @@ def test_declared_in_initialize_or_per_request() -> None:
     assert not apps.declared(None, None)
     assert not apps.declared(_params(), None)
     assert not apps.declared(_params({"io.example/other": {}}), _meta({"io.example/other": {}}))
-    assert not apps.declared(_params(), types.RequestParams.Meta())
+    assert not apps.declared(_params(), {})
     for odd in (object(), "x", 3, SimpleNamespace(model_extra="x"), {apps.CLIENT_CAPABILITIES_META: "x"},
                 {apps.CLIENT_CAPABILITIES_META: {"extensions": {apps.UI_EXTENSION: True}}}):
         assert not apps.declared(odd, odd)
