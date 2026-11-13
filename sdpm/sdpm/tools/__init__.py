@@ -261,11 +261,11 @@ def list_templates() -> dict[str, Any]:
     start_presentation already returns this list.
     """
     from sdpm.api import get_templates_dirs, list_templates_with_metadata
-    from sdpm.config import get_state
+    from sdpm.config import get_builtin_template_notes, get_state
 
     templates_dirs = get_templates_dirs()
     metadata = get_state().get("template_metadata", {})
-    return {"templates": list_templates_with_metadata(templates_dirs, metadata)}
+    return {"templates": list_templates_with_metadata(templates_dirs, metadata, get_builtin_template_notes())}
 
 
 def read_guides(

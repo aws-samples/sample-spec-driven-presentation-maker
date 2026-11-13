@@ -5,6 +5,7 @@ from pptx.dml.color import RGBColor
 from pptx.util import Pt
 
 from sdpm.engine.schema.chart import chart_fingerprint
+from sdpm.utils import xml_safe
 
 
 class ChartMixin:
@@ -85,7 +86,7 @@ class ChartMixin:
             try:
                 from lxml import etree
                 from pptx.oxml.ns import qn
-                orig = etree.fromstring(elem["_chartXml"])
+                orig = xml_safe.fromstring(elem["_chartXml"])
                 ns_c = {'c': 'http://schemas.openxmlformats.org/drawingml/2006/chart',
                         'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
 
@@ -383,7 +384,7 @@ class ChartMixin:
                             dPt = etree.SubElement(ser_el, qn('c:dPt'))
                             idx_el = etree.SubElement(dPt, qn('c:idx'))
                             idx_el.set('val', str(pt_idx))
-                            spPr = etree.fromstring(xml_str)
+                            spPr = xml_safe.fromstring(xml_str)
                             dPt.append(spPr)
                         except Exception:
                             pass

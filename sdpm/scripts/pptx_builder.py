@@ -323,12 +323,13 @@ def cmd_list_templates(args):
     a template.
     """
     from sdpm.api import get_templates_dirs, list_templates_with_metadata
-    from sdpm.config import get_state
+    from sdpm.config import get_builtin_template_notes, get_state
 
     templates_dirs = get_templates_dirs()
     templates = list_templates_with_metadata(
         templates_dirs,
         get_state().get("template_metadata", {}),
+        get_builtin_template_notes(),
     )
     if not templates:
         print("No templates found.", file=sys.stderr)
