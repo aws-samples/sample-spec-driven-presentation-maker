@@ -19,6 +19,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   differed from its `width` × `height` box, the PPTX placed it at the box's top-left corner
   and left the whole gap below or to the right. It is now centered in the box, as CSS
   `object-fit: contain` does; `cover` and `stretch` are unchanged.
+- **Tables and videos inside a group are written to the PPTX.** The builder skipped a
+  `table`, `video` or `rawShape` child of a `group` without a word, so a deck read back
+  with `pptx_to_json` (which keeps them inside their group) lost them on the next build.
+  They are now added like any other child, and a child of an unknown type is reported on
+  stderr instead of vanishing. `pptx_to_json` also scales a grouped table's `colWidths` and
+  `rowHeights` with the group, as it already did its frame, so a table in a resized group
+  rebuilds at its shown size. Local mode and the AWS stack (SdpmRuntime).
 
 ## [0.16.0] - 2026-11-12
 

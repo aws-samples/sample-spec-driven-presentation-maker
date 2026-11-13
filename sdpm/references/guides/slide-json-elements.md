@@ -267,6 +267,7 @@ is found, but you should not produce it in the first place.
 }
 ```
 - Child elements are expanded and added individually (not grouped)
+- Children take any element type (`shape`, `textbox`, `image`, `line`, `freeform`, `chart`, `table`, `video`, `arch-group`, nested `group`) at slide coordinates
 
 ## Placeholder (for user editing)
 
