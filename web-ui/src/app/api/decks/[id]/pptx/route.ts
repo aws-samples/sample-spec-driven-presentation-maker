@@ -16,7 +16,7 @@ const PPTX_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.
 
 function readDeckJson(dp: string): Record<string, unknown> {
   for (const fname of ["deck.json", "presentation.json"]) {
-    const p = path.join(dp, fname)
+    const p = path.join(dp, fname) // nosemgrep: path-join-resolve-traversal — dp validated by resolveDeckDir, constant file names
     if (!fs.existsSync(p)) continue
     try {
       const data = JSON.parse(fs.readFileSync(p, "utf-8"))

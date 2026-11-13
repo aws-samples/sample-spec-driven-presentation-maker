@@ -99,7 +99,7 @@
     "openFolder": "フォルダを開く",
     "openPptx": "PPTX を開く",
     "downloadPptx": "PPTX をダウンロード",
-    "downloadPptxAria": "{name} を PPTX でダウンロード",
+    "downloadPptxAria": "PPTX をダウンロード: {name}",
     "makePrivate": "非公開にする",
     "makeInternal": "社内公開にする",
     "delete": "削除",

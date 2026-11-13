@@ -99,7 +99,7 @@
     "openFolder": "Open Folder",
     "openPptx": "Open PPTX",
     "downloadPptx": "Download PPTX",
-    "downloadPptxAria": "Download {name} as PPTX",
+    "downloadPptxAria": "Download PPTX: {name}",
     "makePrivate": "Make Private",
     "makeInternal": "Make Internal",
     "delete": "Delete",

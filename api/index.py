@@ -20,6 +20,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote, urlencode
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics
@@ -1666,8 +1667,6 @@ def _cf_signed_url(s3_key: str, expires_in: int = 900, query: Optional[Dict[str,
     expires = int((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expires_in)).timestamp())
     url = f"https://{CF_DOMAIN}/{s3_key}"
     if query:
-        from urllib.parse import urlencode, quote
-
         url = f"{url}?{urlencode(query, quote_via=quote, safe='')}"
 
     policy = json.dumps({

@@ -68,7 +68,7 @@ describe("DeckCard thumbnail", () => {
 describe("DeckCard PPTX download", () => {
   function openMenu() {
     fireEvent.keyDown(screen.getByLabelText("Deck actions"), { key: "Enter" })
-    return screen.getByRole("menuitem", { name: "Download Quarterly review as PPTX" })
+    return screen.getByRole("menuitem", { name: "Download PPTX: Quarterly review" })
   }
 
   it("downloads from the menu (keyboard) when the deck has a PPTX", () => {
