@@ -133,8 +133,10 @@ if os.environ.get("SDPM_LOCAL_COMPOSE") == "1":
 
 
 _Q_DESC = (
-    'Question object: {"type": "single_select" | "multi_select" | "free_text", "text": str, '
-    '"options": [str] (select types), "recommended": str | [str] (optional), '
+    'Question object: {"header": str (short chip label, ~6 Japanese / ~12 English chars), '
+    '"type": "single_select" | "multi_select" | "free_text", "text": str, '
+    '"options": [{"label": str (short), "description": str (one line: what choosing it '
+    'leads to, or its trade-off), "recommended": bool (optional)}] (2-4, select types), '
     '"placeholder": str (free_text, optional)}.'
 )
 _Q = Annotated[dict | None, Field(description="Next question; same shape as q0.")]
@@ -142,15 +144,15 @@ _Q = Annotated[dict | None, Field(description="Next question; same shape as q0."
 
 @mcp.tool()
 def hearing(
-    inference: Annotated[str, Field(description="Your reasoning or hypothesis, shown above the questions.")],
     q0: Annotated[dict, Field(description=_Q_DESC)],
     q1: _Q = None,
     q2: _Q = None,
     q3: _Q = None,
-    q4: _Q = None,
 ) -> str:
-    """Show the user a card of up to five structured questions; the answers arrive in the
-    user's next message. For more than five, call again after the reply.
+    """Show the user a card of up to four structured questions, one at a time; the answers
+    arrive in the user's next message. Share your hypothesis as the recommended option and
+    its description. The card adds an "Other" choice itself. For more, call again after
+    the reply.
     """
     return "Questions displayed to user. Wait for their response."
 
