@@ -177,60 +177,45 @@ def split_slide_components(svg_path: "Path | etree._ElementTree", slide_num: int
         raise ValueError("No Page group found")
 
     # --- Background ---
+    # Drawn as LibreOffice and PowerPoint draw it: the slide's own background
+    # (Page > defs.SlideBackground, e.g. from deck.json defaultBackground) or else the
+    # master's, then the master's background objects (the layout's pictures, logo,
+    # footer) on top, unless the slide hides them (hideMasterShapes, written as
+    # ooo:master-objects-visibility="hidden" on the slide's meta entry).
     bg_fill = "#000"
     bg_svg = None
+    parts = []
 
-    # 1) Slide-specific custom background (Page > defs.SlideBackground)
-    slide_bg_defs = page_g.find(f"{{{SVG_NS}}}defs[@class='SlideBackground']")
-    if slide_bg_defs is not None:
-        parts = []
-        for child in slide_bg_defs:
-            cls = child.get("class", "")
-            if cls in ("Background", "BackgroundObjects"):
+    meta = root.find(f".//{{{SVG_NS}}}g[@id='ooo:meta_slide_{slide_num - 1}']")
+    master_id = meta.get(f"{{{OOO_NS}}}master", "") if meta is not None else ""
+    master_g = root.find(f".//*[@id='{master_id}']") if master_id else None
+
+    bg_g = page_g.find(f"{{{SVG_NS}}}defs[@class='SlideBackground']/*[@class='Background']")
+    if bg_g is None and master_g is not None:
+        bg_g = master_g.find(f"{{{SVG_NS}}}g[@class='Background']")
+    if bg_g is not None:
+        _propagate_root_attrs(bg_g, root_attrs)
+        parts.append(etree.tostring(bg_g, encoding="unicode"))
+        for el in bg_g.iter():
+            f = el.get("fill")
+            if f and f != "none":
+                bg_fill = f
+                break
+
+    bo_g = master_g.find(f"{{{SVG_NS}}}g[@class='BackgroundObjects']") if master_g is not None else None
+    if bo_g is not None and meta.get(f"{{{OOO_NS}}}master-objects-visibility") != "hidden":
+        for child in bo_g:
+            # Layout placeholders (com.sun.star.presentation.SubtitleShape, ...)
+            # carry the layout's prompt text; LibreOffice hides only the title
+            # and outline ones on master pages, and slides never draw them.
+            # DateTime / Footer / PageNumber have their own classes.
+            if (child.get("visibility") != "hidden"
+                    and not child.get("class", "").startswith("com.sun.star.presentation.")):
                 _propagate_root_attrs(child, root_attrs)
                 parts.append(etree.tostring(child, encoding="unicode"))
-                if cls == "Background":
-                    for el in child.iter():
-                        f = el.get("fill")
-                        if f and f != "none":
-                            bg_fill = f
-                            break
-        if parts:
-            bg_svg = _convert_images("\n".join(parts))
 
-    # 2) Fallback: master page background
-    if bg_svg is None:
-        meta_slides = root.find(f".//{{{SVG_NS}}}g[@id='ooo:meta_slides']")
-        if meta_slides is not None:
-            meta = meta_slides.find(f".//{{{SVG_NS}}}g[@id='ooo:meta_slide_{slide_num - 1}']")
-            if meta is not None:
-                master_id = meta.get(f"{{{OOO_NS}}}master", "")
-                if master_id:
-                    master_g = root.find(f".//*[@id='{master_id}']")
-                    if master_g is not None:
-                        parts = []
-                        bg_g = master_g.find(f"{{{SVG_NS}}}g[@class='Background']")
-                        if bg_g is not None:
-                            _propagate_root_attrs(bg_g, root_attrs)
-                            parts.append(etree.tostring(bg_g, encoding="unicode"))
-                            for el in bg_g.iter():
-                                f = el.get("fill")
-                                if f and f != "none":
-                                    bg_fill = f
-                                    break
-                        bo_g = master_g.find(f"{{{SVG_NS}}}g[@class='BackgroundObjects']")
-                        if bo_g is not None:
-                            for child in bo_g:
-                                # Layout placeholders (com.sun.star.presentation.SubtitleShape, ...)
-                                # carry the layout's prompt text; LibreOffice hides only the title
-                                # and outline ones on master pages, and slides never draw them.
-                                # DateTime / Footer / PageNumber have their own classes.
-                                if (child.get("visibility") != "hidden"
-                                        and not child.get("class", "").startswith("com.sun.star.presentation.")):
-                                    _propagate_root_attrs(child, root_attrs)
-                                    parts.append(etree.tostring(child, encoding="unicode"))
-                        if parts:
-                            bg_svg = _convert_images("\n".join(parts))
+    if parts:
+        bg_svg = _convert_images("\n".join(parts))
 
     # --- Components ---
     components = []
