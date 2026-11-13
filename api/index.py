@@ -287,6 +287,8 @@ def _deck_summary(item: Dict, extras: Dict[str, Dict], owner: bool = False) -> D
         "updatedAt": item.get("updatedAt", ""),
         "thumbnailUrl": ex.get("thumbnailUrl"),
         "visibility": item.get("visibility", "private"),
+        # A built PPTX exists (GET /decks/{id}/pptx signs it on demand; the list stays URL-free).
+        "hasPptx": bool(item.get("pptxS3Key")),
     }
     if owner:
         summary["chatSessionId"] = _chat_session_id(item)
@@ -1060,6 +1062,30 @@ def get_deck_html(deck_id: str) -> Any:
         return {"error": "HTML not built yet"}, 404
     return {"url": url, "expiresIn": expires}
 
+
+
+@app.get("/decks/<deck_id>/pptx")
+def get_deck_pptx(deck_id: str) -> Any:
+    """Signed URL that downloads the built PPTX as ``<deck title>.pptx`` (15 min).
+
+    Same read permission as get_deck (owner, or viewer of a public deck); 404 when no
+    PPTX is built or the deck is an HTML deck (get_deck gives those no pptxUrl either).
+
+    Returns:
+        Dict with url and expiresIn (seconds).
+    """
+    user_id = get_user_id(app.current_event)
+
+    decision = authorize(user_id, deck_id, "read", table)
+    if not decision.allowed:
+        return {"error": decision.reason}, 403
+
+    deck = decision.deck
+    pptx_key = deck.get("pptxS3Key")
+    url = _pptx_download_url(pptx_key, deck.get("name", "")) if pptx_key else None
+    if not url or is_html_deck(_read_deck_json(deck_id)):
+        return {"error": "PPTX not built yet"}, 404
+    return {"url": url, "expiresIn": PRESIGNED_URL_EXPIRY}
 
 
 @app.get("/decks/<deck_id>")

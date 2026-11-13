@@ -185,9 +185,15 @@ def test_html_download_is_an_attachment(monkeypatch, index):
     assert query["response-content-disposition"][0].startswith('attachment; filename="Q3 Review.html"')
 
 
-# --- PPTX download URL -------------------------------------------------------
+# --- PPTX download URL and GET /decks/{id}/pptx ------------------------------
 
 PPTX_KEY = "pptx/d1/0b0e6c3e-7f6b-4c4c-9a39-1d0f8f5f0a11.pptx"
+
+
+def test_pptx_denied_is_403_before_reading_the_deck(monkeypatch, index):
+    calls = _setup(monkeypatch, index, allowed=False)
+    assert index.get_deck_pptx("d1") == ({"error": "no access"}, 403)
+    assert calls == [("u1", "d1", "read")]
 
 
 CF_DOMAIN = "d111111abcdef8.cloudfront.net"
@@ -238,6 +244,16 @@ def _verified_cf(url: str, public_key) -> tuple[str, dict]:
     return parts.path, parse_qs(parts.query)
 
 
+@pytest.mark.parametrize("role", ["owner", "viewer"])
+def test_pptx_is_a_cloudfront_attachment_named_after_the_deck(monkeypatch, index, cf, role):
+    _setup(monkeypatch, index, role=role, deck={"pptxS3Key": PPTX_KEY, "name": "四半期レビュー"})
+    result = index.get_deck_pptx("d1")
+    assert result["expiresIn"] == 900
+    path, query = _verified_cf(result["url"], cf)
+    assert path == f"/{PPTX_KEY}"
+    assert query == {"response-content-disposition": [JP_DISPOSITION]}
+
+
 def test_pptx_disposition_is_encoded_once(index, cf):
     url = index._pptx_download_url(PPTX_KEY, "四半期レビュー")
     raw = urlsplit(url).query.split("&Policy=")[0]
@@ -274,6 +290,30 @@ def test_previews_stay_unsigned_by_query(index, cf):
     url = index._cf_signed_url("previews/d1/cover_100.webp")
     assert url.startswith(f"https://{CF_DOMAIN}/previews/d1/cover_100.webp?Policy=")
     assert _verified_cf(url, cf) == ("/previews/d1/cover_100.webp", {})
+
+
+def test_pptx_not_built_is_404(monkeypatch, index):
+    _setup(monkeypatch, index)
+    assert index.get_deck_pptx("d1") == ({"error": "PPTX not built yet"}, 404)
+
+
+def test_pptx_of_an_html_deck_is_404(monkeypatch, index):
+    _setup(monkeypatch, index, deck={"pptxS3Key": PPTX_KEY, "htmlS3Key": HTML_KEY}, objects={
+        "decks/d1/deck.json": json.dumps({"outputFormat": "html"}).encode(),
+    })
+    assert index.get_deck_pptx("d1")[1] == 404
+
+
+def test_pptx_refuses_a_key_outside_pptx(monkeypatch, index):
+    _setup(monkeypatch, index, deck={"pptxS3Key": "uploads/u1/a.pptx"})
+    assert index.get_deck_pptx("d1")[1] == 404
+
+
+@pytest.mark.parametrize("record, expected", [({"pptxS3Key": PPTX_KEY}, True), ({}, False)])
+def test_deck_summary_says_whether_a_pptx_exists_without_a_url(index, record, expected):
+    summary = index._deck_summary({"SK": "DECK#d1", **record}, {})
+    assert summary["hasPptx"] is expected
+    assert "pptxUrl" not in summary
 
 
 # --- GET /decks/{id} ---------------------------------------------------------

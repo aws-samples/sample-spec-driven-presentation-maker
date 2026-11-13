@@ -19,6 +19,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   frames areas of a style's slides like on a deck; the frames collect above the style chat
   and are sent together, and the style agent changes only the commented slides. Desktop,
   Local mode and the AWS stack.
+- **Download a deck's PPTX from the deck list.** Each deck card's menu (`…`) has
+  "Download PPTX", which saves the file as `<deck title>.pptx` without opening the deck; it
+  is greyed out until the deck has a built PPTX (and for HTML decks). Works on the My Decks,
+  Favorites and Internal tabs. In Local mode "Open PPTX" stays next to it. The deck list
+  response carries `hasPptx` instead of a URL; the link is signed only when you click
+  (`GET /decks/{id}/pptx`, same read permission as opening the deck). Local mode and the
+  AWS stack.
 
 ### Changed
 
@@ -48,6 +55,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   still comes through CloudFront (inside its WAF): the signed link carries the file name,
   and a new cache policy for `pptx/*` passes it on to S3. AWS stack (deploy SdpmWebUi;
   Local mode too, for the download from the deck list).
+- **Enter on a deck card's menu button opens the menu, not the deck.** The key also reached
+  the card (and so did keys pressed in its menu), which opened the deck instead.
 - **Chart titles keep their font colour and size when a deck is read back.** `pptx_to_json`
   looked for the title font only on the title's first run, but generated charts (and many
   others) set it on the paragraph, so `titleFontColor` and `titleFontSize` were dropped.

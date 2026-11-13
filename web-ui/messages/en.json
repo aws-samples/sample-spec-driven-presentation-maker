@@ -99,6 +99,7 @@
     "openFolder": "Open Folder",
     "openPptx": "Open PPTX",
     "downloadPptx": "Download PPTX",
+    "downloadPptxAria": "Download {name} as PPTX",
     "makePrivate": "Make Private",
     "makeInternal": "Make Internal",
     "delete": "Delete",
@@ -494,6 +495,7 @@
     "bulkDeleteDescriptionLocal": "The selected deck folders will be deleted immediately. This action cannot be undone.",
     "errorUpdateVisibility": "Failed to update visibility.",
     "errorDeleteDeck": "Failed to delete deck.",
+    "errorDownloadPptx": "Failed to download PPTX.",
     "errorLoadDecks": "Failed to load decks."
   },
   "mcp": {

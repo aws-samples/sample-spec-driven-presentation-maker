@@ -77,9 +77,8 @@ export async function GET() {
           thumbnailUrl = `/api/preview/${deckId}/preview/${firstHtml}?v=${mtime}`
         }
       }
-      const pptxPath = path.join(dp, "output.pptx")
-      const pptxUrl = fs.existsSync(pptxPath) ? `/api/preview/${deckId}/output.pptx` : null
-      return { deckId, name, slideCount, updatedAt: new Date().toISOString(), thumbnailUrl, pptxUrl }
+      const hasPptx = !isHtml && fs.existsSync(path.join(dp, "output.pptx"))
+      return { deckId, name, slideCount, updatedAt: new Date().toISOString(), thumbnailUrl, hasPptx }
     })
     .sort((a, b) => b.deckId.localeCompare(a.deckId))
 
