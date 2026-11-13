@@ -8,9 +8,11 @@ import os
 import threading
 import urllib.parse
 from concurrent.futures import Future
+from contextlib import asynccontextmanager
 from typing import Callable
 
-from mcp.client.streamable_http import streamablehttp_client
+import httpx2
+from mcp.client.streamable_http import streamable_http_client
 from strands.tools.mcp import MCPClient
 from strands.types.exceptions import MCPClientInitializationError
 
@@ -51,7 +53,7 @@ def mcp_agentcore_runtime(
     encoded_arn = urllib.parse.quote(runtime_arn, safe="")
     url = f"https://bedrock-agentcore.{region}.amazonaws.com/runtimes/{encoded_arn}/invocations?qualifier=DEFAULT"
 
-    transport: dict = {"url": url, "timeout": 120, "terminate_on_close": False}
+    transport: dict = {"url": url, "timeout": 120.0, "terminate_on_close": False}
     if token is not None:
         headers: dict = {}
         transport["auth"] = HolderAuth(token)
@@ -84,7 +86,18 @@ def mcp_agentcore_runtime(
         kwargs["tool_filters"] = tool_filters
 
     client_class = ReconnectingMCPClient if token is not None else MCPClient
-    return client_class(lambda: streamablehttp_client(**transport), **kwargs)
+    return client_class(lambda: _streamable_http(**transport), **kwargs)
+
+
+@asynccontextmanager
+async def _streamable_http(
+    url: str, *, headers: dict, timeout: float, terminate_on_close: bool, auth: httpx2.Auth | None = None,
+):
+    """mcp 2.x's streamable HTTP transport on a client of our own (headers, auth and timeouts
+    moved onto the httpx2 client). The read timeout stays mcp 1.x's 300 s for the SSE stream."""
+    async with httpx2.AsyncClient(headers=headers, timeout=httpx2.Timeout(timeout, read=300.0), auth=auth) as client:
+        async with streamable_http_client(url, http_client=client, terminate_on_close=terminate_on_close) as streams:
+            yield streams
 
 
 def _run_blocking(make_coro: Callable[[], object]) -> object:
@@ -116,7 +129,7 @@ def _run_blocking(make_coro: Callable[[], object]) -> object:
 
 class ReconnectingMCPClient(MCPClient):
     """A Presentation Maker client kept across a session's turns, restarted when its
-    MCP session has ended (a 401 with no newer token, a dropped connection).
+    MCP session has ended (a dropped connection).
 
     The restart keeps the object, so the Agent's MCP tools (which hold it) keep working,
     and keeps its consumers. A call made on an ended session is sent after the restart
@@ -191,7 +204,7 @@ def mcp_aws_knowledge() -> MCPClient:
     exactly those and is called without the execution role's credentials.
     """
     return MCPClient(
-        lambda: streamablehttp_client(url=AWS_KNOWLEDGE_URL),
+        lambda: streamable_http_client(AWS_KNOWLEDGE_URL),
         tool_filters={"allowed": list(AWS_KNOWLEDGE_TOOLS)},
     )
 

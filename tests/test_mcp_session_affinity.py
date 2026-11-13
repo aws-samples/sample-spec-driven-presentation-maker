@@ -39,7 +39,7 @@ def _capture(monkeypatch, mcp_clients):
 
     MCPClient receives a zero-arg callable and does not invoke it at construction
     time, so the test stands in for both: it records the callable, then calls it
-    to record the kwargs handed to streamablehttp_client.
+    to record the kwargs handed to _streamable_http (the streamable HTTP transport).
     """
     seen: dict = {}
 
@@ -52,7 +52,7 @@ def _capture(monkeypatch, mcp_clients):
         transport_callable()
         return object()
 
-    monkeypatch.setattr(mcp_clients, "streamablehttp_client", fake_transport)
+    monkeypatch.setattr(mcp_clients, "_streamable_http", fake_transport)
     monkeypatch.setattr(mcp_clients, "MCPClient", fake_client)
     monkeypatch.setenv("MCP_RUNTIME_ARN", "arn:aws:bedrock-agentcore:ap-northeast-1:111122223333:runtime/x")
     monkeypatch.setenv("AWS_REGION", "ap-northeast-1")

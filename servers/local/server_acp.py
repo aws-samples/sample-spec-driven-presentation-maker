@@ -31,13 +31,14 @@ import os  # noqa: E402
 import sandbox_tools  # noqa: E402
 import compose_dispatch  # noqa: E402
 from sdpm import tools  # noqa: E402
+from sdpm.tools import tool_errors  # noqa: E402
 from sdpm.api import _get_output_base_dir  # noqa: E402
 from sdpm.tools.attachment.contracts import (  # noqa: E402
     import_attachment as _import_attachment,
     read_attachment as _read_attachment,
 )
 from sdpm.tools.attachment.source import classify_source, validate_local_source  # noqa: E402
-from mcp.server.fastmcp import FastMCP  # noqa: E402
+from mcp.server.mcpserver import MCPServer  # noqa: E402
 
 
 # Same deck root as the CLI, server.py and the Local Web UI (order in _get_output_base_dir).
@@ -85,7 +86,8 @@ def import_attachment(
 # MCP Server (independent instance — no instructions for ACP agents)
 # ---------------------------------------------------------------------------
 
-mcp = FastMCP("sdpm-acp")
+mcp = MCPServer("sdpm-acp")
+tool_errors.install(mcp)
 
 # ---------------------------------------------------------------------------
 # Common tools (1-line registration)
