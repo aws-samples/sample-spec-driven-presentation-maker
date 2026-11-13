@@ -15,6 +15,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **`fit: "contain"` images sit in the middle of their box.** When a picture's aspect ratio
+  differed from its `width` × `height` box, the PPTX placed it at the box's top-left corner
+  and left the whole gap below or to the right. It is now centered in the box, as CSS
+  `object-fit: contain` does; `cover` and `stretch` are unchanged.
 - **Tables and videos inside a group are written to the PPTX.** The builder skipped a
   `table`, `video` or `rawShape` child of a `group` without a word, so a deck read back
   with `pptx_to_json` (which keeps them inside their group) lost them on the next build.

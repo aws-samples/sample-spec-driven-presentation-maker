@@ -174,10 +174,16 @@ class ImageMixin:
                               f"width={sh_w}, height={height_pct}",
                               file=sys.stderr)
                     if fit == "contain":
+                        # Shrink to fit, then center in the box like CSS
+                        # object-fit: contain (object-position 50% 50%).
                         if img_ratio > box_ratio:
-                            height = int(width / img_ratio)
+                            fitted = int(width / img_ratio)
+                            y += (height - fitted) // 2
+                            height = fitted
                         else:
-                            width = int(height * img_ratio)
+                            fitted = int(height * img_ratio)
+                            x += (width - fitted) // 2
+                            width = fitted
                     elif fit == "cover":
                         if img_ratio > box_ratio:
                             crop_pct = (1 - box_ratio / img_ratio) / 2
