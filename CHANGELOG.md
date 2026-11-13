@@ -13,6 +13,12 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Fixed
+
+- **The `blank-light` title layout's subtitle prompt reads "Subtitle".** It read
+  "Sustitle"; it now matches `blank-dark`. Only the empty-placeholder prompt changes —
+  layout and placeholder names, and existing decks, are untouched.
+
 ## [0.16.0] - 2026-11-12
 
 You can now ask for changes to your own styles by commenting on their slides, as on a deck,
