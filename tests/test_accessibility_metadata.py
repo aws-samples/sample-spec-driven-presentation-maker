@@ -13,8 +13,11 @@ from pathlib import Path
 import pytest
 from PIL import Image
 from pptx import Presentation
+from pptx.enum.shapes import MSO_SHAPE
+from pptx.util import Emu
 
 from sdpm.api import generate
+from sdpm.config import TEMPLATES_DIR
 from sdpm.engine.accessibility import DECORATIVE_URI
 from sdpm.engine.converter.pipeline import pptx_to_json
 from test_roundtrip import _make_deck
@@ -104,6 +107,29 @@ class TestRoundTrip:
         out = _build(tmp_path, _elements(tmp_path))
         slide = pptx_to_json(out, tmp_path / "extracted")["slides"][0]
         assert not any("alt" in e or "decorative" in e for e in slide["elements"])
+
+    def test_file_name_with_spaces_is_not_read_as_alt(self, tmp_path):
+        Image.new("RGB", (60, 60), "red").save(tmp_path / "Screenshot 2026-11-14 at 10.00.png")
+        out = _build(tmp_path, [{"type": "image", "src": str(tmp_path / "Screenshot 2026-11-14 at 10.00.png"),
+                                 "x": 0, "y": 0, "width": 60}])
+        assert _cnvprs(out)[0].get("descr") == "Screenshot 2026-11-14 at 10.00.png"
+        slide = pptx_to_json(out, tmp_path / "extracted")["slides"][0]
+        assert "alt" not in slide["elements"][0]
+
+    def test_flattened_group_alt_is_not_read(self, tmp_path):
+        # The builder flattens such a group, so an alt on it would be dropped on rebuild.
+        prs = Presentation(str(TEMPLATES_DIR / "blank-light.pptx"))
+        slide = prs.slides.add_slide(prs.slide_layouts[6])
+        group = slide.shapes.add_group_shape()
+        group.shapes.add_shape(MSO_SHAPE.RECTANGLE, Emu(0), Emu(0), Emu(900000), Emu(900000))
+        group.shapes.add_shape(MSO_SHAPE.OVAL, Emu(1000000), Emu(0), Emu(900000), Emu(900000))
+        group._element.xpath("./p:nvGrpSpPr/p:cNvPr")[0].set("descr", "Architecture diagram")
+        src = tmp_path / "src.pptx"
+        prs.save(src)
+        groups = [e for s in pptx_to_json(src, tmp_path / "extracted")["slides"]
+                  for e in s.get("elements", []) if e.get("type") == "group"]
+        assert len(groups) == 1 and "_groupXml" not in groups[0]
+        assert "alt" not in groups[0]
 
 
 class TestDocumentProperties:

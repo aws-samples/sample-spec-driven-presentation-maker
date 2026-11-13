@@ -97,7 +97,9 @@ def _dispatch_shape(shape, theme_colors=None, color_mapping=None, theme_styles=N
                 pass
         if not elem:
             elem = extract_shape_element(shape, theme_colors, color_mapping, theme_styles, builder_text_color=builder_text_color)
-    if elem:
+    # A group the builder flattens has no shape of its own to carry alt /
+    # decorative; only its children's (read when they are dispatched) survive.
+    if elem and (elem.get("type") != "group" or "_groupXml" in elem):
         elem.update(read_element_metadata(shape._element))
     return elem, img_counter
 

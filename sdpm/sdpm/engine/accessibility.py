@@ -21,7 +21,7 @@ _ADEC_NS = "http://schemas.microsoft.com/office/drawing/2017/decorative"
 # python-pptx writes the image file name as descr; that is not alt text.
 # shortcut: a bare file name is treated as "no alt"; widen if other tools'
 # placeholder descriptions show up in imported decks.
-_FILENAME_DESCR = re.compile(r"^[^\s/\\]+\.(?:png|jpe?g|gif|bmp|svg|webp|tiff?|emf|wmf)$", re.IGNORECASE)
+_FILENAME_DESCR = re.compile(r"^[^/\\]+\.(?:png|jpe?g|gif|bmp|svg|webp|tiff?|emf|wmf)$", re.IGNORECASE)
 
 
 def _cnvpr(node):
