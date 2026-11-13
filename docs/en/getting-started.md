@@ -265,7 +265,9 @@ slide overview. To get a PDF, open `output.html?print-pdf` and print from the br
   template decorations) and JavaScript errors come back as warnings, and each checked slide
   gets a PNG preview (`<deck>/preview/png/<slug>.png`, returned as `preview_files`).
   Without a browser, the check is skipped with a one-line warning. `SDPM_BROWSER` picks the
-  browser executable (`none` turns the check off). The local server also writes a static
+  browser executable (`none` turns the check off). `SDPM_BROWSER_START_TIMEOUT` sets how many
+  seconds a launch may take to start (default 15, at most 120); one that times out is tried
+  once more. The local server also writes a static
   thumbnail per slide (`<deck>/preview/<slug>.html`) next to `output.html`.
 - PPTX-only features (translation, PPTX import, hand-edit sync) refuse HTML decks.
 - Slides can run JavaScript. Apache ECharts and D3 are bundled and embedded only in decks

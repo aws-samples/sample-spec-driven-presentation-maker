@@ -187,3 +187,80 @@ def test_local_browser_temp_dir_failure_raises_before_starting(monkeypatch) -> N
     with pytest.raises(OSError, match="No space"):
         with browser.local_browser("/opt/chrome", 1920, 1080):
             pass
+
+
+class _FakeBrowser:
+    """Popen stand-in: launch number ``n`` writes DevToolsActivePort when ``n`` is in
+    ``ready``, exits with ``exit_code`` when given, and otherwise never starts DevTools."""
+
+    ready: set = set()
+    exit_code: int | None = None
+    launched: list = []
+
+    def __init__(self, argv, **_kwargs):
+        self.profile = Path(next(a for a in argv if a.startswith("--user-data-dir=")).split("=", 1)[1])
+        self.stopped = False
+        type(self).launched.append(self)
+        if len(type(self).launched) in type(self).ready:
+            (self.profile / "DevToolsActivePort").write_text("4242\n/devtools/browser/x\n", encoding="utf-8")
+
+    def poll(self):
+        if self.exit_code is not None:
+            return self.exit_code
+        return 0 if self.stopped else None
+
+    def terminate(self):
+        self.stopped = True
+
+    def wait(self, timeout=None):
+        return 0
+
+    def kill(self):
+        self.stopped = True
+
+
+@pytest.fixture
+def fake_browser(monkeypatch):
+    _FakeBrowser.ready, _FakeBrowser.exit_code, _FakeBrowser.launched = set(), None, []
+    monkeypatch.setattr(browser.subprocess, "Popen", _FakeBrowser)
+    return _FakeBrowser
+
+
+def test_local_browser_retries_a_launch_whose_devtools_does_not_start(fake_browser, caplog) -> None:
+    fake_browser.ready = {2}
+    with caplog.at_level("WARNING", logger=browser.__name__):
+        with browser.local_browser("/opt/google-chrome", 1280, 720, start_timeout=0.1) as endpoint:
+            assert endpoint == BrowserEndpoint("ws://127.0.0.1:4242/devtools/browser/x", {}, "Google Chrome")
+            first, second = fake_browser.launched
+            assert first.stopped and not first.profile.exists(), "the hung launch is stopped and cleaned up"
+            assert first.profile != second.profile and not second.stopped
+    assert second.stopped and not second.profile.exists()
+    assert "DevTools did not start within 0.1 s; starting it once more" in caplog.text
+
+
+def test_local_browser_gives_up_after_the_second_timeout(fake_browser) -> None:
+    with pytest.raises(TimeoutError, match=r"^DevTools did not start within 0.1 s \(tried 2 times\)$"):
+        with browser.local_browser("/opt/google-chrome", 1280, 720, start_timeout=0.1):
+            pytest.fail("no endpoint")
+    assert len(fake_browser.launched) == 2
+    assert all(p.stopped and not p.profile.exists() for p in fake_browser.launched)
+
+
+def test_local_browser_does_not_retry_a_browser_that_exits(fake_browser) -> None:
+    fake_browser.exit_code = 1
+    with pytest.raises(RuntimeError, match=r"exited \(code 1\) before DevTools started"):
+        with browser.local_browser("/opt/google-chrome", 1280, 720, start_timeout=5):
+            pytest.fail("no endpoint")
+    assert len(fake_browser.launched) == 1 and not fake_browser.launched[0].profile.exists()
+
+
+@pytest.mark.parametrize(("value", "expected"), [
+    (None, 15.0), ("", 15.0), ("45", 45.0), ("2.5", 2.5), ("1000", 120.0),
+    ("0", 15.0), ("-3", 15.0), ("soon", 15.0), ("nan", 15.0), ("inf", 15.0),
+])
+def test_browser_start_timeout_reads_the_environment(monkeypatch, value, expected) -> None:
+    if value is None:
+        monkeypatch.delenv(browser.START_TIMEOUT_ENV, raising=False)
+    else:
+        monkeypatch.setenv(browser.START_TIMEOUT_ENV, value)
+    assert browser.browser_start_timeout() == expected
