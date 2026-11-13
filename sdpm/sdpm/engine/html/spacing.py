@@ -14,7 +14,7 @@ and inline ``svg`` / ``math`` keep their text as written; they also end a run.
 """
 from __future__ import annotations
 
-from sdpm.utils.text import is_cjk_punctuation, is_fullwidth, normalize_spacing
+from sdpm.utils.text import ASCII_TRAILING_PUNCTUATION, is_cjk_punctuation, is_fullwidth, normalize_spacing
 
 # Text inside these is left verbatim (code, raw text, drawn text whose width is fixed).
 VERBATIM_TAGS = frozenset({"pre", "code", "kbd", "samp", "script", "style", "textarea", "svg", "math"})
@@ -36,7 +36,8 @@ def _is_wide(c: str) -> bool:
 
 
 def _needs_space(last: str, first: str) -> bool:
-    return (_is_ascii(last) and _is_wide(first)) or (_is_wide(last) and _is_ascii(first))
+    return (_is_ascii(last) and _is_wide(first)) or (
+        _is_wide(last) and _is_ascii(first) and first not in ASCII_TRAILING_PUNCTUATION)
 
 
 class _Run:

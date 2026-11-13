@@ -20,6 +20,7 @@ def _spaced(markup: str) -> str:
     ("<p>新しい<span>Lambda</span>関数</p>", "<p>新しい <span>Lambda </span>関数</p>"),
     ("<p><b>東京</b><i>Region</i></p>", "<p><b>東京 </b><i>Region</i></p>"),
     ("<p><strong>AWS</strong>、<em>S3</em>。</p>", "<p><strong>AWS</strong>、<em>S3</em>。</p>"),
+    ("<p><strong>例</strong>: MCP</p>", "<p><strong>例</strong>: MCP</p>"),
 ])
 def test_text_and_inline_boundaries_match_pptx(src, expected):
     assert _spaced(src) == expected

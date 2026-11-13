@@ -31,6 +31,21 @@ def test_no_space_next_to_japanese_punctuation(src, expected):
     assert normalize_spacing(src) == expected
 
 
+@pytest.mark.parametrize("src, expected", [
+    ("例: MCP サーバー", "例: MCP サーバー"),
+    ("例:説明", "例: 説明"),
+    ("目的; 範囲", "目的; 範囲"),
+    ("完了!次へ", "完了! 次へ"),
+    ("本当?", "本当?"),
+    ("東京,大阪", "東京, 大阪"),
+    ("以上.", "以上."),
+    ("3.5倍", "3.5 倍"),
+    ("1,000円", "1,000 円"),
+])
+def test_trailing_ascii_punctuation_attaches_to_the_word_before(src, expected):
+    assert normalize_spacing(src) == expected
+
+
 def test_letter_like_marks_are_not_punctuation():
     for ch in "々〆〇ー":
         assert not is_cjk_punctuation(ch)

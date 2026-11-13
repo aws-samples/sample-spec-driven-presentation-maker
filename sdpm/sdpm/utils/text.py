@@ -32,8 +32,13 @@ def is_cjk_punctuation(char):
             or 0xFFE0 <= cp <= 0xFFE6)   # 全角通貨等
 
 
+# Half-width punctuation that attaches to the word before it (「例: 説明」, 「完了!」):
+# no space between a CJK letter and one of these.
+ASCII_TRAILING_PUNCTUATION = frozenset(':;,.!?')
+
+
 def normalize_spacing(text):
-    """半角と全角の間に半角スペースを挿入（括弧内側・日本語の約物の隣は除外）"""
+    """半角と全角の間に半角スペースを挿入（括弧内側・日本語の約物の隣・CJK 直後の半角 : ; , . ! ? は除外）"""
     open_br = set('([{「『（【〔《〈')
     close_br = set(')]}」』）】〕》〉')
     quotes = set('"\'`')
@@ -78,7 +83,8 @@ def normalize_spacing(text):
             result.append(' ')
         elif is_ascii(ch) and is_wide(next_ch) and ch not in open_br and not is_opening_quote(i, ch):
             result.append(' ')
-        elif is_wide(ch) and is_ascii(next_ch) and next_ch not in close_br and not is_closing_quote(i + 1, next_ch):
+        elif (is_wide(ch) and is_ascii(next_ch) and next_ch not in close_br
+              and next_ch not in ASCII_TRAILING_PUNCTUATION and not is_closing_quote(i + 1, next_ch)):
             result.append(' ')
 
     return ''.join(result)
@@ -339,7 +345,8 @@ def _parse_non_link_styles(text, auto_spacing=True):
         def is_wide(c: str) -> bool:
             return is_fullwidth(c) and not is_cjk_punctuation(c)
 
-        if (is_ascii(last_ch) and is_wide(first_ch)) or (is_wide(last_ch) and is_ascii(first_ch)):
+        if (is_ascii(last_ch) and is_wide(first_ch)) or (
+                is_wide(last_ch) and is_ascii(first_ch) and first_ch not in ASCII_TRAILING_PUNCTUATION):
             segments[i]["text"] = cur_text + ' '
 
     return segments

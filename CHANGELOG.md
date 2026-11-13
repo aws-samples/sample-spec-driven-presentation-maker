@@ -77,8 +77,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **No automatic space next to Japanese punctuation.** The CJK↔Latin spacing treated
   Japanese punctuation and full-width symbols like letters, so `DBは、DBを` built as
   `DB は、 DB を`, `A・B` as `A ・ B` and `AWS／Azure` as `AWS ／ Azure`, in slide text and
-  speaker notes. Punctuation such as 、。・「」（）／：〜 now takes no space on either side.
-  Local mode and the AWS stack (SdpmRuntime).
+  speaker notes. Punctuation such as 、。・「」（）／：〜 now takes no space on either side,
+  and half-width `: ; , . ! ?` stays attached to the Japanese word before it (`例: 説明`
+  no longer builds as `例 : 説明`). Local mode and the AWS stack (SdpmRuntime).
 - **Edits to a read-back chart show up in the rebuilt PPTX.** `pptx_to_json` keeps each
   chart's original XML in `_chartXml` so an unedited chart rebuilds exactly, but the builder
   restored that XML even after the chart's JSON (values, categories, series names and
