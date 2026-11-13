@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import re
 
+from sdpm.engine.schema.chart import chart_edit_ignored
 from sdpm.engine.schema.regions import is_comment_element
 
 _COLOR_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
@@ -305,6 +306,13 @@ def _lint_chart(si: int, ei: int, elem: dict) -> list[dict]:
                              f"stacked is only valid for chartType 'bar', not '{ct}'."))
 
     results.extend(_lint_bbox_required(si, ei, elem, "chart"))
+    if chart_edit_ignored(elem):
+        results.append(_diag(
+            si, ei, "chart-edit-ignored",
+            "this chart was read back from a PPTX as a chart type or combination of plots that "
+            "chartType cannot describe, so the build keeps the original chart from _chartXml and "
+            "the edits to its JSON are not applied. Delete _chartXml to build it from its JSON "
+            f"as a '{ct}' chart instead (the original chart type and styling are then lost)."))
     return results
 
 
