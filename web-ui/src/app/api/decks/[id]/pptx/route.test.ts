@@ -36,6 +36,9 @@ beforeAll(async () => {
   write("unbuilt/deck.json", JSON.stringify({ name: "Draft" }))
   write("html/deck.json", JSON.stringify({ name: "Web", outputFormat: "html" }))
   write("html/output.pptx", "PK")
+  write("linked/deck.json", JSON.stringify({ name: "Linked" }))
+  fs.writeFileSync(`${root}-outside.pptx`, "PK")
+  fs.symlinkSync(`${root}-outside.pptx`, path.join(root, "linked", "output.pptx"))
   vi.resetModules()
   GET = (await import("./route")).GET
 })
@@ -44,6 +47,7 @@ afterAll(() => {
   if (savedRoot === undefined) delete process.env.SDPM_DECK_ROOT
   else process.env.SDPM_DECK_ROOT = savedRoot
   fs.rmSync(root, { recursive: true, force: true })
+  fs.rmSync(`${root}-outside.pptx`, { force: true })
 })
 
 describe("GET /api/decks/[id]/pptx", () => {
@@ -72,10 +76,11 @@ describe("GET /api/decks/[id]/pptx", () => {
     expect(res.headers.get("Content-Disposition")).toMatch(/^attachment; filename="noname\.pptx"/)
   })
 
-  it("is 404 without output.pptx, for an HTML deck and for an id outside the root", async () => {
+  it("is 404 without output.pptx, for an HTML deck, outside the root and for a link leaving it", async () => {
     expect((await get("unbuilt")).status).toBe(404)
     expect((await get("html")).status).toBe(404)
     expect((await get("..")).status).toBe(404)
     expect((await get("missing")).status).toBe(404)
+    expect((await get("linked")).status).toBe(404)
   })
 })

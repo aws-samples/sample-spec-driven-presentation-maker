@@ -24,6 +24,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   Illustrator does for its namespace URIs; external, nested or markup-bearing entities are
   refused. A refused file is named in the error. Attached SVGs are also parsed with DTDs
   refused.
+- **Local Web UI file reads stay inside their data directories after symlinks are
+  resolved.** The preview, deck detail, PPTX download, template download, style detail and
+  "open in app" endpoints check the real path of both the data directory and the requested
+  file, with a separator boundary, through one shared helper. A symlink leading out of the
+  deck root, the templates or the styles directory is refused the same way as any other
+  path outside it; files inside, including symlinks that stay inside, are served as before.
+  User templates are now also found when the config directory itself is reached through a
+  symlink.
+
 ### Changed
 
 - **The MCP servers run on MCP Python SDK 2.x** (`mcp>=2.3,<3`, was `<2`; #301). The local
