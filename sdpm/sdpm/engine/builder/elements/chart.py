@@ -4,7 +4,7 @@
 from pptx.dml.color import RGBColor
 from pptx.util import Pt
 
-from sdpm.engine.schema.chart import chart_fingerprint
+from sdpm.engine.schema.chart import restores_chart_xml
 from sdpm.utils import xml_safe
 
 
@@ -78,14 +78,10 @@ class ChartMixin:
         chart = graphic_frame.chart
 
         # Restore original chart styling for perfect roundtrip, unless the
-        # structured fields were edited since extraction (fingerprint differs).
-        # JSON without a fingerprint (extracted before it existed) keeps restoring.
-        fingerprint = elem.get("_chartFingerprint")
-        edited = fingerprint is not None and fingerprint != chart_fingerprint(elem)
-        if elem.get("_chartXml") and not edited:
+        # structured fields were edited since extraction (fingerprint differs)
+        # and the chart is one its JSON describes (see sdpm.engine.schema.chart).
+        if restores_chart_xml(elem):
             try:
-                from lxml import etree
-                from pptx.oxml.ns import qn
                 orig = xml_safe.fromstring(elem["_chartXml"])
                 ns_c = {'c': 'http://schemas.openxmlformats.org/drawingml/2006/chart',
                         'r': 'http://schemas.openxmlformats.org/officeDocument/2006/relationships'}
@@ -104,38 +100,20 @@ class ChartMixin:
                 elif ext_data is not None:
                     orig.remove(ext_data)
 
-                # Remove userShapes ref (will re-add with correct rId)
+                # Remove userShapes ref (re-added with the new rId below)
                 user_shapes_el = orig.find('c:userShapes', ns_c)
                 if user_shapes_el is not None:
                     orig.remove(user_shapes_el)
 
                 # Replace entire chart XML
                 chart.part._element = orig
-
-                # Add chartUserShapes drawing
-                if elem.get("_chartUserShapes"):
-                    from pptx.opc.package import Part
-                    from pptx.opc.packuri import PackURI
-                    drawing_xml = elem["_chartUserShapes"].encode('utf-8')
-                    chart_num = chart.part.partname.split('chart')[-1].replace('.xml', '')
-                    drawing_pn = PackURI(f'/ppt/drawings/drawing{chart_num}.xml')
-                    drawing_part = Part(
-                        drawing_pn,
-                        'application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml',
-                        chart.part.package,
-                        drawing_xml,
-                    )
-                    us_rid = chart.part.relate_to(drawing_part, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes')
-                    # Add userShapes element with correct rId
-                    us_el = etree.SubElement(orig, qn('c:userShapes'))
-                    us_el.set(qn('r:id'), us_rid)
-
-                return
             except Exception as _chart_err:
                 import sys
                 print(f"Warning: chart XML restore failed: {_chart_err}", file=sys.stderr)
-                pass  # Fall through to normal chart building
-    
+            else:
+                self._attach_chart_user_shapes(chart.part, elem)
+                return
+
         # Theme-aware design tokens (from template theme colors)
         tc = self.theme_colors
         text_hex = tc["text"].lstrip("#")
@@ -418,5 +396,36 @@ class ChartMixin:
                 hs = doughnut.find(qn('c:holeSize'))
                 if hs is not None:
                     hs.set('val', str(elem["holeSize"]))
+
+        # Text drawn over the chart (kept when the chart is built from its JSON too)
+        self._attach_chart_user_shapes(chart.part, elem)
+
+    def _attach_chart_user_shapes(self, chart_part, elem):
+        """Attach ``_chartUserShapes`` (a chartDrawing part) to the chart part."""
+        if not elem.get("_chartUserShapes"):
+            return
+        from lxml import etree
+        from pptx.opc.package import Part
+        from pptx.opc.packuri import PackURI
+        from pptx.oxml.ns import qn
+        drawing_xml = elem["_chartUserShapes"].encode('utf-8')
+        chart_num = chart_part.partname.split('chart')[-1].replace('.xml', '')
+        drawing_pn = PackURI(f'/ppt/drawings/drawing{chart_num}.xml')
+        drawing_part = Part(
+            drawing_pn,
+            'application/vnd.openxmlformats-officedocument.drawingml.chartshapes+xml',
+            chart_part.package,
+            drawing_xml,
+        )
+        us_rid = chart_part.relate_to(drawing_part, 'http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartUserShapes')
+        # c:userShapes comes last in c:chartSpace, before c:extLst
+        chart_space = chart_part._element
+        us_el = etree.Element(qn('c:userShapes'))
+        us_el.set(qn('r:id'), us_rid)
+        ext_lst = chart_space.find(qn('c:extLst'))
+        if ext_lst is not None:
+            ext_lst.addprevious(us_el)
+        else:
+            chart_space.append(us_el)
     
 

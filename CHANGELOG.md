@@ -59,10 +59,14 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   restored that XML even after the chart's JSON (values, categories, series names and
   colours, title, axes, labels) had been edited, so the edits were lost. The converter now
   also writes `_chartFingerprint`, and the builder restores `_chartXml` only while the
-  chart's fields still match it; an edited chart is built from its JSON (styling the JSON
-  does not describe, and text drawn over the chart, is not kept then). Moving or resizing a
-  chart counts as unedited. JSON converted before this change has no fingerprint and
-  rebuilds as before; convert the PPTX again to edit its charts.
+  chart's fields still match it; an edited chart is built from its JSON, keeping the text
+  drawn over it (`_chartUserShapes`) but not the styling the JSON does not describe. Moving
+  or resizing a chart counts as unedited. A chart whose type or combination of plots
+  `chartType` cannot describe (area, radar, 100% stacked, a column chart with a line plot,
+  and so on) is marked `_chartRebuildable: false` and keeps its original chart when edited;
+  the build reports `chart-edit-ignored` for it, and deleting `_chartXml` builds it from its
+  JSON instead. JSON converted before this change has no fingerprint and rebuilds as before;
+  convert the PPTX again to edit its charts. Local mode and the AWS stack (SdpmRuntime).
 - **Smooth line charts read back as `smooth: true`.** The converter did not read `c:smooth`,
   so a smooth line chart rebuilt from `--minimal` JSON came back with straight segments.
   Local mode and the AWS stack (SdpmRuntime).

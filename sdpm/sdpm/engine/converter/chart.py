@@ -26,6 +26,10 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
         XL_CHART_TYPE.DOUGHNUT: ("donut", False, False),
     }
     chart_type, stacked, horizontal = type_map.get(ct, ("bar", False, False))
+    # The builder can make this chart again from its JSON only when chartType
+    # describes it: one plot of a mapped type. Anything else (area, radar, 100%
+    # stacked, combo charts…) is read as a bar chart and only _chartXml keeps it.
+    rebuildable = ct in type_map and len(chart.plots) == 1
     elem["chartType"] = chart_type
     if stacked:
         elem["stacked"] = True
@@ -130,6 +134,7 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
                 break
         elem["series"] = [{"name": "", "values": [1]}]  # dummy for builder
         elem["_chartFingerprint"] = chart_fingerprint(elem)
+        elem["_chartRebuildable"] = False
         return elem
 
     # Per-point colors (dPt)
@@ -273,6 +278,8 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
         elem["_chartXml"] = _et.tostring(chart._chartSpace, encoding='unicode')
         # Lets the builder tell an edited chart from an unedited one
         elem["_chartFingerprint"] = chart_fingerprint(elem)
+        if not rebuildable:
+            elem["_chartRebuildable"] = False
         # Save chartUserShapes (text overlays on chart)
         for rel in chart.part.rels.values():
             if rel.reltype.endswith('/chartUserShapes'):
