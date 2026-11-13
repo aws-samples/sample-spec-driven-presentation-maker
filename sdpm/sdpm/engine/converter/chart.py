@@ -24,18 +24,20 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
         XL_CHART_TYPE.LINE_MARKERS: ("line", False, False),
         XL_CHART_TYPE.PIE: ("pie", False, False),
         XL_CHART_TYPE.DOUGHNUT: ("donut", False, False),
+        XL_CHART_TYPE.RADAR: ("radar", False, False),
+        XL_CHART_TYPE.RADAR_MARKERS: ("radar", False, False),
     }
     chart_type, stacked, horizontal = type_map.get(ct, ("bar", False, False))
     # The builder can make this chart again from its JSON only when chartType
-    # describes it: one plot of a mapped type. Anything else (area, radar, 100%
-    # stacked, combo charts…) is read as a bar chart and only _chartXml keeps it.
+    # describes it: one plot of a mapped type. Anything else (area, filled radar,
+    # 100% stacked, combo charts…) is read as a bar chart and only _chartXml keeps it.
     rebuildable = ct in type_map and len(chart.plots) == 1
     elem["chartType"] = chart_type
     if stacked:
         elem["stacked"] = True
     if horizontal:
         elem["horizontal"] = True
-    if ct == XL_CHART_TYPE.LINE:
+    if ct in (XL_CHART_TYPE.LINE, XL_CHART_TYPE.RADAR):
         elem["markers"] = False
     if chart_type == "line":
         # c:smooth with no val attribute means true (CT_Boolean default)
@@ -102,6 +104,12 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
             elif chart_type == "line":
                 rgb = series.format.line.color.rgb
                 s["color"] = f"#{rgb}"
+            elif chart_type == "radar":
+                ns_ln = {'c': 'http://schemas.openxmlformats.org/drawingml/2006/chart',
+                         'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
+                if series._element.find('c:spPr/a:ln/a:solidFill', ns_ln) is not None:
+                    rgb = series.format.line.color.rgb
+                    s["color"] = f"#{rgb}"
         except Exception:
             # Try gradient: use last stop color as representative
             try:

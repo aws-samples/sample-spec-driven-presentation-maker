@@ -13,6 +13,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Added
+
+- **Radar charts** (`chartType: "radar"`, #621). A radar chart takes the same categories and
+  series as a line chart; `markers` (default on), series `color`, `style.lineWidth` /
+  `style.markerSize` and `valueAxis` (`min` / `max` / `majorUnit` / `gridlines`, the radial
+  scale) work as for `line`. `pptx_to_json` reads a radar chart back as `radar`, so an
+  edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
+  New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
+
 ## [0.18.0] - 2026-11-15
 
 Japanese decks read more naturally: a `writing-ja` guide that the orchestrator and composers
