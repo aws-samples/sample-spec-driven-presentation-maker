@@ -526,6 +526,8 @@ class TestPipelineContract:
         # _chartXml embeds python-pptx-generated random axIds — assert shape, not value
         chart_xml = elements[6].pop("_chartXml")
         assert "<c:barChart>" in chart_xml
+        from sdpm.engine.schema.chart import chart_fingerprint
+        assert elements[6].pop("_chartFingerprint") == chart_fingerprint(elements[6])
         assert elements == _EXPECTED_CORPUS_ELEMENTS
 
         # On-disk deck structure
