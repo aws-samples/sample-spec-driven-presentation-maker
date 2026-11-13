@@ -15,6 +15,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **The `blank-light` title layout's subtitle prompt reads "Subtitle".** It read
+  "Sustitle"; it now matches `blank-dark`. Only the empty-placeholder prompt changes —
+  layout and placeholder names, and existing decks, are untouched.
 - **`fit: "contain"` images sit in the middle of their box.** When a picture's aspect ratio
   differed from its `width` × `height` box, the PPTX placed it at the box's top-left corner
   and left the whole gap below or to the right. It is now centered in the box, as CSS
