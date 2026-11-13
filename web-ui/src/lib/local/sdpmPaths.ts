@@ -65,6 +65,42 @@ export function updateState(key: string, value: unknown): void {
   fs.writeFileSync(p, JSON.stringify(state, null, 2))
 }
 
+/**
+ * Per-user notes on builtin templates (`state.json` → `builtin_template_notes`),
+ * kept apart from the regenerable analysis cache — the local counterpart of the
+ * cloud's `BUILTIN_NOTE#<name>` items. Notes still in the legacy location
+ * (`template_metadata["builtin:<name>"].description`, ≤ 0.17) are moved here
+ * on first read; sdpm.config.get_builtin_template_notes does the same in Python.
+ */
+export function getBuiltinTemplateNotes(): Record<string, string> {
+  const state = getState()
+  const notes = { ...((state.builtin_template_notes as Record<string, string>) || {}) }
+  const metadata = (state.template_metadata as Record<string, Record<string, unknown>>) || {}
+  let migrated = false
+  for (const [key, entry] of Object.entries(metadata)) {
+    if (!key.startsWith("builtin:") || !entry || typeof entry !== "object" || !("description" in entry)) continue
+    const note = entry.description
+    delete entry.description
+    const name = key.slice("builtin:".length)
+    if (typeof note === "string" && note.trim() && !(name in notes)) notes[name] = note.trim()
+    migrated = true
+  }
+  if (migrated) {
+    state.builtin_template_notes = notes
+    state.template_metadata = metadata
+    fs.writeFileSync(getStateJsonPath(), JSON.stringify(state, null, 2))
+  }
+  return notes
+}
+
+/** Set (non-empty) or clear (empty) the user's note on a builtin template. */
+export function setBuiltinTemplateNote(name: string, description: string): void {
+  const notes = getBuiltinTemplateNotes()
+  if (description) notes[name] = description
+  else delete notes[name]
+  updateState("builtin_template_notes", notes)
+}
+
 /** List style HTML files from a directory. Returns [{name, description, html}]. */
 export function listStylesFromDir(dir: string): Array<{ name: string; description: string; html: string }> {
   if (!fs.existsSync(dir)) return []

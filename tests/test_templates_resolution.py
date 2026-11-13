@@ -118,36 +118,25 @@ def test_list_templates_with_metadata_user_shadows_builtin(tmp_path: Path) -> No
     assert result[0]["source"] == "user"
 
 
-def test_list_templates_with_metadata_builtin_prefix_key_wins(tmp_path: Path) -> None:
-    """Builtin templates read metadata from 'builtin:<name>' first."""
+def test_list_templates_with_metadata_builtin_note_from_notes(tmp_path: Path) -> None:
+    """Builtin descriptions come from builtin_notes; the cache still feeds the analysis fields."""
     bundled_dir = tmp_path / "bundled"
     bundled_dir.mkdir()
     (bundled_dir / "blank-dark.pptx").write_bytes(b"dummy")
 
     metadata = {
-        "builtin:blank-dark": {"description": "User note", "layout_count": 7},
+        "builtin:blank-dark": {"description": "Stale cache note", "layout_count": 7},
         "blank-dark": {"description": "Legacy entry", "layout_count": 1},
     }
-    result = list_templates_with_metadata([bundled_dir], metadata)
-
+    result = list_templates_with_metadata([bundled_dir], metadata, {"blank-dark": "User note"})
     assert result[0]["description"] == "User note"
     assert result[0]["layout_count"] == 7
 
-
-def test_list_templates_with_metadata_builtin_falls_back_to_plain_key(tmp_path: Path) -> None:
-    """Without a 'builtin:' entry, builtin metadata falls back to '<name>' (legacy)."""
-    bundled_dir = tmp_path / "bundled"
-    bundled_dir.mkdir()
-    (bundled_dir / "blank-dark.pptx").write_bytes(b"dummy")
-
-    metadata = {"blank-dark": {"description": "Legacy entry"}}
-    result = list_templates_with_metadata([bundled_dir], metadata)
-
-    assert result[0]["description"] == "Legacy entry"
+    assert list_templates_with_metadata([bundled_dir], metadata)[0]["description"] == ""
 
 
-def test_list_templates_with_metadata_builtin_prefix_not_used_for_user(tmp_path: Path) -> None:
-    """A same-named user template must not pick up the 'builtin:' entry."""
+def test_list_templates_with_metadata_builtin_note_not_used_for_user(tmp_path: Path) -> None:
+    """A same-named user template keeps its own note, not the builtin's."""
     user_dir = tmp_path / "user"
     bundled_dir = tmp_path / "bundled"
     user_dir.mkdir()
@@ -155,15 +144,67 @@ def test_list_templates_with_metadata_builtin_prefix_not_used_for_user(tmp_path:
     (user_dir / "shared.pptx").write_bytes(b"user-ver")
     (bundled_dir / "shared.pptx").write_bytes(b"bundled-ver")
 
-    metadata = {
-        "shared": {"description": "User template note"},
-        "builtin:shared": {"description": "Builtin note"},
-    }
-    result = list_templates_with_metadata([user_dir, bundled_dir], metadata)
+    metadata = {"shared": {"description": "User template note"}}
+    result = list_templates_with_metadata([user_dir, bundled_dir], metadata, {"shared": "Builtin note"})
 
     assert len(result) == 1
     assert result[0]["source"] == "user"
     assert result[0]["description"] == "User template note"
+
+
+# ── get_builtin_template_notes (state.json) ──
+
+
+def _write_state(config_home: Path, state: dict) -> Path:
+    import json
+
+    path = config_home / "sdpm" / "state.json"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(state))
+    return path
+
+
+def test_builtin_notes_migrate_from_legacy_cache(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    """Legacy notes move out of template_metadata["builtin:<name>"] once, keeping the cache."""
+    import json
+
+    from sdpm.config import get_builtin_template_notes
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr("sys.platform", "linux")
+    path = _write_state(tmp_path, {
+        "pinned_styles": ["report"],
+        "builtin_template_notes": {"kept": "New note"},
+        "template_metadata": {
+            "builtin:blank-dark": {"description": " Old note ", "layout_count": 7},
+            "builtin:kept": {"description": "Older duplicate"},
+            "builtin:empty": {"description": ""},
+            "my-brand": {"description": "User template note"},
+        },
+    })
+
+    assert get_builtin_template_notes() == {"kept": "New note", "blank-dark": "Old note"}
+
+    state = json.loads(path.read_text())
+    assert state["builtin_template_notes"] == {"kept": "New note", "blank-dark": "Old note"}
+    assert state["template_metadata"] == {
+        "builtin:blank-dark": {"layout_count": 7},
+        "builtin:kept": {},
+        "builtin:empty": {},
+        "my-brand": {"description": "User template note"},
+    }
+    assert state["pinned_styles"] == ["report"]
+    # Second read: nothing left to migrate, same result.
+    assert get_builtin_template_notes() == {"kept": "New note", "blank-dark": "Old note"}
+
+
+def test_builtin_notes_missing_state(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> None:
+    from sdpm.config import get_builtin_template_notes
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setattr("sys.platform", "linux")
+    assert get_builtin_template_notes() == {}
+    assert not (tmp_path / "sdpm" / "state.json").exists()
 
 
 def test_analyze_and_store_template() -> None:

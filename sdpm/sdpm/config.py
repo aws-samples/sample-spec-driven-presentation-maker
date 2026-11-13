@@ -156,3 +156,41 @@ def update_state(key: str, value: object) -> None:
     state[key] = value
     with open(state_path, "w") as f:
         json.dump(state, f, ensure_ascii=False, indent=2)
+
+
+# Legacy (<= 0.17): builtin notes lived in the analysis cache entry
+# template_metadata["builtin:<name>"].description. The Web UI mirrors this
+# migration in web-ui/src/lib/local/sdpmPaths.ts (getBuiltinTemplateNotes).
+_LEGACY_BUILTIN_PREFIX = "builtin:"
+
+
+def get_builtin_template_notes() -> dict[str, str]:
+    """Per-user notes on builtin templates: ``{template name: note}``.
+
+    Stored in state.json under ``builtin_template_notes``, apart from the
+    regenerable analysis cache — the local counterpart of the cloud's
+    ``BUILTIN_NOTE#<name>`` items. Notes still in the legacy location are moved
+    here on first read (best effort: a read-only config dir keeps them readable
+    without the rewrite).
+    """
+    state = get_state()
+    notes = dict(state.get("builtin_template_notes") or {})
+    metadata = state.get("template_metadata") or {}
+    migrated = False
+    for key, entry in metadata.items():
+        if not key.startswith(_LEGACY_BUILTIN_PREFIX) or not isinstance(entry, dict) or "description" not in entry:
+            continue
+        note = entry.pop("description")
+        name = key[len(_LEGACY_BUILTIN_PREFIX):]
+        if isinstance(note, str) and note.strip() and name not in notes:
+            notes[name] = note.strip()
+        migrated = True
+    if migrated:
+        state["builtin_template_notes"] = notes
+        state["template_metadata"] = metadata
+        try:
+            with open(get_user_config_dir() / "state.json", "w") as f:
+                json.dump(state, f, ensure_ascii=False, indent=2)
+        except OSError:
+            pass
+    return notes
