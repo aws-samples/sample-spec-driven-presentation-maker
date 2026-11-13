@@ -384,9 +384,12 @@ def _analyze_image_colors(path: Path, media_type: str) -> dict[str, Any] | None:
                 {"hex": f"#{red:02X}{green:02X}{blue:02X}", "ratio": count / total}
                 for count, (red, green, blue) in sorted(colors, reverse=True)[:5]
             ]
-            pixels = list(rgb.getdata())
-            luminance = sum(0.2126 * red + 0.7152 * green + 0.0722 * blue for red, green, blue in pixels) / max(1, len(pixels))
-            saturation = sum(colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)[1] for red, green, blue in pixels) / max(1, len(pixels))
+            # getcolors (every Pillow version) instead of getdata (removed in Pillow 14):
+            # one (count, pixel) pair per distinct colour, weighted below.
+            counts = rgb.getcolors(maxcolors=rgb.width * rgb.height) or []
+            pixel_total = max(1, sum(count for count, _ in counts))
+            luminance = sum(count * (0.2126 * red + 0.7152 * green + 0.0722 * blue) for count, (red, green, blue) in counts) / pixel_total
+            saturation = sum(count * colorsys.rgb_to_hsv(red / 255, green / 255, blue / 255)[1] for count, (red, green, blue) in counts) / pixel_total
             return {
                 "palette": palette,
                 "brightness": "dark" if luminance < 85 else "light" if luminance > 170 else "medium",
