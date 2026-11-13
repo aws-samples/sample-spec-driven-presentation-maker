@@ -248,8 +248,8 @@ class TestColorTransforms:
     def test_sys_hex_applies_children(self):
         solid = parse_xml(f'<a:solidFill {nsdecls("a")}><a:sysClr val="window" lastClr="FFFFFF">'
                           '<a:shade val="50000"/></a:sysClr></a:solidFill>')
-        out = _sys_hex(solid)
-        assert out != "#FFFFFF" and out[1:3] == out[3:5] == out[5:7]  # darker gray
+        # shade is applied to lastClr in linear RGB: 50% of white is BABABA in sRGB
+        assert _near(_sys_hex(solid), "#BABABA")
 
     def test_srgb_shade_and_lum_off(self):
         assert _apply_srgb_transforms("#FFFFFF", {"shade": "0"}) == "#000000"
@@ -258,7 +258,7 @@ class TestColorTransforms:
     @pytest.mark.xfail(strict=True, reason=(
         "_apply_srgb_transforms scales lumMod in RGB space; ECMA-376 (and the"
         " schemeClr path) scale HSL luminance, so gradient stops and sysClr"
-        " colors come out off (3B608D instead of Office's 376092)"))
+        " colors come out off (3B608D instead of Office's 376092); #633"))
     def test_srgb_lum_mod_matches_scheme_path(self):
         assert _near(_apply_srgb_transforms("#4F81BD", {"lumMod": "75000"}), "#376092")
 

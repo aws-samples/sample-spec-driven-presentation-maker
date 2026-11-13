@@ -177,7 +177,7 @@ def test_rotation3d_preset_roundtrip(preset):
 
 @pytest.mark.xfail(strict=True, reason=(
     "importer camera map lacks perspectiveBelow / perspectiveContrasting*Facing:"
-    " these builder presets are dropped on import"))
+    " these builder presets are dropped on import; #631"))
 @pytest.mark.parametrize("preset", [
     "perspective-bottom", "perspective-left-most", "perspective-right-most",
 ])
@@ -196,7 +196,7 @@ def test_rotation3d_default_perspective_is_written():
 
 @pytest.mark.xfail(strict=True, reason=(
     "perspective=0 builds an orthographic camera without fov; the importer omits"
-    " 'perspective', so a rebuild falls back to the 120 default"))
+    " 'perspective', so a rebuild falls back to the 120 default; #632"))
 def test_rotation3d_orthographic_roundtrip():
     spec = {"rotX": 20, "perspective": 0}
     assert _roundtrip({"rotation3d": spec})["rotation3d"] == spec
