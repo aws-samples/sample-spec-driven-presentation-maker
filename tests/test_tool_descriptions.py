@@ -119,6 +119,28 @@ def test_guide_pointers_name_existing_guides(any_server_tools):
                 assert g in guides, f"{name} points at unknown guide {g}"
 
 
+def test_hearing_matches_the_cloud_tool(acp_tools):
+    """The local ACP hearing and the cloud Strands hearing take the same questions."""
+    import importlib.util
+
+    pytest.importorskip("strands")
+    # Loaded by path: agent/tools would shadow servers/remote's top-level tools package.
+    spec = importlib.util.spec_from_file_location("agent_hearing_tool", _ROOT / "agent" / "tools" / "hearing_tool.py")
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    cloud = module.hearing.tool_spec["inputSchema"]["json"]
+    local = acp_tools["hearing"].inputSchema
+    for schema in (cloud, local):
+        assert set(schema["properties"]) == {"q0", "q1", "q2", "q3"}
+        assert schema["required"] == ["q0"]
+        q0 = schema["properties"]["q0"]["description"]
+        for key in ("header", "label", "description", "recommended"):
+            assert key in q0, key
+        assert "inference" not in json.dumps(schema)
+
+
 def test_read_guides_description_lists_the_catalogue(local_tools):
     doc = local_tools["read_guides"].description
     for g in (p.stem for p in (_ROOT / "sdpm" / "references" / "guides").glob("*.md")):

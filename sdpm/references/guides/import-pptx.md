@@ -484,16 +484,16 @@ Call `get_preview` to surface visuals:
 
 Then use a single `hearing` (the only user-facing hearing of this
 guide) to wrap up: surface what was auto-generated and let the user
-direct the next edits. Suggested `inference`:
+direct the next edits. Put the summary into the questions:
 
-> 「PPTX を取り込んで以下の内容で deck を生成しました:
-> - 概要 (brief): <briefの主旨を1〜2行>
-> - 構成 (outline): <スライド数> ページ
-> - art-direction: 元 PPTX の theme XML とプレビュー画像から抽出したスタイル
->
-> このまま編集に進めて良いですか?他に変えたいところはありますか?」
+- A `single_select` question 「このまま編集に進めますか?」. The
+  recommended option goes on to editing as is; its description carries
+  what was generated: the brief's gist in 1–2 lines, the outline's page
+  count, and the art-direction taken from the original PPTX's theme XML
+  and preview images. The other options name what to change (構成 /
+  スタイル), each with a one-line description.
+- A `free_text` question ("どこを変えたいですか?").
 
-A `free_text` question is appropriate here ("どこを変えたいですか?").
 After the user responds, return control to the normal edit loop
 (Cloud: `compose_slides`; Local: dispatch composers per your persona's
 Delegation to Composer section).

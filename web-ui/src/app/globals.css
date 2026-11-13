@@ -132,6 +132,11 @@
   --border-hover: oklch(1 0 0 / 12%);
   --input: oklch(1 0 0 / 8%);
   --ring: oklch(0.65 0 0 / 40%);
+  /* Hearing card: lifted off the chat background, option rows clearly outlined */
+  --hearing-card: oklch(0.165 0.005 260);
+  --hearing-option: oklch(0.21 0.005 260);
+  --hearing-option-border: oklch(1 0 0 / 14%);
+  --hearing-field: oklch(0.12 0.005 260);
 }
 
 [data-theme="light"] {
@@ -196,6 +201,10 @@
   --border-hover: oklch(0.2 0.01 260 / 18%);
   --input: oklch(0.2 0.01 260 / 12%);
   --ring: oklch(0.22 0.01 260 / 40%);
+  --hearing-card: oklch(0.995 0.002 85);
+  --hearing-option: oklch(0.975 0.004 85);
+  --hearing-option-border: oklch(0.2 0.01 260 / 16%);
+  --hearing-field: oklch(0.985 0.003 85);
 }
 
 @layer base {
@@ -987,6 +996,71 @@ body {
 .team-action-btn:disabled::before {
   opacity: 0.3;
   animation: none;
+}
+
+/* ── Hearing card (one question at a time) ──
+   Colours, borders and indicators only; text sizes stay Tailwind classes in HearingCard.tsx. */
+.hearing-card {
+  background: var(--hearing-card);
+  border: 1px solid var(--border-hover);
+  box-shadow: var(--shadow-card);
+}
+.hearing-step {
+  color: var(--foreground-muted);
+  border: 1px solid var(--border-hover);
+  background: none;
+}
+.hearing-step:hover { color: var(--foreground); }
+.hearing-step[data-done] { color: var(--foreground-secondary); }
+.hearing-step[aria-current="step"] {
+  color: var(--foreground);
+  border-color: var(--foreground);
+}
+.hearing-row {
+  background: var(--hearing-option);
+  border: 1px solid var(--hearing-option-border);
+}
+.hearing-row:hover { border-color: color-mix(in oklch, var(--foreground) 40%, transparent); }
+.hearing-row[aria-checked="true"] {
+  background: color-mix(in oklch, var(--foreground) 10%, var(--hearing-card));
+  border-color: var(--foreground);
+}
+.hearing-ind {
+  width: 16px;
+  height: 16px;
+  border: 1.5px solid var(--foreground-muted);
+}
+.hearing-ind-radio { border-radius: 50%; }
+.hearing-ind-box { border-radius: 4px; }
+[aria-checked="true"] > .hearing-ind-radio {
+  border-color: var(--foreground);
+  background: radial-gradient(circle, var(--foreground) 0 40%, transparent 46%);
+}
+[aria-checked="true"] > .hearing-ind-box {
+  border-color: var(--foreground);
+  background: var(--foreground);
+  color: var(--hearing-card);
+}
+.hearing-rec {
+  color: var(--agent-data);
+  background: color-mix(in oklch, var(--agent-data) 16%, transparent);
+}
+.hearing-kbd {
+  font-family: inherit;
+  color: var(--foreground-muted);
+  border: 1px solid var(--border-hover);
+}
+.hearing-field {
+  background: var(--hearing-field);
+  border: 1px solid var(--hearing-option-border);
+  color: var(--foreground);
+  outline: none;
+}
+.hearing-field::placeholder { color: var(--foreground-muted); }
+.hearing-field:focus { border-color: color-mix(in oklch, var(--foreground) 50%, transparent); }
+.hearing-primary {
+  background: var(--foreground);
+  color: var(--background);
 }
 
 /* ── Slash picker entrance and token insertion feedback ── */
