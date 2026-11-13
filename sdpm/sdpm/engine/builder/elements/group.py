@@ -2,6 +2,7 @@
 # SPDX-License-Identifier: MIT-0
 """Group and arch-group elements."""
 from sdpm.engine.builder.constants import ARCH_GROUP_DEFS
+from sdpm.engine.schema.regions import is_comment_element
 
 
 class GroupMixin:
@@ -23,6 +24,8 @@ class GroupMixin:
             spTree.append(grp_el)
             return
         for sub_elem in elem.get("elements", []):
+            if is_comment_element(sub_elem):
+                continue
             sub_type = sub_elem.get("type")
             if sub_type == "group":
                 self._add_group(slide, sub_elem)
@@ -40,6 +43,16 @@ class GroupMixin:
                 self._add_line(slide, sub_elem)
             elif sub_type == "chart":
                 self._add_chart(slide, sub_elem)
+            elif sub_type == "table":
+                self._add_table(slide, sub_elem)
+            elif sub_type == "video":
+                self._add_video(slide, sub_elem)
+            elif sub_type == "rawShape":
+                self._add_raw_shape(slide, sub_elem)
+            else:
+                import sys
+                print(f"Warning: unknown element type {sub_type!r} inside group skipped",
+                      file=sys.stderr)
     
     def _sanitize_injected_xml(self, xml_el):
         """Replace OLE graphicFrames in injected raw XML with their fallback picture.
