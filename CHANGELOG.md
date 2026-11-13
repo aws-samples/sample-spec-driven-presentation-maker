@@ -24,6 +24,26 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   Illustrator does for its namespace URIs; external, nested or markup-bearing entities are
   refused. A refused file is named in the error. Attached SVGs are also parsed with DTDs
   refused.
+
+### Added
+
+- **A writing guide for Japanese decks (`writing-ja`).** For a Japanese deck the
+  orchestrator reads it before writing the outline and composers follow it for wording, in
+  both PPTX and HTML. It says how headlines, bullets, diagram labels and speaker notes are
+  written: headlines state the slide's claim, a list's items end the same way, items are
+  shortened from full sentences without losing who does what, notes are polite spoken
+  Japanese, no em dashes or metaphor verbs, full-width Japanese punctuation, one spelling
+  per term. The guide is in Japanese. Local mode and the AWS stack (SdpmData and
+  SdpmRuntime).
+- **HTML decks get the same CJK↔Latin spacing as PPTX.** The PPTX builder puts a
+  half-width space between Japanese (or other CJK) letters and Latin letters or digits; HTML
+  decks kept the text as the composer wrote it. `output.html` and the slide previews now
+  get those spaces too, also where emphasis or a link meets Japanese text
+  (`<strong>AWS</strong>の`). Code, preformatted text, scripts, styles, form fields, inline
+  SVG and MathML and attribute values are left as written, and the slide files are not
+  changed. `"autoSpacing": false` in deck.json turns it off, as for PPTX. Local mode and the
+  AWS stack (SdpmRuntime).
+
 ### Changed
 
 - **The MCP servers run on MCP Python SDK 2.x** (`mcp>=2.3,<3`, was `<2`; #301). The local
@@ -54,6 +74,11 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **No automatic space next to Japanese punctuation.** The CJK↔Latin spacing treated
+  Japanese punctuation and full-width symbols like letters, so `DBは、DBを` built as
+  `DB は、 DB を`, `A・B` as `A ・ B` and `AWS／Azure` as `AWS ／ Azure`, in slide text and
+  speaker notes. Punctuation such as 、。・「」（）／：〜 now takes no space on either side.
+  Local mode and the AWS stack (SdpmRuntime).
 - **Edits to a read-back chart show up in the rebuilt PPTX.** `pptx_to_json` keeps each
   chart's original XML in `_chartXml` so an unedited chart rebuilds exactly, but the builder
   restored that XML even after the chart's JSON (values, categories, series names and
