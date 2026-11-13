@@ -1,6 +1,7 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 """Group and arch-group elements."""
+from sdpm.engine.accessibility import write_element_metadata
 from sdpm.engine.builder.constants import ARCH_GROUP_DEFS
 from sdpm.engine.schema.regions import is_comment_element
 from sdpm.utils import xml_safe
@@ -23,9 +24,11 @@ class GroupMixin:
             spTree = slide._element.find(qn('p:cSld')).find(qn('p:spTree'))
             spTree.append(grp_el)
             return
+        sp_tree = slide.shapes._spTree
         for sub_elem in elem.get("elements", []):
             if is_comment_element(sub_elem):
                 continue
+            n_before = len(sp_tree)
             sub_type = sub_elem.get("type")
             if sub_type == "group":
                 self._add_group(slide, sub_elem)
@@ -53,6 +56,9 @@ class GroupMixin:
                 import sys
                 print(f"Warning: unknown element type {sub_type!r} inside group skipped",
                       file=sys.stderr)
+            # alt / decorative go on the child's own shape (see add_slide).
+            if len(sp_tree) > n_before and (sub_type != "group" or sub_elem.get("_groupXml")):
+                write_element_metadata(sp_tree[n_before], sub_elem)
     
     def _sanitize_injected_xml(self, xml_el):
         """Replace OLE graphicFrames in injected raw XML with their fallback picture.
