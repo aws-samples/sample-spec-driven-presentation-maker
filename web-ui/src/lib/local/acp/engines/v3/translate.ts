@@ -25,7 +25,8 @@
  *    `composer_tool_end` when completed or failed; any other sub-agent's → [].
  * 5. the main session's tools → `tool_use` on the call (an MCP tool named by `rawInput.tool_id`
  *    without its `<server>::`, else by its title without `@<server>/`; a built-in one by its
- *    title; an MCP tool's input is `rawInput.arguments`, a built-in one's `rawInput`) and
+ *    title; an MCP tool's input is `rawInput.arguments` when `rawInput` carries a `tool_id`,
+ *    else `rawInput`, as a built-in one's) and
  *    `tool_end` when completed or failed (the result is `rawOutput.response` or the `content[]`
  *    text, parsed as JSON; a failure's is `{message: rawOutput.message}`). An update that ends a
  *    tool no call announced gets its `tool_use` first, from the update itself.
@@ -78,10 +79,14 @@ function toolName(update: Update, meta: V3UpdateMeta): string {
   return title.startsWith(`@${server}/`) ? title.slice(server.length + 2) : title
 }
 
-/** An MCP tool's input is wrapped (`{tool_id, arguments}`); a built-in tool's is `rawInput` itself. */
+/**
+ * An MCP tool's input: wrapped (`{tool_id, arguments}`) when the call went through a loaded
+ * tool, else `rawInput` itself, as it is for a built-in tool.
+ */
 function toolInput(update: Update, meta: V3UpdateMeta): Record<string, unknown> {
-  if (!meta.serverName) return objectOr(update.rawInput)
-  return objectOr((update.rawInput as V3ToolInput | undefined)?.arguments)
+  const raw = objectOr(update.rawInput)
+  if (!meta.serverName || typeof raw.tool_id !== "string") return raw
+  return objectOr((raw as V3ToolInput).arguments)
 }
 
 /** A finished tool's result: its `rawOutput.response`, else its `content[]` text; a failure's message. */
