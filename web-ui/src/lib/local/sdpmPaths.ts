@@ -71,7 +71,7 @@ export function updateState(key: string, value: unknown): void {
  * Mirrors sdpm.config._write_state.
  */
 function writeState(p: string, state: Record<string, unknown>): void {
-  const tmp = path.join(path.dirname(p), `.state.${process.pid}.${Date.now()}.tmp`)
+  const tmp = `${p}.${process.pid}.${Date.now()}.tmp`
   try {
     fs.writeFileSync(tmp, JSON.stringify(state, null, 2))
     fs.renameSync(tmp, p)
