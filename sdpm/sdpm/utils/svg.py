@@ -92,8 +92,8 @@ def _recolor_svg(svg_bytes: bytes, color: str) -> bytes | None:
 
 def get_svg_dimensions(svg_path: Path) -> tuple[int, int]:
     """Get SVG dimensions from viewBox or width/height attributes."""
-    from lxml import etree
-    tree = etree.parse(str(svg_path))
+    from sdpm.utils import xml_safe
+    tree = xml_safe.parse(svg_path, allow_doctype=True)
     root = tree.getroot()
 
     vb = root.get('viewBox')
@@ -182,12 +182,14 @@ def add_svg_to_slide(slide, svg_bytes: bytes, x, y, width, height):
     from pptx.opc.package import Part
     from pptx.opc.packuri import PackURI
 
+    from sdpm.utils import xml_safe
+
     # OOXML <a:stretch> fills the frame exactly (distorting aspect), but
     # SVG renderers letterbox by default — and LibreOffice ignores
     # preserveAspectRatio="none". Bake the distortion into the SVG itself:
     # reshape the viewBox to the frame aspect and scale the content.
     try:
-        root = etree.fromstring(svg_bytes)
+        root = xml_safe.fromstring(svg_bytes, allow_doctype=True)
         vb = root.get('viewBox')
         if vb and width and height:
             parts = [float(v) for v in vb.replace(',', ' ').split()]

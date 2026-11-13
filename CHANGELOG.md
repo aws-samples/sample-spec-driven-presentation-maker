@@ -13,6 +13,17 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Security
+
+- **One explicit XML parser for content from outside the repository.** Template and
+  imported PPTX parts, the XML fragments a slide JSON carries for round trips, and SVG
+  files are parsed through `sdpm.utils.xml_safe`, which states its settings instead of
+  relying on the installed lxml's defaults: no entity substitution, no DTD loading, no
+  network access, normal size limits. A DOCTYPE or entity declaration is refused outside
+  SVG. SVG keeps its DOCTYPE and may declare short plain-text entities, as Adobe
+  Illustrator does for its namespace URIs; external, nested or markup-bearing entities are
+  refused. A refused file is named in the error. Attached SVGs are also parsed with DTDs
+  refused.
 ### Changed
 
 - **The MCP servers run on MCP Python SDK 2.x** (`mcp>=2.3,<3`, was `<2`; #301). The local
