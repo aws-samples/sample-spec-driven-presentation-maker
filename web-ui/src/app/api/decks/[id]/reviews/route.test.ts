@@ -123,4 +123,18 @@ describe("POST /api/decks/[id]/reviews", () => {
   it.each(["missing", "..", "../d1"])("returns 404 for deck %j", async deckId => {
     expect((await post(deckId, { comments: [comment()] })).status).toBe(404)
   })
+
+  it("does not empty or write a directory a `reviews` symlink points to outside the deck", async () => {
+    const outside = fs.mkdtempSync(path.join(os.tmpdir(), "sdpm-review-outside-"))
+    try {
+      fs.writeFileSync(path.join(outside, "keep.txt"), "keep")
+      write("d3/deck.json", "{}")
+      write("d3/slides/sales.json", "{}")
+      fs.symlinkSync(outside, path.join(root, "d3", "reviews"))
+      expect((await post("d3", { comments: [comment()] })).status).toBe(404)
+      expect(fs.readdirSync(outside)).toEqual(["keep.txt"])
+    } finally {
+      fs.rmSync(outside, { recursive: true, force: true })
+    }
+  })
 })

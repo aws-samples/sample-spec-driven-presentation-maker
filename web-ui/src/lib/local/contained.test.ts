@@ -51,7 +51,20 @@ describe("resolveWithin", () => {
 
   it("returns the lexical path of a missing file and null for a missing root", () => {
     expect(resolveWithin(root, "sub", "missing.txt")).toBe(path.join(root, "sub", "missing.txt"))
+    expect(resolveWithin(root, "sub", "new", "deeper.txt")).toBe(path.join(root, "sub", "new", "deeper.txt"))
     expect(resolveWithin(path.join(base, "nope"), "x")).toBeNull()
+  })
+
+  it("refuses a missing file whose directory is a symlink pointing outside", () => {
+    // A write would create <sibling>/new.txt.
+    expect(resolveWithin(root, "outdir", "new.txt")).toBeNull()
+    expect(resolveWithin(root, "outdir", "new", "deeper.txt")).toBeNull()
+  })
+
+  it("refuses a dangling symlink", () => {
+    fs.symlinkSync(path.join(sibling, "not-yet.txt"), path.join(root, "dangling.txt"))
+    expect(resolveWithin(root, "dangling.txt")).toBeNull()
+    expect(fs.existsSync(path.join(sibling, "not-yet.txt"))).toBe(false)
   })
 
   it("resolves a root given through a symlink", () => {
