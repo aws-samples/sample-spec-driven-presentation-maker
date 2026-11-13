@@ -1,0 +1,418 @@
+{
+  "record": "paneSettings",
+  "application": "Microsoft PowerPoint",
+  "version": "16.113.1",
+  "platform": "macOS",
+  "mechanism": "macOS Accessibility API via the agent-desktop CLI",
+  "window": "w-173062",
+  "popups": {
+    "0": {
+      "index": 0,
+      "label": "Property:",
+      "current": "Anchored to Object",
+      "menuName": "Anchored to Object",
+      "itemCount": 2,
+      "items": [
+        {
+          "label": "Not Anchored",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Anchored to Object",
+          "role": "menuitem",
+          "checked": false
+        }
+      ],
+      "error": null
+    },
+    "1": {
+      "index": 1,
+      "label": "After animation: ",
+      "current": "Don't Dim",
+      "menuName": "Don't Dim",
+      "itemCount": 12,
+      "items": [
+        {
+          "label": "Background Scheme Color",
+          "role": "button",
+          "checked": false
+        },
+        {
+          "label": "Text and Lines Scheme Color",
+          "role": "button",
+          "checked": false
+        },
+        {
+          "label": "Shadows Scheme Color",
+          "role": "button",
+          "checked": false
+        },
+        {
+          "label": "Title Text Scheme Color",
+          "role": "button",
+          "checked": false
+        },
+        {
+          "label": "Fills Scheme Color",
+          "role": "button",
+          "checked": false
+        },
+        {
+          "label": "Accent Scheme Color",
+          "role": "button",
+          "checked": false
+        },
+        {
+          "label": "Accent and Hyperlink Scheme Color",
+          "role": "button",
+          "checked": false
+        },
+        {
+          "label": "Accent and Followed Hyperlink Scheme Color",
+          "role": "button",
+          "checked": false
+        },
+        {
+          "label": "More Colors...",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Don't Dim",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Hide After Animation",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Hide on Next Mouse Click",
+          "role": "menuitem",
+          "checked": false
+        }
+      ],
+      "error": null
+    },
+    "2": {
+      "index": 2,
+      "label": "Sound:",
+      "current": "[No Sound]",
+      "menuName": "[No Sound]",
+      "itemCount": 22,
+      "items": [
+        {
+          "label": "[No Sound]",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "[Stop Previous Sound]",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Applause",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Arrow",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Bomb",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Breeze",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Camera",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Cash Register",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Chime",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Click",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Coin",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Drum Roll",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Explosion",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Hammer",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Laser",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Push",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Suction",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Typewriter",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Voltage",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Whoosh",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Wind",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Other Sound...",
+          "role": "menuitem",
+          "checked": false
+        }
+      ],
+      "error": null
+    },
+    "3": {
+      "index": 3,
+      "label": "Start:",
+      "current": "On Click",
+      "menuName": "On Click",
+      "itemCount": 3,
+      "items": [
+        {
+          "label": "On Click",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "With Previous",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "After Previous",
+          "role": "menuitem",
+          "checked": false
+        }
+      ],
+      "error": null
+    },
+    "4": {
+      "index": 4,
+      "label": "Duration:",
+      "current": "2 seconds (Medium)",
+      "menuName": "2 seconds (Medium)",
+      "itemCount": 6,
+      "items": [
+        {
+          "label": "5 seconds (Very Slow)",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "3 seconds (Slow)",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "2 seconds (Medium)",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "1 seconds (Fast)",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "0.5 seconds (Very Fast)",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "seconds",
+          "role": "menuitem",
+          "checked": false
+        }
+      ],
+      "error": null
+    },
+    "5": {
+      "index": 5,
+      "label": "Repeat:",
+      "current": "(none)",
+      "menuName": "(none)",
+      "itemCount": 9,
+      "items": [
+        {
+          "label": "(none)",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "2",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "3",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "4",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "5",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "10",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Custom:",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Until Next Click",
+          "role": "menuitem",
+          "checked": false
+        },
+        {
+          "label": "Until End of Slide",
+          "role": "menuitem",
+          "checked": false
+        }
+      ],
+      "error": null
+    }
+  },
+  "structure": {
+    "motionPathOnRectangle": {
+      "sections": [
+        {
+          "name": "Effect Options",
+          "axIdentifier": "_NS:236",
+          "expanded": true,
+          "actions": [
+            "Click",
+            "Expand",
+            "Collapse"
+          ]
+        },
+        {
+          "name": "Timing",
+          "axIdentifier": "_NS:843",
+          "expanded": true,
+          "actions": [
+            "Click",
+            "Expand",
+            "Collapse"
+          ]
+        },
+        {
+          "name": "Text Animations",
+          "axIdentifier": "_NS:774",
+          "expanded": false,
+          "actions": [
+            "Click",
+            "Expand",
+            "Collapse"
+          ]
+        },
+        {
+          "name": "Triggers",
+          "axIdentifier": "_NS:732",
+          "expanded": false,
+          "actions": [
+            "Click",
+            "Expand",
+            "Collapse"
+          ]
+        }
+      ],
+      "checkboxes": [
+        {
+          "label": "Smooth End",
+          "checked": true,
+          "axIdentifier": "_NS:250"
+        },
+        {
+          "label": "Bounce End",
+          "checked": false,
+          "axIdentifier": "_NS:220"
+        },
+        {
+          "label": "Auto-reverse",
+          "checked": false,
+          "axIdentifier": "_NS:212"
+        },
+        {
+          "label": "Smooth Start",
+          "checked": true,
+          "axIdentifier": "_NS:258"
+        },
+        {
+          "label": "Rewind when done playing",
+          "checked": false,
+          "axIdentifier": "_NS:433"
+        }
+      ],
+      "defaultsOn": [
+        "Smooth End",
+        "Smooth Start"
+      ]
+    }
+  },
+  "finding": "this build has no 'Effect Options' dialog with Effect / Timing / Text Animations tabs. Those settings are inline in the Animation Pane as disclosure sections under a scroll area identified SettingsScrollView, every one of which answers AXPress, so no double-click is needed and none is available to a semantic driver."
+}

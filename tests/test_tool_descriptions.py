@@ -171,6 +171,18 @@ def test_contract_functions_are_annotated_not_docstring_args():
             assert "Field(" in str(p.annotation) or "Annotated" in str(p.annotation), f"{name}.{p.name}"
 
 
+def test_generate_pptx_describes_both_motion_overrides(any_server_tools):
+    """The render-time overrides are only usable if the client can see them,
+    with their accepted values, on every server (REQ-1.3, REQ-9.5)."""
+    properties = any_server_tools["generate_pptx"].inputSchema.get("properties", {})
+    for argument in ("animation_mode", "transition_mode"):
+        assert argument in properties, argument
+        description = properties[argument]["description"]
+        for accepted in ("inherit", "on", "off"):
+            assert accepted in description, f"{argument}: {description}"
+        assert "deck.json" in description, f"{argument} must say what it overrides"
+
+
 def _public_functions(module) -> set[str]:
     return {n for n, f in inspect.getmembers(module, inspect.isfunction)
             if f.__module__ == module.__name__ and not n.startswith("_")}

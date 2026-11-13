@@ -83,6 +83,15 @@ built as usual.
 - When `background` is set, table auto-colors and icon theme (dark/light) also adapt automatically.
 - Per-element `fontColor` / `iconColor` still takes highest priority.
 
+## Animations and Transitions (optional, off by default)
+
+A slide may carry `transition` and `animations`; `deck.json` carries only the
+`animations.enabled` / `transitions.enabled` switches; elements carry `id` and `morphId` as
+targets. Write none of it from this section — the contract (effect and transition catalogs,
+triggers, timing, Morph, what round-trips) is `read_guides(["animations"])`, loaded only
+when a switch is on or a slide already has those fields. Whatever you animate, the slide
+must still say everything with motion off.
+
 ## notes and elements
 
 A slide has two layers:

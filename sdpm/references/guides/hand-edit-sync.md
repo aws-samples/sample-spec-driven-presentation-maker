@@ -13,7 +13,7 @@ The agent always edits the deck's source JSON, so hand-edits must be synced ther
 
 ### 0. Review available guides
 
-Call `list_guides()` and use `read_guides([...])` for guides relevant to the upcoming edits.
+Use `read_guides([...])` for the guides relevant to the upcoming edits.
 
 **Constraints:**
 - You MUST complete Steps 1-2 BEFORE making any additional edits because hand-edits will be lost on regeneration
@@ -57,9 +57,52 @@ Read the diff output and apply the hand-edit changes to the deck's slide JSON.
 
 ---
 
+### 2a. Animations and transitions added in PowerPoint
+
+Only relevant when the diff reports transition or animation changes, or when the user says
+they used the Animations / Transitions tabs. The contract for the fields below is
+`read_guides(["animations"])`.
+
+The diff reports motion the same way it reports anything else — added, removed, reordered
+and modified effects by their stable effect ID, and changed transition fields — and
+summarises preserved raw XML by digest and affected target names rather than dumping the
+document. Apply those changes to the deck's `slides/*.json`:
+
+- **A transition** becomes a `transition` object on the slide **it lands on** (PowerPoint
+  stores a transition on the destination slide). PowerPoint's *Apply to All* becomes the same
+  object copied into every slide file — there is no deck-wide transition.
+- **Object animations** become `animations.mainSequence` (array order = effect order) and one
+  `animations.interactiveSequences` entry per trigger shape. Each effect needs the shape's
+  logical `id` in `target.element`, so give the animated element an `id` if it has none.
+- **Morph** needs the matching objects on both slides to carry the same `morphId`, and the
+  `transition` on the destination slide only.
+- Anything the converter could not decode semantically comes back as a `_rawTiming` /
+  `_rawTransition` reference into an import bundle rather than as editable fields. Copy the
+  reference across unchanged together with its `animations/` closure, and never put a raw
+  reference and the semantic field for the same feature on one slide — that fails lint
+  instead of merging.
+
+**Constraints:**
+- You MUST preserve an explicit `animations` / `transitions` switch in `deck.json` exactly as
+  the user set it. Derive a switch only when `deck.json` has none, and then from the content
+  the edited PPTX actually carries. Never flip an explicit `true` to `false` because this
+  round's diff showed no motion.
+- You MUST set `animations.enabled` / `transitions.enabled` to `true` when you add the first
+  such field to a deck that has neither switch — otherwise the setting is written and then
+  suppressed at build time.
+- You MUST leave the slide understandable with both switches off. If a hand edit moved a
+  claim into an animated state only, fix the static slide too and say so.
+
+---
+
 ### 3. Additional edits + regenerate
 
 After syncing hand-edits, apply the user's requested changes and regenerate.
 
 **Constraints:**
 - You MUST regenerate after applying all changes (hand-edit sync + additional edits)
+- You MUST verify the regenerated deck still carries the synced motion: run the diff once
+  more and confirm it reports no transition or animation difference you did not intend
+- If generation refuses a setting by catalog key (`animation.*` / `transition.*`), that
+  setting is one sdpm can preserve but cannot yet write. Report it to the user and leave the
+  field in place; do not delete it, and do not substitute a different effect, to get a build

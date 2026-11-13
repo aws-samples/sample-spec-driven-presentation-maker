@@ -171,7 +171,7 @@ def test_the_wrapped_tools_keep_the_contract_schema(server):
     from mcp.server.mcpserver import MCPServer
 
     listed = {t.name: t for t in asyncio.run(server.mcp.list_tools())}
-    assert len(listed) == 20
+    assert len(listed) == 21
     for fn in (tools.init_deck_workspace, tools.generate_pptx):
         reference = MCPServer("reference")
         reference.tool()(fn)

@@ -1,0 +1,285 @@
+{
+  "plan": "effect-options-remeasure",
+  "driver": "scripts/animation_catalog/gui_capture.py",
+  "shapeNames": {
+    "animation.effectOptions.amount.emphasis.growShrink.huge": "Rounded Rectangle 1",
+    "animation.effectOptions.amount.emphasis.growShrink.larger": "Rounded Rectangle 3",
+    "animation.effectOptions.amount.emphasis.growShrink.smaller": "Rounded Rectangle 5",
+    "animation.effectOptions.amount.emphasis.growShrink.tiny": "Rounded Rectangle 7",
+    "animation.effectOptions.amount.emphasis.spin.fullSpin": "Rounded Rectangle 9",
+    "animation.effectOptions.amount.emphasis.spin.halfSpin": "Rounded Rectangle 11",
+    "animation.effectOptions.amount.emphasis.spin.quarterSpin": "Rounded Rectangle 13",
+    "animation.effectOptions.amount.emphasis.spin.twoSpins": "Rounded Rectangle 15",
+    "animation.effectOptions.direction.entrance.flyIn.fromRight": "Rounded Rectangle 17"
+  },
+  "deck": {
+    "slides": 1,
+    "targetsPerSlide": 9,
+    "columns": 4,
+    "rows": 3,
+    "basisPx": [
+      1920.0,
+      1080.0
+    ],
+    "cellPx": [
+      456.0,
+      328.0
+    ],
+    "shapePx": [
+      428,
+      292
+    ],
+    "clickMarginPx": 20.0,
+    "neighbourClearancePx": 20.0,
+    "split": false,
+    "note": "9 targets fit one slide as a 4x3 grid"
+  },
+  "counts": {
+    "targets": 9
+  },
+  "targets": [
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.huge",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Huge",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Grow/Shrink"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Huge"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 1,
+      "cellIndex": 1,
+      "slideIndex": 1,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 58,
+        "width": 428,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 1"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.larger",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Larger",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Grow/Shrink"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Larger"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 2,
+      "cellIndex": 2,
+      "slideIndex": 1,
+      "shapeRectPx": {
+        "x": 518,
+        "y": 58,
+        "width": 428,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 3"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.smaller",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Smaller",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Grow/Shrink"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Smaller"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 3,
+      "cellIndex": 3,
+      "slideIndex": 1,
+      "shapeRectPx": {
+        "x": 974,
+        "y": 58,
+        "width": 428,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 5"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.tiny",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Tiny",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Grow/Shrink"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Tiny"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 4,
+      "cellIndex": 4,
+      "slideIndex": 1,
+      "shapeRectPx": {
+        "x": 1430,
+        "y": 58,
+        "width": 428,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 7"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.fullSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Full Spin",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Full Spin"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 5,
+      "cellIndex": 5,
+      "slideIndex": 1,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 386,
+        "width": 428,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 9"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.halfSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Half Spin",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Half Spin"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 6,
+      "cellIndex": 6,
+      "slideIndex": 1,
+      "shapeRectPx": {
+        "x": 518,
+        "y": 386,
+        "width": 428,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 11"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.quarterSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Quarter Spin",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Quarter Spin"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 7,
+      "cellIndex": 7,
+      "slideIndex": 1,
+      "shapeRectPx": {
+        "x": 974,
+        "y": 386,
+        "width": 428,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 13"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.twoSpins",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Two Spins",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Two Spins"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 8,
+      "cellIndex": 8,
+      "slideIndex": 1,
+      "shapeRectPx": {
+        "x": 1430,
+        "y": 386,
+        "width": 428,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 15"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromRight",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Right",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Fly In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 9,
+      "cellIndex": 9,
+      "slideIndex": 1,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 714,
+        "width": 428,
+        "height": 292
+      },
+      "shapeName": "Rounded Rectangle 17"
+    }
+  ]
+}

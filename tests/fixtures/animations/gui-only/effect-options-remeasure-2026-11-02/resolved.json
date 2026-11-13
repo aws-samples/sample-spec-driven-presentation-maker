@@ -1,0 +1,519 @@
+{
+  "source": "sdpm GUI capture",
+  "application": "Microsoft PowerPoint",
+  "version": "16.113.1",
+  "package": "powerpoint-oracle.pptx",
+  "counts": {
+    "resolved": 9
+  },
+  "targets": [
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.huge",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Huge",
+      "shapeSpid": "2",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "6",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:animScale",
+          "attributes": {},
+          "carrier": {},
+          "timing": {
+            "dur": "2000",
+            "fill": "hold"
+          },
+          "attrNames": [],
+          "values": {
+            "by": {
+              "element": "p:by",
+              "attributes": {
+                "x": "400000",
+                "y": "400000"
+              },
+              "children": []
+            }
+          }
+        }
+      ],
+      "measuredDurationMs": 2000
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.larger",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Larger",
+      "shapeSpid": "4",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "6",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:animScale",
+          "attributes": {},
+          "carrier": {},
+          "timing": {
+            "dur": "2000",
+            "fill": "hold"
+          },
+          "attrNames": [],
+          "values": {
+            "by": {
+              "element": "p:by",
+              "attributes": {
+                "x": "150000",
+                "y": "150000"
+              },
+              "children": []
+            }
+          }
+        }
+      ],
+      "measuredDurationMs": 2000
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.smaller",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Smaller",
+      "shapeSpid": "6",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "6",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:animScale",
+          "attributes": {},
+          "carrier": {},
+          "timing": {
+            "dur": "2000",
+            "fill": "hold"
+          },
+          "attrNames": [],
+          "values": {
+            "by": {
+              "element": "p:by",
+              "attributes": {
+                "x": "50000",
+                "y": "50000"
+              },
+              "children": []
+            }
+          }
+        }
+      ],
+      "measuredDurationMs": 2000
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.tiny",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Tiny",
+      "shapeSpid": "8",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "6",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:animScale",
+          "attributes": {},
+          "carrier": {},
+          "timing": {
+            "dur": "2000",
+            "fill": "hold"
+          },
+          "attrNames": [],
+          "values": {
+            "by": {
+              "element": "p:by",
+              "attributes": {
+                "x": "25000",
+                "y": "25000"
+              },
+              "children": []
+            }
+          }
+        }
+      ],
+      "measuredDurationMs": 2000
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.fullSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Full Spin",
+      "shapeSpid": "10",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "8",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:animRot",
+          "attributes": {
+            "by": "21600000"
+          },
+          "carrier": {},
+          "timing": {
+            "dur": "2000",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "r"
+          ],
+          "values": {}
+        }
+      ],
+      "measuredDurationMs": 2000,
+      "differences": null
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.halfSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Half Spin",
+      "shapeSpid": "12",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "8",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:animRot",
+          "attributes": {
+            "by": "21600000"
+          },
+          "carrier": {},
+          "timing": {
+            "dur": "2000",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "r"
+          ],
+          "values": {}
+        }
+      ],
+      "measuredDurationMs": 2000,
+      "differences": null
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.quarterSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Quarter Spin",
+      "shapeSpid": "14",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "8",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:animRot",
+          "attributes": {
+            "by": "21600000"
+          },
+          "carrier": {},
+          "timing": {
+            "dur": "2000",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "r"
+          ],
+          "values": {}
+        }
+      ],
+      "measuredDurationMs": 2000,
+      "differences": null
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.twoSpins",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Two Spins",
+      "shapeSpid": "16",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "8",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:animRot",
+          "attributes": {
+            "by": "43200000"
+          },
+          "carrier": {},
+          "timing": {
+            "dur": "2000",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "r"
+          ],
+          "values": {}
+        }
+      ],
+      "measuredDurationMs": 2000,
+      "differences": [
+        {
+          "index": 0,
+          "element": "p:animRot",
+          "attributes": {
+            "default": {
+              "by": "21600000"
+            },
+            "measured": {
+              "by": "43200000"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromRight",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Right",
+      "shapeSpid": "18",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "entr",
+        "presetID": "2",
+        "presetSubtype": "4"
+      },
+      "behaviors": [
+        {
+          "element": "p:set",
+          "attributes": {},
+          "carrier": {},
+          "timing": {
+            "dur": "1",
+            "fill": "hold",
+            "delay": "0"
+          },
+          "attrNames": [
+            "style.visibility"
+          ],
+          "values": {
+            "to": {
+              "element": "p:to",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:strVal",
+                  "attributes": {
+                    "val": "visible"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "element": "p:anim",
+          "attributes": {
+            "calcmode": "lin",
+            "valueType": "num"
+          },
+          "carrier": {
+            "additive": "base"
+          },
+          "timing": {
+            "dur": "500",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "ppt_x"
+          ],
+          "values": {
+            "tavLst": {
+              "element": "p:tavLst",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "0"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_x"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "100000"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_x"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "element": "p:anim",
+          "attributes": {
+            "calcmode": "lin",
+            "valueType": "num"
+          },
+          "carrier": {
+            "additive": "base"
+          },
+          "timing": {
+            "dur": "500",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "ppt_y"
+          ],
+          "values": {
+            "tavLst": {
+              "element": "p:tavLst",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "0"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "1+#ppt_h/2"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "100000"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_y"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "measuredDurationMs": 500
+    }
+  ]
+}

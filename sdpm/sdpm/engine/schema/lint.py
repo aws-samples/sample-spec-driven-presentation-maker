@@ -28,6 +28,7 @@ def lint(data: list | dict) -> list[dict]:
         return []
     diagnostics: list[dict] = []
     for si, slide in enumerate(slides):
+        diagnostics.extend(_lint_slide_motion(si, slide))
         for ei, elem in enumerate(slide.get("elements") or []):
             diagnostics.extend(_lint_element(si, ei, elem))
     return diagnostics
@@ -47,7 +48,7 @@ def lint_and_sanitize(slide: dict) -> tuple[dict, list[dict]]:
     """
     import copy
     cleaned = copy.deepcopy(slide)
-    diagnostics: list[dict] = []
+    diagnostics: list[dict] = _lint_slide_motion(0, cleaned)
     for ei, elem in enumerate(cleaned.get("elements") or []):
         diagnostics.extend(_lint_element(0, ei, elem))
         if elem.pop("_spAutoFit", None):
@@ -55,6 +56,16 @@ def lint_and_sanitize(slide: dict) -> tuple[dict, list[dict]]:
                 "_spAutoFit is deprecated and was removed. "
                 "Use measure to detect overflow instead."))
     return cleaned, diagnostics
+
+
+def _lint_slide_motion(si: int, slide: dict) -> list[dict]:
+    """Project path-aware motion diagnostics into the existing lint shape."""
+    from sdpm.engine.timing import validate_slide_motion
+
+    return [
+        _diag(si, -1, diagnostic.rule, f"{diagnostic.path}: {diagnostic.message}")
+        for diagnostic in validate_slide_motion(slide)
+    ]
 
 
 def _diag(slide: int, element: int, rule: str, message: str) -> dict:

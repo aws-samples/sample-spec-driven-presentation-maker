@@ -98,6 +98,48 @@ pictures again, and several chart and shape properties survive a read-back.
 
 ### Added
 
+- **Object animations and slide transitions, opt-in per deck.** A slide JSON file can now
+  carry `transition` (how that slide enters, including Morph by object / word / character)
+  and `animations` (a main sequence plus one interactive sequence per trigger shape), and
+  `deck.json` carries the two independent switches `animations.enabled` and
+  `transitions.enabled`. Both default to off, an absent switch is off, and a deck written
+  before this release builds byte-identically; `generate` / the CLI / both MCP servers also
+  take independent `animation_mode` / `transition_mode` overrides (`inherit` / `on` / `off`)
+  that never rewrite `deck.json`. Importing a PPTX derives each switch from what the file
+  actually contained, recovers transitions, sequences, triggers, timing and `morphId` as
+  editable JSON, and preserves anything it cannot decode semantically as raw XML in the
+  import bundle with a hashed dependency manifest, so a GUI-edited deck round-trips instead
+  of losing its motion. The authoring contract is a new optional guide,
+  `read_guides(["animations"])`: composers load it only when a switch is on or a slide
+  already carries those fields, so ordinary still decks pay no context for it. Authoring
+  coverage is deliberately partial and the guide says exactly where — 12 entrance and 12
+  exit effects, media play, all 53 transition effects and all three Morph variants are
+  generated today, while effect directions, emphasis and motion-path galleries,
+  after-animation effects, sounds and four timing options are preserved on import but
+  refused at generation by their catalog key rather than approximated. A new tool,
+  `describe_effects`, answers what a gallery animation actually does — measured from
+  PowerPoint rather than guessed: no arguments returns the routing table (which effects
+  move, resize, recolour, rotate, fade, wipe or follow a path), an effect name returns every
+  behaviour it writes with keyframes and durations, and a transition name returns the
+  `parameters` sets it accepts. It is bound on both servers, which brings the MCP tool count
+  to 21.
+- **A storyboard: one still frame per click.** `storyboard()` (CLI: `storyboard <deck>`)
+  derives the state after each click from the animation catalog and renders it, so a build
+  can be inspected. The ordinary preview draws every element where it is authored, which is
+  exactly why it cannot show build order: an element revealed too early, never revealed, or
+  hidden at the end of its own build all look correct in it. Each frame carries notes for
+  what a still cannot show — an emphasis that returns to where it started, a path that
+  leaves and comes back. `generate` also reports `animated_slides`, and a text build that
+  cannot survive the file format is now warned about at build time rather than silently
+  flattened.
+- **A craft guide for motion**, `read_guides(["animation-craft"])`: how much to move and
+  when, as recommendations rather than rules, split by who controls the pace — `presenter`
+  (one idea per click, motion as feedback) and `cinematic` (one click per scene, motion as
+  content) — with a recipe table, the translation from the usual easing vocabulary to what
+  PowerPoint records (it has no bézier: `acceleration` / `deceleration` are duration
+  fractions, and there is no overshoot or spring), and the accessibility limits, which are
+  the one hard requirement in it (WCAG 2.3.3 and the Office animation setting are external
+  facts, not taste).
 - **Comment on your own styles in the Web UI.** On the Styles page, the Comment tool (`C`)
   frames areas of a style's slides like on a deck; the frames collect above the style chat
   and are sent together, and the style agent changes only the commented slides. Desktop,

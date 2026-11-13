@@ -1,0 +1,331 @@
+{
+  "source": "sdpm GUI capture",
+  "application": "Microsoft PowerPoint",
+  "version": "16.113.1",
+  "package": "powerpoint-oracle.pptx",
+  "counts": {
+    "missing": 1,
+    "resolved": 1
+  },
+  "targets": [
+    {
+      "key": "animation.effectOptions.amount.emphasis.transparency.percent25",
+      "effectKey": "animation.gallery.emphasis.transparency",
+      "setting": "Amount",
+      "value": "25%",
+      "shapeSpid": "2",
+      "effectsOnShape": 1,
+      "outcome": "missing",
+      "reason": "the driver recorded no successful capture for this target"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.stretch.fromTop",
+      "effectKey": "animation.gallery.entrance.stretch",
+      "setting": "Direction",
+      "value": "From Top",
+      "shapeSpid": "4",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "entr",
+        "presetID": "17",
+        "presetSubtype": "1"
+      },
+      "behaviors": [
+        {
+          "element": "p:set",
+          "attributes": {},
+          "carrier": {},
+          "timing": {
+            "dur": "1",
+            "fill": "hold",
+            "delay": "0"
+          },
+          "attrNames": [
+            "style.visibility"
+          ],
+          "values": {
+            "to": {
+              "element": "p:to",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:strVal",
+                  "attributes": {
+                    "val": "visible"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "element": "p:anim",
+          "attributes": {
+            "calcmode": "lin",
+            "valueType": "num"
+          },
+          "carrier": {},
+          "timing": {
+            "dur": "500",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "ppt_x"
+          ],
+          "values": {
+            "tavLst": {
+              "element": "p:tavLst",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "0"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_x"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "100000"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_x"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "element": "p:anim",
+          "attributes": {
+            "calcmode": "lin",
+            "valueType": "num"
+          },
+          "carrier": {},
+          "timing": {
+            "dur": "500",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "ppt_y"
+          ],
+          "values": {
+            "tavLst": {
+              "element": "p:tavLst",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "0"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_y-#ppt_h/2"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "100000"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_y"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "element": "p:anim",
+          "attributes": {
+            "calcmode": "lin",
+            "valueType": "num"
+          },
+          "carrier": {},
+          "timing": {
+            "dur": "500",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "ppt_w"
+          ],
+          "values": {
+            "tavLst": {
+              "element": "p:tavLst",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "0"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_w"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "100000"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_w"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        },
+        {
+          "element": "p:anim",
+          "attributes": {
+            "calcmode": "lin",
+            "valueType": "num"
+          },
+          "carrier": {},
+          "timing": {
+            "dur": "500",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "ppt_h"
+          ],
+          "values": {
+            "tavLst": {
+              "element": "p:tavLst",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "0"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:fltVal",
+                          "attributes": {
+                            "val": "0"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "element": "p:tav",
+                  "attributes": {
+                    "tm": "100000"
+                  },
+                  "children": [
+                    {
+                      "element": "p:val",
+                      "attributes": {},
+                      "children": [
+                        {
+                          "element": "p:strVal",
+                          "attributes": {
+                            "val": "#ppt_h"
+                          },
+                          "children": []
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ],
+      "measuredDurationMs": 500
+    }
+  ]
+}

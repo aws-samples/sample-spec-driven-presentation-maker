@@ -1,0 +1,544 @@
+{
+  "schemaVersion": 1,
+  "oracle": {
+    "application": "Microsoft PowerPoint for Mac",
+    "version": "16.113.1",
+    "platform": "macOS",
+    "harness": "scripts/animation_catalog/accept.py",
+    "offlineHalf": "runs by default and in CI",
+    "powerPointHalf": "runs only with --powerpoint; unavailable in the dashboard sandbox (-10004)",
+    "visualAcceptance": "pending-powerpoint"
+  },
+  "coverage": {
+    "matrix": "tests/fixtures/animations/coverage-matrix.json",
+    "catalog": "sdpm/references/catalogs/powerpoint-animation-catalog.json",
+    "role": "these packages own the coverage-matrix cells no catalog entry can own, and the whole-package invariants a single fragment cannot show"
+  },
+  "packages": [
+    {
+      "id": "forms-direct-and-alternatecontent",
+      "purpose": "object timing is a direct p:timing child while the transition is wrapped in mc:AlternateContent with a Choice and a Fallback",
+      "requirement": "REQ-5.3, REQ-6.2",
+      "proves": [
+        "the direct form and the AlternateContent form coexist on one slide without the python-pptx issue 954 double representation",
+        "the Choice carries @Requires from the supported namespace set and the Fallback carries the catalog's fallbackElement"
+      ],
+      "covers": ["namespace:direct", "namespace:choice:p14", "namespace:fallback:p14", "mapping:standard"],
+      "deck": {"animations": {"enabled": true}, "transitions": {"enabled": true}},
+      "slideCount": 1,
+      "slides": [
+        {
+          "id": "forms",
+          "layout": "Blank",
+          "elements": [
+            {"id": "hero", "type": "textbox", "text": "Direct timing", "x": 10, "y": 10, "width": 400, "height": 60}
+          ],
+          "animations": {
+            "mainSequence": [
+              {
+                "id": "show-hero",
+                "target": {"element": "hero"},
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "onPageClick", "delayMs": 0},
+                "timing": {"durationMs": 500},
+                "afterEffect": {"type": "none"},
+                "sound": null
+              }
+            ],
+            "interactiveSequences": []
+          },
+          "transition": {
+            "effect": "blinds",
+            "parameters": {"dir": "vert"},
+            "durationMs": 1600,
+            "advance": {"onClick": true, "afterMs": null},
+            "sound": null
+          }
+        }
+      ],
+      "assert": {
+        "timingIsDirect": {"xpath": "./p:timing", "count": 1},
+        "timingIsNotWrapped": {"xpath": "./mc:AlternateContent//p:timing", "count": 0},
+        "transitionIsWrapped": {"xpath": "./mc:AlternateContent/mc:Choice[@Requires='p14']/p:transition/p:blinds", "count": 1},
+        "transitionHasFallback": {"xpath": "./mc:AlternateContent/mc:Fallback/p:transition/p:blinds", "count": 1},
+        "noDirectTransition": {"xpath": "./p:transition", "count": 0}
+      },
+      "powerPointReadBack": {
+        "required": true,
+        "expect": "PowerPoint opens and saves the package without a repair prompt and reports the Blinds Vertical transition",
+        "transitions": ["entry effect blinds vertical"],
+        "humanConfirms": []
+      }
+    },
+    {
+      "id": "sequences-and-triggers",
+      "purpose": "the main sequence and an interactive sequence coexist, keep array order, and resolve every trigger",
+      "requirement": "REQ-3.1, REQ-3.5",
+      "proves": [
+        "one p:seq with nodeType mainSeq and one with nodeType interactiveSeq in the same timing tree",
+        "on-page-click opens a click group while after-previous and with-previous join the surrounding groups",
+        "an on-shape-click trigger resolves to the triggering shape's spid"
+      ],
+      "covers": ["animationFamily:animation.sequence", "animationFamily:animation.start", "mapping:preset"],
+      "deck": {"animations": {"enabled": true}, "transitions": {"enabled": false}},
+      "slideCount": 1,
+      "slides": [
+        {
+          "id": "sequences",
+          "layout": "Blank",
+          "elements": [
+            {"id": "hero", "type": "textbox", "text": "Hero", "x": 10, "y": 10, "width": 300, "height": 60},
+            {"id": "aside", "type": "shape", "shape": "rectangle", "x": 10, "y": 120, "width": 200, "height": 80, "fill": "#333333"}
+          ],
+          "animations": {
+            "mainSequence": [
+              {
+                "id": "first",
+                "target": {"element": "hero"},
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "onPageClick", "delayMs": 0},
+                "timing": {"durationMs": 500},
+                "afterEffect": {"type": "none"},
+                "sound": null
+              },
+              {
+                "id": "second",
+                "target": {"element": "aside"},
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "afterPrevious", "delayMs": 250},
+                "timing": {"durationMs": 700, "repeatCount": 2, "autoReverse": true, "acceleration": 0.2, "restart": "never"},
+                "afterEffect": {"type": "none"},
+                "sound": null
+              },
+              {
+                "id": "third",
+                "target": {"element": "hero"},
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "withPrevious", "delayMs": 0},
+                "timing": {"durationMs": 500},
+                "afterEffect": {"type": "none"},
+                "sound": null
+              }
+            ],
+            "interactiveSequences": [
+              {
+                "id": "interactive-0",
+                "trigger": {"type": "onShapeClick", "target": "hero", "delayMs": 0},
+                "effects": [
+                  {
+                    "id": "on-click",
+                    "target": {"element": "aside"},
+                    "preset": {"category": "entrance", "effect": "fade"},
+                    "start": {"type": "withPrevious", "delayMs": 0},
+                    "timing": {"durationMs": 300},
+                    "afterEffect": {"type": "none"},
+                    "sound": null
+                  }
+                ]
+              }
+            ]
+          }
+        }
+      ],
+      "assert": {
+        "oneMainSequence": {"xpath": ".//p:seq[p:cTn/@nodeType='mainSeq']", "count": 1},
+        "oneInteractiveSequence": {"xpath": ".//p:seq[p:cTn/@nodeType='interactiveSeq']", "count": 1},
+        "oneClickGroup": {"xpath": ".//p:seq[p:cTn/@nodeType='mainSeq']//p:cTn[@nodeType='clickEffect']", "count": 1},
+        "withPreviousJoinsTheGroup": {"xpath": ".//p:cTn[@nodeType='withEffect']", "minimum": 1},
+        "afterPreviousOpensItsOwnGroup": {"xpath": ".//p:cTn[@nodeType='afterEffect']", "minimum": 1},
+        "interactiveTriggerResolves": {"xpath": ".//p:seq[p:cTn/@nodeType='interactiveSeq']//p:tgtEl/p:spTgt[@spid]", "minimum": 1},
+        "noTransition": {"xpath": ".//*[local-name()='transition']", "count": 0}
+      },
+      "powerPointReadBack": {
+        "required": true,
+        "expect": "PowerPoint opens and saves without a repair prompt and the Animation Pane lists four effects in array order with one interactive trigger",
+        "transitions": ["entry effect none"],
+        "humanConfirms": [
+          "the Animation Pane shows first, second, third in that order",
+          "clicking the Hero shape during playback starts the interactive effect"
+        ]
+      }
+    },
+    {
+      "id": "morph-variants",
+      "purpose": "all three Morph variants on one deck with explicit morphId identity",
+      "requirement": "REQ-4.3, REQ-4.4, REQ-9.2a",
+      "proves": [
+        "morphId hero becomes PowerPoint's documented forced-match name !!sdpm-morph-hero on every slide",
+        "byObject, byWord and byChar each write p159:morph inside a Requires='p14 p159' Choice with a p:fade Fallback",
+        "the source slide carries no transition, because a transition describes the slide it enters"
+      ],
+      "covers": [
+        "namespace:choice:p159",
+        "namespace:fallback:p159",
+        "mapping:p159",
+        "mapping:shapeName",
+        "transitionEffect:morph",
+        "transitionParameters:variant"
+      ],
+      "deck": {"animations": {"enabled": false}, "transitions": {"enabled": true}},
+      "slideCount": 4,
+      "slides": [
+        {
+          "id": "morph-source",
+          "layout": "Blank",
+          "elements": [
+            {"id": "hero", "morphId": "hero", "type": "shape", "shape": "rounded_rectangle", "text": "Morph target", "x": 72, "y": 144, "width": 144, "height": 72, "fill": "#334455"}
+          ]
+        },
+        {
+          "id": "morph-by-object",
+          "layout": "Blank",
+          "elements": [
+            {"id": "hero", "morphId": "hero", "type": "shape", "shape": "rounded_rectangle", "text": "Morph target", "x": 432, "y": 216, "width": 216, "height": 108, "fill": "#334455"}
+          ],
+          "transition": {
+            "effect": "morph",
+            "parameters": {"variant": "byObject"},
+            "durationMs": 800,
+            "advance": {"onClick": true, "afterMs": null},
+            "sound": null
+          }
+        },
+        {
+          "id": "morph-by-word",
+          "layout": "Blank",
+          "elements": [
+            {"id": "hero", "morphId": "hero", "type": "shape", "shape": "rounded_rectangle", "text": "Morph target", "x": 144, "y": 288, "width": 288, "height": 72, "fill": "#334455"}
+          ],
+          "transition": {
+            "effect": "morph",
+            "parameters": {"variant": "byWord"},
+            "durationMs": 800,
+            "advance": {"onClick": true, "afterMs": null},
+            "sound": null
+          }
+        },
+        {
+          "id": "morph-by-char",
+          "layout": "Blank",
+          "elements": [
+            {"id": "hero", "morphId": "hero", "type": "shape", "shape": "rounded_rectangle", "text": "Morph target", "x": 360, "y": 72, "width": 180, "height": 144, "fill": "#334455"}
+          ],
+          "transition": {
+            "effect": "morph",
+            "parameters": {"variant": "byChar"},
+            "durationMs": 800,
+            "advance": {"onClick": true, "afterMs": null},
+            "sound": null
+          }
+        }
+      ],
+      "assert": {
+        "forcedMorphNameOnEverySlide": {"xpath": ".//p:cNvPr[@name='!!sdpm-morph-hero']", "count": 4},
+        "sourceSlideHasNoTransition": {"slide": 1, "xpath": ".//*[local-name()='transition']", "count": 0},
+        "byObject": {"slide": 2, "xpath": "./mc:AlternateContent/mc:Choice[@Requires='p14 p159']/p:transition/p159:morph[@option='byObject']", "count": 1},
+        "byWord": {"slide": 3, "xpath": "./mc:AlternateContent/mc:Choice[@Requires='p14 p159']/p:transition/p159:morph[@option='byWord']", "count": 1},
+        "byChar": {"slide": 4, "xpath": "./mc:AlternateContent/mc:Choice[@Requires='p14 p159']/p:transition/p159:morph[@option='byChar']", "count": 1},
+        "everyMorphHasAFadeFallback": {"xpath": "./mc:AlternateContent/mc:Fallback/p:transition/p:fade", "count": 3}
+      },
+      "powerPointReadBack": {
+        "required": true,
+        "expect": "PowerPoint opens and saves all four slides without a repair prompt and reports Morph on slides 2-4",
+        "transitions": [
+          "entry effect none",
+          "entry effect morph by object",
+          "entry effect morph by word",
+          "entry effect morph by character"
+        ],
+        "humanConfirms": [
+          "slide 1 to 2 interpolates the rounded rectangle's position and size rather than cross-fading",
+          "slide 2 to 3 morphs by word",
+          "slide 3 to 4 morphs by character",
+          "no slide shows a cross-fade between two unmatched copies of the shape"
+        ]
+      }
+    },
+    {
+      "id": "placeholder-target",
+      "purpose": "a layout placeholder is an animation target with a resolvable spid",
+      "requirement": "REQ-2.3, REQ-6.1",
+      "proves": [
+        "a logical id declared on a placeholder resolves to the placeholder's own p:cNvPr/@id",
+        "the placeholder target family has a fixture even though no catalog fragment distinguishes it"
+      ],
+      "covers": ["targetFamily:placeholder", "targetFamily:shape"],
+      "deck": {"animations": {"enabled": true}, "transitions": {"enabled": false}},
+      "slideCount": 1,
+      "slides": [
+        {
+          "id": "placeholder",
+          "layout": "Title and Content",
+          "placeholders": {"0": {"text": "Heading", "id": "heroTitle"}},
+          "elements": [
+            {"id": "body", "type": "textbox", "text": "Body", "x": 10, "y": 300, "width": 400, "height": 60}
+          ],
+          "animations": {
+            "mainSequence": [
+              {
+                "id": "show-title",
+                "target": {"element": "heroTitle"},
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "onPageClick", "delayMs": 0},
+                "timing": {"durationMs": 500},
+                "afterEffect": {"type": "none"},
+                "sound": null
+              },
+              {
+                "id": "show-body",
+                "target": {"element": "body"},
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "afterPrevious", "delayMs": 0},
+                "timing": {"durationMs": 500},
+                "afterEffect": {"type": "none"},
+                "sound": null
+              }
+            ],
+            "interactiveSequences": []
+          }
+        }
+      ],
+      "assert": {
+        "titlePlaceholderExists": {"xpath": ".//p:sp[p:nvSpPr/p:nvPr/p:ph[@type='title']]", "count": 1},
+        "twoDistinctTargets": {"xpath": ".//p:tgtEl/p:spTgt[@spid]", "minimum": 2},
+        "oneTimingTree": {"xpath": "./p:timing", "count": 1}
+      },
+      "powerPointReadBack": {
+        "required": true,
+        "expect": "PowerPoint opens and saves without a repair prompt and the Animation Pane lists the title placeholder as an animated object",
+        "transitions": ["entry effect none"],
+        "humanConfirms": ["the Animation Pane names the Title placeholder, not a copy of it"]
+      }
+    },
+    {
+      "id": "media-animations-on",
+      "purpose": "video playback timing and object animations share one timing tree",
+      "requirement": "REQ-6.3",
+      "proves": [
+        "a p:video play control and a mainSeq effect live in the same p:timing",
+        "python-pptx's own timing tree was replaced rather than duplicated (issue 954)"
+      ],
+      "covers": ["animationCategory:media", "animationFamily:animation.media"],
+      "deck": {"animations": {"enabled": true}, "transitions": {"enabled": true}},
+      "media": ["clip.mp4"],
+      "slideCount": 1,
+      "slides": [
+        {
+          "id": "media",
+          "layout": "Blank",
+          "elements": [
+            {"id": "clip", "type": "video", "src": "clip.mp4", "x": 10, "y": 10, "width": 320, "height": 180},
+            {"id": "caption", "type": "textbox", "text": "Caption", "x": 10, "y": 260, "width": 300, "height": 60}
+          ],
+          "animations": {
+            "mainSequence": [
+              {
+                "id": "show-caption",
+                "target": {"element": "caption"},
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "onPageClick", "delayMs": 0},
+                "timing": {"durationMs": 500},
+                "afterEffect": {"type": "none"},
+                "sound": null
+              }
+            ],
+            "interactiveSequences": []
+          },
+          "transition": {
+            "effect": "blinds",
+            "parameters": {"dir": "vert"},
+            "durationMs": 1600,
+            "advance": {"onClick": true, "afterMs": null},
+            "sound": null
+          }
+        }
+      ],
+      "assert": {
+        "oneTimingTree": {"xpath": "./p:timing", "count": 1},
+        "mediaSurvives": {"xpath": "./p:timing//p:video", "count": 1},
+        "objectAnimationPresent": {"xpath": ".//p:seq[p:cTn/@nodeType='mainSeq']", "count": 1}
+      },
+      "powerPointReadBack": {
+        "required": true,
+        "expect": "PowerPoint opens and saves without a repair prompt, keeps the movie, and lists the caption effect",
+        "transitions": ["entry effect blinds vertical"],
+        "humanConfirms": ["the movie is still a playable media object, not a picture"]
+      }
+    },
+    {
+      "id": "media-animations-off",
+      "purpose": "turning object animations off keeps the media timing a video needs",
+      "requirement": "REQ-1.4",
+      "proves": [
+        "the slide still carries exactly one p:timing containing the p:video play control",
+        "no object-animation sequence survives"
+      ],
+      "covers": ["animationFamily:animation.addAnimation"],
+      "deck": {"animations": {"enabled": false}, "transitions": {"enabled": true}},
+      "media": ["clip.mp4"],
+      "slideCount": 1,
+      "slides": [
+        {
+          "id": "media",
+          "layout": "Blank",
+          "elements": [
+            {"id": "clip", "type": "video", "src": "clip.mp4", "x": 10, "y": 10, "width": 320, "height": 180},
+            {"id": "caption", "type": "textbox", "text": "Caption", "x": 10, "y": 260, "width": 300, "height": 60}
+          ],
+          "animations": {
+            "mainSequence": [
+              {
+                "id": "show-caption",
+                "target": {"element": "caption"},
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "onPageClick", "delayMs": 0},
+                "timing": {"durationMs": 500},
+                "afterEffect": {"type": "none"},
+                "sound": null
+              }
+            ],
+            "interactiveSequences": []
+          },
+          "transition": {
+            "effect": "blinds",
+            "parameters": {"dir": "vert"},
+            "durationMs": 1600,
+            "advance": {"onClick": true, "afterMs": null},
+            "sound": null
+          }
+        }
+      ],
+      "assert": {
+        "oneTimingTree": {"xpath": "./p:timing", "count": 1},
+        "mediaSurvives": {"xpath": "./p:timing//p:video", "count": 1},
+        "noObjectAnimation": {"xpath": ".//p:seq[p:cTn/@nodeType='mainSeq']", "count": 0},
+        "transitionUnaffected": {"xpath": "./mc:AlternateContent/mc:Choice/p:transition/p:blinds", "count": 1}
+      },
+      "powerPointReadBack": {
+        "required": true,
+        "expect": "PowerPoint opens and saves without a repair prompt, the Animation Pane is empty, and the movie still plays",
+        "transitions": ["entry effect blinds vertical"],
+        "humanConfirms": ["the movie plays on click even though no animation is listed"]
+      }
+    },
+    {
+      "id": "switch-transitions-on",
+      "purpose": "baseline for the transition-off invariant: identical slides with transitions enabled",
+      "requirement": "REQ-1.4",
+      "proves": ["the slide carries both the transition and the object timing"],
+      "covers": ["transitionEffect:blinds"],
+      "deck": {"animations": {"enabled": true}, "transitions": {"enabled": true}},
+      "media": ["clip.mp4"],
+      "slideCount": 1,
+      "slides": [
+        {
+          "id": "switch",
+          "layout": "Blank",
+          "elements": [
+            {"id": "clip", "type": "video", "src": "clip.mp4", "x": 10, "y": 10, "width": 320, "height": 180},
+            {"id": "caption", "type": "textbox", "text": "Caption", "x": 10, "y": 260, "width": 300, "height": 60}
+          ],
+          "animations": {
+            "mainSequence": [
+              {
+                "id": "show-caption",
+                "target": {"element": "caption"},
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "onPageClick", "delayMs": 0},
+                "timing": {"durationMs": 500},
+                "afterEffect": {"type": "none"},
+                "sound": null
+              }
+            ],
+            "interactiveSequences": []
+          },
+          "transition": {
+            "effect": "blinds",
+            "parameters": {"dir": "vert"},
+            "durationMs": 1600,
+            "advance": {"onClick": true, "afterMs": null},
+            "sound": null
+          }
+        }
+      ],
+      "assert": {
+        "transitionPresent": {"xpath": "./mc:AlternateContent/mc:Choice/p:transition/p:blinds", "count": 1},
+        "mediaSurvives": {"xpath": "./p:timing//p:video", "count": 1},
+        "objectAnimationPresent": {"xpath": ".//p:seq[p:cTn/@nodeType='mainSeq']", "count": 1}
+      },
+      "powerPointReadBack": {
+        "required": false,
+        "expect": "covered by media-animations-on; this package exists for the byte-level invariant pair"
+      }
+    },
+    {
+      "id": "switch-transitions-off",
+      "purpose": "turning transitions off removes only the transition",
+      "requirement": "REQ-1.4",
+      "proves": [
+        "no transition element of any form survives",
+        "the object and media timing is byte-identical to the transitions-on package (see the invariant below)"
+      ],
+      "covers": ["transitionParameters:none"],
+      "deck": {"animations": {"enabled": true}, "transitions": {"enabled": false}},
+      "media": ["clip.mp4"],
+      "slideCount": 1,
+      "slides": [
+        {
+          "id": "switch",
+          "layout": "Blank",
+          "elements": [
+            {"id": "clip", "type": "video", "src": "clip.mp4", "x": 10, "y": 10, "width": 320, "height": 180},
+            {"id": "caption", "type": "textbox", "text": "Caption", "x": 10, "y": 260, "width": 300, "height": 60}
+          ],
+          "animations": {
+            "mainSequence": [
+              {
+                "id": "show-caption",
+                "target": {"element": "caption"},
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "onPageClick", "delayMs": 0},
+                "timing": {"durationMs": 500},
+                "afterEffect": {"type": "none"},
+                "sound": null
+              }
+            ],
+            "interactiveSequences": []
+          },
+          "transition": {
+            "effect": "blinds",
+            "parameters": {"dir": "vert"},
+            "durationMs": 1600,
+            "advance": {"onClick": true, "afterMs": null},
+            "sound": null
+          }
+        }
+      ],
+      "assert": {
+        "noTransitionOfAnyForm": {"xpath": ".//*[local-name()='transition']", "count": 0},
+        "mediaSurvives": {"xpath": "./p:timing//p:video", "count": 1},
+        "objectAnimationPresent": {"xpath": ".//p:seq[p:cTn/@nodeType='mainSeq']", "count": 1}
+      },
+      "powerPointReadBack": {
+        "required": true,
+        "expect": "PowerPoint opens and saves without a repair prompt and reports no transition while the animations still exist",
+        "transitions": ["entry effect none"],
+        "humanConfirms": ["the Transitions tab shows None and the Animation Pane still lists the caption effect"]
+      }
+    }
+  ],
+  "invariants": [
+    {
+      "id": "transition-off-leaves-timing-unchanged",
+      "purpose": "turning transitions off must not touch object or media timing",
+      "requirement": "REQ-1.4",
+      "packages": ["switch-transitions-on", "switch-transitions-off"],
+      "comparison": "canonical (c14n2) XML of every timing representation on every slide must be identical"
+    }
+  ],
+  "evidence": [
+    "scripts/animation_catalog/README.md",
+    "tests/fixtures/animations/morph-spike/README.md",
+    "https://support.microsoft.com/en-us/office/morph-tips-and-tricks-bc7f48ff-f152-4ee8-9081-d3121788024f"
+  ]
+}

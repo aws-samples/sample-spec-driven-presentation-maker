@@ -645,6 +645,8 @@ class BuildConfig:
     lint_diagnostics: list = field(default_factory=list)
     auto_spacing: bool = True  # deck.json "autoSpacing"; False for imported decks
     default_background: str | None = None  # deck.json "defaultBackground"; None keeps template ground
+    animations_enabled: bool = False
+    transitions_enabled: bool = False
 
 
 def _assemble_slides_from_dir(
@@ -756,6 +758,8 @@ def parse_outline_slugs(outline_path: Path) -> list[str]:
 def _resolve_config(
     json_path: str | Path,
     only_slugs: set[str] | None = None,
+    animation_mode: str = "inherit",
+    transition_mode: str = "inherit",
 ) -> BuildConfig:
     """Resolve template, fonts, icons, overrides from JSON or directory.
 
@@ -765,11 +769,20 @@ def _resolve_config(
     Args:
         json_path: Path to presentation.json or deck directory.
         only_slugs: When set, include only the specified slugs in the build.
+        animation_mode: inherit, on, or off; overrides deck.json animations.enabled.
+        transition_mode: inherit, on, or off; overrides deck.json transitions.enabled.
 
     Raises FileNotFoundError, ValueError on missing template/icons.
     """
     from sdpm.engine.builder import resolve_override, validate_icons_in_json
+    from sdpm.engine.timing import normalize_mode
     from sdpm.utils.io import read_json
+
+    # Both overrides are validated before anything is read or built, so an
+    # invalid mode names its argument instead of surfacing later as a
+    # template or lint error (design: Error Handling).
+    animation_mode = normalize_mode(animation_mode, "animation_mode")
+    transition_mode = normalize_mode(transition_mode, "transition_mode")
 
     input_path = Path(json_path)
     if not input_path.exists():
@@ -846,7 +859,13 @@ def _resolve_config(
         raise ValueError(f"Missing assets ({len(missing)}): {', '.join(sorted(missing)[:10])}")
 
     # Token discipline: fontSize must come from --fs-* tokens in active style
-    from sdpm.engine.checks import check_font_size_tokens, check_includes, check_overlay_textbox
+    from sdpm.engine.checks import (
+        check_font_size_tokens,
+        check_includes,
+        check_morph_pairing,
+        check_overlay_textbox,
+        check_text_build,
+    )
 
     fs_warnings = check_font_size_tokens(data, input_path)
     warnings.extend(fs_warnings)
@@ -858,6 +877,26 @@ def _resolve_config(
     # Include references: a missing/empty include silently drops its content.
     include_warnings = check_includes(data, base_dir)
     warnings.extend(include_warnings)
+
+    # Text builds whose sequence/level pair cannot survive a round-trip. Unlike
+    # the morph check this is slide-local, so it runs for a partial build too:
+    # a composer verifying its own slides can see its own text build, and
+    # nothing about the answer depends on a neighbouring slide.
+    warnings.extend(check_text_build(data))
+
+    # Morph identities that pair with nothing on the adjacent slide. The only
+    # morph rule that has to be deck-level: every other one is checked within a
+    # slide, and the half that parallel composition breaks lives in the next
+    # file. Returns immediately for a deck that names no morph identity, which
+    # is the ordinary case.
+    #
+    # Skipped for a partial build, and that is not a weakening — it is the same
+    # rule applied honestly. `only_slugs` means the neighbouring slide is not in
+    # `data` at all, so every morphId would read as unpaired and a composer
+    # verifying its own slides would be told its correct deck is broken. The
+    # check belongs to the assembly that can see both halves.
+    if only_slugs is None:
+        warnings.extend(check_morph_pairing(data))
 
     # Resolve overrides
     slides = data.get("slides", [])
@@ -871,6 +910,8 @@ def _resolve_config(
     if only_slugs is not None and not input_path.is_dir():
         resolved_slides = [s for s in resolved_slides if s.get("id") in only_slugs]
 
+    from sdpm.engine.timing import resolve_enabled
+
     return BuildConfig(
         template_path=template_file,
         custom_template=custom,
@@ -882,6 +923,8 @@ def _resolve_config(
         lint_diagnostics=lint_diagnostics,
         auto_spacing=data.get("autoSpacing", True),
         default_background=data.get("defaultBackground") or None,
+        animations_enabled=resolve_enabled(data, "animations", animation_mode),
+        transitions_enabled=resolve_enabled(data, "transitions", transition_mode),
     )
 
 
@@ -897,6 +940,8 @@ def _build(config: BuildConfig, output_path: Path) -> Path:
         default_text_color=config.default_text_color,
         auto_spacing=config.auto_spacing,
         default_background=config.default_background,
+        animations_enabled=config.animations_enabled,
+        transitions_enabled=config.transitions_enabled,
     )
     for s in config.slides:
         builder.add_slide(s)
@@ -908,6 +953,8 @@ def generate(
     json_path: str | Path,
     output_path: str | Path | None = None,
     only_slugs: set[str] | None = None,
+    animation_mode: str = "inherit",
+    transition_mode: str = "inherit",
     *,
     include_checks: bool = False,
 ) -> dict[str, Any]:
@@ -919,6 +966,10 @@ def generate(
         json_path: Path to the slides JSON file.
         output_path: Output .pptx path. Auto-generated if None.
         only_slugs: When set, build only the specified slugs (for iso.pptx).
+        animation_mode: inherit, on, or off; overrides deck.json animations.enabled.
+        transition_mode: inherit, on, or off; overrides deck.json transitions.enabled.
+            Each mode is independent of the other; a caller value overrides the
+            deck switch and never rewrites deck.json.
         include_checks: Also return the layout checks as data, ``checks``:
             ``{"layout_bias": [{slide, layout, bbox, offset, direction}],
             "invalid_layouts": [{slug, attempted, used, available}]}``; the layout
@@ -926,10 +977,23 @@ def generate(
 
     Returns:
         Dict with output_path, slide_count, slides summary, warnings.
+
+    Raises:
+        ValueError: If animation_mode or transition_mode is not inherit, on, or
+            off — raised before any build work happens.
     """
     from sdpm.engine.preview import check_layout_imbalance_data
+    from sdpm.engine.timing import normalize_mode
 
-    config = _resolve_config(json_path, only_slugs=only_slugs)
+    animation_mode = normalize_mode(animation_mode, "animation_mode")
+    transition_mode = normalize_mode(transition_mode, "transition_mode")
+
+    config = _resolve_config(
+        json_path,
+        only_slugs=only_slugs,
+        animation_mode=animation_mode,
+        transition_mode=transition_mode,
+    )
 
     # Output path
     input_path = Path(json_path)
@@ -955,11 +1019,24 @@ def generate(
             title = title.get("text", "(no title)")
         summary.append(f"page{i:02d} - {title}")
 
+    # Slides whose motion actually reached the package. The ordinary preview
+    # draws every element where it is authored, so it cannot show build order:
+    # an element revealed too early, never revealed, or hidden at the end of its
+    # own build all look correct in it. The caller is told to look at the
+    # storyboard instead, and told here rather than in a guide because this is
+    # the output an author already reads.
+    animated_slides = sum(
+        1 for s in config.slides
+        if (config.animations_enabled and s.get("animations"))
+        or (config.transitions_enabled and s.get("transition"))
+    )
+
     result: dict[str, Any] = {
         "output_path": str(out),
         "slide_count": len(config.slides),
         "slides": summary,
         "warnings": config.warnings,
+        "animated_slides": animated_slides,
     }
     if invalid_layouts:
         result["invalid_layouts"] = [
@@ -1764,6 +1841,62 @@ def measure(
                 shutil.rmtree(svg_path.parent, ignore_errors=True)
 
 
+def storyboard(
+    deck_dir: str | Path,
+    output_dir: str | Path | None = None,
+    only_slugs: set[str] | None = None,
+) -> dict[str, Any]:
+    """Render one still frame per click step, so animations can be inspected.
+
+    The ordinary preview draws every element where it is authored, so it cannot
+    show build order: an element revealed too early, never revealed, or hidden
+    at the end of its own build all look correct in it. This derives the state
+    after each click from the catalog and renders that, which is the only route
+    available without driving PowerPoint.
+
+    Args:
+        deck_dir: Deck directory (deck.json + slides/).
+        output_dir: Where the PNGs go. Defaults to ``<deck_dir>/storyboard``.
+        only_slugs: Restrict to these slides.
+
+    Returns:
+        Dict with ``manifest`` (one entry per frame, with its notes),
+        ``files``, ``frames_json`` and ``preview_dir``.
+    """
+    from sdpm.engine.storyboard import storyboard as build_storyboard
+    from sdpm.engine.timing.writer import load_capability_index
+    from sdpm.utils.io import write_json
+
+    deck_path = Path(deck_dir)
+    if not deck_path.is_dir():
+        raise FileNotFoundError(f"Not a deck directory: {deck_dir}")
+
+    deck_meta, slides = _assemble_slides_from_dir(deck_path, only_slugs=only_slugs)
+    derived_deck, frame_slides, manifest = build_storyboard(
+        deck_meta, slides, load_capability_index()
+    )
+
+    # The frames file lives in the deck directory so that specs/ — which the
+    # token-discipline check reads — stays reachable from its parent.
+    frames_json = deck_path / "storyboard-frames.json"
+    write_json(frames_json, {**derived_deck, "slides": frame_slides}, suffix="\n")
+
+    result = preview(
+        frames_json,
+        grid=False,
+        output_dir=str(output_dir or (deck_path / "storyboard")),
+    )
+    for entry, path in zip(manifest, result["files"]):
+        entry["file"] = path
+    write_json(Path(result["preview_dir"]) / "manifest.json", manifest, suffix="\n")
+    return {
+        "manifest": manifest,
+        "files": result["files"],
+        "frames_json": str(frames_json),
+        "preview_dir": result["preview_dir"],
+    }
+
+
 def preview(
     json_path: str | Path,
     output_path: str | Path | None = None,
@@ -2016,6 +2149,19 @@ def _load_deck_as_roundtrip(deck_dir: Path) -> dict:
             with open(slide_file) as f:
                 slides.append(json.load(f))
     data["slides"] = slides
+    # Preserved-motion sidecars are referenced by digest from slide JSON; the
+    # manifest is what names the targets each one animates. It is read here,
+    # while the converted deck still exists, so the pure diff can summarize a
+    # raw fallback without the XML and without touching the filesystem.
+    manifest_path = deck_dir / "animations" / "manifest.json"
+    if manifest_path.is_file():
+        try:
+            with open(manifest_path) as f:
+                manifest = json.load(f)
+        except (json.JSONDecodeError, OSError, UnicodeDecodeError):
+            manifest = None
+        if isinstance(manifest, dict):
+            data["_rawManifest"] = manifest
     return data
 
 

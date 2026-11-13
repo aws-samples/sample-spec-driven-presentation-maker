@@ -1,0 +1,3765 @@
+{
+  "plan": "effect-options",
+  "driver": "scripts/animation_catalog/gui_capture.py",
+  "shapeNames": {
+    "animation.effectOptions.amount.emphasis.growShrink.huge": "Rounded Rectangle 1",
+    "animation.effectOptions.amount.emphasis.growShrink.larger": "Rounded Rectangle 3",
+    "animation.effectOptions.amount.emphasis.growShrink.smaller": "Rounded Rectangle 5",
+    "animation.effectOptions.amount.emphasis.growShrink.tiny": "Rounded Rectangle 7",
+    "animation.effectOptions.amount.emphasis.spin.fullSpin": "Rounded Rectangle 9",
+    "animation.effectOptions.amount.emphasis.spin.halfSpin": "Rounded Rectangle 11",
+    "animation.effectOptions.amount.emphasis.spin.quarterSpin": "Rounded Rectangle 13",
+    "animation.effectOptions.amount.emphasis.spin.twoSpins": "Rounded Rectangle 15",
+    "animation.effectOptions.amount.emphasis.transparency.percent100": "Rounded Rectangle 17",
+    "animation.effectOptions.amount.emphasis.transparency.percent25": "Rounded Rectangle 19",
+    "animation.effectOptions.amount.emphasis.transparency.percent50": "Rounded Rectangle 21",
+    "animation.effectOptions.amount.emphasis.transparency.percent75": "Rounded Rectangle 23",
+    "animation.effectOptions.direction.emphasis.growShrink.both": "Rounded Rectangle 25",
+    "animation.effectOptions.direction.emphasis.growShrink.horizontal": "Rounded Rectangle 27",
+    "animation.effectOptions.direction.emphasis.growShrink.vertical": "Rounded Rectangle 29",
+    "animation.effectOptions.direction.emphasis.spin.clockwise": "Rounded Rectangle 31",
+    "animation.effectOptions.direction.emphasis.spin.counterclockwise": "Rounded Rectangle 33",
+    "animation.effectOptions.direction.entrance.basicSwivel.horizontal": "Rounded Rectangle 35",
+    "animation.effectOptions.direction.entrance.basicSwivel.vertical": "Rounded Rectangle 37",
+    "animation.effectOptions.direction.entrance.blinds.horizontal": "Rounded Rectangle 39",
+    "animation.effectOptions.direction.entrance.blinds.vertical": "Rounded Rectangle 41",
+    "animation.effectOptions.direction.entrance.checkerboard.across": "Rounded Rectangle 43",
+    "animation.effectOptions.direction.entrance.checkerboard.down": "Rounded Rectangle 45",
+    "animation.effectOptions.direction.entrance.floatIn.floatDown": "Rounded Rectangle 47",
+    "animation.effectOptions.direction.entrance.floatIn.floatUp": "Rounded Rectangle 49",
+    "animation.effectOptions.direction.entrance.flyIn.fromBottom": "Rounded Rectangle 51",
+    "animation.effectOptions.direction.entrance.flyIn.fromBottomLeft": "Rounded Rectangle 53",
+    "animation.effectOptions.direction.entrance.flyIn.fromBottomRight": "Rounded Rectangle 55",
+    "animation.effectOptions.direction.entrance.flyIn.fromLeft": "Rounded Rectangle 57",
+    "animation.effectOptions.direction.entrance.flyIn.fromRight": "Rounded Rectangle 59",
+    "animation.effectOptions.direction.entrance.flyIn.fromTop": "Rounded Rectangle 61",
+    "animation.effectOptions.direction.entrance.flyIn.fromTopLeft": "Rounded Rectangle 63",
+    "animation.effectOptions.direction.entrance.flyIn.fromTopRight": "Rounded Rectangle 65",
+    "animation.effectOptions.direction.entrance.peekIn.fromBottom": "Rounded Rectangle 67",
+    "animation.effectOptions.direction.entrance.peekIn.fromLeft": "Rounded Rectangle 69",
+    "animation.effectOptions.direction.entrance.peekIn.fromRight": "Rounded Rectangle 71",
+    "animation.effectOptions.direction.entrance.peekIn.fromTop": "Rounded Rectangle 73",
+    "animation.effectOptions.direction.entrance.randomBars.horizontal": "Rounded Rectangle 75",
+    "animation.effectOptions.direction.entrance.randomBars.vertical": "Rounded Rectangle 77",
+    "animation.effectOptions.direction.entrance.shape.in": "Rounded Rectangle 79",
+    "animation.effectOptions.direction.entrance.shape.out": "Rounded Rectangle 81",
+    "animation.effectOptions.direction.entrance.split.horizontalIn": "Rounded Rectangle 83",
+    "animation.effectOptions.direction.entrance.split.horizontalOut": "Rounded Rectangle 85",
+    "animation.effectOptions.direction.entrance.split.verticalIn": "Rounded Rectangle 87",
+    "animation.effectOptions.direction.entrance.split.verticalOut": "Rounded Rectangle 89",
+    "animation.effectOptions.direction.entrance.stretch.across": "Rounded Rectangle 91",
+    "animation.effectOptions.direction.entrance.stretch.fromBottom": "Rounded Rectangle 93",
+    "animation.effectOptions.direction.entrance.stretch.fromLeft": "Rounded Rectangle 95",
+    "animation.effectOptions.direction.entrance.stretch.fromRight": "Rounded Rectangle 97",
+    "animation.effectOptions.direction.entrance.stretch.fromTop": "Rounded Rectangle 99",
+    "animation.effectOptions.direction.entrance.strips.leftDown": "Rounded Rectangle 101",
+    "animation.effectOptions.direction.entrance.strips.leftUp": "Rounded Rectangle 103",
+    "animation.effectOptions.direction.entrance.strips.rightDown": "Rounded Rectangle 105",
+    "animation.effectOptions.direction.entrance.strips.rightUp": "Rounded Rectangle 107",
+    "animation.effectOptions.direction.entrance.wipe.fromBottom": "Rounded Rectangle 109",
+    "animation.effectOptions.direction.entrance.wipe.fromLeft": "Rounded Rectangle 111",
+    "animation.effectOptions.direction.entrance.wipe.fromRight": "Rounded Rectangle 113",
+    "animation.effectOptions.direction.entrance.wipe.fromTop": "Rounded Rectangle 115",
+    "animation.effectOptions.direction.exit.basicSwivel.horizontal": "Rounded Rectangle 117",
+    "animation.effectOptions.direction.exit.basicSwivel.vertical": "Rounded Rectangle 119",
+    "animation.effectOptions.direction.exit.blinds.horizontal": "Rounded Rectangle 121",
+    "animation.effectOptions.direction.exit.blinds.vertical": "Rounded Rectangle 123",
+    "animation.effectOptions.direction.exit.checkerboard.across": "Rounded Rectangle 125",
+    "animation.effectOptions.direction.exit.checkerboard.up": "Rounded Rectangle 127",
+    "animation.effectOptions.direction.exit.collapse.across": "Rounded Rectangle 129",
+    "animation.effectOptions.direction.exit.collapse.toBottom": "Rounded Rectangle 131",
+    "animation.effectOptions.direction.exit.collapse.toLeft": "Rounded Rectangle 133",
+    "animation.effectOptions.direction.exit.collapse.toRight": "Rounded Rectangle 135",
+    "animation.effectOptions.direction.exit.collapse.toTop": "Rounded Rectangle 137",
+    "animation.effectOptions.direction.exit.floatOut.floatDown": "Rounded Rectangle 139",
+    "animation.effectOptions.direction.exit.floatOut.floatUp": "Rounded Rectangle 141",
+    "animation.effectOptions.direction.exit.flyOut.toBottom": "Rounded Rectangle 143",
+    "animation.effectOptions.direction.exit.flyOut.toBottomLeft": "Rounded Rectangle 145",
+    "animation.effectOptions.direction.exit.flyOut.toBottomRight": "Rounded Rectangle 147",
+    "animation.effectOptions.direction.exit.flyOut.toLeft": "Rounded Rectangle 149",
+    "animation.effectOptions.direction.exit.flyOut.toRight": "Rounded Rectangle 151",
+    "animation.effectOptions.direction.exit.flyOut.toTop": "Rounded Rectangle 153",
+    "animation.effectOptions.direction.exit.flyOut.toTopLeft": "Rounded Rectangle 155",
+    "animation.effectOptions.direction.exit.flyOut.toTopRight": "Rounded Rectangle 157",
+    "animation.effectOptions.direction.exit.peekOut.toBottom": "Rounded Rectangle 159",
+    "animation.effectOptions.direction.exit.peekOut.toLeft": "Rounded Rectangle 161",
+    "animation.effectOptions.direction.exit.peekOut.toRight": "Rounded Rectangle 163",
+    "animation.effectOptions.direction.exit.peekOut.toTop": "Rounded Rectangle 165",
+    "animation.effectOptions.direction.exit.randomBars.horizontal": "Rounded Rectangle 167",
+    "animation.effectOptions.direction.exit.randomBars.vertical": "Rounded Rectangle 169",
+    "animation.effectOptions.direction.exit.shape.in": "Rounded Rectangle 171",
+    "animation.effectOptions.direction.exit.shape.out": "Rounded Rectangle 173",
+    "animation.effectOptions.direction.exit.split.horizontalIn": "Rounded Rectangle 175",
+    "animation.effectOptions.direction.exit.split.horizontalOut": "Rounded Rectangle 177",
+    "animation.effectOptions.direction.exit.split.verticalIn": "Rounded Rectangle 179",
+    "animation.effectOptions.direction.exit.split.verticalOut": "Rounded Rectangle 181",
+    "animation.effectOptions.direction.exit.strips.leftDown": "Rounded Rectangle 183",
+    "animation.effectOptions.direction.exit.strips.leftUp": "Rounded Rectangle 185",
+    "animation.effectOptions.direction.exit.strips.rightDown": "Rounded Rectangle 187",
+    "animation.effectOptions.direction.exit.strips.rightUp": "Rounded Rectangle 189",
+    "animation.effectOptions.direction.exit.wipe.fromBottom": "Rounded Rectangle 191",
+    "animation.effectOptions.direction.exit.wipe.fromLeft": "Rounded Rectangle 193",
+    "animation.effectOptions.direction.exit.wipe.fromRight": "Rounded Rectangle 195",
+    "animation.effectOptions.direction.exit.wipe.fromTop": "Rounded Rectangle 197",
+    "animation.effectOptions.shapes.entrance.shape.box": "Rounded Rectangle 199",
+    "animation.effectOptions.shapes.entrance.shape.circle": "Rounded Rectangle 201",
+    "animation.effectOptions.shapes.entrance.shape.diamond": "Rounded Rectangle 203",
+    "animation.effectOptions.shapes.entrance.shape.plus": "Rounded Rectangle 205",
+    "animation.effectOptions.shapes.exit.shape.box": "Rounded Rectangle 207",
+    "animation.effectOptions.shapes.exit.shape.circle": "Rounded Rectangle 209",
+    "animation.effectOptions.shapes.exit.shape.diamond": "Rounded Rectangle 211",
+    "animation.effectOptions.shapes.exit.shape.plus": "Rounded Rectangle 213",
+    "animation.effectOptions.spokes.entrance.wheel.spoke1": "Rounded Rectangle 215",
+    "animation.effectOptions.spokes.entrance.wheel.spokes2": "Rounded Rectangle 217",
+    "animation.effectOptions.spokes.entrance.wheel.spokes3": "Rounded Rectangle 219",
+    "animation.effectOptions.spokes.entrance.wheel.spokes4": "Rounded Rectangle 221",
+    "animation.effectOptions.spokes.entrance.wheel.spokes8": "Rounded Rectangle 223",
+    "animation.effectOptions.spokes.exit.wheel.spoke1": "Rounded Rectangle 225",
+    "animation.effectOptions.spokes.exit.wheel.spokes2": "Rounded Rectangle 227",
+    "animation.effectOptions.spokes.exit.wheel.spokes3": "Rounded Rectangle 229",
+    "animation.effectOptions.spokes.exit.wheel.spokes4": "Rounded Rectangle 231",
+    "animation.effectOptions.spokes.exit.wheel.spokes8": "Rounded Rectangle 233",
+    "animation.effectOptions.vanishingPoint.entrance.zoom.objectCenter": "Rounded Rectangle 235",
+    "animation.effectOptions.vanishingPoint.entrance.zoom.slideCenter": "Rounded Rectangle 237",
+    "animation.effectOptions.vanishingPoint.exit.zoom.objectCenter": "Rounded Rectangle 239",
+    "animation.effectOptions.vanishingPoint.exit.zoom.slideCenter": "Rounded Rectangle 241",
+    "animation.effectOptions.zoom.entrance.basicZoom.in": "Rounded Rectangle 243",
+    "animation.effectOptions.zoom.entrance.basicZoom.inFromScreenCenter": "Rounded Rectangle 245",
+    "animation.effectOptions.zoom.entrance.basicZoom.inSlightly": "Rounded Rectangle 247",
+    "animation.effectOptions.zoom.entrance.basicZoom.out": "Rounded Rectangle 249",
+    "animation.effectOptions.zoom.entrance.basicZoom.outFromScreenBottom": "Rounded Rectangle 251",
+    "animation.effectOptions.zoom.entrance.basicZoom.outSlightly": "Rounded Rectangle 253",
+    "animation.effectOptions.zoom.exit.basicZoom.in": "Rounded Rectangle 255",
+    "animation.effectOptions.zoom.exit.basicZoom.inSlightly": "Rounded Rectangle 257",
+    "animation.effectOptions.zoom.exit.basicZoom.inToScreenBottom": "Rounded Rectangle 259",
+    "animation.effectOptions.zoom.exit.basicZoom.out": "Rounded Rectangle 261",
+    "animation.effectOptions.zoom.exit.basicZoom.outSlightly": "Rounded Rectangle 263",
+    "animation.effectOptions.zoom.exit.basicZoom.outToScreenCenter": "Rounded Rectangle 265"
+  },
+  "deck": {
+    "slides": 1,
+    "targetsPerSlide": 133,
+    "columns": 13,
+    "rows": 11,
+    "basisPx": [
+      1920.0,
+      1080.0
+    ],
+    "cellPx": [
+      140.30769230769232,
+      89.45454545454545
+    ],
+    "shapePx": [
+      112,
+      53
+    ],
+    "clickMarginPx": 20.0,
+    "neighbourClearancePx": 20.0,
+    "split": false,
+    "note": "133 targets fit one slide as a 13x11 grid"
+  },
+  "generatedFrom": {
+    "discovery": "effect-options.json",
+    "document": "capture-deck",
+    "tilesRead": 95,
+    "selection": "every enabled AXMenuButton at depth 2 of a tile's Effect Options window, grouped under the disabled one before it, excluding Sequence"
+  },
+  "counts": {
+    "targets": 133,
+    "settings": 6,
+    "effects": 33
+  },
+  "targets": [
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.huge",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Huge",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Grow/Shrink"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Huge"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 1,
+      "slideIndex": 1,
+      "cellIndex": 1,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 1"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.larger",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Larger",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Grow/Shrink"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Larger"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 2,
+      "slideIndex": 1,
+      "cellIndex": 2,
+      "shapeRectPx": {
+        "x": 202,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 3"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.smaller",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Smaller",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Grow/Shrink"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Smaller"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 3,
+      "slideIndex": 1,
+      "cellIndex": 3,
+      "shapeRectPx": {
+        "x": 343,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 5"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.growShrink.tiny",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Amount",
+      "value": "Tiny",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Grow/Shrink"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Tiny"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 4,
+      "slideIndex": 1,
+      "cellIndex": 4,
+      "shapeRectPx": {
+        "x": 483,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 7"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.fullSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Full Spin",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Full Spin"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 5,
+      "slideIndex": 1,
+      "cellIndex": 5,
+      "shapeRectPx": {
+        "x": 623,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 9"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.halfSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Half Spin",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Half Spin"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 6,
+      "slideIndex": 1,
+      "cellIndex": 6,
+      "shapeRectPx": {
+        "x": 764,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 11"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.quarterSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Quarter Spin",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Quarter Spin"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 7,
+      "slideIndex": 1,
+      "cellIndex": 7,
+      "shapeRectPx": {
+        "x": 904,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 13"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.twoSpins",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Two Spins",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Two Spins"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 8,
+      "slideIndex": 1,
+      "cellIndex": 8,
+      "shapeRectPx": {
+        "x": 1044,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 15"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.transparency.percent100",
+      "effectKey": "animation.gallery.emphasis.transparency",
+      "setting": "Amount",
+      "value": "100%",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Transparency"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "100%"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 9,
+      "slideIndex": 1,
+      "cellIndex": 9,
+      "shapeRectPx": {
+        "x": 1184,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 17"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.transparency.percent25",
+      "effectKey": "animation.gallery.emphasis.transparency",
+      "setting": "Amount",
+      "value": "25%",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Transparency"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "25%"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 10,
+      "slideIndex": 1,
+      "cellIndex": 10,
+      "shapeRectPx": {
+        "x": 1325,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 19"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.transparency.percent50",
+      "effectKey": "animation.gallery.emphasis.transparency",
+      "setting": "Amount",
+      "value": "50%",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Transparency"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "50%"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 11,
+      "slideIndex": 1,
+      "cellIndex": 11,
+      "shapeRectPx": {
+        "x": 1465,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 21"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.transparency.percent75",
+      "effectKey": "animation.gallery.emphasis.transparency",
+      "setting": "Amount",
+      "value": "75%",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Transparency"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "75%"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 12,
+      "slideIndex": 1,
+      "cellIndex": 12,
+      "shapeRectPx": {
+        "x": 1605,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 23"
+    },
+    {
+      "key": "animation.effectOptions.direction.emphasis.growShrink.both",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Direction",
+      "value": "Both",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Grow/Shrink"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Both"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 13,
+      "slideIndex": 1,
+      "cellIndex": 13,
+      "shapeRectPx": {
+        "x": 1746,
+        "y": 58,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 25"
+    },
+    {
+      "key": "animation.effectOptions.direction.emphasis.growShrink.horizontal",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Direction",
+      "value": "Horizontal",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Grow/Shrink"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Horizontal"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 14,
+      "slideIndex": 1,
+      "cellIndex": 14,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 27"
+    },
+    {
+      "key": "animation.effectOptions.direction.emphasis.growShrink.vertical",
+      "effectKey": "animation.gallery.emphasis.growShrink",
+      "setting": "Direction",
+      "value": "Vertical",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Grow/Shrink"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Vertical"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 15,
+      "slideIndex": 1,
+      "cellIndex": 15,
+      "shapeRectPx": {
+        "x": 202,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 29"
+    },
+    {
+      "key": "animation.effectOptions.direction.emphasis.spin.clockwise",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Direction",
+      "value": "Clockwise",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Clockwise"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 16,
+      "slideIndex": 1,
+      "cellIndex": 16,
+      "shapeRectPx": {
+        "x": 343,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 31"
+    },
+    {
+      "key": "animation.effectOptions.direction.emphasis.spin.counterclockwise",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Direction",
+      "value": "Counterclockwise",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Counterclockwise"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 17,
+      "slideIndex": 1,
+      "cellIndex": 17,
+      "shapeRectPx": {
+        "x": 483,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 33"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.basicSwivel.horizontal",
+      "effectKey": "animation.gallery.entrance.basicSwivel",
+      "setting": "Direction",
+      "value": "Horizontal",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Basic Swivel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Horizontal"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 18,
+      "slideIndex": 1,
+      "cellIndex": 18,
+      "shapeRectPx": {
+        "x": 623,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 35"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.basicSwivel.vertical",
+      "effectKey": "animation.gallery.entrance.basicSwivel",
+      "setting": "Direction",
+      "value": "Vertical",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Basic Swivel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Vertical"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 19,
+      "slideIndex": 1,
+      "cellIndex": 19,
+      "shapeRectPx": {
+        "x": 764,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 37"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.blinds.horizontal",
+      "effectKey": "animation.gallery.entrance.blinds",
+      "setting": "Direction",
+      "value": "Horizontal",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Blinds"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Horizontal"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 20,
+      "slideIndex": 1,
+      "cellIndex": 20,
+      "shapeRectPx": {
+        "x": 904,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 39"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.blinds.vertical",
+      "effectKey": "animation.gallery.entrance.blinds",
+      "setting": "Direction",
+      "value": "Vertical",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Blinds"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Vertical"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 21,
+      "slideIndex": 1,
+      "cellIndex": 21,
+      "shapeRectPx": {
+        "x": 1044,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 41"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.checkerboard.across",
+      "effectKey": "animation.gallery.entrance.checkerboard",
+      "setting": "Direction",
+      "value": "Across",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Checkerboard"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Across"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 22,
+      "slideIndex": 1,
+      "cellIndex": 22,
+      "shapeRectPx": {
+        "x": 1184,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 43"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.checkerboard.down",
+      "effectKey": "animation.gallery.entrance.checkerboard",
+      "setting": "Direction",
+      "value": "Down",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Checkerboard"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Down"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 23,
+      "slideIndex": 1,
+      "cellIndex": 23,
+      "shapeRectPx": {
+        "x": 1325,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 45"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.floatIn.floatDown",
+      "effectKey": "animation.gallery.entrance.floatIn",
+      "setting": "Direction",
+      "value": "Float Down",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Float In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Float Down"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 24,
+      "slideIndex": 1,
+      "cellIndex": 24,
+      "shapeRectPx": {
+        "x": 1465,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 47"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.floatIn.floatUp",
+      "effectKey": "animation.gallery.entrance.floatIn",
+      "setting": "Direction",
+      "value": "Float Up",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Float In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Float Up"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 25,
+      "slideIndex": 1,
+      "cellIndex": 25,
+      "shapeRectPx": {
+        "x": 1605,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 49"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromBottom",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Bottom",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Fly In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Bottom"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 26,
+      "slideIndex": 1,
+      "cellIndex": 26,
+      "shapeRectPx": {
+        "x": 1746,
+        "y": 147,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 51"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromBottomLeft",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Bottom-Left",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Fly In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Bottom-Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 27,
+      "slideIndex": 1,
+      "cellIndex": 27,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 53"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromBottomRight",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Bottom-Right",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Fly In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Bottom-Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 28,
+      "slideIndex": 1,
+      "cellIndex": 28,
+      "shapeRectPx": {
+        "x": 202,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 55"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromLeft",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Left",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Fly In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 29,
+      "slideIndex": 1,
+      "cellIndex": 29,
+      "shapeRectPx": {
+        "x": 343,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 57"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromRight",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Right",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Fly In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 30,
+      "slideIndex": 1,
+      "cellIndex": 30,
+      "shapeRectPx": {
+        "x": 483,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 59"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromTop",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Top",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Fly In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Top"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 31,
+      "slideIndex": 1,
+      "cellIndex": 31,
+      "shapeRectPx": {
+        "x": 623,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 61"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromTopLeft",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Top-Left",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Fly In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Top-Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 32,
+      "slideIndex": 1,
+      "cellIndex": 32,
+      "shapeRectPx": {
+        "x": 764,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 63"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.flyIn.fromTopRight",
+      "effectKey": "animation.gallery.entrance.flyIn",
+      "setting": "Direction",
+      "value": "From Top-Right",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Fly In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Top-Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 33,
+      "slideIndex": 1,
+      "cellIndex": 33,
+      "shapeRectPx": {
+        "x": 904,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 65"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.peekIn.fromBottom",
+      "effectKey": "animation.gallery.entrance.peekIn",
+      "setting": "Direction",
+      "value": "From Bottom",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Peek In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Bottom"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 34,
+      "slideIndex": 1,
+      "cellIndex": 34,
+      "shapeRectPx": {
+        "x": 1044,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 67"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.peekIn.fromLeft",
+      "effectKey": "animation.gallery.entrance.peekIn",
+      "setting": "Direction",
+      "value": "From Left",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Peek In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 35,
+      "slideIndex": 1,
+      "cellIndex": 35,
+      "shapeRectPx": {
+        "x": 1184,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 69"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.peekIn.fromRight",
+      "effectKey": "animation.gallery.entrance.peekIn",
+      "setting": "Direction",
+      "value": "From Right",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Peek In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 36,
+      "slideIndex": 1,
+      "cellIndex": 36,
+      "shapeRectPx": {
+        "x": 1325,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 71"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.peekIn.fromTop",
+      "effectKey": "animation.gallery.entrance.peekIn",
+      "setting": "Direction",
+      "value": "From Top",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Peek In"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Top"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 37,
+      "slideIndex": 1,
+      "cellIndex": 37,
+      "shapeRectPx": {
+        "x": 1465,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 73"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.randomBars.horizontal",
+      "effectKey": "animation.gallery.entrance.randomBars",
+      "setting": "Direction",
+      "value": "Horizontal",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Random Bars"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Horizontal"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 38,
+      "slideIndex": 1,
+      "cellIndex": 38,
+      "shapeRectPx": {
+        "x": 1605,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 75"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.randomBars.vertical",
+      "effectKey": "animation.gallery.entrance.randomBars",
+      "setting": "Direction",
+      "value": "Vertical",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Random Bars"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Vertical"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 39,
+      "slideIndex": 1,
+      "cellIndex": 39,
+      "shapeRectPx": {
+        "x": 1746,
+        "y": 237,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 77"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.shape.in",
+      "effectKey": "animation.gallery.entrance.shape",
+      "setting": "Direction",
+      "value": "In",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "In"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 40,
+      "slideIndex": 1,
+      "cellIndex": 40,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 79"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.shape.out",
+      "effectKey": "animation.gallery.entrance.shape",
+      "setting": "Direction",
+      "value": "Out",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Out"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 41,
+      "slideIndex": 1,
+      "cellIndex": 41,
+      "shapeRectPx": {
+        "x": 202,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 81"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.split.horizontalIn",
+      "effectKey": "animation.gallery.entrance.split",
+      "setting": "Direction",
+      "value": "Horizontal In",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Split"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Horizontal In"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 42,
+      "slideIndex": 1,
+      "cellIndex": 42,
+      "shapeRectPx": {
+        "x": 343,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 83"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.split.horizontalOut",
+      "effectKey": "animation.gallery.entrance.split",
+      "setting": "Direction",
+      "value": "Horizontal Out",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Split"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Horizontal Out"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 43,
+      "slideIndex": 1,
+      "cellIndex": 43,
+      "shapeRectPx": {
+        "x": 483,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 85"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.split.verticalIn",
+      "effectKey": "animation.gallery.entrance.split",
+      "setting": "Direction",
+      "value": "Vertical In",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Split"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Vertical In"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 44,
+      "slideIndex": 1,
+      "cellIndex": 44,
+      "shapeRectPx": {
+        "x": 623,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 87"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.split.verticalOut",
+      "effectKey": "animation.gallery.entrance.split",
+      "setting": "Direction",
+      "value": "Vertical Out",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Split"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Vertical Out"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 45,
+      "slideIndex": 1,
+      "cellIndex": 45,
+      "shapeRectPx": {
+        "x": 764,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 89"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.stretch.across",
+      "effectKey": "animation.gallery.entrance.stretch",
+      "setting": "Direction",
+      "value": "Across",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Stretch"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Across"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 46,
+      "slideIndex": 1,
+      "cellIndex": 46,
+      "shapeRectPx": {
+        "x": 904,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 91"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.stretch.fromBottom",
+      "effectKey": "animation.gallery.entrance.stretch",
+      "setting": "Direction",
+      "value": "From Bottom",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Stretch"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Bottom"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 47,
+      "slideIndex": 1,
+      "cellIndex": 47,
+      "shapeRectPx": {
+        "x": 1044,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 93"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.stretch.fromLeft",
+      "effectKey": "animation.gallery.entrance.stretch",
+      "setting": "Direction",
+      "value": "From Left",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Stretch"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 48,
+      "slideIndex": 1,
+      "cellIndex": 48,
+      "shapeRectPx": {
+        "x": 1184,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 95"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.stretch.fromRight",
+      "effectKey": "animation.gallery.entrance.stretch",
+      "setting": "Direction",
+      "value": "From Right",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Stretch"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 49,
+      "slideIndex": 1,
+      "cellIndex": 49,
+      "shapeRectPx": {
+        "x": 1325,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 97"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.stretch.fromTop",
+      "effectKey": "animation.gallery.entrance.stretch",
+      "setting": "Direction",
+      "value": "From Top",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Stretch"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Top"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 50,
+      "slideIndex": 1,
+      "cellIndex": 50,
+      "shapeRectPx": {
+        "x": 1465,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 99"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.strips.leftDown",
+      "effectKey": "animation.gallery.entrance.strips",
+      "setting": "Direction",
+      "value": "Left Down",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Strips"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Left Down"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 51,
+      "slideIndex": 1,
+      "cellIndex": 51,
+      "shapeRectPx": {
+        "x": 1605,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 101"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.strips.leftUp",
+      "effectKey": "animation.gallery.entrance.strips",
+      "setting": "Direction",
+      "value": "Left Up",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Strips"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Left Up"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 52,
+      "slideIndex": 1,
+      "cellIndex": 52,
+      "shapeRectPx": {
+        "x": 1746,
+        "y": 326,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 103"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.strips.rightDown",
+      "effectKey": "animation.gallery.entrance.strips",
+      "setting": "Direction",
+      "value": "Right Down",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Strips"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Right Down"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 53,
+      "slideIndex": 1,
+      "cellIndex": 53,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 105"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.strips.rightUp",
+      "effectKey": "animation.gallery.entrance.strips",
+      "setting": "Direction",
+      "value": "Right Up",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Strips"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Right Up"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 54,
+      "slideIndex": 1,
+      "cellIndex": 54,
+      "shapeRectPx": {
+        "x": 202,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 107"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.wipe.fromBottom",
+      "effectKey": "animation.gallery.entrance.wipe",
+      "setting": "Direction",
+      "value": "From Bottom",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Wipe"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Bottom"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 55,
+      "slideIndex": 1,
+      "cellIndex": 55,
+      "shapeRectPx": {
+        "x": 343,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 109"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.wipe.fromLeft",
+      "effectKey": "animation.gallery.entrance.wipe",
+      "setting": "Direction",
+      "value": "From Left",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Wipe"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 56,
+      "slideIndex": 1,
+      "cellIndex": 56,
+      "shapeRectPx": {
+        "x": 483,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 111"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.wipe.fromRight",
+      "effectKey": "animation.gallery.entrance.wipe",
+      "setting": "Direction",
+      "value": "From Right",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Wipe"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 57,
+      "slideIndex": 1,
+      "cellIndex": 57,
+      "shapeRectPx": {
+        "x": 623,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 113"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.wipe.fromTop",
+      "effectKey": "animation.gallery.entrance.wipe",
+      "setting": "Direction",
+      "value": "From Top",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Wipe"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Top"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 58,
+      "slideIndex": 1,
+      "cellIndex": 58,
+      "shapeRectPx": {
+        "x": 764,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 115"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.basicSwivel.horizontal",
+      "effectKey": "animation.gallery.exit.basicSwivel",
+      "setting": "Direction",
+      "value": "Horizontal",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Basic Swivel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Horizontal"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 59,
+      "slideIndex": 1,
+      "cellIndex": 59,
+      "shapeRectPx": {
+        "x": 904,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 117"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.basicSwivel.vertical",
+      "effectKey": "animation.gallery.exit.basicSwivel",
+      "setting": "Direction",
+      "value": "Vertical",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Basic Swivel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Vertical"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 60,
+      "slideIndex": 1,
+      "cellIndex": 60,
+      "shapeRectPx": {
+        "x": 1044,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 119"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.blinds.horizontal",
+      "effectKey": "animation.gallery.exit.blinds",
+      "setting": "Direction",
+      "value": "Horizontal",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Blinds"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Horizontal"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 61,
+      "slideIndex": 1,
+      "cellIndex": 61,
+      "shapeRectPx": {
+        "x": 1184,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 121"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.blinds.vertical",
+      "effectKey": "animation.gallery.exit.blinds",
+      "setting": "Direction",
+      "value": "Vertical",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Blinds"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Vertical"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 62,
+      "slideIndex": 1,
+      "cellIndex": 62,
+      "shapeRectPx": {
+        "x": 1325,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 123"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.checkerboard.across",
+      "effectKey": "animation.gallery.exit.checkerboard",
+      "setting": "Direction",
+      "value": "Across",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Checkerboard"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Across"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 63,
+      "slideIndex": 1,
+      "cellIndex": 63,
+      "shapeRectPx": {
+        "x": 1465,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 125"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.checkerboard.up",
+      "effectKey": "animation.gallery.exit.checkerboard",
+      "setting": "Direction",
+      "value": "Up",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Checkerboard"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Up"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 64,
+      "slideIndex": 1,
+      "cellIndex": 64,
+      "shapeRectPx": {
+        "x": 1605,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 127"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.collapse.across",
+      "effectKey": "animation.gallery.exit.collapse",
+      "setting": "Direction",
+      "value": "Across",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Collapse"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Across"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 65,
+      "slideIndex": 1,
+      "cellIndex": 65,
+      "shapeRectPx": {
+        "x": 1746,
+        "y": 416,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 129"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.collapse.toBottom",
+      "effectKey": "animation.gallery.exit.collapse",
+      "setting": "Direction",
+      "value": "To Bottom",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Collapse"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Bottom"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 66,
+      "slideIndex": 1,
+      "cellIndex": 66,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 131"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.collapse.toLeft",
+      "effectKey": "animation.gallery.exit.collapse",
+      "setting": "Direction",
+      "value": "To Left",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Collapse"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 67,
+      "slideIndex": 1,
+      "cellIndex": 67,
+      "shapeRectPx": {
+        "x": 202,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 133"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.collapse.toRight",
+      "effectKey": "animation.gallery.exit.collapse",
+      "setting": "Direction",
+      "value": "To Right",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Collapse"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 68,
+      "slideIndex": 1,
+      "cellIndex": 68,
+      "shapeRectPx": {
+        "x": 343,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 135"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.collapse.toTop",
+      "effectKey": "animation.gallery.exit.collapse",
+      "setting": "Direction",
+      "value": "To Top",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Collapse"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Top"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 69,
+      "slideIndex": 1,
+      "cellIndex": 69,
+      "shapeRectPx": {
+        "x": 483,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 137"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.floatOut.floatDown",
+      "effectKey": "animation.gallery.exit.floatOut",
+      "setting": "Direction",
+      "value": "Float Down",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Float Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Float Down"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 70,
+      "slideIndex": 1,
+      "cellIndex": 70,
+      "shapeRectPx": {
+        "x": 623,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 139"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.floatOut.floatUp",
+      "effectKey": "animation.gallery.exit.floatOut",
+      "setting": "Direction",
+      "value": "Float Up",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Float Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Float Up"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 71,
+      "slideIndex": 1,
+      "cellIndex": 71,
+      "shapeRectPx": {
+        "x": 764,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 141"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.flyOut.toBottom",
+      "effectKey": "animation.gallery.exit.flyOut",
+      "setting": "Direction",
+      "value": "To Bottom",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Fly Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Bottom"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 72,
+      "slideIndex": 1,
+      "cellIndex": 72,
+      "shapeRectPx": {
+        "x": 904,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 143"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.flyOut.toBottomLeft",
+      "effectKey": "animation.gallery.exit.flyOut",
+      "setting": "Direction",
+      "value": "To Bottom-Left",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Fly Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Bottom-Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 73,
+      "slideIndex": 1,
+      "cellIndex": 73,
+      "shapeRectPx": {
+        "x": 1044,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 145"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.flyOut.toBottomRight",
+      "effectKey": "animation.gallery.exit.flyOut",
+      "setting": "Direction",
+      "value": "To Bottom-Right",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Fly Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Bottom-Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 74,
+      "slideIndex": 1,
+      "cellIndex": 74,
+      "shapeRectPx": {
+        "x": 1184,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 147"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.flyOut.toLeft",
+      "effectKey": "animation.gallery.exit.flyOut",
+      "setting": "Direction",
+      "value": "To Left",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Fly Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 75,
+      "slideIndex": 1,
+      "cellIndex": 75,
+      "shapeRectPx": {
+        "x": 1325,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 149"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.flyOut.toRight",
+      "effectKey": "animation.gallery.exit.flyOut",
+      "setting": "Direction",
+      "value": "To Right",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Fly Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 76,
+      "slideIndex": 1,
+      "cellIndex": 76,
+      "shapeRectPx": {
+        "x": 1465,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 151"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.flyOut.toTop",
+      "effectKey": "animation.gallery.exit.flyOut",
+      "setting": "Direction",
+      "value": "To Top",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Fly Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Top"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 77,
+      "slideIndex": 1,
+      "cellIndex": 77,
+      "shapeRectPx": {
+        "x": 1605,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 153"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.flyOut.toTopLeft",
+      "effectKey": "animation.gallery.exit.flyOut",
+      "setting": "Direction",
+      "value": "To Top-Left",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Fly Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Top-Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 78,
+      "slideIndex": 1,
+      "cellIndex": 78,
+      "shapeRectPx": {
+        "x": 1746,
+        "y": 505,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 155"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.flyOut.toTopRight",
+      "effectKey": "animation.gallery.exit.flyOut",
+      "setting": "Direction",
+      "value": "To Top-Right",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Fly Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Top-Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 79,
+      "slideIndex": 1,
+      "cellIndex": 79,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 157"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.peekOut.toBottom",
+      "effectKey": "animation.gallery.exit.peekOut",
+      "setting": "Direction",
+      "value": "To Bottom",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Peek Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Bottom"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 80,
+      "slideIndex": 1,
+      "cellIndex": 80,
+      "shapeRectPx": {
+        "x": 202,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 159"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.peekOut.toLeft",
+      "effectKey": "animation.gallery.exit.peekOut",
+      "setting": "Direction",
+      "value": "To Left",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Peek Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 81,
+      "slideIndex": 1,
+      "cellIndex": 81,
+      "shapeRectPx": {
+        "x": 343,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 161"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.peekOut.toRight",
+      "effectKey": "animation.gallery.exit.peekOut",
+      "setting": "Direction",
+      "value": "To Right",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Peek Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 82,
+      "slideIndex": 1,
+      "cellIndex": 82,
+      "shapeRectPx": {
+        "x": 483,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 163"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.peekOut.toTop",
+      "effectKey": "animation.gallery.exit.peekOut",
+      "setting": "Direction",
+      "value": "To Top",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Peek Out"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "To Top"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 83,
+      "slideIndex": 1,
+      "cellIndex": 83,
+      "shapeRectPx": {
+        "x": 623,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 165"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.randomBars.horizontal",
+      "effectKey": "animation.gallery.exit.randomBars",
+      "setting": "Direction",
+      "value": "Horizontal",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Random Bars"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Horizontal"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 84,
+      "slideIndex": 1,
+      "cellIndex": 84,
+      "shapeRectPx": {
+        "x": 764,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 167"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.randomBars.vertical",
+      "effectKey": "animation.gallery.exit.randomBars",
+      "setting": "Direction",
+      "value": "Vertical",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Random Bars"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Vertical"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 85,
+      "slideIndex": 1,
+      "cellIndex": 85,
+      "shapeRectPx": {
+        "x": 904,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 169"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.shape.in",
+      "effectKey": "animation.gallery.exit.shape",
+      "setting": "Direction",
+      "value": "In",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "In"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 86,
+      "slideIndex": 1,
+      "cellIndex": 86,
+      "shapeRectPx": {
+        "x": 1044,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 171"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.shape.out",
+      "effectKey": "animation.gallery.exit.shape",
+      "setting": "Direction",
+      "value": "Out",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Out"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 87,
+      "slideIndex": 1,
+      "cellIndex": 87,
+      "shapeRectPx": {
+        "x": 1184,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 173"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.split.horizontalIn",
+      "effectKey": "animation.gallery.exit.split",
+      "setting": "Direction",
+      "value": "Horizontal In",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Split"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Horizontal In"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 88,
+      "slideIndex": 1,
+      "cellIndex": 88,
+      "shapeRectPx": {
+        "x": 1325,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 175"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.split.horizontalOut",
+      "effectKey": "animation.gallery.exit.split",
+      "setting": "Direction",
+      "value": "Horizontal Out",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Split"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Horizontal Out"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 89,
+      "slideIndex": 1,
+      "cellIndex": 89,
+      "shapeRectPx": {
+        "x": 1465,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 177"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.split.verticalIn",
+      "effectKey": "animation.gallery.exit.split",
+      "setting": "Direction",
+      "value": "Vertical In",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Split"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Vertical In"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 90,
+      "slideIndex": 1,
+      "cellIndex": 90,
+      "shapeRectPx": {
+        "x": 1605,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 179"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.split.verticalOut",
+      "effectKey": "animation.gallery.exit.split",
+      "setting": "Direction",
+      "value": "Vertical Out",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Split"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Vertical Out"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 91,
+      "slideIndex": 1,
+      "cellIndex": 91,
+      "shapeRectPx": {
+        "x": 1746,
+        "y": 595,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 181"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.strips.leftDown",
+      "effectKey": "animation.gallery.exit.strips",
+      "setting": "Direction",
+      "value": "Left Down",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Strips"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Left Down"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 92,
+      "slideIndex": 1,
+      "cellIndex": 92,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 183"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.strips.leftUp",
+      "effectKey": "animation.gallery.exit.strips",
+      "setting": "Direction",
+      "value": "Left Up",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Strips"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Left Up"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 93,
+      "slideIndex": 1,
+      "cellIndex": 93,
+      "shapeRectPx": {
+        "x": 202,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 185"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.strips.rightDown",
+      "effectKey": "animation.gallery.exit.strips",
+      "setting": "Direction",
+      "value": "Right Down",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Strips"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Right Down"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 94,
+      "slideIndex": 1,
+      "cellIndex": 94,
+      "shapeRectPx": {
+        "x": 343,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 187"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.strips.rightUp",
+      "effectKey": "animation.gallery.exit.strips",
+      "setting": "Direction",
+      "value": "Right Up",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Strips"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Right Up"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 95,
+      "slideIndex": 1,
+      "cellIndex": 95,
+      "shapeRectPx": {
+        "x": 483,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 189"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.wipe.fromBottom",
+      "effectKey": "animation.gallery.exit.wipe",
+      "setting": "Direction",
+      "value": "From Bottom",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Wipe"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Bottom"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 96,
+      "slideIndex": 1,
+      "cellIndex": 96,
+      "shapeRectPx": {
+        "x": 623,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 191"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.wipe.fromLeft",
+      "effectKey": "animation.gallery.exit.wipe",
+      "setting": "Direction",
+      "value": "From Left",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Wipe"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Left"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 97,
+      "slideIndex": 1,
+      "cellIndex": 97,
+      "shapeRectPx": {
+        "x": 764,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 193"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.wipe.fromRight",
+      "effectKey": "animation.gallery.exit.wipe",
+      "setting": "Direction",
+      "value": "From Right",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Wipe"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Right"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 98,
+      "slideIndex": 1,
+      "cellIndex": 98,
+      "shapeRectPx": {
+        "x": 904,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 195"
+    },
+    {
+      "key": "animation.effectOptions.direction.exit.wipe.fromTop",
+      "effectKey": "animation.gallery.exit.wipe",
+      "setting": "Direction",
+      "value": "From Top",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Wipe"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Top"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 99,
+      "slideIndex": 1,
+      "cellIndex": 99,
+      "shapeRectPx": {
+        "x": 1044,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 197"
+    },
+    {
+      "key": "animation.effectOptions.shapes.entrance.shape.box",
+      "effectKey": "animation.gallery.entrance.shape",
+      "setting": "Shapes",
+      "value": "Box",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Box"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 100,
+      "slideIndex": 1,
+      "cellIndex": 100,
+      "shapeRectPx": {
+        "x": 1184,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 199"
+    },
+    {
+      "key": "animation.effectOptions.shapes.entrance.shape.circle",
+      "effectKey": "animation.gallery.entrance.shape",
+      "setting": "Shapes",
+      "value": "Circle",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Circle"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 101,
+      "slideIndex": 1,
+      "cellIndex": 101,
+      "shapeRectPx": {
+        "x": 1325,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 201"
+    },
+    {
+      "key": "animation.effectOptions.shapes.entrance.shape.diamond",
+      "effectKey": "animation.gallery.entrance.shape",
+      "setting": "Shapes",
+      "value": "Diamond",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Diamond"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 102,
+      "slideIndex": 1,
+      "cellIndex": 102,
+      "shapeRectPx": {
+        "x": 1465,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 203"
+    },
+    {
+      "key": "animation.effectOptions.shapes.entrance.shape.plus",
+      "effectKey": "animation.gallery.entrance.shape",
+      "setting": "Shapes",
+      "value": "Plus",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Plus"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 103,
+      "slideIndex": 1,
+      "cellIndex": 103,
+      "shapeRectPx": {
+        "x": 1605,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 205"
+    },
+    {
+      "key": "animation.effectOptions.shapes.exit.shape.box",
+      "effectKey": "animation.gallery.exit.shape",
+      "setting": "Shapes",
+      "value": "Box",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Box"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 104,
+      "slideIndex": 1,
+      "cellIndex": 104,
+      "shapeRectPx": {
+        "x": 1746,
+        "y": 684,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 207"
+    },
+    {
+      "key": "animation.effectOptions.shapes.exit.shape.circle",
+      "effectKey": "animation.gallery.exit.shape",
+      "setting": "Shapes",
+      "value": "Circle",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Circle"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 105,
+      "slideIndex": 1,
+      "cellIndex": 105,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 209"
+    },
+    {
+      "key": "animation.effectOptions.shapes.exit.shape.diamond",
+      "effectKey": "animation.gallery.exit.shape",
+      "setting": "Shapes",
+      "value": "Diamond",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Diamond"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 106,
+      "slideIndex": 1,
+      "cellIndex": 106,
+      "shapeRectPx": {
+        "x": 202,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 211"
+    },
+    {
+      "key": "animation.effectOptions.shapes.exit.shape.plus",
+      "effectKey": "animation.gallery.exit.shape",
+      "setting": "Shapes",
+      "value": "Plus",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Shape"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Plus"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 107,
+      "slideIndex": 1,
+      "cellIndex": 107,
+      "shapeRectPx": {
+        "x": 343,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 213"
+    },
+    {
+      "key": "animation.effectOptions.spokes.entrance.wheel.spoke1",
+      "effectKey": "animation.gallery.entrance.wheel",
+      "setting": "Spokes",
+      "value": "1 Spoke",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Wheel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "1 Spoke"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 108,
+      "slideIndex": 1,
+      "cellIndex": 108,
+      "shapeRectPx": {
+        "x": 483,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 215"
+    },
+    {
+      "key": "animation.effectOptions.spokes.entrance.wheel.spokes2",
+      "effectKey": "animation.gallery.entrance.wheel",
+      "setting": "Spokes",
+      "value": "2 Spokes",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Wheel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "2 Spokes"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 109,
+      "slideIndex": 1,
+      "cellIndex": 109,
+      "shapeRectPx": {
+        "x": 623,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 217"
+    },
+    {
+      "key": "animation.effectOptions.spokes.entrance.wheel.spokes3",
+      "effectKey": "animation.gallery.entrance.wheel",
+      "setting": "Spokes",
+      "value": "3 Spokes",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Wheel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "3 Spokes"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 110,
+      "slideIndex": 1,
+      "cellIndex": 110,
+      "shapeRectPx": {
+        "x": 764,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 219"
+    },
+    {
+      "key": "animation.effectOptions.spokes.entrance.wheel.spokes4",
+      "effectKey": "animation.gallery.entrance.wheel",
+      "setting": "Spokes",
+      "value": "4 Spokes",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Wheel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "4 Spokes"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 111,
+      "slideIndex": 1,
+      "cellIndex": 111,
+      "shapeRectPx": {
+        "x": 904,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 221"
+    },
+    {
+      "key": "animation.effectOptions.spokes.entrance.wheel.spokes8",
+      "effectKey": "animation.gallery.entrance.wheel",
+      "setting": "Spokes",
+      "value": "8 Spokes",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Wheel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "8 Spokes"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 112,
+      "slideIndex": 1,
+      "cellIndex": 112,
+      "shapeRectPx": {
+        "x": 1044,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 223"
+    },
+    {
+      "key": "animation.effectOptions.spokes.exit.wheel.spoke1",
+      "effectKey": "animation.gallery.exit.wheel",
+      "setting": "Spokes",
+      "value": "1 Spoke",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Wheel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "1 Spoke"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 113,
+      "slideIndex": 1,
+      "cellIndex": 113,
+      "shapeRectPx": {
+        "x": 1184,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 225"
+    },
+    {
+      "key": "animation.effectOptions.spokes.exit.wheel.spokes2",
+      "effectKey": "animation.gallery.exit.wheel",
+      "setting": "Spokes",
+      "value": "2 Spokes",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Wheel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "2 Spokes"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 114,
+      "slideIndex": 1,
+      "cellIndex": 114,
+      "shapeRectPx": {
+        "x": 1325,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 227"
+    },
+    {
+      "key": "animation.effectOptions.spokes.exit.wheel.spokes3",
+      "effectKey": "animation.gallery.exit.wheel",
+      "setting": "Spokes",
+      "value": "3 Spokes",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Wheel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "3 Spokes"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 115,
+      "slideIndex": 1,
+      "cellIndex": 115,
+      "shapeRectPx": {
+        "x": 1465,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 229"
+    },
+    {
+      "key": "animation.effectOptions.spokes.exit.wheel.spokes4",
+      "effectKey": "animation.gallery.exit.wheel",
+      "setting": "Spokes",
+      "value": "4 Spokes",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Wheel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "4 Spokes"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 116,
+      "slideIndex": 1,
+      "cellIndex": 116,
+      "shapeRectPx": {
+        "x": 1605,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 231"
+    },
+    {
+      "key": "animation.effectOptions.spokes.exit.wheel.spokes8",
+      "effectKey": "animation.gallery.exit.wheel",
+      "setting": "Spokes",
+      "value": "8 Spokes",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Wheel"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "8 Spokes"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 117,
+      "slideIndex": 1,
+      "cellIndex": 117,
+      "shapeRectPx": {
+        "x": 1746,
+        "y": 774,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 233"
+    },
+    {
+      "key": "animation.effectOptions.vanishingPoint.entrance.zoom.objectCenter",
+      "effectKey": "animation.gallery.entrance.zoom",
+      "setting": "Vanishing Point",
+      "value": "Object Center",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Object Center"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 118,
+      "slideIndex": 1,
+      "cellIndex": 118,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 235"
+    },
+    {
+      "key": "animation.effectOptions.vanishingPoint.entrance.zoom.slideCenter",
+      "effectKey": "animation.gallery.entrance.zoom",
+      "setting": "Vanishing Point",
+      "value": "Slide Center",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Slide Center"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 119,
+      "slideIndex": 1,
+      "cellIndex": 119,
+      "shapeRectPx": {
+        "x": 202,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 237"
+    },
+    {
+      "key": "animation.effectOptions.vanishingPoint.exit.zoom.objectCenter",
+      "effectKey": "animation.gallery.exit.zoom",
+      "setting": "Vanishing Point",
+      "value": "Object Center",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Object Center"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 120,
+      "slideIndex": 1,
+      "cellIndex": 120,
+      "shapeRectPx": {
+        "x": 343,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 239"
+    },
+    {
+      "key": "animation.effectOptions.vanishingPoint.exit.zoom.slideCenter",
+      "effectKey": "animation.gallery.exit.zoom",
+      "setting": "Vanishing Point",
+      "value": "Slide Center",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Slide Center"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 121,
+      "slideIndex": 1,
+      "cellIndex": 121,
+      "shapeRectPx": {
+        "x": 483,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 241"
+    },
+    {
+      "key": "animation.effectOptions.zoom.entrance.basicZoom.in",
+      "effectKey": "animation.gallery.entrance.basicZoom",
+      "setting": "Zoom",
+      "value": "In",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "In"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 122,
+      "slideIndex": 1,
+      "cellIndex": 122,
+      "shapeRectPx": {
+        "x": 623,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 243"
+    },
+    {
+      "key": "animation.effectOptions.zoom.entrance.basicZoom.inFromScreenCenter",
+      "effectKey": "animation.gallery.entrance.basicZoom",
+      "setting": "Zoom",
+      "value": "In From Screen Center",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "In From Screen Center"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 123,
+      "slideIndex": 1,
+      "cellIndex": 123,
+      "shapeRectPx": {
+        "x": 764,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 245"
+    },
+    {
+      "key": "animation.effectOptions.zoom.entrance.basicZoom.inSlightly",
+      "effectKey": "animation.gallery.entrance.basicZoom",
+      "setting": "Zoom",
+      "value": "In Slightly",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "In Slightly"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 124,
+      "slideIndex": 1,
+      "cellIndex": 124,
+      "shapeRectPx": {
+        "x": 904,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 247"
+    },
+    {
+      "key": "animation.effectOptions.zoom.entrance.basicZoom.out",
+      "effectKey": "animation.gallery.entrance.basicZoom",
+      "setting": "Zoom",
+      "value": "Out",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Out"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 125,
+      "slideIndex": 1,
+      "cellIndex": 125,
+      "shapeRectPx": {
+        "x": 1044,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 249"
+    },
+    {
+      "key": "animation.effectOptions.zoom.entrance.basicZoom.outFromScreenBottom",
+      "effectKey": "animation.gallery.entrance.basicZoom",
+      "setting": "Zoom",
+      "value": "Out From Screen Bottom",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Out From Screen Bottom"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 126,
+      "slideIndex": 1,
+      "cellIndex": 126,
+      "shapeRectPx": {
+        "x": 1184,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 251"
+    },
+    {
+      "key": "animation.effectOptions.zoom.entrance.basicZoom.outSlightly",
+      "effectKey": "animation.gallery.entrance.basicZoom",
+      "setting": "Zoom",
+      "value": "Out Slightly",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Out Slightly"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 127,
+      "slideIndex": 1,
+      "cellIndex": 127,
+      "shapeRectPx": {
+        "x": 1325,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 253"
+    },
+    {
+      "key": "animation.effectOptions.zoom.exit.basicZoom.in",
+      "effectKey": "animation.gallery.exit.basicZoom",
+      "setting": "Zoom",
+      "value": "In",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "In"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 128,
+      "slideIndex": 1,
+      "cellIndex": 128,
+      "shapeRectPx": {
+        "x": 1465,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 255"
+    },
+    {
+      "key": "animation.effectOptions.zoom.exit.basicZoom.inSlightly",
+      "effectKey": "animation.gallery.exit.basicZoom",
+      "setting": "Zoom",
+      "value": "In Slightly",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "In Slightly"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 129,
+      "slideIndex": 1,
+      "cellIndex": 129,
+      "shapeRectPx": {
+        "x": 1605,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 257"
+    },
+    {
+      "key": "animation.effectOptions.zoom.exit.basicZoom.inToScreenBottom",
+      "effectKey": "animation.gallery.exit.basicZoom",
+      "setting": "Zoom",
+      "value": "In To Screen Bottom",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "In To Screen Bottom"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 130,
+      "slideIndex": 1,
+      "cellIndex": 130,
+      "shapeRectPx": {
+        "x": 1746,
+        "y": 863,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 259"
+    },
+    {
+      "key": "animation.effectOptions.zoom.exit.basicZoom.out",
+      "effectKey": "animation.gallery.exit.basicZoom",
+      "setting": "Zoom",
+      "value": "Out",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Out"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 131,
+      "slideIndex": 1,
+      "cellIndex": 131,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 953,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 261"
+    },
+    {
+      "key": "animation.effectOptions.zoom.exit.basicZoom.outSlightly",
+      "effectKey": "animation.gallery.exit.basicZoom",
+      "setting": "Zoom",
+      "value": "Out Slightly",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Out Slightly"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 132,
+      "slideIndex": 1,
+      "cellIndex": 132,
+      "shapeRectPx": {
+        "x": 202,
+        "y": 953,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 263"
+    },
+    {
+      "key": "animation.effectOptions.zoom.exit.basicZoom.outToScreenCenter",
+      "effectKey": "animation.gallery.exit.basicZoom",
+      "setting": "Zoom",
+      "value": "Out To Screen Center",
+      "prerequisite": [
+        "Animations",
+        "Exit Effects",
+        "Basic Zoom"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Out To Screen Center"
+      ],
+      "titleAlternatives": [],
+      "targetIndex": 133,
+      "slideIndex": 1,
+      "cellIndex": 133,
+      "shapeRectPx": {
+        "x": 343,
+        "y": 953,
+        "width": 112,
+        "height": 53
+      },
+      "shapeName": "Rounded Rectangle 265"
+    }
+  ]
+}

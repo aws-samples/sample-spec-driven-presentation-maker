@@ -1,0 +1,453 @@
+{
+  "document": "capture-deck",
+  "readback": "/tmp/sdpm-full/out/powerpoint-readback.jsonl",
+  "package": "/tmp/sdpm-full/out/powerpoint-oracle.pptx",
+  "planned": 76,
+  "slides": [
+    1
+  ],
+  "skippedAlreadyCaptured": 0,
+  "attempted": 76,
+  "captured": 43,
+  "failed": 33,
+  "batchSize": 10,
+  "batches": 8,
+  "attributed": 43,
+  "saveFailures": 0,
+  "retainedRecords": 0,
+  "shapeSelection": {
+    "mechanism": "selectionPaneRow",
+    "selectionPane": "alreadyOpen"
+  },
+  "failures": [
+    {
+      "key": "animation.gallery.emphasis.boldFlash",
+      "slideIndex": 1,
+      "batchIndex": 1,
+      "shapeName": "Rounded Rectangle 3",
+      "shapeSpid": "4",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 3'; the pane shows 62 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 50 more"
+      }
+    },
+    {
+      "key": "animation.gallery.emphasis.brushColor",
+      "slideIndex": 1,
+      "batchIndex": 1,
+      "shapeName": "Rounded Rectangle 7",
+      "shapeSpid": "8",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 7'; the pane shows 47 names, including ['Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123', 'Rounded Rectangle 125', 'Rounded Rectangle 127', 'Rounded Rectangle 129'] and 35 more"
+      }
+    },
+    {
+      "key": "animation.gallery.emphasis.complementaryColor",
+      "slideIndex": 1,
+      "batchIndex": 1,
+      "shapeName": "Rounded Rectangle 11",
+      "shapeSpid": "12",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 11'; the pane shows 56 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 44 more"
+      }
+    },
+    {
+      "key": "animation.gallery.emphasis.contrastingColor",
+      "slideIndex": 1,
+      "batchIndex": 1,
+      "shapeName": "Rounded Rectangle 15",
+      "shapeSpid": "16",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 15'; the pane shows 53 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 41 more"
+      }
+    },
+    {
+      "key": "animation.gallery.emphasis.desaturate",
+      "slideIndex": 1,
+      "batchIndex": 1,
+      "shapeName": "Rounded Rectangle 19",
+      "shapeSpid": "20",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 19'; the pane shows 51 names, including ['Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123', 'Rounded Rectangle 125'] and 39 more"
+      }
+    },
+    {
+      "key": "animation.gallery.emphasis.fontColor",
+      "slideIndex": 1,
+      "batchIndex": 2,
+      "shapeName": "Rounded Rectangle 23",
+      "shapeSpid": "24",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 23'; the pane shows 92 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 80 more"
+      }
+    },
+    {
+      "key": "animation.gallery.emphasis.growWithColor",
+      "slideIndex": 1,
+      "batchIndex": 2,
+      "shapeName": "Rounded Rectangle 27",
+      "shapeSpid": "28",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 27'; the pane shows 87 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 75 more"
+      }
+    },
+    {
+      "key": "animation.gallery.emphasis.lineColor",
+      "slideIndex": 1,
+      "batchIndex": 2,
+      "shapeName": "Rounded Rectangle 31",
+      "shapeSpid": "32",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 31'; the pane shows 56 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 44 more"
+      }
+    },
+    {
+      "key": "animation.gallery.emphasis.pulse",
+      "slideIndex": 1,
+      "batchIndex": 2,
+      "shapeName": "Rounded Rectangle 35",
+      "shapeSpid": "36",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 35'; the pane shows 57 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 45 more"
+      }
+    },
+    {
+      "key": "animation.gallery.emphasis.spin",
+      "slideIndex": 1,
+      "batchIndex": 2,
+      "shapeName": "Rounded Rectangle 39",
+      "shapeSpid": "40",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 39'; the pane shows 52 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 40 more"
+      }
+    },
+    {
+      "key": "animation.gallery.emphasis.transparency",
+      "slideIndex": 1,
+      "batchIndex": 3,
+      "shapeName": "Rounded Rectangle 43",
+      "shapeSpid": "44",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 43'; the pane shows 70 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 58 more"
+      }
+    },
+    {
+      "key": "animation.gallery.emphasis.wave",
+      "slideIndex": 1,
+      "batchIndex": 3,
+      "shapeName": "Rounded Rectangle 47",
+      "shapeSpid": "48",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 47'; the pane shows 57 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 45 more"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.boomerang",
+      "slideIndex": 1,
+      "batchIndex": 3,
+      "shapeName": "Rounded Rectangle 53",
+      "shapeSpid": "54",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 53'; the pane shows 55 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 43 more"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.centerRevolve",
+      "slideIndex": 1,
+      "batchIndex": 3,
+      "shapeName": "Rounded Rectangle 57",
+      "shapeSpid": "58",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 57'; the pane shows 89 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 77 more"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.drop",
+      "slideIndex": 1,
+      "batchIndex": 4,
+      "shapeName": "Rounded Rectangle 63",
+      "shapeSpid": "64",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 63'; the pane shows 65 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 53 more"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.expand",
+      "slideIndex": 1,
+      "batchIndex": 4,
+      "shapeName": "Rounded Rectangle 65",
+      "shapeSpid": "66",
+      "selectionRow": "Rounded Rectangle 65",
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "none of 'Expand' appeared in document window > AXTabGroup > Entrance Effects within 10s; the tree was re-read on every poll, so a lazily materialized tile had its chance"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.float",
+      "slideIndex": 1,
+      "batchIndex": 4,
+      "shapeName": "Rounded Rectangle 69",
+      "shapeSpid": "70",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 69'; the pane shows 68 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 56 more"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.flyIn",
+      "slideIndex": 1,
+      "batchIndex": 4,
+      "shapeName": "Rounded Rectangle 73",
+      "shapeSpid": "74",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 73'; the pane shows 58 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 46 more"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.growTurn",
+      "slideIndex": 1,
+      "batchIndex": 4,
+      "shapeName": "Rounded Rectangle 75",
+      "shapeSpid": "76",
+      "selectionRow": "Rounded Rectangle 75",
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "none of 'Grow & Turn', 'Grow Turn' appeared in document window > AXTabGroup > Entrance Effects within 10s; the tree was re-read on every poll, so a lazily materialized tile had its chance"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.pinwheel",
+      "slideIndex": 1,
+      "batchIndex": 4,
+      "shapeName": "Rounded Rectangle 79",
+      "shapeSpid": "80",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 79'; the pane shows 49 names, including ['Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123', 'Rounded Rectangle 125', 'Rounded Rectangle 127'] and 37 more"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.riseUp",
+      "slideIndex": 1,
+      "batchIndex": 5,
+      "shapeName": "Rounded Rectangle 81",
+      "shapeSpid": "82",
+      "selectionRow": "Rounded Rectangle 81",
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "none of 'Rise Up' appeared in document window > AXTabGroup > Entrance Effects within 10s; the tree was re-read on every poll, so a lazily materialized tile had its chance"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.spinner",
+      "slideIndex": 1,
+      "batchIndex": 5,
+      "shapeName": "Rounded Rectangle 83",
+      "shapeSpid": "84",
+      "selectionRow": "Rounded Rectangle 83",
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "none of 'Spinner' appeared in document window > AXTabGroup > Entrance Effects within 10s; the tree was re-read on every poll, so a lazily materialized tile had its chance"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.stretch",
+      "slideIndex": 1,
+      "batchIndex": 5,
+      "shapeName": "Rounded Rectangle 87",
+      "shapeSpid": "88",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 87'; the pane shows 65 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 53 more"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.swivel",
+      "slideIndex": 1,
+      "batchIndex": 5,
+      "shapeName": "Rounded Rectangle 89",
+      "shapeSpid": "90",
+      "selectionRow": "Rounded Rectangle 89",
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "none of 'Swivel' appeared in document window > AXTabGroup > Entrance Effects within 10s; the tree was re-read on every poll, so a lazily materialized tile had its chance"
+      }
+    },
+    {
+      "key": "animation.gallery.entrance.zoom",
+      "slideIndex": 1,
+      "batchIndex": 5,
+      "shapeName": "Rounded Rectangle 93",
+      "shapeSpid": "94",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "no Selection Pane row is named 'Rounded Rectangle 93'; the pane shows 59 names, including ['Rounded Rectangle 101', 'Rounded Rectangle 103', 'Rounded Rectangle 105', 'Rounded Rectangle 107', 'Rounded Rectangle 109', 'Rounded Rectangle 111', 'Rounded Rectangle 113', 'Rounded Rectangle 115', 'Rounded Rectangle 117', 'Rounded Rectangle 119', 'Rounded Rectangle 121', 'Rounded Rectangle 123'] and 47 more"
+      }
+    },
+    {
+      "key": "animation.gallery.exit.basicZoom",
+      "slideIndex": 1,
+      "batchIndex": 5,
+      "shapeName": "Rounded Rectangle 97",
+      "shapeSpid": "98",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "targetFailure",
+        "message": "setting AXSelected on a  failed with AX error -25202; the row carries []"
+      }
+    },
+    {
+      "key": "animation.gallery.exit.bounce",
+      "slideIndex": 1,
+      "batchIndex": 6,
+      "shapeName": "Rounded Rectangle 101",
+      "shapeSpid": "102",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "targetFailure",
+        "message": "setting AXSelected on a  failed with AX error -25202; the row carries []"
+      }
+    },
+    {
+      "key": "animation.gallery.exit.collapse",
+      "slideIndex": 1,
+      "batchIndex": 6,
+      "shapeName": "Rounded Rectangle 105",
+      "shapeSpid": "106",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "targetFailure",
+        "message": "setting AXSelected on a  failed with AX error -25202; the row carries []"
+      }
+    },
+    {
+      "key": "animation.gallery.exit.credits",
+      "slideIndex": 1,
+      "batchIndex": 6,
+      "shapeName": "Rounded Rectangle 109",
+      "shapeSpid": "110",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "targetFailure",
+        "message": "setting AXSelected on a  failed with AX error -25202; the row carries []"
+      }
+    },
+    {
+      "key": "animation.gallery.exit.drop",
+      "slideIndex": 1,
+      "batchIndex": 6,
+      "shapeName": "Rounded Rectangle 113",
+      "shapeSpid": "114",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "targetFailure",
+        "message": "setting AXSelected on a  failed with AX error -25202; the row carries []"
+      }
+    },
+    {
+      "key": "animation.gallery.exit.float",
+      "slideIndex": 1,
+      "batchIndex": 6,
+      "shapeName": "Rounded Rectangle 117",
+      "shapeSpid": "118",
+      "selectionRow": null,
+      "attributedSpid": null,
+      "error": {
+        "kind": "targetFailure",
+        "message": "setting AXSelected on a  failed with AX error -25202; the row carries []"
+      }
+    },
+    {
+      "key": "animation.gallery.exit.shrinkTurn",
+      "slideIndex": 1,
+      "batchIndex": 7,
+      "shapeName": "Rounded Rectangle 127",
+      "shapeSpid": "128",
+      "selectionRow": "Rounded Rectangle 127",
+      "attributedSpid": null,
+      "error": {
+        "kind": "controlNotFound",
+        "message": "none of 'Shrink & Turn', 'Shrink Turn' appeared in Exit Effects within 10s; the tree was re-read on every poll, so a lazily materialized tile had its chance"
+      }
+    },
+    {
+      "key": "animation.gallery.exit.sinkDown",
+      "slideIndex": 1,
+      "batchIndex": 7,
+      "shapeName": "Rounded Rectangle 129",
+      "shapeSpid": "130",
+      "selectionRow": "Rounded Rectangle 129",
+      "attributedSpid": null,
+      "error": {
+        "kind": "timeout",
+        "message": "timed out after 10s waiting for the 'Exit Effects' window to open"
+      }
+    }
+  ]
+}

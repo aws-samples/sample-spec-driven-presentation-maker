@@ -1,0 +1,83 @@
+{
+  "source": "sdpm GUI capture",
+  "application": "Microsoft PowerPoint",
+  "version": "16.113.1",
+  "package": "powerpoint-oracle.pptx",
+  "counts": {
+    "resolved": 2
+  },
+  "targets": [
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.halfSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Half Spin",
+      "shapeSpid": "2",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "8",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:animRot",
+          "attributes": {
+            "by": "10800000"
+          },
+          "carrier": {},
+          "timing": {
+            "dur": "2000",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "r"
+          ],
+          "values": {}
+        }
+      ],
+      "measuredDurationMs": 2000
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.quarterSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Quarter Spin",
+      "shapeSpid": "4",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "fill": "hold",
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "8",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:animRot",
+          "attributes": {
+            "by": "5400000"
+          },
+          "carrier": {},
+          "timing": {
+            "dur": "2000",
+            "fill": "hold"
+          },
+          "attrNames": [
+            "r"
+          ],
+          "values": {}
+        }
+      ],
+      "measuredDurationMs": 2000
+    }
+  ]
+}

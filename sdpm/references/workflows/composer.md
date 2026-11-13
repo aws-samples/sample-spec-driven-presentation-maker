@@ -54,6 +54,16 @@ and refine wording as needed. Facts come from the brief and its sources.
   `grid`, `table`, `chart-bar` / `chart-line` / `chart-pie`, `freeform`,
   `arch-layout-engine` + `arch-elements` (architecture diagrams via `arch_diagram`),
   `design-rules`.
+- Animations and transitions are off by default and are **not** part of ordinary
+  composition. Load `read_guides(["animations"])` only when `deck` has
+  `animations.enabled` or `transitions.enabled` true, or an assigned slide in
+  `existing_slides` already carries `transition`, `animations` or a `morphId`. Otherwise —
+  the usual case — do not load it, and write none of those fields whatever the outline's
+  `visual` suggests: a drawn form, an `override` build or a chart is how a still slide shows
+  change. The switches live in `deck.json`, the orchestrator's; never turn them on yourself.
+- An animated slide must still say everything with animation and transitions disabled. No
+  claim, number or label may live only in an animated state: previews, PDF and print never
+  play motion. Say in your summary what the motion adds to the still slide.
 - Slugs sharing a prefix (`demo-1`, `demo-2`) are one override group: later slides inherit
   from the first via `override` (`slide-json-elements`) — use it for progressive builds.
 - If `slides/<slug>.json` already exists, the layout pass wrote it: keep its frame elements and
