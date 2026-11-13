@@ -3,6 +3,7 @@
 """Group and arch-group elements."""
 from sdpm.engine.builder.constants import ARCH_GROUP_DEFS
 from sdpm.engine.schema.regions import is_comment_element
+from sdpm.utils import xml_safe
 
 
 class GroupMixin:
@@ -13,9 +14,8 @@ class GroupMixin:
         # If raw group XML is available, inject directly for lossless roundtrip
         group_xml = elem.get("_groupXml")
         if group_xml:
-            from lxml import etree
             from pptx.oxml.ns import qn
-            grp_el = etree.fromstring(group_xml)
+            grp_el = xml_safe.fromstring(group_xml)
             # Re-attach images referenced from inside the group: the source
             # rIds are meaningless in this package, so add each saved image
             # as a part of the new slide and rewrite r:embed/r:link.
@@ -121,9 +121,8 @@ class GroupMixin:
         shape_xml = elem.get("_shapeXml")
         if not shape_xml:
             return
-        from lxml import etree
         from pptx.oxml.ns import qn
-        sp_el = etree.fromstring(shape_xml)
+        sp_el = xml_safe.fromstring(shape_xml)
         self._reattach_xml_images(slide, sp_el, elem.get("_shapeImages"))
         spTree = slide._element.find(qn('p:cSld')).find(qn('p:spTree'))
         spTree.append(sp_el)
