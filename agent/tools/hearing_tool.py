@@ -12,12 +12,10 @@ from strands import tool
 
 @tool
 def hearing(
-    inference: str,
     q0: dict,
     q1: dict = None,
     q2: dict = None,
     q3: dict = None,
-    q4: dict = None,
 ) -> str:
     """Present structured questions to the user via a rich UI card.
 
@@ -26,28 +24,31 @@ def hearing(
     decisions, confirmations with options, and next-step selections.
     Only skip this tool for simple yes/no confirmations.
 
-    Always include your reasoning or hypothesis in the inference field
-    to help the user think — never ask blank questions.
-    Limit to 5 questions per call. If you need more, call again after
+    Share your hypothesis through the options: mark the option you
+    suggest as recommended and say in its description why — never ask
+    blank questions. The card adds an "Other" choice with a text field
+    to every select question itself, so list only real options.
+    Limit to 4 questions per call. If you need more, call again after
     the user responds.
 
-    The Web UI renders a dedicated selection card. The user's answers
-    are returned as a normal chat message in the next turn.
+    The Web UI shows one question at a time. The user's answers are
+    returned as a normal chat message in the next turn.
 
     Args:
-        inference: Your reasoning or hypothesis to share with the user.
-            This is displayed prominently above the questions to provide
-            context and stimulate the user's thinking.
         q0: First question object with keys:
+            - header (str): Short label shown as a chip (about 6
+              Japanese or 12 English characters), e.g. "聞き手"
             - type (str): "single_select", "multi_select", or "free_text"
             - text (str): The question text
-            - options (list[str], optional): Choices for select types
-            - recommended (str or list[str], optional): Suggested choice(s)
+            - options (list[dict], select types): 2-4 choices, each
+              {"label": str, "description": str, "recommended": bool}.
+              label is short; description is one line on what choosing
+              it leads to or its trade-off; recommended (optional) marks
+              your suggestion
             - placeholder (str, optional): Hint text for free_text type
         q1: Second question (optional, same schema as q0).
         q2: Third question (optional, same schema as q0).
         q3: Fourth question (optional, same schema as q0).
-        q4: Fifth question (optional, same schema as q0).
 
     Returns:
         Confirmation that the questions were displayed. Wait for the

@@ -26,6 +26,7 @@ import remarkGfm from "remark-gfm"
 import { ChevronRight, CodeXml, Sparkles, FileText as FileTextIcon, Image as ImageIcon } from "lucide-react"
 import { ToolCard, ToolCardCompact } from "./ToolCard"
 import { HearingCard } from "./HearingCard"
+import { normalizeHearingInput } from "./hearingQuestions"
 import { SnippetBlock } from "./SnippetBlock"
 import { batchGetSlidePreviewUrls } from "@/services/deckService"
 import { SLASH_TOKEN_SOURCE } from "@/lib/slashToken"
@@ -33,13 +34,9 @@ import { useTranslations } from "next-intl"
 import { parseReviewMessage } from "@/lib/review/marker"
 import { ReviewRequestCard } from "@/components/review/ReviewRequestCard"
 
-type HearingQuestion = { id: string; type: "single_select" | "multi_select" | "free_text"; text: string; options?: string[]; recommended?: string | string[]; placeholder?: string }
-
-function extractQuestions(input: Record<string, unknown>): HearingQuestion[] {
-  if (Array.isArray(input.questions)) return input.questions as HearingQuestion[]
-  return ["q0","q1","q2","q3","q4"]
-    .map((k) => input[k] ? { id: k, ...(input[k] as object) } : null)
-    .filter(Boolean) as HearingQuestion[]
+/** The questions of a `hearing` tool block; empty for any other tool or before q0 arrives. */
+function hearingQuestionsOf(tool: ToolUse) {
+  return tool.name === "hearing" ? normalizeHearingInput(tool.input) : []
 }
 
 const MENTION_RE = new RegExp(`(@Page\\s\\d+|@\\[[^\\]]+\\]|${SLASH_TOKEN_SOURCE})`)
@@ -332,11 +329,11 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
             {blocks.map((block, i) =>
               block.type === "text" ? (
                 <div key={`t-${i}`}>{renderTextBlock(block.text, i === blocks.length - 1)}</div>
-              ) : block.tool.name === "hearing" && block.tool.input?.inference ? (
+              ) : hearingQuestionsOf(block.tool).length > 0 ? (
                 <HearingCard
                   key={block.tool.toolUseId}
-                  inference={String(block.tool.input.inference)}
-                  questions={extractQuestions(block.tool.input as Record<string, unknown>)}
+                  questions={hearingQuestionsOf(block.tool)}
+                  streaming={isStreaming && !block.tool.status}
                   disabled={hearingDisabled}
                   onSubmit={(text) => onSend?.(text)}
                 />

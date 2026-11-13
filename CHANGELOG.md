@@ -13,6 +13,20 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Changed
+
+- **The Web UI question card shows one question at a time.** Header chips across the top
+  show every question and how far you are; click one to jump to it. Options are rows with
+  a label, a one-line description and a "Recommended" badge, with radio marks for single
+  choice and check boxes for multiple choice, and the card adds an "Other" choice with a
+  text field. A single choice moves on by itself; number keys pick, Enter moves on and
+  ⌘↵ / Ctrl+↵ sends once the card has focus. After you send, or when you reply in the chat
+  instead, the card folds into a short summary of your answers. The `hearing` tool now
+  takes at most four questions, each with a short `header` and options as
+  `{label, description, recommended}`, and no longer takes `inference`; the agent shares
+  its hypothesis as the recommended option. Cards in older chats still show. Local mode
+  and the AWS stack (SdpmAgent, SdpmRuntime for the import-pptx guide, and the Web UI).
+
 ### Fixed
 
 - **The `blank-light` title layout's subtitle prompt reads "Subtitle".** It read
