@@ -48,7 +48,7 @@ def server_mod(monkeypatch):
     monkeypatch.delenv("KB_ID", raising=False)
 
     boto3 = pytest.importorskip("boto3")
-    pytest.importorskip("mcp.server.fastmcp")
+    pytest.importorskip("mcp.server.mcpserver")
 
     calls: list[str] = []
     ssm = MagicMock()

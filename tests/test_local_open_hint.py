@@ -50,36 +50,16 @@ def server():
             sys.path.remove(p)
 
 
-class _Client(ClientSession):
-    """A client whose initialize declares ``extensions`` (what an MCP Apps host sends)."""
-
-    def __init__(self, *args, extensions: dict | None = None, **kwargs) -> None:
-        super().__init__(*args, **kwargs)
-        self._extensions = extensions
-
-    async def initialize(self) -> types.InitializeResult:
-        extra = {"extensions": self._extensions} if self._extensions is not None else {}
-        result = await self.send_request(
-            types.ClientRequest(types.InitializeRequest(params=types.InitializeRequestParams(
-                protocolVersion=types.LATEST_PROTOCOL_VERSION,
-                capabilities=types.ClientCapabilities(**extra),
-                clientInfo=types.Implementation(name="open-hint-test", version="1"),
-            ))),
-            types.InitializeResult,
-        )
-        await self.send_notification(types.ClientNotification(types.InitializedNotification()))
-        return result
-
-
 def _session(server, extensions, calls):
-    """Run ``calls(session)`` against the server in memory; return what it returns."""
+    """Run ``calls(session)`` against the server in memory; return what it returns. The
+    client's initialize declares ``extensions`` (what an MCP Apps host sends)."""
 
     async def run():
         async with create_client_server_memory_streams() as (client_streams, server_streams):
-            low = server.mcp._mcp_server
+            low = server.mcp._lowlevel_server
             async with anyio.create_task_group() as tg:
                 tg.start_soon(lambda: low.run(*server_streams, low.create_initialization_options()))
-                async with _Client(*client_streams, extensions=extensions) as session:
+                async with ClientSession(*client_streams, extensions=extensions) as session:
                     await session.initialize()
                     out = await calls(session)
                 tg.cancel_scope.cancel()
@@ -89,8 +69,8 @@ def _session(server, extensions, calls):
 
 
 def _result(call: types.CallToolResult) -> dict:
-    assert not call.isError, call.content
-    return call.structuredContent if call.structuredContent is not None else json.loads(call.content[0].text)
+    assert not call.is_error, call.content
+    return call.structured_content if call.structured_content is not None else json.loads(call.content[0].text)
 
 
 @pytest.fixture
@@ -179,7 +159,7 @@ def test_no_command_for_a_deck_outside_the_root_or_a_failed_build(server, local,
         return failed
 
     failed = _session(server, None, calls)
-    assert failed.isError
+    assert failed.is_error
     assert server.OPEN_HINT_FIELD not in json.dumps([c.model_dump() for c in failed.content])
 
     wrapped = server._with_open_hint(lambda deck_id: {"output_dir": deck_id})
@@ -188,12 +168,12 @@ def test_no_command_for_a_deck_outside_the_root_or_a_failed_build(server, local,
 
 
 def test_the_wrapped_tools_keep_the_contract_schema(server):
-    from mcp.server.fastmcp import FastMCP
+    from mcp.server.mcpserver import MCPServer
 
     listed = {t.name: t for t in asyncio.run(server.mcp.list_tools())}
     assert len(listed) == 20
     for fn in (tools.init_deck_workspace, tools.generate_pptx):
-        reference = FastMCP("reference")
+        reference = MCPServer("reference")
         reference.tool()(fn)
         expected = asyncio.run(reference.list_tools())[0]
         assert listed[fn.__name__].model_dump() == expected.model_dump()

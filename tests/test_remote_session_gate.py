@@ -4,7 +4,7 @@
 
 An owner-prefixed session id must carry the prefix of the token's user (also for a
 composer group's ``<sid>-gN``), and each server process serves one user. Requests go
-through the app as server.py runs it (FastMCP + the header middleware).
+through the app as server.py runs it (MCPServer + the header middleware).
 """
 
 import asyncio
@@ -39,10 +39,10 @@ def _list(module, session_id: str | None, sub: str | None = "user-1", **extra):
 
 
 def _statuses(module, *requests: tuple[dict, dict]) -> list[int]:
-    """POST each (body, headers) in turn through one app run (FastMCP's manager runs once)."""
+    """POST each (body, headers) in turn through one app run (the session manager runs once)."""
     import httpx
 
-    app = module.mcp.streamable_http_app()
+    app = module.mcp.streamable_http_app(**module._HTTP_APP_OPTIONS)
     app.add_middleware(module._CaptureHeadersMiddleware)
 
     async def run():

@@ -66,6 +66,6 @@ PREFIX = "sdpm-"
 
 
 def register(mcp) -> None:
-    """Bind every prompt on a FastMCP/MCPServer instance."""
+    """Bind every prompt on an MCPServer instance."""
     for fn in PROMPTS:
         mcp.prompt(name=PREFIX + fn.__name__, description=fn.__doc__)(fn)

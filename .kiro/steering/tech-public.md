@@ -50,7 +50,7 @@ the lock back to npm-11 format (this exact mistake shipped once in #254).
   `api`), one `uv.lock`. Edit a member's `pyproject.toml`, then `make lock` and commit
   `uv.lock`; CI fails on drift (`uv lock --check`)
 - `pyproject.toml` holds supported ranges, `uv.lock` the exact versions. A deliberate
-  cap (e.g. `mcp <2`, #301) goes in the range with a comment — not in a Dependabot ignore
+  cap (e.g. the former `mcp <2`, #301) goes in the range with a comment — not in a Dependabot ignore
 - Artifacts never resolve: the runtime images and the API Lambda bundle install
   `uv export --package <member>` hash-checked. CI builds and starts each of them
   (`remote-image`, `agent-image`, `api-lambda`), so a green PR is a deployable lock

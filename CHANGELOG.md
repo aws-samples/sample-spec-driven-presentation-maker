@@ -13,6 +13,24 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Changed
+
+- **The MCP servers run on MCP Python SDK 2.x** (`mcp>=2.3,<3`, was `<2`; #301). The local
+  stdio server, the ACP server, the remote streamable-HTTP server and the Cloud agent's MCP
+  clients move from `FastMCP` to `MCPServer` and from `httpx` to `httpx2`; the agent drops
+  the `bedrock-agentcore[strands-agents]` extra, which capped `mcp` below 2. Tools, their
+  schemas and results are unchanged, and a failing tool still returns its reason to the
+  agent (`Error executing tool <name>: <reason>`), including the text of an unexpected
+  exception as in 1.x; the server now also logs such an exception at ERROR with its
+  traceback. Differences you can see: tool descriptions lose their docstring indentation
+  (about 270 characters fewer across the 20 local tools), the
+  `initialize` result of a 2025-era connection no longer lists the MCP Apps extension under
+  the server's capabilities (the SDK sends only fields that protocol version defines; MCP
+  Apps hosts negotiate by their own declaration, and a 2026-07-28 `server/discover` result
+  still lists it), `serverInfo.version` is empty instead of the SDK's version, and the
+  remote server refuses a request body over 4 MiB with HTTP 413. Cloud deployments
+  redeploy SdpmRuntime and SdpmAgent to pick it up.
+
 ## [0.17.0] - 2026-11-13
 
 The Web UI question card asks one question at a time: chips across the top show every
