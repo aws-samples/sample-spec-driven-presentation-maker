@@ -41,6 +41,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   colour, and a slide that hides the master's shapes (`hideMasterShapes`) no longer shows
   them in the preview. Existing decks pick it up when their slides are rendered again (for
   example, ask the agent to re-measure every slide). Local mode and the AWS stack (SdpmRuntime).
+- **A downloaded PPTX is named after the deck.** The Web UI saved it under a random
+  `<uuid>.pptx` (its storage key); it is now `<deck title>.pptx`, Japanese and other
+  non-ASCII titles included (path separators, quotes and control characters are dropped,
+  the name is cut at 120 characters, and an empty title gives `deck.pptx`). The download
+  still comes through CloudFront (inside its WAF): the signed link carries the file name,
+  and a new cache policy for `pptx/*` passes it on to S3. AWS stack (deploy SdpmWebUi;
+  Local mode too, for the download from the deck list).
 - **Chart titles keep their font colour and size when a deck is read back.** `pptx_to_json`
   looked for the title font only on the title's first run, but generated charts (and many
   others) set it on the paragraph, so `titleFontColor` and `titleFontSize` were dropped.

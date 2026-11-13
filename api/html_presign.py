@@ -46,23 +46,27 @@ def html_presign_client(region: str) -> Any:
     )
 
 
-def safe_download_name(name: Any) -> str:
-    """File name for a downloaded deck: no control chars, path separators or quotes; ends in .html."""
+def safe_download_name(name: Any, ext: str = ".html") -> str:
+    """File name for a downloaded deck: the title without control chars, path separators
+    or quotes, at most 120 characters, ending in ``ext`` ("deck" + ``ext`` when nothing
+    is left)."""
     text = "".join(
         ch for ch in str(name or "")
         if ch not in _STRIP_CHARS and not unicodedata.category(ch).startswith("C")
     )
     text = " ".join(text.split()).strip(" .")
-    if text.lower().endswith(".html"):
-        text = text[:-5].rstrip(" .")
+    if text.lower().endswith(ext):
+        text = text[:-len(ext)].rstrip(" .")
     text = text[:_MAX_NAME_CHARS].rstrip(" .")
-    return f"{text or 'deck'}.html"
+    return f"{text or 'deck'}{ext}"
 
 
-def _content_disposition(deck_name: str) -> str:
-    filename = safe_download_name(deck_name)
-    ascii_stem = filename[:-5].encode("ascii", "ignore").decode("ascii").strip(" .")
-    ascii_name = f"{ascii_stem or 'deck'}.html"
+def attachment_disposition(deck_name: Any, ext: str = ".html") -> str:
+    """Content-Disposition that downloads as the deck title (RFC 6266): an ASCII
+    ``filename=`` fallback and the UTF-8 ``filename*=``. Always a single ASCII line."""
+    filename = safe_download_name(deck_name, ext)
+    ascii_stem = filename[:-len(ext)].encode("ascii", "ignore").decode("ascii").strip(" .")
+    ascii_name = f"{ascii_stem or 'deck'}{ext}"
     return f"attachment; filename=\"{ascii_name}\"; filename*=UTF-8''{quote(filename, safe='')}"
 
 
@@ -76,7 +80,7 @@ def presign_params(bucket: str, key: str, purpose: str, deck_name: str = "") -> 
         raise ValueError(f"unknown purpose: {purpose!r}")
     if not isinstance(key, str) or not key.startswith(HTML_PREFIX) or not key.endswith(".html") or ".." in key:
         raise ValueError(f"not an HTML artifact key: {key!r}")
-    disposition = _content_disposition(deck_name) if purpose == "download" else "inline"
+    disposition = attachment_disposition(deck_name) if purpose == "download" else "inline"
     params = {
         "Bucket": bucket,
         "Key": key,
