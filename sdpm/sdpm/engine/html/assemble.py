@@ -66,6 +66,7 @@ from sdpm.engine.html.slide_js import (
     wrap_slide_script,
 )
 from sdpm.engine.html.template import TemplateHtml, css_string
+from sdpm.utils import xml_safe
 
 _ROOT_RE = re.compile(r":root\s*\{(?P<body>.*?)\}", re.DOTALL | re.IGNORECASE)
 _CSS_URL_RE = re.compile(r"url\(\s*(?P<q>['\"]?)(?P<url>.*?)(?P=q)\s*\)", re.IGNORECASE | re.DOTALL)
@@ -354,14 +355,14 @@ def _rename_animations(css: str, names: dict[str, str]) -> str:
 
 # ── inline SVG ───────────────────────────────────────────────────────────
 
-_SVG_PARSER = etree.XMLParser(resolve_entities=False, no_network=True, remove_comments=True,
-                              remove_pis=True, huge_tree=False)
+_SVG_PARSER = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False,
+                              remove_comments=True, remove_pis=True, huge_tree=False)
 _XLINK_HREF = "{http://www.w3.org/1999/xlink}href"
 
 
 def _inline_svg_text(path: Path, img, prefix: str) -> str | None:
     try:
-        root = etree.fromstring(path.read_bytes(), _SVG_PARSER)
+        root = xml_safe.fromstring(path.read_bytes(), allow_doctype=True, parser=_SVG_PARSER)
     except etree.XMLSyntaxError:
         return None
     if not isinstance(root.tag, str) or etree.QName(root).localname != "svg":

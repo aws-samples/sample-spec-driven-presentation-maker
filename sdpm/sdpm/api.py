@@ -102,23 +102,23 @@ def list_styles_listing(
 def list_templates_with_metadata(
     templates_dirs: list[Path],
     metadata: dict[str, dict],
+    builtin_notes: dict[str, str] | None = None,
 ) -> list[dict]:
     """List templates with source and metadata.
 
     Pure function — no I/O beyond filesystem glob.
 
-    Consumers are the local paths only (L1 CLI, servers/local, local Web UI via
-    state.json). The cloud path (servers/remote) does NOT use this function — it has
-    an independent listing in servers/remote/tools/template.py where builtin notes
-    are first-class DDB items (BUILTIN_NOTE#<name>), merged at the tool layer.
-    Keep that divergence in mind before consolidating.
+    Builtin notes are a separate input, as in the cloud path (servers/remote
+    reads its BUILTIN_NOTE#<name> items and merges them at the tool layer):
+    the caller loads them (locally: sdpm.config.get_builtin_template_notes) and
+    passes them in, so a builtin's description never comes from the cache.
 
     Args:
         templates_dirs: From get_templates_dirs(). Last entry is bundled.
         metadata: {name: {description, theme_colors, fonts, layout_count}} from state.json.
-            Builtin templates are looked up under "builtin:<name>" first (the key
-            local Web UI uses for its analysis cache; user notes share the entry),
-            falling back to "<name>" for backward compatibility.
+            Builtin analysis caches are looked up under "builtin:<name>" first (the
+            key local Web UI uses for them), falling back to "<name>".
+        builtin_notes: {builtin template name: user note}.
 
     Returns:
         Sorted list of template dicts with name, source, description, theme_colors, fonts, layout_count.
@@ -134,14 +134,16 @@ def list_templates_with_metadata(
                 continue
             source = "builtin" if d == bundled_dir else "user"
             meta = metadata.get(name, {})
+            description = meta.get("description", "")
             if source == "builtin":
-                # builtin: prefix keeps builtin metadata (incl. user notes) from
-                # colliding with a same-named user template entry.
+                # builtin: prefix keeps the builtin analysis cache from colliding
+                # with a same-named user template entry.
                 meta = metadata.get(f"builtin:{name}") or meta
+                description = (builtin_notes or {}).get(name, "")
             seen[name] = {
                 "name": name,
                 "source": source,
-                "description": meta.get("description", ""),
+                "description": description,
                 "theme_colors": meta.get("theme_colors", {}),
                 "fonts": meta.get("fonts", {}),
                 "layout_count": meta.get("layout_count", 0),

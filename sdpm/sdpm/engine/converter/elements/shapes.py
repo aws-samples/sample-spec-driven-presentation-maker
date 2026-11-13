@@ -465,8 +465,8 @@ def extract_shape_element(shape, theme_colors=None, color_mapping=None, theme_st
                     if not use_bg and style_fill_idx and style_fill_idx > 0 and style_fill_color and theme_styles and theme_styles.get("fill"):
                         fill_idx = style_fill_idx - 1
                         if 0 <= fill_idx < len(theme_styles["fill"]):
-                            from lxml import etree as _et
-                            fill_xml = _et.fromstring(theme_styles["fill"][fill_idx])
+                            from sdpm.utils import xml_safe
+                            fill_xml = xml_safe.fromstring(theme_styles["fill"][fill_idx])
                             scheme = fill_xml.find(f'.//{{{_NS["a"]}}}schemeClr')
                             if scheme is not None and scheme.get('val') == 'phClr':
                                 resolved = _resolve_color_with_transforms(scheme, theme_colors, color_mapping, override_scheme=style_fill_color)

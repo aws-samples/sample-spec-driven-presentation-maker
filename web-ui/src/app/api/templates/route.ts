@@ -4,7 +4,7 @@
 import fs from "fs"
 import path from "path"
 import { execFileSync } from "child_process"
-import { getUserConfigDir, getState, updateState, SDPM_ROOT, BUNDLED_TEMPLATES_DIR } from "@/lib/local/sdpmPaths"
+import { getUserConfigDir, getState, updateState, getBuiltinTemplateNotes, SDPM_ROOT, BUNDLED_TEMPLATES_DIR } from "@/lib/local/sdpmPaths"
 
 /** servers/local directory (uv-managed venv with sdpm deps). */
 const MCP_LOCAL_DIR = path.resolve(process.cwd(), "..", "servers", "local")
@@ -17,6 +17,8 @@ function getUserTemplatesDir(): string {
 export async function GET() {
   const userDir = getUserTemplatesDir()
   const bundledDir = BUNDLED_TEMPLATES_DIR
+  // Before getState(): a legacy-note migration rewrites template_metadata.
+  const builtinNotes = getBuiltinTemplateNotes()
   const state = getState()
   const metadata: Record<string, Record<string, unknown>> = (state.template_metadata as Record<string, Record<string, unknown>>) || {}
   let metadataUpdated = false
@@ -64,7 +66,7 @@ export async function GET() {
       if (!meta.theme_colors) {
         meta = analyzeAndCache(path.join(bundledDir, f), cacheKey)
       }
-      templates.push({ name, source: "builtin", description: "", ...meta })
+      templates.push({ name, source: "builtin", ...meta, description: builtinNotes[name] ?? "" })
     }
   }
 

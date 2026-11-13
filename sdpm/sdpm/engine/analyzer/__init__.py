@@ -4,11 +4,11 @@
 import zipfile
 from pathlib import Path
 
-from lxml import etree
 from pptx import Presentation
 
 from sdpm.config import CACHE_DIR
 from sdpm.engine import emu_per_px, slide_size_px
+from sdpm.utils import xml_safe
 from sdpm.utils.io import write_json, read_json
 
 
@@ -113,13 +113,12 @@ def get_layout_placeholders(template_path: Path, layout_name: str):
 def extract_fonts(template_path: Path) -> dict:
     """Extract default fonts from template theme XML."""
     import zipfile
-    from lxml import etree
 
     ns = {"a": "http://schemas.openxmlformats.org/drawingml/2006/main"}
     with zipfile.ZipFile(str(template_path)) as z:
         for name in z.namelist():
             if "theme" in name and name.endswith(".xml"):
-                root = etree.fromstring(z.read(name))
+                root = xml_safe.fromstring(z.read(name))
                 minor = root.find(".//a:minorFont", ns)
                 if minor is not None:
                     latin = minor.find("a:latin", ns)
@@ -144,7 +143,7 @@ def _extract_theme_colors_raw(template_path: Path):
         theme_target = 'ppt/theme/theme1.xml'
         for name in z.namelist():
             if 'slideMaster1.xml.rels' in name:
-                rels = etree.fromstring(z.read(name))
+                rels = xml_safe.fromstring(z.read(name))
                 for rel in rels:
                     if 'theme' in rel.get('Target', ''):
                         target = rel.get('Target').replace('..', 'ppt')
@@ -155,12 +154,12 @@ def _extract_theme_colors_raw(template_path: Path):
                 break
 
         if theme_target in z.namelist():
-            tree = etree.fromstring(z.read(theme_target))
+            tree = xml_safe.fromstring(z.read(theme_target))
         else:
             tree = None
             for name in sorted(z.namelist()):
                 if 'theme' in name and name.endswith('.xml'):
-                    tree = etree.fromstring(z.read(name))
+                    tree = xml_safe.fromstring(z.read(name))
                     break
 
         if tree is not None:
