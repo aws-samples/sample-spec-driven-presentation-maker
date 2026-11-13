@@ -16,7 +16,7 @@ import path from "path"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
 
 import { resolveDeckRoot } from "./deck-paths"
-import { BUNDLED_STYLES_DIR, BUNDLED_TEMPLATES_DIR, SDPM_ROOT } from "./sdpmPaths"
+import { BUNDLED_STYLES_DIR, BUNDLED_TEMPLATES_DIR, SDPM_ROOT, getBuiltinTemplateNotes, setBuiltinTemplateNote } from "./sdpmPaths"
 
 describe("sdpm path anchors", () => {
   it("SDPM_ROOT points at the skill distribution", () => {
@@ -76,5 +76,74 @@ describe("deck root order", () => {
       fs.writeFileSync(path.join(configDir, "config.json"), text)
     }
     expect(path.resolve(resolveDeckRoot())).toBe(path.resolve(expand(expected))) // nosemgrep: path-join-resolve-traversal — constant table rows in a tmpdir
+  })
+})
+
+// Mirrors tests/test_templates_resolution.py::test_builtin_notes_migrate_from_legacy_cache.
+describe("builtin template notes", () => {
+  let tmp: string
+  let statePath: string
+
+  beforeEach(() => {
+    tmp = fs.mkdtempSync(path.join(os.tmpdir(), "sdpm-notes-")) // nosemgrep: path-join-resolve-traversal — constant prefix
+    vi.stubEnv("XDG_CONFIG_HOME", tmp)
+    vi.stubEnv("APPDATA", tmp)
+    fs.mkdirSync(path.join(tmp, "sdpm"))
+    statePath = path.join(tmp, "sdpm", "state.json")
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    fs.rmSync(tmp, { recursive: true, force: true })
+  })
+
+  it("moves legacy notes out of the analysis cache once (a legacy note is the newer edit)", () => {
+    fs.writeFileSync(statePath, JSON.stringify({
+      pinned_styles: ["report"],
+      builtin_template_notes: { edited: "Moved note", kept: "Kept note" },
+      template_metadata: {
+        "builtin:blank-dark": { description: " Old note ", layout_count: 7 },
+        "builtin:edited": { description: "Edited by an older install" },
+        "builtin:empty": { description: "" },
+        "my-brand": { description: "User template note" },
+      },
+    }))
+
+    expect(getBuiltinTemplateNotes()).toEqual({ edited: "Edited by an older install", kept: "Kept note", "blank-dark": "Old note" })
+    const state = JSON.parse(fs.readFileSync(statePath, "utf-8"))
+    expect(state.template_metadata).toEqual({
+      "builtin:blank-dark": { layout_count: 7 },
+      "builtin:edited": {},
+      "builtin:empty": {},
+      "my-brand": { description: "User template note" },
+    })
+    expect(state.pinned_styles).toEqual(["report"])
+    expect(fs.readdirSync(path.dirname(statePath))).toEqual(["state.json"]) // no temp file left behind
+    expect(getBuiltinTemplateNotes()).toEqual({ edited: "Edited by an older install", kept: "Kept note", "blank-dark": "Old note" })
+  })
+
+  it("sets and clears a note without touching the cache", () => {
+    fs.writeFileSync(statePath, JSON.stringify({ template_metadata: { "builtin:a": { layout_count: 3 } } }))
+    setBuiltinTemplateNote("a", "Use for reports")
+    expect(getBuiltinTemplateNotes()).toEqual({ a: "Use for reports" })
+    setBuiltinTemplateNote("a", "")
+    const state = JSON.parse(fs.readFileSync(statePath, "utf-8"))
+    expect(state.builtin_template_notes).toEqual({})
+    expect(state.template_metadata).toEqual({ "builtin:a": { layout_count: 3 } })
+  })
+
+  it("returns the notes when state.json cannot be rewritten", () => {
+    const original = JSON.stringify({ template_metadata: { "builtin:a": { description: "Old note" } } })
+    fs.writeFileSync(statePath, original)
+    const rename = vi.spyOn(fs, "renameSync").mockImplementation(() => {
+      throw Object.assign(new Error("read-only"), { code: "EACCES" })
+    })
+    try {
+      expect(getBuiltinTemplateNotes()).toEqual({ a: "Old note" })
+    } finally {
+      rename.mockRestore()
+    }
+    expect(fs.readFileSync(statePath, "utf-8")).toBe(original)
+    expect(fs.readdirSync(path.dirname(statePath))).toEqual(["state.json"])
   })
 })

@@ -210,8 +210,8 @@ def _parse_table_style(pptx_path, style_id, theme_colors, color_mapping):
     try:
         with zipfile.ZipFile(str(pptx_path)) as z:
             xml = z.read('ppt/tableStyles.xml')
-        from lxml import etree
-        root = etree.fromstring(xml)
+        from sdpm.utils import xml_safe
+        root = xml_safe.fromstring(xml)
         target_id = style_id or root.get('def')
         style_el = None
         for s in root.findall('a:tblStyle', _NS):

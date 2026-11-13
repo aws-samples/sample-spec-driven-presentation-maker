@@ -13,6 +13,17 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Security
+
+- **One explicit XML parser for content from outside the repository.** Template and
+  imported PPTX parts, the XML fragments a slide JSON carries for round trips, and SVG
+  files are parsed through `sdpm.utils.xml_safe`, which states its settings instead of
+  relying on the installed lxml's defaults: no entity substitution, no DTD loading, no
+  network access, normal size limits. A DOCTYPE or entity declaration is refused outside
+  SVG. SVG keeps its DOCTYPE and may declare short plain-text entities, as Adobe
+  Illustrator does for its namespace URIs; external, nested or markup-bearing entities are
+  refused. A refused file is named in the error. Attached SVGs are also parsed with DTDs
+  refused.
 ### Changed
 
 - **The MCP servers run on MCP Python SDK 2.x** (`mcp>=2.3,<3`, was `<2`; #301). The local
@@ -30,6 +41,16 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   still lists it), `serverInfo.version` is empty instead of the SDK's version, and the
   remote server refuses a request body over 4 MiB with HTTP 413. Cloud deployments
   redeploy SdpmRuntime and SdpmAgent to pick it up.
+
+- **Local notes on builtin templates have their own place in `state.json`.** They moved
+  from the analysis cache (`template_metadata["builtin:<name>"].description`) to
+  `builtin_template_notes`, so the cache can be rebuilt without losing them — the same
+  split as the cloud's `BUILTIN_NOTE#` items. Existing notes move over on the first
+  template listing (CLI, local MCP server or local Web UI); nothing to do. A 0.17 or older
+  install that shares the same `state.json` (a dev checkout next to a release, or a rollback)
+  no longer shows the moved notes; a note it edits moves over again on the next listing.
+  `sdpm.api.list_templates_with_metadata` takes the notes as a `builtin_notes` argument
+  instead of reading them from the cache (#222).
 
 ## [0.17.0] - 2026-11-13
 
