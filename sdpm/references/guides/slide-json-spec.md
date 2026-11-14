@@ -37,6 +37,8 @@ Metadata only. Do NOT put slides here.
   - Call `analyze_template(template)` to detect fonts from your template.
 - `"defaultTextColor"`: **Required**. Default color for text and icons (e.g. `"#FFFFFF"` for dark backgrounds, `"#000000"` for light). Overridden per element by `fontColor` / `iconColor`.
 - `"defaultBackground"`: Optional. Solid ground for every slide that does not set its own `background` (e.g. `"#FFF6E5"`). `apply_style` fills it from the style's `--color-bg`; omit to keep the template background. Table auto-colors and icon theme (dark/light) follow it.
+- `"title"`: Optional. Document title written to the PPTX properties (shown by PowerPoint and read by screen readers). Defaults to the first slide's title text.
+- `"language"`: Optional. Document language as a BCP 47 tag (e.g. `"en-US"`, `"ja-JP"`), written to the PPTX properties.
 - Line color, table color, and chart color are auto-resolved from the template's theme colors.
 
 ### slides/{slug}.json

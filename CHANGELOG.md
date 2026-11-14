@@ -24,6 +24,7 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   Illustrator does for its namespace URIs; external, nested or markup-bearing entities are
   refused. A refused file is named in the error. Attached SVGs are also parsed with DTDs
   refused.
+  
 ### Added
 
 - **Radar charts** (`chartType: "radar"`, #621). A radar chart takes the same categories and
@@ -32,6 +33,23 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   scale) work as for `line`. `pptx_to_json` reads a radar chart back as `radar`, so an
   edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
   New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
+- **Local Web UI file access stays inside its data directories after symlinks are
+  resolved.** The preview, deck list, deck detail, PPTX download, template download, style
+  detail, change request and "open in app" endpoints, and the deck's chat files (`.session`,
+  `.session-engine`, `.session-origin.json`, `.chat.json`), check the real path of both the
+  data directory and the file, with a separator boundary, through one shared helper. A
+  symlink leading out of the deck root, the templates or the styles directory is refused the
+  same way as any other path outside it, for reads and for the chat-file and change-request
+  writes; a file that does not exist yet is created only where its directory resolves inside.
+  Files inside, including symlinks that stay inside, are served as before. User templates
+  are now also found when the config directory itself is reached through a symlink.
+- **Accessibility metadata in built PPTX files.** Any element takes `alt` (written as the
+  shape's alt text, `p:cNvPr@descr`) or `decorative: true` (PowerPoint's "Mark as
+  decorative"), so images, icons, charts, tables and videos can pass PowerPoint's
+  Accessibility Checker. `deck.json` takes `title` and `language` (BCP 47), written to the
+  document properties; without `title` the first slide's title text is used. Importing a
+  PPTX reads all of them back. Elements without `alt` are built as before.
+
 ### Changed
 
 - **The MCP servers run on MCP Python SDK 2.x** (`mcp>=2.3,<3`, was `<2`; #301). The local
@@ -61,6 +79,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   instead of reading them from the cache (#222).
 
 ### Fixed
+
+- **Built decks no longer inherit the template's document properties.** A deck kept its
+  template's author and last editor, description, created / modified dates and revision
+  (`docProps/core.xml`), the template's slide titles and word counts (`docProps/app.xml`)
+  and the bundled templates' custom properties (`docProps/custom.xml`). The builder now
+  clears them and dates the deck at build time. A user template's custom properties, such
+  as a sensitivity label, are kept.
 
 - **Edits to a read-back chart show up in the rebuilt PPTX.** `pptx_to_json` keeps each
   chart's original XML in `_chartXml` so an unedited chart rebuilds exactly, but the builder
