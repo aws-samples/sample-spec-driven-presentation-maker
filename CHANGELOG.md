@@ -24,15 +24,6 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   Illustrator does for its namespace URIs; external, nested or markup-bearing entities are
   refused. A refused file is named in the error. Attached SVGs are also parsed with DTDs
   refused.
-
-### Added
-
-- **Accessibility metadata in built PPTX files.** Any element takes `alt` (written as the
-  shape's alt text, `p:cNvPr@descr`) or `decorative: true` (PowerPoint's "Mark as
-  decorative"), so images, icons, charts, tables and videos can pass PowerPoint's
-  Accessibility Checker. `deck.json` takes `title` and `language` (BCP 47), written to the
-  document properties; without `title` the first slide's title text is used. Importing a
-  PPTX reads all of them back. Elements without `alt` are built as before.
 - **Local Web UI file access stays inside its data directories after symlinks are
   resolved.** The preview, deck list, deck detail, PPTX download, template download, style
   detail, change request and "open in app" endpoints, and the deck's chat files (`.session`,
@@ -43,6 +34,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   writes; a file that does not exist yet is created only where its directory resolves inside.
   Files inside, including symlinks that stay inside, are served as before. User templates
   are now also found when the config directory itself is reached through a symlink.
+
+### Added
+
+- **Accessibility metadata in built PPTX files.** Any element takes `alt` (written as the
+  shape's alt text, `p:cNvPr@descr`) or `decorative: true` (PowerPoint's "Mark as
+  decorative"), so images, icons, charts, tables and videos can pass PowerPoint's
+  Accessibility Checker. `deck.json` takes `title` and `language` (BCP 47), written to the
+  document properties; without `title` the first slide's title text is used. Importing a
+  PPTX reads all of them back. Elements without `alt` are built as before.
 
 ### Changed
 
