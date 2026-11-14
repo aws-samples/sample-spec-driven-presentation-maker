@@ -20,6 +20,12 @@ from typing import Iterable
 # Captures `--fs-name: 24pt;` style declarations under :root.
 _FS_TOKEN_RE = re.compile(r"--fs-[\w-]+\s*:\s*(\d+)pt\s*;")
 
+# Inline styled-text directives: {{attrs:text}} (same pattern as
+# sdpm.utils.text._parse_non_link_styles). Also matches the
+# {{NNpt,link:URL:text}} form, whose attrs include `NNpt`.
+_INLINE_TAG_RE = re.compile(r"\{\{([^:}]+):((?:\\}|[^}])+)\}\}")
+_INLINE_PT_RE = re.compile(r"^(\d+)pt$")
+
 
 def parse_allowed_font_sizes(art_direction_path: Path) -> set[int]:
     """Extract allowed font sizes from `--fs-*` tokens in art-direction.html.
@@ -52,6 +58,30 @@ def _walk_font_sizes(node) -> Iterable[tuple[list[str], int]]:
         for i, v in enumerate(node):
             for sub_path, fs in _walk_font_sizes(v):
                 yield ([f"[{i}]"] + sub_path, fs)
+
+
+def _inline_font_sizes(text: str) -> Iterable[int]:
+    """Yield pt sizes from inline ``{{NNpt:...}}`` directives in a string."""
+    for m in _INLINE_TAG_RE.finditer(text):
+        for attr in m.group(1).split(","):
+            attr = attr.strip()
+            if _INLINE_PT_RE.match(attr):
+                yield int(attr[:-2])
+
+
+def _walk_inline_font_sizes(node) -> Iterable[tuple[list[str], int]]:
+    """Yield (path, fontSize) for inline directives found in string values."""
+    if isinstance(node, dict):
+        for k, v in node.items():
+            for sub_path, fs in _walk_inline_font_sizes(v):
+                yield ([str(k)] + sub_path, fs)
+    elif isinstance(node, list):
+        for i, v in enumerate(node):
+            for sub_path, fs in _walk_inline_font_sizes(v):
+                yield ([f"[{i}]"] + sub_path, fs)
+    elif isinstance(node, str):
+        for fs in _inline_font_sizes(node):
+            yield ([], fs)
 
 
 def find_art_direction(json_path: Path) -> Path | None:
@@ -97,12 +127,20 @@ def check_font_size_tokens(
     violations: dict[int, list[str]] = {}
     slides = slides_data.get("slides", [])
     for slide_idx, slide in enumerate(slides, start=1):
+        slug = slide.get("id", "")
+        base = f"page{slide_idx:02d}({slug})" if slug else f"page{slide_idx:02d}"
         for path, fs in _walk_font_sizes(slide):
             if fs not in allowed:
-                slug = slide.get("id", "")
-                location = f"page{slide_idx:02d}({slug})" if slug else f"page{slide_idx:02d}"
+                location = base
                 if path:
                     location += " " + ".".join(path)
+                violations.setdefault(fs, []).append(location)
+        for path, fs in _walk_inline_font_sizes(slide):
+            if fs not in allowed:
+                location = base
+                if path:
+                    location += " " + ".".join(path)
+                location += ":inline"
                 violations.setdefault(fs, []).append(location)
 
     if not violations:
