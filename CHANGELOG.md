@@ -28,13 +28,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 ### Added
 
 - **A writing guide for Japanese decks (`writing-ja`).** For a Japanese deck the
-  orchestrator reads it before writing the outline and composers follow it for wording, in
-  both PPTX and HTML. It says how headlines, bullets, diagram labels and speaker notes are
-  written: headlines state the slide's claim, a list's items end the same way, items are
+  orchestrator reads it before writing the outline, and composers read it before writing any
+  slide text in every pass, in both PPTX and HTML. It says how headlines, bullets, diagram labels and speaker notes are
+  written: headlines state the slide's claim (or the lead does, when the style splits a topic
+  title from a claim lead), a list's items end the same way, items are
   shortened from full sentences without losing who does what, notes are polite spoken
-  Japanese, no em dashes or metaphor verbs, full-width Japanese punctuation, one spelling
-  per term. The guide is in Japanese. Local mode and the AWS stack (SdpmData and
-  SdpmRuntime).
+  Japanese, no em dashes or metaphor verbs, full-width Japanese punctuation, ・ only for
+  listing words, numbered headings as a number, a period and a space, one spelling
+  per term. Its symbol rules take precedence over the symbols in a style's examples. The
+  guide is in Japanese. Local mode and the AWS stack (SdpmData and SdpmRuntime).
 - **HTML decks get the same CJK↔Latin spacing as PPTX.** The PPTX builder puts a
   half-width space between Japanese (or other CJK) letters and Latin letters or digits; HTML
   decks kept the text as the composer wrote it. `output.html` and the slide previews now
