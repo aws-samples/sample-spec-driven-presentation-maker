@@ -35,6 +35,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   Files inside, including symlinks that stay inside, are served as before. User templates
   are now also found when the config directory itself is reached through a symlink.
 
+### Added
+
+- **Accessibility metadata in built PPTX files.** Any element takes `alt` (written as the
+  shape's alt text, `p:cNvPr@descr`) or `decorative: true` (PowerPoint's "Mark as
+  decorative"), so images, icons, charts, tables and videos can pass PowerPoint's
+  Accessibility Checker. `deck.json` takes `title` and `language` (BCP 47), written to the
+  document properties; without `title` the first slide's title text is used. Importing a
+  PPTX reads all of them back. Elements without `alt` are built as before.
+
 ### Changed
 
 - **The MCP servers run on MCP Python SDK 2.x** (`mcp>=2.3,<3`, was `<2`; #301). The local

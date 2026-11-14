@@ -5,6 +5,7 @@ import sys
 
 from pptx.enum.shapes import MSO_SHAPE_TYPE
 
+from sdpm.engine.accessibility import read_element_metadata
 from ..constants import _NS, get_emu_per_px, _base_element, _hex
 from ..xml_helpers import _extract_fill_from_xml
 from .shapes import extract_line_element, extract_freeform_element, extract_shape_element
@@ -82,6 +83,7 @@ def _dispatch_shape(shape, theme_colors=None, color_mapping=None, theme_styles=N
         elem = _extract_blipfill_image(shape, output_dir, slide_idx, img_counter)
         if elem:
             img_counter += 1
+            elem.update(read_element_metadata(shape._element))
             return elem, img_counter
         if shape.shape_type == MSO_SHAPE_TYPE.FREEFORM:
             elem = extract_freeform_element(shape, theme_colors, color_mapping, builder_text_color=builder_text_color)
@@ -95,6 +97,10 @@ def _dispatch_shape(shape, theme_colors=None, color_mapping=None, theme_styles=N
                 pass
         if not elem:
             elem = extract_shape_element(shape, theme_colors, color_mapping, theme_styles, builder_text_color=builder_text_color)
+    # A group the builder flattens has no shape of its own to carry alt /
+    # decorative; only its children's (read when they are dispatched) survive.
+    if elem and (elem.get("type") != "group" or "_groupXml" in elem):
+        elem.update(read_element_metadata(shape._element))
     return elem, img_counter
 
 def _scale_table_tracks(elem, sx, sy):
