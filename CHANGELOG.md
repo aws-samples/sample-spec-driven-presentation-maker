@@ -65,6 +65,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **Built decks no longer inherit the template's document properties.** A deck kept its
+  template's author and last editor, description, created / modified dates and revision
+  (`docProps/core.xml`), the template's slide titles and word counts (`docProps/app.xml`)
+  and the bundled templates' custom properties (`docProps/custom.xml`). The builder now
+  clears them and dates the deck at build time. A user template's custom properties, such
+  as a sensitivity label, are kept.
+
 - **Edits to a read-back chart show up in the rebuilt PPTX.** `pptx_to_json` keeps each
   chart's original XML in `_chartXml` so an unedited chart rebuilds exactly, but the builder
   restored that XML even after the chart's JSON (values, categories, series names and
