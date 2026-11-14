@@ -22,8 +22,6 @@ from pptx.oxml import parse_xml
 from pptx.oxml.ns import nsdecls
 
 from sdpm.engine.converter.color import (
-    _apply_shade,
-    _apply_tint,
     _resolve_color_with_transforms,
     _resolve_scheme_color,
     apply_color_transforms,
@@ -255,12 +253,20 @@ class TestColorTransforms:
         assert _apply_srgb_transforms("#FFFFFF", {"shade": "0"}) == "#000000"
         assert _apply_srgb_transforms("#000000", {"lumOff": "100000"}) == "#FFFFFF"
 
-    @pytest.mark.xfail(strict=True, reason=(
-        "_apply_srgb_transforms scales lumMod in RGB space; ECMA-376 (and the"
-        " schemeClr path) scale HSL luminance, so gradient stops and sysClr"
-        " colors come out off (3B608D instead of Office's 376092); #633"))
     def test_srgb_lum_mod_matches_scheme_path(self):
         assert _near(_apply_srgb_transforms("#4F81BD", {"lumMod": "75000"}), "#376092")
+        assert _near(_apply_srgb_transforms("#4F81BD", {"lumMod": "20000", "lumOff": "80000"}), "#DBE5F1")
+
+    def test_gradient_stop_and_sys_clr_lum_mod_use_hsl(self):
+        grad = parse_xml(f'<p:spPr {nsdecls("a", "p")}><a:gradFill><a:gsLst>'
+                         '<a:gs pos="0"><a:srgbClr val="4F81BD"><a:lumMod val="75000"/></a:srgbClr></a:gs>'
+                         '<a:gs pos="100000"><a:srgbClr val="FFFFFF"/></a:gs>'
+                         '</a:gsLst></a:gradFill></p:spPr>')
+        stop = _extract_fill_from_xml(grad)["gradient"]["stops"][0]
+        assert _near(stop["color"], "#376092")
+        solid = parse_xml(f'<a:solidFill {nsdecls("a")}><a:sysClr val="window" lastClr="4F81BD">'
+                          '<a:lumMod val="75000"/></a:sysClr></a:solidFill>')
+        assert _near(_sys_hex(solid), "#376092")
 
     def test_element_transforms(self):
         assert apply_element_transforms("#4F81BD", _clr('<a:srgbClr val="4F81BD"/>')) == "#4F81BD"
@@ -298,9 +304,6 @@ class TestColorTransforms:
     def test_legacy_transform_helpers(self):
         assert apply_color_transforms("#000000", {"lumMod": "50000", "tint": "25000"}) == "#808080"
         assert apply_color_transforms("#123456", {"lumMod": "50000"}) == "#123456"
-        assert _apply_tint("#000000", 0.0) == "#FFFFFF"
-        assert _apply_tint("#336699", 1.0) == "#336699"
-        assert _apply_shade("#FFFFFF", 0.5) == "#7F7F7F"
 
 
 # ---------------------------------------------------------------------------
