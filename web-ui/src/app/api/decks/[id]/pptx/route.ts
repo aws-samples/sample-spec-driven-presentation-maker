@@ -8,16 +8,16 @@
  */
 
 import fs from "fs"
-import path from "path"
 import { resolveDeckDir } from "@/lib/local/deck-paths"
+import { resolveWithin } from "@/lib/local/contained"
 import { attachmentDisposition } from "@/lib/local/downloadName"
 
 const PPTX_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 function readDeckJson(dp: string): Record<string, unknown> {
   for (const fname of ["deck.json", "presentation.json"]) {
-    const p = path.join(dp, fname) // nosemgrep: path-join-resolve-traversal — dp validated by resolveDeckDir, constant file names
-    if (!fs.existsSync(p)) continue
+    const p = resolveWithin(dp, fname)
+    if (!p || !fs.existsSync(p)) continue
     try {
       const data = JSON.parse(fs.readFileSync(p, "utf-8"))
       return data && typeof data === "object" ? data : {}
@@ -32,9 +32,9 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   const { id: deckId } = await params
   const dp = resolveDeckDir(deckId)
   if (!dp) return new Response("Not found", { status: 404 })
-  const pptxPath = path.join(dp, "output.pptx")
+  const pptxPath = resolveWithin(dp, "output.pptx")
   const deckJson = readDeckJson(dp)
-  if (deckJson.outputFormat === "html" || !fs.existsSync(pptxPath)) return new Response("Not found", { status: 404 })
+  if (deckJson.outputFormat === "html" || !pptxPath || !fs.existsSync(pptxPath)) return new Response("Not found", { status: 404 })
 
   return new Response(fs.readFileSync(pptxPath), {
     headers: {
