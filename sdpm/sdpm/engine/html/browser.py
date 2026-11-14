@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: MIT-0
 """Where the browser check gets its browser (design §9).
 
-A ``BrowserSource`` is a callable ``(width, height) -> ContextManager[BrowserEndpoint]``:
-entering it starts (or borrows) a browser and yields the DevTools WebSocket URL, the
-headers to connect with and a display name; leaving it releases the browser.
+A ``BrowserSource`` is a callable ``(width, height, *, start_timeout) ->
+ContextManager[BrowserEndpoint]``: entering it starts (or borrows) a browser and yields the
+DevTools WebSocket URL, the headers to connect with and a display name; leaving it releases
+the browser. ``start_timeout`` is what is left of the check's time budget, the most a start
+may take.
 
 Two kinds exist. The local source (``local_browser``) starts the Chrome or Edge found on
 this machine headless, with DevTools on a random loopback port, a temporary profile and
@@ -18,8 +20,6 @@ server registers AgentCore Browser; the core itself never imports AWS code.
 from __future__ import annotations
 
 import contextlib
-import logging
-import math
 import os
 import shutil
 import subprocess
@@ -28,9 +28,7 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, ContextManager, Iterator
-
-logger = logging.getLogger(__name__)
+from typing import ContextManager, Iterator, Protocol
 
 
 @dataclass(frozen=True)
@@ -42,7 +40,10 @@ class BrowserEndpoint:
     name: str = "browser"
 
 
-BrowserSource = Callable[[int, int], ContextManager[BrowserEndpoint]]
+class BrowserSource(Protocol):
+    def __call__(self, width: int, height: int, *,
+                 start_timeout: float) -> ContextManager[BrowserEndpoint]: ...
+
 
 DISABLED_NOTE = ("Browser check skipped: turned off here (SDPM_BROWSER=none), so layout, JS errors "
                  "and PNG previews of the slides are unknown.")
@@ -144,54 +145,16 @@ def _display_name(executable: str) -> str:
     return Path(executable).name
 
 
-START_TIMEOUT_ENV = "SDPM_BROWSER_START_TIMEOUT"
-DEFAULT_START_TIMEOUT_S = 15.0
-MAX_START_TIMEOUT_S = 120.0  # a hard bound, so a wrong setting cannot hang a check for long
-START_ATTEMPTS = 2  # a launch that times out is tried once more
-
-
-def browser_start_timeout() -> float:
-    """Seconds to wait for a launch's DevTools: ``SDPM_BROWSER_START_TIMEOUT``, else 15.
-    A value that is not a positive number falls back to 15; larger than 120 is cut to 120."""
-    raw = os.environ.get(START_TIMEOUT_ENV, "").strip()
-    try:
-        value = float(raw) if raw else DEFAULT_START_TIMEOUT_S
-    except ValueError:
-        value = DEFAULT_START_TIMEOUT_S
-    if not math.isfinite(value) or value <= 0:
-        value = DEFAULT_START_TIMEOUT_S
-    return min(value, MAX_START_TIMEOUT_S)
-
-
 @contextlib.contextmanager
 def local_browser(executable: str, width: int, height: int, *,
-                  start_timeout: float | None = None) -> Iterator[BrowserEndpoint]:
+                  start_timeout: float = 15.0) -> Iterator[BrowserEndpoint]:
     """Start ``executable`` headless with DevTools on a random 127.0.0.1 port.
 
     The port and path come from ``DevToolsActivePort`` in a temporary profile; the
-    browser is stopped and the profile removed on exit. A launch whose DevTools does not
-    start within ``start_timeout`` (default: ``browser_start_timeout()``) is stopped and
-    tried once more with a fresh profile; a browser that exits is not retried.
+    browser is stopped and the profile removed on exit. A first start on a fresh machine
+    can take tens of seconds, so the check passes what is left of its time budget as
+    ``start_timeout``.
     """
-    timeout = browser_start_timeout() if start_timeout is None else start_timeout
-    for attempt in range(1, START_ATTEMPTS + 1):
-        try:
-            proc, profile, port, path = _launch(executable, width, height, timeout)
-            break
-        except TimeoutError as exc:
-            if attempt == START_ATTEMPTS:
-                raise TimeoutError(f"{exc} (tried {START_ATTEMPTS} times)") from None
-            logger.warning("%s: %s; starting it once more", _display_name(executable), exc)
-    try:
-        yield BrowserEndpoint(f"ws://127.0.0.1:{port}{path}", {}, _display_name(executable))
-    finally:
-        _stop(proc)
-        _remove(profile)
-
-
-def _launch(executable: str, width: int, height: int,
-            timeout: float) -> tuple[subprocess.Popen, str, str, str]:
-    """One start: ``(proc, profile, port, path)``; stops it and removes its profile on failure."""
     profile = tempfile.mkdtemp(prefix="sdpm-browser-")
     proc = None
     try:
@@ -205,23 +168,25 @@ def _launch(executable: str, width: int, height: int,
         while True:
             lines = port_file.read_text(encoding="utf-8").splitlines() if port_file.is_file() else []
             if len(lines) >= 2 and lines[0].strip().isdigit():
-                return proc, profile, lines[0].strip(), lines[1].strip()
+                break
             code = proc.poll()
             if code is not None:
                 raise RuntimeError(f"{Path(executable).name} exited (code {code}) before DevTools started")
-            if time.monotonic() - started > timeout:
-                raise TimeoutError(f"DevTools did not start within {timeout:g} s")
+            if time.monotonic() - started > start_timeout:
+                raise TimeoutError(f"{_display_name(executable)} did not start within "
+                                   f"{round(start_timeout, 1):g} s (no DevTools port)")
             time.sleep(0.05)
-    except BaseException:
+        port, path = lines[0].strip(), lines[1].strip()
+        yield BrowserEndpoint(f"ws://127.0.0.1:{port}{path}", {}, _display_name(executable))
+    finally:
         if proc is not None:
             _stop(proc)
         _remove(profile)
-        raise
 
 
 def _local_source(executable: str) -> BrowserSource:
-    def source(width: int, height: int) -> ContextManager[BrowserEndpoint]:
-        return local_browser(executable, width, height)
+    def source(width: int, height: int, *, start_timeout: float) -> ContextManager[BrowserEndpoint]:
+        return local_browser(executable, width, height, start_timeout=start_timeout)
     source.browser_name = _display_name(executable)  # type: ignore[attr-defined]  # named before it starts
     return source
 
@@ -239,6 +204,6 @@ def resolve_browser() -> tuple[BrowserSource | None, str | None]:
     return _local_source(executable), None
 
 
-__all__ = ["BrowserEndpoint", "BrowserSource", "DISABLED_NOTE", "SKIPPED_NOTE", "browser_start_timeout",
-           "find_browser", "local_browser", "not_found_note", "register_browser_source",
-           "registered_browser_source", "resolve_browser"]
+__all__ = ["BrowserEndpoint", "BrowserSource", "DISABLED_NOTE", "SKIPPED_NOTE", "find_browser",
+           "local_browser", "not_found_note", "register_browser_source", "registered_browser_source",
+           "resolve_browser"]

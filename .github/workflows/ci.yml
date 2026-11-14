@@ -69,9 +69,6 @@ jobs:
         env:
           SDPM_TEST_BROWSER: "1"
           SDPM_BROWSER: google-chrome
-          # The hosted runner sometimes needs more than the default 15 s to start Chrome
-          # (#625); a launch that still times out is tried once more.
-          SDPM_BROWSER_START_TIMEOUT: "45"
         run: google-chrome --version && command -v lsof && uv run pytest tests/test_html_browser_check.py -k real_browser -v -rs
 
   web-ui:

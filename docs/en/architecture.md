@@ -248,7 +248,8 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
   `StopBrowserSession` and `ConnectBrowserAutomationStream` on the
   `aws.browser.v1` ARN only. A check that is skipped, stopped by a slide that navigates the
   page away (the slide helper logs `pagehide`), or does not finish within
-  `min(30 + 3 × slides, 110)` s adds a one-line `output.html: Browser check …` warning.
+  `min(30 + 3 × slides, 110)` s (starting the browser included; a first start on a fresh
+  machine can take tens of seconds) adds a one-line `output.html: Browser check …` warning.
 - HTML objects live under `html/` in the deck bucket. No CloudFront behaviour serves
   `html/*` and the CloudFront OAC bucket-policy grant does not include it.
 - The API returns S3 presigned URLs on the bucket's regional host (a different origin from

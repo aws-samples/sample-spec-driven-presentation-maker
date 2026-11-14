@@ -29,7 +29,8 @@ an adapter registered) over the DevTools protocol (``sdpm.engine.html.cdp``):
    helper's ``sdpm slide <slug>: …`` console errors, CSP violations.
 
 A slide that navigates the page away stops the check (``navigated``); the whole check has
-a deadline (``min(30 + 3 × slides, 110)`` s, below AgentCore Browser's 120 s session).
+a deadline (``min(30 + 3 × slides, 110)`` s, below AgentCore Browser's 120 s session) that
+includes starting the browser.
 ``check_deck`` never raises; every status but ``ok`` / ``issues`` carries a ``note``.
 """
 
@@ -506,6 +507,13 @@ def _rest_note(run: _Run) -> str:
             "previews of the rest are unknown")
 
 
+def _timeout_cause(run: _Run) -> str:
+    started_in = run.timings.get("acquire", 0.0)
+    if started_in >= run.limit / 3:
+        return f"The browser took {started_in:.1f} s of it to start."
+    return "A slide script that never returns can cause this."
+
+
 def check_deck(
     output_html: str | Path,
     slugs: Sequence[str],
@@ -548,7 +556,8 @@ def check_deck(
     try:
         html = Path(output_html).read_text(encoding="utf-8")
         t0 = time.monotonic()
-        with source(width, height) as endpoint:
+        # the start shares the budget: a first start on a fresh machine can take tens of seconds
+        with source(width, height, start_timeout=max(run.left(), 0.1)) as endpoint:
             name = endpoint.name
             run.timings["acquire"] = round(time.monotonic() - t0, 3)
             try:
@@ -587,8 +596,8 @@ def check_deck(
                         f"site); {_rest_note(run)}. Remove the navigation (see the script-external warning).")
             except (_Deadline, CdpTimeout):
                 status = "timeout"
-                note = (f"Browser check did not finish within {limit:g} s; {_rest_note(run)}. A slide "
-                        "script that never returns can cause this.")
+                note = (f"Browser check did not finish within {limit:g} s; {_rest_note(run)}. "
+                        f"{_timeout_cause(run)}")
             finally:
                 run.cdp = None
                 released = time.monotonic()

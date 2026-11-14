@@ -70,12 +70,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **Smooth line charts read back as `smooth: true`.** The converter did not read `c:smooth`,
   so a smooth line chart rebuilt from `--minimal` JSON came back with straight segments.
   Local mode and the AWS stack (SdpmRuntime).
-- **A slow Chrome or Edge start no longer fails the HTML browser check at once.** When the
-  local browser's DevTools did not start within 15 s, the check reported `failed` (`could
-  not run … DevTools did not start within 15 s`). A launch that times out is now stopped and
-  tried once more with a fresh profile, and `SDPM_BROWSER_START_TIMEOUT` (seconds, default
-  15, at most 120) sets the wait per launch. A browser that exits before DevTools starts is
-  not retried. Local mode (#625).
+- **A slow first start of Chrome or Edge no longer fails the HTML browser check.** The
+  check gave the local browser a fixed 15 s to start and reported `failed` (`could not run
+  … DevTools did not start within 15 s`) when a first start on a fresh machine took longer,
+  even with most of the check's time budget left. The start now may take what is left of
+  that budget (`min(30 + 3 × slides, 110)` s, unchanged), and a browser that does not start
+  in time is named in the note (`Google Chrome did not start within N s`). A check that
+  runs out of time after a slow start says how long the start took. Local mode (#625).
 
 ## [0.17.0] - 2026-11-13
 

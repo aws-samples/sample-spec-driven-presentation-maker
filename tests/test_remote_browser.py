@@ -58,7 +58,7 @@ def _source(client: StubClient, calls: list | None = None):
 
 def test_session_starts_with_the_deck_viewport_and_signs_the_stream():
     client = StubClient()
-    with _source(client)(1920, 1080) as endpoint:
+    with _source(client)(1920, 1080, start_timeout=30) as endpoint:
         assert client.stopped == []
         assert endpoint.url == _STREAM and endpoint.name == "AgentCore Browser"
         assert set(endpoint.headers) == {"Authorization", "X-Amz-Date", "X-Amz-Security-Token"}
@@ -75,7 +75,7 @@ def test_session_starts_with_the_deck_viewport_and_signs_the_stream():
 def test_session_is_stopped_when_the_check_raises():
     client = StubClient()
     with pytest.raises(RuntimeError, match="boom"):
-        with _source(client)(1280, 720):
+        with _source(client)(1280, 720, start_timeout=30):
             raise RuntimeError("boom")
     assert client.stopped == [{"browserIdentifier": "aws.browser.v1", "sessionId": "s1"}]
 
@@ -83,7 +83,7 @@ def test_session_is_stopped_when_the_check_raises():
 def test_failing_stop_is_logged_not_raised(caplog):
     client = StubClient(stop_error=RuntimeError("throttled"))
     with caplog.at_level(logging.WARNING, logger="sdpm.agentcore_browser"):
-        with _source(client)(1920, 1080):
+        with _source(client)(1920, 1080, start_timeout=30):
             pass
     assert "stop_browser_session failed for s1" in caplog.text
 
@@ -93,7 +93,7 @@ def test_client_is_created_on_first_use_only():
     source = _source(StubClient(), calls)
     assert calls == [] and source.browser_name == "AgentCore Browser"
     for _ in range(2):
-        with source(1920, 1080):
+        with source(1920, 1080, start_timeout=30):
             pass
     assert calls == [1]
 
