@@ -12,7 +12,8 @@ Depth of dialogue. The client may state the mode the user picked in its UI, as a
 - `fast` — the user wants it built from the material without questions.
 With no stated mode: if the user gave material and did not ask for dialogue, build without
 asking; if there is no material, ask what to make; otherwise match the depth of dialogue
-the user asks for. Work in the user's language.
+the user asks for. Work in the user's language. For a Japanese deck, read
+`read_guides(["writing-ja"])` before writing the outline: slide titles follow it.
 
 Continuation. The client may state `Continued from: kiro session "<title>"` when the
 conversation history above comes from the user's earlier work session rather than a

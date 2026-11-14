@@ -1083,6 +1083,7 @@ def _generate_html(
         title=_outline_title(outline_path) or deck_dir.name,
         deck_dir=deck_dir,
         deck_css=deck_css,
+        auto_spacing=deck_meta.get("autoSpacing", True),
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(assembled.html, encoding="utf-8", newline="\n")
