@@ -2,8 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 /** Local User Style API — save a user style HTML file. */
 import fs from "fs"
-import path from "path"
 import { getUserStylesDir } from "@/lib/local/sdpmPaths"
+import { resolveWithin } from "@/lib/local/contained"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 export async function POST(req: Request) {
@@ -19,9 +19,9 @@ export async function POST(req: Request) {
 
   const dir = getUserStylesDir()
   fs.mkdirSync(dir, { recursive: true })
-  const rootDir = fs.realpathSync(dir)
-  const outputPath = path.resolve(rootDir, `${name}.html`)
-  if (!outputPath.startsWith(rootDir + path.sep)) {
+  // Refuses a target that is a symlink leading out of the styles directory (or a dangling one).
+  const outputPath = resolveWithin(dir, `${name}.html`)
+  if (!outputPath) {
     return Response.json({ error: "invalid style name" }, { status: 400 })
   }
   fs.writeFileSync(outputPath, html, "utf-8")

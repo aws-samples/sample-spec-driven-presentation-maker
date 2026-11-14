@@ -14,6 +14,9 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ name: 
 
   // Rename
   if (body.newName) {
+    if (!/^[a-zA-Z0-9_\-\s.()]+$/.test(name)) {
+      return Response.json({ error: "Invalid template name" }, { status: 400 })
+    }
     const newName = body.newName.trim()
     if (!/^[a-zA-Z0-9_\-]+$/.test(newName)) {
       return Response.json({ error: "Letters, numbers, hyphens, underscores only" }, { status: 400 })

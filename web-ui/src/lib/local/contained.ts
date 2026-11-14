@@ -50,3 +50,16 @@ export function resolveWithin(root: string, ...segments: string[]): string | nul
     }
   }
 }
+
+/**
+ * Create the directory `root/segments...` (and missing parents) and return its real path, or
+ * null when it would lie outside `root`. The check runs before anything is created, so an
+ * existing symlinked directory pointing out of `root` is refused rather than written through.
+ * Use it for the directory of a write, then `resolveWithin` for the file inside it.
+ */
+export function mkdirWithin(root: string, segments: string[], mode?: number): string | null {
+  const dir = resolveWithin(root, ...segments)
+  if (!dir) return null
+  fs.mkdirSync(dir, { recursive: true, ...(mode === undefined ? {} : { mode }) })
+  return resolveWithin(root, ...segments)
+}

@@ -3,7 +3,7 @@
 /** Local User Style API — delete or rename a user style HTML file. */
 import fs from "fs"
 import path from "path"
-import { getUserStylesDir, getStateJsonPath } from "@/lib/local/sdpmPaths"
+import { getUserStylesDir, getState, updateState } from "@/lib/local/sdpmPaths"
 
 const NAME_RE = /^[a-zA-Z0-9_-]+$/
 
@@ -44,19 +44,12 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ name: 
   fs.renameSync(oldPath, newPath)
 
   // Update pin references in state.json
-  const statePath = getStateJsonPath()
-  if (fs.existsSync(statePath)) {
-    try {
-      const state = JSON.parse(fs.readFileSync(statePath, "utf-8"))
-      if (Array.isArray(state.pinned_styles)) {
-        const idx = state.pinned_styles.indexOf(name)
-        if (idx !== -1) {
-          state.pinned_styles[idx] = newName
-          fs.writeFileSync(statePath, JSON.stringify(state, null, 2), "utf-8")
-        }
-      }
-    } catch { /* ignore corrupt state */ }
-  }
+  try {
+    const pinned = getState().pinned_styles
+    if (Array.isArray(pinned) && pinned.includes(name)) {
+      updateState("pinned_styles", pinned.map(s => (s === name ? newName : s)))
+    }
+  } catch { /* ignore corrupt state */ }
 
   return Response.json({ renamed: { from: name, to: newName } })
 }
