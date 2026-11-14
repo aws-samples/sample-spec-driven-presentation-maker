@@ -15,6 +15,11 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Security
 
+- **Local Web UI writes stay inside their directory.** Saving an outline, a user style or
+  template, an attachment, or the deck index now checks the real path of the target
+  directory and file before writing, so a symlink leading out of the data directory is
+  refused instead of written through. Template rename validates the source name too.
+
 - **One explicit XML parser for content from outside the repository.** Template and
   imported PPTX parts, the XML fragments a slide JSON carries for round trips, and SVG
   files are parsed through `sdpm.utils.xml_safe`, which states its settings instead of

@@ -7,7 +7,7 @@ import os from "os"
 import path from "path"
 import { afterAll, beforeAll, describe, expect, it } from "vitest"
 
-import { resolveWithin } from "./contained"
+import { mkdirWithin, resolveWithin } from "./contained"
 
 let base: string
 let root: string
@@ -71,5 +71,18 @@ describe("resolveWithin", () => {
     const alias = path.join(base, "alias")
     fs.symlinkSync(root, alias)
     expect(resolveWithin(alias, "sub", "a.txt")).toBe(path.join(root, "sub", "a.txt"))
+  })
+})
+
+describe("mkdirWithin", () => {
+  it("creates a missing directory under the root and returns its real path", () => {
+    expect(mkdirWithin(root, ["made", "deeper"])).toBe(path.join(root, "made", "deeper"))
+    expect(fs.statSync(path.join(root, "made", "deeper")).isDirectory()).toBe(true)
+  })
+
+  it("refuses a symlinked directory pointing outside and creates nothing there", () => {
+    expect(mkdirWithin(root, ["outdir", "made"])).toBeNull()
+    expect(fs.existsSync(path.join(sibling, "made"))).toBe(false)
+    expect(mkdirWithin(root, ["outdir"])).toBeNull()
   })
 })

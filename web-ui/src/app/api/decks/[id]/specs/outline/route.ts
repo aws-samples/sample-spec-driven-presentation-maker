@@ -6,8 +6,8 @@
  */
 
 import fs from "fs"
-import path from "path"
 import { resolveDeckDir } from "@/lib/local/deck-paths"
+import { mkdirWithin, resolveWithin } from "@/lib/local/contained"
 
 const OUTLINE_MAX_BYTES = 256 * 1024
 
@@ -31,8 +31,9 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
     return Response.json({ error: `content exceeds ${OUTLINE_MAX_BYTES} bytes` }, { status: 400 })
   }
 
-  const specsDir = path.join(dp, "specs")
-  fs.mkdirSync(specsDir, { recursive: true })
-  fs.writeFileSync(path.join(specsDir, "outline.md"), content, "utf-8")
+  // A `specs` directory or `outline.md` that is a symlink leading out of the deck is refused.
+  const outlinePath = mkdirWithin(dp, ["specs"]) && resolveWithin(dp, "specs", "outline.md")
+  if (!outlinePath) return Response.json({ error: "Deck not found" }, { status: 404 })
+  fs.writeFileSync(outlinePath, content, "utf-8")
   return Response.json({ bytes })
 }

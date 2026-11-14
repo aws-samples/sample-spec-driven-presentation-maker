@@ -7,6 +7,7 @@ import fs from "fs"
 import path from "path"
 import { DECK_ROOT } from "@/lib/local/deck-paths"
 import { hasProcess } from "@/lib/local/acp-process"
+import { mkdirWithin, resolveWithin } from "@/lib/local/contained"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 const MAX_FILE_SIZE = 100 * 1024 * 1024
@@ -43,9 +44,10 @@ function usage(root: string): { count: number; bytes: number } {
   return { count: files.length, bytes: files.reduce((total, file) => total + fs.statSync(file).size, 0) }
 }
 
+/** `root` is the real path of the attachments directory (see POST). */
 function maybeCollectExpired(root: string): void {
-  fs.mkdirSync(root, { recursive: true, mode: 0o700 })
-  const stamp = path.join(root, ".gc-stamp")
+  const stamp = resolveWithin(root, ".gc-stamp")
+  if (!stamp) return // a symlink leading out of the directory
   const lock = path.join(root, ".gc.lock")
   const now = Date.now()
   try {
@@ -97,17 +99,19 @@ export async function POST(req: Request): Promise<Response> {
     const data = Buffer.from(await file.arrayBuffer())
     const digest = createHash("sha256").update(data).digest("hex")
     const filename = `${digest}_${sanitizeFilename(file.name)}`
-    const root = path.resolve(DECK_ROOT, ".attachments")
-    const sessionDir = path.resolve(root, sessionId)
-    if (!sessionDir.startsWith(root + path.sep)) throw new Error("Invalid attachment path")
+    // Both directories are checked by realpath before anything is created or written in them.
+    fs.mkdirSync(DECK_ROOT, { recursive: true })
+    const root = mkdirWithin(DECK_ROOT, [".attachments"], 0o700)
+    const sessionDir = root && mkdirWithin(root, [sessionId], 0o700)
+    const lease = sessionDir && resolveWithin(sessionDir, ".lease")
+    if (!root || !sessionDir || !lease) throw new Error("Invalid attachment path")
     maybeCollectExpired(root)
-    fs.mkdirSync(sessionDir, { recursive: true, mode: 0o700 })
-    const lease = path.join(sessionDir, ".lease")
     fs.closeSync(fs.openSync(lease, "a", 0o600))
     const now = new Date()
     fs.utimesSync(lease, now, now)
 
-    const destination = path.join(sessionDir, filename)
+    const destination = resolveWithin(sessionDir, filename)
+    if (!destination) throw new Error("Invalid attachment path")
     if (fs.existsSync(destination)) return Response.json({ source: destination })
 
     const sessionUsage = usage(sessionDir)
