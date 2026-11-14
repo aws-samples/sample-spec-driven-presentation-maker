@@ -9,6 +9,7 @@
 
 import fs from "fs"
 import path from "path"
+import { resolveWithin } from "@/lib/local/contained"
 import { DECK_ROOT } from "@/lib/local/deck-paths"
 
 // Copies of the Python definitions, pinned by tests/test_slug_parity.py.
@@ -40,8 +41,8 @@ export async function GET() {
       let name = deckId
       let isHtml = false
       for (const fname of ["deck.json", "presentation.json"]) {
-        const p = path.join(dp, fname)
-        if (fs.existsSync(p)) {
+        const p = resolveWithin(dp, fname)
+        if (p && fs.existsSync(p)) {
           try {
             const deckJson = JSON.parse(fs.readFileSync(p, "utf-8"))
             name = deckJson.name || deckId
@@ -66,7 +67,8 @@ export async function GET() {
         const htmlPreviews = first ? [] : files.filter(f => HTML_PREVIEW_FILE_RE.test(f))
         const firstHtml = htmlPreviews.length === 0 ? undefined : (() => {
           let outline = ""
-          try { outline = fs.readFileSync(path.join(dp, "specs", "outline.md"), "utf-8") } catch {}
+          const outlinePath = resolveWithin(dp, "specs", "outline.md")
+          try { if (outlinePath) outline = fs.readFileSync(outlinePath, "utf-8") } catch {}
           const slug = outline.split("\n").map(l => OUTLINE_ENTRY_RE.exec(l)?.[1])
             .find(s => s && htmlPreviews.includes(`${s}.html`))
           return slug ? `${slug}.html` : htmlPreviews[0]
