@@ -98,6 +98,26 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   speaker notes. Punctuation such as 、。・「」（）／：〜 now takes no space on either side,
   and half-width `: ; , . ! ?` stays attached to the Japanese word before it (`例: 説明`
   no longer builds as `例 : 説明`). Local mode and the AWS stack (SdpmRuntime).
+- **Quotes and apostrophes no longer gain spaces.** The CJK↔Latin spacing put a space
+  around every `'` `"` `` ` `` it counted as a quote, whatever stood next to it, in English
+  text too: `It's` built as `It 's`, `AWS What's New` as `What 's New`, `the "best" option`
+  with doubled spaces and `"hi".` as `"hi" .`; a deck rebuilt from its own output gained
+  more each time. A quote now takes a space only on its outside and only toward a Japanese
+  letter (`"AWS"の` → `"AWS" の`), and `'` between two Latin letters or digits is an
+  apostrophe. `<` `>` are spaced like brackets (`<ファイル名>` keeps no inner space), and
+  non-ASCII Latin letters count as Latin text (`Caféで` → `Café で`). Local mode and the
+  AWS stack (SdpmRuntime).
+- **Styling no longer changes where the spaces go.** Spaces are computed over a whole
+  paragraph, so a bold or coloured run, a link, or an HTML inline element gets the same
+  spaces as the same text without styling: `{{bold:サーバー}})` no longer builds as
+  `サーバー )`, and a link next to Japanese text is spaced like plain text. Superscript and
+  subscript runs (`baseline=`, `<sup>`, `<sub>`) and ruby text (`<rt>`) take no spaces
+  inside or at their edges, so `説明<sup>1</sup>です` keeps its footnote marker attached. Local mode and the AWS stack
+  (SdpmRuntime).
+- **Chart text gets the same spacing.** A native chart's title, category names and series
+  names get the CJK↔Latin spacing of slide text (`AWSの利用料` → `AWS の利用料`), and keep
+  their text as written with `"autoSpacing": false`. Local mode and the AWS stack
+  (SdpmRuntime).
 - **Built decks no longer inherit the template's document properties.** A deck kept its
   template's author and last editor, description, created / modified dates and revision
   (`docProps/core.xml`), the template's slide titles and word counts (`docProps/app.xml`)
