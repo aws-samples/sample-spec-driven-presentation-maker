@@ -217,8 +217,10 @@ def apply_transforms(base_hex, transforms):
     The one implementation every color element shares (schemeClr, srgbClr,
     sysClr, prstClr, gradient stops): shade / tint mix toward black / white
     in linear gamma, lumMod / lumOff scale and offset the HSL luminance
-    (4F81BD at lumMod 75% is 376092), satMod scales the HSL saturation.
-    Applied in that order, independent of the order of the children.
+    (4F81BD at lumMod 75% is 376092), then satMod scales the HSL saturation.
+    Applied in that order, independent of the order of the children. Only
+    the srgbClr gradient-stop path passes satMod; the others read lumMod /
+    lumOff / tint / shade. Channels are rounded to the nearest integer.
     """
     hx = base_hex.lstrip('#')
     r, g, b = int(hx[0:2], 16) / 255, int(hx[2:4], 16) / 255, int(hx[4:6], 16) / 255
@@ -239,7 +241,7 @@ def apply_transforms(base_hex, transforms):
         h, lum, sat = colorsys.rgb_to_hls(r, g, b)
         r, g, b = colorsys.hls_to_rgb(h, lum, min(1.0, sat * int(transforms['satMod']) / 100000))
     r, g, b = min(1.0, max(0.0, r)), min(1.0, max(0.0, g)), min(1.0, max(0.0, b))
-    return f"#{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
+    return f"#{round(r * 255):02X}{round(g * 255):02X}{round(b * 255):02X}"
 
 
 def apply_color_transforms(base_color_hex, transforms):

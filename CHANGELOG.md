@@ -102,11 +102,14 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   presets `perspective-bottom`, `perspective-left-most` and `perspective-right-most` were
   dropped on import (#631), and a free rotation with `perspective: 0` came back without
   `perspective`, so a rebuild showed it at the default 120° (#632).
-- **Imported `lumMod` / `lumOff` colors match PowerPoint on every color element.**
+- **Imported `lumMod` / `lumOff` colors match PowerPoint.**
   Gradient stops on an `srgbClr` and system colors (`sysClr`) scaled RGB instead of HSL
   luminance, so `4F81BD` at lumMod 75% came out `3B608D` instead of `376092` (#633). Fills
   of theme table styles dropped `lumMod` / `lumOff` and mixed `tint` / `shade` in sRGB.
-  All color elements now share one transform implementation.
+  These colors and every other transformed fill, line and text color now share one
+  implementation, which rounds each channel instead of truncating it (transformed colors
+  can move by 1 per channel). Table borders and table text from a theme table style still
+  ignore color transforms.
 - **Built decks no longer inherit the template's document properties.** A deck kept its
   template's author and last editor, description, created / modified dates and revision
   (`docProps/core.xml`), the template's slide titles and word counts (`docProps/app.xml`)

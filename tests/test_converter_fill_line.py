@@ -51,7 +51,7 @@ def _clr(inner: str):
 
 
 def _near(actual: str | None, expected: str) -> bool:
-    """Same color within 1/255 per channel (int() truncation vs Office rounding)."""
+    """Same color within 1/255 per channel (Office's own rounding of the gamma / HSL steps)."""
     if not actual:
         return False
     return all(abs(int(actual[i:i + 2], 16) - int(expected[i:i + 2], 16)) <= 1 for i in (1, 3, 5))
@@ -254,7 +254,7 @@ class TestColorTransforms:
         assert _apply_srgb_transforms("#000000", {"lumOff": "100000"}) == "#FFFFFF"
 
     def test_srgb_lum_mod_matches_scheme_path(self):
-        assert _near(_apply_srgb_transforms("#4F81BD", {"lumMod": "75000"}), "#376092")
+        assert _apply_srgb_transforms("#4F81BD", {"lumMod": "75000"}) == "#376092"
         assert _near(_apply_srgb_transforms("#4F81BD", {"lumMod": "20000", "lumOff": "80000"}), "#DBE5F1")
 
     def test_gradient_stop_and_sys_clr_lum_mod_use_hsl(self):

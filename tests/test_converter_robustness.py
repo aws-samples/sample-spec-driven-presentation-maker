@@ -311,10 +311,10 @@ class TestExplicitCropKeepsFrame:
 class TestTableThemeStyle:
     # the scheme fill goes through the same transforms as every other
     # schemeClr (accent1 of blank-dark is 4F81BD; lumMod 75% is Office's
-    # 376092, 366092 after the converter's int() truncation)
+    # 376092)
     @pytest.mark.parametrize("fill, expected", [
         ('<a:srgbClr val="112233"/>', "#112233"),
-        ('<a:schemeClr val="accent1"><a:lumMod val="75000"/></a:schemeClr>', "#366092"),
+        ('<a:schemeClr val="accent1"><a:lumMod val="75000"/></a:schemeClr>', "#376092"),
     ])
     def test_table_style_id_resolves_to_style_dict(self, tmp_path, fill, expected):
         """Tables styled via tableStyleId (theme table styles) must emit a
