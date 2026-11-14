@@ -200,7 +200,6 @@ def test_a_call_to_the_manage_tool_by_name_is_refused_and_the_task_keeps_running
         agent = _agent(PolicyModel(policy), [fake_compose(0.4)])
         await agent.invoke_async("make a deck")
         dispatched = [t["status"] for t in background.tasks(agent)]
-        await _until(lambda: [t["status"] for t in background.tasks(agent)] == ["working"])
         await _until(lambda: background.undelivered(agent))
         return agent, dispatched
 
@@ -209,7 +208,7 @@ def test_a_call_to_the_manage_tool_by_name_is_refused_and_the_task_keeps_running
     refused = [r for m in agent.messages for r in tool_results(m)][-1]
     assert refused["status"] == "error" and "delivered automatically" in result_text(refused)
     # Strands publishes "working" from its runtime thread after the dispatch ack, so the
-    # turn can end while the snapshot still says "queued"; run() waited for "working".
+    # turn can end while the snapshot still says "queued".
     assert dispatched in (["queued"], ["working"]), "the refused cancel did not touch the task"
     assert [t["status"] for t in background.undelivered(agent)] == ["completed"]
 
