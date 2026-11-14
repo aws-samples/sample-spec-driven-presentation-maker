@@ -54,6 +54,7 @@ class ChartMixin:
             ("line", True, False): XL_CHART_TYPE.LINE_MARKERS if markers else XL_CHART_TYPE.LINE,
             ("pie", False, False): XL_CHART_TYPE.PIE,
             ("donut", False, False): XL_CHART_TYPE.DOUGHNUT,
+            ("radar", False, False): XL_CHART_TYPE.RADAR_MARKERS if markers else XL_CHART_TYPE.RADAR,
         }
         xl_type = type_map.get((chart_type, stacked, horizontal))
         if xl_type is None:
@@ -325,7 +326,7 @@ class ChartMixin:
                     c = c.lstrip("#") if c else default_series_colors[j % len(default_series_colors)]
                     point.format.fill.solid()
                     point.format.fill.fore_color.rgb = RGBColor.from_string(c)
-            elif chart_type == "line":
+            elif chart_type in ("line", "radar"):
                 series.format.line.color.rgb = rgb
                 series.format.line.width = Pt(style_line_width or 2.5)
                 if markers:

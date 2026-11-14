@@ -226,5 +226,5 @@ Each element type's fields are in a guide that `read_guides` returns:
   textboxes and images
 - `visual-forms` — when to draw a form, icon use and sizes, and the geometry of flow, cycle,
   hub, hierarchy, matrix, timeline, progress and the other forms
-- `table`, `chart-bar` / `chart-line` / `chart-pie`, `freeform` — the full references of those
+- `table`, `chart-bar` / `chart-line` / `chart-pie` / `chart-radar`, `freeform` — the full references of those
   elements

@@ -24,6 +24,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   Illustrator does for its namespace URIs; external, nested or markup-bearing entities are
   refused. A refused file is named in the error. Attached SVGs are also parsed with DTDs
   refused.
+  
+### Added
+
+- **Radar charts** (`chartType: "radar"`, #621). A radar chart takes the same categories and
+  series as a line chart; `markers` (default on), series `color`, `style.lineWidth` /
+  `style.markerSize` and `valueAxis` (`min` / `max` / `majorUnit` / `gridlines`, the radial
+  scale) work as for `line`. `pptx_to_json` reads a radar chart back as `radar`, so an
+  edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
+  New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
 - **Local Web UI file access stays inside its data directories after symlinks are
   resolved.** The preview, deck list, deck detail, PPTX download, template download, style
   detail, change request and "open in app" endpoints, and the deck's chat files (`.session`,
@@ -34,9 +43,6 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   writes; a file that does not exist yet is created only where its directory resolves inside.
   Files inside, including symlinks that stay inside, are served as before. User templates
   are now also found when the config directory itself is reached through a symlink.
-
-### Added
-
 - **Accessibility metadata in built PPTX files.** Any element takes `alt` (written as the
   shape's alt text, `p:cNvPr@descr`) or `decorative: true` (PowerPoint's "Mark as
   decorative"), so images, icons, charts, tables and videos can pass PowerPoint's
@@ -89,8 +95,8 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   chart's fields still match it; an edited chart is built from its JSON, keeping the text
   drawn over it (`_chartUserShapes`) but not the styling the JSON does not describe. Moving
   or resizing a chart counts as unedited. A chart whose type or combination of plots
-  `chartType` cannot describe (area, radar, 100% stacked, a column chart with a line plot,
-  and so on) is marked `_chartRebuildable: false` and keeps its original chart when edited;
+  `chartType` cannot describe (area, filled radar, 100% stacked, a column chart with a line
+  plot, and so on) is marked `_chartRebuildable: false` and keeps its original chart when edited;
   the build reports `chart-edit-ignored` for it, and deleting `_chartXml` builds it from its
   JSON instead. JSON converted before this change has no fingerprint and rebuilds as before;
   convert the PPTX again to edit its charts. Local mode and the AWS stack (SdpmRuntime).
