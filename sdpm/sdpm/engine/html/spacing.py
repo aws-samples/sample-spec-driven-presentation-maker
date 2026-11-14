@@ -3,64 +3,61 @@
 """CJK↔Latin auto spacing for HTML slides — the same typography the PPTX builder applies.
 
 ``space_section(section)`` rewrites the text nodes of one parsed ``<section>`` in place
-with ``sdpm.utils.text.normalize_spacing`` and adds the space at the boundary between
-inline elements too (``<strong>AWS</strong>の`` → ``AWS`` and ``の`` apart), as the PPTX
-builder does across styled segments. Only text changes; attribute values never do.
+with ``sdpm.utils.text.spacing_points``, computed over each run of text joined up, so
+inline elements get the same spaces as the PPTX builder gives styled segments
+(``<strong>AWS</strong>の`` → ``AWS`` and ``の`` apart). A space at a boundary goes at
+the end of the text before it. Only text changes; attribute values never do.
 
 A run of text continues through inline elements and stops at any other element (block
 elements, ``<br>``, images): no space is added across such a boundary. Code and
-preformatted text (``pre`` ``code`` ``kbd`` ``samp``), ``script`` ``style`` ``textarea``
-and inline ``svg`` / ``math`` keep their text as written; they also end a run.
+preformatted text (``pre`` ``code`` ``kbd`` ``samp``), ``script`` ``style`` ``textarea``,
+inline ``svg`` / ``math``, superscript and subscript (``sup`` ``sub``) and ruby text
+(``rt`` ``rp``) keep their text as written; they also end a run.
 """
 from __future__ import annotations
 
-from sdpm.utils.text import ASCII_TRAILING_PUNCTUATION, is_cjk_punctuation, is_fullwidth, normalize_spacing
+from sdpm.utils.text import spacing_points
 
 # Text inside these is left verbatim (code, raw text, drawn text whose width is fixed).
-VERBATIM_TAGS = frozenset({"pre", "code", "kbd", "samp", "script", "style", "textarea", "svg", "math"})
+VERBATIM_TAGS = frozenset({
+    "pre", "code", "kbd", "samp", "script", "style", "textarea", "svg", "math", "sup", "sub", "rt", "rp",
+})
 
 # Text runs continue through these; every other element ends the run.
 INLINE_TAGS = frozenset({
     "a", "abbr", "b", "bdi", "bdo", "cite", "data", "del", "dfn", "em", "font", "i", "ins",
-    "label", "mark", "q", "ruby", "rb", "rp", "rt", "s", "small", "span", "strong", "sub",
-    "sup", "time", "u", "var",
+    "label", "mark", "q", "ruby", "rb", "s", "small", "span", "strong", "time", "u", "var",
 })
 
 
-def _is_ascii(c: str) -> bool:
-    return "\x21" <= c <= "\x7e"
-
-
-def _is_wide(c: str) -> bool:
-    return is_fullwidth(c) and not is_cjk_punctuation(c)
-
-
-def _needs_space(last: str, first: str) -> bool:
-    return (_is_ascii(last) and _is_wide(first)) or (
-        _is_wide(last) and _is_ascii(first) and first not in ASCII_TRAILING_PUNCTUATION)
-
-
 class _Run:
-    """The text slots of the current run, so a boundary space can go on the previous one."""
+    """The text slots of the current run; spaced together when the run ends."""
 
     def __init__(self) -> None:
-        self.prev: tuple[object, str] | None = None  # (element, "text" | "tail")
-
-    def end(self) -> None:
-        self.prev = None
+        self.slots: list[tuple[object, str]] = []  # (element, "text" | "tail")
 
     def add(self, el, attr: str) -> None:
-        value = getattr(el, attr)
-        if not value:
+        if getattr(el, attr):
+            self.slots.append((el, attr))
+
+    def end(self) -> None:
+        slots, self.slots = self.slots, []
+        if not slots:
             return
-        value = normalize_spacing(value)
-        setattr(el, attr, value)
-        if self.prev is not None:
-            prev_el, prev_attr = self.prev
-            prev_value = getattr(prev_el, prev_attr)
-            if _needs_space(prev_value[-1], value[0]):
-                setattr(prev_el, prev_attr, prev_value + " ")
-        self.prev = (el, attr)
+        values = [getattr(el, attr) for el, attr in slots]
+        owner, start = [], []
+        for idx, value in enumerate(values):
+            start.append(len(owner))
+            owner.extend([idx] * len(value))
+        inserts: dict[int, list[int]] = {}
+        for p in spacing_points("".join(values)):
+            inserts.setdefault(owner[p], []).append(p - start[owner[p]] + 1)
+        for idx, cuts in inserts.items():
+            value = values[idx]
+            for cut in sorted(cuts, reverse=True):
+                value = value[:cut] + " " + value[cut:]
+            el, attr = slots[idx]
+            setattr(el, attr, value)
 
 
 def _walk(el, run: _Run) -> None:
@@ -88,3 +85,4 @@ def space_section(section) -> None:
     run.add(section, "text")
     for child in section:
         _walk(child, run)
+    run.end()
