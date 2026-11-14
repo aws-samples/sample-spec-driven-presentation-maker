@@ -25,6 +25,7 @@ from sdpm.utils.effects import (
     BEVEL_PRESETS,
     GLOW_PRESETS,
     REFLECTION_PRESETS,
+    ROTATION3D_PRESETS,
     SHADOW_PRESETS,
     _insert_ordered,
     apply_effects,
@@ -167,21 +168,8 @@ def test_bevel_preset_roundtrip(name):
     assert "rotation3d" not in out  # the orthographic camera is not a rotation
 
 
-@pytest.mark.parametrize("preset", [
-    "perspective-left", "perspective-right", "perspective-top",
-    "isometric-top", "isometric-left",
-])
+@pytest.mark.parametrize("preset", sorted(ROTATION3D_PRESETS))
 def test_rotation3d_preset_roundtrip(preset):
-    assert _roundtrip({"rotation3d": preset})["rotation3d"] == preset
-
-
-@pytest.mark.xfail(strict=True, reason=(
-    "importer camera map lacks perspectiveBelow / perspectiveContrasting*Facing:"
-    " these builder presets are dropped on import; #631"))
-@pytest.mark.parametrize("preset", [
-    "perspective-bottom", "perspective-left-most", "perspective-right-most",
-])
-def test_rotation3d_preset_roundtrip_missing_from_importer(preset):
     assert _roundtrip({"rotation3d": preset}).get("rotation3d") == preset
 
 
@@ -194,9 +182,6 @@ def test_rotation3d_default_perspective_is_written():
     assert _roundtrip({"rotation3d": {"rotY": 15}})["rotation3d"] == {"rotY": 15, "perspective": 120}
 
 
-@pytest.mark.xfail(strict=True, reason=(
-    "perspective=0 builds an orthographic camera without fov; the importer omits"
-    " 'perspective', so a rebuild falls back to the 120 default; #632"))
 def test_rotation3d_orthographic_roundtrip():
     spec = {"rotX": 20, "perspective": 0}
     assert _roundtrip({"rotation3d": spec})["rotation3d"] == spec

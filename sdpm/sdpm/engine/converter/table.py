@@ -5,7 +5,7 @@ import sys
 import zipfile
 
 from .constants import _NS, get_emu_per_px, _base_element, _hex
-from .color import _resolve_scheme_color, _apply_tint, _apply_shade, extract_text_color
+from .color import _resolve_scheme_color, extract_text_color
 from .xml_helpers import _extract_fill_from_xml
 from .text import _extract_styled_text
 
@@ -230,15 +230,8 @@ def _parse_table_style(pptx_path, style_id, theme_colors, color_mapping):
                 return _hex(srgb)
             scheme = fill_el.find('a:schemeClr', _NS)
             if scheme is not None:
-                base = _resolve_scheme_color(scheme.get('val'), theme_colors, color_mapping)
-                if base:
-                    tint = scheme.find('a:tint', _NS)
-                    shade = scheme.find('a:shade', _NS)
-                    if tint is not None:
-                        return _apply_tint(base, int(tint.get('val')) / 100000)
-                    if shade is not None:
-                        return _apply_shade(base, int(shade.get('val')) / 100000)
-                    return base
+                from .color import _resolve_color_with_transforms
+                return _resolve_color_with_transforms(scheme, theme_colors, color_mapping)
             return None
 
         def resolve_border(tc_bdr):
