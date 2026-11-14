@@ -133,7 +133,7 @@ def test_connect_failure_is_a_cdp_error() -> None:
 # ── browser resolution ────────────────────────────────────────────────────
 
 @contextlib.contextmanager
-def _registered_endpoint(width, height):
+def _registered_endpoint(width, height, *, start_timeout):
     yield BrowserEndpoint("ws://x", {"Authorization": "a"}, "Registered")
 
 
@@ -187,3 +187,50 @@ def test_local_browser_temp_dir_failure_raises_before_starting(monkeypatch) -> N
     with pytest.raises(OSError, match="No space"):
         with browser.local_browser("/opt/chrome", 1920, 1080):
             pass
+
+
+class _SilentBrowser:
+    """Popen stand-in that never writes DevToolsActivePort."""
+
+    launched: list = []
+
+    def __init__(self, argv, **_kwargs) -> None:
+        self.profile = Path(next(a for a in argv if a.startswith("--user-data-dir=")).split("=", 1)[1])
+        self.stopped = False
+        type(self).launched.append(self)
+
+    def poll(self):
+        return 0 if self.stopped else None
+
+    def terminate(self) -> None:
+        self.stopped = True
+
+    def wait(self, timeout=None) -> int:
+        return 0
+
+    def kill(self) -> None:
+        self.stopped = True
+
+
+def test_local_browser_names_the_browser_that_did_not_start(monkeypatch) -> None:
+    _SilentBrowser.launched = []
+    monkeypatch.setattr(browser.subprocess, "Popen", _SilentBrowser)
+    with pytest.raises(TimeoutError, match=r"^Google Chrome did not start within 0.2 s \(no DevTools port\)$"):
+        with browser.local_browser("/opt/google-chrome", 1280, 720, start_timeout=0.2):
+            pytest.fail("no endpoint")
+    (proc,) = _SilentBrowser.launched
+    assert proc.stopped and not proc.profile.exists()
+
+
+def test_local_source_passes_the_start_timeout(monkeypatch) -> None:
+    seen = []
+
+    @contextlib.contextmanager
+    def fake(executable, width, height, *, start_timeout):
+        seen.append((executable, width, height, start_timeout))
+        yield BrowserEndpoint("ws://x", {}, "x")
+
+    monkeypatch.setattr(browser, "local_browser", fake)
+    with browser._local_source("/opt/google-chrome")(1280, 720, start_timeout=42.0):
+        pass
+    assert seen == [("/opt/google-chrome", 1280, 720, 42.0)]
