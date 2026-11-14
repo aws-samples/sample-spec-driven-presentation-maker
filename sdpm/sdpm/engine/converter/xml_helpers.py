@@ -5,7 +5,11 @@ import defusedxml
 defusedxml.defuse_stdlib()
 
 from .constants import _NS, _hex, get_emu_per_px
-from .color import _resolve_scheme_color, _resolve_color_with_transforms
+from .color import _resolve_scheme_color, _resolve_color_with_transforms, apply_transforms
+from sdpm.utils.effects import ROTATION3D_PRESETS
+
+# camera prst -> rotation3d preset name, the inverse of what the builder writes
+_CAMERA_PRESET_NAMES = {v["prst"]: k for k, v in ROTATION3D_PRESETS.items()}
 
 
 def _sys_hex(solid):
@@ -32,32 +36,8 @@ def _sys_hex(solid):
 
 def _apply_srgb_transforms(hex_color, transforms):
     """Apply lumMod/lumOff/tint/shade/satMod transforms to an srgbClr."""
-    h = hex_color.lstrip("#")
-    r, g, b = int(h[0:2], 16), int(h[2:4], 16), int(h[4:6], 16)
-    if 'lumMod' in transforms or 'lumOff' in transforms:
-        mod = int(transforms.get('lumMod', '100000')) / 100000
-        off = int(transforms.get('lumOff', '0')) / 100000
-        r = min(255, max(0, int(r * mod + 255 * off)))
-        g = min(255, max(0, int(g * mod + 255 * off)))
-        b = min(255, max(0, int(b * mod + 255 * off)))
-    if 'tint' in transforms:
-        # ECMA-376: an N% tint is N% of the input color mixed with (100-N)%
-        # white — val=100000 leaves the color unchanged (in linear gamma).
-        t = int(transforms['tint']) / 100000
-        rl, gl, bl = pow(r/255, 2.2), pow(g/255, 2.2), pow(b/255, 2.2)
-        rl, gl, bl = rl*t + (1-t), gl*t + (1-t), bl*t + (1-t)
-        r, g, b = int(pow(max(0,rl), 1/2.2)*255), int(pow(max(0,gl), 1/2.2)*255), int(pow(max(0,bl), 1/2.2)*255)
-    if 'shade' in transforms:
-        s = int(transforms['shade']) / 100000
-        rl, gl, bl = pow(r/255, 2.2)*s, pow(g/255, 2.2)*s, pow(b/255, 2.2)*s
-        r, g, b = int(pow(max(0,rl), 1/2.2)*255), int(pow(max(0,gl), 1/2.2)*255), int(pow(max(0,bl), 1/2.2)*255)
-    if 'satMod' in transforms:
-        import colorsys
-        m = int(transforms['satMod']) / 100000
-        hh, ll, ss = colorsys.rgb_to_hls(r/255, g/255, b/255)
-        rr, gg, bb = colorsys.hls_to_rgb(hh, ll, min(1.0, ss * m))
-        r, g, b = int(rr*255), int(gg*255), int(bb*255)
-    return f"#{min(255,max(0,r)):02X}{min(255,max(0,g)):02X}{min(255,max(0,b)):02X}"
+    return apply_transforms(hex_color, transforms)
+
 
 def extract_line_dash(shape):
     """Extract line dash type from shape XML."""
@@ -224,13 +204,8 @@ def _extract_3d_from_xml(sp_pr):
         camera = scene3d.find(f'{{{_NS["a"]}}}camera')
         if camera is not None:
             prst = camera.get('prst', '')
-            _cam_map = {
-                'perspectiveLeft': 'perspective-left', 'perspectiveRight': 'perspective-right',
-                'perspectiveAbove': 'perspective-top',
-                'isometricTopUp': 'isometric-top', 'isometricLeftDown': 'isometric-left',
-            }
-            if prst in _cam_map:
-                result["rotation3d"] = _cam_map[prst]
+            if prst in _CAMERA_PRESET_NAMES:
+                result["rotation3d"] = _CAMERA_PRESET_NAMES[prst]
             else:
                 rot = camera.find(f'{{{_NS["a"]}}}rot')
                 if rot is not None:
@@ -242,6 +217,10 @@ def _extract_3d_from_xml(sp_pr):
                     fov = camera.get('fov')
                     if fov:
                         r["perspective"] = round(int(fov) / 60000)
+                    elif r and prst == 'orthographicFront':
+                        # the builder writes perspective 0 as an orthographic
+                        # camera without fov; omitting it would rebuild as 120
+                        r["perspective"] = 0
                     if r:
                         result["rotation3d"] = r
 

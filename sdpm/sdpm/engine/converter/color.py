@@ -193,36 +193,8 @@ def _resolve_color_with_transforms(scheme_el, theme_colors, color_mapping, overr
     resolved = _resolve_scheme_color(scheme_val, theme_colors, color_mapping)
     if not resolved:
         return None
-    lum_mod = scheme_el.find('a:lumMod', _NS)
-    lum_off = scheme_el.find('a:lumOff', _NS)
-    shade = scheme_el.find('a:shade', _NS)
-    tint = scheme_el.find('a:tint', _NS)
-    if lum_mod is not None or lum_off is not None or shade is not None or tint is not None:
-        hx = resolved.lstrip('#')
-        r, g, b = int(hx[0:2], 16) / 255, int(hx[2:4], 16) / 255, int(hx[4:6], 16) / 255
-        # shade: darken toward black (in linear space)
-        if shade is not None:
-            f = int(shade.get('val')) / 100000
-            r, g, b = pow(r, 2.2) * f, pow(g, 2.2) * f, pow(b, 2.2) * f
-            r, g, b = pow(max(0,r), 1/2.2), pow(max(0,g), 1/2.2), pow(max(0,b), 1/2.2)
-        # tint: lighten toward white (in linear space)
-        if tint is not None:
-            f = int(tint.get('val')) / 100000
-            rl, gl, bl = pow(r, 2.2), pow(g, 2.2), pow(b, 2.2)
-            rl, gl, bl = rl + (1-rl)*(1-f), gl + (1-gl)*(1-f), bl + (1-bl)*(1-f)
-            r, g, b = pow(max(0,rl), 1/2.2), pow(max(0,gl), 1/2.2), pow(max(0,bl), 1/2.2)
-        # lumMod/lumOff
-        if lum_mod is not None or lum_off is not None:
-            h, lum, s = colorsys.rgb_to_hls(r, g, b)
-            if lum_mod is not None:
-                lum *= int(lum_mod.get('val')) / 100000
-            if lum_off is not None:
-                lum += int(lum_off.get('val')) / 100000
-            lum = min(1.0, max(0.0, lum))
-            r, g, b = colorsys.hls_to_rgb(h, lum, s)
-        r, g, b = min(1.0, max(0.0, r)), min(1.0, max(0.0, g)), min(1.0, max(0.0, b))
-        resolved = f"#{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
-    return resolved
+    return apply_element_transforms(resolved, scheme_el)
+
 
 def apply_element_transforms(base_hex, color_el):
     """Apply lumMod/lumOff/tint/shade children of a color element to a hex.
@@ -231,33 +203,45 @@ def apply_element_transforms(base_hex, color_el):
     <a:srgbClr val="4F81BD"><a:lumMod val="75000"/></a:srgbClr> and dropping
     the transform shifts the rendered color dramatically.
     """
-    lum_mod = color_el.find('a:lumMod', _NS)
-    lum_off = color_el.find('a:lumOff', _NS)
-    shade = color_el.find('a:shade', _NS)
-    tint = color_el.find('a:tint', _NS)
-    if lum_mod is None and lum_off is None and shade is None and tint is None:
-        return base_hex
+    transforms = {}
+    for name in ('lumMod', 'lumOff', 'tint', 'shade'):
+        el = color_el.find(f'a:{name}', _NS)
+        if el is not None:
+            transforms[name] = el.get('val')
+    return apply_transforms(base_hex, transforms) if transforms else base_hex
+
+
+def apply_transforms(base_hex, transforms):
+    """Apply DrawingML color transforms ({name: val}) to a hex color.
+
+    The one implementation every color element shares (schemeClr, srgbClr,
+    sysClr, prstClr, gradient stops): shade / tint mix toward black / white
+    in linear gamma, lumMod / lumOff scale and offset the HSL luminance
+    (4F81BD at lumMod 75% is 376092), then satMod scales the HSL saturation.
+    Applied in that order, independent of the order of the children. Only
+    the srgbClr gradient-stop path passes satMod; the others read lumMod /
+    lumOff / tint / shade. Channels are rounded to the nearest integer.
+    """
     hx = base_hex.lstrip('#')
     r, g, b = int(hx[0:2], 16) / 255, int(hx[2:4], 16) / 255, int(hx[4:6], 16) / 255
-    if shade is not None:
-        f = int(shade.get('val')) / 100000
+    if 'shade' in transforms:
+        f = int(transforms['shade']) / 100000
         r, g, b = pow(r, 2.2) * f, pow(g, 2.2) * f, pow(b, 2.2) * f
         r, g, b = pow(max(0, r), 1/2.2), pow(max(0, g), 1/2.2), pow(max(0, b), 1/2.2)
-    if tint is not None:
-        f = int(tint.get('val')) / 100000
+    if 'tint' in transforms:
+        f = int(transforms['tint']) / 100000
         rl, gl, bl = pow(r, 2.2), pow(g, 2.2), pow(b, 2.2)
         rl, gl, bl = rl + (1-rl)*(1-f), gl + (1-gl)*(1-f), bl + (1-bl)*(1-f)
         r, g, b = pow(max(0, rl), 1/2.2), pow(max(0, gl), 1/2.2), pow(max(0, bl), 1/2.2)
-    if lum_mod is not None or lum_off is not None:
+    if 'lumMod' in transforms or 'lumOff' in transforms:
         h, lum, sat = colorsys.rgb_to_hls(r, g, b)
-        if lum_mod is not None:
-            lum *= int(lum_mod.get('val')) / 100000
-        if lum_off is not None:
-            lum += int(lum_off.get('val')) / 100000
-        lum = min(1.0, max(0.0, lum))
-        r, g, b = colorsys.hls_to_rgb(h, lum, sat)
+        lum = lum * int(transforms.get('lumMod', '100000')) / 100000 + int(transforms.get('lumOff', '0')) / 100000
+        r, g, b = colorsys.hls_to_rgb(h, min(1.0, max(0.0, lum)), sat)
+    if 'satMod' in transforms:
+        h, lum, sat = colorsys.rgb_to_hls(r, g, b)
+        r, g, b = colorsys.hls_to_rgb(h, lum, min(1.0, sat * int(transforms['satMod']) / 100000))
     r, g, b = min(1.0, max(0.0, r)), min(1.0, max(0.0, g)), min(1.0, max(0.0, b))
-    return f"#{int(r * 255):02X}{int(g * 255):02X}{int(b * 255):02X}"
+    return f"#{round(r * 255):02X}{round(g * 255):02X}{round(b * 255):02X}"
 
 
 def apply_color_transforms(base_color_hex, transforms):
@@ -281,20 +265,4 @@ def apply_color_transforms(base_color_hex, transforms):
     g = max(0, min(255, g))
     b = max(0, min(255, b))
     
-    return f"#{r:02X}{g:02X}{b:02X}"
-
-def _apply_tint(hex_color, tint_factor):
-    """Apply tint (mix with white) to a hex color."""
-    r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
-    r = int(r + (255 - r) * (1 - tint_factor))
-    g = int(g + (255 - g) * (1 - tint_factor))
-    b = int(b + (255 - b) * (1 - tint_factor))
-    return f"#{r:02X}{g:02X}{b:02X}"
-
-def _apply_shade(hex_color, shade_factor):
-    """Apply shade (mix with black) to a hex color."""
-    r, g, b = int(hex_color[1:3], 16), int(hex_color[3:5], 16), int(hex_color[5:7], 16)
-    r = int(r * shade_factor)
-    g = int(g * shade_factor)
-    b = int(b * shade_factor)
     return f"#{r:02X}{g:02X}{b:02X}"

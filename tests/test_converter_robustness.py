@@ -16,6 +16,7 @@ import copy
 import json
 from pathlib import Path
 
+import pytest
 from pptx import Presentation
 from pptx.util import Emu
 
@@ -308,7 +309,14 @@ class TestExplicitCropKeepsFrame:
 
 
 class TestTableThemeStyle:
-    def test_table_style_id_resolves_to_style_dict(self, tmp_path):
+    # the scheme fill goes through the same transforms as every other
+    # schemeClr (accent1 of blank-dark is 4F81BD; lumMod 75% is Office's
+    # 376092)
+    @pytest.mark.parametrize("fill, expected", [
+        ('<a:srgbClr val="112233"/>', "#112233"),
+        ('<a:schemeClr val="accent1"><a:lumMod val="75000"/></a:schemeClr>', "#376092"),
+    ])
+    def test_table_style_id_resolves_to_style_dict(self, tmp_path, fill, expected):
         """Tables styled via tableStyleId (theme table styles) must emit a
         table-level style dict; otherwise the builder overwrites the look
         with its own default banding (white rows on dark decks)."""
@@ -336,7 +344,7 @@ class TestTableThemeStyle:
   <a:wholeTbl>
    <a:tcStyle>
     <a:tcBdr><a:insideH><a:ln w="12700"><a:solidFill><a:srgbClr val="AD5CFF"/></a:solidFill></a:ln></a:insideH></a:tcBdr>
-    <a:fill><a:solidFill><a:srgbClr val="112233"/></a:solidFill></a:fill>
+    <a:fill><a:solidFill>{fill}</a:solidFill></a:fill>
    </a:tcStyle>
   </a:wholeTbl>
  </a:tblStyle>
@@ -354,7 +362,7 @@ class TestTableThemeStyle:
         assert tables, "table element not extracted"
         style = tables[0].get("style")
         assert style is not None, "tableStyleId did not resolve to a style dict"
-        assert style["body"]["background"] == "#112233"
+        assert style["body"]["background"] == expected
         assert style["border"]["color"] == "#AD5CFF"
 
 
