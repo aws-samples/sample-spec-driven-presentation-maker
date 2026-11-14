@@ -2,9 +2,11 @@
 # SPDX-License-Identifier: MIT-0
 """Where the browser check gets its browser (design §9).
 
-A ``BrowserSource`` is a callable ``(width, height) -> ContextManager[BrowserEndpoint]``:
-entering it starts (or borrows) a browser and yields the DevTools WebSocket URL, the
-headers to connect with and a display name; leaving it releases the browser.
+A ``BrowserSource`` is a callable ``(width, height, *, start_timeout) ->
+ContextManager[BrowserEndpoint]``: entering it starts (or borrows) a browser and yields the
+DevTools WebSocket URL, the headers to connect with and a display name; leaving it releases
+the browser. ``start_timeout`` is what is left of the check's time budget, the most a start
+may take.
 
 Two kinds exist. The local source (``local_browser``) starts the Chrome or Edge found on
 this machine headless, with DevTools on a random loopback port, a temporary profile and
@@ -26,7 +28,7 @@ import tempfile
 import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Callable, ContextManager, Iterator
+from typing import ContextManager, Iterator, Protocol
 
 
 @dataclass(frozen=True)
@@ -38,7 +40,10 @@ class BrowserEndpoint:
     name: str = "browser"
 
 
-BrowserSource = Callable[[int, int], ContextManager[BrowserEndpoint]]
+class BrowserSource(Protocol):
+    def __call__(self, width: int, height: int, *,
+                 start_timeout: float) -> ContextManager[BrowserEndpoint]: ...
+
 
 DISABLED_NOTE = ("Browser check skipped: turned off here (SDPM_BROWSER=none), so layout, JS errors "
                  "and PNG previews of the slides are unknown.")
@@ -146,7 +151,9 @@ def local_browser(executable: str, width: int, height: int, *,
     """Start ``executable`` headless with DevTools on a random 127.0.0.1 port.
 
     The port and path come from ``DevToolsActivePort`` in a temporary profile; the
-    browser is stopped and the profile removed on exit.
+    browser is stopped and the profile removed on exit. A first start on a fresh machine
+    can take tens of seconds, so the check passes what is left of its time budget as
+    ``start_timeout``.
     """
     profile = tempfile.mkdtemp(prefix="sdpm-browser-")
     proc = None
@@ -166,7 +173,8 @@ def local_browser(executable: str, width: int, height: int, *,
             if code is not None:
                 raise RuntimeError(f"{Path(executable).name} exited (code {code}) before DevTools started")
             if time.monotonic() - started > start_timeout:
-                raise TimeoutError(f"DevTools did not start within {start_timeout:g} s")
+                raise TimeoutError(f"{_display_name(executable)} did not start within "
+                                   f"{round(start_timeout, 1):g} s (no DevTools port)")
             time.sleep(0.05)
         port, path = lines[0].strip(), lines[1].strip()
         yield BrowserEndpoint(f"ws://127.0.0.1:{port}{path}", {}, _display_name(executable))
@@ -177,8 +185,8 @@ def local_browser(executable: str, width: int, height: int, *,
 
 
 def _local_source(executable: str) -> BrowserSource:
-    def source(width: int, height: int) -> ContextManager[BrowserEndpoint]:
-        return local_browser(executable, width, height)
+    def source(width: int, height: int, *, start_timeout: float) -> ContextManager[BrowserEndpoint]:
+        return local_browser(executable, width, height, start_timeout=start_timeout)
     source.browser_name = _display_name(executable)  # type: ignore[attr-defined]  # named before it starts
     return source
 
