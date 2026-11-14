@@ -105,7 +105,7 @@ def _check(tmp_path: Path, slugs=("a",), **kw) -> dict:
 
 
 def test_disabled_check_starts_nothing(tmp_path: Path, monkeypatch) -> None:
-    monkeypatch.setattr(browser, "_registered", lambda w, h: pytest.fail("source used"))
+    monkeypatch.setattr(browser, "_registered", lambda w, h, **_: pytest.fail("source used"))
     result = _check(tmp_path)
     assert result == {"status": "skipped", "slides": 0, "checked": [], "findings": {}, "errors": [],
                       "pngs": {}, "note": DISABLED_NOTE}
@@ -113,7 +113,7 @@ def test_disabled_check_starts_nothing(tmp_path: Path, monkeypatch) -> None:
 
 def test_failing_source_is_reported(tmp_path: Path, monkeypatch) -> None:
     @contextlib.contextmanager
-    def broken(width, height):
+    def broken(width, height, *, start_timeout):
         raise RuntimeError("no session")
         yield  # pragma: no cover
 
@@ -127,11 +127,58 @@ def test_failing_source_is_reported(tmp_path: Path, monkeypatch) -> None:
     assert not (tmp_path / "png").exists()
 
 
+def test_the_start_may_take_what_is_left_of_the_budget(tmp_path: Path, monkeypatch) -> None:
+    given = []
+
+    @contextlib.contextmanager
+    def source(width, height, *, start_timeout):
+        given.append(start_timeout)
+        raise TimeoutError(f"Slow Browser did not start within {start_timeout:.0f} s (no DevTools port)")
+        yield  # pragma: no cover
+
+    monkeypatch.delenv("SDPM_BROWSER")
+    monkeypatch.setattr(browser, "_registered", source)
+    result = _check(tmp_path, ["a", "b"], deadline=20)
+    (start_timeout,) = given
+    assert 19 < start_timeout <= 20, "the start gets the check's budget, not a fixed 15 s"
+    assert result["status"] == "failed"
+    assert "TimeoutError: Slow Browser did not start within 20 s (no DevTools port)" in result["note"]
+
+
+class _TimedOutCdp:
+    def __init__(self, *_a, **_k) -> None:
+        pass
+
+    def __enter__(self):
+        raise browser_check.CdpTimeout("Target.createTarget: no reply")
+
+    def __exit__(self, *_exc) -> None:
+        pass
+
+
+@pytest.mark.parametrize(("start_s", "cause"), [
+    (0.0, "A slide script that never returns can cause this."),
+    (0.5, "The browser took 0.5 s of it to start."),
+])
+def test_timeout_note_names_a_slow_start(tmp_path: Path, monkeypatch, start_s, cause) -> None:
+    @contextlib.contextmanager
+    def source(width, height, *, start_timeout):
+        time.sleep(start_s)
+        yield BrowserEndpoint("ws://127.0.0.1:9/devtools/browser/x", {}, "Slow Browser")
+
+    monkeypatch.delenv("SDPM_BROWSER")
+    monkeypatch.setattr(browser, "_registered", source)
+    monkeypatch.setattr(browser_check, "CdpConnection", _TimedOutCdp)
+    result = _check(tmp_path, deadline=1.2)
+    assert result["status"] == "timeout"
+    assert result["note"].endswith(cause), result["note"]
+
+
 def test_unreachable_endpoint_is_reported(tmp_path: Path, monkeypatch) -> None:
     released = []
 
     @contextlib.contextmanager
-    def dead(width, height):
+    def dead(width, height, *, start_timeout):
         try:
             yield BrowserEndpoint("ws://127.0.0.1:9/devtools/browser/x", {}, "Dead")
         finally:
@@ -192,7 +239,7 @@ class _ReachableRtcCdp(_NoBlockCdp):
 
 def _no_block_source(monkeypatch, cdp=_NoBlockCdp, reject="Fetch.enable"):
     @contextlib.contextmanager
-    def source(width, height):
+    def source(width, height, *, start_timeout):
         yield BrowserEndpoint("ws://127.0.0.1:9/devtools/browser/x", {}, "Remote Browser")
 
     _NoBlockCdp.sent = []
@@ -524,8 +571,8 @@ def test_real_browser_devtools_listens_on_loopback_only(tmp_path: Path, use_brow
     executable = find_browser()
 
     @contextlib.contextmanager
-    def watched(width, height):
-        with browser.local_browser(executable, width, height) as endpoint:
+    def watched(width, height, *, start_timeout):
+        with browser.local_browser(executable, width, height, start_timeout=start_timeout) as endpoint:
             port = re.search(r":(\d+)/", endpoint.url).group(1)
             pids = subprocess.run(["lsof", "-t", "-nP", f"-iTCP:{port}", "-sTCP:LISTEN"],
                                   capture_output=True, text=True, check=False).stdout.split()

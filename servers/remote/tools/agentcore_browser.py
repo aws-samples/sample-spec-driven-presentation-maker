@@ -94,7 +94,8 @@ def make_source(
             except Exception:  # the session times out on its own (SESSION_TIMEOUT_S)
                 logger.warning("stop_browser_session failed for %s", session_id, exc_info=True)
 
-    def source(width: int, height: int) -> ContextManager[BrowserEndpoint]:
+    def source(width: int, height: int, *, start_timeout: float) -> ContextManager[BrowserEndpoint]:
+        # start_browser_session is bounded by the client's own API timeout, not start_timeout
         return session(width, height)
 
     source.browser_name = DISPLAY_NAME  # type: ignore[attr-defined]  # named before it starts

@@ -118,6 +118,18 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   names get the CJK↔Latin spacing of slide text (`AWSの利用料` → `AWS の利用料`), and keep
   their text as written with `"autoSpacing": false`. Local mode and the AWS stack
   (SdpmRuntime).
+- **PPTX import keeps every `rotation3d` preset and an orthographic rotation.** The
+  presets `perspective-bottom`, `perspective-left-most` and `perspective-right-most` were
+  dropped on import (#631), and a free rotation with `perspective: 0` came back without
+  `perspective`, so a rebuild showed it at the default 120° (#632).
+- **Imported `lumMod` / `lumOff` colors match PowerPoint.**
+  Gradient stops on an `srgbClr` and system colors (`sysClr`) scaled RGB instead of HSL
+  luminance, so `4F81BD` at lumMod 75% came out `3B608D` instead of `376092` (#633). Fills
+  of theme table styles dropped `lumMod` / `lumOff` and mixed `tint` / `shade` in sRGB.
+  These colors and every other transformed fill, line and text color now share one
+  implementation, which rounds each channel instead of truncating it (transformed colors
+  can move by 1 per channel). Table borders and table text from a theme table style still
+  ignore color transforms.
 - **Built decks no longer inherit the template's document properties.** A deck kept its
   template's author and last editor, description, created / modified dates and revision
   (`docProps/core.xml`), the template's slide titles and word counts (`docProps/app.xml`)
@@ -141,6 +153,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **Smooth line charts read back as `smooth: true`.** The converter did not read `c:smooth`,
   so a smooth line chart rebuilt from `--minimal` JSON came back with straight segments.
   Local mode and the AWS stack (SdpmRuntime).
+- **A slow first start of Chrome or Edge no longer fails the HTML browser check.** The
+  check gave the local browser a fixed 15 s to start and reported `failed` (`could not run
+  … DevTools did not start within 15 s`) when a first start on a fresh machine took longer,
+  even with most of the check's time budget left. The start now may take what is left of
+  that budget (`min(30 + 3 × slides, 110)` s, unchanged), and a browser that does not start
+  in time is named in the note (`Google Chrome did not start within N s`). A check that
+  runs out of time after a slow start says how long the start took. Local mode (#625).
 
 ## [0.17.0] - 2026-11-13
 
