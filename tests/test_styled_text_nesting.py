@@ -129,6 +129,14 @@ class TestParseStyledTextNested:
         segments = parse_styled_text("{{bold:漢字{{#FF0000:abc}}}}")
         assert _all_text(segments) == "漢字 abc"
 
+    def test_auto_spacing_skips_japanese_punctuation_at_boundaries(self):
+        segments = parse_styled_text("{{bold:AWS}}の新機能、{{bold:DB}}。「{{bold:S3}}」")
+        assert _all_text(segments) == "AWS の新機能、DB。「S3」"
+
+    def test_auto_spacing_keeps_trailing_ascii_punctuation_attached(self):
+        segments = parse_styled_text("{{bold:例}}: {{bold:手順}}!")
+        assert _all_text(segments) == "例: 手順!"
+
     def test_unbalanced_does_not_crash(self):
         # Fallback: same (broken) output as before the flatten pre-pass.
         segments = parse_styled_text("{{bold:{{#FF0000:x}}")

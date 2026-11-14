@@ -6,8 +6,8 @@
  * referenced catalog icons drawn in.
  */
 import fs from "fs"
-import path from "path"
 import { BUNDLED_STYLES_DIR, getUserStylesDir } from "@/lib/local/sdpmPaths"
+import { resolveWithin } from "@/lib/local/contained"
 import { inlineStyleIcons } from "@/lib/local/styleIcons"
 
 export async function GET(_req: Request, { params }: { params: Promise<{ name: string }> }) {
@@ -16,8 +16,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ name: s
 
   // Search user-local first, then bundled
   for (const dir of [getUserStylesDir(), BUNDLED_STYLES_DIR]) {
-    const filePath = path.join(dir, `${name}.html`)
-    if (fs.existsSync(filePath)) {
+    const filePath = resolveWithin(dir, `${name}.html`)
+    if (filePath && fs.existsSync(filePath)) {
       const fullHtml = fs.readFileSync(filePath, "utf-8")
       const [html] = await inlineStyleIcons([fullHtml])
       return Response.json({ fullHtml, html })

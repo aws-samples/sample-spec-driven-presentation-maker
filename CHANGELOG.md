@@ -24,6 +24,44 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   Illustrator does for its namespace URIs; external, nested or markup-bearing entities are
   refused. A refused file is named in the error. Attached SVGs are also parsed with DTDs
   refused.
+
+### Added
+
+- **A writing guide for Japanese decks (`writing-ja`).** For a Japanese deck the
+  orchestrator reads it before writing the outline, and composers read it before writing any
+  slide text in every pass, in both PPTX and HTML. It says how headlines, bullets, diagram labels and speaker notes are
+  written: headlines state the slide's claim (or the lead does, when the style splits a topic
+  title from a claim lead), a list's items end the same way, items are
+  shortened from full sentences without losing who does what, notes are polite spoken
+  Japanese, no em dashes or metaphor verbs, full-width Japanese punctuation, ・ only for
+  listing words, numbered headings as a number, a period and a space, one spelling
+  per term. Its symbol rules take precedence over the symbols in a style's examples. The
+  guide is in Japanese. Local mode and the AWS stack (SdpmData and SdpmRuntime).
+- **HTML decks get the same CJK↔Latin spacing as PPTX.** The PPTX builder puts a
+  half-width space between Japanese (or other CJK) letters and Latin letters or digits; HTML
+  decks kept the text as the composer wrote it. `output.html` and the slide previews now
+  get those spaces too, also where emphasis or a link meets Japanese text
+  (`<strong>AWS</strong>の`). Code, preformatted text, scripts, styles, form fields, inline
+  SVG and MathML and attribute values are left as written, and the slide files are not
+  changed. `"autoSpacing": false` in deck.json turns it off, as for PPTX. Local mode and the
+  AWS stack (SdpmRuntime).
+- **Local Web UI file access stays inside its data directories after symlinks are
+  resolved.** The preview, deck list, deck detail, PPTX download, template download, style
+  detail, change request and "open in app" endpoints, and the deck's chat files (`.session`,
+  `.session-engine`, `.session-origin.json`, `.chat.json`), check the real path of both the
+  data directory and the file, with a separator boundary, through one shared helper. A
+  symlink leading out of the deck root, the templates or the styles directory is refused the
+  same way as any other path outside it, for reads and for the chat-file and change-request
+  writes; a file that does not exist yet is created only where its directory resolves inside.
+  Files inside, including symlinks that stay inside, are served as before. User templates
+  are now also found when the config directory itself is reached through a symlink.
+- **Accessibility metadata in built PPTX files.** Any element takes `alt` (written as the
+  shape's alt text, `p:cNvPr@descr`) or `decorative: true` (PowerPoint's "Mark as
+  decorative"), so images, icons, charts, tables and videos can pass PowerPoint's
+  Accessibility Checker. `deck.json` takes `title` and `language` (BCP 47), written to the
+  document properties; without `title` the first slide's title text is used. Importing a
+  PPTX reads all of them back. Elements without `alt` are built as before.
+
 ### Changed
 
 - **The MCP servers run on MCP Python SDK 2.x** (`mcp>=2.3,<3`, was `<2`; #301). The local
@@ -53,6 +91,19 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   instead of reading them from the cache (#222).
 
 ### Fixed
+
+- **No automatic space next to Japanese punctuation.** The CJK↔Latin spacing treated
+  Japanese punctuation and full-width symbols like letters, so `DBは、DBを` built as
+  `DB は、 DB を`, `A・B` as `A ・ B` and `AWS／Azure` as `AWS ／ Azure`, in slide text and
+  speaker notes. Punctuation such as 、。・「」（）／：〜 now takes no space on either side,
+  and half-width `: ; , . ! ?` stays attached to the Japanese word before it (`例: 説明`
+  no longer builds as `例 : 説明`). Local mode and the AWS stack (SdpmRuntime).
+- **Built decks no longer inherit the template's document properties.** A deck kept its
+  template's author and last editor, description, created / modified dates and revision
+  (`docProps/core.xml`), the template's slide titles and word counts (`docProps/app.xml`)
+  and the bundled templates' custom properties (`docProps/custom.xml`). The builder now
+  clears them and dates the deck at build time. A user template's custom properties, such
+  as a sensitivity label, are kept.
 
 - **Edits to a read-back chart show up in the rebuilt PPTX.** `pptx_to_json` keeps each
   chart's original XML in `_chartXml` so an unedited chart rebuilds exactly, but the builder

@@ -647,6 +647,8 @@ class BuildConfig:
     lint_diagnostics: list = field(default_factory=list)
     auto_spacing: bool = True  # deck.json "autoSpacing"; False for imported decks
     default_background: str | None = None  # deck.json "defaultBackground"; None keeps template ground
+    title: str | None = None  # deck.json "title" -> dc:title; None falls back to the first slide's title
+    language: str | None = None  # deck.json "language" -> dc:language (BCP 47, e.g. "en-US")
 
 
 def _assemble_slides_from_dir(
@@ -884,6 +886,8 @@ def _resolve_config(
         lint_diagnostics=lint_diagnostics,
         auto_spacing=data.get("autoSpacing", True),
         default_background=data.get("defaultBackground") or None,
+        title=data.get("title") or None,
+        language=data.get("language") or None,
     )
 
 
@@ -902,7 +906,7 @@ def _build(config: BuildConfig, output_path: Path) -> Path:
     )
     for s in config.slides:
         builder.add_slide(s)
-    builder.save(output_path)
+    builder.save(output_path, title=config.title, language=config.language)
     return output_path, builder.invalid_layouts
 
 
@@ -1079,6 +1083,7 @@ def _generate_html(
         title=_outline_title(outline_path) or deck_dir.name,
         deck_dir=deck_dir,
         deck_css=deck_css,
+        auto_spacing=deck_meta.get("autoSpacing", True),
     )
     output_path.parent.mkdir(parents=True, exist_ok=True)
     output_path.write_text(assembled.html, encoding="utf-8", newline="\n")

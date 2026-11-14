@@ -34,7 +34,9 @@ from sdpm.knowledge.assets import (  # noqa: F401
     _assets_not_installed_error,
 )
 
+from sdpm.engine.accessibility import write_document_properties, write_element_metadata
 from sdpm.engine.builder.constants import ARCH_GROUP_DEFS  # noqa: F401
+from sdpm.engine.builder.document_properties import is_bundled_template, reset_document_properties
 from sdpm.engine.builder.formatting import FormattingMixin
 from sdpm.engine.builder.placeholder import PlaceholderMixin
 from sdpm.engine.builder.elements.textbox import TextboxMixin
@@ -105,6 +107,7 @@ class PPTXBuilder(
                 "This color is used as the default for text and icon colors."
             )
         self.prs = Presentation(str(template_path))
+        reset_document_properties(self.prs, bundled=is_bundled_template(template_path))
         self.theme_colors, self.is_dark = self._extract_theme_colors(template_path)
         self.theme_colors["text"] = default_text_color
         self.default_background = default_background
@@ -369,6 +372,12 @@ class PPTXBuilder(
                     if sp_pr_el.tag.split('}')[-1] == 'spPr':
                         normalize_sppr_order(sp_pr_el)
 
+            # alt / decorative belong to the element's own shape (an image
+            # label is a second node). A flattened group has no shape of its
+            # own; its children are handled in _add_group.
+            if len(sp_tree) > n_before and (elem_type != "group" or elem.get("_groupXml")):
+                write_element_metadata(sp_tree[n_before], elem)
+
             if elem.get("sendToBack"):
                 new_nodes = list(sp_tree)[n_before:]
                 for node in new_nodes:
@@ -403,8 +412,9 @@ class PPTXBuilder(
 
         return slide
 
-    def save(self, output_path: Path):
+    def save(self, output_path: Path, title: str | None = None, language: str | None = None):
         _declare_notes_master(self.prs)
+        write_document_properties(self.prs, title=title, language=language)
         self.prs.save(str(output_path))
 
 

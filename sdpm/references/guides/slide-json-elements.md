@@ -1,6 +1,6 @@
 ---
 name: slide-json-elements
-description: "Slide JSON elements — fields of textbox, shape, line, image, include and group, text sizing, labeled shapes, and slide override (inheritance)"
+description: "Slide JSON elements — fields of textbox, shape, line, image, include and group, alt text, text sizing, labeled shapes, and slide override (inheritance)"
 category: guide
 ---
 
@@ -136,6 +136,16 @@ Expands an external JSON file's elements array. Draw order is controlled by posi
 - `labelSize`: default 11
 - `iconColor`: (optional) change SVG icon color. Single-color SVGs only (multi-color icons are ignored)
 - Masks, crops, colour treatments and QR codes: `slide-json-media`; shadow, glow and soft edge: `slide-json-effects`
+
+## alt and decorative (any element)
+
+- `alt`: alt text — what a screen reader says for the element and what PowerPoint's
+  Accessibility Checker looks for. Give every image, icon, chart, table and video that carries
+  meaning a short sentence stating the message it shows.
+  On an image with a `label`, it describes the picture; the label stays its own text
+- `decorative`: `true` for an element that is purely visual; screen
+  readers skip it and the checker accepts it without alt text
+- On a `group`, set them on the children (a group is expanded into its children)
 
 ## shape
 ```json

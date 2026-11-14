@@ -12,7 +12,7 @@ KEY_ORDER = [
     "arrowStart", "arrowEnd", "points", "path",
     "text", "paragraphs", "items", "src",
     "fontSize", "fontColor", "align", "verticalAlign",
-    "label", "labelPosition", "link",
+    "label", "labelPosition", "link", "alt", "decorative",
     "marginLeft", "marginTop", "marginRight", "marginBottom",
 ]
 
