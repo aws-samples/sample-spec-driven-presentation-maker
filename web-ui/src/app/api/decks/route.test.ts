@@ -9,6 +9,7 @@ import path from "path"
 import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 
 let root: string
+let outside: string
 let savedRoot: string | undefined
 let GET: typeof import("./route")["GET"]
 
@@ -27,6 +28,11 @@ beforeAll(async () => {
   write("draft/deck.json", JSON.stringify({ name: "Draft" }))
   write("web/deck.json", JSON.stringify({ name: "Web", outputFormat: "html" }))
   write("web/output.pptx", "PK")
+  // deck.json linked to a JSON file outside the deck root: its name must not be listed
+  outside = fs.mkdtempSync(path.join(os.tmpdir(), "sdpm-deck-list-outside-"))
+  fs.writeFileSync(path.join(outside, "other.json"), JSON.stringify({ name: "Outside" }))
+  fs.mkdirSync(path.join(root, "linked"))
+  fs.symlinkSync(path.join(outside, "other.json"), path.join(root, "linked", "deck.json"))
   vi.resetModules()
   GET = (await import("./route")).GET
 })
@@ -35,6 +41,7 @@ afterAll(() => {
   if (savedRoot === undefined) delete process.env.SDPM_DECK_ROOT
   else process.env.SDPM_DECK_ROOT = savedRoot
   fs.rmSync(root, { recursive: true, force: true })
+  fs.rmSync(outside, { recursive: true, force: true })
 })
 
 describe("GET /api/decks (local)", () => {
@@ -45,5 +52,11 @@ describe("GET /api/decks (local)", () => {
     expect(byId.draft.hasPptx).toBe(false)
     expect(byId.web.hasPptx).toBe(false)
     expect(decks.every((d: Record<string, unknown>) => !("pptxUrl" in d))).toBe(true)
+  })
+
+  it("does not read a deck.json that is a symlink pointing out of the deck", async () => {
+    const { decks } = await (await GET()).json()
+    const linked = decks.find((d: { deckId: string }) => d.deckId === "linked")
+    expect(linked.name).toBe("linked")
   })
 })
