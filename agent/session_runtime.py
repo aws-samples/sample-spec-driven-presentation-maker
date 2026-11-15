@@ -502,11 +502,17 @@ class Session:
                     self._ensure_monitor(period)
                 with self.lock:
                     turn = self._next_turn_locked(period)
+                    if turn is None and not self._waiting_locked(period):
+                        # Nothing is pending, so every task has settled. Strands stores its
+                        # snapshots on its own thread, so one may have settled since the scan
+                        # above: scan again so it gets its taskEnd (and its wake) first.
+                        self._scan_tasks()
+                        turn = self._next_turn_locked(period)
+                        if turn is None:
+                            self._end_period_locked(period, how)
+                            break
                     if turn is not None:
                         continue
-                    if not self._waiting_locked(period):
-                        self._end_period_locked(period, how)
-                        break
                     period.wake.clear()
                 try:
                     await asyncio.wait_for(period.wake.wait(), TASK_POLL_S)

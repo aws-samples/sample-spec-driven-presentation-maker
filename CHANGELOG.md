@@ -92,6 +92,12 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **A background compose that ends as the work stops is always reported.** When a
+  compose was cancelled (Stop) or finished just as the session checked whether anything was
+  still running, the session could go idle without its `taskEnd`: the compose card stayed
+  running after Stop, an `/invocations` client never got the task's result, and a finished
+  compose started no wake turn, so its report waited for the next prompt (#636). The session
+  now checks the tasks once more before it goes idle. AWS stack (SdpmAgent).
 - **No automatic space next to Japanese punctuation.** The CJK↔Latin spacing treated
   Japanese punctuation and full-width symbols like letters, so `DBは、DBを` built as
   `DB は、 DB を`, `A・B` as `A ・ B` and `AWS／Azure` as `AWS ／ Azure`, in slide text and
