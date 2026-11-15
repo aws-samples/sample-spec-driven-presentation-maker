@@ -164,8 +164,8 @@ export async function DELETE(_req: Request, { params }: { params: Promise<{ id: 
   fs.rmSync(dp, { recursive: true, force: true })
 
   // Remove from decks.json index if present
-  const indexPath = path.join(DECK_ROOT, "decks.json")
-  if (fs.existsSync(indexPath)) {
+  const indexPath = resolveWithin(DECK_ROOT, "decks.json") // null: a symlink leading out of the deck root
+  if (indexPath && fs.existsSync(indexPath)) {
     try {
       const index = JSON.parse(fs.readFileSync(indexPath, "utf-8"))
       if (Array.isArray(index.decks)) {
