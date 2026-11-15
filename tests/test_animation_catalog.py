@@ -2717,7 +2717,7 @@ def test_the_manifest_no_longer_claims_a_dialog_this_build_lacks():
         assert item["status"] == "nonPersisted", item["key"]
 
 
-# --- describe_effects: what an effect does, derived not written -------------
+# --- effects(): what an effect does, derived not written -------------
 def test_the_guide_table_matches_what_the_catalog_measured():
     """The routing table is derived, so it must not drift from the catalog.
 
@@ -2768,17 +2768,17 @@ def test_no_effect_name_appears_in_two_rows_of_the_table():
     assert qualified == {"entrance.bounce", "exit.bounce", "motionPath.bounce"}, qualified
 
 
-def test_describe_effects_says_what_was_measured_and_nothing_else():
+def test_effects_says_what_was_measured_and_nothing_else():
     """The expression is a transcription, so the values in it are the measured ones."""
-    from sdpm.tools import describe_effects
+    from sdpm.engine.timing.describe import effects
 
-    table = describe_effects()
+    table = effects()
     assert len(table["changes"]) == len(
         {row["changes"] for row in table["changes"]}
     ), "a label appears twice"
     assert any(row["changes"] == "moves" and "flyIn" in row["effects"] for row in table["changes"])
 
-    fly_in = describe_effects(effect="flyIn")["effects"]
+    fly_in = effects(effect="flyIn")["effects"]
     assert len(fly_in) == 1
     described = fly_in[0]
     assert described["category"] == "entrance"
@@ -2791,19 +2791,19 @@ def test_describe_effects_says_what_was_measured_and_nothing_else():
     assert len(described["options"]["direction"]["values"]) == 8
 
     # A setting carried only by the behaviours still shows its difference.
-    spin = describe_effects(effect="spin")["effects"][0]
+    spin = effects(effect="spin")["effects"][0]
     assert "-21600000" in spin["options"]["direction"]["values"]["counterclockwise"]
     assert "21600000" in spin["options"]["direction"]["values"]["clockwise"]
     assert spin["optionsNote"], "the unmeasured combinations are not reported"
 
     # A path is transcribed rather than summarised.
-    star = describe_effects(category="motionPath", effect="star")["effects"][0]
+    star = effects(category="motionPath", effect="star")["effects"][0]
     assert "M 0 0 L 0.091 -0.034" in star["expression"]
 
-    assert describe_effects(effect="teleport")["effects"] == []
+    assert effects(effect="teleport")["effects"] == []
 
 
-def test_describe_effects_stays_small_enough_to_call_per_effect():
+def test_effects_stays_small_enough_to_call_per_effect():
     """The two layers exist because they cost different amounts.
 
     Shipping every expression would add about 9,000 tokens to a guide read on
@@ -2812,11 +2812,11 @@ def test_describe_effects_stays_small_enough_to_call_per_effect():
     """
     import json
 
-    from sdpm.tools import describe_effects
+    from sdpm.engine.timing.describe import effects
 
-    assert len(json.dumps(describe_effects())) < 4000
+    assert len(json.dumps(effects())) < 4000
     for effect in ("flyIn", "spin", "growShrink", "wave"):
-        one = json.dumps(describe_effects(effect=effect))
+        one = json.dumps(effects(effect=effect))
         assert len(one) < 6000, f"{effect} describes to {len(one)} characters"
 
 

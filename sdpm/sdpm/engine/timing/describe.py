@@ -20,7 +20,13 @@ keep in the authoring guide.
 **Verifying** needs the whole thing, and :func:`expression` is one line per
 effect — 136 characters at the median. All 209 of them together come to about
 9,000 tokens, which is why they are fetched per effect rather than shipped as a
-block. The ``describe_effects`` tool is that fetch.
+block. :func:`effects` is that fetch, called through ``run_python``.
+
+It is deliberately not an MCP tool. A tool's description is attached to every
+turn of every conversation, including the decks that carry no animation at all,
+and this one cost about 1,300 characters of a 16,000-character budget for a
+lookup that only an animation author makes. The guide carries the cheap layer
+as text and names this function for the expensive one.
 
 An expression reads as a sum of behaviours::
 
@@ -321,3 +327,57 @@ def describe_transition(index: Any, slug: str) -> dict[str, Any]:
             }
         ]
     }
+
+
+def effects(
+    *,
+    category: str | None = None,
+    effect: str | None = None,
+    transition: str | None = None,
+) -> dict[str, Any]:
+    """One entry point for an animation author, called through ``run_python``.
+
+    ``from sdpm.engine.timing.describe import effects``
+
+    No argument returns the routing table — which effects move, resize,
+    recolour, rotate, fade, wipe or follow a path. The animations guide carries
+    the same table as text, so the usual reason to call this is one of the
+    other two arguments.
+
+    ``effect`` returns that effect's expression: every behaviour it writes,
+    with keyframes and durations, and the same for each of its options.
+
+    ``transition`` returns the ``transition.parameters`` sets a slide
+    transition accepts. Those keys are OOXML attribute names, not the friendly
+    names animation options use: Push takes ``{"dir": "d"}``, not
+    ``{"direction": "fromBottom"}``.
+
+    Reach for it rather than trying effects, and rather than hand-composing
+    ``behaviors``, which is unverified and does not survive import.
+    """
+    from sdpm.engine.timing import load_capability_index
+
+    index = load_capability_index()
+    if transition is not None:
+        return describe_transition(index, transition)
+    if category is None and effect is None:
+        return {
+            "changes": [
+                {"changes": label, "effects": names}
+                for label, names in axis_table(index)
+            ],
+            "next": (
+                "effects(effect='flyIn') for one effect's measured behaviours "
+                "and its options"
+            ),
+        }
+    described = describe(index, category=category, effect=effect)
+    if not described:
+        return {
+            "effects": [],
+            "hint": (
+                "no gallery effect matched; effects() with no argument returns "
+                "the full list"
+            ),
+        }
+    return {"effects": described}

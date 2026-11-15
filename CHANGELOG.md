@@ -33,13 +33,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   exit effects, media play, all 53 transition effects and all three Morph variants are
   generated today, while effect directions, emphasis and motion-path galleries,
   after-animation effects, sounds and four timing options are preserved on import but
-  refused at generation by their catalog key rather than approximated. A new tool,
-  `describe_effects`, answers what a gallery animation actually does — measured from
+  refused at generation by their catalog key rather than approximated. `effects()` in
+  `sdpm.engine.timing.describe`, called through `run_python`, answers what a gallery
+  animation actually does — measured from
   PowerPoint rather than guessed: no arguments returns the routing table (which effects
   move, resize, recolour, rotate, fade, wipe or follow a path), an effect name returns every
   behaviour it writes with keyframes and durations, and a transition name returns the
-  `parameters` sets it accepts. It is bound on both servers, which brings the MCP tool count
-  to 21.
+  `parameters` sets it accepts. It is a function rather than a tool because a tool's
+  description is sent on every turn of every conversation, including the decks that carry no
+  animation; the MCP tool count is unchanged.
 - **A storyboard: one still frame per click.** `storyboard()` (CLI: `storyboard <deck>`)
   derives the state after each click from the animation catalog and renders it, so a build
   can be inspected. The ordinary preview draws every element where it is authored, which is

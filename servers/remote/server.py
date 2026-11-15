@@ -953,7 +953,6 @@ def apply_style(
 # --- Reference tools (bound from the shared contract; bundled data baked into the image) ---
 
 offloaded_tool(contract.read_guides)
-offloaded_tool(contract.describe_effects)
 
 # User-invoked entry points (slash commands / prompt menu): vibe, spec, style, translate
 from sdpm.tools import prompts as _prompts  # noqa: E402

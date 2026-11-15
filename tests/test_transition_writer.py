@@ -599,9 +599,9 @@ def test_transition_controls_are_counted_in_the_same_pass(coverage):
 
 
 def test_every_parameter_set_describe_reports_is_one_the_writer_accepts(index):
-    """`describe_effects(transition=...)` is checked against the writer, not prose.
+    """`effects(transition=...)` is checked against the writer, not prose.
 
-    The tool exists for one reason: a composer that needs one transition's
+    The call exists for one reason: a composer that needs one transition's
     parameter keys should not have to read an 11,500-token guide to learn them.
     That is only worth doing if the short answer is the *same* answer — so every
     set it reports is written here, for all 53 transitions.

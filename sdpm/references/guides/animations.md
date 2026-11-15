@@ -449,8 +449,18 @@ A name is bare where it means the same thing in every category it appears in, an
 where it does not: `entrance.bounce` moves and resizes, `motionPath.bounce` follows a curve.
 
 For the detail — every behaviour an effect writes, with its keyframes, durations and each of
-its options — call the **`describe_effects`** tool. With no arguments it returns this table;
-with `effect="flyIn"` it returns the expression:
+its options — call `effects` through `run_python`:
+
+```python
+from sdpm.engine.timing.describe import effects
+print(effects(effect="flyIn"))
+```
+
+It is a function rather than a tool on purpose: a tool's description rides along on every
+turn of every conversation, including the decks with no animation in them, and this lookup
+belongs to whoever is actually authoring one. The table above is the cheap layer, which is
+why it is text here; `effects()` with no argument returns the same thing. With
+`effect="flyIn"` it returns the expression:
 
 ```
 set(style.visibility: -> visible)@1
@@ -474,9 +484,9 @@ Two things in that answer are instructions rather than description:
   effect's other setting left at its default, so asking for two settings on one effect is
   refused. Ask for one at a time.
 
-`describe_effects(transition="push")` answers the other side: which `parameters` sets a slide
+`effects(transition="push")` answers the other side: which `parameters` sets a slide
 transition accepts, with the effect's own defaults listed separately. The table below has the
-same information for every transition, so reach for the tool when you need one effect's sets
+same information for every transition, so reach for the call when you need one effect's sets
 and not this whole guide — about 140 tokens against 11,500.
 
 #### Prefer a `preset`; reach for `behaviors` only when no effect fits
