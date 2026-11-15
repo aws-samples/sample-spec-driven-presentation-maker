@@ -15,6 +15,20 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Security
 
+- **Local Web UI file access stays inside its data directories after symlinks are
+  resolved.** The preview, deck list, deck detail, PPTX download, template download, style
+  detail, change request and "open in app" endpoints, and the deck's chat files (`.session`,
+  `.session-engine`, `.session-origin.json`, `.chat.json`), check the real path of both the
+  data directory and the file, with a separator boundary, through one shared helper. A
+  symlink leading out of the deck root, the templates or the styles directory is refused the
+  same way as any other path outside it, for reads and for the chat-file and change-request
+  writes; a file that does not exist yet is created only where its directory resolves inside.
+  Files inside, including symlinks that stay inside, are served as before. User templates
+  are now also found when the config directory itself is reached through a symlink.
+  Saving an outline, a user style or template, an attachment, or the deck index checks the
+  directory and the file the same way before anything is written, so a symlink leading out
+  of the data directory is refused (400) instead of written through. Template rename
+  validates the source name too. Local mode only.
 - **One explicit XML parser for content from outside the repository.** Template and
   imported PPTX parts, the XML fragments a slide JSON carries for round trips, and SVG
   files are parsed through `sdpm.utils.xml_safe`, which states its settings instead of
@@ -45,16 +59,6 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   SVG and MathML and attribute values are left as written, and the slide files are not
   changed. `"autoSpacing": false` in deck.json turns it off, as for PPTX. Local mode and the
   AWS stack (SdpmRuntime).
-- **Local Web UI file access stays inside its data directories after symlinks are
-  resolved.** The preview, deck list, deck detail, PPTX download, template download, style
-  detail, change request and "open in app" endpoints, and the deck's chat files (`.session`,
-  `.session-engine`, `.session-origin.json`, `.chat.json`), check the real path of both the
-  data directory and the file, with a separator boundary, through one shared helper. A
-  symlink leading out of the deck root, the templates or the styles directory is refused the
-  same way as any other path outside it, for reads and for the chat-file and change-request
-  writes; a file that does not exist yet is created only where its directory resolves inside.
-  Files inside, including symlinks that stay inside, are served as before. User templates
-  are now also found when the config directory itself is reached through a symlink.
 - **Accessibility metadata in built PPTX files.** Any element takes `alt` (written as the
   shape's alt text, `p:cNvPr@descr`) or `decorative: true` (PowerPoint's "Mark as
   decorative"), so images, icons, charts, tables and videos can pass PowerPoint's
