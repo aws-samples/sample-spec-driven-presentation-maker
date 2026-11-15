@@ -459,6 +459,25 @@ class TestTextboxParagraphs:
         assert p_pr is not None and p_pr.find(f"{_A}lnSpc/{_A}spcPts") is not None
         assert p_pr.find(f"{_A}lnSpc/{_A}spcPts").get("val") == "2400"
 
+    def test_fixed_spacing_wins_over_percent_at_both_levels(self, tmp_path):
+        both = {"lineSpacingPt": 24, "lineSpacingPct": 150000}
+        (elem_sp, para_sp) = _built_shapes(tmp_path, [
+            _textbox(text="x", **both),
+            _textbox(paragraphs=[{"text": "x", **both}]),
+        ])
+        for sp in (elem_sp, para_sp):
+            ln = sp.text_frame.paragraphs[0]._p.pPr.findall(f"{_A}lnSpc")
+            assert [(c.tag, c.get("val")) for c in ln[0]] == [(f"{_A}spcPts", "2400")]
+
+    def test_paragraph_spacing_wins_over_the_element_and_is_written_once(self, tmp_path):
+        (sp,) = _built_shapes(tmp_path, [_textbox(lineSpacingPt=30, paragraphs=[
+            {"text": "own", "lineSpacingPt": 24}, {"text": "inherits"}])])
+        own, inherits = sp.text_frame.paragraphs
+        own_ln = own._p.pPr.findall(f"{_A}lnSpc")
+        assert len(own_ln) == 1 and own_ln[0][0].get("val") == "2400"
+        inherits_ln = inherits._p.pPr.findall(f"{_A}lnSpc")
+        assert len(inherits_ln) == 1 and inherits_ln[0][0].get("val") == "3000"
+
     def test_legacy_paragraph_line_spacing_key_still_builds(self, tmp_path):
         # Older pptx_to_json output wrote fixed spacing as "lineSpacing" (1/100 pt).
         (sp,) = _built_shapes(tmp_path, [_textbox(paragraphs=[{"text": "x", "lineSpacing": 2400}])])

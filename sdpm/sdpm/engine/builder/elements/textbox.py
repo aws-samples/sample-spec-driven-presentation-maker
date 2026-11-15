@@ -164,8 +164,9 @@ class TextboxMixin:
                     self._apply_styled_text(p, para_text, default_color=default_color, default_font_size=para_font_size, font_family=font_family, no_default_font=has_lst_style)
                 
                 # Apply line spacing (must be before spcBef/spcAft in XML).
-                # Fixed spacing is lineSpacingPt (pt), as at element level;
-                # lineSpacing (1/100 pt) is what older pptx_to_json output wrote.
+                # Fixed spacing is lineSpacingPt (pt) and wins over lineSpacingPct,
+                # as at element level; lineSpacing (1/100 pt) is what older
+                # pptx_to_json output wrote.
                 if isinstance(para_item, dict):
                     ls_pct = para_item.get("lineSpacingPct")
                     ls_pts = None
@@ -178,12 +179,12 @@ class TextboxMixin:
                         from pptx.oxml.ns import qn as _qn
                         pPr = p._element.get_or_add_pPr()
                         lnSpc = etree.Element(_qn('a:lnSpc'))
-                        if ls_pct:
-                            spc = etree.SubElement(lnSpc, _qn('a:spcPct'))
-                            spc.set('val', str(ls_pct))
-                        else:
+                        if ls_pts:
                             spc = etree.SubElement(lnSpc, _qn('a:spcPts'))
                             spc.set('val', str(ls_pts))
+                        else:
+                            spc = etree.SubElement(lnSpc, _qn('a:spcPct'))
+                            spc.set('val', str(ls_pct))
                         pPr.insert(0, lnSpc)  # first in sequence, before bullets
                 
                 # Apply space after
@@ -249,7 +250,8 @@ class TextboxMixin:
                     if elem.get("marL") is not None:
                         pPr.set('marL', str(elem["marL"]))
         
-        # Apply line spacing (single-text) - must be before buNone in pPr
+        # Apply line spacing (single-text) - must be before buNone in pPr.
+        # A paragraph that set its own spacing keeps it (one a:lnSpc per pPr).
         lnSpcPct = elem.get("lineSpacingPct")
         lnSpcPt = elem.get("lineSpacingPt")
         if lnSpcPct or lnSpcPt:
@@ -257,10 +259,12 @@ class TextboxMixin:
             from pptx.oxml.ns import qn as _qn
             for p in tf.paragraphs:
                 pPr = p._element.get_or_add_pPr()
+                if pPr.find(_qn('a:lnSpc')) is not None:
+                    continue
                 lnSpc = _et.Element(_qn('a:lnSpc'))
                 if lnSpcPt:
                     spcEl = _et.SubElement(lnSpc, _qn('a:spcPts'))
-                    spcEl.set('val', str(int(lnSpcPt * 100)))
+                    spcEl.set('val', str(int(round(lnSpcPt * 100))))
                 else:
                     spcEl = _et.SubElement(lnSpc, _qn('a:spcPct'))
                     spcEl.set('val', str(lnSpcPct))
