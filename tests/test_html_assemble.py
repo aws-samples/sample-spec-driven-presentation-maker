@@ -59,7 +59,7 @@ def _make_deck(tmp_path: Path, template: str = "blank-light", slides: dict[str, 
 
 
 def _assemble(deck: Path, *, deck_css: str | None = None, slides: dict[str, str] | None = None,
-              template=None):
+              template=None, **kwargs):
     meta = json.loads((deck / "deck.json").read_text(encoding="utf-8"))
     if template is None:
         template = load_template_html(TEMPLATES_DIR / f"{meta['template']}.pptx",
@@ -74,6 +74,7 @@ def _assemble(deck: Path, *, deck_css: str | None = None, slides: dict[str, str]
         title="Assembly test",
         deck_dir=deck,
         deck_css=deck_css,
+        **kwargs,
     )
 
 

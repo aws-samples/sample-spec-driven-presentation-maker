@@ -29,6 +29,27 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   Illustrator does for its namespace URIs; external, nested or markup-bearing entities are
   refused. A refused file is named in the error. Attached SVGs are also parsed with DTDs
   refused.
+
+### Added
+
+- **A writing guide for Japanese decks (`writing-ja`).** For a Japanese deck the
+  orchestrator reads it before writing the outline, and composers read it before writing any
+  slide text in every pass, in both PPTX and HTML. It says how headlines, bullets, diagram labels and speaker notes are
+  written: headlines state the slide's claim (or the lead does, when the style splits a topic
+  title from a claim lead), a list's items end the same way, items are
+  shortened from full sentences without losing who does what, notes are polite spoken
+  Japanese, no em dashes or metaphor verbs, full-width Japanese punctuation, ・ only for
+  listing words, numbered headings as a number, a period and a space, one spelling
+  per term. Its symbol rules take precedence over the symbols in a style's examples. The
+  guide is in Japanese. Local mode and the AWS stack (SdpmData and SdpmRuntime).
+- **HTML decks get the same CJK↔Latin spacing as PPTX.** The PPTX builder puts a
+  half-width space between Japanese (or other CJK) letters and Latin letters or digits; HTML
+  decks kept the text as the composer wrote it. `output.html` and the slide previews now
+  get those spaces too, also where emphasis or a link meets Japanese text
+  (`<strong>AWS</strong>の`). Code, preformatted text, scripts, styles, form fields, inline
+  SVG and MathML and attribute values are left as written, and the slide files are not
+  changed. `"autoSpacing": false` in deck.json turns it off, as for PPTX. Local mode and the
+  AWS stack (SdpmRuntime).
 - **Local Web UI file access stays inside its data directories after symlinks are
   resolved.** The preview, deck list, deck detail, PPTX download, template download, style
   detail, change request and "open in app" endpoints, and the deck's chat files (`.session`,
@@ -39,9 +60,6 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   writes; a file that does not exist yet is created only where its directory resolves inside.
   Files inside, including symlinks that stay inside, are served as before. User templates
   are now also found when the config directory itself is reached through a symlink.
-
-### Added
-
 - **Accessibility metadata in built PPTX files.** Any element takes `alt` (written as the
   shape's alt text, `p:cNvPr@descr`) or `decorative: true` (PowerPoint's "Mark as
   decorative"), so images, icons, charts, tables and videos can pass PowerPoint's
@@ -79,6 +97,50 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **A background compose that ends as the work stops is always reported.** When a
+  compose was cancelled (Stop) or finished just as the session checked whether anything was
+  still running, the session could go idle without its `taskEnd`: the compose card stayed
+  running after Stop, an `/invocations` client never got the task's result, and a finished
+  compose started no wake turn, so its report waited for the next prompt (#636). The session
+  now checks the tasks once more before it goes idle. AWS stack (SdpmAgent).
+- **No automatic space next to Japanese punctuation.** The CJK↔Latin spacing treated
+  Japanese punctuation and full-width symbols like letters, so `DBは、DBを` built as
+  `DB は、 DB を`, `A・B` as `A ・ B` and `AWS／Azure` as `AWS ／ Azure`, in slide text and
+  speaker notes. Punctuation such as 、。・「」（）／：〜 now takes no space on either side,
+  and half-width `: ; , . ! ?` stays attached to the Japanese word before it (`例: 説明`
+  no longer builds as `例 : 説明`). Local mode and the AWS stack (SdpmRuntime).
+- **Quotes and apostrophes no longer gain spaces.** The CJK↔Latin spacing put a space
+  around every `'` `"` `` ` `` it counted as a quote, whatever stood next to it, in English
+  text too: `It's` built as `It 's`, `AWS What's New` as `What 's New`, `the "best" option`
+  with doubled spaces and `"hi".` as `"hi" .`; a deck rebuilt from its own output gained
+  more each time. A quote now takes a space only on its outside and only toward a Japanese
+  letter (`"AWS"の` → `"AWS" の`), and `'` between two Latin letters or digits is an
+  apostrophe. `<` `>` are spaced like brackets (`<ファイル名>` keeps no inner space), and
+  non-ASCII Latin letters count as Latin text (`Caféで` → `Café で`). Local mode and the
+  AWS stack (SdpmRuntime).
+- **Styling no longer changes where the spaces go.** Spaces are computed over a whole
+  paragraph, so a bold or coloured run, a link, or an HTML inline element gets the same
+  spaces as the same text without styling: `{{bold:サーバー}})` no longer builds as
+  `サーバー )`, and a link next to Japanese text is spaced like plain text. Superscript and
+  subscript runs (`baseline=`, `<sup>`, `<sub>`) and ruby text (`<rt>`) take no spaces
+  inside or at their edges, so `説明<sup>1</sup>です` keeps its footnote marker attached. Local mode and the AWS stack
+  (SdpmRuntime).
+- **Chart text gets the same spacing.** A native chart's title, category names and series
+  names get the CJK↔Latin spacing of slide text (`AWSの利用料` → `AWS の利用料`), and keep
+  their text as written with `"autoSpacing": false`. Local mode and the AWS stack
+  (SdpmRuntime).
+- **PPTX import keeps every `rotation3d` preset and an orthographic rotation.** The
+  presets `perspective-bottom`, `perspective-left-most` and `perspective-right-most` were
+  dropped on import (#631), and a free rotation with `perspective: 0` came back without
+  `perspective`, so a rebuild showed it at the default 120° (#632).
+- **Imported `lumMod` / `lumOff` colors match PowerPoint.**
+  Gradient stops on an `srgbClr` and system colors (`sysClr`) scaled RGB instead of HSL
+  luminance, so `4F81BD` at lumMod 75% came out `3B608D` instead of `376092` (#633). Fills
+  of theme table styles dropped `lumMod` / `lumOff` and mixed `tint` / `shade` in sRGB.
+  These colors and every other transformed fill, line and text color now share one
+  implementation, which rounds each channel instead of truncating it (transformed colors
+  can move by 1 per channel). Table borders and table text from a theme table style still
+  ignore color transforms.
 - **Built decks no longer inherit the template's document properties.** A deck kept its
   template's author and last editor, description, created / modified dates and revision
   (`docProps/core.xml`), the template's slide titles and word counts (`docProps/app.xml`)
@@ -102,6 +164,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **Smooth line charts read back as `smooth: true`.** The converter did not read `c:smooth`,
   so a smooth line chart rebuilt from `--minimal` JSON came back with straight segments.
   Local mode and the AWS stack (SdpmRuntime).
+- **A slow first start of Chrome or Edge no longer fails the HTML browser check.** The
+  check gave the local browser a fixed 15 s to start and reported `failed` (`could not run
+  … DevTools did not start within 15 s`) when a first start on a fresh machine took longer,
+  even with most of the check's time budget left. The start now may take what is left of
+  that budget (`min(30 + 3 × slides, 110)` s, unchanged), and a browser that does not start
+  in time is named in the note (`Google Chrome did not start within N s`). A check that
+  runs out of time after a slow start says how long the start took. Local mode (#625).
 
 ## [0.17.0] - 2026-11-13
 
