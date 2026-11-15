@@ -122,6 +122,51 @@ def test_unknown_targets_and_trigger_targets_are_rejected():
     assert {"unknown-animation-target", "unknown-trigger-target"} <= rules
 
 
+def test_an_identity_on_a_group_child_is_reported_as_inert():
+    """A group is flattened, but nothing registers its children's identities.
+
+    So an `id` there did nothing at all and an effect naming it failed the build
+    with "known element ids: none", which does not explain why an id the JSON
+    visibly carries was not seen. Moving the child out of the group changes no
+    geometry, so the diagnostic can name the fix.
+    """
+    slide = _slide()
+    slide["elements"] = [{
+        "type": "group", "x": 10, "y": 10, "width": 400, "height": 200,
+        "elements": [
+            {"id": "inner", "type": "shape", "shape": "rectangle",
+             "x": 0, "y": 0, "width": 100, "height": 50, "fill": "#FFFFFF"},
+            {"morphId": "card", "type": "shape", "shape": "rectangle",
+             "x": 0, "y": 60, "width": 100, "height": 50, "fill": "#FFFFFF"},
+        ],
+    }]
+    slide["animations"]["mainSequence"][0]["target"]["element"] = "inner"
+
+    diagnostics = validate_slide_motion(slide)
+    inert = [d for d in diagnostics if d.rule == "inert-group-child-identity"]
+    assert [d.path for d in inert] == [
+        "elements[0].elements[0].id", "elements[0].elements[1].morphId",
+    ]
+    assert "move the element out of the group" in inert[0].message
+    # The id is reported, not adopted: it is still not a usable target.
+    assert any(d.rule == "unknown-animation-target" for d in diagnostics)
+
+
+def test_a_nested_group_child_identity_is_reported_too():
+    slide = _slide()
+    slide["elements"] = [{
+        "type": "group", "x": 0, "y": 0, "width": 400, "height": 200,
+        "elements": [{
+            "type": "group", "x": 0, "y": 0, "width": 200, "height": 100,
+            "elements": [{"id": "deep", "type": "shape", "shape": "rectangle",
+                          "x": 0, "y": 0, "width": 50, "height": 50, "fill": "#FFFFFF"}],
+        }],
+    }]
+    paths = [d.path for d in validate_slide_motion(slide)
+             if d.rule == "inert-group-child-identity"]
+    assert paths == ["elements[0].elements[0].elements[0].id"]
+
+
 def test_an_unexpanded_include_suspends_the_target_rule_only():
     """The element set an include contributes is not knowable from this slide.
 

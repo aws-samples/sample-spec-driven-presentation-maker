@@ -584,6 +584,30 @@ class TestTheBuildPointsAtTheStoryboard:
         result = generate(str(deck), output_path=str(tmp_path / "out.pptx"))
         assert result["animated_slides"] == 0
 
+    def test_a_still_deck_gets_no_motion_warnings(self, tmp_path):
+        """`check_text_build` and `check_morph_pairing` describe what the build
+        will write, and neither writes anything with its switch off. They ran
+        unconditionally, so a deck built as a still was warned about a text
+        build and an unpaired morph identity it was never going to get."""
+        from sdpm.api import _resolve_config
+
+        deck = self._deck(tmp_path, animated=True, enabled=False)
+        slide = json.loads((deck / "slides/one.json").read_text())
+        slide["elements"][0]["morphId"] = "lonely"
+        slide["animations"]["mainSequence"][0]["text"] = {"sequence": "byParagraph", "level": 3}
+        (deck / "slides/one.json").write_text(json.dumps(slide, ensure_ascii=False))
+
+        off = _resolve_config(str(deck), animation_mode=None, transition_mode=None)
+        assert off.animations_enabled is False and off.transitions_enabled is False
+        assert not [w for w in off.warnings if "morph" in w.lower() or "text build" in w.lower()], (
+            off.warnings
+        )
+
+        # With the switches on, the same deck does report them — so the gate is
+        # what changed, not the fixture.
+        on = _resolve_config(str(deck), animation_mode="on", transition_mode="on")
+        assert on.warnings, "the fixture must be one the checks have something to say about"
+
     def test_a_transition_only_deck_is_not_pointed_at_the_storyboard(self, tmp_path):
         """The count drives a nudge to run `storyboard`, which draws one frame
         per click step. A transition happens between slides and has no build

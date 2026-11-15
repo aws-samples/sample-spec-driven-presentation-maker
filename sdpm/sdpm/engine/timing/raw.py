@@ -603,8 +603,15 @@ def replay_raw_fragment(
 
     target = resolve_within(root_path, path, what="raw sidecar path")
     data = target.read_bytes()
-    expected = reference.get("sha256") or record.get("sha256")
-    if path == sidecar and expected and sha256_hex(data) != expected:
+    # The media-only sidecar is digested too. Only the full sidecar used to be
+    # checked here, which was covered in-tree because the builder validates the
+    # whole closure against a root first — but this function also accepts a
+    # manifest with no root, and then nothing verified the file it replayed.
+    if path == sidecar:
+        expected = reference.get("sha256") or record.get("sha256")
+    else:
+        expected = record.get("mediaOnlySha256")
+    if expected and sha256_hex(data) != expected:
         raise RawReplayError(
             f"raw sidecar {path!r} does not match its recorded digest; the immutable bundle "
             "content changed under sdpm"
@@ -649,7 +656,12 @@ def apply_raw_fragment(
     if node is None:
         remove_timing(slide_element)
         return None
-    tag = "transition" if _carries(node, "transition") else "timing"
+    # The manifest's `kind`, which validation has already constrained to
+    # "timing" or "transition", rather than sniffing the replayed XML for a
+    # p:transition anywhere inside it. The two agree for every fragment sdpm
+    # writes, and where they could disagree the recorded kind is the one the
+    # import decided and the digest covers.
+    tag = _fragment_kind(reference, root=root, manifest=manifest)
     if tag == "timing":
         remove_timing(slide_element)
     else:
@@ -658,11 +670,16 @@ def apply_raw_fragment(
     return node
 
 
-def _carries(node: etree._Element, local_name: str) -> bool:
-    if etree.QName(node).localname == local_name:
-        return True
-    return any(
-        etree.QName(child).localname == local_name
-        for child in node.iter()
-        if isinstance(child.tag, str)
-    )
+def _fragment_kind(
+    reference: Mapping[str, Any],
+    *,
+    root: str | Path,
+    manifest: Mapping[str, Any] | None,
+) -> str:
+    """Return the recorded ``kind`` of the fragment one reference names."""
+    sidecar = safe_bundle_path(reference.get("sidecar"), what="raw reference sidecar")
+    if manifest is None:
+        manifest = load_raw_manifest(
+            resolve_within(Path(root), MANIFEST_PATH, what="manifest path")
+        )
+    return str(sidecar_record(manifest, sidecar).get("kind"))

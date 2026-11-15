@@ -224,9 +224,37 @@ def _element_ids(slide: Mapping[str, Any]) -> tuple[set[str], list[MotionDiagnos
             else:
                 morph_ids.add(morph_id)
 
+    def report_inert_group_children(element: Mapping[str, Any], path: str) -> None:
+        """Flag an identity on a group child, which nothing registers.
+
+        A group is flattened — its children become ordinary slide shapes at
+        slide coordinates — but neither the builder's registration walk nor this
+        inventory descends into one, so an `id` or `morphId` there does nothing
+        and an effect naming it fails the build with "known element ids: none".
+        Moving the child out of the group changes no geometry, which is what
+        makes this worth saying rather than silently ignoring.
+        """
+        for index, child in enumerate(element.get("elements") or []):
+            if not isinstance(child, Mapping):
+                continue
+            child_path = f"{path}.elements[{index}]"
+            for key in ("id", "morphId"):
+                if child.get(key) is not None:
+                    diagnostics.append(MotionDiagnostic(
+                        f"{child_path}.{key}",
+                        "inert-group-child-identity",
+                        f"{key} {child[key]!r} is on a group child, which nothing registers, so "
+                        "no effect can target it; move the element out of the group (a group is "
+                        "flattened, so its position does not change)",
+                    ))
+            if child.get("type") == "group":
+                report_inert_group_children(child, child_path)
+
     for index, element in enumerate(slide.get("elements") or []):
         if isinstance(element, Mapping) and element.get("type") != "include":
             add_identity(element, f"elements[{index}]")
+            if element.get("type") == "group":
+                report_inert_group_children(element, f"elements[{index}]")
     placeholders = slide.get("placeholders")
     if isinstance(placeholders, Mapping):
         for key, placeholder in placeholders.items():

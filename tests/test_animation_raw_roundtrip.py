@@ -12,6 +12,7 @@ a dangling ``rId`` behind.
 
 from __future__ import annotations
 
+import hashlib
 import json
 import shutil
 from pathlib import Path
@@ -422,6 +423,86 @@ class TestMediaPlaybackSettingsSurvive:
     clip came back unmuted and a clip at half volume came back at 80%. Only the
     node the builder writes is accepted now; the rest is preserved.
     """
+
+    def test_the_replayed_slot_comes_from_the_manifest_not_the_xml(self, media_dir):
+        """The record's `kind` decides the slot, not a scan of the bytes.
+
+        `apply_raw_fragment` used to sniff the replayed XML for a `p:transition`
+        anywhere inside it. For every fragment sdpm writes the two agree, so
+        this pins the precedence with one where they cannot: a sidecar recorded
+        as `timing` whose XML carries a `p:transition` descendant. The old code
+        put that tree in the transition slot and left the slide with no timing.
+        """
+        slide, root = _import(media_dir, _inject_unknown_sequence(
+            _package(media_dir, _video_slide())
+        ))
+        reference = slide["_rawTiming"]
+        sidecar = root / reference["sidecar"]
+        xml = sidecar.read_bytes().replace(
+            b"<p:tnLst>", b"<p:tnLst><p:transition spd=\"fast\"><p:fade/></p:transition>", 1,
+        )
+        sidecar.write_bytes(xml)
+
+        # The manifest's digest covers the sidecar, so it is restated here: the
+        # point under test is the slot, not the integrity check.
+        manifest = load_raw_manifest(root / MANIFEST_PATH)
+        record = next(r for r in manifest["sidecars"] if r["path"] == reference["sidecar"])
+        assert record["kind"] == "timing"
+        digest = hashlib.sha256(xml).hexdigest()
+        record["sha256"] = digest
+        reference = {**reference, "sha256": digest}
+
+        # A slide that already has its own p:timing, which replaying into the
+        # timing slot must replace. Sniffing the bytes sent the fragment to the
+        # transition slot instead, leaving the old timing in place: the slide
+        # ended up with two p:timing children, which is the corruption
+        # python-pptx issue 954 describes.
+        target = etree.fromstring(etree.tostring(list(Presentation(str(
+            _package(media_dir, _video_slide(), name="slot.pptx")
+        )).slides)[0]._element))
+        assert len(target.findall("{%s}timing" % P)) == 1, "the fixture starts with one"
+
+        apply_raw_fragment(
+            target,
+            reference,
+            root=root,
+            resolve_shape=lambda logical: 2,
+            manifest=manifest,
+        )
+        assert len(target.findall("{%s}timing" % P)) == 1, (
+            "the replayed timing replaced the slide's own, rather than landing "
+            "in the transition slot beside it"
+        )
+        assert b"futureThing" in etree.tostring(target), "it is the replayed one"
+
+    def test_a_tampered_media_only_sidecar_is_refused(self, media_dir):
+        """Only the full sidecar's digest was checked here. In tree that was
+        covered because the builder validates the whole closure against a root
+        first, but `replay_raw_fragment` also accepts a manifest with no root —
+        and then nothing verified the file it actually replayed."""
+        slide, root = _import(media_dir, _inject_unknown_sequence(
+            _package(media_dir, _video_slide())
+        ))
+        manifest = load_raw_manifest(root / MANIFEST_PATH)
+        record = next(
+            r for r in manifest["sidecars"] if r["path"] == slide["_rawTiming"]["sidecar"]
+        )
+        assert record["mediaBoundary"] == "classified"
+        media_only = record.get("mediaOnlyPath")
+        assert media_only, "the fixture must have a media-only variant to tamper with"
+        target = root / media_only
+        target.write_bytes(target.read_bytes().replace(b'dur="indefinite"', b'dur="indefinit3"'))
+
+        # Rootless: the closure is not revalidated, so the digest carried in the
+        # record is the only thing standing between this and a silent replay.
+        with pytest.raises(RawReplayError, match="recorded digest"):
+            replay_raw_fragment(
+                slide["_rawTiming"],
+                root=root,
+                resolve_shape=lambda logical: 2,
+                animations_enabled=False,
+                manifest=manifest,
+            )
 
     def test_the_manifest_is_written_as_bytes_so_its_newlines_are_the_same_everywhere(
         self, media_dir,

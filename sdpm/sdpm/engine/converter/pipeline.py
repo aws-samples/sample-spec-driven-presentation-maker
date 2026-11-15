@@ -24,7 +24,7 @@ from pptx import Presentation
 from .color import extract_theme_colors_and_mapping
 from .constants import conversion_scale
 from .slide import extract_slide
-from sdpm.utils.io import write_json
+from sdpm.utils.io import read_json, write_json
 from sdpm.engine.schema.defaults import sort_element_keys
 from sdpm.engine.timing.raw import RAW_MANIFEST_VERSION, RawSidecarWriter
 from sdpm.engine.timing.reader import resolve_import_switches
@@ -77,7 +77,7 @@ def pptx_to_json(
     output_dir: Path = None,
     use_layout_names: bool = True,
     minimal: bool = False,
-    existing_deck: dict = None,
+    existing_deck: dict | None = None,
 ):
     """Convert PPTX to JSON. Output is a deck-structure directory.
 
@@ -89,7 +89,12 @@ def pptx_to_json(
         existing_deck: The current ``deck.json`` when this is a hand-edit sync
             rather than a new import. An explicit ``animations``/``transitions``
             switch in it is preserved; only a missing one is derived from the
-            detected content (REQ-1.2).
+            detected content (REQ-1.2). **Defaults to the ``deck.json`` already
+            in ``output_dir``**, if there is one: converting into a deck
+            directory is a sync whether or not the caller says so, and leaving
+            it unread turned a switch the user had explicitly set to false back
+            on. A fresh import bundle has no ``deck.json`` there, so nothing
+            changes for one.
 
     Returns:
         Dict with {slides, fonts, defaultTextColor} for in-memory consumers.
@@ -109,6 +114,18 @@ def pptx_to_json(
         output_dir = pptx_path.with_suffix('')
     output_dir = Path(output_dir)
     output_dir.mkdir(parents=True, exist_ok=True)
+
+    if existing_deck is None:
+        existing_path = output_dir / "deck.json"
+        if existing_path.exists():
+            try:
+                loaded = read_json(existing_path)
+            except ValueError:
+                # Unreadable deck.json: a sync is not the place to fail on it,
+                # and the switches simply fall back to the detected content.
+                loaded = None
+            if isinstance(loaded, dict):
+                existing_deck = loaded
 
     slides_dir = output_dir / "slides"
     slides_dir.mkdir(parents=True, exist_ok=True)

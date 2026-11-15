@@ -885,11 +885,21 @@ def _resolve_config(
     include_warnings = check_includes(data, base_dir)
     warnings.extend(include_warnings)
 
+    # Resolved before the two motion checks below, because both describe what
+    # the build will write and neither writes anything when its switch is off.
+    # They used to run unconditionally, so a deck built as a still was told
+    # about text builds and unpaired morph identities it was not going to get.
+    from sdpm.engine.timing import resolve_enabled
+
+    animations_enabled = resolve_enabled(data, "animations", animation_mode)
+    transitions_enabled = resolve_enabled(data, "transitions", transition_mode)
+
     # Text builds whose sequence/level pair cannot survive a round-trip. Unlike
     # the morph check this is slide-local, so it runs for a partial build too:
     # a composer verifying its own slides can see its own text build, and
     # nothing about the answer depends on a neighbouring slide.
-    warnings.extend(check_text_build(data))
+    if animations_enabled:
+        warnings.extend(check_text_build(data))
 
     # Morph identities that pair with nothing on the adjacent slide. The only
     # morph rule that has to be deck-level: every other one is checked within a
@@ -902,7 +912,9 @@ def _resolve_config(
     # `data` at all, so every morphId would read as unpaired and a composer
     # verifying its own slides would be told its correct deck is broken. The
     # check belongs to the assembly that can see both halves.
-    if only_slugs is None:
+    #
+    # Morph is a transition, so it is also skipped when transitions are off.
+    if only_slugs is None and transitions_enabled:
         warnings.extend(check_morph_pairing(data))
 
     # Resolve overrides
@@ -923,8 +935,6 @@ def _resolve_config(
 
     lint_diagnostics = lint_diagnostics + lint_motion(resolved_slides)
 
-    from sdpm.engine.timing import resolve_enabled
-
     return BuildConfig(
         template_path=template_file,
         custom_template=custom,
@@ -936,8 +946,8 @@ def _resolve_config(
         lint_diagnostics=lint_diagnostics,
         auto_spacing=data.get("autoSpacing", True),
         default_background=data.get("defaultBackground") or None,
-        animations_enabled=resolve_enabled(data, "animations", animation_mode),
-        transitions_enabled=resolve_enabled(data, "transitions", transition_mode),
+        animations_enabled=animations_enabled,
+        transitions_enabled=transitions_enabled,
         title=data.get("title") or None,
         language=data.get("language") or None,
     )

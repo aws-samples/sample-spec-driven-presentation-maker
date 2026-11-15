@@ -594,6 +594,40 @@ class TestImportSwitches:
         assert deck["animations"] == {"enabled": False}, "the user's explicit off is kept"
         assert deck["transitions"] == {"enabled": True}, "the missing switch is derived"
 
+    def test_a_resync_into_a_deck_directory_reads_its_own_deck_json(self, tmp_path):
+        """`existing_deck` was passed only from tests, so in production the
+        preserve-an-explicit-switch rule never fired: converting again over a
+        deck turned a switch the user had set to false back on. Converting into
+        a directory that already holds a deck.json is a sync whether or not the
+        caller says so, so the switches come from there by default.
+        """
+        out = tmp_path / "out"
+        package = _package(tmp_path, _slide(
+            animations={"mainSequence": [_effect()], "interactiveSequences": []},
+        ))
+        pptx_to_json(package, out)
+        assert json.loads((out / "deck.json").read_text())["animations"] == {"enabled": True}
+
+        # The user turns it off in the deck they are working in.
+        deck = json.loads((out / "deck.json").read_text())
+        deck["animations"] = {"enabled": False}
+        (out / "deck.json").write_text(json.dumps(deck, ensure_ascii=False))
+
+        pptx_to_json(package, out)
+        assert json.loads((out / "deck.json").read_text())["animations"] == {"enabled": False}
+
+    def test_a_fresh_import_bundle_is_unaffected(self, tmp_path):
+        """There is no deck.json in a fresh output directory, so a new import
+        still derives both switches from the detected content."""
+        pptx_to_json(
+            _package(tmp_path, _slide(
+                animations={"mainSequence": [_effect()], "interactiveSequences": []},
+            )),
+            tmp_path / "fresh",
+        )
+        deck = json.loads((tmp_path / "fresh" / "deck.json").read_text())
+        assert deck["animations"] == {"enabled": True}
+
     @pytest.mark.parametrize(
         "existing,expected",
         [
