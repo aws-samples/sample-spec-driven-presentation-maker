@@ -189,6 +189,17 @@ def _slug(value: str) -> str:
     return cleaned
 
 
+def _suffix_on_collision(base: str, taken: Iterable[str]) -> str:
+    """Return ``base``, or ``base-2`` / ``base-3`` / … when it is taken."""
+    taken = set(taken)
+    candidate = base
+    ordinal = 2
+    while candidate in taken:
+        candidate = f"{base}-{ordinal}"
+        ordinal += 1
+    return candidate
+
+
 def derive_element_id(name: str, spid: int, used: Iterable[str]) -> str:
     """Return a deterministic, collision-free slide-local ID for one shape.
 
@@ -197,14 +208,7 @@ def derive_element_id(name: str, spid: int, used: Iterable[str]) -> str:
     to its source ``spid``. A collision appends ``-2``, ``-3``, … so an import
     is deterministic and collision-free within itself (REQ-2.3).
     """
-    taken = set(used)
-    base = _slug(name) or f"shape-{spid}"
-    candidate = base
-    ordinal = 2
-    while candidate in taken:
-        candidate = f"{base}-{ordinal}"
-        ordinal += 1
-    return candidate
+    return _suffix_on_collision(_slug(name) or f"shape-{spid}", used)
 
 
 def shape_identities(slide_element: etree._Element) -> dict[int, ShapeIdentity]:
@@ -231,8 +235,17 @@ def shape_identities(slide_element: etree._Element) -> dict[int, ShapeIdentity]:
         shape = owner.getparent() if owner is not None else None
         identity = read_identity_extension(shape) if shape is not None else {}
         element_id = identity.get("element")
-        recovered = bool(element_id)
-        if not recovered:
+        if element_id:
+            # PowerPoint copies an a:ext payload with the shape, so duplicating
+            # a shape sdpm wrote and reimporting gives two shapes claiming one
+            # ID. A recovered ID goes through the same suffixing as a derived
+            # one — it is not re-slugged, so it survives unchanged when it is
+            # unique — and the copy is no longer the shape the extension names.
+            unique = _suffix_on_collision(str(element_id), used)
+            recovered = unique == element_id
+            element_id = unique
+        else:
+            recovered = False
             element_id = derive_element_id(morph_id or name, spid, used)
         used.add(element_id)
         identities[spid] = ShapeIdentity(
@@ -358,6 +371,38 @@ def reverse_index(index: CapabilityIndex) -> _Reverse:
 #: approximate.
 _VOLATILE_ATTRS = frozenset({"id", "dur", "delay"})
 
+#: The media timing node the builder recreates from a ``video`` / ``audio``
+#: element, as python-pptx's ``add_movie`` writes it. A media node carries no
+#: slide JSON representation, so a value that differs from these is a playback
+#: setting with nowhere to live — a mute, a lowered volume, autoplay, loop — and
+#: the tree is preserved raw rather than imported without it.
+MEDIA_NODE_DEFAULTS: dict[str, str] = {"vol": "80000"}
+MEDIA_CTN_DEFAULTS: dict[str, str] = {"fill": "hold", "display": "0"}
+MEDIA_START_DELAY = "indefinite"
+
+#: The attributes each explicit behaviour's inversion reads, mirroring the
+#: writer's ``_behavior_attrs`` tag by tag. The inversion reads attributes by
+#: name and ignores the rest, so without this allowlist an attribute sdpm cannot
+#: write back — a `p14:` extension, an `accel` on the behaviour itself — would be
+#: dropped on the way to JSON and simply absent when the slide is rebuilt. The
+#: five tags not listed here take no attributes of their own: `p:animClr`,
+#: `p:animScale` and `p:set` carry their payload in a `p:to` child.
+_EXPLICIT_BEHAVIOR_ATTRS: dict[str, tuple[str, ...]] = {
+    "p:animMotion": ("path", "pathEditMode", "origin", "rAng", "ptsTypes"),
+    "p:animRot": ("by", "from", "to"),
+    "p:anim": ("calcmode", "valueType", "by", "from", "to"),
+    "p:animEffect": ("transition", "filter"),
+    "p:cmd": ("type", "cmd"),
+}
+
+#: Attributes a behaviour node carries because an **authored setting** put them
+#: there, on top of the measured capture. `p14:bounceEnd` is the only one today:
+#: Bounce End writes `p14:presetBounceEnd` on the effect's `p:cTn` and mirrors
+#: the same percentage here, so it identifies nothing and its absence from the
+#: capture is not a mismatch. The two are checked against each other where the
+#: setting itself is read.
+_SETTING_ATTRS = frozenset({f"{{{P14_NS}}}bounceEnd"})
+
 
 def _subtree_signature(node: Mapping[str, Any]) -> tuple[Any, ...]:
     """Signature of a measured ``{element, attributes, children}`` value subtree."""
@@ -413,7 +458,7 @@ def _xml_subtree_signature(node: etree._Element) -> tuple[Any, ...]:
             sorted(
                 (str(name), str(value))
                 for name, value in node.attrib.items()
-                if name not in _VOLATILE_ATTRS
+                if name not in _VOLATILE_ATTRS and name not in _SETTING_ATTRS
             )
         ),
         tuple(
@@ -443,7 +488,7 @@ def _xml_payload(children: etree._Element) -> tuple[Any, ...]:
                     sorted(
                         (str(name), str(value))
                         for name, value in node.attrib.items()
-                        if name not in _VOLATILE_ATTRS
+                        if name not in _VOLATILE_ATTRS and name not in _SETTING_ATTRS
                     )
                 ),
                 tuple(names),
@@ -679,6 +724,23 @@ def select_representation(
         elif kind == "AlternateContent":
             payload = {name for branch in child for name in _branch_payload(branch)}
             if local_name in payload:
+                mixed = sorted(payload & {"timing", "transition"} - {local_name})
+                if mixed:
+                    # Preserving this container would record it under both
+                    # references, and generation replays a raw fragment per
+                    # feature: the first replay inserts the whole container and
+                    # the second cannot replace its half without deleting the
+                    # other, which remove_alternate_content refuses by design.
+                    # Importing it would therefore produce a deck that can
+                    # never be rebuilt, so it is refused here instead.
+                    raise MotionReadError(
+                        f"slide wraps p:{local_name} and p:{mixed[0]} in one "
+                        "mc:AlternateContent branch set. Generation replays one preserved "
+                        f"fragment per feature and cannot replace p:{local_name} inside that "
+                        f"container without deleting the p:{mixed[0]} beside it, so the slide "
+                        "would import and then fail every build. Split the wrapper in "
+                        "PowerPoint so each representation has its own mc:AlternateContent."
+                    )
                 found.append(select_alternate_branch(child, local_name, supported=supported))
     if not found:
         return Selection(None, "none")
@@ -1140,24 +1202,70 @@ class _TimingReader:
     def _read_media(self, node: etree._Element) -> None:
         """Accept only the media node python-pptx's ``add_movie`` writes.
 
-        A media node is understood but not represented in slide JSON: the
-        builder recreates it from the ``video``/``audio`` element. Anything
-        richer — a bookmark, a trim, an explicit autoplay condition — is a
-        playback-affecting setting the JSON has no field for, so it sends the
-        whole tree to raw instead of being thrown away.
+        A media node is understood but **not represented in slide JSON**: the
+        builder recreates it from the ``video``/``audio`` element. So every
+        value here has to be one the builder would write again. ``@vol``,
+        ``@mute``, ``@numSld``, ``@showWhenStopped`` and the ``p:cTn``'s
+        ``@dur`` / ``@restart`` used to be allowed through and then dropped,
+        which is how a muted clip came back unmuted and a clip at half volume
+        came back at 80%.
+
+        Anything that differs now sends the whole tree to raw, which keeps the
+        setting instead of throwing it away. :data:`MEDIA_NODE_DEFAULTS` and
+        :data:`MEDIA_CTN_DEFAULTS` are pinned against the builder's own output
+        by ``test_the_accepted_media_node_is_the_one_the_builder_writes``, so the
+        two cannot drift apart.
         """
         _require_attrs(node, (), f"p:{_local(node)}")
         media = _child(node, "cMediaNode")
         if media is None:
             raise _Unsupported(f"p:{_local(node)} has no p:cMediaNode")
-        _require_attrs(media, ("vol", "mute", "numSld", "showWhenStopped"), "p:cMediaNode")
+        self._require_defaults(media, MEDIA_NODE_DEFAULTS, "p:cMediaNode")
         _only_children(media, {"cTn", "tgtEl"}, "p:cMediaNode")
         ctn = _child(media, "cTn")
         if ctn is None:
             raise _Unsupported("p:cMediaNode has no p:cTn")
-        _require_attrs(ctn, ("id", "fill", "display", "dur", "restart"), "p:cMediaNode/p:cTn")
+        self._require_defaults(
+            ctn, MEDIA_CTN_DEFAULTS, "p:cMediaNode/p:cTn", volatile={"id"}
+        )
         _only_children(ctn, {"stCondLst"}, "p:cMediaNode/p:cTn")
+        start = _child(ctn, "stCondLst")
+        conditions = [
+            child.get("delay")
+            for child in (start if start is not None else ())
+            if isinstance(child.tag, str) and _local(child) == "cond"
+        ]
+        if start is not None and (
+            conditions != [MEDIA_START_DELAY]
+            or len([child for child in start if isinstance(child.tag, str)]) != 1
+        ):
+            raise _Unsupported(
+                f"p:cMediaNode start condition {conditions} is not the builder's "
+                f"single delay={MEDIA_START_DELAY!r}; an autoplay or loop setting has no "
+                "slide JSON field, so the tree is preserved instead"
+            )
         self._read_target(media, allow_range=False)
+
+    @staticmethod
+    def _require_defaults(
+        node: etree._Element,
+        defaults: Mapping[str, str],
+        what: str,
+        *,
+        volatile: Iterable[str] = (),
+    ) -> None:
+        """Require ``node``'s attributes to be exactly ``defaults``."""
+        volatile = set(volatile)
+        written = {
+            str(name): str(value)
+            for name, value in _attrs(node).items()
+            if name not in volatile
+        }
+        if written != dict(defaults):
+            raise _Unsupported(
+                f"{what} carries {sorted(written.items())}, not the "
+                f"{sorted(dict(defaults).items())} the builder recreates"
+            )
 
     # -- sequences -----------------------------------------------------
     def _read_main(self, seq: etree._Element) -> list[dict[str, Any]]:
@@ -1346,6 +1454,8 @@ class _TimingReader:
             named = {"preset": self._read_preset(preset, options)}
             grp_id = int(attrs.get("grpId", 0))
             self._preset_build[(self._spid_of(target), grp_id)] = _animates_background(entry)
+
+        self._check_bounce_mirror(attrs, behaviors, sequence)
 
         # Both before the effect dict is built, because the writer allocates an
         # effect ID from the JSON *including* its text and build fields: an
@@ -1794,6 +1904,13 @@ class _TimingReader:
             kind = BEHAVIOR_TYPE_BY_TAG.get(tag)
             if kind is None:
                 raise _Unsupported(f"{sequence} effect writes {tag}, which is not a behavior")
+            # Only what the inversion below reads. An attribute or child outside
+            # the writer's own vocabulary is not inverted, so importing it would
+            # hand back JSON that rebuilds the slide without it.
+            _require_attrs(
+                node, _EXPLICIT_BEHAVIOR_ATTRS.get(tag, ()), f"{sequence} behavior {tag}"
+            )
+            _only_children(node, {"cBhvr", "to"}, f"{sequence} behavior {tag}")
             common = _child(node, "cBhvr")
             if common is None:
                 raise _Unsupported(f"{sequence} behavior {tag} has no p:cBhvr")
@@ -1907,6 +2024,20 @@ class _TimingReader:
                 f"{sequence} effect writes behaviors {list(found)} but catalog entry "
                 f"{entry.key!r} measured {expected}"
             )
+        # The names and their order are not the effect. Everything the writer
+        # transcribes verbatim — each behaviour's own attributes, its
+        # p:attrNameLst and its p:to / p:from / p:by / p:tavLst payload — has to
+        # match too, or a tampered @filter, a moved keyframe or a different @by
+        # would read back as the catalogued preset and regenerate with the
+        # catalogued value, silently replacing what the file actually carried.
+        # These are the same signatures the option identification uses, so the
+        # comparison is exact rather than a nearest match, and anything that
+        # does not match goes raw under the module's all-or-nothing rule.
+        if _xml_payload(children) != _catalog_payload(measured):
+            raise _Unsupported(
+                f"{sequence} effect writes behaviors that do not match the measured payload of "
+                f"{entry.key!r}; only the timings may differ from the capture"
+            )
         targets: set[str] = set()
         scale: Fraction | None = None
         for node, behavior in zip(children, measured):
@@ -1918,6 +2049,11 @@ class _TimingReader:
             carrier_ctn = _child(carrier, "cTn")
             if carrier_ctn is None:
                 raise _Unsupported(f"{tag}/p:cBhvr has no p:cTn")
+            # The carrier and its p:cTn are written from the capture too, and
+            # neither is part of the payload signature above: @override on the
+            # carrier and @fill / @accel / @additive on the p:cTn change how the
+            # effect plays and settles. Only @id and @dur are the writer's.
+            self._check_carrier(carrier, carrier_ctn, behavior, tag, sequence)
             targets.add(self._read_target(carrier, allow_range=True))
             written = carrier_ctn.get("dur")
             source = behavior.get("durMs")
@@ -1935,6 +2071,110 @@ class _TimingReader:
         if scale is None or measured_duration is None:
             return targets.pop(), None
         return targets.pop(), int(round(int(measured_duration) * scale))
+
+    def _check_bounce_mirror(
+        self, attrs: Mapping[str, str], behaviors: etree._Element, sequence: str
+    ) -> None:
+        """Require Bounce End's two attributes to agree.
+
+        Measured 2026-11-02: the setting writes ``p14:presetBounceEnd`` on the
+        effect's ``p:cTn`` *and* ``p14:bounceEnd`` on its ``p:animMotion``, with
+        the same percentage. Only the first is read, because reporting the same
+        setting twice would hand back JSON that differs from the JSON that
+        produced the package — which means a file where the two disagree would
+        read back one of them and regenerate both from it. That is a silent
+        change to how the effect plays, so it goes raw instead.
+        """
+        setting = attrs.get(f"{{{P14_NS}}}presetBounceEnd")
+        mirrors = {
+            node.get(f"{{{P14_NS}}}bounceEnd")
+            for node in behaviors.iter()
+            if isinstance(node.tag, str) and _local(node) == "animMotion"
+            and node.get(f"{{{P14_NS}}}bounceEnd") is not None
+        }
+        if not mirrors:
+            if setting is not None:
+                raise _Unsupported(
+                    f"{sequence} effect carries p14:presetBounceEnd {setting!r} but no "
+                    "p:animMotion/@p14:bounceEnd beside it; PowerPoint writes both"
+                )
+            return
+        if setting is None:
+            raise _Unsupported(
+                f"{sequence} effect carries p:animMotion/@p14:bounceEnd {sorted(mirrors)} but no "
+                "p14:presetBounceEnd on the effect; PowerPoint writes both"
+            )
+        if mirrors != {setting}:
+            raise _Unsupported(
+                f"{sequence} effect p14:presetBounceEnd {setting!r} disagrees with its "
+                f"p:animMotion/@p14:bounceEnd {sorted(mirrors)}"
+            )
+
+    def _check_carrier(
+        self,
+        carrier: etree._Element,
+        carrier_ctn: etree._Element,
+        behavior: Mapping[str, Any],
+        tag: str,
+        sequence: str,
+    ) -> None:
+        """Verify one measured behaviour's carrier against the capture.
+
+        The writer builds the carrier from three recorded fields and adds
+        nothing: ``carrier`` becomes the ``p:cBhvr`` attributes,
+        ``timingAttributes`` becomes the ``p:cTn`` attributes beside the
+        generated ``@id`` and the scaled ``@dur``, and a ``delayMs`` becomes one
+        ``p:stCondLst/p:cond/@delay``. A written carrier that says anything else
+        is not the measured preset, so it goes raw instead of being regenerated
+        from the catalog.
+
+        The delay is compared by presence, not value. For every animated
+        behaviour the value is the measured delay scaled by the effect duration,
+        which this reader is still recovering; for the visibility ``p:set`` it is
+        recomputed from the duration rather than scaled. Checking the number
+        here would therefore need the answer before it is known.
+        """
+        expected_carrier = {str(k): str(v) for k, v in (behavior.get("carrier") or {}).items()}
+        written_carrier = {str(k): str(v) for k, v in carrier.attrib.items()}
+        if written_carrier != expected_carrier:
+            raise _Unsupported(
+                f"{sequence} behavior {tag} p:cBhvr carries {sorted(written_carrier.items())}, "
+                f"not the measured {sorted(expected_carrier.items())}"
+            )
+        expected_timing = {
+            str(k): str(v) for k, v in (behavior.get("timingAttributes") or {}).items()
+        }
+        written_timing = {
+            str(k): str(v) for k, v in carrier_ctn.attrib.items() if k != "id"
+        }
+        if behavior.get("durMs") is not None:
+            # A measured millisecond duration is the one value the writer scales,
+            # and the scale is recovered from it below. Where there is none, the
+            # capture's own @dur — "indefinite" on three p:set behaviours — is
+            # written literally and has to come back literally.
+            expected_timing.pop("dur", None)
+            written_timing.pop("dur", None)
+        if written_timing != expected_timing:
+            raise _Unsupported(
+                f"{sequence} behavior {tag} p:cBhvr/p:cTn carries "
+                f"{sorted(written_timing.items())}, not the measured "
+                f"{sorted(expected_timing.items())}"
+            )
+        _only_children(carrier_ctn, {"stCondLst"}, f"{tag}/p:cBhvr/p:cTn")
+        start = _child(carrier_ctn, "stCondLst")
+        if (start is not None) != (behavior.get("delayMs") is not None):
+            raise _Unsupported(
+                f"{sequence} behavior {tag} "
+                f"{'adds a start condition the capture has none of' if start is not None else 'drops the measured start condition'}"
+            )
+        if start is not None:
+            conditions = [child for child in start if isinstance(child.tag, str)]
+            if len(conditions) != 1 or _local(conditions[0]) != "cond":
+                raise _Unsupported(
+                    f"{sequence} behavior {tag} p:stCondLst holds "
+                    f"{[_local(node) for node in conditions]}, not one p:cond"
+                )
+            _require_attrs(conditions[0], ("delay",), f"{tag} p:stCondLst/p:cond")
 
     def _check_visibility_set(
         self,
@@ -2280,9 +2520,20 @@ def _transition_sound(
     lookup: RelationshipLookup,
     *,
     slide_slug: str,
-    assets: list[AssetRef],
-) -> dict[str, Any] | None:
-    """Read ``p:sndAc`` into the semantic sound contract, copying the asset."""
+) -> None:
+    """Refuse a transition sound so the whole ``p:transition`` is preserved raw.
+
+    A semantic sound cannot be written back: ``build_transition`` refuses on
+    ``transition.sound.*``, because the writer creates neither the audio part nor
+    its package relationship. Returning the semantic contract here would import
+    cleanly and then fail every later build of that deck, so the sound is read
+    only far enough to describe it and the fragment goes raw, which copies the
+    audio part with the relationship intact.
+
+    The structural checks are kept because their reasons are more useful than the
+    general one: a reader of ``_rawTransition.reason`` learns that the source was
+    malformed rather than that sdpm cannot write sounds.
+    """
     sound_action = _child(node, "sndAc")
     if sound_action is None:
         return None
@@ -2308,19 +2559,11 @@ def _transition_sound(
             f"slide {slide_slug!r}: transition sound {rid!r} is an external relationship; sdpm "
             "does not follow links out of the package during import"
         )
-    asset = AssetRef(
-        path=f"media/{_asset_name(slide_slug, reference)}",
-        blob=reference.blob,
-        content_type=reference.content_type,
-        relationship_type=reference.relationship_type,
-        source_part=reference.source_part,
+    raise _Unsupported(
+        "p:sndAc carries a transition sound, and the writer creates neither the audio part nor "
+        "its package relationship, so the transition is preserved raw rather than imported into "
+        "a shape that cannot be built"
     )
-    assets.append(asset)
-    return {
-        "src": asset.path,
-        "mediaType": reference.content_type,
-        "loop": start.get("loop") in {"1", "true"},
-    }
 
 
 def _asset_name(slide_slug: str, reference: RelationshipRef) -> str:
@@ -2336,9 +2579,13 @@ def read_transition(
     index: CapabilityIndex,
     slide_slug: str,
     lookup: RelationshipLookup,
-    assets: list[AssetRef],
 ) -> dict[str, Any]:
-    """Return the semantic transition for one ``p:transition`` element."""
+    """Return the semantic transition for one ``p:transition`` element.
+
+    A semantic transition owns no package part. The one element that could,
+    ``p:sndAc``, sends the fragment raw instead (see :func:`_transition_sound`),
+    so this reader collects no assets.
+    """
     reverse = reverse_index(index)
     allowed = ("spd", "advClick", "advTm", f"{{{P14_NS}}}dur")
     attrs = _require_attrs(node, allowed, "p:transition")
@@ -2390,7 +2637,10 @@ def read_transition(
             "onClick": advance_click not in {"0", "false"},
             "afterMs": int(after) if after is not None else None,
         },
-        "sound": _transition_sound(node, lookup, slide_slug=slide_slug, assets=assets),
+        # Always None: a sound raises _Unsupported and the transition goes raw.
+        # The key stays so the semantic contract keeps one shape, and so the
+        # writer's own sound branch stays reachable once it can write one.
+        "sound": _transition_sound(node, lookup, slide_slug=slide_slug),
     }
     return transition
 
@@ -2566,13 +2816,11 @@ def read_slide_motion(
                 canonical_xml(transition_selection.container),
                 what=f"slide {slide_slug!r} p:transition",
             )
-            transition_assets: list[AssetRef] = []
             try:
                 transition = read_transition(
                     transition_selection.node, index=index, slide_slug=slide_slug,
-                    lookup=lookup, assets=transition_assets,
+                    lookup=lookup,
                 )
-                assets.extend(transition_assets)
             except _Unsupported as error:
                 transition = None
                 reasons.append(error.reason)

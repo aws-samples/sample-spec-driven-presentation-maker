@@ -189,6 +189,41 @@ class TestAlternateContentSelection:
         with pytest.raises(MotionReadError, match="representations"):
             select_representation(slide._element, "transition", supported=("p14",))
 
+    def test_a_wrapper_mixing_timing_and_transition_is_refused_at_import(self, tmp_path):
+        """A mixed wrapper would import and then fail every build.
+
+        Preserving it records the whole container under both `_rawTiming` and
+        `_rawTransition`. Generation replays one fragment per feature: the first
+        replay inserts the container, and the second cannot replace its half
+        without deleting the other, which `remove_alternate_content` refuses by
+        design. Refusing here keeps the failure at the point where the user can
+        still act on it — the alternative is a deck that is permanently
+        unbuildable.
+        """
+        def replace(slide):
+            for node in list(slide._element):
+                if etree.QName(node).localname in {"transition", "timing"}:
+                    slide._element.remove(node)
+            slide._element.append(etree.fromstring(
+                f'<mc:AlternateContent xmlns:mc="{MC}" xmlns:p="{P}">'
+                '<mc:Choice Requires="p14">'
+                '<p:transition spd="fast"><p:fade/></p:transition>'
+                '<p:timing><p:tnLst><p:par><p:cTn id="1" dur="indefinite" restart="never" '
+                'nodeType="tmRoot"/></p:par></p:tnLst></p:timing>'
+                "</mc:Choice></mc:AlternateContent>"
+            ))
+
+        package = _mutate(_package(tmp_path, _slide(
+            transition={"effect": "wipe", "parameters": {}, "durationMs": 1000,
+                        "advance": {"onClick": True, "afterMs": None}, "sound": None},
+        )), replace)
+        slide = list(Presentation(str(package)).slides)[0]
+        for feature in ("timing", "transition"):
+            with pytest.raises(MotionReadError, match="one mc:AlternateContent branch set"):
+                select_representation(slide._element, feature, supported=("p14",))
+        with pytest.raises(MotionReadError, match="Split the wrapper"):
+            _read(package)
+
     def test_an_unreadable_branch_set_is_preserved_whole(self, tmp_path):
         def replace(slide):
             for node in slide._element.findall("{%s}transition" % P):
@@ -212,10 +247,20 @@ class TestAlternateContentSelection:
         assert "mc" in fragment.namespaces
 
 
-# --- semantic sound --------------------------------------------------------
+# --- transition sound ------------------------------------------------------
 
 
-class TestSemanticSoundAsset:
+class TestTransitionSoundGoesRaw:
+    """A transition sound is preserved raw, not read into the semantic contract.
+
+    It used to import semantically, which looked better and was worse: the writer
+    creates neither the audio part nor its package relationship, so
+    ``build_transition`` refuses ``transition.sound.*`` and every later build of
+    the imported deck failed. Raw preservation copies the audio part with its
+    relationship, so the deck both imports and regenerates — see
+    ``test_animation_raw_roundtrip.py`` for the generate half.
+    """
+
     def _with_sound(self, tmp_path, loop=False):
         def attach(slide):
             rid = _add_audio(slide)
@@ -233,33 +278,36 @@ class TestSemanticSoundAsset:
                         "advance": {"onClick": True, "afterMs": None}, "sound": None},
         )), attach)
 
-    def test_a_transition_sound_becomes_a_bundle_relative_asset_reference(self, tmp_path):
+    def test_a_sound_sends_the_whole_transition_raw(self, tmp_path):
         motion = _read(self._with_sound(tmp_path))
-        assert motion.transition is not None, "a sound does not make the transition unreadable"
-        assert motion.transition["sound"] == {
-            "src": "media/slide-001-audio1.wav",
-            "mediaType": "audio/wav",
-            "loop": False,
-        }
-        assert len(motion.assets) == 1
-        asset = motion.assets[0]
-        assert asset.blob == WAV
-        assert asset.relationship_type in ALLOWED_RELATIONSHIP_TYPES, (
-            "generation has to be able to recreate the relationship from this record"
+        assert motion.transition is None, (
+            "a semantic sound would import into a deck that build_transition refuses"
+        )
+        fragment = motion.raw_transition
+        assert fragment is not None
+        assert b"sndAc" in fragment.xml, "the sound travels inside the preserved fragment"
+        assert any("audio part" in reason for reason in fragment.reasons), fragment.reasons
+        assert not motion.assets, "the audio is a raw part now, not a semantic asset"
+
+    def test_the_loop_flag_travels_in_the_preserved_xml(self, tmp_path):
+        fragment = _read(self._with_sound(tmp_path, loop=True)).raw_transition
+        assert b'loop="1"' in fragment.xml, (
+            "loopUntilNext is the one sound setting PowerPoint writes as an attribute, "
+            "so losing it would change playback on reopen"
         )
 
-    def test_loop_until_next_sound_survives(self, tmp_path):
-        motion = _read(self._with_sound(tmp_path, loop=True))
-        assert motion.transition["sound"]["loop"] is True
-
-    def test_the_asset_lands_in_the_deck_and_the_manifest(self, tmp_path):
+    def test_the_audio_lands_in_the_deck_as_a_manifest_part(self, tmp_path):
         pptx_to_json(self._with_sound(tmp_path), tmp_path / "out")
         slide = json.loads((tmp_path / "out" / "slides" / "slide-001.json").read_text())
-        src = slide["transition"]["sound"]["src"]
-        assert (tmp_path / "out" / src).read_bytes() == WAV
+        assert slide.get("transition") is None
         manifest = load_raw_manifest(tmp_path / "out" / "animations" / "manifest.json")
         validate_raw_manifest(manifest, root=tmp_path / "out")
-        assert [asset["path"] for asset in manifest["assets"]] == [src]
+        parts = [part["path"] for part in manifest["parts"]]
+        assert len(parts) == 1, parts
+        assert (tmp_path / "out" / parts[0]).read_bytes() == WAV
+        assert manifest["parts"][0]["relationshipType"] in ALLOWED_RELATIONSHIP_TYPES, (
+            "generation has to be able to recreate the relationship from this record"
+        )
 
     def test_an_external_sound_relationship_is_refused(self, tmp_path):
         def attach(slide):

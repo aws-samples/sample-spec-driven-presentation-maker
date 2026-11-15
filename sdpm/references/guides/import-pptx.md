@@ -213,32 +213,39 @@ bundle, and the slide holds only a small reference:
                 "manifest": "animations/manifest.json", "reason": "…"}}
 ```
 
-Those paths are **deck-root relative**, and the build resolves them — and every path inside
-`animations/manifest.json` — against the active deck root. So the whole
-`attachments/imports/{importKey}/deck/animations/` subtree (plus `deck/media/` when the
-manifest declares assets) has to exist at the active deck root under the same names, with
-the same bytes: the manifest carries a SHA-256 per file and a mismatch fails generation.
+**Do not copy the closure. Point at it**, exactly as Step 4 points `deck["template"]` at the
+bundle. The bundle already holds the sidecars, the manifest and every binary part the
+manifest declares, with the bytes the manifest's SHA-256 values were taken from.
+
+The build derives the root for a raw reference from its `manifest` path — the directory that
+owns the `animations/` subtree — and resolves every path *inside* the manifest against that
+root. So redirecting `manifest` into the bundle moves the whole closure there in one field:
 
 ```python
-manifest = read_json(f"{bundle_path}/deck/animations/manifest.json")
-binary = (manifest.get("parts") or []) + (manifest.get("assets") or [])
-if binary:
-    print("REPORT: preserved animations depend on binary parts:",
-          [row["path"] for row in binary])
-else:
-    write_text("animations/manifest.json", read_text(f"{bundle_path}/deck/animations/manifest.json"))
-    for row in manifest.get("sidecars") or []:
-        for key in ("path", "mediaOnlyPath"):
-            path = row.get(key)
-            if path:
-                write_text(path, read_text(f"{bundle_path}/deck/{path}"))
+for slug in slugs:
+    slide = read_json(f"slides/{slug}.json")
+    changed = False
+    for key in ("_rawTiming", "_rawTransition"):
+        reference = slide.get(key)
+        if isinstance(reference, dict):
+            reference["manifest"] = f"{bundle_path}/deck/animations/manifest.json"
+            changed = True
+    if changed:
+        write_json(f"slides/{slug}.json", slide)
 ```
 
-`run_python` copies text only. A manifest with a non-empty `parts` or `assets` list depends
-on audio / video / image parts that cannot be copied this way — **report that to the user**
-and leave the deck at its Step 4 state. Do not delete the `_rawTiming` / `_rawTransition`
-reference, hand-edit a sidecar, or edit the manifest to make a build succeed: all three throw
-away a setting the source file actually carried.
+Change `manifest` and nothing else. `sidecar`, `mediaOnlyPath`, `sha256` and `reason` stay
+byte-identical to what the bundle wrote, because they are relative to that same root and are
+looked up in the manifest by those exact strings.
+
+This needs no binary copy, which matters because `run_python` writes text only: an audio or
+video part a preserved fragment depends on could never reach the active deck that way. It
+also behaves identically on Local and Cloud, since `bundlePath` is deck-relative on both.
+
+Do not delete a `_rawTiming` / `_rawTransition` reference, hand-edit a sidecar, or edit the
+manifest to make a build succeed: all three throw away a setting the source file carried. If
+the build still reports a missing or mismatched part, the bundle is incomplete — report that
+rather than trimming the reference.
 
 ---
 

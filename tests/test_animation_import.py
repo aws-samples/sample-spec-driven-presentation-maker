@@ -23,6 +23,7 @@ from sdpm.engine.builder import PPTXBuilder
 from sdpm.engine.converter.pipeline import pptx_to_json
 from sdpm.engine.timing import SDPM_EFFECT_EXT_URI, effect_fingerprint
 from sdpm.engine.timing.reader import (
+    P14_NS,
     MotionReadError,
     derive_element_id,
     read_slide_motion,
@@ -252,6 +253,47 @@ class TestIdentityRecovery:
         assert len(card) == 1
         assert card[0].element_id == "aside", "the logical id is not the morphId"
         assert set(motion.morph_ids.values()) == {"card"}
+
+    def test_a_duplicated_shape_cannot_claim_the_original_s_recovered_id(self, tmp_path):
+        """Copying a shape in PowerPoint copies the sdpm identity extension.
+
+        A derived ID is suffixed on collision, but a recovered one used to be
+        taken verbatim, so duplicate-and-reimport produced two elements with the
+        same `id` — ambiguous for every animation target that names it.
+        """
+        package = _package(tmp_path, _slide(animations={
+            "mainSequence": [_effect()], "interactiveSequences": [],
+        }), name="duplicated.pptx")
+
+        def duplicate(slide_element):
+            tree = slide_element.find("{%s}cSld/{%s}spTree" % (NS["p"], NS["p"]))
+            source = [
+                node for node in tree
+                if isinstance(node.tag, str) and etree.QName(node).localname == "sp"
+            ][0]
+            copy = etree.fromstring(etree.tostring(source))
+            # PowerPoint gives the copy a fresh spid and keeps everything else,
+            # including the a:ext payload that names the logical element.
+            taken = {
+                int(props.get("id"))
+                for props in tree.iter("{%s}cNvPr" % NS["p"])
+                if (props.get("id") or "").isdigit()
+            }
+            for props in copy.iter("{%s}cNvPr" % NS["p"]):
+                props.set("id", str(max(taken) + 1))
+            tree.append(copy)
+
+        _mutate(package, duplicate)
+        slide = list(Presentation(str(package)).slides)[0]
+        identities = shape_identities(slide._element)
+        ids = [identity.element_id for identity in identities.values()]
+
+        assert len(ids) == len(set(ids)), f"two shapes claim one id: {ids}"
+        assert "hero" in ids and "hero-2" in ids, ids
+        original = next(i for i in identities.values() if i.element_id == "hero")
+        copy = next(i for i in identities.values() if i.element_id == "hero-2")
+        assert original.recovered is True, "the first shape keeps the id the extension names"
+        assert copy.recovered is False, "the copy's id is derived, so it is not recovered"
 
     def test_a_shape_without_sdpm_metadata_gets_a_deterministic_id(self):
         used: list[str] = []
@@ -662,6 +704,133 @@ def test_rewind_round_trips_through_the_fill_attribute(tmp_path):
         motion = _read(package)
         assert motion.raw_timing is None
         assert motion.animations["mainSequence"][0]["timing"] == expected
+
+
+class TestAMeasuredPresetMustMatchItsCapture:
+    """Reading back a preset by name alone regenerates the catalog, not the file.
+
+    A measured effect's behaviours are transcribed from the GUI capture and only
+    the timings are allowed to move. The reader used to check the behaviour
+    element names and their order and nothing else, so a file whose payload had
+    been changed — by another tool, by an older PowerPoint, by hand — imported as
+    the catalogued preset with no raw sidecar, and the next build wrote the
+    catalog's values over what the file actually carried. Each of these is that
+    class of change, and each must send the effect raw.
+    """
+
+    def _tampered(self, tmp_path, mutate, *, preset=None, name="tampered.pptx"):
+        effect = _effect(preset=preset) if preset else _effect()
+        package = _package(tmp_path, _slide(animations={
+            "mainSequence": [effect], "interactiveSequences": [],
+        }), name=name)
+        return _read(_mutate(package, mutate))
+
+    def _behaviors(self, slide_element):
+        for ctn in slide_element.iter(f"{{{NS['p']}}}cTn"):
+            if ctn.get("presetClass") is not None and ctn.get("presetID") is not None:
+                return ctn.find(f"{{{NS['p']}}}childTnLst")
+        raise AssertionError("no preset effect found in the package")
+
+    #: A preset whose behaviours the GUI capture measured, so reading it back
+    #: goes through the measured path rather than the general catalog rules.
+    #: `entrance.fade` does not: it has no measured behaviours, and its
+    #: `p:animEffect/@filter` is checked by the general rule already.
+    MEASURED = {"category": "entrance", "effect": "blinds"}
+
+    def test_a_changed_filter_is_not_read_as_the_catalogued_preset(self, tmp_path):
+        def retarget(slide):
+            for node in slide.iter(f"{{{NS['p']}}}animEffect"):
+                node.set("filter", "wipe(left)")
+
+        motion = self._tampered(tmp_path, retarget, preset=self.MEASURED)
+        assert motion.animations is None, "a changed @filter must not read back as blinds"
+        assert motion.raw_timing is not None
+        assert b"wipe(left)" in motion.raw_timing.xml, "the file's own value is preserved"
+
+    def test_a_moved_keyframe_is_not_read_as_the_catalogued_preset(self, tmp_path):
+        def retime(slide):
+            for node in slide.iter(f"{{{NS['p']}}}tav"):
+                if node.get("tm") == "50000":
+                    node.set("tm", "75000")
+
+        motion = self._tampered(
+            tmp_path, retime, preset={"category": "emphasis", "effect": "blink"},
+            name="keyframe.pptx",
+        )
+        assert motion.animations is None, "a moved keyframe changes how the effect plays"
+        assert motion.raw_timing is not None
+
+    def _anim_effect_ctn(self, slide):
+        """The `p:cBhvr/p:cTn` of the measured preset's `p:animEffect`.
+
+        The capture records neither a timing attribute nor a delay on it, so an
+        addition there is unambiguously not what was measured.
+        """
+        node = next(iter(slide.iter(f"{{{NS['p']}}}animEffect")))
+        return node.find(f"{{{NS['p']}}}cBhvr").find(f"{{{NS['p']}}}cTn")
+
+    def test_a_changed_carrier_attribute_is_not_read_as_the_catalogued_preset(self, tmp_path):
+        def refill(slide):
+            self._anim_effect_ctn(slide).set("fill", "freeze")
+
+        motion = self._tampered(
+            tmp_path, refill, preset=self.MEASURED, name="carrier.pptx",
+        )
+        assert motion.animations is None, "@fill decides whether the effect settles or snaps back"
+        assert motion.raw_timing is not None
+        assert b'fill="freeze"' in motion.raw_timing.xml
+
+    def test_an_added_start_condition_is_not_read_as_the_catalogued_preset(self, tmp_path):
+        def delay(slide):
+            ctn = self._anim_effect_ctn(slide)
+            assert ctn.find(f"{{{NS['p']}}}stCondLst") is None, "the capture has no delay here"
+            etree.SubElement(
+                etree.SubElement(ctn, f"{{{NS['p']}}}stCondLst"), f"{{{NS['p']}}}cond"
+            ).set("delay", "250")
+
+        motion = self._tampered(
+            tmp_path, delay, preset=self.MEASURED, name="startcond.pptx",
+        )
+        assert motion.animations is None, "a start condition the capture has none of is a change"
+        assert motion.raw_timing is not None
+
+    def test_bounce_end_must_agree_with_its_mirror(self, tmp_path):
+        """The setting is written twice and read once, so the two have to agree."""
+        def disagree(slide):
+            changed = 0
+            for node in slide.iter():
+                if node.get(f"{{{P14_NS}}}bounceEnd") is not None:
+                    node.set(f"{{{P14_NS}}}bounceEnd", "25000")
+                    changed += 1
+            assert changed == 1, f"the fixture must carry one mirror, found {changed}"
+
+        package = _package(tmp_path, _slide(animations={
+            "mainSequence": [_effect(
+                preset={"category": "motionPath", "effect": "lines"},
+                timing={"durationMs": 500, "bounceEnd": 0.5},
+            )],
+            "interactiveSequences": [],
+        }), name="bounce.pptx")
+        motion = _read(_mutate(package, disagree))
+        assert motion.animations is None, "one value would be regenerated over the other"
+        assert motion.raw_timing is not None
+
+    def test_an_uninvertible_attribute_on_an_explicit_behavior_is_refused(self, tmp_path):
+        """The explicit form reads attributes by name, so it needs the same rule."""
+        def extend(slide):
+            for node in slide.iter(f"{{{NS['p']}}}animRot"):
+                node.set("accel", "50000")
+
+        package = _package(tmp_path, _slide(animations={
+            "mainSequence": [_effect(preset=None, behaviors=[
+                {"type": "rotation", "by": 360, "durationMs": 500},
+            ])],
+            "interactiveSequences": [],
+        }), name="explicit.pptx")
+        motion = _read(_mutate(package, extend))
+        assert motion.animations is None, "an attribute the inversion drops must not import"
+        assert motion.raw_timing is not None
+        assert b'accel="50000"' in motion.raw_timing.xml
 
 
 def _slide_xml(path):

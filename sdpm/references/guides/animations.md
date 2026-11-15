@@ -808,17 +808,24 @@ Capture it with the PowerPoint oracle (Task 8); sdpm refuses to approximate it.
 ```
 
 A sound needs an audio part plus a package relationship the writer does not create, so
-`sound` must stay `null` on both an effect and a transition. The shape is validated when
-present, and import produces it for a transition sound, so this is what you will read in an
-imported slide file:
+`sound` must stay `null` on both an effect and a transition. The shape is still validated when
+present — `src` is a safe workspace-relative path (no absolute path, no URL, no `..`
+segment), `mediaType` must start with `audio/`, and `loop` is a boolean — so an authored
+sound is refused by name rather than quietly ignored.
+
+Import never produces one either. A slide whose `p:transition` carries `p:sndAc` is
+**preserved raw**, and you will read `"transition": null` with a `_rawTransition` beside it:
 
 ```json
-"sound": {"src": "media/slide-003-rId3-chime.wav", "mediaType": "audio/wav", "loop": false}
+"_rawTransition": {"sidecar": "animations/slide-003-transition.xml", "sha256": "…",
+                   "manifest": "animations/manifest.json",
+                   "reason": "p:sndAc carries a transition sound, and the writer creates neither
+                              the audio part nor its package relationship, …"}
 ```
 
-`src` is a safe workspace-relative path (no absolute path, no URL, no `..` segment),
-`mediaType` must start with `audio/`, and `loop` is a boolean. Import copies the audio part
-into the bundle and writes the bundle-relative path here.
+The audio travels as a manifest `part`, with its relationship type recorded, so generation
+recreates both the part and the relationship. Reading the sound into semantic JSON instead
+would import cleanly and then fail every later build of that deck.
 
 ## What import recovers
 

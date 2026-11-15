@@ -13,6 +13,7 @@ a dangling ``rId`` behind.
 from __future__ import annotations
 
 import json
+import shutil
 from pathlib import Path
 
 import pytest
@@ -35,6 +36,9 @@ from sdpm.engine.timing.raw import (
     validate_raw_manifest,
 )
 from sdpm.engine.timing.reader import (
+    MEDIA_CTN_DEFAULTS,
+    MEDIA_NODE_DEFAULTS,
+    MEDIA_START_DELAY,
     MediaBoundaryError,
     classify_media_boundary,
     media_only_timing,
@@ -409,6 +413,113 @@ def _inject_sound(path):
     return path
 
 
+class TestMediaPlaybackSettingsSurvive:
+    """A media node is not represented in JSON, so anything extra must go raw.
+
+    `_read_media` allowed `@vol`, `@mute`, `@numSld`, `@showWhenStopped` and the
+    `p:cTn`'s `@dur` / `@restart` through and then represented none of them,
+    because the builder recreates the node from the `video` element. A muted
+    clip came back unmuted and a clip at half volume came back at 80%. Only the
+    node the builder writes is accepted now; the rest is preserved.
+    """
+
+    def test_the_accepted_media_node_is_the_one_the_builder_writes(self, media_dir):
+        """Pins the reader's accepted defaults against the builder's output.
+
+        These are python-pptx's `add_movie` values. If it ever writes different
+        ones, every video would import raw with no other warning, so the two
+        statements are compared here rather than kept in step by hand.
+        """
+        package = _package(media_dir, _video_slide(), name="defaults.pptx")
+        slide = list(Presentation(str(package)).slides)[0]
+        nodes = [
+            node for node in slide._element.iter()
+            if isinstance(node.tag, str) and etree.QName(node).localname == "video"
+        ]
+        assert len(nodes) == 1, "the fixture must carry one video"
+        media = nodes[0].find("{%s}cMediaNode" % P)
+        assert dict(media.attrib) == MEDIA_NODE_DEFAULTS
+        ctn = media.find("{%s}cTn" % P)
+        assert {k: v for k, v in ctn.attrib.items() if k != "id"} == MEDIA_CTN_DEFAULTS
+        conditions = ctn.findall("{%s}stCondLst/{%s}cond" % (P, P))
+        assert [cond.get("delay") for cond in conditions] == [MEDIA_START_DELAY]
+
+    def _with_media_attr(self, media_dir, *, on, name, **attrs):
+        package = _package(media_dir, _video_slide(), name=name)
+        presentation = Presentation(str(package))
+        slide = list(presentation.slides)[0]
+        media = next(
+            node for node in slide._element.iter()
+            if isinstance(node.tag, str) and etree.QName(node).localname == "cMediaNode"
+        )
+        target = media if on == "media" else media.find("{%s}cTn" % P)
+        for key, value in attrs.items():
+            target.set(key, value)
+        presentation.save(str(package))
+        return _read(package)
+
+    def test_a_muted_clip_is_preserved_rather_than_imported_unmuted(self, media_dir):
+        motion = self._with_media_attr(media_dir, on="media", name="muted.pptx", mute="1")
+        assert motion.animations is None, "an unrepresentable setting must not import"
+        assert motion.raw_timing is not None
+        assert b'mute="1"' in motion.raw_timing.xml
+
+    def test_a_lowered_volume_is_preserved(self, media_dir):
+        motion = self._with_media_attr(media_dir, on="media", name="vol.pptx", vol="40000")
+        assert motion.animations is None
+        assert b'vol="40000"' in motion.raw_timing.xml
+
+    def test_a_trimmed_or_restarted_clip_is_preserved(self, media_dir):
+        motion = self._with_media_attr(
+            media_dir, on="ctn", name="trim.pptx", dur="4000", restart="always",
+        )
+        assert motion.animations is None
+        assert b'dur="4000"' in motion.raw_timing.xml
+
+    def test_an_autoplay_start_condition_is_preserved(self, media_dir):
+        package = _package(media_dir, _video_slide(), name="autoplay.pptx")
+        presentation = Presentation(str(package))
+        slide = list(presentation.slides)[0]
+        for cond in slide._element.iter("{%s}cond" % P):
+            if cond.get("delay") == MEDIA_START_DELAY:
+                cond.set("delay", "0")
+        presentation.save(str(package))
+
+        motion = _read(package)
+        assert motion.animations is None, "autoplay has no slide JSON field today"
+        assert motion.raw_timing is not None
+        assert b'delay="0"' in motion.raw_timing.xml
+
+
+def _inject_transition_sound(path):
+    """Attach a catalogued transition that also plays an embedded sound.
+
+    The effect itself is readable; only ``p:sndAc`` is not writable, which is
+    what sends the whole transition raw.
+    """
+    from pptx.opc.constants import RELATIONSHIP_TYPE as RT
+    from pptx.opc.package import Part
+    from pptx.opc.packuri import PackURI
+
+    presentation = Presentation(str(path))
+    slide = list(presentation.slides)[0]
+    rid = slide.part.relate_to(
+        Part(PackURI("/ppt/media/audio1.wav"), "audio/wav", slide.part.package, WAV), RT.AUDIO,
+    )
+    for node in slide._element.findall("{%s}transition" % P):
+        slide._element.remove(node)
+    slide._element.insert(
+        len(slide._element) - len(slide._element.findall("{%s}timing" % P)),
+        etree.fromstring(
+            '<p:transition xmlns:p="%s" xmlns:r="%s" spd="fast"><p:fade/>'
+            '<p:sndAc><p:stSnd loop="0"><p:snd r:embed="%s" name="alarm.wav"/>'
+            "</p:stSnd></p:sndAc></p:transition>" % (P, R, rid)
+        ),
+    )
+    presentation.save(str(path))
+    return path
+
+
 def _inject_unreadable_transition(path):
     presentation = Presentation(str(path))
     slide = list(presentation.slides)[0]
@@ -503,6 +614,74 @@ class TestGenerationReplaysPreservedMotion:
         relationship = regenerated.part.rels[rid]
         assert relationship.reltype.endswith("/audio")
         assert relationship.target_part.blob == WAV, "the manifest-declared part was copied"
+
+    def test_a_transition_sound_imports_and_regenerates_with_its_audio(self, media_dir):
+        """A transition sound must not import into a deck that cannot be built.
+
+        The writer creates neither the audio part nor its relationship, so
+        ``build_transition`` refuses a semantic ``transition.sound``. Reading one
+        into the semantic contract therefore produced a deck that imported
+        cleanly and failed every later generate. The transition goes raw instead,
+        which carries the audio part and replays it.
+        """
+        slide, root = _import(media_dir, _inject_transition_sound(
+            _package(media_dir, _video_slide(), name="tsound.pptx")
+        ))
+        assert slide.get("transition") is None, "a sound must not import semantically"
+        assert "sndAc" in slide["_rawTransition"]["reason"] or "sound" in (
+            slide["_rawTransition"]["reason"]
+        )
+
+        out, builder = _regenerate(root, slide, transitions=True, name="tsound-regen.pptx")
+
+        regenerated = list(Presentation(str(out)).slides)[0]
+        transitions = regenerated._element.findall("{%s}transition" % P)
+        assert len(transitions) == 1, "one transition, replayed from the raw fragment"
+        sounds = regenerated._element.findall(".//{%s}snd" % P)
+        assert len(sounds) == 1, "the sound survived the round trip"
+        relationship = regenerated.part.rels[sounds[0].get("{%s}embed" % R)]
+        assert relationship.reltype.endswith("/audio")
+        assert relationship.target_part.blob == WAV
+        assert builder.transition_reports[-1]["raw"] is True
+
+    def test_a_bundle_relative_reference_replays_binary_parts_without_copying(self, tmp_path):
+        """Activation redirects `manifest` into the bundle instead of copying.
+
+        `run_python`, which activates an import, writes text only, so an audio or
+        video part a preserved fragment depends on can never reach the active
+        deck by copying — the closure validates whole, so such a deck could not
+        be built locally at all. The build derives the closure root from the
+        reference's `manifest` path, so pointing that one field at the read-only
+        bundle resolves the sidecars and every binary part where they already
+        are. This is the behaviour `import-pptx.md` Step 4-1 tells an agent to
+        rely on.
+        """
+        work = tmp_path / "work"
+        work.mkdir()
+        (work / "clip.mp4").write_bytes(b"\x00\x00\x00\x18ftypmp42" + b"\x00" * 128)
+        slide, imported = _import(work, _inject_sound(
+            _package(work, _video_slide(), name="sound.pptx")
+        ))
+        assert load_raw_manifest(imported / MANIFEST_PATH)["parts"], (
+            "the fixture must depend on a binary part for this to mean anything"
+        )
+
+        deck = tmp_path / "deck"
+        bundle = deck / "attachments" / "imports" / "imp1" / "deck"
+        bundle.parent.mkdir(parents=True)
+        shutil.copytree(imported, bundle)
+        (deck / "clip.mp4").write_bytes((work / "clip.mp4").read_bytes())
+        # The active deck root holds no animations/ subtree of its own.
+        assert not (deck / "animations").exists()
+
+        slide["_rawTiming"]["manifest"] = "attachments/imports/imp1/deck/animations/manifest.json"
+        out, _builder = _regenerate(deck, slide, name="bundle-relative.pptx")
+
+        regenerated = list(Presentation(str(out)).slides)[0]
+        sounds = regenerated._element.findall(".//{%s}snd" % P)
+        assert len(sounds) == 1, "the preserved fragment replayed from the bundle"
+        relationship = regenerated.part.rels[sounds[0].get("{%s}embed" % R)]
+        assert relationship.target_part.blob == WAV, "the bundle's part was copied into the build"
 
     def test_a_missing_target_fails_before_the_package_is_written(self, media_dir):
         slide, root = _import(media_dir, _inject_unknown_sequence(
