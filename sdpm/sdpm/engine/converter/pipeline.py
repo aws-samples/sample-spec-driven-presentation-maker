@@ -39,7 +39,14 @@ def _source_provenance(pptx_path: Path) -> dict:
     nulls — guessing a version would be worse than admitting it is unknown.
     """
     import zipfile
-    from xml.etree import ElementTree
+
+    # defusedxml, not xml.etree: app.xml comes out of a PPTX the user supplied,
+    # which may have come from anywhere, so the entity and expansion attacks the
+    # stdlib parser allows are reachable here. The sibling converter modules
+    # reach the same place through defuse_stdlib(), which neither bandit nor
+    # semgrep recognises and which .ash.yaml therefore suppresses per path --
+    # calling the safe parser directly needs no suppression at all.
+    from defusedxml.ElementTree import ParseError, fromstring
 
     provenance = {
         "sourceFile": pptx_path.name,
@@ -53,8 +60,8 @@ def _source_provenance(pptx_path: Path) -> dict:
     except (OSError, KeyError, zipfile.BadZipFile):
         return provenance
     try:
-        root = ElementTree.fromstring(data)
-    except ElementTree.ParseError:
+        root = fromstring(data)
+    except ParseError:
         return provenance
     for child in root:
         tag = child.tag.rsplit("}", 1)[-1]
