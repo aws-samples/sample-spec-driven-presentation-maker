@@ -646,6 +646,54 @@ def test_a_pending_task_keeps_the_session_working_with_no_turn(rt):
     assert _wait_for(lambda: rt.busy.active == 0)
 
 
+def _settle_before_the_pending_check(rt, monkeypatch, task, status, *, stopped):
+    """Strands stores task snapshots on its own thread: make ``task`` settle right before
+    the work loop asks whether anything is pending, after its scan saw it working (#636)."""
+    waiting = rt.runtime.Session._waiting_locked
+
+    def settle_then_check(self, period):
+        if task["status"] == "working" and period.stop.is_set() == stopped:
+            task.update(status=status, result={"content": [{"text": f'{{"status": "{status}"}}'}]})
+        return waiting(self, period)
+
+    monkeypatch.setattr(rt.runtime.Session, "_waiting_locked", settle_then_check)
+
+
+def test_a_task_cancelled_during_the_last_check_ends_before_idle(rt, monkeypatch):
+    session = rt.session()
+    tail = rt.tail(session)
+    task = {"task_id": "k1", "tool_use_id": "t1", "tool_name": "compose_slides", "status": "working"}
+    session.handle._agent = _FakeAgent([task])
+    _settle_before_the_pending_check(rt, monkeypatch, task, "cancelled", stopped=True)
+
+    session.submit("hello", "ws", _jwt())
+    rt.turns.release("hello")
+    tail.until(lambda ev: "turnEnd" in ev)
+    assert session.cancel() == "cancelling"
+    evs = tail.until(_idle, timeout=STOP_SETTLE_WAIT)
+
+    assert [e["status"] for e in _kinds(evs, "taskEnd")] == ["cancelled"]
+    assert evs[-1]["work"] == {"state": "idle", "how": "cancelled"}
+
+
+def test_a_task_completed_during_the_last_check_wakes_the_session(rt, monkeypatch):
+    session = rt.session()
+    tail = rt.tail(session)
+    task = {"task_id": "k1", "tool_use_id": "t1", "tool_name": "compose_slides", "status": "working"}
+    session.handle._agent = _FakeAgent([task])
+    _settle_before_the_pending_check(rt, monkeypatch, task, "completed", stopped=False)
+
+    session.submit("hello", "ws", _jwt())
+    rt.turns.release("hello")
+    tail.until(lambda ev: ev.get("turn", {}).get("why") == "wake")
+    rt.turns.release(None)
+    evs = tail.until(_idle)
+
+    assert [e["status"] for e in _kinds(evs, "taskEnd")] == ["completed"]
+    assert [t["why"] for t in _kinds(evs, "turn")] == ["prompt", "wake"]
+    assert evs[-1]["work"] == {"state": "idle", "how": "finished"}
+
+
 STOP_SETTLE_WAIT = 8.0  # the fake task never settles: the stopped period gives up after STOP_SETTLE_S
 
 
