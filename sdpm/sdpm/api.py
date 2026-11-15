@@ -855,7 +855,10 @@ def _resolve_config(
     # Lint
     from sdpm.engine.schema.lint import lint as lint_slides
 
-    lint_diagnostics = lint_slides(data)
+    # Motion is validated after the overrides are resolved, below: an effect may
+    # target an element its slide inherits rather than declares, and on the
+    # unresolved form that reads as unknown-animation-target.
+    lint_diagnostics = lint_slides(data, include_motion=False)
 
     # Validate icons
     missing = validate_icons_in_json(data)
@@ -913,6 +916,12 @@ def _resolve_config(
     # Filter by only_slugs for legacy JSON path (directory path already filtered)
     if only_slugs is not None and not input_path.is_dir():
         resolved_slides = [s for s in resolved_slides if s.get("id") in only_slugs]
+
+    # Now that an inherited element is actually present on the slide that uses
+    # it, an effect targeting one is no longer an unknown target.
+    from sdpm.engine.schema.lint import lint_motion
+
+    lint_diagnostics = lint_diagnostics + lint_motion(resolved_slides)
 
     from sdpm.engine.timing import resolve_enabled
 
@@ -1031,10 +1040,14 @@ def generate(
     # own build all look correct in it. The caller is told to look at the
     # storyboard instead, and told here rather than in a guide because this is
     # the output an author already reads.
+    # Counted as "what the storyboard can show", which is object animation and
+    # nothing else. A transition is between slides and has no build order, so a
+    # transition-only deck used to be pointed at a storyboard that could not
+    # show it; and a slide whose timing was preserved raw carries build order
+    # just as much as a semantic one, but was not counted at all.
     animated_slides = sum(
         1 for s in config.slides
-        if (config.animations_enabled and s.get("animations"))
-        or (config.transitions_enabled and s.get("transition"))
+        if config.animations_enabled and (s.get("animations") or s.get("_rawTiming"))
     )
 
     result: dict[str, Any] = {
@@ -1878,7 +1891,22 @@ def storyboard(
     if not deck_path.is_dir():
         raise FileNotFoundError(f"Not a deck directory: {deck_dir}")
 
-    deck_meta, slides = _assemble_slides_from_dir(deck_path, only_slugs=only_slugs)
+    from sdpm.engine.builder import expand_includes, resolve_override
+
+    # Resolved the way the build resolves it, because the frames are an
+    # inventory of what the build will draw. On the source form an effect
+    # targeting an inherited or included element read as an unknown target, and
+    # that element was missing from the on/off-screen lists.
+    deck_meta, source_slides = _assemble_slides_from_dir(deck_path)
+    id_map = {s["id"]: s for s in source_slides if "id" in s}
+    slides = []
+    for slide in source_slides:
+        if only_slugs is not None and slide.get("id") not in only_slugs:
+            continue
+        resolved = dict(resolve_override(slide, id_map))
+        resolved["elements"] = expand_includes(resolved.get("elements"), deck_path)
+        slides.append(resolved)
+
     derived_deck, frame_slides, manifest = build_storyboard(
         deck_meta, slides, load_capability_index()
     )

@@ -213,6 +213,58 @@ class TestSemanticAnimations:
 # --- identity --------------------------------------------------------------
 
 
+class TestAMorphIdMustLandSomewhere:
+    """A morphId that cannot be stamped used to be discarded in silence.
+
+    `stamp`'s return value was read for `id` and ignored for `morphId`. Morph
+    matches a shape across two slides by that value, so losing one side changes
+    how the rebuilt deck animates with nothing in the output to say so, and
+    losing both makes the pair stop existing.
+    """
+
+    def _motion(self, **patch):
+        from sdpm.engine.timing.reader import SlideMotion
+
+        fields = {
+            "animations": None, "transition": None, "raw_timing": None,
+            "raw_transition": None, "assets": (), "element_ids": {}, "morph_ids": {},
+            "reasons": (),
+        }
+        fields.update(patch)
+        return SlideMotion(**fields)
+
+    def test_a_morph_id_with_no_json_node_is_refused(self):
+        from sdpm.engine.timing.reader import apply_motion_to_slide_json
+
+        slide_dict: dict = {"id": "one", "elements": []}
+        with pytest.raises(MotionReadError, match="morphId"):
+            apply_motion_to_slide_json(
+                slide_dict, self._motion(morph_ids={7: "card"}), element_targets=(),
+            )
+
+    def test_a_morph_id_lands_on_the_element_that_produced_the_shape(self):
+        from sdpm.engine.timing.reader import apply_motion_to_slide_json
+
+        element: dict = {"type": "shape"}
+        slide_dict = {"id": "one", "elements": [element]}
+        apply_motion_to_slide_json(
+            slide_dict, self._motion(morph_ids={7: "card"}), element_targets=((7, element),),
+        )
+        assert element["morphId"] == "card"
+
+    def test_a_morph_id_lands_on_a_placeholder(self):
+        from sdpm.engine.timing.reader import apply_motion_to_slide_json
+
+        slide_dict: dict = {"id": "one", "elements": [], "placeholders": {"title": "Hero"}}
+        apply_motion_to_slide_json(
+            slide_dict,
+            self._motion(morph_ids={7: "card"}),
+            element_targets=(),
+            placeholder_targets={7: "title"},
+        )
+        assert slide_dict["placeholders"]["title"]["morphId"] == "card"
+
+
 class TestIdentityRecovery:
     def test_effect_ids_come_from_the_sdpm_extension(self, tmp_path):
         motion = _read(_package(tmp_path, _slide(animations={

@@ -242,6 +242,40 @@ def _elements(slide: Mapping[str, Any]) -> Iterator[tuple[int, Mapping[str, Any]
             yield position, element
 
 
+def _addressable(slide: Mapping[str, Any]) -> list[str]:
+    """Every element id an effect on this slide may target.
+
+    A placeholder is as addressable as an element — the importer stamps a
+    logical id onto one, and the builder plays an effect against it — so
+    inventorying ``elements`` alone reported a valid placeholder target as "not
+    an element on this slide" and left it out of the on/off-screen lists. An
+    include contributes ids too; it is expanded before this is called, so
+    anything still carrying ``type: include`` here is a missing include file.
+    """
+    ids = [element.get("id") for _, element in _elements(slide) if element.get("id")]
+    placeholders = slide.get("placeholders")
+    if isinstance(placeholders, Mapping):
+        for placeholder in placeholders.values():
+            if isinstance(placeholder, Mapping) and placeholder.get("id"):
+                ids.append(placeholder["id"])
+    return ids
+
+
+def _raw_notes(slide: Mapping[str, Any]) -> list[str]:
+    """Say what a preserved fragment carries that these frames cannot show."""
+    notes: list[str] = []
+    for key, what in (("_rawTiming", "object animation"), ("_rawTransition", "transition")):
+        reference = slide.get(key)
+        if not isinstance(reference, Mapping):
+            continue
+        reason = reference.get("reason") or "no reason recorded"
+        notes.append(
+            f"{key}: this slide's {what} was preserved as raw XML, so the storyboard cannot "
+            f"show it — the frames below are the slide without it ({reason})"
+        )
+    return notes
+
+
 def frames(
     slide: Mapping[str, Any],
     index: Any,
@@ -260,8 +294,22 @@ def frames(
     reduced = [_Effect(e, index, slide_size) for e in main]
     steps = click_steps(main)
 
-    ids = [e.get("id") for _, e in _elements(slide) if e.get("id")]
-    revealed_by_entrance = {r.target for r in reduced if r.reveals}
+    ids = _addressable(slide)
+    # An element revealed only by a trigger is off screen before the first
+    # click too, exactly like one revealed by the main run. Counting the main
+    # sequence alone drew it at frame 0 as though it were already there, which
+    # is the opposite of what the storyboard exists to show.
+    interactive_effects = [
+        effect
+        for sequence in (animations.get("interactiveSequences") or [])
+        if isinstance(sequence, Mapping)
+        for effect in (sequence.get("effects") or [])
+        if isinstance(effect, Mapping)
+    ]
+    revealed_by_entrance = {r.target for r in reduced if r.reveals} | {
+        r.target for r in (_Effect(e, index, slide_size) for e in interactive_effects)
+        if r.reveals
+    }
 
     #: id -> state. Anything an entrance reveals starts off screen.
     def initial():
@@ -283,7 +331,11 @@ def frames(
         "frame": 0,
         "label": "before the first click",
         "state": copy.deepcopy(state),
-        "notes": [],
+        # Motion preserved as raw XML is motion this slide really has and these
+        # frames cannot read: the reference names a fragment, not a timeline.
+        # Without this the slide rendered as one still frame with no notes,
+        # which reads as "no animation" rather than "not shown here".
+        "notes": _raw_notes(slide),
     })
 
     step_effects = [[_Effect(e, index, slide_size) for e in step] for step in steps]
@@ -347,19 +399,29 @@ def frames(
 
     # Trigger sequences are not on the clicker, so each gets one frame applied
     # on top of the settled main sequence rather than a place in the run.
+    #
+    # Each starts from a copy of that settled state. They used to share one
+    # mutable dict, so the second trigger's frame showed the first trigger's
+    # effects as well — two triggers are alternatives the viewer picks between,
+    # not a sequence, and nothing in the deck says they were ever both clicked.
+    settled = copy.deepcopy(state)
     for ordinal, sequence in enumerate(animations.get("interactiveSequences") or []):
         if not isinstance(sequence, Mapping):
             continue
         notes = []
         trigger = (sequence.get("trigger") or {}).get("target")
+        state = copy.deepcopy(settled)
         for item in (_Effect(e, index, slide_size)
                      for e in (sequence.get("effects") or []) if isinstance(e, Mapping)):
             if item.target not in state:
+                notes.append(f"{item.id}: targets {item.target!r}, which is not an element on this slide")
                 continue
             if item.reveals:
                 state[item.target]["visible"] = True
+                state[item.target]["hiddenBy"] = None
             if item.conceals:
                 state[item.target]["visible"] = False
+                state[item.target]["hiddenBy"] = "exit"
             if item.offset != (0.0, 0.0):
                 state[item.target]["dx"] += item.offset[0]
                 state[item.target]["dy"] += item.offset[1]
@@ -371,6 +433,24 @@ def frames(
                     f"so this frame cannot show it"
                 )
             notes.extend(item.notes)
+            # The same after-animation values the main run applies. A trigger
+            # has no "next click" in this model, so hideOnNextClick is reported
+            # rather than applied: the frame is the moment after this trigger.
+            if item.after == "dim":
+                state[item.target]["dim"] = item.after_color or "theme accent"
+                notes.append(
+                    f"{item.target}: dimmed (text recoloured; PowerPoint uses the template's "
+                    f"Accent swatch, which this cannot know)"
+                )
+            elif item.after == "hide":
+                state[item.target]["visible"] = False
+                state[item.target]["hiddenBy"] = "afterEffect hide"
+                notes.append(f"{item.target}: hidden at the end of this trigger by afterEffect hide")
+            elif item.after == "hideOnNextClick":
+                notes.append(
+                    f"{item.target}: afterEffect hideOnNextClick — it goes on the next click, "
+                    f"which is not part of this trigger's frame"
+                )
         out.append({
             "frame": len(out),
             "label": f"after clicking {trigger!r} ({sequence.get('id') or ordinal})",
@@ -398,10 +478,23 @@ def _dim_text(element: dict[str, Any], dim: str) -> None:
         element["iconColor"] = colour
 
 
+#: Dropped from every frame slide. A frame is a still: it has no build order of
+#: its own, and the three motion keys would each be a defect here.
+#:
+#: ``animations`` / ``transition`` are the timeline the frame already represents.
+#: ``_rawTiming`` / ``_rawTransition`` are a reference into a preserved
+#: fragment, and carrying one into a frame made the storyboard fail outright —
+#: the frame deck is built with animations off, so a raw timing replays its
+#: media-only tree, which is a ``RawReplayError`` whenever the media/object
+#: boundary could not be classified. Where it did succeed it recreated the
+#: fragment's media parts once per frame.
+_MOTION_KEYS = ("animations", "transition", "_rawTiming", "_rawTransition")
+
+
 def frame_slide(slide: Mapping[str, Any], frame: Mapping[str, Any], suffix: str) -> dict[str, Any]:
     """Build the slide JSON for one frame: hidden elements out, offsets applied."""
     state = frame["state"]
-    derived = {k: v for k, v in slide.items() if k not in ("animations", "transition", "elements")}
+    derived = {k: v for k, v in slide.items() if k not in (*_MOTION_KEYS, "elements")}
     derived["id"] = f"{slide.get('id', 'slide')}{suffix}"
     kept = []
     for _, element in _elements(slide):
@@ -410,19 +503,43 @@ def frame_slide(slide: Mapping[str, Any], frame: Mapping[str, Any], suffix: str)
         if entry is not None and not entry["visible"]:
             continue
         copied = copy.deepcopy(dict(element))
-        if entry is not None:
-            if entry["dx"] or entry["dy"]:
-                if copied.get("x") is not None:
-                    copied["x"] = copied["x"] + entry["dx"]
-                if copied.get("y") is not None:
-                    copied["y"] = copied["y"] + entry["dy"]
-            if entry["fill"] is not None and copied.get("fill") not in (None, "none"):
-                copied["fill"] = entry["fill"]
-            if entry["dim"] is not None:
-                _dim_text(copied, entry["dim"])
+        _apply_entry(copied, entry)
         kept.append(copied)
     derived["elements"] = kept
+
+    # A placeholder an effect targets gets the same treatment. Its state used to
+    # be computed and then ignored, so a placeholder an exit removed stayed on
+    # every frame and one an entrance reveals was drawn before its click.
+    placeholders = slide.get("placeholders")
+    if isinstance(placeholders, Mapping):
+        shown: dict[str, Any] = {}
+        for key, placeholder in placeholders.items():
+            if not isinstance(placeholder, Mapping):
+                shown[key] = placeholder
+                continue
+            entry = state.get(placeholder.get("id")) if placeholder.get("id") else None
+            if entry is not None and not entry["visible"]:
+                continue
+            copied = copy.deepcopy(dict(placeholder))
+            _apply_entry(copied, entry)
+            shown[key] = copied
+        derived["placeholders"] = shown
     return derived
+
+
+def _apply_entry(node: dict[str, Any], entry: Mapping[str, Any] | None) -> None:
+    """Apply one frame's state for a node that is on screen."""
+    if entry is None:
+        return
+    if entry["dx"] or entry["dy"]:
+        if node.get("x") is not None:
+            node["x"] = node["x"] + entry["dx"]
+        if node.get("y") is not None:
+            node["y"] = node["y"] + entry["dy"]
+    if entry["fill"] is not None and node.get("fill") not in (None, "none"):
+        node["fill"] = entry["fill"]
+    if entry["dim"] is not None:
+        _dim_text(node, entry["dim"])
 
 
 def storyboard(
@@ -451,7 +568,7 @@ def storyboard(
     for slide in slides:
         slug = slide.get("id", "slide")
         slide_frames = frames(slide, index, slide_size=size)
-        ids = [e.get("id") for _, e in _elements(slide) if e.get("id")]
+        ids = _addressable(slide)
         for frame in slide_frames:
             derived_slides.append(frame_slide(slide, frame, f"-f{frame['frame']:02d}"))
             on_screen = sorted(k for k, v in frame["state"].items() if v["visible"])

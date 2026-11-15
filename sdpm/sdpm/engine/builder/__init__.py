@@ -298,21 +298,7 @@ class PPTXBuilder(
             self.theme_colors["text"] = slide_text_color
 
         # Process elements
-        elements = slide_def.get("elements", [])
-        expanded = []
-        for elem in elements:
-            if elem.get("type") == "include":
-                src = elem.get("src", "")
-                include_path = Path(src) if Path(src).is_absolute() else self._base_dir / src
-                if include_path.exists():
-                    try:
-                        inc_data = read_json(include_path)
-                    except (json.JSONDecodeError, ValueError) as e:
-                        raise ValueError(f"Invalid JSON in include file {src}: {e}")
-                    inc_elements = inc_data if isinstance(inc_data, list) else inc_data.get("elements", [])
-                    expanded.extend(inc_elements)
-            else:
-                expanded.append(elem)
+        expanded = expand_includes(slide_def.get("elements", []), self._base_dir)
         # Z-order: OOXML renders spTree children in document order, and
         # placeholders (from the layout) always precede appended elements.
         # sendToBack moves an element BEFORE the placeholders so e.g. a
@@ -661,6 +647,40 @@ class PPTXBuilder(
         _declare_notes_master(self.prs)
         write_document_properties(self.prs, title=title, language=language)
         self.prs.save(str(output_path))
+
+
+def expand_includes(elements, base_dir: Path) -> list:
+    """Replace every ``include`` element with the elements it names.
+
+    One implementation for two readers. The build needs it to produce the
+    shapes; the storyboard needs it to know which element ids exist on a slide,
+    and inventorying the unexpanded form reported an animation that targets an
+    included element as an unknown target.
+
+    A missing include file is skipped rather than raised, which is the build's
+    existing behaviour: ``check_includes`` reports it as a warning so one bad
+    path does not stop a deck from building.
+    """
+    expanded: list = []
+    for elem in elements or ():
+        if not isinstance(elem, dict):
+            expanded.append(elem)
+            continue
+        if elem.get("type") != "include":
+            expanded.append(elem)
+            continue
+        src = elem.get("src", "")
+        include_path = Path(src) if Path(src).is_absolute() else base_dir / src
+        if not include_path.exists():
+            continue
+        try:
+            inc_data = read_json(include_path)
+        except (json.JSONDecodeError, ValueError) as e:
+            raise ValueError(f"Invalid JSON in include file {src}: {e}")
+        expanded.extend(
+            inc_data if isinstance(inc_data, list) else inc_data.get("elements", [])
+        )
+    return expanded
 
 
 def resolve_override(slide_def, id_map, visited=None):

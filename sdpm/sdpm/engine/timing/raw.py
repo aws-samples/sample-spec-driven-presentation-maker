@@ -288,7 +288,12 @@ class RawSidecarWriter:
         payload = json.dumps(manifest, ensure_ascii=False, indent=2, sort_keys=False) + "\n"
         target = resolve_within(self.root, MANIFEST_PATH, what="manifest path")
         target.parent.mkdir(parents=True, exist_ok=True)
-        target.write_text(payload, encoding="utf-8")
+        # Bytes, not text: `write_text` translates "\n" to os.linesep, so the
+        # same manifest would differ between platforms. Every file this manifest
+        # names is written with `write_bytes` and digested, and a deck is synced
+        # between a Windows workstation and Linux CI, so the one file in the
+        # subtree whose bytes were platform-dependent is now not.
+        target.write_bytes(payload.encode("utf-8"))
         return manifest
 
 

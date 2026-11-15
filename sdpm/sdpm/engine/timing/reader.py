@@ -2937,8 +2937,22 @@ def apply_motion_to_slide_json(
             f"{unmapped}; regeneration could not resolve them, so sdpm refuses to write "
             "animation JSON that points at nothing"
         )
-    for spid, morph_id in motion.morph_ids.items():
-        stamp(spid, "morphId", morph_id)
+    # A morphId that cannot be placed is the same class of silent loss as an
+    # unmappable `id`, and quieter: Morph matches a shape across two slides by
+    # this value, so losing one side changes how the rebuilt deck animates with
+    # nothing in the output to say so. If both sides are lost the pair simply
+    # stops existing. `stamp`'s result was discarded here.
+    unplaced = [
+        f"{morph_id} (source spid {spid})"
+        for spid, morph_id in motion.morph_ids.items()
+        if not stamp(spid, "morphId", morph_id)
+    ]
+    if unplaced:
+        raise MotionReadError(
+            "the source carries morphId values on shapes that produced no slide JSON node: "
+            f"{unplaced}; Morph pairs that shape across slides, so sdpm refuses to import a "
+            "deck whose morph matching would silently differ from the source"
+        )
 
     if motion.animations is not None:
         slide_dict["animations"] = motion.animations

@@ -126,7 +126,7 @@ def _validate_timing(value: object, path: str) -> list[MotionDiagnostic]:
     return diagnostics
 
 
-def _validate_start(value: object, path: str, target_ids: set[str]) -> list[MotionDiagnostic]:
+def _validate_start(value: object, path: str, target_ids: set[str] | None) -> list[MotionDiagnostic]:
     if not isinstance(value, Mapping):
         return [MotionDiagnostic(path, "invalid-start", "start must be an object")]
     diagnostics: list[MotionDiagnostic] = []
@@ -138,7 +138,10 @@ def _validate_start(value: object, path: str, target_ids: set[str]) -> list[Moti
         diagnostics.append(MotionDiagnostic(f"{path}.delayMs", "invalid-delay", "delayMs must be a non-negative number"))
     trigger_target = value.get("target")
     if trigger == "onShapeClick":
-        if not isinstance(trigger_target, str) or trigger_target not in target_ids:
+        # target_ids is None while an unexpanded include leaves the slide's
+        # element set unknown; the target still has to be a string.
+        unknown = target_ids is not None and trigger_target not in target_ids
+        if not isinstance(trigger_target, str) or unknown:
             diagnostics.append(MotionDiagnostic(f"{path}.target", "unknown-trigger-target", "onShapeClick requires an existing element target"))
     elif trigger_target is not None:
         diagnostics.append(MotionDiagnostic(f"{path}.target", "unexpected-trigger-target", "only onShapeClick accepts a target"))
@@ -154,7 +157,7 @@ def _validate_behavior(value: object, path: str) -> list[MotionDiagnostic]:
     return []
 
 
-def _validate_effect(value: object, path: str, target_ids: set[str]) -> list[MotionDiagnostic]:
+def _validate_effect(value: object, path: str, target_ids: set[str] | None) -> list[MotionDiagnostic]:
     if not isinstance(value, Mapping):
         return [MotionDiagnostic(path, "invalid-effect", "animation effect must be an object")]
     diagnostics: list[MotionDiagnostic] = []
@@ -164,7 +167,7 @@ def _validate_effect(value: object, path: str, target_ids: set[str]) -> list[Mot
     target = value.get("target")
     if not isinstance(target, Mapping) or not isinstance(target.get("element"), str):
         diagnostics.append(MotionDiagnostic(f"{path}.target", "invalid-animation-target", "target.element is required"))
-    elif target["element"] not in target_ids:
+    elif target_ids is not None and target["element"] not in target_ids:
         diagnostics.append(MotionDiagnostic(f"{path}.target.element", "unknown-animation-target", f"unknown element target {target['element']!r}"))
 
     has_preset = "preset" in value
@@ -233,8 +236,25 @@ def _element_ids(slide: Mapping[str, Any]) -> tuple[set[str], list[MotionDiagnos
 
 
 def validate_slide_motion(slide: Mapping[str, Any]) -> list[MotionDiagnostic]:
-    """Validate one slide's transition, identities, and animation timeline."""
-    target_ids, diagnostics = _element_ids(slide)
+    """Validate one slide's transition, identities, and animation timeline.
+
+    Call this on a slide whose **overrides are already resolved**: an effect may
+    legitimately target an element the slide inherits rather than declares, and
+    on the unresolved form that reads as an unknown target.
+
+    An unexpanded ``include`` is handled here instead, because the element set
+    it contributes is not knowable from this slide: the builder expands it at
+    build time. While one is present the target-membership rule is skipped —
+    every other rule still applies — so a valid included target is not reported
+    as unknown. The build itself still refuses a target that resolves to
+    nothing.
+    """
+    ids, diagnostics = _element_ids(slide)
+    unexpanded_include = any(
+        isinstance(element, Mapping) and element.get("type") == "include"
+        for element in slide.get("elements") or ()
+    )
+    target_ids = None if unexpanded_include else ids
     transition = slide.get("transition")
     raw_transition = slide.get("_rawTransition")
     if transition is not None and raw_transition is not None:

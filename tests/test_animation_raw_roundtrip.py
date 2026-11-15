@@ -423,6 +423,23 @@ class TestMediaPlaybackSettingsSurvive:
     node the builder writes is accepted now; the rest is preserved.
     """
 
+    def test_the_manifest_is_written_as_bytes_so_its_newlines_are_the_same_everywhere(
+        self, media_dir,
+    ):
+        """`write_text` translates "\\n" to `os.linesep`.
+
+        Every file the manifest names is written with `write_bytes` and carries
+        a SHA-256, and a deck is synced between a Windows workstation and Linux
+        CI, so the manifest was the one file in the subtree whose bytes depended
+        on the platform that wrote it.
+        """
+        _slide, root = _import(media_dir, _inject_sound(
+            _package(media_dir, _video_slide(), name="newlines.pptx")
+        ))
+        data = (root / MANIFEST_PATH).read_bytes()
+        assert b"\r\n" not in data, "the manifest must not pick up platform line endings"
+        assert data.endswith(b"\n")
+
     def test_the_accepted_media_node_is_the_one_the_builder_writes(self, media_dir):
         """Pins the reader's accepted defaults against the builder's output.
 

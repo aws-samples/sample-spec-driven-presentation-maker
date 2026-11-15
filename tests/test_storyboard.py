@@ -7,7 +7,11 @@ storyboard still produced plausible-looking frames. Only the rendered PNG
 showed it, and only because the icon was somewhere it should not have been.
 """
 
+import json
+from pathlib import Path
+
 import pytest
+from lxml import etree
 
 from sdpm.engine.storyboard import (
     DIM_TEXT,
@@ -19,6 +23,8 @@ from sdpm.engine.storyboard import (
     storyboard,
 )
 from sdpm.engine.timing.writer import load_capability_index
+
+P = "http://schemas.openxmlformats.org/presentationml/2006/main"
 
 
 @pytest.fixture(scope="module")
@@ -59,6 +65,149 @@ def _slide(effects, elements=None, interactive=None, slide_id="probe"):
             "interactiveSequences": interactive or [],
         },
     }
+
+
+class TestRawPreservedMotion:
+    """A frame is a still, so the raw references must not travel into one."""
+
+    def _raw_slide(self):
+        slide = _slide([], elements=[
+            {"id": "a", "type": "shape", "shape": "rectangle",
+             "x": 100, "y": 100, "width": 200, "height": 100, "fill": "#FFFFFF"},
+        ])
+        del slide["animations"]
+        slide["_rawTiming"] = {
+            "sidecar": "animations/probe-timing.xml",
+            "sha256": "0" * 64,
+            "manifest": "animations/manifest.json",
+            "reason": "p:seq carries futureThing",
+        }
+        slide["_rawTransition"] = {
+            "sidecar": "animations/probe-transition.xml",
+            "sha256": "1" * 64,
+            "manifest": "animations/manifest.json",
+            "reason": "an unknown effect element",
+        }
+        return slide
+
+    def test_a_frame_carries_no_raw_reference(self, index):
+        """The frame deck is built with animations off, so a raw timing replays
+        its media-only tree — a RawReplayError whenever the media/object
+        boundary could not be classified. Where it succeeded it recreated the
+        fragment's media parts once per frame."""
+        slide = self._raw_slide()
+        frame = frames(slide, index)[0]
+        derived = frame_slide(slide, frame, "-f00")
+        assert "_rawTiming" not in derived
+        assert "_rawTransition" not in derived
+        assert "animations" not in derived and "transition" not in derived
+
+    def test_the_frame_says_the_motion_is_not_shown(self, index):
+        """Without this the slide rendered as one still with no notes, which
+        reads as "this slide has no animation" rather than "not shown here"."""
+        notes = frames(self._raw_slide(), index)[0]["notes"]
+        assert len(notes) == 2, notes
+        assert any("_rawTiming" in note and "cannot show it" in note for note in notes)
+        assert any("_rawTransition" in note for note in notes)
+        assert any("futureThing" in note for note in notes), "the recorded reason is carried"
+
+
+class TestInteractiveFramesAreIndependent:
+    def _two_triggers(self):
+        return _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[
+                {"id": "showB", "trigger": {"type": "onShapeClick", "target": "a"},
+                 "effects": [_fx("b-in", "b", "entrance", "fade", start="onShapeClick")]},
+                {"id": "hideIcon", "trigger": {"type": "onShapeClick", "target": "a"},
+                 "effects": [_fx("icon-out", "icon", "exit", "fade", start="onShapeClick")]},
+            ],
+        )
+
+    def test_one_trigger_frame_does_not_show_another_triggers_effects(self, index):
+        """Two triggers are alternatives the viewer picks between, not a
+        sequence. They shared one mutable state, so the second frame showed the
+        first trigger's effects as well and nothing said both were clicked."""
+        out = frames(self._two_triggers(), index)
+        first = next(f for f in out if "showB" in f["label"])
+        second = next(f for f in out if "hideIcon" in f["label"])
+
+        assert first["state"]["b"]["visible"] is True
+        assert first["state"]["icon"]["visible"] is True, "the other trigger did not fire"
+        assert second["state"]["icon"]["visible"] is False
+        assert second["state"]["b"]["visible"] is False, "showB did not fire in this frame"
+
+    def test_an_element_only_a_trigger_reveals_starts_off_screen(self, index):
+        """Initial visibility came from main-sequence entrances only, so an
+        element a trigger reveals was drawn at frame 0 as if already there."""
+        out = frames(self._two_triggers(), index)
+        assert out[0]["state"]["b"]["visible"] is False
+
+    def test_a_trigger_records_why_an_element_left(self, index):
+        out = frames(self._two_triggers(), index)
+        second = next(f for f in out if "hideIcon" in f["label"])
+        assert second["state"]["icon"]["hiddenBy"] == "exit"
+
+    def test_a_trigger_applies_its_after_effect(self, index):
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[{
+                "id": "flash", "trigger": {"type": "onShapeClick", "target": "a"},
+                "effects": [_fx("b-in", "b", "entrance", "fade", start="onShapeClick",
+                                afterEffect={"type": "hide"})],
+            }],
+        )
+        frame = next(f for f in frames(slide, index) if "flash" in f["label"])
+        assert frame["state"]["b"]["visible"] is False
+        assert frame["state"]["b"]["hiddenBy"] == "afterEffect hide"
+        assert any("afterEffect hide" in note for note in frame["notes"])
+
+    def test_a_trigger_target_that_is_not_on_the_slide_is_reported(self, index):
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[{
+                "id": "ghost", "trigger": {"type": "onShapeClick", "target": "a"},
+                "effects": [_fx("x", "missing", "entrance", "fade", start="onShapeClick")],
+            }],
+        )
+        frame = next(f for f in frames(slide, index) if "ghost" in f["label"])
+        assert any("not an element on this slide" in note for note in frame["notes"])
+
+
+class TestPlaceholderTargets:
+    """A placeholder is as addressable as an element."""
+
+    def _slide_with_placeholder(self, effects):
+        return {
+            "id": "probe", "layout": "Title and Content",
+            "placeholders": {"title": {"text": "Hero", "id": "hero"}},
+            "elements": [
+                {"id": "a", "type": "shape", "shape": "rectangle",
+                 "x": 100, "y": 100, "width": 200, "height": 100, "fill": "#FFFFFF"},
+            ],
+            "animations": {"mainSequence": effects, "interactiveSequences": []},
+        }
+
+    def test_a_placeholder_target_is_not_reported_as_missing(self, index):
+        slide = self._slide_with_placeholder([_fx("in", "hero", "entrance", "fade")])
+        out = frames(slide, index)
+        assert not any("not an element on this slide" in n for f in out for n in f["notes"])
+        assert out[0]["state"]["hero"]["visible"] is False, "an entrance hides it at frame 0"
+        assert out[1]["state"]["hero"]["visible"] is True
+
+    def test_a_placeholder_an_entrance_reveals_is_absent_from_frame_zero(self, index):
+        slide = self._slide_with_placeholder([_fx("in", "hero", "entrance", "fade")])
+        out = frames(slide, index)
+        before = frame_slide(slide, out[0], "-f00")
+        after = frame_slide(slide, out[1], "-f01")
+        assert "title" not in before["placeholders"], "it has not arrived yet"
+        assert after["placeholders"]["title"]["text"] == "Hero"
+
+    def test_a_placeholder_appears_in_the_on_screen_inventory(self, index):
+        slide = self._slide_with_placeholder([_fx("in", "hero", "entrance", "fade")])
+        _deck, _frame_slides, manifest = storyboard({}, [slide], index)
+        assert "hero" in manifest[0]["offScreen"]
+        assert "hero" in manifest[-1]["onScreen"]
 
 
 class TestClickSteps:
@@ -434,6 +583,89 @@ class TestTheBuildPointsAtTheStoryboard:
         deck = self._deck(tmp_path, animated=True, enabled=False)
         result = generate(str(deck), output_path=str(tmp_path / "out.pptx"))
         assert result["animated_slides"] == 0
+
+    def test_a_transition_only_deck_is_not_pointed_at_the_storyboard(self, tmp_path):
+        """The count drives a nudge to run `storyboard`, which draws one frame
+        per click step. A transition happens between slides and has no build
+        order, so there is nothing for those frames to show."""
+        from sdpm.api import generate
+
+        deck = self._deck(tmp_path, animated=False)
+        slide = json.loads((deck / "slides/one.json").read_text())
+        slide["transition"] = {
+            "effect": "fade", "parameters": {}, "durationMs": 700,
+            "advance": {"onClick": True, "afterMs": None}, "sound": None,
+        }
+        (deck / "slides/one.json").write_text(json.dumps(slide, ensure_ascii=False))
+
+        result = generate(str(deck), output_path=str(tmp_path / "out.pptx"))
+        assert result["animated_slides"] == 0, "a transition is not build order"
+
+    def test_a_raw_preserved_slide_is_counted(self, tmp_path):
+        """Timing sdpm could not decode still carries build order, and a
+        storyboard of it is the only way to see what those frames do and do not
+        show. It used to be counted as no motion at all.
+
+        The deck is a real import, closure and all, so the count is taken from
+        a package that actually built rather than from a hand-written reference.
+        """
+        from pptx import Presentation
+
+        from sdpm.api import generate
+        from sdpm.engine.builder import PPTXBuilder
+        from sdpm.engine.converter.pipeline import pptx_to_json
+
+        template = Path(__file__).resolve().parent.parent / "sdpm" / "templates" / "blank-dark.pptx"
+        builder = PPTXBuilder(
+            template,
+            fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"},
+            default_text_color="#FFFFFF",
+            base_dir=tmp_path,
+            animations_enabled=True,
+            transitions_enabled=False,
+        )
+        builder.add_slide({
+            "id": "one", "layout": "Blank",
+            "elements": [
+                {"id": "a", "type": "textbox", "text": "A", "x": 10, "y": 10,
+                 "width": 300, "height": 60},
+            ],
+        })
+        source = tmp_path / "source.pptx"
+        builder.save(source)
+
+        # A timing branch no sdpm version understands, so import preserves it.
+        presentation = Presentation(str(source))
+        slide = list(presentation.slides)[0]
+        for node in slide._element.findall("{%s}timing" % P):
+            slide._element.remove(node)
+        slide._element.append(etree.fromstring(
+            '<p:timing xmlns:p="%s"><p:tnLst><p:par>'
+            '<p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>'
+            '<p:seq concurrent="1" nextAc="seek"><p:cTn id="2" nodeType="mainSeq">'
+            '<p:childTnLst><p:par><p:cTn id="3" futureThing="7">'
+            '<p:tgtEl><p:spTgt spid="%d"/></p:tgtEl>'
+            "</p:cTn></p:par></p:childTnLst></p:cTn></p:seq>"
+            "</p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>"
+            % (P, slide.shapes[0].shape_id)
+        ))
+        presentation.save(str(source))
+
+        deck = tmp_path / "imported"
+        pptx_to_json(source, deck)
+        imported = json.loads((deck / "slides" / "slide-001.json").read_text())
+        assert imported.get("animations") is None, "the fixture must import raw"
+        assert imported["_rawTiming"], "the fixture must carry a raw reference"
+
+        deck_json = json.loads((deck / "deck.json").read_text())
+        deck_json["template"] = str(template)
+        deck_json["animations"] = {"enabled": True}
+        (deck / "deck.json").write_text(json.dumps(deck_json, ensure_ascii=False))
+        (deck / "specs").mkdir(exist_ok=True)
+        (deck / "specs" / "outline.md").write_text("- [slide-001] one\n")
+
+        result = generate(str(deck), output_path=str(tmp_path / "raw.pptx"))
+        assert result["animated_slides"] == 1
 
 
 def _bfx(effect_id, element, behaviors, start="onPageClick", **timing):

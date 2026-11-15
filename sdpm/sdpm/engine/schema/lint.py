@@ -14,11 +14,14 @@ _ALIGN_VALUES = {"left", "center", "right"}
 _VALIGN_VALUES = {"top", "middle", "bottom"}
 
 
-def lint(data: list | dict) -> list[dict]:
+def lint(data: list | dict, *, include_motion: bool = True) -> list[dict]:
     """Lint slide JSON and return diagnostics.
 
     Args:
         data: Slide list or presentation dict with "slides" key.
+        include_motion: Also validate transitions, identities and the animation
+            timeline. Pass False when the caller will resolve overrides first
+            and then call :func:`lint_motion`, which is what a build does.
 
     Returns:
         List of diagnostic dicts with slide, element, rule, message.
@@ -29,9 +32,25 @@ def lint(data: list | dict) -> list[dict]:
         return []
     diagnostics: list[dict] = []
     for si, slide in enumerate(slides):
-        diagnostics.extend(_lint_slide_motion(si, slide))
+        if include_motion:
+            diagnostics.extend(_lint_slide_motion(si, slide))
         for ei, elem in enumerate(slide.get("elements") or []):
             diagnostics.extend(_lint_element(si, ei, elem))
+    return diagnostics
+
+
+def lint_motion(slides: list[dict]) -> list[dict]:
+    """Motion diagnostics only, for slides whose overrides are resolved.
+
+    A build resolves overrides before it validates, because an effect may target
+    an element the slide inherits rather than declares: on the unresolved form
+    that reads as ``unknown-animation-target``. :func:`lint` therefore takes
+    ``include_motion=False`` there and the build calls this afterwards.
+    """
+    diagnostics: list[dict] = []
+    for si, slide in enumerate(slides):
+        if isinstance(slide, dict):
+            diagnostics.extend(_lint_slide_motion(si, slide))
     return diagnostics
 
 

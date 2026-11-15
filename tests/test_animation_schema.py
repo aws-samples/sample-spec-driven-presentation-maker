@@ -122,6 +122,88 @@ def test_unknown_targets_and_trigger_targets_are_rejected():
     assert {"unknown-animation-target", "unknown-trigger-target"} <= rules
 
 
+def test_an_unexpanded_include_suspends_the_target_rule_only():
+    """The element set an include contributes is not knowable from this slide.
+
+    The builder expands it at build time, so validating membership here reported
+    a valid included target as unknown. Every other rule still applies, and the
+    build still refuses a target that resolves to nothing.
+    """
+    slide = _slide()
+    slide["elements"] = [{"type": "include", "include": "includes/cards.json"}]
+    slide["animations"]["mainSequence"][0]["target"]["element"] = "lives-in-the-include"
+    slide["animations"]["interactiveSequences"] = [{
+        "id": "details",
+        "trigger": {"type": "onShapeClick", "target": "also-in-the-include"},
+        "effects": [],
+    }]
+
+    rules = {item.rule for item in validate_slide_motion(slide)}
+    assert "unknown-animation-target" not in rules
+    assert "unknown-trigger-target" not in rules
+
+    # The rule is suspended, not the validation.
+    slide["animations"]["mainSequence"][0]["id"] = "not a valid id"
+    slide["animations"]["interactiveSequences"][0]["trigger"]["target"] = 7
+    rules = {item.rule for item in validate_slide_motion(slide)}
+    assert "invalid-effect-id" in rules
+    assert "unknown-trigger-target" in rules, "a non-string target is still wrong"
+
+
+def test_motion_is_validated_after_overrides_resolve(tmp_path):
+    """An effect may target an element its slide inherits rather than declares.
+
+    `_resolve_config` used to lint the unresolved slides, so a valid inherited
+    target was reported as `unknown-animation-target` on every build.
+    """
+    import json
+
+    from sdpm.api import _resolve_config
+
+    deck = tmp_path / "deck"
+    (deck / "slides").mkdir(parents=True)
+    (deck / "specs").mkdir()
+    (deck / "deck.json").write_text(json.dumps({
+        "template": "blank-light",
+        "animations": {"enabled": True},
+    }))
+    (deck / "slides" / "base.json").write_text(json.dumps({
+        "id": "base", "layout": "Blank",
+        "elements": [
+            {"id": "inherited", "type": "textbox", "text": "A",
+             "x": 10, "y": 10, "width": 300, "height": 60},
+        ],
+    }))
+    (deck / "slides" / "derived.json").write_text(json.dumps({
+        "id": "derived", "layout": "Blank", "override": "base",
+        "animations": {
+            "mainSequence": [{
+                "id": "reveal", "target": {"element": "inherited"},
+                "preset": {"category": "entrance", "effect": "fade"},
+                "start": {"type": "onPageClick", "delayMs": 0},
+                "timing": {"durationMs": 400},
+            }],
+            "interactiveSequences": [],
+        },
+    }))
+    (deck / "specs" / "outline.md").write_text("- [base] base\n- [derived] derived\n")
+
+    config = _resolve_config(str(deck), animation_mode=None, transition_mode=None)
+    rules = {d["rule"] for d in config.lint_diagnostics}
+    assert "unknown-animation-target" not in rules, config.lint_diagnostics
+
+    # The other half of the contract: on the unresolved form the same deck does
+    # report it, so the ordering is what makes the difference rather than the
+    # fixture happening to be clean.
+    from sdpm.engine.schema.lint import lint
+
+    unresolved = {"slides": [
+        json.loads((deck / "slides" / "base.json").read_text()),
+        json.loads((deck / "slides" / "derived.json").read_text()),
+    ]}
+    assert "unknown-animation-target" in {d["rule"] for d in lint(unresolved)}
+
+
 def test_raw_and_semantic_representations_are_mutually_exclusive():
     slide = _slide()
     slide["_rawTiming"] = {"src": "attachments/imports/key/timing.json"}
