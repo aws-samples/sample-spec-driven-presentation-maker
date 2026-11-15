@@ -96,6 +96,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **Fixed paragraph line spacing survives a rebuild.** `pptx_to_json` wrote a textbox
+  paragraph's fixed line spacing as `lineSpacing` (1/100 pt), a key the builder did not
+  read, so the spacing was lost when the JSON was built again. Paragraphs now use
+  `lineSpacingPt` in pt, the same key and unit as element-level fixed spacing, in both the
+  converter and the builder. JSON with the old `lineSpacing` key still builds (#586).
+  `lineSpacingPt` wins over `lineSpacingPct` at both levels, and a paragraph's own spacing
+  wins over the element's: a paragraph no longer gets two `a:lnSpc` (which PowerPoint may
+  offer to repair) when both levels set one.
+  Local mode and the AWS stack (SdpmRuntime).
 - **A background compose that ends as the work stops is always reported.** When a
   compose was cancelled (Stop) or finished just as the session checked whether anything was
   still running, the session could go idle without its `taskEnd`: the compose card stayed
