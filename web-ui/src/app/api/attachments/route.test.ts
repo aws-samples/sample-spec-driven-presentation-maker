@@ -51,7 +51,7 @@ describe("POST /api/attachments", () => {
   })
 
   it("refuses a session directory that is a symlink out of the root", async () => {
-    expect((await upload("linked")).status).toBe(500)
+    expect((await upload("linked")).status).toBe(400)
     expect(fs.readdirSync(outside)).toEqual([])
   })
 })

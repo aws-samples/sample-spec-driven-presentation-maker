@@ -51,12 +51,12 @@ describe("PUT outline", () => {
   })
 
   it("refuses a specs directory that is a symlink out of the deck", async () => {
-    expect((await put("linkdir")).status).toBe(404)
+    expect((await put("linkdir")).status).toBe(400)
     expect(fs.existsSync(path.join(outside, "outline.md"))).toBe(false)
   })
 
   it("does not follow an outline.md symlink out of the deck", async () => {
-    expect((await put("linkfile")).status).toBe(404)
+    expect((await put("linkfile")).status).toBe(400)
     expect(fs.readFileSync(path.join(outside, "keep.md"), "utf-8")).toBe("keep")
   })
 })

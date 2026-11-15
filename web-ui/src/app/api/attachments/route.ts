@@ -47,7 +47,10 @@ function usage(root: string): { count: number; bytes: number } {
 /** `root` is the real path of the attachments directory (see POST). */
 function maybeCollectExpired(root: string): void {
   const stamp = resolveWithin(root, ".gc-stamp")
-  if (!stamp) return // a symlink leading out of the directory
+  if (!stamp) {
+    console.warn(`[attachments] ${root}/.gc-stamp leads out of the directory; expired attachments are not collected`)
+    return
+  }
   const lock = path.join(root, ".gc.lock")
   const now = Date.now()
   try {
@@ -104,14 +107,14 @@ export async function POST(req: Request): Promise<Response> {
     const root = mkdirWithin(DECK_ROOT, [".attachments"], 0o700)
     const sessionDir = root && mkdirWithin(root, [sessionId], 0o700)
     const lease = sessionDir && resolveWithin(sessionDir, ".lease")
-    if (!root || !sessionDir || !lease) throw new Error("Invalid attachment path")
+    if (!root || !sessionDir || !lease) return Response.json({ error: "Invalid attachment path" }, { status: 400 })
     maybeCollectExpired(root)
     fs.closeSync(fs.openSync(lease, "a", 0o600))
     const now = new Date()
     fs.utimesSync(lease, now, now)
 
     const destination = resolveWithin(sessionDir, filename)
-    if (!destination) throw new Error("Invalid attachment path")
+    if (!destination) return Response.json({ error: "Invalid attachment path" }, { status: 400 })
     if (fs.existsSync(destination)) return Response.json({ source: destination })
 
     const sessionUsage = usage(sessionDir)

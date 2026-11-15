@@ -33,7 +33,7 @@ export async function PUT(req: Request, { params }: { params: Promise<{ id: stri
 
   // A `specs` directory or `outline.md` that is a symlink leading out of the deck is refused.
   const outlinePath = mkdirWithin(dp, ["specs"]) && resolveWithin(dp, "specs", "outline.md")
-  if (!outlinePath) return Response.json({ error: "Deck not found" }, { status: 404 })
+  if (!outlinePath) return Response.json({ error: "Invalid outline path" }, { status: 400 })
   fs.writeFileSync(outlinePath, content, "utf-8")
   return Response.json({ bytes })
 }
