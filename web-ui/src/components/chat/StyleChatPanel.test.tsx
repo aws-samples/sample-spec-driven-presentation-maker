@@ -6,17 +6,18 @@
  * names the style itself, and the save it reports reaches the parent.
  *
  * StyleChatPanel send: a message clears the input when it is sent (ChatInput waits only for a
- * Promise, and sendMessage settles at the end of the turn); a steer the agent did not take
- * keeps it.
+ * Promise, and sendMessage settles at the end of the turn), a steer too; a steer that could
+ * not be sent puts its text back into the input.
  */
 
-import { forwardRef } from "react"
+import { forwardRef, useImperativeHandle } from "react"
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest"
-import { act, cleanup, fireEvent, screen } from "@testing-library/react"
+import { act, cleanup, fireEvent, screen, waitFor } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
-import type { ToolUseCallbackData } from "@/hooks/useChatStream"
+import type { SendMessageOptions, ToolUseCallbackData } from "@/hooks/useChatStream"
 
-const { sendMessage, streamOptions, streamState, onSendResult } = vi.hoisted(() => ({
+const { sendMessage, streamOptions, streamState, onSendResult, replaceText } = vi.hoisted(() => ({
+  replaceText: vi.fn(),
   sendMessage: vi.fn(async (..._args: unknown[]) => true),
   streamOptions: { current: null as null | { onToolEvent?: (name: string, data: ToolUseCallbackData | undefined) => void } },
   streamState: { isLoading: false },
@@ -34,11 +35,15 @@ vi.mock("@/services/localService", () => ({ saveLocalChat: vi.fn(async () => {})
 vi.mock("@/hooks/useChatStream", () => ({
   useChatStream: (options: typeof streamOptions.current) => {
     streamOptions.current = options
-    return { messages: [], isLoading: streamState.isLoading, stopping: false, reconnecting: false, sendMessage, stopGeneration: vi.fn() }
+    return {
+      messages: [], isLoading: streamState.isLoading, stopping: false, reconnecting: false, sendMessage, stopGeneration: vi.fn(),
+      steerQueue: [], dismissSteer: vi.fn(), arrivedSteerIds: new Set(),
+    }
   },
 }))
 vi.mock("./ChatInput", () => ({
-  ChatInput: forwardRef(function ChatInput({ onSend }: { onSend: (text: string, files: [], snippets: [], attachments: []) => unknown }, _ref) {
+  ChatInput: forwardRef(function ChatInput({ onSend }: { onSend: (text: string, files: [], snippets: [], attachments: []) => unknown }, ref) {
+    useImperativeHandle(ref, () => ({ replaceText, textareaRef: { current: { value: "" } } }))
     return <button onClick={() => { onSendResult.current = onSend("make it calm", [], [], []) }}>send</button>
   }),
 }))
@@ -81,18 +86,25 @@ describe("StyleChatPanel send", () => {
     expect(onSendResult.current).not.toBeInstanceOf(Promise)
   })
 
-  it("keeps the input when a steer is not accepted", async () => {
+  it("clears the input at once for a steer and puts its text back when it was not sent", async () => {
     streamState.isLoading = true
-    sendMessage.mockImplementationOnce(async () => false)
+    sendMessage.mockImplementationOnce(async (...args: unknown[]) => {
+      (args[4] as SendMessageOptions).onSteerFailed?.()
+      return false
+    })
     renderWithIntl(<StyleChatPanel styleId="brand-blue" />)
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "send" })) })
-    await expect(onSendResult.current).resolves.toBe(false)
+    expect(onSendResult.current).toBeUndefined()
+    expect(sendMessage.mock.calls[0][4]).toMatchObject({ inputText: "make it calm" })
+    await waitFor(() => expect(replaceText).toHaveBeenCalledWith("make it calm"))
   })
 
-  it("clears the input when a steer is accepted", async () => {
+  it("leaves the input empty when a steer is sent", async () => {
     streamState.isLoading = true
     renderWithIntl(<StyleChatPanel styleId="brand-blue" />)
     await act(async () => { fireEvent.click(screen.getByRole("button", { name: "send" })) })
-    await expect(onSendResult.current).resolves.not.toBe(false)
+    expect(onSendResult.current).toBeUndefined()
+    await act(async () => { await new Promise((resolve) => setTimeout(resolve, 10)) })
+    expect(replaceText).not.toHaveBeenCalled()
   })
 })

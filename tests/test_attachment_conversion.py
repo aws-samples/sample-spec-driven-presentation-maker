@@ -143,6 +143,7 @@ class TestReadCore:
         with pytest.raises(ImportConversionFailed):
             getattr(pipeline, projection)(broken)
 
+    @pytest.mark.filterwarnings("error::DeprecationWarning:sdpm")
     def test_raster_image_returns_colour_analysis(self, tmp_path):
         source = tmp_path / "dark.png"
         source.write_bytes(_png_bytes((10, 10, 10)))
@@ -152,6 +153,23 @@ class TestReadCore:
         assert result["colorAnalysis"]["brightness"] == "dark"
         assert result["colorAnalysis"]["saturation"] == "low"
         assert result["colorAnalysis"]["palette"][0]["hex"] == "#0A0A0A"
+
+    @pytest.mark.filterwarnings("error::DeprecationWarning:sdpm")
+    def test_colour_analysis_weights_each_colour_by_its_pixel_count(self, tmp_path):
+        from PIL import Image
+
+        # 3/4 pure red, 1/4 black.
+        image = Image.new("RGB", (8, 8))
+        image.paste((255, 0, 0), (0, 0, 8, 6))
+        image.paste((0, 0, 0), (0, 6, 8, 8))
+        source = tmp_path / "mixed.png"
+        image.save(source)
+        analysis = pipeline.read_attachment_core(source, str(source))["colorAnalysis"]
+        # luminance = 0.75 * 54.2 = 40.7 → dark; saturation = 0.75 → high
+        assert analysis["brightness"] == "dark"
+        assert analysis["saturation"] == "high"
+        assert [entry["hex"] for entry in analysis["palette"]] == ["#FF0000", "#000000"]
+        assert [entry["ratio"] for entry in analysis["palette"]] == [0.75, 0.25]
 
     def test_svg_has_no_colour_analysis(self, tmp_path):
         source = tmp_path / "icon.svg"

@@ -64,3 +64,32 @@ describe("DeckCard thumbnail", () => {
     expect(container.querySelector("img")?.getAttribute("src")).toBe("/api/preview/d1/preview/intro.png")
   })
 })
+
+describe("DeckCard PPTX download", () => {
+  function openMenu() {
+    fireEvent.keyDown(screen.getByLabelText("Deck actions"), { key: "Enter" })
+    return screen.getByRole("menuitem", { name: "Download PPTX: Quarterly review" })
+  }
+
+  it("downloads from the menu (keyboard) when the deck has a PPTX", () => {
+    const onDownload = vi.fn(), onOpen = vi.fn()
+    renderWithIntl(<DeckCard deck={{ ...deck, hasPptx: true }} index={0} onOpen={onOpen} onDownload={onDownload} />)
+    const item = openMenu()
+    expect(item.getAttribute("aria-disabled")).toBeNull()
+    fireEvent.click(item)
+    expect(onDownload).toHaveBeenCalledWith("d1")
+    expect(onOpen).not.toHaveBeenCalled()
+  })
+
+  it.each([
+    ["no PPTX built yet", { hasPptx: false }],
+    ["an HTML deck or an older API (no hasPptx)", {}],
+  ])("is disabled for %s", (_label, extra) => {
+    const onDownload = vi.fn()
+    renderWithIntl(<DeckCard deck={{ ...deck, ...extra }} index={0} onOpen={() => {}} onDownload={onDownload} />)
+    const item = openMenu()
+    expect(item.getAttribute("aria-disabled")).toBe("true")
+    fireEvent.click(item)
+    expect(onDownload).not.toHaveBeenCalled()
+  })
+})

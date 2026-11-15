@@ -19,7 +19,7 @@ import { IS_LOCAL } from "@/lib/mode"
 import {
   listDecks, DeckSummary,
   listPublicDecks, listFavorites,
-  updateVisibility, deleteDeck, toggleFavorite,
+  updateVisibility, deleteDeck, toggleFavorite, downloadDeckPptx,
   searchSlides, SlideSearchResult,
 } from "@/services/deckService"
 import { openInOs } from "@/services/localService"
@@ -199,15 +199,17 @@ export function useDeckList(
     }
   }, [idToken, t])
 
+  /** Download the deck's PPTX as `<title>.pptx` (any tab: the API checks read access). */
   const handleDownload = useCallback((deckId: string) => {
-    const target = decks.find((d) => d.deckId === deckId)
-    if (!target?.pptxUrl) return
-    if (IS_LOCAL) {
-      openInOs(deckId, "output.pptx").catch((err) => notifyError(tCarousel("errorOpenPptx"), err))
-    } else {
-      window.open(target.pptxUrl, "_blank")
-    }
-  }, [decks, tCarousel])
+    if (!IS_LOCAL && !idToken) return
+    downloadDeckPptx(deckId, idToken ?? "").catch((err) => notifyError(t("errorDownloadPptx"), err))
+  }, [idToken, t])
+
+  /** Local: open output.pptx with the default app. */
+  const handleOpenPptx = useCallback((deckId: string) => {
+    if (!IS_LOCAL) return
+    openInOs(deckId, "output.pptx").catch((err) => notifyError(tCarousel("errorOpenPptx"), err))
+  }, [tCarousel])
 
   const handleOpenFolder = useCallback((deckId: string) => {
     if (!IS_LOCAL) return
@@ -272,7 +274,7 @@ export function useDeckList(
     loading, error, deleteTarget, setDeleteTarget,
     bulkDeleteTargets, setBulkDeleteTargets, bulkProgress, requestBulkDelete, confirmBulkDelete,
     searchQuery, setSearchQuery, searchResults, searching,
-    handleToggleFavorite, handleDelete, handleToggleVisibility, handleDownload, handleOpenFolder, confirmDelete,
+    handleToggleFavorite, handleDelete, handleToggleVisibility, handleDownload, handleOpenPptx, handleOpenFolder, confirmDelete,
     setDecks,
   }
 }

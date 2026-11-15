@@ -45,7 +45,7 @@ def server(monkeypatch):
         monkeypatch.delenv(var, raising=False)
 
     boto3 = pytest.importorskip("boto3")
-    pytest.importorskip("mcp.server.fastmcp")
+    pytest.importorskip("mcp.server.mcpserver")
     import boto3.session
     import botocore.session
 
@@ -89,14 +89,14 @@ def _bearer(sub: str = "user-1") -> str:
 
 
 def _post(module, body: dict, *, headers: dict | None = None, events: list | None = None, linger: float = 0.0):
-    """POST /mcp through the app as server.py runs it (FastMCP + the header middleware).
+    """POST /mcp through the app as server.py runs it (MCPServer + the header middleware).
 
     ``events`` gets "response sent" once the last body chunk has gone out. The event
     loop keeps running for ``linger`` seconds after the response (timers may fire).
     """
     import httpx
 
-    app = module.mcp.streamable_http_app()
+    app = module.mcp.streamable_http_app(**module._HTTP_APP_OPTIONS)
     app.add_middleware(module._CaptureHeadersMiddleware)
 
     async def recording(scope, receive, send):

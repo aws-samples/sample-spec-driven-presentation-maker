@@ -32,7 +32,9 @@ resource is ``data:``. ``AssembleResult.previews`` holds one static document per
 (no script at all, every fragment shown) for thumbnails.
 
 External links (``<a href="http(s)://…">``) get ``target="_blank" rel="noopener
-noreferrer"`` so they open in a new tab instead of replacing the deck.
+noreferrer"`` so they open in a new tab instead of replacing the deck. Unless deck.json
+sets ``"autoSpacing": false``, slide text gets the CJK↔Latin spaces the PPTX builder
+inserts (``sdpm.engine.html.spacing``); the slide files keep the text as written.
 """
 
 from __future__ import annotations
@@ -65,7 +67,9 @@ from sdpm.engine.html.slide_js import (
     library_script,
     wrap_slide_script,
 )
+from sdpm.engine.html.spacing import space_section
 from sdpm.engine.html.template import TemplateHtml, css_string
+from sdpm.utils import xml_safe
 
 _ROOT_RE = re.compile(r":root\s*\{(?P<body>.*?)\}", re.DOTALL | re.IGNORECASE)
 _CSS_URL_RE = re.compile(r"url\(\s*(?P<q>['\"]?)(?P<url>.*?)(?P=q)\s*\)", re.IGNORECASE | re.DOTALL)
@@ -354,14 +358,14 @@ def _rename_animations(css: str, names: dict[str, str]) -> str:
 
 # ── inline SVG ───────────────────────────────────────────────────────────
 
-_SVG_PARSER = etree.XMLParser(resolve_entities=False, no_network=True, remove_comments=True,
-                              remove_pis=True, huge_tree=False)
+_SVG_PARSER = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False,
+                              remove_comments=True, remove_pis=True, huge_tree=False)
 _XLINK_HREF = "{http://www.w3.org/1999/xlink}href"
 
 
 def _inline_svg_text(path: Path, img, prefix: str) -> str | None:
     try:
-        root = etree.fromstring(path.read_bytes(), _SVG_PARSER)
+        root = xml_safe.fromstring(path.read_bytes(), allow_doctype=True, parser=_SVG_PARSER)
     except etree.XMLSyntaxError:
         return None
     if not isinstance(root.tag, str) or etree.QName(root).localname != "svg":
@@ -706,6 +710,7 @@ def assemble_deck(
     deck_dir: Path,
     deck_css: str | None = None,
     lang: str | None = None,
+    auto_spacing: bool = True,
 ) -> AssembleResult:
     """Build the single-file reveal.js deck.
 
@@ -721,6 +726,9 @@ def assemble_deck(
         deck_dir: deck root; deck-relative image paths resolve against it.
         deck_css: deck-root deck.css text, embedded once, unscoped.
         lang: ``<html lang>`` (omitted when None).
+        auto_spacing: deck.json ``autoSpacing`` — insert half-width spaces between CJK and
+            Latin text in the output (``sdpm.engine.html.spacing``), as the PPTX builder
+            does; the slide files are not changed. False keeps the text as written.
 
     Returns:
         AssembleResult(html, bytes, layouts_used, warnings, slugs, previews, line_map,
@@ -775,6 +783,8 @@ def assemble_deck(
         used_libraries.update(declared_libraries(section))
         _process_media(section, number, resolver, slug, inline)
         _external_links_new_tab(section)
+        if auto_spacing:
+            space_section(section)
         layout = parsed.layout
         if layout and layout in layouts_by_name and layout not in layouts_used:
             layouts_used.append(layout)

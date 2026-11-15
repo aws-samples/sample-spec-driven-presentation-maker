@@ -20,7 +20,8 @@ export interface DeckSummary {
   thumbnailUrl: string | null
   owner?: string
   visibility?: "public" | "private"
-  pptxUrl?: string | null
+  /** A built PPTX exists; download it with downloadDeckPptx (the list carries no URL). */
+  hasPptx?: boolean
 }
 
 export interface SlidePreview {
@@ -69,6 +70,39 @@ export type ScriptWarningKind = "navigation" | "popup" | "external-url" | "webrt
 export interface ScriptWarning {
   slug: string
   kinds: ScriptWarningKind[]
+}
+
+/** Start a browser download of `url` without leaving the page (the response's Content-Disposition names the file). */
+function startDownload(url: string): void {
+  const link = document.createElement("a")
+  link.href = url
+  link.download = ""
+  link.rel = "noopener"
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+}
+
+/**
+ * Download a deck's built PPTX, saved as `<deck title>.pptx`.
+ * Cloud: asks GET /decks/{id}/pptx for a 15-minute presigned URL; Local: the file route itself.
+ *
+ * @throws Error when the deck is not readable or has no PPTX (cloud)
+ */
+export async function downloadDeckPptx(deckId: string, idToken: string): Promise<void> {
+  const path = `decks/${encodeURIComponent(deckId)}/pptx`
+  if (IS_LOCAL) {
+    startDownload(`/api/${path}`)
+    return
+  }
+  const base = await getApiBaseUrl()
+  const response = await fetch(`${base}${path}`, {
+    headers: { Authorization: `Bearer ${idToken}` },
+  })
+  if (!response.ok) throw new Error(`Failed to get PPTX URL: ${response.status}`)
+  const data = (await response.json()) as { url?: string }
+  if (!data.url) throw new Error("No PPTX URL returned")
+  startDownload(data.url)
 }
 
 /** Why an HTML deck URL is requested: Present / PDF (inline, 4 hours) or Download (attachment). */

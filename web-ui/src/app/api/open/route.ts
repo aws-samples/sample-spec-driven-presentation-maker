@@ -5,9 +5,9 @@
  * macOS: `open`, Linux: `xdg-open`, Windows: `start`
  */
 import { execFile } from "child_process"
-import path from "path"
 import fs from "fs"
-import { DECK_ROOT } from "@/lib/local/deck-paths"
+import { resolveDeckDir } from "@/lib/local/deck-paths"
+import { resolveWithin } from "@/lib/local/contained"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
 
 /** Only allow safe characters in path segments to prevent traversal/injection. */
@@ -34,8 +34,8 @@ export async function POST(req: Request) {
   if (!safeDeckId)
     return Response.json({ error: "invalid deckId" }, { status: 400 })
 
-  const deckDir = path.join(DECK_ROOT, safeDeckId)
-  if (!fs.existsSync(deckDir))
+  const deckDir = resolveDeckDir(safeDeckId)
+  if (!deckDir || !fs.existsSync(deckDir))
     return Response.json({ error: "deck not found" }, { status: 404 })
 
   let target = deckDir
@@ -43,9 +43,9 @@ export async function POST(req: Request) {
     const safeFile = validateSegment(body.file)
     if (!safeFile)
       return Response.json({ error: "invalid file" }, { status: 400 })
-    const filePath = path.join(deckDir, safeFile)
-    // Defence-in-depth: verify containment after join
-    if (!filePath.startsWith(deckDir + path.sep) && filePath !== deckDir)
+    // Containment after symlinks are resolved (resolveWithin)
+    const filePath = resolveWithin(deckDir, safeFile)
+    if (!filePath)
       return Response.json({ error: "invalid path" }, { status: 400 })
     target = filePath
   }

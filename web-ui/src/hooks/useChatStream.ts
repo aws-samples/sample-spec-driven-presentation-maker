@@ -7,18 +7,26 @@
  * Manages: messages, isLoading, invokeAgentCore, abort, tool state, blocks rebuild.
  *
  * Cloud: `isLoading` is "the session is working" (a turn runs, or one it started follows).
- * A message sent while it works is a steer (steerAgentCore): its bubble appears where the
- * agent accepted it, and the reply after it goes into a new assistant message. Stop sends a
- * cancel (cancelAgentCore). `resume` follows a session that was working when the page
- * loaded; a send while it connects waits for its answer.
+ * A message sent while it works is a steer (steerAgentCore). Stop sends a cancel
+ * (cancelAgentCore). `resume` follows a session that was working when the page loaded; a
+ * send while it connects waits for its answer.
  *
  * Local: one invoke at a time; its stream lasts the chat's work period (every turn of it). A
  * message sent while it runs is a steer too (steerLocalAgent): the stream reports it with the
  * same `steer` events (a steer the prompt ended without reading continues the turn, as in
- * Cloud). Stop ends the invoke at once; a steer the agent had not read by then is marked not
+ * Cloud). Stop ends the invoke at once; a steer the agent had not read by then is not
  * delivered (the server clears it from kiro-cli's queue). `resume` follows a period that runs
  * (or ended unseen) when the deck is reloaded or reopened (resumeLocalAgent); a send while it
  * connects waits for its answer, and a send while it follows is a steer into that period.
+ *
+ * Steers (both modes): a steer waits in `steerQueue` (the cards above the input), `sending`
+ * until the request is answered or the stream reports it `accepted`, then `waiting`. One sent
+ * from another tab joins the queue at its `accepted`. When the agent reads it (`delivered`) it
+ * leaves the queue and becomes a user message there, the reply after it going into a new
+ * assistant message, and its id is in `arrivedSteerIds` for a moment. A steer the work dropped
+ * (`discarded`, a Local Stop, or work that ended without reading it) stays in the queue as
+ * `notDelivered` until `dismissSteer`. A failed request leaves the queue at once and calls the
+ * send's `onSteerFailed`.
  *
  * Background compose: `taskStart` gives the compose card a running task, which stays running
  * across later turns and messages until `taskEnd` closes it. `turnActive` is "a turn runs"
@@ -40,7 +48,7 @@ import { steerLocalAgent, stopLocalAgent } from "@/services/localService"
 import type { ToolUse } from "@/components/chat/ChatMessage"
 import type { McpServerStatus } from "@/components/chat/McpStatusBar"
 import type { UploadedFile } from "@/services/uploadService"
-import { userMessageFromText } from "@/components/chat/chatHistory"
+import { typedText, userMessageFromText } from "@/components/chat/chatHistory"
 import { notifyError } from "@/lib/errors"
 import { agentErrorMessage, classifyAgentError } from "@/lib/agentErrors"
 import type { SessionOrigin } from "@/lib/local/kiro-sessions.types"
@@ -53,6 +61,23 @@ export interface SendMessageOptions {
   sessionIdOverride?: string
   hideUserMessage?: boolean
   propagateError?: boolean
+  /** A steer: the text the user typed, which "back to input" puts into the input (default: the shown text). */
+  inputText?: string
+  /** A steer that was not sent (the request failed): called after it left the queue. */
+  onSteerFailed?: () => void
+}
+
+/** A steer the agent has not read yet (a card above the input). */
+export interface QueuedSteer {
+  id: string
+  /** `sending`: the request is out; `waiting`: accepted, the agent has not read it; `notDelivered`: dropped. */
+  state: "sending" | "waiting" | "notDelivered"
+  /** The text its user message shows. */
+  display: string
+  /** The text the user typed. */
+  inputText: string
+  snippets?: { label: string; text: string }[]
+  attachments?: { fileName: string; fileType: string }[]
 }
 
 export interface Message {
@@ -63,12 +88,8 @@ export interface Message {
   snippets?: { label: string; text: string }[]
   attachments?: { fileName: string; fileType: string }[]
   mcpStatus?: McpServerStatus[]
-  /** The id of the steer this user message is. */
+  /** The id of the steer this user message is (shown where the agent read it). */
   steerId?: string
-  /** The steer was dropped by a stop before it reached the agent. */
-  steerNotDelivered?: boolean
-  /** The steer is waiting for the agent (accepted) or the agent has read it (delivered). */
-  steerState?: "accepted" | "delivered"
   /** Cloud: a composer's report to the orchestrator (`report_to_orchestrator`). */
   composerNote?: ComposerNote
   /** Local: a notice about the session this reply ran in (lib/local/sessionNotices.ts code). */
@@ -140,6 +161,12 @@ export interface UseChatStreamReturn {
   messagesRef: React.MutableRefObject<Message[]>
   /** The stream parser's translator for error codes. */
   translateError: (code: string) => string | undefined
+  /** The steers the agent has not read yet, in sent order. */
+  steerQueue: QueuedSteer[]
+  /** Remove a steer from the queue (a not-delivered card closed or put back into the input). */
+  dismissSteer: (id: string) => void
+  /** Steers that became user messages a moment ago (their bubble is highlighted briefly). */
+  arrivedSteerIds: ReadonlySet<string>
 }
 
 type Block = { type: "text"; text: string } | { type: "tool"; tool: ToolUse }
@@ -179,8 +206,22 @@ interface Segment {
 
 interface PendingSteer {
   display: string
+  inputText: string
   snippets?: { label: string; text: string }[]
   attachments?: { fileName: string; fileType: string }[]
+  /** The stream reported it accepted (a request that then fails was still sent). */
+  accepted?: boolean
+}
+
+/** What a run does with the steer queue. */
+interface SteerQueueOps {
+  /** Accepted: into the queue (another tab's), or on from `sending`. */
+  waiting: (id: string, steer: PendingSteer) => void
+  notDelivered: (id: string) => void
+  /** The agent read it (or it became a turn of its own): out of the queue. */
+  remove: (id: string) => void
+  /** Its user message went up just now. */
+  arrived: (id: string) => void
 }
 
 interface SessionEventInfo { own: boolean }
@@ -195,6 +236,9 @@ type SessionEvent = {
 }
 
 const emptyAssistant = (): Message => ({ role: "assistant", content: "", toolUses: [] })
+
+/** How long a steer's bubble stays highlighted after the agent read it. */
+const STEER_ARRIVED_MS = 2000
 
 /** An assistant placeholder nothing has been written into yet. */
 const isBlankAssistant = (m: Message | undefined) =>
@@ -215,10 +259,11 @@ function indexOfTool(messages: Message[], toolUseId: string | undefined): number
  * The handlers of one run: an invoke (its assistant placeholder already shown) or a resume
  * (`replayCut` set: the first prompt of the replay replaces the history after it).
  */
-function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, setTurnActive, onTurnEnd }: {
+function createRun({ setMessages, onToolEvent, steers, queue, segmentOpen, replayCut, setTurnActive, onTurnEnd }: {
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>
   onToolEvent?: (toolName: string, data: ToolUseCallbackData | undefined) => void
   steers: Map<string, PendingSteer>
+  queue: SteerQueueOps
   segmentOpen: boolean
   replayCut?: (prompt: string) => Message[]
   setTurnActive?: (active: boolean) => void
@@ -253,7 +298,7 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, s
     })
   }
 
-  /** A user message the agent accepted (or a composer note), followed by a new assistant message. */
+  /** A user message the agent read (or a composer note), followed by a new assistant message. */
   const pushUser = (user: Message, base?: Message[]) => {
     newSegment()
     setMessages((prev) => {
@@ -455,6 +500,8 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, s
       if (turn?.id && turn.why === "prompt") {
         if (rendered.has(turn.id)) return
         rendered.add(turn.id)
+        // A steer that became a turn of its own (the work ended as it arrived): its bubble goes here.
+        queue.remove(turn.id)
         // This page's own prompt: its bubble went up when it was sent.
         if (mine && !steers.has(turn.id)) return
         // A hidden first message (a fork's): the reply starts without a user bubble.
@@ -472,17 +519,31 @@ function createRun({ setMessages, onToolEvent, steers, segmentOpen, replayCut, s
       }
       const steer = ev.steer
       if (!steer?.id) return
+      const id = steer.id
       if (steer.state === "accepted") {
-        if (rendered.has(steer.id)) return
-        rendered.add(steer.id)
-        if (mine && !steers.has(steer.id)) return
-        pushUser({ ...userFor(steer.id, steer.text ?? "", true), steerState: "accepted" })
+        if (rendered.has(id)) return
+        rendered.add(id)
+        // Another tab's steer (or this one's from before a reload): known from here on.
+        if (!steers.has(id)) {
+          const user = userMessageFromText(steer.text ?? "")
+          steers.set(id, {
+            display: user.content, inputText: typedText(steer.text ?? ""),
+            ...(user.attachments ? { attachments: user.attachments } : {}),
+          })
+        }
+        const pending = steers.get(id) as PendingSteer
+        pending.accepted = true
+        queue.waiting(id, pending)
       } else if (steer.state === "delivered") {
-        const id = steer.id
-        setMessages((prev) => prev.map((m) => (m.steerId === id ? { ...m, steerState: "delivered" } : m)))
+        const key = `delivered:${id}`
+        // Its `accepted` was not seen: nothing to show it with.
+        if (rendered.has(key) || !steers.has(id)) return
+        rendered.add(key)
+        queue.remove(id)
+        pushUser(userFor(id, "", true))
+        queue.arrived(id)
       } else if (steer.state === "discarded") {
-        const id = steer.id
-        setMessages((prev) => prev.map((m) => (m.steerId === id ? { ...m, steerNotDelivered: true } : m)))
+        queue.notDelivered(id)
       }
     },
   }
@@ -520,6 +581,44 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
   const resumeInFlightRef = useRef<{ sessionId: string; done: Promise<boolean | undefined> } | null>(null)
   useEffect(() => () => resumeControllerRef.current?.abort(), [])
   const steersRef = useRef(new Map<string, PendingSteer>())
+  const [steerQueue, setSteerQueue] = useState<QueuedSteer[]>([])
+  const [arrivedSteerIds, setArrivedSteerIds] = useState<ReadonlySet<string>>(() => new Set())
+  const arrivedTimersRef = useRef(new Set<ReturnType<typeof setTimeout>>())
+  useEffect(() => {
+    const timers = arrivedTimersRef.current
+    return () => timers.forEach(clearTimeout)
+  }, [])
+  // Another chat: its steers are not this one's.
+  useEffect(() => () => setSteerQueue([]), [sessionId])
+  const steerQueueOps = useRef<SteerQueueOps>({
+    waiting: (id, steer) => setSteerQueue((prev) => {
+      const card = prev.find((s) => s.id === id)
+      if (!card) return [...prev, { id, state: "waiting", ...steer }]
+      return card.state === "sending" ? prev.map((s) => (s.id === id ? { ...s, state: "waiting" } : s)) : prev
+    }),
+    notDelivered: (id) => setSteerQueue((prev) => prev.some((s) => s.id === id && s.state !== "notDelivered")
+      ? prev.map((s) => (s.id === id ? { ...s, state: "notDelivered" } : s))
+      : prev),
+    remove: (id) => setSteerQueue((prev) => (prev.some((s) => s.id === id) ? prev.filter((s) => s.id !== id) : prev)),
+    arrived: (id) => {
+      setArrivedSteerIds((prev) => new Set(prev).add(id))
+      const timer = setTimeout(() => {
+        arrivedTimersRef.current.delete(timer)
+        setArrivedSteerIds((prev) => {
+          const next = new Set(prev)
+          next.delete(id)
+          return next
+        })
+      }, STEER_ARRIVED_MS)
+      arrivedTimersRef.current.add(timer)
+    },
+  }).current
+  const dismissSteer = useCallback((id: string) => steerQueueOps.remove(id), [steerQueueOps])
+  /** The work ended (or stopped): a steer it did not read is not delivered. */
+  const dropUnreadSteers = useCallback((which: "waiting" | "unread") => setSteerQueue((prev) => {
+    const dropped = (s: QueuedSteer) => (which === "waiting" ? s.state === "waiting" : s.state !== "notDelivered")
+    return prev.some(dropped) ? prev.map((s) => (dropped(s) ? { ...s, state: "notDelivered" } : s)) : prev
+  }), [])
   const messagesRef = useRef(messages)
   messagesRef.current = messages
   const auth = useAuth()
@@ -541,9 +640,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       abortControllerRef.current?.abort()
       stopLocalAgent({ sessionId: localRunSessionRef.current ?? sessionId }).catch((err) => notifyError(t("errorStopGeneration"), err))
       // The stream is no longer read: a steer the agent had not read is dropped by this stop.
-      setMessages((prev) => prev.some((m) => m.steerState === "accepted" && !m.steerNotDelivered)
-        ? prev.map((m) => (m.steerState === "accepted" && !m.steerNotDelivered ? { ...m, steerNotDelivered: true } : m))
-        : prev)
+      dropUnreadSteers("unread")
       return
     }
     const token = auth.user?.access_token
@@ -555,7 +652,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
         void stopRuntimeSession(sessionId, token)
       })
       .finally(() => setStopping(false))
-  }, [sessionId, auth.user?.access_token, t])
+  }, [sessionId, auth.user?.access_token, t, dropUnreadSteers])
 
   const sendMessage = useCallback(async (
     userMessage: string,
@@ -578,16 +675,33 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     // Session working: a steer into the running work (Local: into the running invoke's turn).
     if (isLoadingRef.current && (!IS_LOCAL || localRunSessionRef.current)) {
       const accessToken = auth.user?.access_token
-      if ((!IS_LOCAL && !accessToken) || !hasContent) return false
+      if (!hasContent) return false
+      if (!IS_LOCAL && !accessToken) {
+        options?.onSteerFailed?.()
+        return false
+      }
       const id = crypto.randomUUID()
-      steersRef.current.set(id, { display, snippets, attachments: sentAttachments })
+      const pending: PendingSteer = {
+        display, inputText: options?.inputText ?? display,
+        ...(snippets?.length ? { snippets } : {}),
+        ...(sentAttachments?.length ? { attachments: sentAttachments } : {}),
+      }
+      steersRef.current.set(id, pending)
+      setSteerQueue((prev) => [...prev, { id, state: "sending", ...pending }])
       try {
         if (IS_LOCAL) await steerLocalAgent(localRunSessionRef.current as string, id, userMessage)
         else await steerAgentCore(sessionId, userMessage, accessToken, id)
+        setSteerQueue((prev) => prev.some((s) => s.id === id && s.state === "sending")
+          ? prev.map((s) => (s.id === id ? { ...s, state: "waiting" } : s))
+          : prev)
         return true
       } catch (err) {
+        // The stream already reported it accepted (its answer was lost): it was sent.
+        if (pending.accepted) return true
         steersRef.current.delete(id)
+        steerQueueOps.remove(id)
         notifyError(t("steerFailed"), err)
+        options?.onSteerFailed?.()
         return false
       }
     }
@@ -602,6 +716,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       return false
     }
     let ok = true
+    let aborted = false
 
     setMessages((prev) => [
       ...prev,
@@ -617,7 +732,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     abortControllerRef.current = controller
     const runSessionId = options?.sessionIdOverride ?? sessionId
     if (IS_LOCAL) localRunSessionRef.current = runSessionId
-    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: true, setTurnActive: setTurnActiveState, onTurnEnd })
+    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, queue: steerQueueOps, segmentOpen: true, setTurnActive: setTurnActiveState, onTurnEnd })
 
     try {
       await invokeAgentCore(
@@ -637,6 +752,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     } catch (err) {
       if (err instanceof DOMException && err.name === "AbortError") {
         // Keep partial response
+        aborted = true
       } else {
         if (options?.propagateError) {
           setMessages([])
@@ -682,10 +798,12 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       setIsLoading(false)
       setTurnActiveState(false)
       setReconnecting(false)
+      // The work is over: a steer it accepted and never read will not be read now.
+      if (!aborted) dropUnreadSteers("waiting")
       onSendComplete?.(IS_LOCAL ? runSessionId : undefined)
     }
     return ok
-  }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent, onSendComplete, onTurnEnd, t, translateError])
+  }, [sessionId, mode, deckId, isLoading, auth.user?.access_token, auth.user?.profile?.sub, onToolEvent, onSendComplete, onTurnEnd, t, translateError, steerQueueOps, dropUnreadSteers])
 
   /** Local resume: follow the chat's work period over GET /api/agent/stream. */
   const resumeLocal = useCallback(async (cutHistory: (prompt: string) => Message[]): Promise<boolean | undefined> => {
@@ -712,8 +830,9 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     let openGate = () => {}
     const gate = new Promise<void>((resolve) => { openGate = resolve })
     resumeGateRef.current = gate
-    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: false, replayCut: cutHistory, setTurnActive: setTurnActiveState, onTurnEnd })
+    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, queue: steerQueueOps, segmentOpen: false, replayCut: cutHistory, setTurnActive: setTurnActiveState, onTurnEnd })
     let followed = false
+    let aborted = false
     let settleDone: (value: boolean | undefined) => void = () => {}
     resumeInFlightRef.current = { sessionId, done: new Promise((resolve) => { settleDone = resolve }) }
     let result: boolean | undefined
@@ -741,7 +860,8 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     } catch (err) {
       // A newer resume, Stop or unmount ended it (AbortError): nothing failed. A failed request
       // says nothing about the session's work either.
-      if (!(err instanceof DOMException && err.name === "AbortError")) console.error("Resume failed:", err)
+      if (err instanceof DOMException && err.name === "AbortError") aborted = true
+      else console.error("Resume failed:", err)
       result = undefined
     } finally {
       if (resumeRunRef.current === token) {
@@ -754,6 +874,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
           isLoadingRef.current = false
           setIsLoading(false)
           setTurnActiveState(false)
+          if (!aborted) dropUnreadSteers("waiting")
           onSendComplete?.(sessionId)
         }
       }
@@ -762,7 +883,7 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     }
     settleDone(result)
     return result
-  }, [sessionId, onToolEvent, onSendComplete, onTurnEnd, translateError])
+  }, [sessionId, onToolEvent, onSendComplete, onTurnEnd, translateError, steerQueueOps, dropUnreadSteers])
 
   const resume = useCallback(async (cutHistory: (prompt: string) => Message[]): Promise<boolean | undefined> => {
     if (IS_LOCAL) return resumeLocal(cutHistory)
@@ -773,8 +894,9 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
     let openGate = () => {}
     const gate = new Promise<void>((resolve) => { openGate = resolve })
     resumeGateRef.current = gate
-    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, segmentOpen: false, replayCut: cutHistory, setTurnActive: setTurnActiveState, onTurnEnd })
+    const run = createRun({ setMessages, onToolEvent, steers: steersRef.current, queue: steerQueueOps, segmentOpen: false, replayCut: cutHistory, setTurnActive: setTurnActiveState, onTurnEnd })
     let followed = false
+    let aborted = false
     try {
       await resumeAgentCore(sessionId, accessToken, 0, {
         onResumeAck: (ack: { working?: boolean }) => {
@@ -793,7 +915,8 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
       })
     } catch (err) {
       // A newer invoke or resume on the session took over (AbortError): nothing failed.
-      if (!(err instanceof DOMException && err.name === "AbortError")) console.error("Resume failed:", err)
+      if (err instanceof DOMException && err.name === "AbortError") aborted = true
+      else console.error("Resume failed:", err)
     } finally {
       resumingRef.current = false
       setReconnecting(false)
@@ -801,12 +924,16 @@ export function useChatStream({ sessionId, mode, deckId, onToolEvent, onSendComp
         isLoadingRef.current = false
         setIsLoading(false)
         setTurnActiveState(false)
+        if (!aborted) dropUnreadSteers("waiting")
         onSendComplete?.()
       }
       if (resumeGateRef.current === gate) resumeGateRef.current = null
       openGate()
     }
-  }, [sessionId, auth.user?.access_token, onToolEvent, onSendComplete, onTurnEnd, translateError, resumeLocal])
+  }, [sessionId, auth.user?.access_token, onToolEvent, onSendComplete, onTurnEnd, translateError, resumeLocal, steerQueueOps, dropUnreadSteers])
 
-  return { messages, setMessages, isLoading, sendMessage, stopGeneration, resume, reconnecting, stopping, turnActive: turnActiveState, messagesRef, translateError }
+  return {
+    messages, setMessages, isLoading, sendMessage, stopGeneration, resume, reconnecting, stopping, turnActive: turnActiveState,
+    messagesRef, translateError, steerQueue, dismissSteer, arrivedSteerIds,
+  }
 }

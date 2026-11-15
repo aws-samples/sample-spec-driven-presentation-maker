@@ -242,7 +242,7 @@ export function cutAtPrompt(history: ChatMessage[], prompt: string): ChatMessage
  * The text the user typed, from a prompt as ChatPanel.handleSend sent it: without the sdpm
  * markers, the leading `[Attached:…]` lines and their blank line, and the trailing snippets.
  */
-function typedText(prompt: string): string {
+export function typedText(prompt: string): string {
   let text = prompt.replace(MARKER_RE, "")
   if (text.startsWith("[Attached:")) {
     const end = text.indexOf("\n\n")

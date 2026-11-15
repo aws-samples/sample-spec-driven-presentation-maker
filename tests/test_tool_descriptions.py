@@ -89,7 +89,7 @@ def any_server_tools(request, local_tools, acp_tools, remote_tools):
 def test_every_argument_carries_a_description(any_server_tools):
     missing = []
     for name, tool in any_server_tools.items():
-        for prop, schema in tool.inputSchema.get("properties", {}).items():
+        for prop, schema in tool.input_schema.get("properties", {}).items():
             if not schema.get("description"):
                 missing.append(f"{name}.{prop}")
     assert not missing, missing
@@ -107,7 +107,7 @@ def test_description_budget(any_server_tools):
         if len(t.description or "") > _DESC_MAX.get(n, _DESC_MAX_DEFAULT)
     }
     assert not over, over
-    sizes = {n: len(t.description or "") + len(json.dumps(t.inputSchema, ensure_ascii=False)) for n, t in any_server_tools.items()}
+    sizes = {n: len(t.description or "") + len(json.dumps(t.input_schema, ensure_ascii=False)) for n, t in any_server_tools.items()}
     assert sum(sizes.values()) <= _TOTAL_MAX, (sum(sizes.values()), sorted(sizes.items(), key=lambda kv: -kv[1]))
 
 
@@ -117,6 +117,28 @@ def test_guide_pointers_name_existing_guides(any_server_tools):
         for ref in re.findall(r'read_guides\(\[([^\]]*)\]\)', tool.description or ""):
             for g in re.findall(r'"([a-z-]+)"', ref):
                 assert g in guides, f"{name} points at unknown guide {g}"
+
+
+def test_hearing_matches_the_cloud_tool(acp_tools):
+    """The local ACP hearing and the cloud Strands hearing take the same questions."""
+    import importlib.util
+
+    pytest.importorskip("strands")
+    # Loaded by path: agent/tools would shadow servers/remote's top-level tools package.
+    spec = importlib.util.spec_from_file_location("agent_hearing_tool", _ROOT / "agent" / "tools" / "hearing_tool.py")
+    module = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(module)
+
+    cloud = module.hearing.tool_spec["inputSchema"]["json"]
+    local = acp_tools["hearing"].input_schema
+    for schema in (cloud, local):
+        assert set(schema["properties"]) == {"q0", "q1", "q2", "q3"}
+        assert schema["required"] == ["q0"]
+        q0 = schema["properties"]["q0"]["description"]
+        for key in ("header", "label", "description", "recommended"):
+            assert key in q0, key
+        assert "inference" not in json.dumps(schema)
 
 
 def test_read_guides_description_lists_the_catalogue(local_tools):
@@ -152,7 +174,7 @@ def test_contract_functions_are_annotated_not_docstring_args():
 def test_generate_pptx_describes_both_motion_overrides(any_server_tools):
     """The render-time overrides are only usable if the client can see them,
     with their accepted values, on every server (REQ-1.3, REQ-9.5)."""
-    properties = any_server_tools["generate_pptx"].inputSchema.get("properties", {})
+    properties = any_server_tools["generate_pptx"].input_schema.get("properties", {})
     for argument in ("animation_mode", "transition_mode"):
         assert argument in properties, argument
         description = properties[argument]["description"]

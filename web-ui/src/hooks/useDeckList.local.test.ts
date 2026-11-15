@@ -18,6 +18,7 @@ vi.mock("@/services/deckService", () => ({
   updateVisibility: vi.fn(),
   deleteDeck: vi.fn(),
   toggleFavorite: vi.fn(),
+  downloadDeckPptx: vi.fn(),
 }))
 vi.mock("@/services/localService", () => ({ openInOs: vi.fn() }))
 
@@ -26,7 +27,7 @@ import { openInOs } from "@/services/localService"
 import { useDeckList } from "./useDeckList"
 
 const api = vi.mocked(deckService)
-const DECK = { deckId: "d1", name: "Deck", pptxUrl: "/api/decks/d1/pptx" }
+const DECK = { deckId: "d1", name: "Deck", hasPptx: true }
 
 async function renderList() {
   const hook = renderHook(() => useDeckList("local", true, null), { wrapper: intlWrapper() })
@@ -48,7 +49,7 @@ describe("useDeckList (local) — open in the OS", () => {
 
   it("opens the PPTX and the deck folder", async () => {
     const { result } = await renderList()
-    act(() => result.current.handleDownload("d1"))
+    act(() => result.current.handleOpenPptx("d1"))
     act(() => result.current.handleOpenFolder("d1"))
     expect(openInOs).toHaveBeenNthCalledWith(1, "d1", "output.pptx")
     expect(openInOs).toHaveBeenNthCalledWith(2, "d1")
@@ -58,10 +59,30 @@ describe("useDeckList (local) — open in the OS", () => {
     vi.mocked(openInOs).mockRejectedValue(new Error("HTTP 500"))
     vi.spyOn(console, "error").mockImplementation(() => {})
     const { result } = await renderList()
-    act(() => result.current.handleDownload("d1"))
+    act(() => result.current.handleOpenPptx("d1"))
     act(() => result.current.handleOpenFolder("d1"))
     await waitFor(() => expect(toast.error).toHaveBeenCalledTimes(2))
     expect(toast.error).toHaveBeenCalledWith(en.carousel.errorOpenPptx, undefined)
     expect(toast.error).toHaveBeenCalledWith(en.carousel.errorOpenFolder, undefined)
+  })
+})
+
+describe("useDeckList (local) — PPTX download", () => {
+  beforeEach(() => {
+    api.listDecks.mockResolvedValue({ decks: [DECK], favoriteIds: [] } as never)
+    api.listPublicDecks.mockResolvedValue([] as never)
+    api.listFavorites.mockResolvedValue([] as never)
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("downloads instead of opening in the OS", async () => {
+    api.downloadDeckPptx.mockResolvedValue(undefined)
+    const { result } = await renderList()
+    act(() => result.current.handleDownload("d1"))
+    expect(api.downloadDeckPptx).toHaveBeenCalledWith("d1", "local")
+    expect(openInOs).not.toHaveBeenCalled()
   })
 })

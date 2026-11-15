@@ -5,8 +5,8 @@
  * Verifies agent tokens, theme behavior, primary actions, and semantic surfaces.
  */
 
-import { describe, it, expect } from "vitest"
-import { screen, fireEvent } from "@testing-library/react"
+import { afterEach, describe, it, expect } from "vitest"
+import { cleanup, screen, fireEvent } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { HearingCard } from "@/components/chat/HearingCard"
 import fs from "fs"
@@ -82,18 +82,21 @@ describe("Agent token mapping (globals.css)", () => {
 
 describe("HearingCard — achromatic + five-color spine", () => {
   const baseProps = {
-    inference: "Test inference",
     questions: [
       {
-        id: "q1",
+        id: "q0",
         type: "single_select" as const,
+        header: "Pick",
         text: "Pick one",
-        options: ["A", "B"],
-        recommended: "A",
+        options: [
+          { label: "A", description: "First choice", recommended: true },
+          { label: "B", description: "Second choice" },
+        ],
       },
     ],
     onSubmit: () => {},
   }
+  afterEach(cleanup)
 
   it("renders a 3px vertical five-color spine", () => {
     const { container } = renderWithIntl(<HearingCard {...baseProps} />)
@@ -109,20 +112,26 @@ describe("HearingCard — achromatic + five-color spine", () => {
     expect(submitBtn).toBeTruthy()
   })
 
-  it("uses achromatic selected chip (bg-foreground class)", () => {
-    const { container } = renderWithIntl(<HearingCard {...baseProps} />)
-    const chips = screen.getAllByRole("radio")
-    const chipA = chips.find(c => c.textContent === "A")!
-    // Click to select
-    fireEvent.click(chipA)
-    expect(chipA.className).toContain("bg-foreground")
+  it("marks the selected row with aria-checked on a hearing-row", () => {
+    renderWithIntl(<HearingCard {...baseProps} />)
+    const rowA = screen.getByRole("radio", { name: /^A/ })
+    expect(rowA.className).toContain("hearing-row")
+    fireEvent.click(rowA)
+    expect(rowA.getAttribute("aria-checked")).toBe("true")
   })
 
-  it("recommendation dot uses agent-data class", () => {
-    const { container } = renderWithIntl(<HearingCard {...baseProps} />)
-    // "A" is recommended but not selected initially → dot visible
-    const dot = container.querySelector(".bg-agent-data")
-    expect(dot).toBeTruthy()
+  it("shows the Recommended badge on the recommended option", () => {
+    renderWithIntl(<HearingCard {...baseProps} />)
+    const rowA = screen.getByRole("radio", { name: /^A/ })
+    const badge = rowA.querySelector(".hearing-rec")
+    expect(badge?.textContent).toBe("Recommended")
+    expect(screen.getByRole("radio", { name: /^B/ }).querySelector(".hearing-rec")).toBeNull()
+  })
+
+  it("lifts the card off the background with its own token in both themes", () => {
+    const css = fs.readFileSync(sourcePath("app/globals.css"), "utf-8")
+    expect(css.match(/--hearing-card:/g)?.length).toBe(2)
+    expect(css).toContain(".hearing-card {")
   })
 })
 

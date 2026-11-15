@@ -37,6 +37,8 @@ Metadata only. Do NOT put slides here.
   - Call `analyze_template(template)` to detect fonts from your template.
 - `"defaultTextColor"`: **Required**. Default color for text and icons (e.g. `"#FFFFFF"` for dark backgrounds, `"#000000"` for light). Overridden per element by `fontColor` / `iconColor`.
 - `"defaultBackground"`: Optional. Solid ground for every slide that does not set its own `background` (e.g. `"#FFF6E5"`). `apply_style` fills it from the style's `--color-bg`; omit to keep the template background. Table auto-colors and icon theme (dark/light) follow it.
+- `"title"`: Optional. Document title written to the PPTX properties (shown by PowerPoint and read by screen readers). Defaults to the first slide's title text.
+- `"language"`: Optional. Document language as a BCP 47 tag (e.g. `"en-US"`, `"ja-JP"`), written to the PPTX properties.
 - Line color, table color, and chart color are auto-resolved from the template's theme colors.
 
 ### slides/{slug}.json
@@ -83,14 +85,13 @@ built as usual.
 - When `background` is set, table auto-colors and icon theme (dark/light) also adapt automatically.
 - Per-element `fontColor` / `iconColor` still takes highest priority.
 
-## Animations and Transitions (optional, off by default)
+## Animations and Transitions
 
 A slide may carry `transition` and `animations`; `deck.json` carries only the
 `animations.enabled` / `transitions.enabled` switches; elements carry `id` and `morphId` as
 targets. Write none of it from this section — the contract (effect and transition catalogs,
-triggers, timing, Morph, what round-trips) is `read_guides(["animations"])`, loaded only
-when a switch is on or a slide already has those fields. Whatever you animate, the slide
-must still say everything with motion off.
+triggers, timing, Morph, what round-trips) is `read_guides(["animations"])`. A slide must
+still say everything with motion off.
 
 ## notes and elements
 

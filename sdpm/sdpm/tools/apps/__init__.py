@@ -8,13 +8,13 @@ URIs. No ``mcp`` import, no I/O beyond reading the bundled view files, and the r
 raise. The views' operations are pure modules next to this one: ``gallery`` (style previews)
 and ``deck`` (the deck viewer, with storage passed in as a ``DeckAccess``).
 
-``register(mcp, ...)`` installs the wiring on a FastMCP server (``binding.py``): the style
+``register(mcp, ...)`` installs the wiring on an MCPServer (``binding.py``): the style
 gallery on ``list_styles``; with a ``deck`` access, the deck viewer on ``check_specs`` (Outline
 tab) and on ``show_deck`` (Slides tab, listed only to MCP Apps clients); the views as
 resources, the app-only ``app_action`` tool, the ``tools/list`` filter and the extension in the
 initialize capabilities. Both servers call it once, after their tools are registered. The
-Local server also uses ``ui_capable`` to leave out the ``sdpm open`` hint (such a client shows
-decks itself).
+Local server also uses ``binding.caller_declared`` to leave out the ``sdpm open`` hint (such a
+client shows decks itself).
 """
 
 import functools
@@ -48,11 +48,16 @@ def ui_capable(client_params: Any) -> bool:
 
     ``client_params`` is the session's InitializeRequestParams (or None before initialize).
     The declaration is an object under ``extensions["io.modelcontextprotocol/ui"]``; an empty
-    object counts. mcp 1.30 keeps ``extensions`` as an extra field of ClientCapabilities, a
-    later SDK as a field of its own; both are read here.
+    object counts.
     """
+    return capabilities_declare_ui(getattr(client_params, "capabilities", None))
+
+
+def capabilities_declare_ui(capabilities: Any) -> bool:
+    """Whether client ``capabilities`` (a ClientCapabilities, or None) declare MCP Apps.
+    mcp 1.x keeps ``extensions`` as an extra field of ClientCapabilities, mcp 2.x as a field
+    of its own; both are read here."""
     try:
-        capabilities = getattr(client_params, "capabilities", None)
         if capabilities is None:
             return False
         extensions = getattr(capabilities, "extensions", None)
@@ -119,7 +124,7 @@ def view_uri(name: str) -> str:
 
 
 def register(mcp: Any, *, read_styles: Any = None, load_icons: Any = None, deck: Any = None) -> None:
-    """Install sdpm's MCP Apps wiring on a FastMCP server (see ``binding.register``)."""
+    """Install sdpm's MCP Apps wiring on an MCPServer (see ``binding.register``)."""
     from .binding import register as _register
 
     _register(mcp, read_styles=read_styles, load_icons=load_icons, deck=deck)

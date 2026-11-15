@@ -19,6 +19,7 @@ from pptx import Presentation
 
 from sdpm.api import generate
 from sdpm.engine.builder.elements.shape import ShapeMixin
+from sdpm.engine.converter.pipeline import pptx_to_json
 from test_roundtrip import _make_deck, _plain_text, _roundtrip
 
 _A = "{http://schemas.openxmlformats.org/drawingml/2006/main}"
@@ -504,6 +505,59 @@ class TestGroup:
         kinds = sorted(e["type"] for e in slide["elements"])
         assert kinds == ["line", "shape", "shape", "textbox"]
 
+    def test_table_and_video_children_round_trip(self, tmp_path):
+        deck = _make_deck(tmp_path, [{"type": "group", "elements": [
+            {"_comment": "section marker"},
+            {"type": "table", "x": 100, "y": 100, "width": 600, "height": 200,
+             "colWidths": [200, 400], "headers": ["A", "B"], "rows": [["1", "2"]]},
+            {"type": "video", "src": "media/v.mp4",
+             "x": 800, "y": 100, "width": 320, "height": 180},
+        ]}])
+        (deck / "media").mkdir()
+        (deck / "media" / "v.mp4").write_bytes(b"FAKE_MP4")
+        out = tmp_path / "out.pptx"
+        generate(deck, output_path=out)
+        slide = pptx_to_json(out, tmp_path / "extracted")["slides"][0]
+
+        (table,) = _of_type(slide, "table")
+        assert (table["x"], table["y"], table["width"]) == (100, 100, 600)
+        assert table["colWidths"] == [200, 400]
+        assert [_plain_text(h["text"]) for h in table["headers"]] == ["A", "B"]
+        (video,) = _of_type(slide, "video")
+        assert (video["x"], video["y"], video["width"], video["height"]) == (800, 100, 320, 180)
+        assert (tmp_path / "extracted" / video["src"]).read_bytes() == b"FAKE_MP4"
+
+    def test_raw_shape_child_is_injected(self, tmp_path):
+        prs = Presentation()
+        tb = prs.slides.add_slide(prs.slide_layouts[6]).shapes.add_textbox(0, 0, 914400, 457200)
+        tb.text_frame.text = "verbatim"
+        xml = etree.tostring(tb._element, encoding="unicode")
+        shapes = _built_shapes(tmp_path, [{"type": "group", "elements": [
+            {"type": "rawShape", "_shapeXml": xml}]}])
+        assert [s.text_frame.text for s in shapes] == ["verbatim"]
+
+    def test_unknown_child_type_warns(self, tmp_path, capsys):
+        assert _built_shapes(tmp_path, [{"type": "group", "elements": [{"type": "nope"}]}]) == []
+        assert "unknown element type 'nope' inside group" in capsys.readouterr().err
+
+    def test_table_tracks_scale_with_the_group(self, tmp_path):
+        # A group whose ext is twice its chExt: the table's columns and rows
+        # must come back in slide space, like its frame.
+        src = tmp_path / "src.pptx"
+        prs = Presentation()
+        shapes = prs.slides.add_slide(prs.slide_layouts[6]).shapes
+        tbl = shapes.add_table(2, 2, 914400, 914400, 3657600, 914400)
+        grp = shapes.add_group_shape([tbl])
+        ext = grp._element.find(f"{_P}grpSpPr/{_A}xfrm/{_A}ext")
+        ext.set("cx", str(int(ext.get("cx")) * 2))
+        ext.set("cy", str(int(ext.get("cy")) * 2))
+        prs.save(str(src))
+
+        (group,) = pptx_to_json(src, tmp_path / "x")["slides"][0]["elements"]
+        (table,) = group["elements"]
+        assert sum(table["colWidths"]) == table["width"]
+        assert sum(table["rowHeights"]) == table["height"]
+
     def test_raw_group_xml_is_injected(self, tmp_path):
         src = tmp_path / "src.pptx"
         prs = Presentation()
@@ -546,6 +600,10 @@ class TestArchGroup:
 
 # ── image ────────────────────────────────────────────────────────────────
 
+def _px(n: int) -> int:
+    return n * 6350  # EMU per px on the default 1920-wide slide
+
+
 def _image(src: Path | str, **props) -> dict:
     return {"type": "image", "src": str(src), "x": 100, "y": 100, **props}
 
@@ -555,6 +613,34 @@ class TestImageFit:
         out = _one(tmp_path, _image(_png(tmp_path / "wide.png"), width=200, height=200, fit="contain"))
         assert (out["width"], out["height"]) == (200, 100)
         assert "padding within the box" in capsys.readouterr().err
+
+    def test_contain_centers_wide_image_vertically(self, tmp_path):
+        # Like CSS object-fit: contain (object-position 50% 50%): the gap is
+        # split evenly, not left below the picture.
+        out = _one(tmp_path, _image(_png(tmp_path / "wide.png"), width=200, height=200, fit="contain"))
+        assert (out["x"], out["y"], out["width"], out["height"]) == (100, 150, 200, 100)
+
+    def test_contain_centers_tall_image_horizontally(self, tmp_path):
+        out = _one(tmp_path, _image(_png(tmp_path / "tall.png", (200, 400)), width=200, height=200,
+                                    fit="contain"))
+        assert (out["x"], out["y"], out["width"], out["height"]) == (150, 100, 100, 200)
+
+    def test_contain_centers_svg(self, tmp_path):
+        svg = tmp_path / "wide.svg"
+        svg.write_text('<svg xmlns="http://www.w3.org/2000/svg" width="96" height="48" '
+                       'viewBox="0 0 96 48"><path fill="#000" d="M0 0h96v48H0z"/></svg>')
+        (pic,) = _built_shapes(tmp_path, [_image(svg, width=200, height=200, fit="contain",
+                                                 iconColor="none")])
+        box_top, box_h = _px(100), _px(200)
+        assert pic.height < box_h
+        assert abs((pic.top - box_top) - ((box_top + box_h) - (pic.top + pic.height))) <= 1
+
+    def test_contain_centered_label_sits_under_the_picture(self, tmp_path):
+        shapes = _built_shapes(tmp_path, [_image(_png(tmp_path / "wide.png"), width=200, height=200,
+                                                 fit="contain", label="Wide")])
+        pic, label = shapes
+        assert label.top > pic.top + pic.height
+        assert label.top < _px(100 + 200)  # inside the requested box, not below it
 
     def test_cover_crops_both_sides_evenly(self, tmp_path):
         out = _one(tmp_path, _image(_png(tmp_path / "wide.png"), width=200, height=200, fit="cover"))

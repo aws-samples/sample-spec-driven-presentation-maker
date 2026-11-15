@@ -125,7 +125,8 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
         if src_rect is not None:
             try:
                 from lxml import etree as _et
-                root = _et.fromstring(svg_bytes)
+                from sdpm.utils import xml_safe
+                root = xml_safe.fromstring(svg_bytes, allow_doctype=True)
                 vb = root.get('viewBox')
                 if vb:
                     mx, my, vw, vh = [float(v) for v in vb.replace(',', ' ').split()]

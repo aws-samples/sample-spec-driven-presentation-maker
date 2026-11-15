@@ -29,21 +29,24 @@ if (_SKILL_DIR / "sdpm" / "config.py").is_file():
     sys.path.insert(0, str(_REPO_ROOT))
 
 import functools  # noqa: E402
+import inspect  # noqa: E402
 
 import deck_access  # noqa: E402
 import sandbox_tools  # noqa: E402
 import sdpm_command  # noqa: E402
-from mcp.server.fastmcp import FastMCP  # noqa: E402
+from mcp.server.mcpserver import Context, MCPServer  # noqa: E402
 
 from sdpm import tools  # noqa: E402
-from sdpm.tools.apps import ui_capable  # noqa: E402
+from sdpm.tools import tool_errors  # noqa: E402
+from sdpm.tools.apps.binding import caller_declared  # noqa: E402
 from sdpm.tools.attachment.contracts import read_attachment, import_attachment  # noqa: E402
 from sdpm.tools.instructions import instructions  # noqa: E402
 
-mcp = FastMCP(
+mcp = MCPServer(
     "spec-driven-presentation-maker",
     instructions=instructions(),
 )
+tool_errors.install(mcp)
 
 # ---------------------------------------------------------------------------
 # Local-environment fact: the `sdpm open` hint
@@ -54,14 +57,6 @@ mcp = FastMCP(
 # mentions it.
 OPEN_HINT_FIELD = "note_for_user"
 _CHECKOUT = _REPO_ROOT
-
-
-def _client_params():
-    """The client's initialize params, or None outside a request (treated as not declared)."""
-    try:
-        return mcp.get_context().session.client_params
-    except (LookupError, AttributeError, ValueError):
-        return None
 
 
 def _result_deck(result: dict) -> Path | None:
@@ -79,21 +74,27 @@ def _with_open_hint(fn):
     result when it created or built a deck, the Web UI is installed here and the client did
     not declare MCP Apps (it would show the deck itself). The deck must sit in the root
     ``sdpm open`` searches (``sdpm_command.deck_root``). Same name, docstring and signature,
-    so the tool's schema is the contract's."""
+    so the tool's schema is the contract's; the one added parameter is the request ``Context``,
+    which MCPServer injects and leaves out of the schema."""
 
     @functools.wraps(fn)
-    def bound(*args, **kwargs):
+    def bound(*args, ctx: Context | None = None, **kwargs):
         result = fn(*args, **kwargs)
         if not isinstance(result, dict) or "error" in result:
             return result
         deck = _result_deck(result)
-        if not deck or ui_capable(_client_params()) or not sdpm_command.webui_installed_at(_CHECKOUT):
+        declared = ctx is not None and caller_declared(ctx.request_context)
+        if not deck or declared or not sdpm_command.webui_installed_at(_CHECKOUT):
             return result
         hint = sdpm_command.open_hint(deck, sdpm_command.deck_root())
         if hint:
             result[OPEN_HINT_FIELD] = f"To open this deck in the browser Web UI, run `{hint}` in a terminal."
         return result
 
+    signature = inspect.signature(fn)
+    context = inspect.Parameter("ctx", inspect.Parameter.KEYWORD_ONLY, default=None, annotation=Context | None)
+    bound.__signature__ = signature.replace(parameters=[*signature.parameters.values(), context])
+    bound.__annotations__ = {**fn.__annotations__, "ctx": Context | None}
     return bound
 
 

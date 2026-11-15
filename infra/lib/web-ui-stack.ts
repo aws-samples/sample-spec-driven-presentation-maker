@@ -168,6 +168,20 @@ function handler(event) {
       queryStringBehavior: cloudfront.CacheQueryStringBehavior.allowList("_t"),
     });
 
+    // --- PPTX cache policy: the preview policy plus response-content-disposition ---
+    // The API signs that parameter into the URL (api/index.py _pptx_download_url) so
+    // S3 sends the download as "<deck title>.pptx"; a cache policy's query strings are
+    // also what CloudFront forwards to the origin.
+    const pptxCachePolicy = new cloudfront.CachePolicy(this, "PptxCachePolicy", {
+      cachePolicyName: "sdpm-pptx-cache",
+      defaultTtl: cdk.Duration.seconds(5),
+      maxTtl: cdk.Duration.hours(1),
+      minTtl: cdk.Duration.seconds(0),
+      enableAcceptEncodingGzip: true,
+      enableAcceptEncodingBrotli: true,
+      queryStringBehavior: cloudfront.CacheQueryStringBehavior.allowList("_t", "response-content-disposition"),
+    });
+
     // --- Preview origin ---
     // Cross-stack OAC causes dependency cycles in CDK (aws/aws-cdk#31462).
     // Workaround: define preview origin + OAC at L1 level via escape hatch.
@@ -231,7 +245,7 @@ function handler(event) {
       PathPattern: "pptx/*",
       TargetOriginId: "previewS3Origin",
       ViewerProtocolPolicy: "redirect-to-https",
-      CachePolicyId: previewCachePolicy.cachePolicyId,
+      CachePolicyId: pptxCachePolicy.cachePolicyId,
       TrustedKeyGroups: [keyGroup.keyGroupId],
       Compress: true,
     }]);

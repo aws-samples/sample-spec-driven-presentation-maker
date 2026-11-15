@@ -13,7 +13,7 @@ import logging
 import threading
 import time
 
-import httpx
+import httpx2
 
 from shared.session_owner import sub_from_jwt
 
@@ -61,19 +61,19 @@ class TokenHolder:
                 self.unauthorized_at = None
 
 
-class HolderAuth(httpx.Auth):
+class HolderAuth(httpx2.Auth):
     """Sets ``Authorization: Bearer <latest token>`` on every request.
 
     A 401 is retried once when the holder got a newer token after the request was
     built (a turn swapped it meanwhile); otherwise the response goes back to the MCP
-    transport, which ends the session, and the client is restarted at its next use
-    (mcp_clients.ReconnectingMCPClient).
+    transport, which fails that one call with an MCP error and keeps the session (mcp
+    2.x); the next request carries the token the holder has by then.
     """
 
     def __init__(self, holder: TokenHolder):
         self.holder = holder
 
-    def auth_flow(self, request: httpx.Request):
+    def auth_flow(self, request: httpx2.Request):
         version = self.holder.version
         request.headers["Authorization"] = f"Bearer {self.holder.token}"
         response = yield request

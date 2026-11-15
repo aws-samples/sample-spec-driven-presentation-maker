@@ -121,9 +121,11 @@ def _styles() -> list[dict]:
 
 def _templates() -> list[dict]:
     from sdpm.api import get_templates_dirs, list_templates_with_metadata
-    from sdpm.config import get_state
+    from sdpm.config import get_builtin_template_notes, get_state
 
-    return list_templates_with_metadata(get_templates_dirs(), get_state().get("template_metadata", {}))
+    return list_templates_with_metadata(
+        get_templates_dirs(), get_state().get("template_metadata", {}), get_builtin_template_notes()
+    )
 
 
 # ---------------------------------------------------------------------------

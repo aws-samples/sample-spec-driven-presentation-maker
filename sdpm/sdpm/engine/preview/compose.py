@@ -19,6 +19,8 @@ from pathlib import Path
 from lxml import etree
 from PIL import Image
 
+from sdpm.utils import xml_safe
+
 logger = logging.getLogger("sdpm.compose")
 
 SVG_NS = "http://www.w3.org/2000/svg"
@@ -108,7 +110,7 @@ def _repair_bitmap_refs(root: etree._Element) -> None:
 
 def load_svg(svg_path: Path) -> etree._ElementTree:
     """Parse a LibreOffice SVG once so several extractions can share the tree."""
-    tree = etree.parse(str(svg_path))
+    tree = xml_safe.parse(svg_path, allow_doctype=True)
     _repair_bitmap_refs(tree.getroot())
     return tree
 
@@ -177,60 +179,45 @@ def split_slide_components(svg_path: "Path | etree._ElementTree", slide_num: int
         raise ValueError("No Page group found")
 
     # --- Background ---
+    # Drawn as LibreOffice and PowerPoint draw it: the slide's own background
+    # (Page > defs.SlideBackground, e.g. from deck.json defaultBackground) or else the
+    # master's, then the master's background objects (the layout's pictures, logo,
+    # footer) on top, unless the slide hides them (hideMasterShapes, written as
+    # ooo:master-objects-visibility="hidden" on the slide's meta entry).
     bg_fill = "#000"
     bg_svg = None
+    parts = []
 
-    # 1) Slide-specific custom background (Page > defs.SlideBackground)
-    slide_bg_defs = page_g.find(f"{{{SVG_NS}}}defs[@class='SlideBackground']")
-    if slide_bg_defs is not None:
-        parts = []
-        for child in slide_bg_defs:
-            cls = child.get("class", "")
-            if cls in ("Background", "BackgroundObjects"):
+    meta = root.find(f".//{{{SVG_NS}}}g[@id='ooo:meta_slide_{slide_num - 1}']")
+    master_id = meta.get(f"{{{OOO_NS}}}master", "") if meta is not None else ""
+    master_g = root.find(f".//*[@id='{master_id}']") if master_id else None
+
+    bg_g = page_g.find(f"{{{SVG_NS}}}defs[@class='SlideBackground']/*[@class='Background']")
+    if bg_g is None and master_g is not None:
+        bg_g = master_g.find(f"{{{SVG_NS}}}g[@class='Background']")
+    if bg_g is not None:
+        _propagate_root_attrs(bg_g, root_attrs)
+        parts.append(etree.tostring(bg_g, encoding="unicode"))
+        for el in bg_g.iter():
+            f = el.get("fill")
+            if f and f != "none":
+                bg_fill = f
+                break
+
+    bo_g = master_g.find(f"{{{SVG_NS}}}g[@class='BackgroundObjects']") if master_g is not None else None
+    if bo_g is not None and meta.get(f"{{{OOO_NS}}}master-objects-visibility") != "hidden":
+        for child in bo_g:
+            # Layout placeholders (com.sun.star.presentation.SubtitleShape, ...)
+            # carry the layout's prompt text; LibreOffice hides only the title
+            # and outline ones on master pages, and slides never draw them.
+            # DateTime / Footer / PageNumber have their own classes.
+            if (child.get("visibility") != "hidden"
+                    and not child.get("class", "").startswith("com.sun.star.presentation.")):
                 _propagate_root_attrs(child, root_attrs)
                 parts.append(etree.tostring(child, encoding="unicode"))
-                if cls == "Background":
-                    for el in child.iter():
-                        f = el.get("fill")
-                        if f and f != "none":
-                            bg_fill = f
-                            break
-        if parts:
-            bg_svg = _convert_images("\n".join(parts))
 
-    # 2) Fallback: master page background
-    if bg_svg is None:
-        meta_slides = root.find(f".//{{{SVG_NS}}}g[@id='ooo:meta_slides']")
-        if meta_slides is not None:
-            meta = meta_slides.find(f".//{{{SVG_NS}}}g[@id='ooo:meta_slide_{slide_num - 1}']")
-            if meta is not None:
-                master_id = meta.get(f"{{{OOO_NS}}}master", "")
-                if master_id:
-                    master_g = root.find(f".//*[@id='{master_id}']")
-                    if master_g is not None:
-                        parts = []
-                        bg_g = master_g.find(f"{{{SVG_NS}}}g[@class='Background']")
-                        if bg_g is not None:
-                            _propagate_root_attrs(bg_g, root_attrs)
-                            parts.append(etree.tostring(bg_g, encoding="unicode"))
-                            for el in bg_g.iter():
-                                f = el.get("fill")
-                                if f and f != "none":
-                                    bg_fill = f
-                                    break
-                        bo_g = master_g.find(f"{{{SVG_NS}}}g[@class='BackgroundObjects']")
-                        if bo_g is not None:
-                            for child in bo_g:
-                                # Layout placeholders (com.sun.star.presentation.SubtitleShape, ...)
-                                # carry the layout's prompt text; LibreOffice hides only the title
-                                # and outline ones on master pages, and slides never draw them.
-                                # DateTime / Footer / PageNumber have their own classes.
-                                if (child.get("visibility") != "hidden"
-                                        and not child.get("class", "").startswith("com.sun.star.presentation.")):
-                                    _propagate_root_attrs(child, root_attrs)
-                                    parts.append(etree.tostring(child, encoding="unicode"))
-                        if parts:
-                            bg_svg = _convert_images("\n".join(parts))
+    if parts:
+        bg_svg = _convert_images("\n".join(parts))
 
     # --- Components ---
     components = []
@@ -289,9 +276,8 @@ def referenced_defs(defs: str, fragments: "list[str]") -> str:
     wanted = set().union(*(_local_refs(f) for f in fragments)) if fragments else set()
     if not wanted or not defs:
         return ""
-    parser = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False)
     try:
-        root = etree.fromstring(f'<svg xmlns="{SVG_NS}">{defs}</svg>', parser)
+        root = xml_safe.fromstring(f'<svg xmlns="{SVG_NS}">{defs}</svg>')
     except etree.XMLSyntaxError:
         return defs
     by_id = {el.get("id"): el for el in root.iter() if isinstance(el.tag, str) and el.get("id")}

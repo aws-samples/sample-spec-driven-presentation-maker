@@ -20,6 +20,7 @@ import re
 import uuid
 from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional
+from urllib.parse import quote, urlencode
 
 import boto3
 from aws_lambda_powertools import Logger, Metrics
@@ -38,6 +39,7 @@ from html_presign import (
     PURPOSES as HTML_PURPOSES,
     html_presign_client,
     html_slide_slugs,
+    attachment_disposition,
     is_html_deck,
     presigned_html_url,
     slide_size,
@@ -195,6 +197,25 @@ def _html_presigned(key: str, purpose: str = "view", deck_name: str = "") -> Opt
         return None
 
 
+def _pptx_download_url(key: str, deck_name: str = "") -> Optional[str]:
+    """Signed URL that downloads a built PPTX as ``<deck title>.pptx``.
+
+    CloudFront (the ``pptx/*`` behaviour, inside the distribution's WAF), with
+    ``response-content-disposition`` in the signed URL: the behaviour's cache policy
+    forwards that parameter to S3, which answers with it as Content-Disposition.
+    Without CloudFront configured, an S3 presign on the API's client (as before).
+    None for a key outside ``pptx/**.pptx``.
+    """
+    if not isinstance(key, str) or not key.startswith("pptx/") or not key.endswith(".pptx") or ".." in key:
+        return None
+    disposition = attachment_disposition(deck_name, ".pptx")
+    return _cf_signed_url(key, query={"response-content-disposition": disposition}) or s3_client.generate_presigned_url(
+        "get_object",
+        Params={"Bucket": BUCKET_NAME, "Key": key, "ResponseContentDisposition": disposition},
+        ExpiresIn=PRESIGNED_URL_EXPIRY,
+    )
+
+
 def _list_html_preview_map(deck_id: str) -> Dict[str, str]:
     """slug → latest HTML preview key under html/{deck_id}/preview/ (one S3 call)."""
     resp = s3_client.list_objects_v2(Bucket=BUCKET_NAME, Prefix=html_preview_prefix(deck_id))
@@ -267,6 +288,8 @@ def _deck_summary(item: Dict, extras: Dict[str, Dict], owner: bool = False) -> D
         "updatedAt": item.get("updatedAt", ""),
         "thumbnailUrl": ex.get("thumbnailUrl"),
         "visibility": item.get("visibility", "private"),
+        # A built PPTX exists (GET /decks/{id}/pptx signs it on demand; the list stays URL-free).
+        "hasPptx": bool(item.get("pptxS3Key")),
     }
     if owner:
         summary["chatSessionId"] = _chat_session_id(item)
@@ -1042,6 +1065,30 @@ def get_deck_html(deck_id: str) -> Any:
 
 
 
+@app.get("/decks/<deck_id>/pptx")
+def get_deck_pptx(deck_id: str) -> Any:
+    """Signed URL that downloads the built PPTX as ``<deck title>.pptx`` (15 min).
+
+    Same read permission as get_deck (owner, or viewer of a public deck); 404 when no
+    PPTX is built or the deck is an HTML deck (get_deck gives those no pptxUrl either).
+
+    Returns:
+        Dict with url and expiresIn (seconds).
+    """
+    user_id = get_user_id(app.current_event)
+
+    decision = authorize(user_id, deck_id, "read", table)
+    if not decision.allowed:
+        return {"error": decision.reason}, 403
+
+    deck = decision.deck
+    pptx_key = deck.get("pptxS3Key")
+    url = _pptx_download_url(pptx_key, deck.get("name", "")) if pptx_key else None
+    if not url or is_html_deck(_read_deck_json(deck_id)):
+        return {"error": "PPTX not built yet"}, 404
+    return {"url": url, "expiresIn": PRESIGNED_URL_EXPIRY}
+
+
 @app.get("/decks/<deck_id>")
 def get_deck(deck_id: str) -> Dict[str, Any]:
     """Get deck details with presigned URLs. Reads slides from S3 (deck.json + slides/*.json)."""
@@ -1127,7 +1174,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         "specs": specs,
         "template": template,
         "defsUrl": preview_url(defs_key) if has_defs else None,
-        "pptxUrl": (_cf_signed_url(pptx_key) or presigned_url(s3_client, BUCKET_NAME, pptx_key)) if pptx_key else None,
+        "pptxUrl": _pptx_download_url(pptx_key, deck.get("name", "")) if pptx_key else None,
         "slideSize": slide_size(deck_json),
         "updatedAt": deck.get("updatedAt", ""),
         "chatSessionId": _owner_chat_session_id(decision),
@@ -1595,12 +1642,15 @@ def _parse_memory_payload(payload_item: Dict) -> Dict | None:
 # ---------------------------------------------------------------------------
 
 
-def _cf_signed_url(s3_key: str, expires_in: int = 900) -> Optional[str]:
+def _cf_signed_url(s3_key: str, expires_in: int = 900, query: Optional[Dict[str, str]] = None) -> Optional[str]:
     """Generate a CloudFront signed URL for an S3 key.
 
     Args:
         s3_key: S3 object key (e.g. previews/deck_id/slide_01.webp).
         expires_in: URL validity in seconds (default 15 min).
+        query: Query parameters for the origin (e.g. response-content-disposition).
+            Percent-encoded once and part of the signed policy's Resource, so they
+            cannot be changed or dropped without breaking the signature.
 
     Returns:
         Signed URL string, or None if CloudFront is not configured.
@@ -1616,6 +1666,8 @@ def _cf_signed_url(s3_key: str, expires_in: int = 900) -> Optional[str]:
     private_key_pem = _get_cf_private_key()
     expires = int((datetime.datetime.now(datetime.timezone.utc) + datetime.timedelta(seconds=expires_in)).timestamp())
     url = f"https://{CF_DOMAIN}/{s3_key}"
+    if query:
+        url = f"{url}?{urlencode(query, quote_via=quote, safe='')}"
 
     policy = json.dumps({
         "Statement": [{
@@ -1638,7 +1690,8 @@ def _cf_signed_url(s3_key: str, expires_in: int = 900) -> Optional[str]:
     def _b64(data: bytes) -> str:
         return base64.b64encode(data).decode().replace("+", "-").replace("=", "_").replace("/", "~")
 
-    return f"{url}?Policy={_b64(policy.encode())}&Signature={_b64(sig_raw)}&Key-Pair-Id={CF_KEY_PAIR_ID}"
+    sep = "&" if query else "?"
+    return f"{url}{sep}Policy={_b64(policy.encode())}&Signature={_b64(sig_raw)}&Key-Pair-Id={CF_KEY_PAIR_ID}"
 
 
 # ---------------------------------------------------------------------------

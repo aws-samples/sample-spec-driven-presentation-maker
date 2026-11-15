@@ -85,14 +85,15 @@ def _mcp_agentcore_runtime(jwt_token: str, session_id: str = "") -> MCPClient:
     if session_id:
         headers["Mcp-Session-Id"] = session_id
 
-    return MCPClient(
-        lambda: streamablehttp_client(
-            url=url,
-            headers=headers,
-            timeout=120,
-            terminate_on_close=False,
-        ),
-    )
+    @asynccontextmanager
+    async def transport():
+        # mcp 2.x: headers and timeouts go on an httpx2 client of your own.
+        timeout = httpx2.Timeout(120.0, read=300.0)
+        async with httpx2.AsyncClient(headers=headers, timeout=timeout) as client:
+            async with streamable_http_client(url, http_client=client, terminate_on_close=False) as streams:
+                yield streams
+
+    return MCPClient(transport)
 ```
 
 > `Mcp-Session-Id` を省略してはいけない。AgentCore はヘッダーのないリクエストごとに
@@ -107,7 +108,7 @@ def _mcp_agentcore_runtime(jwt_token: str, session_id: str = "") -> MCPClient:
 ```python
 def _mcp_aws_knowledge() -> MCPClient:
     return MCPClient(
-        lambda: streamablehttp_client(url="https://knowledge-mcp.global.api.aws"),
+        lambda: streamable_http_client("https://knowledge-mcp.global.api.aws"),
     )
 ```
 

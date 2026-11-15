@@ -79,7 +79,7 @@ Key capabilities:
 
 A thin bind of the `sdpm.tools` contract. Runs as a stdio server (plus an ACP variant for the local Web UI).
 
-- Registers the contract tools via FastMCP — no tool logic of its own
+- Registers the contract tools on the MCP SDK's `MCPServer` — no tool logic of its own
 - **Role entry tools `start_presentation` / `start_composing` / `start_style` / `start_translation`** — any MCP client (including ones with no skill/sub-agent mechanism, e.g. Claude Desktop) gets the role document as a tool response, together with what that role reads first (style/template catalogues; the deck's specs and assigned slides; a base style). The entry is carried by the tool surface itself, so nothing depends on skills, agent definitions or MCP Server Instructions (`SDPM_DISABLE_INSTRUCTIONS=1` turns the latter off).
 - No AWS required — all files stored locally
 
@@ -248,7 +248,8 @@ An HTML deck runs scripts, so it is never served from the Web UI's origin:
   `StopBrowserSession` and `ConnectBrowserAutomationStream` on the
   `aws.browser.v1` ARN only. A check that is skipped, stopped by a slide that navigates the
   page away (the slide helper logs `pagehide`), or does not finish within
-  `min(30 + 3 × slides, 110)` s adds a one-line `output.html: Browser check …` warning.
+  `min(30 + 3 × slides, 110)` s (starting the browser included; a first start on a fresh
+  machine can take tens of seconds) adds a one-line `output.html: Browser check …` warning.
 - HTML objects live under `html/` in the deck bucket. No CloudFront behaviour serves
   `html/*` and the CloudFront OAC bucket-policy grant does not include it.
 - The API returns S3 presigned URLs on the bucket's regional host (a different origin from

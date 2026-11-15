@@ -1,6 +1,6 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""FastMCP wiring for sdpm's MCP Apps views (mcp 1.30). The rules come from the package.
+"""MCPServer wiring for sdpm's MCP Apps views (mcp 2.x). The rules come from the package.
 
 What ``register`` installs on a server whose tools are already registered:
 
@@ -40,44 +40,43 @@ outline_edit: an outline edit as a diff message for the chat; writes nothing."""
 _OPEN_DESCRIPTION = "\nopen: open the deck's built file or its folder (target) with the OS default app."
 
 
-def _caller_declared(mcp: Any) -> bool:
-    try:
-        rc = mcp.get_context().request_context
-    except (ValueError, LookupError, AttributeError):  # outside a request
+def caller_declared(request_context: Any) -> bool:
+    """Whether the caller of this request declared MCP Apps: in initialize, in the
+    connection's capabilities (a 2026-07-28 request declares them in its envelope) or in
+    the request's ``_meta``. ``request_context`` is the SDK's ``ServerRequestContext`` (a
+    tool's ``ctx.request_context``); None (outside a request) means not declared."""
+    session = getattr(request_context, "session", None)
+    if session is None:
         return False
-    return apps.declared(getattr(rc.session, "client_params", None), rc.meta)
+    return apps.capabilities_declare_ui(getattr(session, "client_capabilities", None)) or apps.declared(
+        getattr(session, "client_params", None), getattr(request_context, "meta", None)
+    )
 
 
 def _install_list_filter(mcp: Any) -> None:
     unfiltered = mcp.list_tools
 
-    async def list_tools() -> list[types.Tool]:
+    async def list_tools(declared: bool = False) -> list[types.Tool]:
         listed = await unfiltered()
-        declared = _caller_declared(mcp)
         return [t for t in listed if apps.listed(t.name, t.meta, declared)]
 
+    async def handle_list_tools(ctx: Any, params: types.PaginatedRequestParams | None) -> types.ListToolsResult:
+        return types.ListToolsResult(tools=await list_tools(caller_declared(ctx)))
+
     list_tools.__doc__ = unfiltered.__doc__
-    # FastMCP bound its own method as the handler at init; replace both.
+    # MCPServer's own tools/list handler has no request context to read the declaration
+    # from; replace it, and the method (outside a request nobody declared).
     mcp.list_tools = list_tools
-    mcp._mcp_server.list_tools()(list_tools)
+    mcp._lowlevel_server.add_request_handler("tools/list", types.PaginatedRequestParams, handle_list_tools)
 
 
 def _install_capability(mcp: Any) -> None:
-    low = mcp._mcp_server
-    capabilities = low.get_capabilities
-
-    def get_capabilities(*args: Any, **kwargs: Any) -> types.ServerCapabilities:
-        caps = capabilities(*args, **kwargs)
-        extensions = dict(getattr(caps, "extensions", None) or {})
-        extensions[apps.UI_EXTENSION] = {"mimeTypes": [apps.APP_MIME]}
-        caps.extensions = extensions  # ServerCapabilities allows extra fields
-        return caps
-
-    low.get_capabilities = get_capabilities
+    # The SEP-2133 extension map the initialize (and server/discover) capabilities carry.
+    mcp._lowlevel_server.extensions[apps.UI_EXTENSION] = {"mimeTypes": [apps.APP_MIME]}
 
 
 def _text(text: str, payload: dict) -> types.CallToolResult:
-    return types.CallToolResult(content=[types.TextContent(type="text", text=text)], structuredContent=payload)
+    return types.CallToolResult(content=[types.TextContent(type="text", text=text)], structured_content=payload)
 
 
 def _view(mcp: Any, name: str, doc: str) -> str:
@@ -143,12 +142,12 @@ def register(mcp: Any, *, read_styles: Any = None, load_icons: Any = None, deck:
         names: Annotated[
             list[str],
             Field(description=f"Style names for style_previews, 1 to {gallery.MAX_NAMES}.", max_length=gallery.MAX_NAMES),
-        ] = [],  # noqa: B006 (FastMCP copies defaults); not Optional: hosts that validate view calls reject anyOf
+        ] = [],  # noqa: B006 (MCPServer copies defaults); not Optional: hosts that validate view calls reject anyOf
         deck_id: Annotated[str, Field(description="Deck for the deck actions: the deck_id the deck tools take.")] = "",
         slug: Annotated[str, Field(description="Slide for slide_preview.")] = "",
         review: Annotated[
             dict[str, Any], Field(description="Change request for submit_review: {note, comments}."),
-        ] = {},  # noqa: B006 (FastMCP copies defaults)
+        ] = {},  # noqa: B006 (MCPServer copies defaults)
         base: Annotated[
             str, Field(description="Outline as loaded, for outline_edit.", max_length=_deck.MAX_TEXT),
         ] = "",

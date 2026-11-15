@@ -1,6 +1,6 @@
 ---
 name: slide-json-elements
-description: "Slide JSON elements — fields of textbox, shape, line, image, include and group, text sizing, labeled shapes, and slide override (inheritance)"
+description: "Slide JSON elements — fields of textbox, shape, line, image, include and group, alt text, text sizing, labeled shapes, and slide override (inheritance)"
 category: guide
 ---
 
@@ -130,12 +130,22 @@ Expands an external JSON file's elements array. Draw order is controlled by posi
 - `src`: `assets:SOURCE/NAME`, `icons:NAME` (backward compatible), `qr:URL`, file path, relative path
 - `height`: omit to maintain aspect ratio
 - `fit`: `"contain"` (default) | `"cover"` | `"stretch"` — controls sizing when both width and height are specified
-  - `contain`: maintain aspect ratio, fit within the box (may leave gaps)
+  - `contain`: maintain aspect ratio, fit within the box, centered (may leave even gaps on two sides)
   - `cover`: maintain aspect ratio, fill the box (excess is cropped via PowerPoint trim)
   - `stretch`: ignore aspect ratio, fill the box exactly
 - `labelSize`: default 11
 - `iconColor`: (optional) change SVG icon color. Single-color SVGs only (multi-color icons are ignored)
 - Masks, crops, colour treatments and QR codes: `slide-json-media`; shadow, glow and soft edge: `slide-json-effects`
+
+## alt and decorative (any element)
+
+- `alt`: alt text — what a screen reader says for the element and what PowerPoint's
+  Accessibility Checker looks for. Give every image, icon, chart, table and video that carries
+  meaning a short sentence stating the message it shows.
+  On an image with a `label`, it describes the picture; the label stays its own text
+- `decorative`: `true` for an element that is purely visual; screen
+  readers skip it and the checker accepts it without alt text
+- On a `group`, set them on the children (a group is expanded into its children)
 
 ## shape
 ```json
@@ -267,6 +277,7 @@ is found, but you should not produce it in the first place.
 }
 ```
 - Child elements are expanded and added individually (not grouped)
+- Children take any element type (`shape`, `textbox`, `image`, `line`, `freeform`, `chart`, `table`, `video`, `arch-group`, nested `group`) at slide coordinates
 
 ## Placeholder (for user editing)
 

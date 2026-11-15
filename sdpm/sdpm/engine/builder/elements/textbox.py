@@ -4,6 +4,7 @@
 from pptx.dml.color import RGBColor
 from pptx.util import Pt
 from sdpm.engine.schema.defaults import ELEMENT_DEFAULTS
+from sdpm.utils import xml_safe
 from sdpm.utils.effects import apply_effects
 from sdpm.utils.text import _expand_styled_newlines
 
@@ -36,7 +37,7 @@ class TextboxMixin:
         if lst_style_xml:
             from lxml import etree
             from pptx.oxml.ns import qn
-            new_lst = etree.fromstring(lst_style_xml)
+            new_lst = xml_safe.fromstring(lst_style_xml)
             ns = 'http://schemas.openxmlformats.org/drawingml/2006/main'
             # If paragraphs have bullets, remove buNone from lstStyle
             has_bullets = any(
@@ -341,7 +342,7 @@ class TextboxMixin:
                         r.insert(0, rPr)
                     for old_eff in rPr.findall(_qn('a:effectLst')):
                         rPr.remove(old_eff)
-                    eff = _et.fromstring(text_effects)
+                    eff = xml_safe.fromstring(text_effects)
                     # schema order: effectLst goes before latin/ea/cs fonts
                     font_el = rPr.find(_qn('a:latin'))
                     if font_el is not None:

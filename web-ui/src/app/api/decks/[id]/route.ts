@@ -11,10 +11,13 @@ import fs from "fs"
 import path from "path"
 import { resolveDeckDir, readSlideSize, DECK_ROOT } from "@/lib/local/deck-paths"
 import { readOriginFromDeck } from "@/lib/local/acp-process"
+import { resolveWithin } from "@/lib/local/contained"
 import { inlineStyleIcons } from "@/lib/local/styleIcons"
 
-function safeRead(p: string): string | null {
-  try { return fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : null } catch { return null }
+/** Text of a file under the deck directory; null when missing, unreadable or outside it. */
+function safeRead(dp: string, ...segments: string[]): string | null {
+  const p = resolveWithin(dp, ...segments)
+  try { return p && fs.existsSync(p) ? fs.readFileSync(p, "utf-8") : null } catch { return null }
 }
 
 // Copies of the Python definitions, pinned by tests/test_slug_parity.py.
@@ -57,8 +60,8 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   // Read deck metadata
   let deckJson: Record<string, unknown> = {}
   for (const fname of ["deck.json", "presentation.json"]) {
-    const p = path.join(dp, fname)
-    if (fs.existsSync(p)) { deckJson = JSON.parse(fs.readFileSync(p, "utf-8")); break }
+    const p = resolveWithin(dp, fname)
+    if (p && fs.existsSync(p)) { deckJson = JSON.parse(fs.readFileSync(p, "utf-8")); break }
   }
 
   // Index compose files by slug → latest epoch
@@ -80,8 +83,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
   }
 
   // Parse outline for slug order
-  const specsDir = path.join(dp, "specs")
-  const outlineText = safeRead(path.join(specsDir, "outline.md"))
+  const outlineText = safeRead(dp, "specs", "outline.md")
   const outlineSlugs = outlineText
     ? outlineText.split("\n").map(l => OUTLINE_ENTRY_RE.exec(l)?.[1]).filter((s): s is string => !!s)
     : []
@@ -122,11 +124,11 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
 
   // Read specs
   let specs = null
-  const brief = safeRead(path.join(specsDir, "brief.md"))
-  const outline = safeRead(path.join(specsDir, "outline.md"))
+  const brief = safeRead(dp, "specs", "brief.md")
+  const outline = safeRead(dp, "specs", "outline.md")
   // The deck's style copy is shown in the Web UI: draw the catalog icons it references
-  const artHtml = safeRead(path.join(specsDir, "art-direction.html"))
-  const artDirection = artHtml ? (await inlineStyleIcons([artHtml]))[0] : safeRead(path.join(specsDir, "art-direction.md"))
+  const artHtml = safeRead(dp, "specs", "art-direction.html")
+  const artDirection = artHtml ? (await inlineStyleIcons([artHtml]))[0] : safeRead(dp, "specs", "art-direction.md")
   if (brief || outline || artDirection) specs = { brief, outline, artDirection }
 
   const pptxPath = path.join(dp, "output.pptx")
@@ -142,7 +144,7 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     pptxUrl: fs.existsSync(pptxPath) ? `/api/preview/${deckId}/output.pptx` : null,
     specs,
     updatedAt: new Date().toISOString(),
-    chatSessionId: safeRead(path.join(dp, ".session"))?.trim() || null,
+    chatSessionId: safeRead(dp, ".session")?.trim() || null,
     ...(sessionOrigin ? { sessionOrigin } : {}),
     visibility: "private",
     isOwner: true,

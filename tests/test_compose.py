@@ -304,6 +304,69 @@ class TestLayoutPlaceholderPrompt:
         assert "11/12/26" in bg and "Confidential" in bg and ">7<" in bg
 
 
+class TestMasterObjectsOverSlideBackground:
+    """The layout's background pictures are drawn over a slide's own background, as in the PNG."""
+
+    # As LibreOffice writes a styled deck (deck.json defaultBackground): every slide has its
+    # own solid background, and the master page's BackgroundObjects hold the template's picture.
+    # Slide 2 sets hideMasterShapes, which LibreOffice writes as master-objects-visibility.
+    _SVG = f"""\
+<svg xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink"
+     xmlns:ooo="http://xml.openoffice.org/svg/export" viewBox="0 0 28000 15750">
+  <defs>
+    <g id="ooo:meta_slides">
+      <g id="ooo:meta_slide_0" ooo:master="m1" ooo:has-custom-background="true"/>
+      <g id="ooo:meta_slide_1" ooo:master="m1" ooo:has-custom-background="true"
+         ooo:master-objects-visibility="hidden"/>
+      <g id="ooo:meta_slide_2" ooo:master="m1" ooo:master-objects-visibility="hidden"/>
+    </g>
+  </defs>
+  <defs>
+    <g id="m1" class="Master_Slide">
+      <g class="Background"><path fill="rgb(255,255,255)" d="M0,0 h28000 v15750 h-28000 z"/></g>
+      <g class="BackgroundObjects"><g class="Graphic"><g id="layout-photo">
+        <rect class="BoundingBox" x="0" y="0" width="28000" height="15750"/>
+        <image x="0" y="0" width="28000" height="15750" preserveAspectRatio="none" xlink:href="{_IMG}"/>
+      </g></g></g>
+    </g>
+  </defs>
+  <g class="Slide"><g class="Page"/></g>
+  <g class="Slide"><g class="Page">
+    <defs class="SlideBackground">
+      <g class="Background"><path fill="rgb(22,29,38)" d="M0,0 h28000 v15750 h-28000 z"/></g>
+    </defs>
+  </g></g>
+  <g class="Slide"><g class="Page">
+    <defs class="SlideBackground">
+      <g class="Background"><path fill="rgb(22,29,38)" d="M0,0 h28000 v15750 h-28000 z"/></g>
+    </defs>
+  </g></g>
+  <g class="Slide"><g class="Page"/></g>
+</svg>
+"""
+
+    def test_layout_picture_drawn_over_slide_fill(self):
+        result = split_slide_components(_write_svg(self._SVG), 1)
+
+        bg = result["bgSvg"]
+        assert result["bgFill"] == "rgb(22,29,38)"
+        assert "rgb(255,255,255)" not in bg
+        assert 'id="layout-photo"' in bg and "<image" in bg
+        assert bg.index("rgb(22,29,38)") < bg.index("<image")
+
+    def test_hidden_master_objects_not_drawn_over_slide_fill(self):
+        result = split_slide_components(_write_svg(self._SVG), 2)
+
+        assert result["bgFill"] == "rgb(22,29,38)"
+        assert "<image" not in result["bgSvg"]
+
+    def test_hidden_master_objects_not_drawn_over_master_fill(self):
+        result = split_slide_components(_write_svg(self._SVG), 3)
+
+        assert result["bgFill"] == "rgb(255,255,255)"
+        assert "<image" not in result["bgSvg"]
+
+
 class TestTextLengthStripped:
     """textLength / lengthAdjust are removed so WebKit does not squash glyphs."""
 

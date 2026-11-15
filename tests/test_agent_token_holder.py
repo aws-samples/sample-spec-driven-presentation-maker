@@ -3,7 +3,7 @@
 """A session's MCP clients read the latest JWT per request and restart an ended session.
 
 agent/token_holder.py (TokenHolder, HolderAuth) and mcp_clients.ReconnectingMCPClient.
-The MCP side runs in memory (FastMCP), so a restart is a real new MCP session.
+The MCP side runs in memory (MCPServer), so a restart is a real new MCP session.
 """
 
 import asyncio
@@ -12,9 +12,9 @@ import json
 import threading
 
 import anyio
-import httpx
+import httpx2
 import pytest
-from mcp.server.fastmcp import FastMCP
+from mcp.server.mcpserver import MCPServer
 
 from agent_modules import load
 
@@ -29,7 +29,7 @@ def _holder(sub="user-1", n=0):
 
 
 def _client(holder, handler):
-    return httpx.Client(transport=httpx.MockTransport(handler), auth=load("token_holder").HolderAuth(holder))
+    return httpx2.Client(transport=httpx2.MockTransport(handler), auth=load("token_holder").HolderAuth(holder))
 
 
 def test_each_request_carries_the_latest_token():
@@ -38,7 +38,7 @@ def test_each_request_carries_the_latest_token():
 
     def handler(request):
         seen.append(request.headers["Authorization"])
-        return httpx.Response(200)
+        return httpx2.Response(200)
 
     with _client(holder, handler) as client:
         client.get("https://mcp.test/")
@@ -57,8 +57,8 @@ def test_a_401_is_retried_once_with_a_newer_token():
         seen.append(request.headers["Authorization"])
         if len(seen) == 1:
             holder.set(_jwt("user-1", 1))  # a turn swapped the token while the request ran
-            return httpx.Response(401)
-        return httpx.Response(200)
+            return httpx2.Response(401)
+        return httpx2.Response(200)
 
     with _client(holder, handler) as client:
         assert client.get("https://mcp.test/").status_code == 200
@@ -73,7 +73,7 @@ def test_a_401_without_a_newer_token_is_not_retried():
 
     def handler(request):
         calls.append(request)
-        return httpx.Response(401)
+        return httpx2.Response(401)
 
     with _client(holder, handler) as client:
         assert client.get("https://mcp.test/").status_code == 401
@@ -102,8 +102,8 @@ def test_a_holder_needs_its_owners_token():
 # --- ReconnectingMCPClient ---------------------------------------------------
 
 
-def _server(calls: list, entered: threading.Event | None = None) -> FastMCP:
-    server = FastMCP("fake-presentation-maker")
+def _server(calls: list, entered: threading.Event | None = None) -> MCPServer:
+    server = MCPServer("fake-presentation-maker")
 
     async def echo(text: str) -> str:
         calls.append(text)
@@ -121,7 +121,7 @@ def _server(calls: list, entered: threading.Event | None = None) -> FastMCP:
     return server
 
 
-def _reconnecting(server: FastMCP):
+def _reconnecting(server: MCPServer):
     from test_agent_tool_exposure import _in_memory_transport
 
     mcp_clients = load("mcp_clients")

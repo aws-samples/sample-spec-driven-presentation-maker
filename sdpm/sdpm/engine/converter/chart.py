@@ -3,6 +3,8 @@
 """Chart extraction."""
 from pptx.enum.chart import XL_CHART_TYPE
 
+from sdpm.engine.schema.chart import chart_fingerprint
+
 from .constants import _base_element, _hex
 from .color import _resolve_scheme_color
 
@@ -24,6 +26,10 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
         XL_CHART_TYPE.DOUGHNUT: ("donut", False, False),
     }
     chart_type, stacked, horizontal = type_map.get(ct, ("bar", False, False))
+    # The builder can make this chart again from its JSON only when chartType
+    # describes it: one plot of a mapped type. Anything else (area, radar, 100%
+    # stacked, combo charts…) is read as a bar chart and only _chartXml keeps it.
+    rebuildable = ct in type_map and len(chart.plots) == 1
     elem["chartType"] = chart_type
     if stacked:
         elem["stacked"] = True
@@ -31,6 +37,13 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
         elem["horizontal"] = True
     if ct == XL_CHART_TYPE.LINE:
         elem["markers"] = False
+    if chart_type == "line":
+        # c:smooth with no val attribute means true (CT_Boolean default)
+        ns_sm = {'c': 'http://schemas.openxmlformats.org/drawingml/2006/chart'}
+        for sm in chart._chartSpace.findall('.//c:lineChart/c:ser/c:smooth', ns_sm):
+            if sm.get('val', '1') in ('1', 'true'):
+                elem["smooth"] = True
+                break
 
     # Title
     if chart.has_title:
@@ -120,6 +133,8 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
                 elem["_chartUserShapes"] = rel.target_part.blob.decode('utf-8')
                 break
         elem["series"] = [{"name": "", "values": [1]}]  # dummy for builder
+        elem["_chartFingerprint"] = chart_fingerprint(elem)
+        elem["_chartRebuildable"] = False
         return elem
 
     # Per-point colors (dPt)
@@ -261,6 +276,10 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
     try:
         from lxml import etree as _et
         elem["_chartXml"] = _et.tostring(chart._chartSpace, encoding='unicode')
+        # Lets the builder tell an edited chart from an unedited one
+        elem["_chartFingerprint"] = chart_fingerprint(elem)
+        if not rebuildable:
+            elem["_chartRebuildable"] = False
         # Save chartUserShapes (text overlays on chart)
         for rel in chart.part.rels.values():
             if rel.reltype.endswith('/chartUserShapes'):

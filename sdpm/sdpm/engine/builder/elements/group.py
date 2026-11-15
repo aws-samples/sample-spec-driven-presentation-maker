@@ -1,7 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
 """Group and arch-group elements."""
+from sdpm.engine.accessibility import write_element_metadata
 from sdpm.engine.builder.constants import ARCH_GROUP_DEFS
+from sdpm.engine.schema.regions import is_comment_element
+from sdpm.utils import xml_safe
 
 
 class GroupMixin:
@@ -12,9 +15,8 @@ class GroupMixin:
         # If raw group XML is available, inject directly for lossless roundtrip
         group_xml = elem.get("_groupXml")
         if group_xml:
-            from lxml import etree
             from pptx.oxml.ns import qn
-            grp_el = etree.fromstring(group_xml)
+            grp_el = xml_safe.fromstring(group_xml)
             # Re-attach images referenced from inside the group: the source
             # rIds are meaningless in this package, so add each saved image
             # as a part of the new slide and rewrite r:embed/r:link.
@@ -22,7 +24,11 @@ class GroupMixin:
             spTree = slide._element.find(qn('p:cSld')).find(qn('p:spTree'))
             spTree.append(grp_el)
             return
+        sp_tree = slide.shapes._spTree
         for sub_elem in elem.get("elements", []):
+            if is_comment_element(sub_elem):
+                continue
+            n_before = len(sp_tree)
             sub_type = sub_elem.get("type")
             if sub_type == "group":
                 self._add_group(slide, sub_elem)
@@ -40,6 +46,19 @@ class GroupMixin:
                 self._add_line(slide, sub_elem)
             elif sub_type == "chart":
                 self._add_chart(slide, sub_elem)
+            elif sub_type == "table":
+                self._add_table(slide, sub_elem)
+            elif sub_type == "video":
+                self._add_video(slide, sub_elem)
+            elif sub_type == "rawShape":
+                self._add_raw_shape(slide, sub_elem)
+            else:
+                import sys
+                print(f"Warning: unknown element type {sub_type!r} inside group skipped",
+                      file=sys.stderr)
+            # alt / decorative go on the child's own shape (see add_slide).
+            if len(sp_tree) > n_before and (sub_type != "group" or sub_elem.get("_groupXml")):
+                write_element_metadata(sp_tree[n_before], sub_elem)
     
     def _sanitize_injected_xml(self, xml_el):
         """Replace OLE graphicFrames in injected raw XML with their fallback picture.
@@ -108,9 +127,8 @@ class GroupMixin:
         shape_xml = elem.get("_shapeXml")
         if not shape_xml:
             return
-        from lxml import etree
         from pptx.oxml.ns import qn
-        sp_el = etree.fromstring(shape_xml)
+        sp_el = xml_safe.fromstring(shape_xml)
         self._reattach_xml_images(slide, sp_el, elem.get("_shapeImages"))
         spTree = slide._element.find(qn('p:cSld')).find(qn('p:spTree'))
         spTree.append(sp_el)

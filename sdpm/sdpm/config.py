@@ -6,6 +6,7 @@
 import json
 import os
 import sys
+import tempfile
 from pathlib import Path
 from typing import Optional
 
@@ -154,5 +155,61 @@ def update_state(key: str, value: object) -> None:
         with open(state_path) as f:
             state = json.load(f)
     state[key] = value
-    with open(state_path, "w") as f:
-        json.dump(state, f, ensure_ascii=False, indent=2)
+    _write_state(state_path, state)
+
+
+def _write_state(state_path: Path, state: dict) -> None:
+    """Write state.json atomically: a temp file in the same directory, then os.replace.
+
+    The local MCP server and the local Web UI share this file, so a reader must never
+    see it half written.
+    """
+    fd, tmp = tempfile.mkstemp(dir=state_path.parent, prefix=".state.", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w") as f:
+            json.dump(state, f, ensure_ascii=False, indent=2)
+        os.replace(tmp, state_path)
+    except BaseException:
+        Path(tmp).unlink(missing_ok=True)
+        raise
+
+
+# Legacy (<= 0.17): builtin notes lived in the analysis cache entry
+# template_metadata["builtin:<name>"].description. The Web UI mirrors this
+# migration in web-ui/src/lib/local/sdpmPaths.ts (getBuiltinTemplateNotes).
+_LEGACY_BUILTIN_PREFIX = "builtin:"
+
+
+def get_builtin_template_notes() -> dict[str, str]:
+    """Per-user notes on builtin templates: ``{template name: note}``.
+
+    Stored in state.json under ``builtin_template_notes``, apart from the
+    regenerable analysis cache — the local counterpart of the cloud's
+    ``BUILTIN_NOTE#<name>`` items. Notes still in the legacy location are moved
+    here on first read (best effort: a read-only config dir keeps them readable
+    without the rewrite).
+
+    A legacy note wins over one already in the new section: once a note has been
+    moved, only a <= 0.17 install (sharing this state.json) writes the legacy
+    location again, so a note found there is the newer edit.
+    """
+    state = get_state()
+    notes = dict(state.get("builtin_template_notes") or {})
+    metadata = state.get("template_metadata") or {}
+    migrated = False
+    for key, entry in metadata.items():
+        if not key.startswith(_LEGACY_BUILTIN_PREFIX) or not isinstance(entry, dict) or "description" not in entry:
+            continue
+        note = entry.pop("description")
+        name = key[len(_LEGACY_BUILTIN_PREFIX):]
+        if isinstance(note, str) and note.strip():
+            notes[name] = note.strip()
+        migrated = True
+    if migrated:
+        state["builtin_template_notes"] = notes
+        state["template_metadata"] = metadata
+        try:
+            _write_state(get_user_config_dir() / "state.json", state)
+        except OSError:
+            pass
+    return notes

@@ -30,6 +30,7 @@ vi.mock("@/services/deckService", () => ({ createReview }))
 vi.mock("@/hooks/useChatStream", () => ({
   useChatStream: () => ({
     messages: [], isLoading: streamState.isLoading, stopping: false, reconnecting: false, sendMessage, stopGeneration: vi.fn(),
+    steerQueue: [], dismissSteer: vi.fn(), arrivedSteerIds: new Set(),
   }),
 }))
 
@@ -130,7 +131,10 @@ describe("StyleChatPanel change request", () => {
 
   it("puts the frames back when the agent does not take the steer", async () => {
     streamState.isLoading = true
-    sendMessage.mockResolvedValue(false)
+    sendMessage.mockImplementation(async (...args: unknown[]) => {
+      (args[4] as { onSteerFailed?: () => void } | undefined)?.onSteerFailed?.()
+      return false
+    })
     renderPanel()
     addSaved("2", "bigger")
     await requestChanges("overall")

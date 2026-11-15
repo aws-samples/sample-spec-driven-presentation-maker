@@ -265,6 +265,7 @@ export default function DecksPage() {
                 onDelete={list.handleDelete}
                 onToggleVisibility={list.handleToggleVisibility}
                 onDownload={list.handleDownload}
+                onOpenPptx={list.handleOpenPptx}
                 onOpenFolder={list.handleOpenFolder}
                 loading={list.loading}
                 selection={deckSelection}

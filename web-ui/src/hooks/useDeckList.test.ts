@@ -17,6 +17,7 @@ vi.mock("@/services/deckService", () => ({
   updateVisibility: vi.fn(),
   deleteDeck: vi.fn(),
   toggleFavorite: vi.fn(),
+  downloadDeckPptx: vi.fn(),
 }))
 
 import * as deckService from "@/services/deckService"
@@ -119,5 +120,38 @@ describe("useDeckList — translated action errors", () => {
     const { result } = renderHook(() => useDeckList("token", true, null), { wrapper: intlWrapper(locale) })
     await waitFor(() => expect(result.current.loading).toBe(false))
     expect(result.current.error).toBe(expected)
+  })
+})
+
+describe("useDeckList — PPTX download from the list", () => {
+  beforeEach(() => {
+    api.listDecks.mockResolvedValue({ decks: [], favoriteIds: [] } as never)
+    api.listPublicDecks.mockResolvedValue([] as never)
+    api.listFavorites.mockResolvedValue([] as never)
+  })
+
+  afterEach(() => {
+    vi.clearAllMocks()
+  })
+
+  it("asks the API for any listed deck (public and favorite tabs included)", async () => {
+    api.downloadDeckPptx.mockResolvedValue(undefined)
+    const { result } = renderHook(() => useDeckList("token", true, null), { wrapper: intlWrapper() })
+    act(() => result.current.handleDownload("someone-elses"))
+    expect(api.downloadDeckPptx).toHaveBeenCalledWith("someone-elses", "token")
+  })
+
+  it("reports a failed download with the translated message", async () => {
+    api.downloadDeckPptx.mockRejectedValue(new Error("Failed to get PPTX URL: 404"))
+    vi.spyOn(console, "error").mockImplementation(() => {})
+    const { result } = renderHook(() => useDeckList("token", true, null), { wrapper: intlWrapper() })
+    act(() => result.current.handleDownload("d1"))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(en.decksPage.errorDownloadPptx, undefined))
+  })
+
+  it("does nothing without a token", () => {
+    const { result } = renderHook(() => useDeckList(undefined, false, null), { wrapper: intlWrapper() })
+    act(() => result.current.handleDownload("d1"))
+    expect(api.downloadDeckPptx).not.toHaveBeenCalled()
   })
 })

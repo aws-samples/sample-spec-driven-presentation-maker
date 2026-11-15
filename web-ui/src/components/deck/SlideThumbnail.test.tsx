@@ -39,7 +39,7 @@ describe("SlideThumbnail — aspect ratio agnostic", () => {
       <SlideThumbnail src="/test.png" alt="slide 1" index={0} />
     )
     const outerDiv = container.firstChild as HTMLElement
-    expect(outerDiv.style.aspectRatio).toBe("16/9")
+    expect(outerDiv.style.aspectRatio.replace(/\s+/g, "")).toBe("16/9")
   })
 
   it("updates aspect ratio from image naturalWidth/naturalHeight on load", () => {
@@ -55,7 +55,7 @@ describe("SlideThumbnail — aspect ratio agnostic", () => {
     fireEvent.load(img)
 
     const outerDiv = container.firstChild as HTMLElement
-    expect(outerDiv.style.aspectRatio).toBe("1920/1440")
+    expect(outerDiv.style.aspectRatio.replace(/\s+/g, "")).toBe("1920/1440")
   })
 
   it("updates aspect ratio to 16:9 dimensions on load", () => {
@@ -70,7 +70,7 @@ describe("SlideThumbnail — aspect ratio agnostic", () => {
     fireEvent.load(img)
 
     const outerDiv = container.firstChild as HTMLElement
-    expect(outerDiv.style.aspectRatio).toBe("1920/1080")
+    expect(outerDiv.style.aspectRatio.replace(/\s+/g, "")).toBe("1920/1080")
   })
 
   it("maintains absolute inset-0 structure for skeleton contract", () => {
@@ -158,7 +158,7 @@ describe("SlideThumbnail — HTML previews", () => {
     expect(container.querySelector("img")).toBeNull()
     const frame = container.querySelector("iframe")
     expect(frame?.getAttribute("sandbox")).toBe("")
-    expect((container.firstChild as HTMLElement).style.aspectRatio).toBe("1280/960")
+    expect((container.firstChild as HTMLElement).style.aspectRatio.replace(/\s+/g, "")).toBe("1280/960")
     expect(onAspectRatio).toHaveBeenCalledWith(1280 / 960)
   })
 

@@ -2,14 +2,13 @@
 // SPDX-License-Identifier: MIT-0
 /** Local Builtin Template Note API — per-user notes stored in state.json.
  *
- * Mirrors the cloud `PATCH /templates/builtin/<name>` endpoint. Notes live
- * under `template_metadata["builtin:<name>"].description` — the same key the
- * templates listing already uses for builtin analysis caches — so servers/local
- * and the L1 CLI pick them up through the engine without extra plumbing.
+ * Mirrors the cloud `PATCH /templates/builtin/<name>` endpoint. Notes live in
+ * their own `builtin_template_notes` section (see getBuiltinTemplateNotes), which
+ * servers/local and the L1 CLI read through sdpm.config.get_builtin_template_notes.
  */
 import fs from "fs"
 import path from "path"
-import { getState, updateState, BUNDLED_TEMPLATES_DIR } from "@/lib/local/sdpmPaths"
+import { setBuiltinTemplateNote, BUNDLED_TEMPLATES_DIR } from "@/lib/local/sdpmPaths"
 
 export async function PATCH(req: Request, { params }: { params: Promise<{ name: string }> }) {
   const { name } = await params
@@ -33,18 +32,8 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ name: 
     return Response.json({ error: "Template not found" }, { status: 404 })
   }
 
-  const state = getState()
-  const templateMetadata = (state.template_metadata as Record<string, Record<string, unknown>>) || {}
-  const key = `builtin:${name}`
   const description = body.description.trim()
-
-  if (description) {
-    templateMetadata[key] = { ...templateMetadata[key], description }
-  } else if (templateMetadata[key]) {
-    // Clear the note but keep the analysis cache (theme_colors etc.) intact.
-    delete templateMetadata[key].description
-  }
-  updateState("template_metadata", templateMetadata)
+  setBuiltinTemplateNote(name, description)
 
   return Response.json({ updated: name, description })
 }

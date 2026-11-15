@@ -23,6 +23,8 @@ from collections.abc import Callable, Iterable, Mapping
 
 from lxml import etree
 
+from sdpm.utils import xml_safe
+
 from . import AssetsNotInstalledError, resolve_asset_path
 
 #: A catalog icon id: ``<source>/<name>``, one slash, no path traversal.
@@ -34,8 +36,8 @@ _BODY_RE = re.compile(r"<body\b[^>]*>", re.IGNORECASE)
 _FIRST_SLIDE_RE = re.compile(r"""<div\s+class\s*=\s*["']slide[\s"']""", re.IGNORECASE)
 
 _XLINK_HREF = "{http://www.w3.org/1999/xlink}href"
-_PARSER = etree.XMLParser(resolve_entities=False, no_network=True, remove_comments=True,
-                          remove_pis=True, huge_tree=False)
+_PARSER = etree.XMLParser(resolve_entities=False, no_network=True, load_dtd=False,
+                          remove_comments=True, remove_pis=True, huge_tree=False)
 _DROP_ELEMENTS = {"script", "foreignObject", "style"}
 _ROOT_SKIP_ATTRS = {"width", "height", "x", "y", "id", "class", "version", "viewBox"}
 _URL_REF_RE = re.compile(r"url\(\s*(['\"]?)#([^)'\"]+)\1\s*\)")
@@ -78,7 +80,7 @@ def load_catalog_icons(ids: Iterable[str]) -> dict[str, bytes]:
 def icon_symbol(icon_id: str, svg: bytes) -> str | None:
     """A ``<symbol id=icon_id>`` drawn from a catalog SVG, or None when it is not an SVG."""
     try:
-        root = etree.fromstring(svg, _PARSER)
+        root = xml_safe.fromstring(svg, allow_doctype=True, parser=_PARSER)
     except etree.XMLSyntaxError:
         return None
     if not isinstance(root.tag, str) or etree.QName(root).localname != "svg":

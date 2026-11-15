@@ -289,7 +289,9 @@ class Smoke:
         self.git("clone", "-q", "--branch", "main", str(self.mirror), str(work))
         lock = (work / "uv.lock").read_text(encoding="utf-8")
         orig = re.search(r'name = "idna"\nversion = "([^"]+)"', lock).group(1)
-        pin = "3.10"
+        # Any idna other than the lock's that the tree still accepts (httpx2, via mcp 2.x,
+        # needs >= 3.18).
+        pin = "3.18"
         check(orig != pin, "pick another version")
         pyproject = (work / "pyproject.toml").read_text(encoding="utf-8")
         check("[tool.uv.workspace]" in pyproject, "no [tool.uv.workspace] in pyproject.toml")

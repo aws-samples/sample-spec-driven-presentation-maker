@@ -11,6 +11,7 @@ import fs from "fs"
 import path from "path"
 import os from "os"
 
+import { resolveWithin } from "./contained"
 import { getConfiguredOutputDir } from "./sdpmPaths"
 
 /**
@@ -65,13 +66,10 @@ export function readSlideSize(deckJson: Record<string, unknown>): { width: numbe
 
 /**
  * Resolve a full path under a deck (deckId + subpath segments).
- * Returns null if any segment escapes the deck directory.
+ * Returns null if any segment, or a symlink on the way, escapes the deck directory
+ * (see resolveWithin; a missing file comes back as its lexical path).
  */
 export function resolveDeckPath(deckId: string, ...subpath: string[]): string | null {
   const dir = resolveDeckDir(deckId)
-  if (!dir) return null
-
-  const full = path.resolve(dir, ...subpath)
-  if (full !== dir && !full.startsWith(dir + path.sep)) return null
-  return full
+  return dir ? resolveWithin(dir, ...subpath) : null
 }

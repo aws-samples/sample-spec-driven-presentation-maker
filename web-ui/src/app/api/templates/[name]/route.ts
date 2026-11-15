@@ -4,6 +4,7 @@
 import fs from "fs"
 import path from "path"
 import { getUserConfigDir, BUNDLED_TEMPLATES_DIR } from "@/lib/local/sdpmPaths"
+import { resolveWithin } from "@/lib/local/contained"
 
 function findTemplate(name: string): string | null {
   const filename = name.endsWith(".pptx") ? name : `${name}.pptx`
@@ -11,14 +12,10 @@ function findTemplate(name: string): string | null {
   if (path.basename(filename) !== filename) return null
 
   const userDir = path.join(getUserConfigDir(), "templates")
-  if (fs.existsSync(userDir)) {
-    // nosemgrep: path-join-resolve-traversal — basename validated above, startsWith check below
-    const userPath = path.resolve(userDir, filename)
-    if (userPath.startsWith(fs.realpathSync(userDir) + path.sep) && fs.existsSync(userPath)) return userPath
-  }
-  // nosemgrep: path-join-resolve-traversal — basename validated above, startsWith check below
-  const bundledPath = path.resolve(BUNDLED_TEMPLATES_DIR, filename)
-  if (bundledPath.startsWith(BUNDLED_TEMPLATES_DIR + path.sep) && fs.existsSync(bundledPath)) return bundledPath
+  const userPath = resolveWithin(userDir, filename)
+  if (userPath && fs.existsSync(userPath)) return userPath
+  const bundledPath = resolveWithin(BUNDLED_TEMPLATES_DIR, filename)
+  if (bundledPath && fs.existsSync(bundledPath)) return bundledPath
   return null
 }
 

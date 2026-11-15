@@ -13,6 +13,225 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Security
+
+- **One explicit XML parser for content from outside the repository.** Template and
+  imported PPTX parts, the XML fragments a slide JSON carries for round trips, and SVG
+  files are parsed through `sdpm.utils.xml_safe`, which states its settings instead of
+  relying on the installed lxml's defaults: no entity substitution, no DTD loading, no
+  network access, normal size limits. A DOCTYPE or entity declaration is refused outside
+  SVG. SVG keeps its DOCTYPE and may declare short plain-text entities, as Adobe
+  Illustrator does for its namespace URIs; external, nested or markup-bearing entities are
+  refused. A refused file is named in the error. Attached SVGs are also parsed with DTDs
+  refused.
+
+### Added
+
+- **A writing guide for Japanese decks (`writing-ja`).** For a Japanese deck the
+  orchestrator reads it before writing the outline, and composers read it before writing any
+  slide text in every pass, in both PPTX and HTML. It says how headlines, bullets, diagram labels and speaker notes are
+  written: headlines state the slide's claim (or the lead does, when the style splits a topic
+  title from a claim lead), a list's items end the same way, items are
+  shortened from full sentences without losing who does what, notes are polite spoken
+  Japanese, no em dashes or metaphor verbs, full-width Japanese punctuation, ・ only for
+  listing words, numbered headings as a number, a period and a space, one spelling
+  per term. Its symbol rules take precedence over the symbols in a style's examples. The
+  guide is in Japanese. Local mode and the AWS stack (SdpmData and SdpmRuntime).
+- **HTML decks get the same CJK↔Latin spacing as PPTX.** The PPTX builder puts a
+  half-width space between Japanese (or other CJK) letters and Latin letters or digits; HTML
+  decks kept the text as the composer wrote it. `output.html` and the slide previews now
+  get those spaces too, also where emphasis or a link meets Japanese text
+  (`<strong>AWS</strong>の`). Code, preformatted text, scripts, styles, form fields, inline
+  SVG and MathML and attribute values are left as written, and the slide files are not
+  changed. `"autoSpacing": false` in deck.json turns it off, as for PPTX. Local mode and the
+  AWS stack (SdpmRuntime).
+- **Local Web UI file access stays inside its data directories after symlinks are
+  resolved.** The preview, deck list, deck detail, PPTX download, template download, style
+  detail, change request and "open in app" endpoints, and the deck's chat files (`.session`,
+  `.session-engine`, `.session-origin.json`, `.chat.json`), check the real path of both the
+  data directory and the file, with a separator boundary, through one shared helper. A
+  symlink leading out of the deck root, the templates or the styles directory is refused the
+  same way as any other path outside it, for reads and for the chat-file and change-request
+  writes; a file that does not exist yet is created only where its directory resolves inside.
+  Files inside, including symlinks that stay inside, are served as before. User templates
+  are now also found when the config directory itself is reached through a symlink.
+- **Accessibility metadata in built PPTX files.** Any element takes `alt` (written as the
+  shape's alt text, `p:cNvPr@descr`) or `decorative: true` (PowerPoint's "Mark as
+  decorative"), so images, icons, charts, tables and videos can pass PowerPoint's
+  Accessibility Checker. `deck.json` takes `title` and `language` (BCP 47), written to the
+  document properties; without `title` the first slide's title text is used. Importing a
+  PPTX reads all of them back. Elements without `alt` are built as before.
+
+### Changed
+
+- **The MCP servers run on MCP Python SDK 2.x** (`mcp>=2.3,<3`, was `<2`; #301). The local
+  stdio server, the ACP server, the remote streamable-HTTP server and the Cloud agent's MCP
+  clients move from `FastMCP` to `MCPServer` and from `httpx` to `httpx2`; the agent drops
+  the `bedrock-agentcore[strands-agents]` extra, which capped `mcp` below 2. Tools, their
+  schemas and results are unchanged, and a failing tool still returns its reason to the
+  agent (`Error executing tool <name>: <reason>`), including the text of an unexpected
+  exception as in 1.x; the server now also logs such an exception at ERROR with its
+  traceback. Differences you can see: tool descriptions lose their docstring indentation
+  (about 270 characters fewer across the 20 local tools), the
+  `initialize` result of a 2025-era connection no longer lists the MCP Apps extension under
+  the server's capabilities (the SDK sends only fields that protocol version defines; MCP
+  Apps hosts negotiate by their own declaration, and a 2026-07-28 `server/discover` result
+  still lists it), `serverInfo.version` is empty instead of the SDK's version, and the
+  remote server refuses a request body over 4 MiB with HTTP 413. Cloud deployments
+  redeploy SdpmRuntime and SdpmAgent to pick it up.
+
+- **Local notes on builtin templates have their own place in `state.json`.** They moved
+  from the analysis cache (`template_metadata["builtin:<name>"].description`) to
+  `builtin_template_notes`, so the cache can be rebuilt without losing them — the same
+  split as the cloud's `BUILTIN_NOTE#` items. Existing notes move over on the first
+  template listing (CLI, local MCP server or local Web UI); nothing to do. A 0.17 or older
+  install that shares the same `state.json` (a dev checkout next to a release, or a rollback)
+  no longer shows the moved notes; a note it edits moves over again on the next listing.
+  `sdpm.api.list_templates_with_metadata` takes the notes as a `builtin_notes` argument
+  instead of reading them from the cache (#222).
+
+### Fixed
+
+- **A background compose that ends as the work stops is always reported.** When a
+  compose was cancelled (Stop) or finished just as the session checked whether anything was
+  still running, the session could go idle without its `taskEnd`: the compose card stayed
+  running after Stop, an `/invocations` client never got the task's result, and a finished
+  compose started no wake turn, so its report waited for the next prompt (#636). The session
+  now checks the tasks once more before it goes idle. AWS stack (SdpmAgent).
+- **No automatic space next to Japanese punctuation.** The CJK↔Latin spacing treated
+  Japanese punctuation and full-width symbols like letters, so `DBは、DBを` built as
+  `DB は、 DB を`, `A・B` as `A ・ B` and `AWS／Azure` as `AWS ／ Azure`, in slide text and
+  speaker notes. Punctuation such as 、。・「」（）／：〜 now takes no space on either side,
+  and half-width `: ; , . ! ?` stays attached to the Japanese word before it (`例: 説明`
+  no longer builds as `例 : 説明`). Local mode and the AWS stack (SdpmRuntime).
+- **Quotes and apostrophes no longer gain spaces.** The CJK↔Latin spacing put a space
+  around every `'` `"` `` ` `` it counted as a quote, whatever stood next to it, in English
+  text too: `It's` built as `It 's`, `AWS What's New` as `What 's New`, `the "best" option`
+  with doubled spaces and `"hi".` as `"hi" .`; a deck rebuilt from its own output gained
+  more each time. A quote now takes a space only on its outside and only toward a Japanese
+  letter (`"AWS"の` → `"AWS" の`), and `'` between two Latin letters or digits is an
+  apostrophe. `<` `>` are spaced like brackets (`<ファイル名>` keeps no inner space), and
+  non-ASCII Latin letters count as Latin text (`Caféで` → `Café で`). Local mode and the
+  AWS stack (SdpmRuntime).
+- **Styling no longer changes where the spaces go.** Spaces are computed over a whole
+  paragraph, so a bold or coloured run, a link, or an HTML inline element gets the same
+  spaces as the same text without styling: `{{bold:サーバー}})` no longer builds as
+  `サーバー )`, and a link next to Japanese text is spaced like plain text. Superscript and
+  subscript runs (`baseline=`, `<sup>`, `<sub>`) and ruby text (`<rt>`) take no spaces
+  inside or at their edges, so `説明<sup>1</sup>です` keeps its footnote marker attached. Local mode and the AWS stack
+  (SdpmRuntime).
+- **Chart text gets the same spacing.** A native chart's title, category names and series
+  names get the CJK↔Latin spacing of slide text (`AWSの利用料` → `AWS の利用料`), and keep
+  their text as written with `"autoSpacing": false`. Local mode and the AWS stack
+  (SdpmRuntime).
+- **PPTX import keeps every `rotation3d` preset and an orthographic rotation.** The
+  presets `perspective-bottom`, `perspective-left-most` and `perspective-right-most` were
+  dropped on import (#631), and a free rotation with `perspective: 0` came back without
+  `perspective`, so a rebuild showed it at the default 120° (#632).
+- **Imported `lumMod` / `lumOff` colors match PowerPoint.**
+  Gradient stops on an `srgbClr` and system colors (`sysClr`) scaled RGB instead of HSL
+  luminance, so `4F81BD` at lumMod 75% came out `3B608D` instead of `376092` (#633). Fills
+  of theme table styles dropped `lumMod` / `lumOff` and mixed `tint` / `shade` in sRGB.
+  These colors and every other transformed fill, line and text color now share one
+  implementation, which rounds each channel instead of truncating it (transformed colors
+  can move by 1 per channel). Table borders and table text from a theme table style still
+  ignore color transforms.
+- **Built decks no longer inherit the template's document properties.** A deck kept its
+  template's author and last editor, description, created / modified dates and revision
+  (`docProps/core.xml`), the template's slide titles and word counts (`docProps/app.xml`)
+  and the bundled templates' custom properties (`docProps/custom.xml`). The builder now
+  clears them and dates the deck at build time. A user template's custom properties, such
+  as a sensitivity label, are kept.
+
+- **Edits to a read-back chart show up in the rebuilt PPTX.** `pptx_to_json` keeps each
+  chart's original XML in `_chartXml` so an unedited chart rebuilds exactly, but the builder
+  restored that XML even after the chart's JSON (values, categories, series names and
+  colours, title, axes, labels) had been edited, so the edits were lost. The converter now
+  also writes `_chartFingerprint`, and the builder restores `_chartXml` only while the
+  chart's fields still match it; an edited chart is built from its JSON, keeping the text
+  drawn over it (`_chartUserShapes`) but not the styling the JSON does not describe. Moving
+  or resizing a chart counts as unedited. A chart whose type or combination of plots
+  `chartType` cannot describe (area, radar, 100% stacked, a column chart with a line plot,
+  and so on) is marked `_chartRebuildable: false` and keeps its original chart when edited;
+  the build reports `chart-edit-ignored` for it, and deleting `_chartXml` builds it from its
+  JSON instead. JSON converted before this change has no fingerprint and rebuilds as before;
+  convert the PPTX again to edit its charts. Local mode and the AWS stack (SdpmRuntime).
+- **Smooth line charts read back as `smooth: true`.** The converter did not read `c:smooth`,
+  so a smooth line chart rebuilt from `--minimal` JSON came back with straight segments.
+  Local mode and the AWS stack (SdpmRuntime).
+- **A slow first start of Chrome or Edge no longer fails the HTML browser check.** The
+  check gave the local browser a fixed 15 s to start and reported `failed` (`could not run
+  … DevTools did not start within 15 s`) when a first start on a fresh machine took longer,
+  even with most of the check's time budget left. The start now may take what is left of
+  that budget (`min(30 + 3 × slides, 110)` s, unchanged), and a browser that does not start
+  in time is named in the note (`Google Chrome did not start within N s`). A check that
+  runs out of time after a slow start says how long the start took. Local mode (#625).
+
+## [0.17.0] - 2026-11-13
+
+The Web UI question card asks one question at a time: chips across the top show every
+question, each option has a one-line description, and the agent's recommendation carries a
+"Recommended" badge. The card shows again in the Local Web UI. `fit: "contain"` images sit
+in the middle of their box, and tables and videos inside a group survive a read-back.
+
+### Upgrading from 0.16
+
+**Cloud deployments.**
+
+- Deploy all stacks (`scripts/deploy.sh`), in any order, and the Web UI
+  (`scripts/deploy_webui.sh`). Nothing in `infra/config.yaml` changes.
+
+### Changed
+
+- **The Web UI question card shows one question at a time.** Header chips across the top
+  show every question and how far you are; click one to jump to it. Options are rows with
+  a label, a one-line description and a "Recommended" badge, with radio marks for single
+  choice and check boxes for multiple choice, and the card adds an "Other" choice with a
+  text field. A single choice moves on by itself; number keys pick, Enter moves on and
+  ⌘↵ / Ctrl+↵ sends once the card has focus. After you send, or when you reply in the chat
+  instead, the card folds into a short summary of your answers. The `hearing` tool now
+  takes at most four questions, each with a short `header` and options as
+  `{label, description, recommended}`, and no longer takes `inference`; the agent shares
+  its hypothesis as the recommended option. Cards in older chats still show. Local mode
+  and the AWS stack (SdpmAgent, SdpmRuntime for the import-pptx guide, and the Web UI).
+
+### Fixed
+
+- **Local Web UI: the question card shows again.** kiro-cli (engine V3) sends an MCP
+  tool's input either wrapped as `{tool_id, arguments}` or as the arguments themselves; the
+  Local Web UI read only the wrapped form, so a direct call reached the chat with an empty
+  input and the question card never showed. Both forms are read now. Local mode only.
+- **The `blank-light` title layout's subtitle prompt reads "Subtitle".** It read
+  "Sustitle"; it now matches `blank-dark`. Only the empty-placeholder prompt changes —
+  layout and placeholder names, and existing decks, are untouched.
+- **`fit: "contain"` images sit in the middle of their box.** When a picture's aspect ratio
+  differed from its `width` × `height` box, the PPTX placed it at the box's top-left corner
+  and left the whole gap below or to the right. It is now centered in the box, as CSS
+  `object-fit: contain` does; `cover` and `stretch` are unchanged.
+- **Tables and videos inside a group are written to the PPTX.** The builder skipped a
+  `table`, `video` or `rawShape` child of a `group` without a word, so a deck read back
+  with `pptx_to_json` (which keeps them inside their group) lost them on the next build.
+  They are now added like any other child, and a child of an unknown type is reported on
+  stderr instead of vanishing. `pptx_to_json` also scales a grouped table's `colWidths` and
+  `rowHeights` with the group, as it already did its frame, so a table in a resized group
+  rebuilds at its shown size. Local mode and the AWS stack (SdpmRuntime).
+
+## [0.16.0] - 2026-11-12
+
+You can now ask for changes to your own styles by commenting on their slides, as on a deck,
+and download a deck's PPTX straight from the deck list.
+Creating a style no longer times out: the style author saves one slide at a time, and the
+preview shows each save right away. A message sent while the agent works waits as a card
+above the input until the agent reads it. Slide previews show the template's background
+pictures again, and several chart and shape properties survive a read-back.
+
+### Upgrading from 0.15
+
+**Cloud deployments.**
+
+- Deploy all stacks (`scripts/deploy.sh`), in any order. Nothing in `infra/config.yaml`
+  changes.
+
 ### Added
 
 - **Object animations and slide transitions, opt-in per deck.** A slide JSON file can now
@@ -63,9 +282,44 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   frames areas of a style's slides like on a deck; the frames collect above the style chat
   and are sent together, and the style agent changes only the commented slides. Desktop,
   Local mode and the AWS stack.
+- **Download a deck's PPTX from the deck list.** Each deck card's menu (`…`) has
+  "Download PPTX", which saves the file as `<deck title>.pptx` without opening the deck; it
+  is greyed out until the deck has a built PPTX (and for HTML decks). Works on the My Decks,
+  Favorites and Internal tabs. In Local mode "Open PPTX" stays next to it. The deck list
+  response carries `hasPptx` instead of a URL; the link is signed only when you click
+  (`GET /decks/{id}/pptx`, same read permission as opening the deck). Local mode and the
+  AWS stack.
+
+### Changed
+
+- **Messages sent while the agent works wait above the input until the agent reads them.**
+  In the Web UI chat (decks and styles), such a message clears the input at once and shows
+  as a card above it: "Sending…", then waiting for the agent's next step. Several stack in
+  sent order, including ones sent from another tab. When the agent reads one, the card
+  becomes a normal message at that point in the chat, the reply continues below it, and the
+  bubble is highlighted briefly; the "Sent while the agent works" / "Read by the agent"
+  labels are gone. A message the agent never got (stopped first) stays as a "Not delivered"
+  card with "Back to input" and dismiss. If the message cannot be sent, its text goes back
+  into the input. Local mode and the AWS stack.
 
 ### Fixed
 
+- **Slide previews show the template's background pictures again.** On a slide with its
+  own background, which every slide of a styled deck has (`defaultBackground`), the Web UI
+  preview and the MCP Apps viewer drew only the solid colour and left out the layout's
+  pictures, logo and footer that the PNG thumbnail shows. They are now drawn over that
+  colour, and a slide that hides the master's shapes (`hideMasterShapes`) no longer shows
+  them in the preview. Existing decks pick it up when their slides are rendered again (for
+  example, ask the agent to re-measure every slide). Local mode and the AWS stack (SdpmRuntime).
+- **A downloaded PPTX is named after the deck.** The Web UI saved it under a random
+  `<uuid>.pptx` (its storage key); it is now `<deck title>.pptx`, Japanese and other
+  non-ASCII titles included (path separators, quotes and control characters are dropped,
+  the name is cut at 120 characters, and an empty title gives `deck.pptx`). The download
+  still comes through CloudFront (inside its WAF): the signed link carries the file name,
+  and a new cache policy for `pptx/*` passes it on to S3. AWS stack (deploy SdpmWebUi;
+  Local mode too, for the download from the deck list).
+- **Enter on a deck card's menu button opens the menu, not the deck.** The key also reached
+  the card (and so did keys pressed in its menu), which opened the deck instead.
 - **Chart titles keep their font colour and size when a deck is read back.** `pptx_to_json`
   looked for the title font only on the title's first run, but generated charts (and many
   others) set it on the paragraph, so `titleFontColor` and `titleFontSize` were dropped.
@@ -107,8 +361,7 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   style list loaded before that save, so each change appeared only after the next save or a
   reload.
 - The style chat empties its input as soon as a message is sent. It used to keep the text
-  until the agent finished its reply; a message sent while the agent works and not taken by
-  it still stays in the input.
+  until the agent finished its reply.
 
 ## [0.15.0] - 2026-11-12
 
@@ -2274,7 +2527,9 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.15.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.17.0...HEAD
+[0.17.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.16.0...v0.17.0
+[0.16.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.14.0...v0.15.0
 [0.14.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.13.0...v0.14.0
 [0.13.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.12.0...v0.13.0

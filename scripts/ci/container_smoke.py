@@ -21,14 +21,14 @@ from urllib.parse import urlsplit
 
 async def _mcp(url: str) -> str:
     from mcp import ClientSession
-    from mcp.client.streamable_http import streamablehttp_client
+    from mcp.client.streamable_http import streamable_http_client
 
-    async with streamablehttp_client(url) as (read, write, _), ClientSession(read, write) as session:
+    async with streamable_http_client(url) as (read, write), ClientSession(read, write) as session:
         init = await session.initialize()
         tools = await session.list_tools()
     if not tools.tools:
         raise RuntimeError("tools/list returned no tools")
-    return f"{init.serverInfo.name}: {len(tools.tools)} tools"
+    return f"{init.server_info.name}: {len(tools.tools)} tools"
 
 
 def _ping(url: str) -> str:

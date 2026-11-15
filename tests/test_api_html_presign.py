@@ -17,6 +17,7 @@ from api.html_presign import (
     DEFAULT_SLIDE_SIZE,
     PURPOSES,
     VIEW_EXPIRY,
+    attachment_disposition,
     html_presign_client,
     html_slide_slugs,
     is_html_deck,
@@ -126,6 +127,46 @@ def test_disposition_header_never_breaks_out():
     assert "\r" not in disposition and "\n" not in disposition
     assert disposition.count('"') == 2
     assert 'filename="x; filename=evil.exeSet-Cookie: a=b.html"' in disposition
+
+
+# --- PPTX download names ---------------------------------------------------------
+
+
+@pytest.mark.parametrize("name, expected", [
+    ("四半期レビュー", "四半期レビュー.pptx"),
+    ("Q3 Review.pptx", "Q3 Review.pptx"),
+    ("Q3 Review.PPTX", "Q3 Review.pptx"),
+    ("", "deck.pptx"),
+    ("../a/b", "ab.pptx"),
+    ("a\nb", "ab.pptx"),
+])
+def test_safe_download_name_pptx(name, expected):
+    assert safe_download_name(name, ".pptx") == expected
+
+
+def test_safe_download_name_pptx_is_bounded():
+    name = safe_download_name("資" * 500, ".pptx")
+    assert name == "資" * 120 + ".pptx"
+
+
+def test_pptx_disposition_mixed_title_keeps_ascii_fallback():
+    disposition = attachment_disposition("営業資料 Q3 2026", ".pptx")
+    assert disposition.startswith('attachment; filename="Q3 2026.pptx"; filename*=UTF-8\'\'')
+    assert disposition.isascii()
+
+
+def test_pptx_disposition_percent_encodes_reserved_characters():
+    assert attachment_disposition("A (draft)*!", ".pptx") == (
+        "attachment; filename=\"A (draft)*!.pptx\"; filename*=UTF-8''A%20%28draft%29%2A%21.pptx"
+    )
+
+
+def test_pptx_disposition_never_breaks_out():
+    disposition = attachment_disposition('x"; filename="evil.exe\r\nSet-Cookie: a=b', ".pptx")
+    assert disposition.isascii()
+    assert "\r" not in disposition and "\n" not in disposition
+    assert disposition.count('"') == 2
+    assert disposition.endswith(".pptx")
 
 
 # --- signed URL on the regional S3 endpoint --------------------------------------

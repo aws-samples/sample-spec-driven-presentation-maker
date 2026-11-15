@@ -28,7 +28,7 @@ describe("HtmlDeckPlayer", () => {
   it("follows the deck aspect ratio", () => {
     renderWithIntl(<HtmlDeckPlayer htmlUrl={URL_1} slideSize={{ width: 1280, height: 960 }} />)
     const wrapper = screen.getByTitle("HTML deck").parentElement as HTMLElement
-    expect(wrapper.style.aspectRatio).toBe("1280/960")
+    expect(wrapper.style.aspectRatio.replace(/\s+/g, "")).toBe("1280/960")
   })
 
   it("keeps the loaded deck when only the signature changes, reloads on a new build", () => {

@@ -63,6 +63,7 @@ interface DeckListViewProps {
   onDelete: (deckId: string) => void
   onToggleVisibility?: (deckId: string, visibility: "public" | "private") => void
   onDownload?: (deckId: string) => void
+  onOpenPptx?: (deckId: string) => void
   onOpenFolder?: (deckId: string) => void
   loading: boolean
   /** Multi-select (bulk delete). Provided only when the active tab allows it. */
@@ -91,7 +92,7 @@ export function visibleDecks(decks: DeckSummary[], searchQuery: string): DeckSum
 export function DeckListView({
   decks, activeTab, onTabChange, searchQuery, onSearchChange,
   searchResults, searching, onDeckOpen, onNewDeck, favoriteIds,
-  onToggleFavorite, onDelete, onToggleVisibility, onDownload, onOpenFolder, loading,
+  onToggleFavorite, onDelete, onToggleVisibility, onDownload, onOpenPptx, onOpenFolder, loading,
   selection,
 }: DeckListViewProps) {
   const t = useTranslations("deckList")
@@ -224,6 +225,7 @@ export function DeckListView({
                   onDelete={onDelete}
                   onToggleVisibility={onToggleVisibility}
                   onDownload={onDownload}
+                  onOpenPptx={onOpenPptx}
                   onOpenFolder={onOpenFolder}
                   selectable={canSelect}
                   selectionMode={selecting}

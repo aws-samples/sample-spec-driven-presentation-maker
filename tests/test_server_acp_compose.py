@@ -12,7 +12,7 @@ import os
 import re
 
 import pytest
-from mcp.shared.memory import create_connected_server_and_client_session
+from mcp.client import Client
 
 from agent_modules import load
 from test_tool_descriptions import _LOCAL, _ROOT, _load, _tools
@@ -85,7 +85,7 @@ def deck(root):
 
 def _call(module, name: str, args: dict):
     async def run():
-        async with create_connected_server_and_client_session(module.mcp) as session:
+        async with Client(module.mcp, mode="legacy") as session:
             return await session.call_tool(name, args)
 
     return asyncio.run(run())
@@ -142,12 +142,12 @@ def test_tbd_outline_dispatches_with_the_warning(acp, root):
     assert result["spec_warnings"] == ["outline.md contains [TBD]"]
 
 
-# --- Over MCP: FastMCP parses and validates first ---------------------------------------
+# --- Over MCP: MCPServer parses and validates first ---------------------------------------
 
 
 def test_valid_call_over_mcp(acp, deck):
     result = _call(acp, "compose_slides", {"deck_id": str(deck), "slide_groups": _GROUPS})
-    assert not result.isError
+    assert not result.is_error
     assert json.loads(result.content[0].text)["status"] == "dispatched"
 
 
@@ -159,7 +159,7 @@ def test_slide_groups_as_a_json_string_is_parsed(acp, deck):
 
     as_list = _call(acp, "compose_slides", {"deck_id": str(deck), "slide_groups": _GROUPS})
     as_string = _call(acp, "compose_slides", {"deck_id": str(deck), "slide_groups": json.dumps(_GROUPS)})
-    assert not as_string.isError
+    assert not as_string.is_error
     assert strip(as_string) == strip(as_list)
 
 
@@ -172,15 +172,15 @@ def test_slide_groups_as_a_json_string_is_parsed(acp, deck):
     ],
     ids=["no-instruction", "slugs-string", "slug-not-string"],
 )
-def test_type_errors_are_fastmcp_validation_errors(acp, deck, groups):
+def test_type_errors_are_mcpserver_validation_errors(acp, deck, groups):
     result = _call(acp, "compose_slides", {"deck_id": str(deck), "slide_groups": groups})
-    assert result.isError
+    assert result.is_error
     assert "validation error for compose_slidesArguments" in result.content[0].text
 
 
 def test_message_composer_type_error_is_a_validation_error(acp):
     result = _call(acp, "message_composer", {"group": "x", "text": "hi"})
-    assert result.isError
+    assert result.is_error
     assert "validation error for message_composerArguments" in result.content[0].text
 
 
@@ -334,7 +334,7 @@ def test_local_differences(acp_tools):
 
 
 def test_parameter_descriptions(cloud, acp_tools):
-    local = acp_tools["compose_slides"].inputSchema
+    local = acp_tools["compose_slides"].input_schema
     cloud_props = cloud["compose_slides"]["inputSchema"]["json"]["properties"]
     assert local["properties"]["deck_id"]["description"] == "Deck directory path."
     assert local["properties"]["slide_groups"]["description"] == cloud_props["slide_groups"]["description"]
@@ -343,7 +343,7 @@ def test_parameter_descriptions(cloud, acp_tools):
     for field in ("slugs", "instruction"):
         assert group[field]["description"] == cloud_props["slide_groups"]["items"]["properties"][field]["description"]
 
-    local_msg = acp_tools["message_composer"].inputSchema["properties"]
+    local_msg = acp_tools["message_composer"].input_schema["properties"]
     cloud_msg = cloud["message_composer"]["inputSchema"]["json"]["properties"]
     for field in ("group", "text"):
         assert _norm(local_msg[field]["description"]) == _norm(cloud_msg[field]["description"])
@@ -356,7 +356,7 @@ def test_parameter_descriptions(cloud, acp_tools):
 def test_description_rules(acp_tools, name):
     tool = acp_tools[name]
     desc = tool.description or ""
-    assert all(p.get("description") for p in tool.inputSchema["properties"].values())
+    assert all(p.get("description") for p in tool.input_schema["properties"].values())
     assert not re.search(r"^\s*(Args|Returns):", desc, re.M)
     assert len(desc) <= _DESC_MAX[name], len(desc)
     assert not re.search(r"\b[Cc]all (it|this) (first|before)|[Cc]all first|Start here", desc)

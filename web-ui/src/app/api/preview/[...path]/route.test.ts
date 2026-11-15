@@ -15,6 +15,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest"
 type Route = typeof import("./route")
 
 let root: string
+let outside: string
 let GET: Route["GET"]
 let savedRoot: string | undefined
 
@@ -44,6 +45,13 @@ beforeAll(async () => {
   write("d1/output.pptx", "PK")
   write("d1/notes.txt", "x")
   write("other.html", "<!doctype html>")
+  // A sibling whose name extends the root's (`<root>-evil`), and links into it from the deck
+  outside = `${root}-evil`
+  fs.mkdirSync(outside)
+  fs.writeFileSync(path.join(outside, "secret.png"), PNG)
+  fs.symlinkSync(path.join(outside, "secret.png"), path.join(root, "d1", "preview", "leak.png"))
+  fs.symlinkSync(outside, path.join(root, "d1", "linked"))
+  fs.symlinkSync(path.join(root, "d1", "preview", "png", "cover.png"), path.join(root, "d1", "preview", "alias.png"))
   vi.resetModules()
   GET = (await import("./route")).GET
 })
@@ -52,6 +60,7 @@ afterAll(() => {
   if (savedRoot === undefined) delete process.env.SDPM_DECK_ROOT
   else process.env.SDPM_DECK_ROOT = savedRoot
   fs.rmSync(root, { recursive: true, force: true })
+  fs.rmSync(outside, { recursive: true, force: true })
 })
 
 describe("GET /api/preview/[...path]", () => {
@@ -80,6 +89,20 @@ describe("GET /api/preview/[...path]", () => {
   it("refuses paths outside the deck", async () => {
     expect((await get("d1", "..", "other.html")).status).toBe(403)
     expect((await get("..", "other.html")).status).toBe(403)
+  })
+
+  it("refuses a symlink in the deck that points outside the deck root", async () => {
+    expect((await get("d1", "preview", "leak.png")).status).toBe(403)
+    expect((await get("d1", "linked", "secret.png")).status).toBe(403)
+  })
+
+  it("refuses a sibling directory whose name starts with the root's", async () => {
+    expect((await get("d1", "..", "..", `${path.basename(root)}-evil`, "secret.png")).status).toBe(403)
+  })
+
+  it("serves a symlink that stays inside the deck, and 404s a missing file", async () => {
+    expect((await get("d1", "preview", "alias.png")).status).toBe(200)
+    expect((await get("d1", "preview", "missing.png")).status).toBe(404)
   })
 
   it("serves a PNG as image/png", async () => {

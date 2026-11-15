@@ -11,7 +11,7 @@
  * preview collect in a draft bar above the input, and one send turns them and the typed text
  * into a change request message (`createRequest` of the provider), sent like any message.
  * A steer the agent did not take puts the frames back into the drafts and the text back into
- * an empty input.
+ * an empty input. Steers the agent has not read yet wait as cards above the input (SteerQueue).
  */
 
 "use client"
@@ -19,9 +19,10 @@
 import { useEffect, useRef, useCallback, useState } from "react"
 import { useTranslations } from "next-intl"
 import { useAuth } from "@/hooks/useAuth"
-import { useChatStream, type ToolUseCallbackData } from "@/hooks/useChatStream"
+import { useChatStream, type SendMessageOptions, type ToolUseCallbackData } from "@/hooks/useChatStream"
 import { ChatInput, type ChatInputHandle } from "./ChatInput"
 import { ChatMessage } from "./ChatMessage"
+import { SteerQueue } from "./SteerQueue"
 import { FileDropZone } from "./FileDropZone"
 import { generateSessionId, setAgentConfig } from "@/services/agentCoreService"
 import { IS_LOCAL } from "@/lib/mode"
@@ -113,7 +114,8 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved, onLoadin
     uploadedFiles: UploadedFile[],
     snippets: { label: string; text: string }[],
     attachments: { fileName: string; fileType: string }[],
-  ): Promise<void | false> | void => {
+    steer?: Pick<SendMessageOptions, "inputText" | "onSteerFailed">,
+  ): void => {
     let fullMessage = text
     // First message on an existing style: name it so the agent writes that style.
     // A new style (no styleId yet) is named by the agent; the parent follows its first save.
@@ -128,15 +130,24 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved, onLoadin
       const snippetInfo = snippets.map((s) => `---snippet---\n${s.text}\n---/snippet---`).join("\n\n")
       fullMessage = `${fullMessage}\n\n${snippetInfo}`
     }
-    // Agent working: a steer. A steer that was not accepted keeps the input, so ChatInput waits
-    // for its answer. Any other send returns at once: sendMessage settles only when the turn
-    // ends, and ChatInput clears the input after the Promise it is given.
-    if (stream.isLoading) {
-      return stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments).then((ok) => (ok ? undefined : false))
-    }
-    void stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments)
+    // Returns at once (sendMessage settles only when the turn ends), so ChatInput clears the
+    // input; a steer that could not be sent calls `onSteerFailed`.
+    void stream.sendMessage(fullMessage, uploadedFiles, snippets, attachments, steer)
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [stream.sendMessage, stream.isLoading, styleId])
+  }, [stream.sendMessage, styleId])
+
+  /**
+   * Put a steer's text back into the input: after the text there, when it has some. Later than
+   * ChatInput clearing the input after the send it came from.
+   */
+  const putBackIntoInput = useCallback((text: string) => {
+    setTimeout(() => {
+      const input = chatInputRef.current
+      if (!input || !text.trim()) return
+      const current = input.textareaRef.current?.value ?? ""
+      input.replaceText(current.trim() ? `${current.trimEnd()}\n\n${text}` : text)
+    }, 0)
+  }, [])
 
   useEffect(() => {
     onLoadingChange?.(stream.isLoading)
@@ -155,8 +166,9 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved, onLoadin
 
   /**
    * Send from the input. A plain send goes straight to `handleSend` (not wrapped in a
-   * promise, so the input clears as `handleSend` allows). With comments waiting, the typed text
-   * becomes the request's note and the request message is sent instead.
+   * promise, so the input clears at once; a steer that could not be sent puts its text back).
+   * With comments waiting, the typed text becomes the request's note and the request message is
+   * sent instead.
    */
   const handleInputSend = useCallback((
     text: string,
@@ -165,7 +177,9 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved, onLoadin
     attachments: { fileName: string; fileType: string }[],
   ) => {
     const r = reviewRef.current
-    if (!hasReviewDrafts || !r) return handleSend(text, uploadedFiles, snippets, attachments)
+    if (!hasReviewDrafts || !r) {
+      return handleSend(text, uploadedFiles, snippets, attachments, { inputText: text, onSteerFailed: () => putBackIntoInput(text) })
+    }
     return (async (): Promise<void | false> => {
       let created: SubmittedReview
       try {
@@ -174,17 +188,15 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved, onLoadin
         notifyError(tReview("sendFailed"), err)
         return false
       }
-      void Promise.resolve(handleSend(created.message, uploadedFiles, snippets, attachments)).then((ok) => {
-        if (ok !== false) return
-        created.restore()
-        // Later than ChatInput clearing the input after this send.
-        setTimeout(() => {
-          const input = chatInputRef.current
-          if (text.trim() && input && !input.textareaRef.current?.value.trim()) input.replaceText(text)
-        }, 100)
+      handleSend(created.message, uploadedFiles, snippets, attachments, {
+        inputText: text,
+        onSteerFailed: () => {
+          created.restore()
+          putBackIntoInput(text)
+        },
       })
     })()
-  }, [hasReviewDrafts, handleSend, tReview])
+  }, [hasReviewDrafts, handleSend, putBackIntoInput, tReview])
 
   const isInitial = stream.messages.length === 0
 
@@ -239,10 +251,8 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved, onLoadin
                   idToken={auth.user?.id_token}
                   onSend={(text: string) => handleSend(text, [], [], [])}
                   hearingDisabled={i < lastUserIdx}
+                  arrived={!!msg.steerId && stream.arrivedSteerIds.has(msg.steerId)}
                 />
-                {msg.steerNotDelivered && (
-                  <p className="mt-1 text-right text-xs text-foreground-muted">{tChat("steerNotDelivered")}</p>
-                )}
               </div>
             ))
             })()}
@@ -256,6 +266,15 @@ export function StyleChatPanel({ styleId, onStyleWritten, onStyleSaved, onLoadin
           {stream.stopping ? tChat("stopping") : tChat("reconnecting")}
         </p>
       )}
+
+      <SteerQueue
+        steers={stream.steerQueue}
+        onBackToInput={(steer, text) => {
+          stream.dismissSteer(steer.id)
+          putBackIntoInput(text)
+        }}
+        onDismiss={stream.dismissSteer}
+      />
 
       <ChatInput
         ref={chatInputRef}

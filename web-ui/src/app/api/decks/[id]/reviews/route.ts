@@ -9,14 +9,17 @@
 
 import fs from "fs"
 import path from "path"
+import { resolveWithin } from "@/lib/local/contained"
 import { readSlideSize, resolveDeckDir } from "@/lib/local/deck-paths"
 import { rejectCrossSite } from "@/lib/local/requestGuard"
 import { loadReviewTemplate } from "@/lib/local/reviewTemplate"
 import { buildReviewFile, buildReviewMessage, MAX_BODY_BYTES, newReviewId, validateReviewSubmission } from "@/lib/review/schema"
 
 function readDeckJson(dp: string): Record<string, unknown> {
+  const file = resolveWithin(dp, "deck.json")
+  if (!file) return {}
   try {
-    const data = JSON.parse(fs.readFileSync(path.join(dp, "deck.json"), "utf-8")) as unknown // nosemgrep: path-join-resolve-traversal — dp validated by resolveDeckDir
+    const data = JSON.parse(fs.readFileSync(file, "utf-8")) as unknown
     return typeof data === "object" && data !== null && !Array.isArray(data) ? data as Record<string, unknown> : {}
   } catch {
     return {}
@@ -52,7 +55,9 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
   if (!result.ok) return Response.json({ error: result.error }, { status: 400 })
 
   const template = loadReviewTemplate()
-  const reviewsDir = path.join(dp, "reviews") // nosemgrep: path-join-resolve-traversal — dp validated by resolveDeckDir
+  // A `reviews` symlink pointing out of the deck would have the loop below empty that directory.
+  const reviewsDir = resolveWithin(dp, "reviews")
+  if (!reviewsDir) return Response.json({ error: "Deck not found" }, { status: 404 })
   fs.mkdirSync(reviewsDir, { recursive: true })
   for (const entry of fs.readdirSync(reviewsDir, { withFileTypes: true })) {
     if (!entry.isDirectory()) fs.unlinkSync(path.join(reviewsDir, entry.name)) // nosemgrep: path-join-resolve-traversal — entry name from readdir of a validated dir

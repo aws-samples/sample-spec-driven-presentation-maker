@@ -164,7 +164,8 @@ def pptx_to_json(
             result["slides"].append(slide_dict)
 
     # Write deck.json (fonts + defaultTextColor; template is caller's responsibility)
-    deck_meta: dict = {}
+    from sdpm.engine.accessibility import read_document_properties
+    deck_meta: dict = read_document_properties(prs)  # title / language, when set
     if "fonts" in result:
         deck_meta["fonts"] = result["fonts"]
     if "defaultTextColor" in result:
