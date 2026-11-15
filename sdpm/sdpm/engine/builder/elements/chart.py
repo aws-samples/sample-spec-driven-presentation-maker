@@ -30,6 +30,16 @@ class ChartMixin:
         smooth = elem.get("smooth", False)
         title = elem.get("title")
         style = elem.get("style", {})
+        if getattr(self, "auto_spacing", True):
+            # Same CJK↔Latin spacing as slide text: title, category and series names.
+            from sdpm.utils.text import normalize_spacing
+            if isinstance(title, str):
+                title = normalize_spacing(title)
+            categories = [normalize_spacing(c) if isinstance(c, str) else c for c in categories]
+            series_defs = [
+                {**s, "name": normalize_spacing(s["name"])} if isinstance(s.get("name"), str) else s
+                for s in series_defs
+            ]
     
         # Style overrides (all optional, sensible defaults applied)
         style_gridline_color = style.get("gridlineColor")

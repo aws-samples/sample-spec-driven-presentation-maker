@@ -35,59 +35,75 @@ def is_cjk_punctuation(char):
 # Half-width punctuation that attaches to the word before it (「例: 説明」, 「完了!」):
 # no space between a CJK letter and one of these.
 ASCII_TRAILING_PUNCTUATION = frozenset(':;,.!?')
+_OPEN_BRACKETS = frozenset('([{<')
+_CLOSE_BRACKETS = frozenset(')]}>')
+_QUOTES = frozenset('"\'`')
+
+
+def _is_halfwidth(c):
+    """Latin-script text that takes a space next to CJK letters: printable ASCII and
+    non-ASCII Latin letters (é ü ñ ...) with their combining marks."""
+    cp = ord(c)
+    return (0x21 <= cp <= 0x7E
+            or (0xC0 <= cp <= 0x24F and cp not in (0xD7, 0xF7))  # Latin-1 letters, Latin Extended-A/B
+            or 0x0300 <= cp <= 0x036F                             # combining diacritical marks
+            or 0x1E00 <= cp <= 0x1EFF)                            # Latin Extended Additional
+
+
+def _is_wide(c):
+    """CJK letters (kanji, kana, full-width alphanumerics), not CJK punctuation."""
+    return is_fullwidth(c) and not is_cjk_punctuation(c)
+
+
+def _quote_roles(text):
+    """Map the index of each quote character to 'open' or 'close'.
+
+    A ``'`` between two Latin letters or digits is an apostrophe (It's, O'Reilly) and is
+    not a quote. Each quote character pairs up with itself in order of appearance."""
+    roles, seen = {}, {}
+    for i, ch in enumerate(text):
+        if ch not in _QUOTES:
+            continue
+        if (ch == "'" and 0 < i < len(text) - 1
+                and _is_halfwidth(text[i - 1]) and text[i - 1].isalnum()
+                and _is_halfwidth(text[i + 1]) and text[i + 1].isalnum()):
+            continue
+        roles[i] = 'open' if seen.get(ch, 0) % 2 == 0 else 'close'
+        seen[ch] = seen.get(ch, 0) + 1
+    return roles
+
+
+def spacing_points(text):
+    """Indices ``i`` after which a half-width space goes between ``text[i]`` and ``text[i + 1]``.
+
+    A space goes between a CJK letter and Latin text, either way round. Brackets and quotes
+    take it on their outside only: none after an opening one, none before a closing one.
+    None goes next to Japanese punctuation, and none before half-width ``: ; , . ! ?``
+    following a CJK letter. The rule only looks at the two characters and the quote
+    pairing, so applying it again adds nothing."""
+    roles = _quote_roles(text)
+    points = []
+    for i in range(len(text) - 1):
+        a, b = text[i], text[i + 1]
+        if _is_halfwidth(a) and _is_wide(b):
+            if a not in _OPEN_BRACKETS and roles.get(i) != 'open':
+                points.append(i)
+        elif _is_wide(a) and _is_halfwidth(b):
+            if (b not in _CLOSE_BRACKETS and roles.get(i + 1) != 'close'
+                    and b not in ASCII_TRAILING_PUNCTUATION):
+                points.append(i)
+    return points
 
 
 def normalize_spacing(text):
-    """半角と全角の間に半角スペースを挿入（括弧内側・日本語の約物の隣・CJK 直後の半角 : ; , . ! ? は除外）"""
-    open_br = set('([{「『（【〔《〈')
-    close_br = set(')]}」』）】〕》〉')
-    quotes = set('"\'`')
-
-    def is_ascii(c):
-        return '\x21' <= c <= '\x7e'
-
-    def is_wide(c):
-        return (is_fullwidth(c) and not is_cjk_punctuation(c)
-                and c not in open_br and c not in close_br)
-
-    quote_positions = {q: [] for q in quotes}
-    for i, ch in enumerate(text):
-        if ch in quotes:
-            quote_positions[ch].append(i)
-
-    def is_opening_quote(pos, ch):
-        if ch not in quotes:
-            return False
-        positions = quote_positions[ch]
-        idx = positions.index(pos)
-        return idx % 2 == 0
-
-    def is_closing_quote(pos, ch):
-        if ch not in quotes:
-            return False
-        positions = quote_positions[ch]
-        idx = positions.index(pos)
-        return idx % 2 == 1
-
-    result = []
-    for i, ch in enumerate(text):
-        result.append(ch)
-        if i + 1 >= len(text):
-            continue
-
-        next_ch = text[i + 1]
-
-        if is_closing_quote(i, ch) and next_ch not in open_br and not is_opening_quote(i + 1, next_ch):
-            result.append(' ')
-        elif is_opening_quote(i + 1, next_ch) and ch not in open_br and not is_opening_quote(i, ch):
-            result.append(' ')
-        elif is_ascii(ch) and is_wide(next_ch) and ch not in open_br and not is_opening_quote(i, ch):
-            result.append(' ')
-        elif (is_wide(ch) and is_ascii(next_ch) and next_ch not in close_br
-              and next_ch not in ASCII_TRAILING_PUNCTUATION and not is_closing_quote(i + 1, next_ch)):
-            result.append(' ')
-
-    return ''.join(result)
+    """半角と全角の間に半角スペースを挿入（括弧・引用符の内側、日本語の約物の隣、CJK 直後の半角 : ; , . ! ? は除外）"""
+    out, last = [], 0
+    for i in spacing_points(text):
+        out.append(text[last:i + 1])
+        out.append(' ')
+        last = i + 1
+    out.append(text[last:])
+    return ''.join(out)
 
 
 def _flatten_nested_styles(text):
@@ -227,12 +243,17 @@ def parse_styled_text(text, auto_spacing=True):
     text = _flatten_nested_styles(text)
     link_pattern = r'\{\{(?:(\d+pt),)?link:([^}]+)\}\}'
     segments = []
+    kinds = []
     last_end = 0
+
+    def add_plain(part):
+        segs, ks = _parse_non_link_raw(part)
+        segments.extend(segs)
+        kinds.extend(ks)
 
     for match in re.finditer(link_pattern, text):
         if match.start() > last_end:
-            plain_part = text[last_end:match.start()]
-            segments.extend(_parse_non_link_styles(plain_part, auto_spacing=auto_spacing))
+            add_plain(text[last_end:match.start()])
 
         size_attr = match.group(1)  # e.g. "14pt" or None
         content = match.group(2)
@@ -256,27 +277,65 @@ def parse_styled_text(text, auto_spacing=True):
             except ValueError:
                 pass
         segments.append(seg)
+        kinds.append('text')
 
         last_end = match.end()
 
     if last_end < len(text):
-        segments.extend(_parse_non_link_styles(text[last_end:], auto_spacing=auto_spacing))
+        add_plain(text[last_end:])
 
-    return segments if segments else [{"text": text}]
+    if not segments:
+        return [{"text": text}]
+    if auto_spacing:
+        _space_segments(segments, kinds)
+    return segments
+
+
+def _space_segments(segments, kinds):
+    """Insert CJK↔Latin spaces into ``segments`` in place, computed over their joined text so a
+    paragraph gets the same spaces whatever its styling. A space at a boundary goes at the end
+    of the segment before it. ``kinds[i]`` is ``'text'``; ``'verbatim'`` (no space inside it,
+    its edges are spaced, e.g. ``font=`` runs); or ``'break'`` (no space inside or at its
+    edges, e.g. superscript and subscript runs)."""
+    owner, start = [], []
+    for idx, seg in enumerate(segments):
+        start.append(len(owner))
+        owner.extend([idx] * len(seg["text"]))
+    joined = "".join(seg["text"] for seg in segments)
+    inserts = {}
+    for p in spacing_points(joined):
+        a, b = owner[p], owner[p + 1]
+        if kinds[a] == 'break' or kinds[b] == 'break':
+            continue
+        if a == b and kinds[a] == 'verbatim':
+            continue
+        inserts.setdefault(a, []).append(p - start[a] + 1)
+    for idx, cuts in inserts.items():
+        t = segments[idx]["text"]
+        for cut in sorted(cuts, reverse=True):
+            t = t[:cut] + ' ' + t[cut:]
+        segments[idx]["text"] = t
 
 
 def _parse_non_link_styles(text, auto_spacing=True):
     """Parse non-link styled text."""
+    segments, kinds = _parse_non_link_raw(text)
+    if auto_spacing:
+        _space_segments(segments, kinds)
+    return segments
+
+
+def _parse_non_link_raw(text):
+    """Parse non-link styled text into segments (text as written) and their spacing kinds."""
     pattern = r'\{\{([^:}]+):((?:\\}|[^}])+)\}\}'
     segments = []
+    kinds = []
     last_end = 0
 
     for match in re.finditer(pattern, text):
         if match.start() > last_end:
-            plain_text = text[last_end:match.start()]
-            if auto_spacing:
-                plain_text = normalize_spacing(plain_text)
-            segments.append({"text": plain_text})
+            segments.append({"text": text[last_end:match.start()]})
+            kinds.append('text')
 
         raw_attrs = match.group(1)
         inner_text = match.group(2).replace('\\}', '}')
@@ -288,7 +347,6 @@ def _parse_non_link_styles(text, auto_spacing=True):
             inner_text = inner_text[8:]  # skip "#RRGGBB:"
         attrs = raw_attrs.split(',')
         has_font = any(a.startswith('font=') for a in attrs)
-        inner_text = inner_text if (has_font or not auto_spacing) else normalize_spacing(inner_text)
         segment = {"text": inner_text}
 
         for attr in attrs:
@@ -321,35 +379,14 @@ def _parse_non_link_styles(text, auto_spacing=True):
                 segment["highlight"] = attr[10:]
 
         segments.append(segment)
+        kinds.append('break' if segment.get("baseline") else 'verbatim' if has_font else 'text')
         last_end = match.end()
 
     if last_end < len(text):
-        plain_text = text[last_end:]
-        if auto_spacing:
-            plain_text = normalize_spacing(plain_text)
-        segments.append({"text": plain_text})
+        segments.append({"text": text[last_end:]})
+        kinds.append('text')
 
-    if not auto_spacing:
-        return segments
-
-    for i in range(len(segments) - 1):
-        cur_text = segments[i]["text"]
-        nxt_text = segments[i + 1]["text"]
-        if not cur_text or not nxt_text:
-            continue
-        last_ch, first_ch = cur_text[-1], nxt_text[0]
-
-        def is_ascii(c: str) -> bool:
-            return '\x21' <= c <= '\x7e'
-
-        def is_wide(c: str) -> bool:
-            return is_fullwidth(c) and not is_cjk_punctuation(c)
-
-        if (is_ascii(last_ch) and is_wide(first_ch)) or (
-                is_wide(last_ch) and is_ascii(first_ch) and first_ch not in ASCII_TRAILING_PUNCTUATION):
-            segments[i]["text"] = cur_text + ' '
-
-    return segments
+    return segments, kinds
 
 
 def _expand_styled_newlines(text):
