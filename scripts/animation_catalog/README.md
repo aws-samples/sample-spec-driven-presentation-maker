@@ -22,7 +22,7 @@ Two checked-in artefacts, with different owners:
 
 | File | Owner | Role |
 | --- | --- | --- |
-| `sdpm/references/catalogs/powerpoint-gui-surface-16.113.1.json` | hand-maintained | the versioned **expected universe**: every GUI control/value with its discovery evidence, persistence flag, verification method and expected disposition, plus the assignment of all 435 scripting candidates to a GUI surface |
+| `scripts/animation_catalog/powerpoint-gui-surface-16.113.1.json` | hand-maintained | the versioned **expected universe**: every GUI control/value with its discovery evidence, persistence flag, verification method and expected disposition, plus the assignment of all 435 scripting candidates to a GUI surface |
 | `sdpm/references/catalogs/powerpoint-animation-catalog.json` | generated | the **derived catalog**: full semantic JSON, OOXML mapping metadata, capability level, evidence and provenance per entry |
 
 `generate.py` writes the second file and the generated candidate arrays inside `powerpoint.applescript`. The manifest is never written by a script, which is what lets `--check` catch drift in either direction (REQ-7.4).

@@ -374,7 +374,7 @@ class CapabilityEntry:
 
 
 class CapabilityIndex:
-    """Indexed view over the 1.2 MB capability catalog.
+    """Indexed view over the 2.9 MB capability catalog.
 
     The catalog is parsed once per process (see :func:`load_capability_index`)
     and reduced to dictionaries, so generating a deck never rescans the
@@ -556,7 +556,7 @@ def load_capability_index(path: str | Path | None = None) -> CapabilityIndex:
     """Return the process-wide capability index for the catalog at ``path``.
 
     The parse is cached, so repeated slide generation never re-reads or
-    re-walks the 1.2 MB catalog document.
+    re-walks the 2.9 MB catalog document.
     """
     return _load_index(str(path or default_catalog_path()))
 
@@ -964,7 +964,7 @@ class TimingWriter:
         """Return the capability index, parsing the catalog on first use.
 
         An ordinary deck has no animations, so :meth:`build` returns before it
-        needs a single catalog value. Loading the 1.2 MB document in
+        needs a single catalog value. Loading the 2.9 MB document in
         ``__init__`` would charge every non-animated slide for a feature it
         does not use, so the parse is deferred to the first lookup.
         """

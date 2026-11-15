@@ -32,7 +32,7 @@ from typing import Any
 
 REPO_ROOT = Path(__file__).resolve().parents[2]
 DEFAULT_SDEF = Path("/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef")
-DEFAULT_MANIFEST = REPO_ROOT / "sdpm/references/catalogs/powerpoint-gui-surface-16.113.1.json"
+DEFAULT_MANIFEST = Path(__file__).resolve().parent / "powerpoint-gui-surface-16.113.1.json"
 DEFAULT_CATALOG = REPO_ROOT / "sdpm/references/catalogs/powerpoint-animation-catalog.json"
 
 #: The checked-in scripting-oracle capture. ``--write`` folds it into the

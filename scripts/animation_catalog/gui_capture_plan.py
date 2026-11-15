@@ -94,7 +94,9 @@ from typing import Any, Iterable, Sequence
 REPO_ROOT = Path(__file__).resolve().parents[2]
 CATALOG_DIR = REPO_ROOT / "sdpm" / "references" / "catalogs"
 DEFAULT_CATALOG = CATALOG_DIR / "powerpoint-animation-catalog.json"
-DEFAULT_MANIFEST = CATALOG_DIR / "powerpoint-gui-surface-16.113.1.json"
+#: Hand-maintained input to the generator, so it lives beside it rather than
+#: under ``references/``, which ships with every install and image.
+DEFAULT_MANIFEST = Path(__file__).resolve().parent / "powerpoint-gui-surface-16.113.1.json"
 DEFAULT_TEMPLATE = REPO_ROOT / "sdpm" / "templates" / "blank-dark.pptx"
 
 #: The driver this plan feeds.

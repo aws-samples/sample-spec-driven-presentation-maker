@@ -55,7 +55,7 @@ from sdpm.engine.timing.model import validate_slide_motion
 
 CATALOG_DIR = Path(__file__).resolve().parent.parent / "sdpm" / "references" / "catalogs"
 REPO_ROOT = Path(__file__).resolve().parent.parent
-MANIFEST_PATH = CATALOG_DIR / "powerpoint-gui-surface-16.113.1.json"
+MANIFEST_PATH = REPO_ROOT / "scripts" / "animation_catalog" / "powerpoint-gui-surface-16.113.1.json"
 CATALOG_PATH = CATALOG_DIR / "powerpoint-animation-catalog.json"
 GENERATOR_PATH = Path(__file__).resolve().parent.parent / "scripts" / "animation_catalog" / "generate.py"
 
@@ -2705,9 +2705,7 @@ def test_the_manifest_no_longer_claims_a_dialog_this_build_lacks():
     that points at a surface nobody can open is worse than silence: it reads as
     checkable.
     """
-    manifest = json.loads(
-        (REPO_ROOT / "sdpm/references/catalogs/powerpoint-gui-surface-16.113.1.json").read_text()
-    )
+    manifest = json.loads(MANIFEST_PATH.read_text())
     more = [i for i in manifest["items"] if i["key"].startswith("animation.moreEffects.")]
     assert len(more) == 4
     for item in more:

@@ -3232,7 +3232,7 @@ def test_write_slide_timing_reports_what_it_wrote(registry, index):
 
 
 def test_a_slide_without_animations_never_parses_the_catalog(monkeypatch):
-    """An ordinary deck must not pay for the 1.2 MB capability catalog."""
+    """An ordinary deck must not pay for the 2.9 MB capability catalog."""
     from sdpm.engine.timing import writer as writer_module
 
     def explode():  # pragma: no cover - the point is that it is never called

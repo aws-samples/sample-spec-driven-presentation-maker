@@ -52,7 +52,7 @@ Two consequences, both load-bearing for the steps below:
 | Application | Microsoft PowerPoint for Mac |
 | Version | 16.113.1 |
 | Scripting definition | `/Applications/Microsoft PowerPoint.app/Contents/Resources/PowerPoint.sdef` |
-| GUI manifest | `sdpm/references/catalogs/powerpoint-gui-surface-16.113.1.json` |
+| GUI manifest | `scripts/animation_catalog/powerpoint-gui-surface-16.113.1.json` |
 
 Record the exact version string from **PowerPoint ▸ About Microsoft PowerPoint**
 before and after a session. A different build invalidates the capture: bump

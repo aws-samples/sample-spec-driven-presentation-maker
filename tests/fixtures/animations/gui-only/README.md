@@ -13,8 +13,6 @@ tests and CI never invoke PowerPoint, AppleScript or Computer Use.
 | --- | --- | --- | --- | --- |
 | `transition.gallery.box.fromRight` | PowerPoint for Mac 16.113.1 | 2026-10-31 | Transitions ▸ Transition Styles ▸ Box ▸ Effect Options ▸ From Right | `.pptx`, `.xml`, `powerpoint-readback.jsonl` |
 | `animation.gallery.motionPath.lines` | PowerPoint for Mac 16.113.1 | 2026-10-31 | Animations ▸ Path Animation ▸ Basic ▸ Lines | `.pptx`, `.xml`, `powerpoint-readback.jsonl` |
-| 9 animation values | PowerPoint for Mac 16.113.1 | 2026-10-31 | Animations ▸ gallery ▸ tile | `batch-2026-10-31/` |
-| 43 animation values | PowerPoint for Mac 16.113.1 | 2026-11-01 | Animations ▸ gallery ▸ tile | `batch-2026-11-01/` |
 | **all 76 animation values** | PowerPoint for Mac 16.113.1 | 2026-11-01 | Animations ▸ gallery ▸ tile | `batch-2026-11-01-complete/` |
 | 95 tiles' Effect Options windows read | PowerPoint for Mac 16.113.1 | 2026-11-01 | Animations ▸ Effect Options | `effect-options-2026-11-01/` |
 | **all 133 effect-option values** | PowerPoint for Mac 16.113.1 | 2026-11-02 | Animations ▸ tile ▸ Effect Options ▸ value | `effect-options-capture-2026-11-02/` + `effect-options-remeasure-2026-11-02/` |
@@ -60,9 +58,22 @@ the `p:spTgt/@spid` the effect landed on, and that effect's own `p:cTn`
 attributes, so a value is read per target even though every target shares one
 slide. `powerpoint-oracle.pptx` is the package those records were read from.
 
-It supersedes the two earlier batches rather than replacing them: the earlier
-runs are what the mechanism was corrected against, and
-`scripts/animation_catalog/computer-use.md` cites their failure counts.
+Two earlier runs of the same 76 targets are **not** checked in. They are what
+the mechanism was corrected against, and their numbers are the whole of what
+they had to say, so the numbers are kept here and the captures are not:
+
+| Run | Attempted | Applied and attributed | Failed |
+| --- | --- | --- | --- |
+| 2026-10-31 | 76 | 9 | 67 |
+| 2026-11-01 | 76 | 43 | 33, in 8 batches of 10 |
+| 2026-11-01, complete | 76 | 76 | 0 |
+
+Nothing read either run: `generate.py` ingests `batch-2026-11-01-complete/`,
+and the catalog cites that directory's three files by path. Every one of the
+first run's 67 failures was the same kind, `effectNotAdded` — the slide's
+effect count did not change for the shape the press aimed at. That is the
+failure the complete run answers by recording, per target, the shape aimed at,
+the Selection Pane row selected and the `p:spTgt/@spid` the effect landed on.
 
 **These captures are not in the catalog yet.** Promoting them is a separate step
 through `generate.py`, which today ingests transition captures only — the
@@ -95,6 +106,11 @@ Lines, Loops, Shapes, Turns) and Complex (Bounce, Inverted Shape, Special
 Curve, Special Shape, Spiral, Star, Waves).
 
 ## Known incompleteness of the pilot capture
+
+`transition.gallery.box.fromRight/` is kept although nothing reads it: the
+catalog's transition entries rest on the vendored `office-kit/pptx` corpus, and
+this is the only first-party transition capture on this build. It is here as
+the record that the capture loop reached a transition at all.
 
 `computer-use.md` requires four artefacts per value. The pilot carries three:
 
