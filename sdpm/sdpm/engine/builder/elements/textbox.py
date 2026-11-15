@@ -163,15 +163,28 @@ class TextboxMixin:
                     para_font_size = para_item.get("fontSize", default_font_size) if isinstance(para_item, dict) else default_font_size
                     self._apply_styled_text(p, para_text, default_color=default_color, default_font_size=para_font_size, font_family=font_family, no_default_font=has_lst_style)
                 
-                # Apply line spacing percentage (must be before spcBef/spcAft in XML)
-                if isinstance(para_item, dict) and para_item.get("lineSpacingPct"):
-                    from lxml import etree
-                    from pptx.oxml.ns import qn as _qn
-                    pPr = p._element.get_or_add_pPr()
-                    lnSpc = etree.Element(_qn('a:lnSpc'))
-                    spcPct = etree.SubElement(lnSpc, _qn('a:spcPct'))
-                    spcPct.set('val', str(para_item["lineSpacingPct"]))
-                    pPr.insert(0, lnSpc)  # first in sequence, before bullets
+                # Apply line spacing (must be before spcBef/spcAft in XML).
+                # Fixed spacing is lineSpacingPt (pt), as at element level;
+                # lineSpacing (1/100 pt) is what older pptx_to_json output wrote.
+                if isinstance(para_item, dict):
+                    ls_pct = para_item.get("lineSpacingPct")
+                    ls_pts = None
+                    if para_item.get("lineSpacingPt"):
+                        ls_pts = int(round(para_item["lineSpacingPt"] * 100))
+                    elif para_item.get("lineSpacing"):
+                        ls_pts = int(para_item["lineSpacing"])
+                    if ls_pct or ls_pts:
+                        from lxml import etree
+                        from pptx.oxml.ns import qn as _qn
+                        pPr = p._element.get_or_add_pPr()
+                        lnSpc = etree.Element(_qn('a:lnSpc'))
+                        if ls_pct:
+                            spc = etree.SubElement(lnSpc, _qn('a:spcPct'))
+                            spc.set('val', str(ls_pct))
+                        else:
+                            spc = etree.SubElement(lnSpc, _qn('a:spcPts'))
+                            spc.set('val', str(ls_pts))
+                        pPr.insert(0, lnSpc)  # first in sequence, before bullets
                 
                 # Apply space after
                 if isinstance(para_item, dict) and para_item.get("spaceAfter") is not None:

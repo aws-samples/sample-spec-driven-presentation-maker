@@ -107,6 +107,10 @@ Expands an external JSON file's elements array. Draw order is controlled by posi
 ```json
 {"text": "1.2x line spacing", "lineSpacingPct": 120000}
 ```
+- `lineSpacingPt`: fixed line spacing in pt, as at element level. `lineSpacingPct` wins when both are set
+```json
+{"text": "24pt line spacing", "lineSpacingPt": 24}
+```
 
 ## table
 

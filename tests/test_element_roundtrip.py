@@ -451,13 +451,19 @@ class TestTextboxParagraphs:
             tags = _tags(p._p.pPr)
             assert tags[0] == "lnSpc", tags
 
-    @pytest.mark.xfail(strict=True, reason="the converter writes fixed paragraph line spacing "
-                       "as 'lineSpacing' (1/100 pt), which the builder does not read")
     def test_fixed_line_spacing_survives_a_second_build(self, tmp_path):
         first = _one(tmp_path / "a", _textbox(text="one\ntwo", lineSpacingPt=24))
+        assert [p["lineSpacingPt"] for p in first["paragraphs"]] == [24.0, 24.0]
         (sp,) = _built_shapes(tmp_path / "b", [first])
         p_pr = sp.text_frame.paragraphs[0]._p.pPr
         assert p_pr is not None and p_pr.find(f"{_A}lnSpc/{_A}spcPts") is not None
+        assert p_pr.find(f"{_A}lnSpc/{_A}spcPts").get("val") == "2400"
+
+    def test_legacy_paragraph_line_spacing_key_still_builds(self, tmp_path):
+        # Older pptx_to_json output wrote fixed spacing as "lineSpacing" (1/100 pt).
+        (sp,) = _built_shapes(tmp_path, [_textbox(paragraphs=[{"text": "x", "lineSpacing": 2400}])])
+        p_pr = sp.text_frame.paragraphs[0]._p.pPr
+        assert p_pr.find(f"{_A}lnSpc/{_A}spcPts").get("val") == "2400"
 
 
 class TestTextboxBox:

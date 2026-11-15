@@ -258,7 +258,7 @@ def extract_textbox_element(shape, theme_colors=None, color_mapping=None, theme_
                 if line_spacing[0] == 'pct':
                     para_info["lineSpacingPct"] = int(line_spacing[1])
                 else:
-                    para_info["lineSpacing"] = int(line_spacing[1])
+                    para_info["lineSpacingPt"] = int(line_spacing[1]) / 100
             
             # Paragraph level (for sub-bullets)
             try:
