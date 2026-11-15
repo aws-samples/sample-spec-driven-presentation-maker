@@ -263,3 +263,40 @@ class TestCheckFontSizeTokens:
         assert "page02" in joined  # slide 2 (22pt)
         assert "page03" in joined  # slide 3 (18pt × 2)
         assert "title" in joined   # nested path from slide 3 title.fontSize
+
+
+class TestInlineDirectives:
+    """Inline ``{{NNpt:text}}`` directives follow the same token discipline."""
+
+    def _run(self, tmp_path, text, *, nested=False):
+        project = tmp_path / "proj"
+        (project / "specs").mkdir(parents=True, exist_ok=True)
+        (project / "specs" / "art-direction.html").write_text(
+            _ART_DIRECTION_HTML, encoding="utf-8"
+        )
+        el = {"type": "text", "text": text}
+        if nested:
+            el = {"type": "group", "elements": [el]}
+        return check_font_size_tokens({"slides": [{"elements": [el]}]}, project)
+
+    def test_allowed_size_passes(self, tmp_path):
+        assert self._run(tmp_path, "a {{24pt:big}} b") == []
+
+    def test_disallowed_size_reported_as_inline(self, tmp_path):
+        joined = "\n".join(self._run(tmp_path, "a {{22pt:x}}"))
+        assert "22pt" in joined
+        assert ":inline" in joined
+
+    def test_mixed_attrs(self, tmp_path):
+        joined = "\n".join(self._run(tmp_path, "{{bold,18pt:x}}"))
+        assert "18pt" in joined and ":inline" in joined
+
+    def test_link_form(self, tmp_path):
+        assert self._run(tmp_path, "{{24pt,link:https://e.com:x}}") == []
+        joined = "\n".join(self._run(tmp_path, "{{20pt,link:https://e.com:x}}"))
+        assert "20pt" in joined and ":inline" in joined
+
+    def test_nested_group_child(self, tmp_path):
+        joined = "\n".join(self._run(tmp_path, "{{22pt:x}}", nested=True))
+        assert "22pt" in joined
+        assert "elements.[0].elements.[0].text:inline" in joined
