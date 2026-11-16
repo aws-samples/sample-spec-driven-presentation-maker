@@ -439,13 +439,18 @@ def _catalog_payload(behaviors: Sequence[Mapping[str, Any]]) -> tuple[Any, ...]:
                 )
             ),
             tuple(str(name) for name in behavior.get("attrNames") or ()),
-            tuple(
+            # Keyed by element name and sorted, not in document order. The
+            # writer appends these in the order below, the ECMA-376 sequence for
+            # `p:animScale` is `by, from, to`, and PowerPoint writes `from, to`
+            # — so comparing positionally made `entrance.curveUp` and
+            # `exit.curveDown` import raw from a real PowerPoint file while
+            # importing semantically from sdpm's own output. The four names are
+            # distinct, so keying by them loses nothing.
+            tuple(sorted(
                 _subtree_signature((behavior.get("values") or {})[key])
-                # The writer appends these in this order, so the XML side can
-                # walk children in document order and agree.
                 for key in ("to", "from", "by", "tavLst")
                 if (behavior.get("values") or {}).get(key) is not None
-            ),
+            )),
         )
         for behavior in behaviors
     )
@@ -492,11 +497,13 @@ def _xml_payload(children: etree._Element) -> tuple[Any, ...]:
                     )
                 ),
                 tuple(names),
-                tuple(
+                # Sorted, to match `_catalog_payload`: see the note there on why
+                # document order cannot be the comparison key.
+                tuple(sorted(
                     _xml_subtree_signature(child)
                     for child in node
                     if isinstance(child.tag, str) and _local(child) != "cBhvr"
-                ),
+                )),
             )
         )
     return tuple(out)
@@ -707,6 +714,7 @@ def select_representation(
     local_name: str,
     *,
     supported: Sequence[str],
+    slide_slug: str = "",
 ) -> Selection:
     """Return the slide's one effective ``local_name`` representation.
 
@@ -714,6 +722,7 @@ def select_representation(
     feature is the python-pptx issue 954 corruption, so two representations are
     a deterministic error rather than a silent choice.
     """
+    where = f"slide {slide_slug!r}: " if slide_slug else ""
     found: list[Selection] = []
     for child in slide_element:
         if not isinstance(child.tag, str):
@@ -734,8 +743,8 @@ def select_representation(
                     # Importing it would therefore produce a deck that can
                     # never be rebuilt, so it is refused here instead.
                     raise MotionReadError(
-                        f"slide wraps p:{local_name} and p:{mixed[0]} in one "
-                        "mc:AlternateContent branch set. Generation replays one preserved "
+                        f"{where}p:{local_name} and p:{mixed[0]} are wrapped in "
+                        "one mc:AlternateContent branch set. Generation replays one preserved "
                         f"fragment per feature and cannot replace p:{local_name} inside that "
                         f"container without deleting the p:{mixed[0]} beside it, so the slide "
                         "would import and then fail every build. Split the wrapper in "
@@ -746,7 +755,7 @@ def select_representation(
         return Selection(None, "none")
     if len(found) > 1:
         raise MotionReadError(
-            f"slide carries {len(found)} p:{local_name} representations (direct and/or "
+            f"{where}the slide carries {len(found)} p:{local_name} representations (direct and/or "
             "mc:AlternateContent); python-pptx issue 954 documents the package corruption "
             "this causes, so sdpm refuses to pick one"
         )
@@ -903,6 +912,14 @@ class SlideMotion:
     transition: dict[str, Any] | None = None
     raw_timing: RawFragment | None = None
     raw_transition: RawFragment | None = None
+    #: Always empty today, and kept rather than removed. A *semantic* asset was
+    #: only ever produced by a transition sound, which now sends the whole
+    #: fragment raw, so nothing fills this. The chain it feeds —
+    #: ``RawSidecarWriter.add_asset`` and the manifest's ``assets`` list — has to
+    #: stay regardless: bundles imported before that change carry ``assets``
+    #: entries and validation must keep reading them. The writer's own sound
+    #: support, when it exists, fills this again. ``_asset_name``, which nothing
+    #: but the removed reader could reach, is gone.
     assets: tuple[AssetRef, ...] = ()
     #: source ``spid`` → logical element ID that the slide JSON must carry.
     element_ids: Mapping[int, str] = field(default_factory=dict)
@@ -1046,6 +1063,17 @@ def _allowed_attrs(allowed: Iterable[str]) -> set[str]:
         else:
             expanded.add(name)
     return expanded
+
+
+def _start_delay(ctn: etree._Element) -> str | None:
+    """The single ``p:stCondLst/p:cond/@delay`` a measured behaviour may carry."""
+    start = _child(ctn, "stCondLst")
+    if start is None:
+        return None
+    for child in start:
+        if isinstance(child.tag, str) and _local(child) == "cond":
+            return child.get("delay")
+    return None
 
 
 def _require_attrs(node: etree._Element, allowed: Iterable[str], what: str) -> dict[str, str]:
@@ -1235,14 +1263,17 @@ class _TimingReader:
             for child in (start if start is not None else ())
             if isinstance(child.tag, str) and _local(child) == "cond"
         ]
-        if start is not None and (
+        # The guard used to run only when the start list was present, so a node
+        # with none imported semantically and was rebuilt with
+        # delay="indefinite" — the builder's value, not the source's.
+        if start is None or (
             conditions != [MEDIA_START_DELAY]
             or len([child for child in start if isinstance(child.tag, str)]) != 1
         ):
             raise _Unsupported(
-                f"p:cMediaNode start condition {conditions} is not the builder's "
-                f"single delay={MEDIA_START_DELAY!r}; an autoplay or loop setting has no "
-                "slide JSON field, so the tree is preserved instead"
+                f"p:cMediaNode start condition {conditions or 'is absent'} is not the "
+                f"builder's single delay={MEDIA_START_DELAY!r}; an autoplay or loop setting "
+                "has no slide JSON field, so the tree is preserved instead"
             )
         self._read_target(media, allow_range=False)
 
@@ -1914,11 +1945,20 @@ class _TimingReader:
             common = _child(node, "cBhvr")
             if common is None:
                 raise _Unsupported(f"{sequence} behavior {tag} has no p:cBhvr")
+            # The carrier itself, like the behaviour node above: only what the
+            # inversion reads. `_behavior_common` writes a bare `p:cBhvr`, so an
+            # attribute on it — `override="childStyle"`, `additive`, `rctx` —
+            # is one this form cannot write back, and accepting it dropped a
+            # setting that changes how the behaviour composes with others.
+            _require_attrs(common, (), f"{tag}/p:cBhvr")
             _only_children(common, {"cTn", "tgtEl", "attrNameLst"}, f"{tag}/p:cBhvr")
             common_ctn = _child(common, "cTn")
             if common_ctn is None:
                 raise _Unsupported(f"{tag}/p:cBhvr has no p:cTn")
-            _require_attrs(common_ctn, ("id", "dur", "fill"), f"{tag}/p:cBhvr/p:cTn")
+            # `@fill` was allowed here and represented nowhere, and the writer
+            # emits none for an explicit behaviour, so a file carrying one came
+            # back without it. It goes raw instead.
+            _require_attrs(common_ctn, ("id", "dur"), f"{tag}/p:cBhvr/p:cTn")
             targets.add(self._read_target(common, allow_range=True))
 
             behavior: dict[str, Any] = {"type": kind}
@@ -2070,7 +2110,59 @@ class _TimingReader:
         measured_duration = entry.ooxml.get("measuredDurationMs")
         if scale is None or measured_duration is None:
             return targets.pop(), None
-        return targets.pop(), int(round(int(measured_duration) * scale))
+        duration = int(round(int(measured_duration) * scale))
+        # Now that the scale is known, the timings themselves can be compared.
+        # The first pass could only check that a delay exists, so a *changed*
+        # delay still read back as the catalogued preset and was regenerated
+        # with the catalog's value.
+        self._check_measured_timings(children, measured, scale, duration, sequence)
+        return targets.pop(), duration
+
+    def _check_measured_timings(
+        self,
+        children: etree._Element,
+        measured: Sequence[Mapping[str, Any]],
+        scale: Fraction,
+        duration: int,
+        sequence: str,
+    ) -> None:
+        """Compare each behaviour's duration and delay against the capture.
+
+        The writer's rule is the one inverted here: an animated behaviour's
+        duration and delay scale in proportion to the effect duration, while the
+        visibility ``p:set`` keeps its measured duration and has its delay
+        recomputed from the effect duration rather than scaled. Using the
+        writer's own ``_scaled`` means a deck sdpm wrote round-trips exactly;
+        where a source file rounded differently, the effect goes raw, which is
+        the module's all-or-nothing rule rather than a silent repair.
+        """
+        from sdpm.engine.timing.writer import _is_visibility_set, _scaled
+
+        for node, behavior in zip(children, measured):
+            tag = f"p:{_local(node)}"
+            carrier_ctn = _child(_child(node, "cBhvr"), "cTn")
+            visibility = _is_visibility_set(behavior)
+            for attribute, key, written in (
+                ("dur", "durMs", carrier_ctn.get("dur")),
+                ("delay", "delayMs", _start_delay(carrier_ctn)),
+            ):
+                source = behavior.get(key)
+                if source is None or written is None or not str(written).isdigit():
+                    continue
+                if visibility:
+                    # Measured 2026-11-02: its duration stays at 1 ms however
+                    # long the effect is, and a non-zero delay is recomputed as
+                    # the effect duration less one, not scaled.
+                    expected = int(source) if attribute == "dur" else (
+                        max(duration - 1, 0) if int(source) > 0 else int(source)
+                    )
+                else:
+                    expected = _scaled(int(source), scale)
+                if int(written) != expected:
+                    raise _Unsupported(
+                        f"{sequence} behavior {tag} @{attribute} {written} is not the measured "
+                        f"{source} at this effect duration ({expected})"
+                    )
 
     def _check_bounce_mirror(
         self, attrs: Mapping[str, str], behaviors: etree._Element, sequence: str
@@ -2566,13 +2658,6 @@ def _transition_sound(
     )
 
 
-def _asset_name(slide_slug: str, reference: RelationshipRef) -> str:
-    base = (reference.source_part or reference.target_ref).rsplit("/", 1)[-1]
-    safe = _ID_SAFE.sub("-", base).strip("-") or "asset"
-    prefix = _slug(slide_slug) or "slide"
-    return f"{prefix}-{safe}"
-
-
 def read_transition(
     node: etree._Element,
     *,
@@ -2772,8 +2857,12 @@ def read_slide_motion(
     assets: list[AssetRef] = []
     reasons: list[str] = []
 
-    timing_selection = select_representation(slide_element, "timing", supported=supported)
-    transition_selection = select_representation(slide_element, "transition", supported=supported)
+    timing_selection = select_representation(
+        slide_element, "timing", supported=supported, slide_slug=slide_slug,
+    )
+    transition_selection = select_representation(
+        slide_element, "transition", supported=supported, slide_slug=slide_slug,
+    )
 
     animations: dict[str, Any] | None = None
     raw_timing: RawFragment | None = None
@@ -2949,6 +3038,7 @@ def apply_motion_to_slide_json(
     ]
     if unplaced:
         raise MotionReadError(
+            f"slide {slide_dict.get('id', '')!r}: "
             "the source carries morphId values on shapes that produced no slide JSON node: "
             f"{unplaced}; Morph pairs that shape across slides, so sdpm refuses to import a "
             "deck whose morph matching would silently differ from the source"

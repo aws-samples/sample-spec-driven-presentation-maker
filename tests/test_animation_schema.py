@@ -237,16 +237,24 @@ def test_motion_is_validated_after_overrides_resolve(tmp_path):
     rules = {d["rule"] for d in config.lint_diagnostics}
     assert "unknown-animation-target" not in rules, config.lint_diagnostics
 
-    # The other half of the contract: on the unresolved form the same deck does
-    # report it, so the ordering is what makes the difference rather than the
-    # fixture happening to be clean.
-    from sdpm.engine.schema.lint import lint
+    # The save path sees one slide at a time and cannot resolve `override`, so
+    # it suspends the membership rule rather than reporting a target it cannot
+    # check. The two paths agree about this deck.
+    from sdpm.engine.schema.lint import lint, lint_and_sanitize
 
-    unresolved = {"slides": [
-        json.loads((deck / "slides" / "base.json").read_text()),
-        json.loads((deck / "slides" / "derived.json").read_text()),
-    ]}
-    assert "unknown-animation-target" in {d["rule"] for d in lint(unresolved)}
+    derived = json.loads((deck / "slides" / "derived.json").read_text())
+    _cleaned, diagnostics = lint_and_sanitize(derived)
+    assert "unknown-animation-target" not in {d["rule"] for d in diagnostics}, diagnostics
+    assert "unknown-animation-target" not in {
+        d["rule"] for d in lint({"slides": [derived]})
+    }
+
+    # Suspending it on the unresolved form must not let a real mistake through
+    # on the build path, which lints the resolved and expanded slide.
+    derived["animations"]["mainSequence"][0]["target"]["element"] = "inhreited"
+    (deck / "slides" / "derived.json").write_text(json.dumps(derived, ensure_ascii=False))
+    broken = _resolve_config(str(deck), animation_mode=None, transition_mode=None)
+    assert "unknown-animation-target" in {d["rule"] for d in broken.lint_diagnostics}
 
 
 def test_raw_and_semantic_representations_are_mutually_exclusive():

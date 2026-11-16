@@ -174,6 +174,53 @@ class TestInteractiveFramesAreIndependent:
         assert any("not an element on this slide" in note for note in frame["notes"])
 
 
+class TestTheEndOfTheBuild:
+    """"ends with …" is a statement about the build, not about the last frame.
+
+    Making each trigger frame independent left this pass reading the last frame
+    in the list, which is a trigger's. With two triggers it reported everything
+    the *other* trigger reveals as "never revealed".
+    """
+
+    def test_an_element_a_trigger_reveals_is_not_stranded(self, index):
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[
+                {"id": "showB", "trigger": {"type": "onShapeClick", "target": "a"},
+                 "effects": [_fx("b-in", "b", "entrance", "fade", start="onShapeClick")]},
+                {"id": "hideIcon", "trigger": {"type": "onShapeClick", "target": "a"},
+                 "effects": [_fx("icon-out", "icon", "exit", "fade", start="onShapeClick")]},
+            ],
+        )
+        _deck, _frames, manifest = storyboard({}, [slide], index)
+        assert not [n for entry in manifest for n in entry["notes"] if "ends with" in n], (
+            "b has a reveal path, just not one on the clicker"
+        )
+
+    def test_an_element_hidden_at_the_end_of_its_build_is_still_reported(self, index):
+        """The rule cannot become "visible in any frame": that would stop
+        reporting one of the three defects the storyboard exists to catch."""
+        slide = _slide([_fx("in", "a", "entrance", "fade", afterEffect={"type": "hide"})])
+        _deck, _frames, manifest = storyboard({}, [slide], index)
+        ends = [(e["kind"], n) for e in manifest for n in e["notes"] if "ends with" in n]
+        assert len(ends) == 1, ends
+        kind, note = ends[0]
+        assert "a off screen (afterEffect hide)" in note
+        assert kind == "build", "the note belongs on the last frame of the build"
+
+    def test_every_frame_says_whether_it_is_build_or_trigger(self, index):
+        """`_settled_state` reads this rather than parsing the label."""
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[{
+                "id": "t", "trigger": {"type": "onShapeClick", "target": "a"},
+                "effects": [_fx("b-in", "b", "entrance", "fade", start="onShapeClick")],
+            }],
+        )
+        kinds = [frame["kind"] for frame in frames(slide, index)]
+        assert kinds == ["build", "build", "trigger"], kinds
+
+
 class TestPlaceholderTargets:
     """A placeholder is as addressable as an element."""
 
@@ -607,6 +654,32 @@ class TestTheBuildPointsAtTheStoryboard:
         # what changed, not the fixture.
         on = _resolve_config(str(deck), animation_mode="on", transition_mode="on")
         assert on.warnings, "the fixture must be one the checks have something to say about"
+
+    def test_a_still_deck_gets_no_inert_group_identity_diagnostic(self, tmp_path):
+        """It says "no effect can target it", and a still deck writes no effect.
+
+        The sibling text-build and Morph checks are gated on their switches, so
+        this one is too — on the build path. The save path keeps reporting it,
+        having no switch context and nothing to build.
+        """
+        from sdpm.api import _resolve_config
+
+        deck = self._deck(tmp_path, animated=False, enabled=False)
+        slide = json.loads((deck / "slides/one.json").read_text())
+        slide["elements"] = [{
+            "type": "group", "x": 0, "y": 0, "width": 400, "height": 200,
+            "elements": [{"id": "inner", "type": "shape", "shape": "rectangle",
+                          "x": 0, "y": 0, "width": 50, "height": 50, "fill": "#FFFFFF"}],
+        }]
+        (deck / "slides/one.json").write_text(json.dumps(slide, ensure_ascii=False))
+
+        off = _resolve_config(str(deck), animation_mode=None, transition_mode=None)
+        assert "inert-group-child-identity" not in {
+            d["rule"] for d in off.lint_diagnostics
+        }, off.lint_diagnostics
+
+        on = _resolve_config(str(deck), animation_mode="on", transition_mode=None)
+        assert "inert-group-child-identity" in {d["rule"] for d in on.lint_diagnostics}
 
     def test_a_transition_only_deck_is_not_pointed_at_the_storyboard(self, tmp_path):
         """The count drives a nudge to run `storyboard`, which draws one frame

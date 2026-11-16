@@ -261,6 +261,12 @@ def _addressable(slide: Mapping[str, Any]) -> list[str]:
     return ids
 
 
+def _settled_state(slide_frames: Sequence[Mapping[str, Any]]) -> Mapping[str, Any]:
+    """The state at the end of the main run, ignoring any trigger frames."""
+    build = [frame for frame in slide_frames if frame.get("kind") != "trigger"]
+    return (build or list(slide_frames))[-1]["state"]
+
+
 def _raw_notes(slide: Mapping[str, Any]) -> list[str]:
     """Say what a preserved fragment carries that these frames cannot show."""
     notes: list[str] = []
@@ -329,6 +335,7 @@ def frames(
     pending_hide: set[str] = set()
     out.append({
         "frame": 0,
+        "kind": "build",
         "label": "before the first click",
         "state": copy.deepcopy(state),
         # Motion preserved as raw XML is motion this slide really has and these
@@ -392,6 +399,7 @@ def frames(
 
         out.append({
             "frame": number,
+            "kind": "build",
             "label": f"after click {number}",
             "state": copy.deepcopy(state),
             "notes": notes,
@@ -453,6 +461,11 @@ def frames(
                 )
         out.append({
             "frame": len(out),
+            # Not part of the build: one alternative the viewer may pick,
+            # applied on top of the settled state and independent of its
+            # siblings. `_settled_state` relies on this rather than on the
+            # label, so the end-of-build pass cannot read a trigger as the end.
+            "kind": "trigger",
             "label": f"after clicking {trigger!r} ({sequence.get('id') or ordinal})",
             "state": copy.deepcopy(state),
             "notes": notes,
@@ -576,6 +589,7 @@ def storyboard(
                 "page": len(derived_slides),
                 "slide": slug,
                 "frame": frame["frame"],
+                "kind": frame.get("kind", "build"),
                 "label": frame["label"],
                 "onScreen": on_screen,
                 "offScreen": sorted(set(ids) - set(on_screen)),
@@ -586,12 +600,34 @@ def storyboard(
         # An element the author explicitly exited is excluded: a motion-led deck
         # sends its travelling parts off stage on purpose, and flagging those
         # would bury the real finding under noise.
-        final = slide_frames[-1]["state"]
-        stranded = sorted(k for k, v in final.items()
-                          if not v["visible"] and v.get("hiddenBy") != "exit")
+        # The end of the *build*, which is the last main-sequence frame rather
+        # than the last frame in the list. A trigger frame is one alternative
+        # the viewer may pick, applied on top of the settled build and
+        # independent of its siblings, so reading one as the end reported
+        # everything the other triggers reveal as "never revealed".
+        final = _settled_state(slide_frames)
+        # And an element a trigger reveals is not stranded: it has a reveal
+        # path, just not one on the clicker. Asking "visible in any frame?"
+        # instead would also stop reporting the element hidden at the end of its
+        # own build, which is one of the three defects this exists to catch.
+        by_trigger = {
+            element_id
+            for frame in slide_frames if frame.get("kind") == "trigger"
+            for element_id, entry in frame["state"].items() if entry["visible"]
+        }
+        stranded = sorted(
+            k for k, v in final.items()
+            if not v["visible"] and v.get("hiddenBy") != "exit" and k not in by_trigger
+        )
         if stranded:
             reasons = {k: final[k].get("hiddenBy") or "never revealed" for k in stranded}
-            manifest[-1]["notes"] = list(manifest[-1]["notes"]) + [
+            # On the last frame of the build, not the last frame of the list:
+            # "ends with" is a statement about the build.
+            last_build = max(
+                index for index, entry in enumerate(manifest)
+                if entry["slide"] == slug and entry.get("kind") != "trigger"
+            )
+            manifest[last_build]["notes"] = list(manifest[last_build]["notes"]) + [
                 "ends with " + ", ".join(f"{k} off screen ({v})" for k, v in reasons.items())
             ]
 

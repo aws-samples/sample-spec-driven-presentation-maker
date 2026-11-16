@@ -778,7 +778,7 @@ def _resolve_config(
 
     Raises FileNotFoundError, ValueError on missing template/icons.
     """
-    from sdpm.engine.builder import resolve_override, validate_icons_in_json
+    from sdpm.engine.builder import expand_includes, resolve_override, validate_icons_in_json
     from sdpm.engine.timing import normalize_mode
     from sdpm.utils.io import read_json
 
@@ -924,16 +924,46 @@ def _resolve_config(
         if "id" in s:
             id_map[s["id"]] = s
     resolved_slides = [resolve_override(s, id_map) for s in slides]
+    # Each resolved slide's index in `data["slides"]`, which is what `lint`
+    # numbers diagnostics by. The filter below can drop slides, and renumbering
+    # the survivors from zero put two numberings in one diagnostics list.
+    slide_numbers = list(range(len(resolved_slides)))
 
     # Filter by only_slugs for legacy JSON path (directory path already filtered)
     if only_slugs is not None and not input_path.is_dir():
-        resolved_slides = [s for s in resolved_slides if s.get("id") in only_slugs]
+        kept = [
+            (number, slide)
+            for number, slide in zip(slide_numbers, resolved_slides)
+            if slide.get("id") in only_slugs
+        ]
+        slide_numbers = [number for number, _ in kept]
+        resolved_slides = [slide for _, slide in kept]
 
     # Now that an inherited element is actually present on the slide that uses
-    # it, an effect targeting one is no longer an unknown target.
+    # it, an effect targeting one is no longer an unknown target. Includes are
+    # expanded here too: the suppression inside `validate_slide_motion` exists
+    # for the standalone linter, which cannot read an include, and leaving it in
+    # force on the build path meant a misspelled target on a slide with any
+    # include got no diagnostic at all.
     from sdpm.engine.schema.lint import lint_motion
 
-    lint_diagnostics = lint_diagnostics + lint_motion(resolved_slides)
+    lint_slides_resolved = []
+    for slide in resolved_slides:
+        expanded = dict(slide)
+        expanded["elements"] = expand_includes(slide.get("elements"), base_dir)
+        expanded.pop("override", None)
+        lint_slides_resolved.append(expanded)
+    motion_diagnostics = lint_motion(lint_slides_resolved, numbers=slide_numbers)
+    if not (animations_enabled or transitions_enabled):
+        # Same reasoning as the two checks above: this one says "no effect can
+        # target it", and with both switches off no effect is written at all.
+        # The invalid-JSON rules still report — a malformed timeline is wrong
+        # whether or not this build writes it — but an unreachable identity is
+        # not a finding about a still deck.
+        motion_diagnostics = [
+            d for d in motion_diagnostics if d.get("rule") != "inert-group-child-identity"
+        ]
+    lint_diagnostics = lint_diagnostics + motion_diagnostics
 
     return BuildConfig(
         template_path=template_file,

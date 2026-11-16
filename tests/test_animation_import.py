@@ -792,6 +792,60 @@ def test_rewind_round_trips_through_the_fill_attribute(tmp_path):
         assert motion.animations["mainSequence"][0]["timing"] == expected
 
 
+class TestPowerPointAuthoredPackagesStillImport:
+    """The stricter reader is calibrated against PowerPoint, not against sdpm.
+
+    Every other test here feeds the reader sdpm's own output, where the payload
+    order, the carrier attributes and the scaled timings agree by construction.
+    That is why a comparison that depended on child order passed the whole
+    suite while sending `entrance.curveUp` from a real file to the raw
+    fallback: the suite had nothing PowerPoint wrote.
+
+    These packages were saved by PowerPoint for Mac 16.113.1 during the GUI
+    capture. The counts are the calibration: if a future check is tightened past
+    what PowerPoint actually writes, effects move from semantic to raw here —
+    still lossless, but no longer editable as JSON, which is the thing to notice.
+    """
+
+    #: Package -> effects that must still read as semantic JSON.
+    SEMANTIC = {
+        "gui-only/animation.gallery.motionPath.lines/"
+        "animation.gallery.motionPath.lines.pptx": 1,
+        "gui-only/effect-options-remeasure-2026-11-02/powerpoint-oracle.pptx": 9,
+        "gui-only/effect-options-remeasure-2026-11-02/from-right/powerpoint-oracle.pptx": 1,
+        "gui-only/effect-options-remeasure-2026-11-02/spin-amounts/powerpoint-oracle.pptx": 2,
+        "gui-only/effect-options-remeasure-2026-11-02/stretch-from-top/"
+        "powerpoint-oracle.pptx": 2,
+        "gui-only/effect-options-remeasure-2026-11-02/transparency-25/"
+        "powerpoint-oracle.pptx": 1,
+        "gui-only/motion-paths-complex-2026-11-02/powerpoint-oracle.pptx": 7,
+    }
+
+    @pytest.mark.parametrize("relative", sorted(SEMANTIC))
+    def test_it_reads_as_semantic_json(self, relative):
+        fixtures = REPO_ROOT / "tests" / "fixtures" / "animations"
+        package = fixtures / relative
+        assert package.exists(), package
+
+        read = 0
+        for index, slide in enumerate(Presentation(str(package)).slides):
+            motion = read_slide_motion(
+                slide._element, slide_slug=f"slide-{index}", part=slide.part,
+            )
+            if motion.animations is None:
+                continue
+            effects = motion.animations["mainSequence"]
+            read += len(effects)
+            for effect in effects:
+                assert effect["preset"]["category"], effect
+                assert effect["target"]["element"], effect
+
+        assert read == self.SEMANTIC[relative], (
+            f"{relative} read {read} semantic effects, expected "
+            f"{self.SEMANTIC[relative]}; a tightened check may have sent one to raw"
+        )
+
+
 class TestAMeasuredPresetMustMatchItsCapture:
     """Reading back a preset by name alone regenerates the catalog, not the file.
 

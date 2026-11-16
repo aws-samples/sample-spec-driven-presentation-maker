@@ -275,13 +275,42 @@ def list_templates() -> dict[str, Any]:
     return {"templates": list_templates_with_metadata(templates_dirs, metadata, get_builtin_template_notes())}
 
 
+#: Prefixes `read_guides` answers from the animation catalog rather than from a
+#: guide file. They live on `names` instead of a parameter of their own because
+#: a new schema property costs about 150 characters of the per-turn tool budget
+#: and the whole surface has roughly 160 to spare; widening one description
+#: costs 60 and is just as discoverable.
+_CATALOG_LOOKUPS = ("effect", "transition", "category")
+
+
 def read_guides(
-    names: Annotated[list[str], Field(description='Guide names to read.')],
+    names: Annotated[list[str], Field(description='Guide names, or "effect:flyIn" / "transition:push" to describe one catalog entry.')],
 ) -> dict[str, Any]:
-    """Read guide documents."""
+    """Read guide documents, and describe catalog entries named as "effect:<name>"."""
     from sdpm.knowledge.reference import read_docs
 
-    return {"documents": read_docs(_REFERENCES_DIR / "guides", names)}
+    guides: list[str] = []
+    lookups: list[tuple[str, str]] = []
+    for name in names:
+        kind, _, value = str(name).partition(":")
+        if value and kind in _CATALOG_LOOKUPS:
+            lookups.append((kind, value))
+        else:
+            guides.append(name)
+
+    out: dict[str, Any] = {"documents": read_docs(_REFERENCES_DIR / "guides", guides)}
+    if not lookups:
+        return out
+    from sdpm.engine.timing.describe import effects
+
+    described: dict[str, Any] = {}
+    for kind, value in lookups:
+        try:
+            described[f"{kind}:{value}"] = effects(**{kind: value})
+        except (KeyError, ValueError) as error:
+            described[f"{kind}:{value}"] = {"error": str(error)}
+    out["described"] = described
+    return out
 
 
 def code_to_slide(

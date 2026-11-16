@@ -119,6 +119,67 @@ def _read(path, slug="slide-001"):
     return read_slide_motion(slide._element, slide_slug=slug, part=slide.part)
 
 
+def _repack(source, destination, app_xml):
+    """Copy a package, replacing ``docProps/app.xml`` with hostile bytes."""
+    import zipfile
+
+    with zipfile.ZipFile(source) as zin, zipfile.ZipFile(destination, "w") as zout:
+        for item in zin.infolist():
+            data = app_xml if item.filename == "docProps/app.xml" else zin.read(item.filename)
+            zout.writestr(item, data)
+    return destination
+
+
+class TestHostileSourceProperties:
+    """The provenance reader must survive the input it uses defusedxml for.
+
+    It parses `docProps/app.xml` out of a PPTX the user supplied, which is why
+    it uses `defusedxml` rather than the stdlib parser. It caught `ParseError`
+    only, and defusedxml signals a *refusal* with `EntitiesForbidden` /
+    `ExternalReferenceForbidden` — `DefusedXmlException`, which derives from
+    `ValueError`, not from `ParseError`. `pptx_to_json` calls it unguarded, so
+    the one input the safe parser was chosen for failed the whole conversion.
+    """
+
+    ENTITY_APP = (
+        b'<?xml version="1.0"?>\n'
+        b'<!DOCTYPE Properties [<!ENTITY boom "boom">]>\n'
+        b'<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/'
+        b'2006/extended-properties"><Application>&boom;</Application></Properties>'
+    )
+
+    def test_the_refusal_is_not_a_parse_error(self):
+        """Pins the premise, so this does not quietly stop testing anything."""
+        from defusedxml.common import DefusedXmlException
+        from defusedxml.ElementTree import ParseError, fromstring
+
+        with pytest.raises(DefusedXmlException) as caught:
+            fromstring(self.ENTITY_APP)
+        assert not isinstance(caught.value, ParseError)
+
+    def test_an_entity_declaration_records_nulls_rather_than_failing(self, media_dir):
+        from sdpm.engine.converter.pipeline import _source_provenance
+
+        hostile = _repack(
+            _package(media_dir, _video_slide(), name="clean.pptx"),
+            media_dir / "hostile.pptx",
+            self.ENTITY_APP,
+        )
+        provenance = _source_provenance(hostile)
+        assert provenance["sourceFile"] == "hostile.pptx"
+        assert provenance["sourceApplication"] is None
+        assert provenance["sourceAppVersion"] is None
+
+    def test_the_conversion_completes(self, media_dir):
+        hostile = _repack(
+            _package(media_dir, _video_slide(), name="clean.pptx"),
+            media_dir / "hostile.pptx",
+            self.ENTITY_APP,
+        )
+        pptx_to_json(hostile, media_dir / "out")
+        assert (media_dir / "out" / "slides" / "slide-001.json").exists()
+
+
 # --- the slide JSON side ---------------------------------------------------
 
 
@@ -474,6 +535,51 @@ class TestMediaPlaybackSettingsSurvive:
             "in the transition slot beside it"
         )
         assert b"futureThing" in etree.tostring(target), "it is the replayed one"
+
+    def test_a_record_without_a_kind_cannot_be_read_as_a_transition(self, media_dir):
+        """`str(None)` is `"None"`, which fell into the caller's else branch —
+        removing the transition and leaving the slide's own `p:timing` beside
+        the replayed one.
+
+        On the in-tree path `replay_raw_fragment`'s own shape validation rejects
+        a kind-less record before this is reached, so the guard covers the case
+        the review named: a manifest handed in by a caller that validated
+        nothing. It is tested at that seam rather than through
+        `apply_raw_fragment`, which cannot get there.
+        """
+        from sdpm.engine.timing.raw import _fragment_kind
+
+        slide, root = _import(media_dir, _inject_unknown_sequence(
+            _package(media_dir, _video_slide())
+        ))
+        manifest = load_raw_manifest(root / MANIFEST_PATH)
+        record = next(
+            r for r in manifest["sidecars"] if r["path"] == slide["_rawTiming"]["sidecar"]
+        )
+        assert _fragment_kind(slide["_rawTiming"], root=root, manifest=manifest) == "timing"
+
+        del record["kind"]
+        with pytest.raises(RawManifestError, match="must be 'timing' or 'transition'"):
+            _fragment_kind(slide["_rawTiming"], root=root, manifest=manifest)
+
+    def test_a_media_node_without_a_start_condition_is_preserved(self, media_dir):
+        """The guard only ran when the start list was present, so a node with
+        none imported semantically and was rebuilt with the builder's
+        `delay="indefinite"` rather than the source's absence of one."""
+        package = _package(media_dir, _video_slide(), name="nostart.pptx")
+        presentation = Presentation(str(package))
+        slide = list(presentation.slides)[0]
+        media = next(
+            node for node in slide._element.iter()
+            if isinstance(node.tag, str) and etree.QName(node).localname == "cMediaNode"
+        )
+        ctn = media.find("{%s}cTn" % P)
+        ctn.remove(ctn.find("{%s}stCondLst" % P))
+        presentation.save(str(package))
+
+        motion = _read(package)
+        assert motion.animations is None, "an absent start condition is not the builder's node"
+        assert motion.raw_timing is not None
 
     def test_a_tampered_media_only_sidecar_is_refused(self, media_dir):
         """Only the full sidecar's digest was checked here. In tree that was

@@ -20,13 +20,18 @@ keep in the authoring guide.
 **Verifying** needs the whole thing, and :func:`expression` is one line per
 effect — 136 characters at the median. All 209 of them together come to about
 9,000 tokens, which is why they are fetched per effect rather than shipped as a
-block. :func:`effects` is that fetch, called through ``run_python``.
+block. :func:`effects` is that fetch, reached as ``read_guides(["effect:…"])``.
 
-It is deliberately not an MCP tool. A tool's description is attached to every
-turn of every conversation, including the decks that carry no animation at all,
-and this one cost about 1,300 characters of a 16,000-character budget for a
-lookup that only an animation author makes. The guide carries the cheap layer
-as text and names this function for the expensive one.
+It is deliberately not an MCP tool of its own. A tool's description is attached
+to every turn of every conversation, including the decks that carry no animation
+at all, and this one cost about 1,300 characters of a 16,000-character budget
+for a lookup that only an animation author makes. The guide carries the cheap
+layer as text and names the lookup for the expensive one.
+
+It is served by ``read_guides`` rather than by ``run_python``, which is where it
+was first documented and could never have worked: that sandbox rejects every
+``import`` at parse time, and the Cloud runner has no ``sdpm`` installed. A
+lookup the server answers works the same on both.
 
 An expression reads as a sum of behaviours::
 
@@ -335,9 +340,17 @@ def effects(
     effect: str | None = None,
     transition: str | None = None,
 ) -> dict[str, Any]:
-    """One entry point for an animation author, called through ``run_python``.
+    """One entry point for an animation author, reached through ``read_guides``.
 
-    ``from sdpm.engine.timing.describe import effects``
+    ``read_guides(["effect:flyIn"])`` — the names ``effect:``, ``transition:``
+    and ``category:`` route here, and the answer comes back under ``described``.
+
+    It is **not** reachable from ``run_python``: that sandbox rejects every
+    ``import`` at parse time, and the Cloud runner has no ``sdpm`` installed, so
+    the documented route has to be a tool the server itself serves. It is not a
+    tool of its own either, because a tool's description is sent on every turn
+    of every conversation and this lookup belongs to whoever is authoring an
+    animation.
 
     No argument returns the routing table — which effects move, resize,
     recolour, rotate, fade, wipe or follow a path. The animations guide carries

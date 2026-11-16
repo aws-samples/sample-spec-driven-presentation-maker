@@ -46,6 +46,7 @@ def _source_provenance(pptx_path: Path) -> dict:
     # reach the same place through defuse_stdlib(), which neither bandit nor
     # semgrep recognises and which .ash.yaml therefore suppresses per path --
     # calling the safe parser directly needs no suppression at all.
+    from defusedxml.common import DefusedXmlException
     from defusedxml.ElementTree import ParseError, fromstring
 
     provenance = {
@@ -61,7 +62,14 @@ def _source_provenance(pptx_path: Path) -> dict:
         return provenance
     try:
         root = fromstring(data)
-    except ParseError:
+    except (ParseError, DefusedXmlException):
+        # DefusedXmlException, not just ParseError: a refused document — an
+        # entity declaration, an external reference — raises
+        # EntitiesForbidden / ExternalReferenceForbidden, which derive from
+        # ValueError rather than from ParseError. Catching only ParseError left
+        # the refusal propagating out of an unguarded call in `pptx_to_json`, so
+        # the input this parser was chosen to make safe failed the whole
+        # conversion instead of recording nulls.
         return provenance
     for child in root:
         tag = child.tag.rsplit("}", 1)[-1]

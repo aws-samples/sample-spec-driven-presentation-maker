@@ -290,6 +290,55 @@ def sync_guide() -> str:
     return (_GUIDES / "hand-edit-sync.md").read_text(encoding="utf-8")
 
 
+class TestTheDocumentedLookupRouteWorks:
+    """The guide may only name a route an author can actually take.
+
+    `effects` was first documented as `from sdpm.engine.timing.describe import
+    effects` inside `run_python`. That could never work: the local sandbox
+    rejects every import at parse time and the Cloud runner has no `sdpm`
+    installed. The tests passed because they imported the function directly,
+    which is the one thing an author cannot do — a test that bypasses the
+    documented route does not test the documented route.
+    """
+
+    def test_the_route_the_guide_names_returns_a_description(self, guide):
+        assert 'read_guides(["effect:flyIn"])' in guide
+        result = contract.read_guides(["effect:flyIn"])
+        assert "effect:flyIn" in result["described"]
+        assert result["described"]["effect:flyIn"]["effects"], result
+
+    def test_a_transition_and_a_category_route_the_same_way(self):
+        described = contract.read_guides(["transition:push", "category:entrance"])["described"]
+        assert set(described) == {"transition:push", "category:entrance"}
+        assert "error" not in described["transition:push"]
+        assert "error" not in described["category:entrance"]
+
+    def test_a_guide_and_a_lookup_come_back_from_one_call(self):
+        result = contract.read_guides(["animations", "effect:flyIn"])
+        assert len(result["documents"]) == 1
+        assert "effect:flyIn" in result["described"]
+
+    def test_a_plain_name_is_still_a_guide(self):
+        result = contract.read_guides(["animations"])
+        assert len(result["documents"]) == 1
+        assert "described" not in result
+
+    def test_the_guide_does_not_name_the_route_the_sandbox_rejects(self, guide):
+        """And the sandbox really does reject it, which is why the route moved."""
+        import sys
+
+        sys.path.insert(0, str(_ROOT / "servers" / "local"))
+        try:
+            from sandbox import check_code
+        finally:
+            sys.path.pop(0)
+
+        snippet = "from sdpm.engine.timing.describe import effects\nprint(effects())\n"
+        assert check_code(snippet), "the sandbox must reject an import"
+        assert "import statement is not allowed" in check_code(snippet)[0]
+        assert "from sdpm.engine.timing.describe import" not in guide
+
+
 class TestSpecOnlyPoints:
     """Ordinary composer context must not grow (REQ-1.1)."""
 

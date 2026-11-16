@@ -270,19 +270,30 @@ def validate_slide_motion(slide: Mapping[str, Any]) -> list[MotionDiagnostic]:
     legitimately target an element the slide inherits rather than declares, and
     on the unresolved form that reads as an unknown target.
 
-    An unexpanded ``include`` is handled here instead, because the element set
-    it contributes is not knowable from this slide: the builder expands it at
-    build time. While one is present the target-membership rule is skipped —
-    every other rule still applies — so a valid included target is not reported
-    as unknown. The build itself still refuses a target that resolves to
-    nothing.
+    Two things make a slide's element set unknowable from the slide alone: an
+    unexpanded ``include``, whose contents the builder reads at build time, and
+    an unresolved ``override``, whose inherited elements live in another file.
+    While either is present the target-membership rule is skipped — every other
+    rule still applies — so a valid included or inherited target is not reported
+    as unknown. The build resolves both and lints the resolved form, so a
+    target that resolves to nothing is still refused there.
     """
     ids, diagnostics = _element_ids(slide)
-    unexpanded_include = any(
-        isinstance(element, Mapping) and element.get("type") == "include"
-        for element in slide.get("elements") or ()
-    )
-    target_ids = None if unexpanded_include else ids
+    unresolved = [
+        reason
+        for reason, present in (
+            ("an unexpanded include", any(
+                isinstance(element, Mapping) and element.get("type") == "include"
+                for element in slide.get("elements") or ()
+            )),
+            # The save path (`lint_and_sanitize`) sees one slide at a time and
+            # cannot resolve `override`, so an inherited target read as unknown
+            # on save and clean on build. The two agree now.
+            ("an unresolved override", bool(slide.get("override"))),
+        )
+        if present
+    ]
+    target_ids = None if unresolved else ids
     transition = slide.get("transition")
     raw_transition = slide.get("_rawTransition")
     if transition is not None and raw_transition is not None:

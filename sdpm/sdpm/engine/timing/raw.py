@@ -682,4 +682,15 @@ def _fragment_kind(
         manifest = load_raw_manifest(
             resolve_within(Path(root), MANIFEST_PATH, what="manifest path")
         )
-    return str(sidecar_record(manifest, sidecar).get("kind"))
+    kind = sidecar_record(manifest, sidecar).get("kind")
+    if kind not in {"timing", "transition"}:
+        # This function accepts a manifest the caller may not have validated
+        # (the rootless case), so a missing `kind` must not fall through:
+        # `str(None)` is `"None"`, which the caller's else branch treated as a
+        # transition — removing the transition and leaving the slide's own
+        # p:timing beside the replayed one.
+        raise RawManifestError(
+            f"the raw manifest records kind {kind!r} for {sidecar!r}; it must be 'timing' or "
+            "'transition' for the fragment to be replayed into the right slot"
+        )
+    return str(kind)

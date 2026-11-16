@@ -39,17 +39,23 @@ def lint(data: list | dict, *, include_motion: bool = True) -> list[dict]:
     return diagnostics
 
 
-def lint_motion(slides: list[dict]) -> list[dict]:
+def lint_motion(slides: list[dict], *, numbers: list[int] | None = None) -> list[dict]:
     """Motion diagnostics only, for slides whose overrides are resolved.
 
     A build resolves overrides before it validates, because an effect may target
     an element the slide inherits rather than declares: on the unresolved form
     that reads as ``unknown-animation-target``. :func:`lint` therefore takes
     ``include_motion=False`` there and the build calls this afterwards.
+
+    ``numbers`` gives each slide the index it has in the caller's own list, so a
+    partial build does not renumber them. Without it a filtered list numbered
+    from zero while :func:`lint` numbered from the full deck, and both ended up
+    in one diagnostics list carrying a bare ``slide`` integer.
     """
     diagnostics: list[dict] = []
-    for si, slide in enumerate(slides):
+    for position, slide in enumerate(slides):
         if isinstance(slide, dict):
+            si = numbers[position] if numbers is not None else position
             diagnostics.extend(_lint_slide_motion(si, slide))
     return diagnostics
 

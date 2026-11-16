@@ -449,18 +449,21 @@ A name is bare where it means the same thing in every category it appears in, an
 where it does not: `entrance.bounce` moves and resizes, `motionPath.bounce` follows a curve.
 
 For the detail — every behaviour an effect writes, with its keyframes, durations and each of
-its options — call `effects` through `run_python`:
+its options — ask for the entry by name alongside this guide:
 
-```python
-from sdpm.engine.timing.describe import effects
-print(effects(effect="flyIn"))
+```
+read_guides(["effect:flyIn"])
 ```
 
-It is a function rather than a tool on purpose: a tool's description rides along on every
-turn of every conversation, including the decks with no animation in them, and this lookup
-belongs to whoever is actually authoring one. The table above is the cheap layer, which is
-why it is text here; `effects()` with no argument returns the same thing. With
-`effect="flyIn"` it returns the expression:
+The answer comes back under `described["effect:flyIn"]`. `"transition:push"` describes a
+slide transition's `parameters` sets instead, and `"category:entrance"` a whole category.
+Anything without one of those three prefixes is read as a guide name, so one call can take
+both.
+
+It rides on an existing tool rather than being one of its own: a tool's description is sent
+on every turn of every conversation, including the decks with no animation in them, and this
+lookup belongs to whoever is actually authoring one. The table above is the cheap layer,
+which is why it is text here. Asking for one effect returns its expression:
 
 ```
 set(style.visibility: -> visible)@1
@@ -484,10 +487,10 @@ Two things in that answer are instructions rather than description:
   effect's other setting left at its default, so asking for two settings on one effect is
   refused. Ask for one at a time.
 
-`effects(transition="push")` answers the other side: which `parameters` sets a slide
+`read_guides(["transition:push"])` answers the other side: which `parameters` sets a slide
 transition accepts, with the effect's own defaults listed separately. The table below has the
-same information for every transition, so reach for the call when you need one effect's sets
-and not this whole guide — about 140 tokens against 11,500.
+same information for every transition, so reach for the lookup when you need one effect's
+sets and not this whole guide — about 140 tokens against 11,500.
 
 #### Prefer a `preset`; reach for `behaviors` only when no effect fits
 
