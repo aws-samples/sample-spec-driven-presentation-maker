@@ -93,6 +93,22 @@ export default function DecksPage() {
     sendMessage: (text: string, options?: { displayContent?: string }) =>
       chatRef.current?.sendMessage(text, options) ?? Promise.resolve(),
   }), [agentIsLoading])
+  // Home prompt: open a new chat, then send once its panel owns chatRef.
+  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null)
+  const startWithPrompt = useCallback((prompt: string) => {
+    ws.setChatOpen(true)
+    ws.setChatTab("new")
+    setPendingPrompt(prompt)
+  }, [ws])
+  useEffect(() => {
+    if (!pendingPrompt || !ws.chatOpen || ws.chatTab !== "new") return
+    const timer = setTimeout(() => {
+      if (!chatRef.current) return
+      void chatRef.current.sendMessage(pendingPrompt)
+      setPendingPrompt(null)
+    }, 50)
+    return () => clearTimeout(timer)
+  }, [pendingPrompt, ws.chatOpen, ws.chatTab])
   const swipeRef = useSwipe(
     () => setActiveTab("preview"),
     () => setActiveTab("chat"),
@@ -260,6 +276,7 @@ export default function DecksPage() {
                 searching={list.searching}
                 onDeckOpen={ws.openDeck}
                 onNewDeck={() => { ws.setChatOpen(true); ws.setChatTab("new") }}
+                onCreateWithPrompt={startWithPrompt}
                 favoriteIds={list.favoriteIds}
                 onToggleFavorite={list.handleToggleFavorite}
                 onDelete={list.handleDelete}

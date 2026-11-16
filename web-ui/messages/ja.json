@@ -46,7 +46,12 @@
     "selectAll": "すべて選択 ({total})",
     "deleteSelected": "削除",
     "deletingProgress": "{done} / {total} 件削除中…",
-    "selectionToolbar": "選択中のデッキ"
+    "selectionToolbar": "選択中のデッキ",
+    "heroTitle": "どんなプレゼンを作りますか?",
+    "heroSubtitle": "内容を伝えると、エージェントがブリーフ・アートディレクション・アウトラインを固めてからスライドを組みます。",
+    "heroPlaceholder": "聞き手、持ち帰ってほしいこと、だいたいの枚数を書いてください",
+    "heroHint": "⌘↵ で開始",
+    "heroSubmit": "作り始める"
   },
   "settings": {
     "title": "設定",
@@ -106,7 +111,8 @@
     "previewAlt": "{name} のプレビュー",
     "internal": "社内公開",
     "private": "非公開",
-    "selectDeck": "{name} を選択"
+    "selectDeck": "{name} を選択",
+    "slideCountShort": "{count} 枚"
   },
   "deckActions": {
     "internal": "社内公開",
@@ -479,7 +485,8 @@
     "brief": "ブリーフ",
     "outline": "アウトライン",
     "artDirection": "アートディレクション",
-    "slides": "スライド"
+    "slides": "スライド",
+    "phases": "工程"
   },
   "specWaiting": {
     "draftingBrief": "ブリーフを作成中…",

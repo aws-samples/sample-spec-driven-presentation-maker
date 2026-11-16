@@ -18,6 +18,7 @@
 import { Layers } from "lucide-react"
 import type { SpecFiles } from "@/services/deckService"
 import { useTranslations } from "next-intl"
+import { deckDisplay } from "@/lib/deckTitle"
 
 // Re-exported for existing consumers (SlideCarousel imports from here).
 export { SpecMarkdownPreview } from "./SpecMarkdownPreview"
@@ -49,9 +50,11 @@ interface SpecStepNavProps {
   activeTab: SpecTab
   onTabChange: (tab: SpecTab) => void
   slideCount: number
+  /** Desktop: the rail shows the deck's title above the phases. */
+  deckName?: string
 }
 
-export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecStepNavProps) {
+export function SpecStepNav({ specs, activeTab, onTabChange, slideCount, deckName }: SpecStepNavProps) {
   const t = useTranslations("specNav")
   /**
    * Check whether a spec tab has content.
@@ -63,18 +66,29 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
     return true
   }
 
+  const title = deckName ? deckDisplay(deckName).title : null
+
   return (
-    <nav className="flex items-center gap-1 px-5 py-2 border-b border-border/40" role="tablist" aria-label={t("specPhases")}>
+    <div className="flex-none border-b border-border/40 md:border-b-0 md:border-r md:border-border md:w-60 md:px-4 md:py-6 md:overflow-y-auto">
+    {title && (
+      <div className="hidden md:block px-2 mb-7">
+        <h2 className="text-lg font-semibold leading-snug tracking-[-0.02em] text-foreground line-clamp-3" title={deckName}>
+          {title}
+        </h2>
+      </div>
+    )}
+    {title && <p className="hidden md:block px-2 mb-2 text-xs font-medium text-foreground-muted">{t("phases")}</p>}
+    <nav className="flex items-center gap-1 px-5 py-2 md:flex-col md:items-stretch md:gap-0 md:p-0" role="tablist" aria-label={t("specPhases")}>
       {STEPS.map((s, i) => {
         const isSlides = s.key === "slides"
         const active = activeTab === s.key
         const enabled = hasContent(s.key)
 
         return (
-          <div key={s.key} className="flex items-center">
-            {/* Connector line between steps */}
+          <div key={s.key} className="flex items-center md:flex-col md:items-stretch">
+            {/* Connector line between steps (horizontal on mobile, vertical in the rail) */}
             {i > 0 && (
-              <div className={`w-4 h-px mx-1 transition-colors duration-300 ${
+              <div className={`w-4 h-px mx-1 md:w-px md:h-3 md:mx-0 md:ml-[21px] transition-colors duration-300 ${
                 enabled && hasContent(STEPS[i - 1].key)
                   ? "bg-border-hover"
                   : "bg-border/30"
@@ -89,6 +103,7 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
               onClick={() => onTabChange(s.key)}
               className={`
                 relative flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-sm font-medium
+                md:w-full md:gap-3 md:px-2.5 md:py-2 md:rounded-xl
                 transition-all duration-300 select-none
                 ${active
                   ? isSlides
@@ -102,10 +117,12 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
             >
               {/* Step number badge or Slides icon */}
               {isSlides ? (
-                <Layers className={`h-3.5 w-3.5 ${active ? "text-brand-amber" : ""}`} />
+                <span className="inline-flex items-center justify-center md:w-6 md:h-6">
+                  <Layers className={`h-3.5 w-3.5 ${active ? "text-brand-amber" : ""}`} />
+                </span>
               ) : (
                 <span className={`
-                  inline-flex items-center justify-center w-4 h-4 rounded-full text-[11px] font-semibold leading-none
+                  inline-flex items-center justify-center w-4 h-4 md:w-6 md:h-6 rounded-full text-[11px] md:text-xs font-semibold leading-none
                   transition-all duration-300
                   ${active
                     ? "bg-foreground text-background"
@@ -122,14 +139,14 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
 
               {/* Slide count badge */}
               {isSlides && slideCount > 0 && (
-                <span className={`text-[11px] font-normal ${active ? "text-brand-amber/70" : "text-foreground-muted"}`}>
-                  · {slideCount}
+                <span className={`text-[11px] md:text-xs font-normal md:ml-auto md:tabular-nums ${active ? "text-brand-amber" : "text-foreground-muted"}`}>
+                  <span className="md:hidden">· </span>{slideCount}
                 </span>
               )}
 
               {/* Active indicator dot */}
               {active && (
-                <span className={`absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${
+                <span className={`md:hidden absolute -bottom-2.5 left-1/2 -translate-x-1/2 w-1 h-1 rounded-full ${
                   isSlides ? "bg-brand-amber" : "bg-foreground"
                 }`} />
               )}
@@ -138,5 +155,6 @@ export function SpecStepNav({ specs, activeTab, onTabChange, slideCount }: SpecS
         )
       })}
     </nav>
+    </div>
   )
 }

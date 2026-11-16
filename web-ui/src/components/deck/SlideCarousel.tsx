@@ -28,6 +28,7 @@ import { Download, ExternalLink, Layers, LayoutGrid, Presentation, Printer, Rows
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
+import { deckDisplay } from "@/lib/deckTitle"
 import { SlideThumbnail } from "@/components/deck/SlideThumbnail"
 import { AnimatedSlidePreview } from "@/components/deck/AnimatedSlidePreview"
 import { HtmlDeckPlayer, type HtmlPlayerSlide } from "@/components/deck/HtmlDeckPlayer"
@@ -570,17 +571,19 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   }
 
   return (
-    <div className="h-full flex flex-col">
+    <div className="h-full flex flex-col md:flex-row">
       {defsUrl && viewMode === "full" && specTab === "slides" && (
         <DeckDefs defsUrl={defsUrl} onStatusChange={handleDefsStatus} />
       )}
-      {/* Spec step navigation */}
+      {/* Spec step navigation (top tabs on mobile, phase rail on desktop) */}
       <SpecStepNav
         specs={specs}
         activeTab={specTab}
         onTabChange={setSpecTab}
         slideCount={slidesWithPreview.length}
+        deckName={deckName}
       />
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
 
       {/* Header (shown only on Slides tab) */}
       {specTab === "slides" && (
@@ -588,8 +591,8 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           <div className="flex items-center gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-lg font-semibold tracking-[-0.02em] truncate max-w-[360px]">
-                  {deckName || t("preview")}
+                <h2 className="md:hidden text-lg font-semibold tracking-[-0.02em] truncate max-w-[360px]">
+                  {deckName ? deckDisplay(deckName).title : t("preview")}
                 </h2>
                 {isHtml && (
                   <span
@@ -709,6 +712,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           outlineExists={specTab === "brief" ? (specs?.outline != null) : undefined}
         />
       )}
+      </div>
     </div>
   )
 }

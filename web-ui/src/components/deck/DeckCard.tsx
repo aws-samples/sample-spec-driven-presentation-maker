@@ -32,6 +32,7 @@ import { useTranslations } from "next-intl"
 import { useLocale } from "@/i18n/LocaleProvider"
 import { isHtmlPreview } from "@/lib/preview"
 import { HtmlSlideFrame } from "@/components/deck/HtmlSlideFrame"
+import { deckDisplay } from "@/lib/deckTitle"
 
 
 interface DeckCardProps {
@@ -64,6 +65,7 @@ export function DeckCard({
   const { locale } = useLocale()
   const canSelect = selectable && !!onSelectToggle
   const toggle = (shiftKey: boolean) => onSelectToggle?.(deck.deckId, shiftKey)
+  const { title } = deckDisplay(deck.name)
 
   function handleCardClick(e: React.MouseEvent) {
     if (canSelect && selectionMode) { toggle(e.shiftKey); return }
@@ -90,11 +92,8 @@ export function DeckCard({
       onKeyDown={handleCardKeyDown}
       // Shift-click range selection must not start a text selection.
       onMouseDown={(e) => { if (canSelect && e.shiftKey) e.preventDefault() }}
-      className={`animate-card-in group relative rounded-xl overflow-hidden bg-card border shadow-[var(--shadow-card)] transition-all duration-350 cursor-pointer motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
-        selected
-          ? "border-brand-teal ring-2 ring-brand-teal/60 shadow-[var(--shadow-lift)]"
-          : "border-border hover:border-border-hover hover:-translate-y-[2px] hover:shadow-[var(--shadow-lift)]"
-      }`}
+      className="animate-card-in group relative cursor-pointer outline-none focus-visible:[&>.deck-thumb]:ring-2 focus-visible:[&>.deck-thumb]:ring-ring"
+      title={deck.name}
       style={{ "--delay": `${index * 60}ms` } as React.CSSProperties}
     >
 
@@ -129,10 +128,10 @@ export function DeckCard({
             navigator.vibrate?.(10)
             onToggleFavorite?.(deck.deckId, isFavorite ? "remove" : "add")
           }}
-          className={`p-1 transition-all flex items-center justify-center drop-shadow-[0_1px_2px_oklch(0_0_0/60%)] ${
+          className={`p-1.5 rounded-md bg-black/45 backdrop-blur-md transition-all flex items-center justify-center ${
             isFavorite
               ? "text-brand-amber"
-              : "text-foreground-muted/50 sm:opacity-0 sm:group-hover:opacity-100 hover:text-brand-amber/70"
+              : "text-white/80 sm:opacity-0 sm:group-hover:opacity-100 hover:text-brand-amber"
           }`}
           aria-label={isFavorite ? t("removeFromFavorites") : t("addToFavorites")}
           aria-pressed={isFavorite}
@@ -145,7 +144,7 @@ export function DeckCard({
           <DropdownMenuTrigger asChild>
             <button
               onClick={(e) => { e.preventDefault(); e.stopPropagation() }}
-              className="p-1 transition-all flex items-center justify-center drop-shadow-[0_1px_2px_oklch(0_0_0/60%)] text-foreground-muted/50 sm:opacity-0 sm:group-hover:opacity-100 hover:text-foreground/70"
+              className="p-1.5 rounded-md bg-black/45 backdrop-blur-md transition-all flex items-center justify-center text-white/80 sm:opacity-0 sm:group-hover:opacity-100 focus-visible:opacity-100 hover:text-white"
               aria-label={t("deckActions")}
             >
               <MoreHorizontal className="h-3.5 w-3.5" />
@@ -153,7 +152,7 @@ export function DeckCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-44 bg-popover/95 backdrop-blur-xl"
+            className="w-52"
             onClick={(e) => e.stopPropagation()}
           >
             <DropdownMenuItem
@@ -214,20 +213,24 @@ export function DeckCard({
       </div>
       )}
 
-      {/* Thumbnail */}
-      <div className={`aspect-[16/9.5] relative overflow-hidden transition-transform duration-300 ${selected ? "scale-[0.97] rounded-lg" : ""}`}>
+      {/* Thumbnail — the slide itself is the object you pick up */}
+      <div className={`deck-thumb aspect-video relative overflow-hidden rounded-lg transition-all duration-300 ease-out motion-reduce:transition-none ${
+        selected
+          ? "ring-2 ring-brand-teal shadow-[var(--shadow-lift)] scale-[0.98]"
+          : "ring-1 ring-border shadow-[var(--shadow-slide)] group-hover:-translate-y-1 group-hover:shadow-[var(--shadow-lift)] motion-reduce:group-hover:translate-y-0"
+      }`}>
         {deck.thumbnailUrl && isHtmlPreview(deck.thumbnailUrl) ? (
           <HtmlSlideFrame
             src={deck.thumbnailUrl}
-            title={t("previewAlt", { name: deck.name })}
+            title={t("previewAlt", { name: title })}
             fit="cover"
-            className="group-hover:scale-[1.03] transition-transform duration-700 ease-out"
+            className=""
           />
         ) : deck.thumbnailUrl ? (
           <img
             src={deck.thumbnailUrl}
-            alt={t("previewAlt", { name: deck.name })}
-            className="w-full h-full object-cover group-hover:scale-[1.03] transition-transform duration-700 ease-out"
+            alt={t("previewAlt", { name: title })}
+            className="w-full h-full object-cover"
           />
         ) : (
           <div className="w-full h-full" style={{ background: meshGradient(deck.deckId) }}>
@@ -242,10 +245,6 @@ export function DeckCard({
         )}
         {/* Badges */}
         <div className="absolute bottom-2.5 left-3 flex items-center gap-1.5">
-          <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium text-foreground-secondary bg-black/50 backdrop-blur-md">
-            <Layers className="h-2.5 w-2.5" />
-            {deck.slideCount}
-          </div>
           <CloudOnly>
           {(deck.visibility || "private") === "public" ? (
             <div className="flex items-center gap-1 px-2 py-0.5 rounded-md text-[11px] font-medium backdrop-blur-md"
@@ -264,14 +263,14 @@ export function DeckCard({
       </div>
 
       {/* Meta */}
-      <div className="px-4 pt-3 pb-3.5">
+      <div className="pt-3 px-0.5">
         <h3 className="text-[15px] font-semibold text-foreground truncate leading-snug tracking-[-0.015em]">
-          {deck.name}
+          {title}
         </h3>
-        <div className="flex items-center gap-2 mt-1 text-xs text-foreground-muted">
-          {deck.owner && <span>{deck.owner}</span>}
-          {deck.owner && deck.updatedAt && <span className="opacity-40">·</span>}
-          {deck.updatedAt && <span>{formatDate(deck.updatedAt, locale)}</span>}
+        <div className="flex items-center gap-1.5 mt-1 text-xs text-foreground-muted">
+          <span className="inline-flex items-center gap-1"><Layers className="h-3 w-3" aria-hidden="true" />{t("slideCountShort", { count: deck.slideCount })}</span>
+          {deck.owner && <><span aria-hidden="true">·</span><span>{deck.owner}</span></>}
+          {deck.updatedAt && <><span aria-hidden="true">·</span><span>{formatDate(deck.updatedAt, locale)}</span></>}
         </div>
       </div>
     </div>

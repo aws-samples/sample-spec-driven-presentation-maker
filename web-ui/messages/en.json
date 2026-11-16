@@ -46,7 +46,12 @@
     "selectAll": "Select all ({total})",
     "deleteSelected": "Delete",
     "deletingProgress": "Deleting {done} / {total}…",
-    "selectionToolbar": "Selected decks"
+    "selectionToolbar": "Selected decks",
+    "heroTitle": "What are we presenting?",
+    "heroSubtitle": "Describe the talk. The agents draft a brief, an art direction and an outline before building the slides.",
+    "heroPlaceholder": "Who is the audience, what should they take away, and roughly how many slides?",
+    "heroHint": "⌘↵ to start",
+    "heroSubmit": "Start"
   },
   "settings": {
     "title": "Settings",
@@ -106,7 +111,8 @@
     "previewAlt": "Preview of {name}",
     "internal": "Internal",
     "private": "Private",
-    "selectDeck": "Select {name}"
+    "selectDeck": "Select {name}",
+    "slideCountShort": "{count, plural, one {# slide} other {# slides}}"
   },
   "deckActions": {
     "internal": "Internal",
@@ -479,7 +485,8 @@
     "brief": "Brief",
     "outline": "Outline",
     "artDirection": "Art Direction",
-    "slides": "Slides"
+    "slides": "Slides",
+    "phases": "Phases"
   },
   "specWaiting": {
     "draftingBrief": "Drafting the brief…",
