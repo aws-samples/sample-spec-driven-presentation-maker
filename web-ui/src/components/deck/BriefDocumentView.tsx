@@ -190,7 +190,7 @@ const briefComponents = {
   ),
   th: ({ children, ...props }: React.ComponentProps<"th">) => (
     <th
-      className="text-left text-xs font-semibold uppercase tracking-wider text-foreground/60 px-3 py-2 border-b border-foreground/[0.08]"
+      className="text-left text-xs font-semibold uppercase tracking-wider text-foreground-secondary px-3 py-2 border-b border-foreground/[0.08]"
       {...props}
     >
       {children}
@@ -252,7 +252,7 @@ function ApprovalStatus({ approved }: ApprovalStatusProps) {
 
   if (approved) {
     return (
-      <div className="flex items-center gap-2 text-xs text-foreground/60" role="status" aria-label={t("approvedAria")}>
+      <div className="flex items-center gap-2 text-xs text-foreground-muted" role="status" aria-label={t("approvedAria")}>
         <FileCheck2 className="h-3.5 w-3.5" aria-hidden="true" />
         <span>{t("approved")}</span>
       </div>
@@ -260,7 +260,7 @@ function ApprovalStatus({ approved }: ApprovalStatusProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 text-xs text-foreground/50" role="status" aria-label={t("pendingAria")}>
+    <div className="flex items-center gap-2 text-xs text-foreground-muted" role="status" aria-label={t("pendingAria")}>
       <FileClock className="h-3.5 w-3.5" aria-hidden="true" />
       <span>{t("pending")}</span>
     </div>
@@ -286,7 +286,7 @@ export function BriefDocumentView({ content, outlineExists }: BriefDocumentViewP
       {/* Document header — contract metaphor */}
       <div className="max-w-3xl mx-auto mb-4">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-mono text-foreground/40 tracking-wide">
+          <span className="text-xs font-mono text-foreground-muted tracking-wide">
             {t("filePath")}
           </span>
           <ApprovalStatus approved={approved} />

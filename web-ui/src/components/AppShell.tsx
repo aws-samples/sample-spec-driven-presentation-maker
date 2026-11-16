@@ -136,7 +136,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                 <a
                   href="/decks/"
                   className={`px-2.5 py-1 rounded-md text-sm font-medium no-underline transition-colors ${
-                    pathname?.startsWith("/decks") ? "text-foreground" : "text-foreground/40 hover:text-foreground/70"
+                    pathname?.startsWith("/decks") ? "text-foreground" : "text-foreground-muted hover:text-foreground"
                   }`}
                 >
                   {t("decks")}
@@ -144,7 +144,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                 <a
                   href="/styles/"
                   className={`px-2.5 py-1 rounded-md text-sm font-medium no-underline transition-colors ${
-                    pathname?.startsWith("/styles") ? "text-foreground" : "text-foreground/40 hover:text-foreground/70"
+                    pathname?.startsWith("/styles") ? "text-foreground" : "text-foreground-muted hover:text-foreground"
                   }`}
                 >
                   {t("styles")}
@@ -152,7 +152,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                 <a
                   href="/templates/"
                   className={`px-2.5 py-1 rounded-md text-sm font-medium no-underline transition-colors ${
-                    pathname?.startsWith("/templates") ? "text-foreground" : "text-foreground/40 hover:text-foreground/70"
+                    pathname?.startsWith("/templates") ? "text-foreground" : "text-foreground-muted hover:text-foreground"
                   }`}
                 >
                   {t("templates")}
@@ -204,8 +204,8 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
               >
                 {/* User info */}
                 <div className="px-3.5 py-2">
-                  <div className="text-xs text-foreground/50 font-medium">{alias}</div>
-                  {email && <div className="text-[11px] text-foreground/30 mt-0.5 truncate">{email}</div>}
+                  <div className="text-xs text-foreground-secondary font-medium">{alias}</div>
+                  {email && <div className="text-[11px] text-foreground-muted mt-0.5 truncate">{email}</div>}
                 </div>
 
                 <div className="my-1 border-t border-border" />

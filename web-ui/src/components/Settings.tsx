@@ -225,7 +225,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                     triggerId="chat-model"
                     ariaLabel="Select chat model"
                   />
-                  <p className="mt-1 text-xs text-muted-foreground/80">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Conversations and planning.
                   </p>
                 </div>
@@ -246,7 +246,7 @@ export function Settings({ open, onOpenChange }: SettingsProps) {
                     triggerId="create-model"
                     ariaLabel="Select create model"
                   />
-                  <p className="mt-1 text-xs text-muted-foreground/80">
+                  <p className="mt-1 text-xs text-muted-foreground">
                     Slides, styles, and other artifacts. Needs a capable model.
                   </p>
                 </div>
