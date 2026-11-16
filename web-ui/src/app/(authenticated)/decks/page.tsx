@@ -137,7 +137,7 @@ export default function DecksPage() {
       onChatToggle={() => ws.setChatOpen((prev) => !prev)}
     >
       <div className="flex-1 overflow-hidden relative sm:flex">
-        <main className="app-canvas h-full sm:h-auto overflow-y-auto flex-1 min-w-0">
+        <main className="h-full overflow-y-auto flex-1 min-w-0">
           {ws.isWorkspace ? (
             <>
               {/* Mobile tab bar */}

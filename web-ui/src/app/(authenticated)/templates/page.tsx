@@ -103,7 +103,7 @@ export default function TemplatesPage() {
 
   return (
     <AppShell>
-      <div className="app-canvas flex-1 overflow-y-auto">
+      <div className="flex-1 overflow-y-auto">
         {loading ? (
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
             <div className="mb-8">
