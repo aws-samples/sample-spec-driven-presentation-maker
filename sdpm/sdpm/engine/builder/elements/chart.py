@@ -158,7 +158,7 @@ class ChartMixin:
             title_fc = elem.get("titleFontColor")
             if title_fc:
                 tf.paragraphs[0].font.color.rgb = RGBColor.from_string(title_fc.lstrip("#"))
-            elif not elem.get("valueAxis"):
+            elif elem.get("_chartFontSize") is None:
                 tf.paragraphs[0].font.color.rgb = text_color
             tf.paragraphs[0].font.name = self.fonts["halfwidth"]
     
@@ -180,10 +180,17 @@ class ChartMixin:
                 pa_sp_pr.remove(child)
             etree.SubElement(pa_sp_pr, qn('a:noFill'))
     
-        # --- Axis & gridline styling (bar/line only) ---
+        # --- Axis & gridline styling (bar/line/radar: every chart with axes) ---
         if chart_type not in ("pie", "donut"):
             val_axis_def = elem.get("valueAxis", {})
             cat_axis_def = elem.get("categoryAxis", {})
+            # A chart extracted from a PPTX carries its own tick-label font size
+            # in ``_chartFontSize``; such a chart keeps the styling it came with.
+            # Everything else (fresh JSON, agent JSON that only sets the scale, a
+            # ``--minimal`` round trip that drops the ``_`` keys) gets theme styling,
+            # regardless of whether ``valueAxis``/``categoryAxis`` are present.
+            chart_font_sz = elem.get("_chartFontSize")
+            theme_axis_style = chart_font_sz is None
             
             # Value axis scaling
             if val_axis_def.get("min") is not None:
@@ -217,8 +224,8 @@ class ChartMixin:
                 prstDash = etree.SubElement(ln, qn('a:prstDash'))
                 prstDash.set('val', gridline_dash)
     
-            # Axis lines: subtle solid (skip for roundtrip)
-            if not val_axis_def and not cat_axis_def:
+            # Axis lines: subtle solid (kept from the extracted XML for a round trip)
+            if theme_axis_style:
                 for ax_tag in ['c:valAx', 'c:catAx']:
                     ax_el = chart._chartSpace.find(f'.//{qn(ax_tag)}')
                     if ax_el is None:
@@ -233,22 +240,20 @@ class ChartMixin:
                     solid = etree.SubElement(ln, qn('a:solidFill'))
                     srgb = etree.SubElement(solid, qn('a:srgbClr'))
                     srgb.set('val', axis_line_color)
-            else:
-                # Roundtrip: apply axis line settings
-                if val_axis_def.get("line") == "none":
-                    ax_el = chart._chartSpace.find(f'.//{qn("c:valAx")}')
-                    if ax_el is not None:
-                        ax_sp_pr = ax_el.find(qn('c:spPr'))
-                        if ax_sp_pr is None:
-                            ax_sp_pr = etree.SubElement(ax_el, qn('c:spPr'))
-                        for old_ln in ax_sp_pr.findall(qn('a:ln')):
-                            ax_sp_pr.remove(old_ln)
-                        ln = etree.SubElement(ax_sp_pr, qn('a:ln'))
-                        etree.SubElement(ln, qn('a:noFill'))
-    
-            # Tick labels: brand font, muted color (skip if roundtrip with axis defs)
-            chart_font_sz = elem.get("_chartFontSize")
-            if not val_axis_def and not cat_axis_def:
+            # Explicit "no value-axis line" always wins (independent of theming)
+            if val_axis_def.get("line") == "none":
+                ax_el = chart._chartSpace.find(f'.//{qn("c:valAx")}')
+                if ax_el is not None:
+                    ax_sp_pr = ax_el.find(qn('c:spPr'))
+                    if ax_sp_pr is None:
+                        ax_sp_pr = etree.SubElement(ax_el, qn('c:spPr'))
+                    for old_ln in ax_sp_pr.findall(qn('a:ln')):
+                        ax_sp_pr.remove(old_ln)
+                    ln = etree.SubElement(ax_sp_pr, qn('a:ln'))
+                    etree.SubElement(ln, qn('a:noFill'))
+
+            # Tick labels: brand font, muted color (kept from extracted XML for a round trip)
+            if theme_axis_style:
                 for axis in [chart.value_axis, chart.category_axis]:
                     axis.has_title = False
                     axis.tick_labels.font.size = Pt(tick_font_size)
@@ -382,9 +387,8 @@ class ChartMixin:
         if show_data_labels:
             plot.has_data_labels = True
             dl = plot.data_labels
-            val_axis_def = elem.get("valueAxis", {})
-            cat_axis_def = elem.get("categoryAxis", {})
-            if not val_axis_def and not cat_axis_def:
+            chart_font_sz = elem.get("_chartFontSize")
+            if chart_font_sz is None:
                 dl.font.size = Pt(style_font_size or 10)
                 dl.font.color.rgb = text_color
                 dl.font.name = self.fonts["halfwidth"]
