@@ -10,6 +10,7 @@
   --color-background-raised: var(--background-raised);
   --color-background-hover: var(--background-hover);
   --color-background-panel: var(--background-panel);
+  --color-background-chrome: var(--background-chrome);
   --color-foreground: var(--foreground);
   --color-foreground-secondary: var(--foreground-secondary);
   --color-foreground-muted: var(--foreground-muted);
@@ -108,6 +109,9 @@
   --background-raised: oklch(0.195 0.004 70);
   --background-hover: oklch(0.219 0.004 70);
   --background-panel: oklch(0.183 0.004 70);
+  /* Chrome: header + chat sit on this; the work canvas is a raised sheet above it */
+  --background-chrome: oklch(0.135 0.004 70);
+  --shadow-canvas: inset 0 1px 0 oklch(1 0 0 / 4%), 0 10px 30px oklch(0 0 0 / 35%);
   --foreground: oklch(0.95 0 0);
   --foreground-secondary: oklch(0.79 0.004 70);
   --foreground-muted: oklch(0.69 0.004 70);
@@ -177,6 +181,8 @@
   --background-raised: oklch(0.995 0.002 85);
   --background-hover: oklch(0.955 0.005 85);
   --background-panel: oklch(0.945 0.006 85);
+  --background-chrome: oklch(0.945 0.006 85);
+  --shadow-canvas: 0 1px 2px oklch(0.2 0.02 260 / 6%), 0 8px 24px oklch(0.2 0.02 260 / 6%);
   --foreground: oklch(0.22 0.01 260);
   --foreground-secondary: oklch(0.42 0.008 260);
   --foreground-muted: oklch(0.55 0.006 260);
@@ -720,7 +726,22 @@ body {
 
 /* ── Frosted glass header ── */
 .header-glass {
-  background: var(--background-panel);
+  background: var(--background-chrome);
+}
+
+/* ── Canvas: the work area is a sheet above the chrome (desktop only) ── */
+@media (min-width: 640px) {
+  .app-canvas {
+    margin: 0 8px 8px;
+    border-radius: 12px;
+    border: 1px solid var(--border);
+    background: var(--background);
+    box-shadow: var(--shadow-canvas);
+  }
+  .chat-panel-inner {
+    background: var(--background-chrome);
+    box-shadow: none !important;
+  }
 }
 
 /* ── Search glow on focus ── */

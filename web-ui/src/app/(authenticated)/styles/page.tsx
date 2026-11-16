@@ -185,7 +185,7 @@ export default function StylesPage() {
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
     >
       <div className="flex-1 flex overflow-hidden">
-        <div className="flex-1 overflow-y-auto" data-slide-scroller>
+        <div className="app-canvas flex-1 overflow-y-auto" data-slide-scroller>
         {loading ? (
           /* ── Loading skeleton ── */
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
