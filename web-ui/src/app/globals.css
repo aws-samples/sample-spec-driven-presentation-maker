@@ -751,9 +751,26 @@ body {
     background: var(--background);
     box-shadow: var(--shadow-canvas);
   }
+  .app-canvas {
+    transition: margin-right 0.35s cubic-bezier(0.4, 0, 0.6, 1);
+  }
+  /* An open chat owns the gutter, so its shadow has room to fall on the canvas */
+  .app-canvas:has(~ .chat-panel[data-open="true"]) {
+    margin-right: 0;
+  }
+  /* Chat comes and goes: it floats one level above the canvas (elevation 2) */
   .chat-panel-inner {
-    background: var(--background-chrome);
-    box-shadow: none !important;
+    margin: 0 8px 8px 8px;
+    height: calc(100% - 8px);
+    min-width: calc(var(--chat-panel-inner-w, 440px) - 16px);
+    border-radius: 12px;
+    border: 1px solid var(--border-hover);
+    background: var(--background-raised);
+    box-shadow: inset 0 1px 0 oklch(1 0 0 / 7%), -2px 0 8px oklch(0 0 0 / 35%) !important;
+  }
+  /* Inside the chat sheet the input steps up once more */
+  .chat-panel-inner .search-glow {
+    background: var(--popover);
   }
 }
 
