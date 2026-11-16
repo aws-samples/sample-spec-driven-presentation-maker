@@ -128,8 +128,8 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
           ) : (
             <>
               <a href="/decks/" className="flex items-center gap-2.5 no-underline">
-                <div className="w-6 h-6 rounded-md flex items-center justify-center bg-brand-teal-soft">
-                  <Layers className="h-3 w-3 text-brand-teal" />
+                <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: "var(--team-gradient)" }}>
+                  <Layers className="h-3.5 w-3.5 text-background" />
                 </div>
               </a>
               <div className="flex items-center gap-0.5 ml-1">

@@ -109,7 +109,7 @@ export function DeckListView({
           <h1 className="text-3xl font-semibold tracking-[-0.03em] leading-tight">
             {t("title")}
           </h1>
-          <p className="text-sm text-foreground-muted mt-2.5 font-medium tracking-wide uppercase">
+          <p className="text-sm text-foreground-muted mt-2">
             {t("presentationCount", { count: decks.length })}
           </p>
         </div>

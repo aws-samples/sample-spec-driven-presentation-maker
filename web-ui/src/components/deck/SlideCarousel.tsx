@@ -588,7 +588,7 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           <div className="flex items-center gap-3">
             <div>
               <div className="flex items-center gap-2">
-                <h2 className="text-sm font-medium truncate max-w-[200px]">
+                <h2 className="text-lg font-semibold tracking-[-0.02em] truncate max-w-[360px]">
                   {deckName || t("preview")}
                 </h2>
                 {isHtml && (

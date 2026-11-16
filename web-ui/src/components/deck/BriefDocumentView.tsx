@@ -130,7 +130,7 @@ function getTextContent(node: React.ReactNode): string {
 const briefComponents = {
   h1: ({ children, ...props }: React.ComponentProps<"h1">) => (
     <h1
-      className="text-2xl font-semibold tracking-tight mt-0 mb-4 pb-3 border-b border-foreground/[0.08]"
+      className="text-3xl font-semibold tracking-[-0.025em] leading-tight mt-0 mb-6 pb-4 border-b border-border"
       {...props}
     >
       {typeof children === "string" ? processTextContent(children) : children}
@@ -138,7 +138,7 @@ const briefComponents = {
   ),
   h2: ({ children, ...props }: React.ComponentProps<"h2">) => (
     <h2
-      className="text-lg font-semibold tracking-tight mt-8 mb-3"
+      className="text-lg font-semibold tracking-[-0.015em] text-foreground mt-10 mb-3"
       {...props}
     >
       {typeof children === "string" ? processTextContent(children) : children}
@@ -146,19 +146,19 @@ const briefComponents = {
   ),
   h3: ({ children, ...props }: React.ComponentProps<"h3">) => (
     <h3
-      className="text-[15px] font-medium mt-6 mb-2 text-foreground/80"
+      className="text-[15px] font-semibold mt-6 mb-2 text-foreground"
       {...props}
     >
       {typeof children === "string" ? processTextContent(children) : children}
     </h3>
   ),
   p: ({ children, ...props }: React.ComponentProps<"p">) => (
-    <p className="text-sm leading-relaxed mb-3 text-foreground/90" {...props}>
+    <p className="text-sm leading-relaxed mb-3 text-foreground-secondary" {...props}>
       {typeof children === "string" ? processTextContent(children) : children}
     </p>
   ),
   li: ({ children, ...props }: React.ComponentProps<"li">) => (
-    <li className="text-sm leading-relaxed text-foreground/90" {...props}>
+    <li className="text-sm leading-relaxed text-foreground-secondary" {...props}>
       {typeof children === "string" ? processTextContent(children) : children}
     </li>
   ),

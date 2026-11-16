@@ -264,11 +264,11 @@ export function DeckCard({
       </div>
 
       {/* Meta */}
-      <div className="px-3.5 py-3">
-        <h3 className="text-sm font-semibold text-foreground truncate leading-snug tracking-[-0.01em]">
+      <div className="px-4 pt-3 pb-3.5">
+        <h3 className="text-[15px] font-semibold text-foreground truncate leading-snug tracking-[-0.015em]">
           {deck.name}
         </h3>
-        <div className="flex items-center gap-2 mt-2 text-xs text-foreground/50">
+        <div className="flex items-center gap-2 mt-1 text-xs text-foreground-muted">
           {deck.owner && <span>{deck.owner}</span>}
           {deck.owner && deck.updatedAt && <span className="opacity-40">·</span>}
           {deck.updatedAt && <span>{formatDate(deck.updatedAt, locale)}</span>}
