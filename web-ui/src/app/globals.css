@@ -92,11 +92,11 @@
   --human-ink: oklch(0.24 0.04 95);
   --human-text: oklch(0.87 0.17 95);
   --surface-subtle: oklch(1 0 0 / 4%);
-  --surface-stage: oklch(0.19 0.009 265);
+  --surface-stage: oklch(0.156 0.004 70);
   --shadow-card: inset 0 1px 0 oklch(1 0 0 / 5%), 0 1px 2px oklch(0 0 0 / 30%), 0 8px 24px oklch(0 0 0 / 22%);
   --shadow-lift: inset 0 1px 0 oklch(1 0 0 / 6%), 0 2px 4px oklch(0 0 0 / 30%), 0 16px 40px oklch(0 0 0 / 35%);
   --shadow-slide: 0 4px 24px oklch(0 0 0 / 45%), 0 0 0 1px oklch(1 0 0 / 6%);
-  --storyboard-paper: oklch(0.275 0.011 265);
+  --storyboard-paper: oklch(0.213 0.004 70);
   --storyboard-ink: oklch(0.95 0 0);
   --storyboard-ink-2: oklch(0.78 0 0);
   --storyboard-ink-3: oklch(0.62 0 0);
@@ -104,39 +104,39 @@
   --storyboard-shadow: 0 4px 24px oklch(0 0 0 / 55%), 0 0 0 1px oklch(1 0 0 / 10%);
 
   /* Agent identity tokens are used directly; no waiting-color aliases needed. */
-  --background: oklch(0.215 0.009 265);
-  --background-raised: oklch(0.265 0.011 265);
-  --background-hover: oklch(0.30 0.012 265);
-  --background-panel: oklch(0.245 0.01 265);
+  --background: oklch(0.165 0.004 70);
+  --background-raised: oklch(0.195 0.004 70);
+  --background-hover: oklch(0.219 0.004 70);
+  --background-panel: oklch(0.183 0.004 70);
   --foreground: oklch(0.95 0 0);
-  --foreground-secondary: oklch(0.8 0.005 265);
-  --foreground-muted: oklch(0.72 0.008 265);
+  --foreground-secondary: oklch(0.79 0.004 70);
+  --foreground-muted: oklch(0.69 0.004 70);
   --brand: oklch(0.95 0 0);
   --brand-soft: oklch(1 0 0 / 8%);
   --glow: none;
   --noise-opacity: 0;
-  --card: oklch(0.265 0.011 265);
+  --card: oklch(0.195 0.004 70);
   --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.285 0.012 265);
+  --popover: oklch(0.207 0.004 70);
   --popover-foreground: oklch(0.95 0 0);
   --primary: oklch(0.95 0 0);
-  --primary-foreground: oklch(0.215 0.009 265);
-  --secondary: oklch(0.31 0.012 265);
+  --primary-foreground: oklch(0.165 0.004 70);
+  --secondary: oklch(0.225 0.004 70);
   --secondary-foreground: oklch(0.88 0 0);
-  --muted: oklch(0.285 0.012 265);
-  --muted-foreground: oklch(0.72 0.008 265);
-  --accent: oklch(0.31 0.012 265);
+  --muted: oklch(0.207 0.004 70);
+  --muted-foreground: oklch(0.69 0.004 70);
+  --accent: oklch(0.225 0.004 70);
   --accent-foreground: oklch(0.95 0 0);
   --destructive: oklch(0.65 0.2 25);
-  --border: oklch(1 0 0 / 10%);
-  --border-hover: oklch(1 0 0 / 18%);
+  --border: oklch(1 0 0 / 9%);
+  --border-hover: oklch(1 0 0 / 16%);
   --input: oklch(1 0 0 / 11%);
   --ring: oklch(0.65 0 0 / 40%);
   /* Hearing card: lifted off the chat background, option rows clearly outlined */
-  --hearing-card: oklch(0.285 0.012 265);
-  --hearing-option: oklch(0.32 0.012 265);
+  --hearing-card: oklch(0.207 0.004 70);
+  --hearing-option: oklch(0.231 0.004 70);
   --hearing-option-border: oklch(1 0 0 / 14%);
-  --hearing-field: oklch(0.235 0.01 265);
+  --hearing-field: oklch(0.174 0.004 70);
 }
 
 [data-theme="light"] {
