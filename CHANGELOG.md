@@ -13,6 +13,23 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+## [0.18.0] - 2026-11-15
+
+Japanese decks read more naturally: a `writing-ja` guide that the orchestrator and composers
+read for a Japanese deck, and CJK↔Latin spacing that leaves Japanese punctuation, quotes
+and apostrophes alone, gives styled text the same spaces as plain text, and now also
+covers HTML decks and chart text. The MCP servers move to MCP Python SDK 2.x. Built PPTX
+files carry accessibility metadata, the Local Web UI keeps its reads and writes inside
+its data directories, and XML from outside the repository goes through one explicit parser.
+
+### Upgrading from 0.17
+
+**Cloud deployments.**
+
+- Deploy all stacks (`scripts/deploy.sh`), in any order. The Web UI
+  (`scripts/deploy_webui.sh`) changes only in its dependencies. Nothing in
+  `infra/config.yaml` changes.
+
 ### Security
 
 - **Local Web UI file access stays inside its data directories after symlinks are
@@ -2496,7 +2513,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.17.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.18.0...HEAD
+[0.18.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.15.0...v0.16.0
 [0.15.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.14.0...v0.15.0
