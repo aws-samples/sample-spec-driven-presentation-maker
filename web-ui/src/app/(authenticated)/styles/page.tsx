@@ -191,7 +191,7 @@ export default function StylesPage() {
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-xl font-semibold tracking-[-0.02em]">{t("title")}</h1>
+                <h1 className="text-3xl font-semibold tracking-[-0.03em] leading-tight">{t("title")}</h1>
                 <p className="text-sm text-foreground-muted mt-1">{t("subtitle")}</p>
               </div>
             </div>
@@ -280,7 +280,7 @@ export default function StylesPage() {
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-xl font-semibold tracking-[-0.02em]">{t("title")}</h1>
+                <h1 className="text-3xl font-semibold tracking-[-0.03em] leading-tight">{t("title")}</h1>
                 <p className="text-sm text-foreground-muted mt-1">{t("subtitle")}</p>
               </div>
             </div>

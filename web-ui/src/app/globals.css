@@ -56,12 +56,12 @@
 /* Live Design Studio — dark is the default studio experience. */
 :root {
   color-scheme: dark;
-  --radius: 0.75rem;
-  --font-ui: var(--font-bricolage), "Noto Sans JP", "Yu Gothic", sans-serif;
-  --font-display: var(--font-bricolage), "Noto Sans JP", "Yu Gothic", sans-serif;
-  --font-document: var(--font-fraunces), "Noto Serif JP", "Yu Mincho", serif;
+  --radius: 0.625rem;
+  --font-ui: var(--font-geist), "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
+  --font-display: var(--font-geist), "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
+  --font-document: var(--font-fraunces), "Hiragino Mincho ProN", "Noto Serif JP", "Yu Mincho", serif;
   --display-weight: 600;
-  --display-tracking: -0.03em;
+  --display-tracking: -0.025em;
   --document-display-weight: 550;
   --document-display-tracking: -0.015em;
 
@@ -91,12 +91,12 @@
   --human: oklch(0.87 0.17 95);
   --human-ink: oklch(0.24 0.04 95);
   --human-text: oklch(0.87 0.17 95);
-  --surface-subtle: oklch(1 0 0 / 3%);
-  --surface-stage: oklch(0.13 0.006 260);
-  --shadow-card: 0 1px 2px oklch(0 0 0 / 30%), 0 8px 24px oklch(0 0 0 / 25%);
-  --shadow-lift: 0 2px 4px oklch(0 0 0 / 35%), 0 16px 48px oklch(0 0 0 / 40%);
+  --surface-subtle: oklch(1 0 0 / 4%);
+  --surface-stage: oklch(0.19 0.009 265);
+  --shadow-card: inset 0 1px 0 oklch(1 0 0 / 5%), 0 1px 2px oklch(0 0 0 / 30%), 0 8px 24px oklch(0 0 0 / 22%);
+  --shadow-lift: inset 0 1px 0 oklch(1 0 0 / 6%), 0 2px 4px oklch(0 0 0 / 30%), 0 16px 40px oklch(0 0 0 / 35%);
   --shadow-slide: 0 4px 24px oklch(0 0 0 / 45%), 0 0 0 1px oklch(1 0 0 / 6%);
-  --storyboard-paper: oklch(0.245 0.006 260);
+  --storyboard-paper: oklch(0.275 0.011 265);
   --storyboard-ink: oklch(0.95 0 0);
   --storyboard-ink-2: oklch(0.78 0 0);
   --storyboard-ink-3: oklch(0.62 0 0);
@@ -104,39 +104,39 @@
   --storyboard-shadow: 0 4px 24px oklch(0 0 0 / 55%), 0 0 0 1px oklch(1 0 0 / 10%);
 
   /* Agent identity tokens are used directly; no waiting-color aliases needed. */
-  --background: oklch(0.11 0.005 260);
-  --background-raised: oklch(0.14 0.005 260);
-  --background-hover: oklch(0.16 0.005 260);
-  --background-panel: oklch(0.08 0.005 260);
+  --background: oklch(0.215 0.009 265);
+  --background-raised: oklch(0.265 0.011 265);
+  --background-hover: oklch(0.30 0.012 265);
+  --background-panel: oklch(0.245 0.01 265);
   --foreground: oklch(0.95 0 0);
-  --foreground-secondary: oklch(0.75 0 0);
-  --foreground-muted: oklch(0.65 0 0);
+  --foreground-secondary: oklch(0.8 0.005 265);
+  --foreground-muted: oklch(0.72 0.008 265);
   --brand: oklch(0.95 0 0);
   --brand-soft: oklch(1 0 0 / 8%);
-  --glow: radial-gradient(ellipse at 30% -10%, oklch(1 0 0 / 2.5%) 0%, transparent 55%);
-  --noise-opacity: 0.025;
-  --card: oklch(0.14 0.005 260);
+  --glow: none;
+  --noise-opacity: 0;
+  --card: oklch(0.265 0.011 265);
   --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.14 0.005 260);
+  --popover: oklch(0.285 0.012 265);
   --popover-foreground: oklch(0.95 0 0);
   --primary: oklch(0.95 0 0);
-  --primary-foreground: oklch(0.11 0.005 260);
-  --secondary: oklch(0.20 0.005 260);
+  --primary-foreground: oklch(0.215 0.009 265);
+  --secondary: oklch(0.31 0.012 265);
   --secondary-foreground: oklch(0.88 0 0);
-  --muted: oklch(0.18 0.005 260);
-  --muted-foreground: oklch(0.55 0 0);
-  --accent: oklch(0.20 0.005 260);
+  --muted: oklch(0.285 0.012 265);
+  --muted-foreground: oklch(0.72 0.008 265);
+  --accent: oklch(0.31 0.012 265);
   --accent-foreground: oklch(0.95 0 0);
   --destructive: oklch(0.65 0.2 25);
-  --border: oklch(1 0 0 / 6%);
-  --border-hover: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 8%);
+  --border: oklch(1 0 0 / 10%);
+  --border-hover: oklch(1 0 0 / 18%);
+  --input: oklch(1 0 0 / 11%);
   --ring: oklch(0.65 0 0 / 40%);
   /* Hearing card: lifted off the chat background, option rows clearly outlined */
-  --hearing-card: oklch(0.165 0.005 260);
-  --hearing-option: oklch(0.21 0.005 260);
+  --hearing-card: oklch(0.285 0.012 265);
+  --hearing-option: oklch(0.32 0.012 265);
   --hearing-option-border: oklch(1 0 0 / 14%);
-  --hearing-field: oklch(0.12 0.005 260);
+  --hearing-field: oklch(0.235 0.01 265);
 }
 
 [data-theme="light"] {
@@ -720,9 +720,7 @@ body {
 
 /* ── Frosted glass header ── */
 .header-glass {
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  background: color-mix(in oklch, var(--background) 80%, transparent);
+  background: var(--background-panel);
 }
 
 /* ── Search glow on focus ── */

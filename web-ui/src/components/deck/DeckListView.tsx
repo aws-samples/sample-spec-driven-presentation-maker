@@ -106,7 +106,7 @@ export function DeckListView({
       {/* Title + actions */}
       <div className="animate-card-in flex items-end justify-between mb-10">
         <div>
-          <h1 className="text-[36px] sm:text-[42px] font-extrabold tracking-[-0.04em] leading-[1]">
+          <h1 className="text-3xl font-semibold tracking-[-0.03em] leading-tight">
             {t("title")}
           </h1>
           <p className="text-sm text-foreground-muted mt-2.5 font-medium tracking-wide uppercase">
