@@ -90,10 +90,10 @@ export function DeckCard({
       onKeyDown={handleCardKeyDown}
       // Shift-click range selection must not start a text selection.
       onMouseDown={(e) => { if (canSelect && e.shiftKey) e.preventDefault() }}
-      className={`animate-card-in group relative rounded-xl overflow-hidden bg-card border transition-all duration-350 cursor-pointer motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
+      className={`animate-card-in group relative rounded-xl overflow-hidden bg-card border shadow-[var(--shadow-card)] transition-all duration-350 cursor-pointer motion-reduce:hover:translate-y-0 motion-reduce:transition-none ${
         selected
           ? "border-brand-teal ring-2 ring-brand-teal/60 shadow-[var(--shadow-lift)]"
-          : "border-border hover:border-border-hover hover:-translate-y-[3px] hover:shadow-[var(--shadow-lift)]"
+          : "border-border hover:border-border-hover hover:-translate-y-[2px] hover:shadow-[var(--shadow-lift)]"
       }`}
       style={{ "--delay": `${index * 60}ms` } as React.CSSProperties}
     >

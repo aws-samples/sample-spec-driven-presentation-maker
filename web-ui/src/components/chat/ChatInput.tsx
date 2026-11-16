@@ -320,7 +320,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         <form
           ref={formRef}
           onSubmit={handleSubmit}
-          className="rounded-xl border border-border bg-background-raised search-glow"
+          className="rounded-xl border border-border bg-background-raised shadow-[var(--shadow-card)] search-glow"
           data-landed={landed ? "" : undefined}
         >
           {topSlot}

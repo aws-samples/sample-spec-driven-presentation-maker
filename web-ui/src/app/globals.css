@@ -94,7 +94,10 @@
   --human-text: oklch(0.87 0.17 95);
   --surface-subtle: oklch(1 0 0 / 4%);
   --surface-stage: oklch(0.156 0.004 70);
-  --shadow-card: inset 0 1px 0 oklch(1 0 0 / 5%), 0 1px 2px oklch(0 0 0 / 30%), 0 8px 24px oklch(0 0 0 / 22%);
+  /* Elevation: 0 chrome · 1 canvas · 2 objects (cards, input) · 3 floating (menus, dialogs).
+     Higher = lighter + a 1px top highlight; shadows only grow from 2 upward. */
+  --shadow-card: inset 0 1px 0 oklch(1 0 0 / 6%), 0 1px 2px oklch(0 0 0 / 30%), 0 6px 16px oklch(0 0 0 / 20%);
+  --shadow-float: inset 0 1px 0 oklch(1 0 0 / 8%), 0 0 0 1px oklch(0 0 0 / 45%), 0 2px 6px oklch(0 0 0 / 30%), 0 16px 40px oklch(0 0 0 / 50%);
   --shadow-lift: inset 0 1px 0 oklch(1 0 0 / 6%), 0 2px 4px oklch(0 0 0 / 30%), 0 16px 40px oklch(0 0 0 / 35%);
   --shadow-slide: 0 4px 24px oklch(0 0 0 / 45%), 0 0 0 1px oklch(1 0 0 / 6%);
   --storyboard-paper: oklch(0.213 0.004 70);
@@ -121,7 +124,7 @@
   --noise-opacity: 0;
   --card: oklch(0.195 0.004 70);
   --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.207 0.004 70);
+  --popover: oklch(0.225 0.004 70);
   --popover-foreground: oklch(0.95 0 0);
   --primary: oklch(0.95 0 0);
   --primary-foreground: oklch(0.165 0.004 70);
@@ -170,6 +173,7 @@
   --surface-stage: oklch(0.93 0.008 85);
   --shadow-card: 0 1px 2px oklch(0.2 0.02 260 / 8%), 0 8px 24px oklch(0.2 0.02 260 / 8%);
   --shadow-lift: 0 2px 4px oklch(0.2 0.02 260 / 10%), 0 16px 48px oklch(0.2 0.02 260 / 14%);
+  --shadow-float: 0 0 0 1px oklch(0.2 0.02 260 / 6%), 0 2px 6px oklch(0.2 0.02 260 / 8%), 0 16px 40px oklch(0.2 0.02 260 / 16%);
   --shadow-slide: 0 6px 28px oklch(0.2 0.02 260 / 18%), 0 0 0 1px oklch(0.2 0.02 260 / 6%);
   --storyboard-paper: var(--card);
   --storyboard-ink: oklch(0.22 0.01 260);
@@ -727,6 +731,15 @@ body {
 /* ── Frosted glass header ── */
 .header-glass {
   background: var(--background-chrome);
+}
+
+/* ── Elevation 3: everything that floats over the page ── */
+[data-slot="dialog-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"] {
+  background-color: var(--popover);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-float);
 }
 
 /* ── Canvas: the work area is a sheet above the chrome (desktop only) ── */

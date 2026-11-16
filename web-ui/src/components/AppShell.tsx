@@ -200,7 +200,7 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
               <div
                 role="menu"
                 aria-label={t("userMenu")}
-                className={`absolute right-0 top-full mt-1.5 w-56 rounded-xl py-1.5 z-[60] border border-border bg-popover shadow-[var(--shadow-lift)] backdrop-blur-xl user-menu-enter ${menuVisible ? "user-menu-visible" : ""}`}
+                className={`absolute right-0 top-full mt-1.5 w-56 rounded-xl py-1.5 z-[60] border border-border-hover bg-popover shadow-[var(--shadow-float)] user-menu-enter ${menuVisible ? "user-menu-visible" : ""}`}
               >
                 {/* User info */}
                 <div className="px-3.5 py-2">
