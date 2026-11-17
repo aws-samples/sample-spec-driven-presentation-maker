@@ -755,6 +755,33 @@ body {
   }
 }
 
+/* ── Stage → sheet: the first send moves the home composer into the chat sheet ── */
+/* Names exist only while the move runs (html.stage-morph), so nothing else takes part. */
+html.stage-morph .chat-panel {
+  transition: none;
+}
+/* Only the input box travels; the rest of the page cross-fades. */
+html.stage-morph [data-chat-composer] {
+  view-transition-name: chat-composer;
+}
+::view-transition-group(chat-composer) {
+  overflow: hidden;
+  border-radius: 16px;
+  animation-duration: 520ms;
+  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+::view-transition-old(chat-composer),
+::view-transition-new(chat-composer) {
+  height: 100%;
+  object-fit: none;
+  object-position: left top;
+  animation-duration: 520ms;
+}
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 280ms;
+}
+
 /* ── Search glow on focus ── */
 .search-glow {
   transition: box-shadow 0.3s ease, border-color 0.3s ease;

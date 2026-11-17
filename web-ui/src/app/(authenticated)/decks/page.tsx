@@ -93,22 +93,10 @@ export default function DecksPage() {
     sendMessage: (text: string, options?: { displayContent?: string }) =>
       chatRef.current?.sendMessage(text, options) ?? Promise.resolve(),
   }), [agentIsLoading])
-  // Home prompt: open a new chat, then send once its panel owns chatRef.
-  const [pendingPrompt, setPendingPrompt] = useState<string | null>(null)
-  const startWithPrompt = useCallback((prompt: string) => {
-    ws.setChatOpen(true)
-    ws.setChatTab("new")
-    setPendingPrompt(prompt)
-  }, [ws])
-  useEffect(() => {
-    if (!pendingPrompt || !ws.chatOpen || ws.chatTab !== "new") return
-    const timer = setTimeout(() => {
-      if (!chatRef.current) return
-      void chatRef.current.sendMessage(pendingPrompt)
-      setPendingPrompt(null)
-    }, 50)
-    return () => clearTimeout(timer)
-  }, [pendingPrompt, ws.chatOpen, ws.chatTab])
+  // Home screen: a blank new chat is the composer at the top (the shell's stage).
+  const [staged, setStaged] = useState(false)
+  const focusComposer = useCallback(() => chatRef.current?.focus(), [])
+  const openChatSheet = useCallback(() => ws.setChatOpen(true), [ws])
   const swipeRef = useSwipe(
     () => setActiveTab("preview"),
     () => setActiveTab("chat"),
@@ -149,11 +137,11 @@ export default function DecksPage() {
     <AppShell
       deckName={ws.isWorkspace && ws.deck ? ws.deck.name : undefined}
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
-      chatOpen={ws.chatOpen}
-      onChatToggle={() => ws.setChatOpen((prev) => !prev)}
+      chatOpen={staged ? false : ws.chatOpen}
+      onChatToggle={staged ? focusComposer : () => ws.setChatOpen((prev) => !prev)}
     >
-      <div className="flex-1 overflow-hidden relative sm:flex">
-        <main className="h-full overflow-y-auto flex-1 min-w-0">
+      <div className={staged ? "flex-1 overflow-y-auto relative flex flex-col" : "flex-1 overflow-hidden relative sm:flex"}>
+        <main className={staged ? "flex-none min-w-0" : "h-full overflow-y-auto flex-1 min-w-0"}>
           {ws.isWorkspace ? (
             <>
               {/* Mobile tab bar */}
@@ -275,8 +263,8 @@ export default function DecksPage() {
                 searchResults={list.searchResults}
                 searching={list.searching}
                 onDeckOpen={ws.openDeck}
-                onNewDeck={() => { ws.setChatOpen(true); ws.setChatTab("new") }}
-                onCreateWithPrompt={startWithPrompt}
+                onNewDeck={staged ? focusComposer : () => { ws.setChatOpen(true); ws.setChatTab("new") }}
+                showNewDeck={!staged}
                 favoriteIds={list.favoriteIds}
                 onToggleFavorite={list.handleToggleFavorite}
                 onDelete={list.handleDelete}
@@ -314,6 +302,9 @@ export default function DecksPage() {
             onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}
             onLoadingChange={setAgentIsLoading}
+            stageAllowed={!ws.isWorkspace}
+            onStagedChange={setStaged}
+            onStageExit={openChatSheet}
           />
           </DeckFormatProvider>
         )}
@@ -339,7 +330,7 @@ export default function DecksPage() {
         onConfirm={handleConfirmBulkDelete}
       />
 
-      {isMobile && !ws.isWorkspace && (
+      {isMobile && !ws.isWorkspace && !staged && (
         <div className="fixed right-4 z-40" style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}>
           {fabOpen && (
             <>

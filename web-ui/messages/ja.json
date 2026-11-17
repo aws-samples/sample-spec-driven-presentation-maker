@@ -46,12 +46,7 @@
     "selectAll": "すべて選択 ({total})",
     "deleteSelected": "削除",
     "deletingProgress": "{done} / {total} 件削除中…",
-    "selectionToolbar": "選択中のデッキ",
-    "heroTitle": "どんなプレゼンを作りますか?",
-    "heroSubtitle": "内容を伝えると、エージェントがブリーフ・アートディレクション・アウトラインを固めてからスライドを組みます。",
-    "heroPlaceholder": "聞き手、持ち帰ってほしいこと、だいたいの枚数を書いてください",
-    "heroHint": "⌘↵ で開始",
-    "heroSubmit": "作り始める"
+    "selectionToolbar": "選択中のデッキ"
   },
   "settings": {
     "title": "設定",
@@ -323,7 +318,11 @@
     "steerComments": "{count, plural, other {コメント # 件}}",
     "backgroundWorking": "コンポーザーが裏で作業中です。チャットは続けられます。",
     "stopping": "停止中…",
-    "reconnecting": "エージェントに再接続中…"
+    "reconnecting": "エージェントに再接続中…",
+    "stageTitle": "どんなプレゼンを作りますか?",
+    "stageSubtitle": "内容を伝えると、エージェントがブリーフ・アートディレクション・アウトラインを固めてからスライドを組みます。",
+    "stagePlaceholder": "聞き手、持ち帰ってほしいこと、だいたいの枚数を書いてください\n/ でテンプレート・スタイル  ⌘↵ で送信",
+    "stagePlaceholderMobile": "聞き手と、持ち帰ってほしいことを書いてください"
   },
   "composerNote": {
     "from": "コンポーザー {group}",
@@ -409,7 +408,8 @@
     "vibePath": "すばやく作成",
     "specPath": "確認しながら作成",
     "vibeSummary": "ラフな素材から、まず初稿をすばやく形にします。",
-    "specSummary": "スライドを作る前に、伝えるストーリーを固めます。"
+    "specSummary": "スライドを作る前に、伝えるストーリーを固めます。",
+    "chipLabel": "進め方: {mode}"
   },
   "htmlFormatPill": {
     "buildAsHtml": "HTML で作成",

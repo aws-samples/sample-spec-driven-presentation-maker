@@ -29,8 +29,7 @@ import { DeckCard } from "@/components/deck/DeckCard"
 import { EmptyState } from "@/components/deck/EmptyState"
 import { SearchResultsGrid } from "@/components/deck/SearchResultsGrid"
 import { SelectionBar } from "@/components/deck/SelectionBar"
-import { Search, X, Lock, Star, Building2, Sparkles, CheckSquare, ArrowUp } from "lucide-react"
-import { useState } from "react"
+import { Search, X, Plus, Lock, Star, Building2, Sparkles, CheckSquare } from "lucide-react"
 import { Skeleton } from "@/components/ui/skeleton"
 import { IS_LOCAL } from "@/lib/mode"
 import { useTranslations } from "next-intl"
@@ -59,8 +58,8 @@ interface DeckListViewProps {
   searching?: boolean
   onDeckOpen: (deckId: string) => void
   onNewDeck: () => void
-  /** Start a new deck from the home prompt. Falls back to onNewDeck when absent. */
-  onCreateWithPrompt?: (prompt: string) => void
+  /** Show the New Deck button (off while the composer is on the home screen). */
+  showNewDeck?: boolean
   favoriteIds: Set<string>
   onToggleFavorite: (deckId: string, action: "add" | "remove") => void
   onDelete: (deckId: string) => void
@@ -94,7 +93,7 @@ export function visibleDecks(decks: DeckSummary[], searchQuery: string): DeckSum
 
 export function DeckListView({
   decks, activeTab, onTabChange, searchQuery, onSearchChange,
-  searchResults, searching, onDeckOpen, onNewDeck, onCreateWithPrompt, favoriteIds,
+  searchResults, searching, onDeckOpen, onNewDeck, showNewDeck = true, favoriteIds,
   onToggleFavorite, onDelete, onToggleVisibility, onDownload, onOpenPptx, onOpenFolder, loading,
   selection,
 }: DeckListViewProps) {
@@ -104,52 +103,8 @@ export function DeckListView({
   const canSelect = !!selection && activeTab === "mine" && !showSearch && filteredDecks.length > 0
   const selecting = canSelect && selection.selectionMode
 
-  const [prompt, setPrompt] = useState("")
-  const submitPrompt = () => {
-    const text = prompt.trim()
-    if (text && onCreateWithPrompt) { onCreateWithPrompt(text); setPrompt("") }
-    else onNewDeck()
-  }
-
   return (
-    <div className={`max-w-6xl mx-auto px-5 sm:px-10 pt-12 sm:pt-20 pb-12 ${selecting ? "pb-28" : ""}`}>
-      {/* ── Hero: creating a deck starts here ── */}
-      <section className="animate-card-in max-w-[720px] mx-auto mb-16 sm:mb-24">
-        <h1 className="text-center text-3xl sm:text-5xl font-semibold tracking-[-0.035em] leading-[1.15] text-balance">
-          {t("heroTitle")}
-        </h1>
-        <p className="text-center text-[15px] text-foreground-secondary mt-3 text-balance">
-          {t("heroSubtitle")}
-        </p>
-        <form
-          onSubmit={(e) => { e.preventDefault(); submitPrompt() }}
-          className="hero-prompt mt-9 rounded-2xl border border-border-hover bg-background-raised shadow-[var(--shadow-card)]"
-        >
-          <label htmlFor="hero-prompt" className="sr-only">{t("heroTitle")}</label>
-          <textarea
-            id="hero-prompt"
-            rows={3}
-            value={prompt}
-            onChange={(e) => setPrompt(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) { e.preventDefault(); submitPrompt() }
-            }}
-            placeholder={t("heroPlaceholder")}
-            className="block w-full resize-none bg-transparent px-5 pt-4 pb-1 text-[15px] leading-relaxed outline-none placeholder:text-foreground-muted"
-          />
-          <div className="flex items-center justify-between gap-3 px-3 pb-3 pt-1">
-            <span className="pl-2 text-xs text-foreground-muted">{t("heroHint")}</span>
-            <button
-              type="submit"
-              className="team-action-btn team-entry-btn inline-flex items-center gap-1.5 h-9 pl-4 pr-3 text-sm font-semibold rounded-xl transition-all"
-            >
-              {t("heroSubmit")}
-              <ArrowUp className="h-4 w-4" aria-hidden="true" />
-            </button>
-          </div>
-        </form>
-      </section>
-
+    <div className={`max-w-6xl mx-auto px-5 sm:px-10 pt-10 sm:pt-12 pb-12 ${selecting ? "pb-28" : ""}`}>
       {/* ── Library ── */}
       <div className="animate-card-in flex flex-wrap items-center justify-between gap-3 mb-6" style={{ "--delay": "50ms" } as React.CSSProperties}>
         <div className="flex items-baseline gap-3">
@@ -187,6 +142,16 @@ export function DeckListView({
             >
               <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
               {selecting ? t("cancelSelection") : t("select")}
+            </button>
+          )}
+          {showNewDeck && (
+            <button
+              type="button"
+              onClick={onNewDeck}
+              className="team-action-btn team-entry-btn hidden sm:inline-flex items-center gap-1.5 h-9 px-3.5 text-sm font-semibold rounded-lg transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              {t("newDeck")}
             </button>
           )}
         </div>

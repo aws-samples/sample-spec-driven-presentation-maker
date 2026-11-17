@@ -19,11 +19,15 @@
  *   - Screen navigates to new deck
  *   - Panel B remounts with new deck's key
  *   - Panel A stays as-is
+ *
+ * Stage (home screen): while no deck is open and Panel A is blank, the shell renders Panel A as
+ * the composer at the top of the home screen instead of the sheet. The same element moves, so
+ * the panel keeps its state; its first send moves it into the sheet and opens the chat.
  */
 
 "use client"
 
-import { useRef, useEffect, useState, useCallback } from "react"
+import { useRef, useEffect, useLayoutEffect, useState, useCallback } from "react"
 import { ChatPanel, ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { MessageSquare, PanelRightClose, SquarePen, Layers } from "lucide-react"
 import { IS_LOCAL } from "@/lib/mode"
@@ -56,12 +60,18 @@ interface ChatPanelShellProps {
   onLoadingChange?: (isLoading: boolean) => void
   chatRef?: React.RefObject<ChatPanelHandle | null>
   inline?: boolean
+  /** The home screen: Panel A may be shown as the stage while it is blank. */
+  stageAllowed?: boolean
+  /** Reports whether Panel A is shown as the stage (the page lays itself out around it). */
+  onStagedChange?: (staged: boolean) => void
+  /** Panel A left the stage with its first message: open the chat sheet. */
+  onStageExit?: () => void
 }
 
 export function ChatPanelShell({
   open, onClose, chatTab, onChatTabChange,
   deckId, deckName, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, chatRef: externalChatRef,
-  inline = false,
+  inline = false, stageAllowed = false, onStagedChange, onStageExit,
 }: ChatPanelShellProps) {
   const t = useTranslations("chatShell")
   const internalChatRef = useRef<ChatPanelHandle>(null)
@@ -79,12 +89,30 @@ export function ChatPanelShell({
   }, [])
 
   /** Close the panel on Escape (matches dialog conventions on mobile overlay). */
+  // Panel A is blank (no messages yet); set by the panel itself.
+  const [panelABlank, setPanelABlank] = useState(true)
+  const staged = stageAllowed && !inline && deckId === null && panelABlank
+  const stagedRef = useRef(staged)
+  const exitRef = useRef({ onChatTabChange, onStageExit })
+  exitRef.current = { onChatTabChange, onStageExit }
+  const handlePanelABlank = useCallback((blank: boolean) => {
+    setPanelABlank(blank)
+    if (!blank && stagedRef.current) {
+      exitRef.current.onChatTabChange("new")
+      exitRef.current.onStageExit?.()
+    }
+  }, [])
+  useLayoutEffect(() => {
+    stagedRef.current = staged
+    onStagedChange?.(staged)
+  }, [staged, onStagedChange])
+
   useEffect(() => {
-    if (!open || inline) return
+    if (!open || inline || staged) return
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [open, inline, onClose])
+  }, [open, inline, staged, onClose])
 
   /** Apply width to panel DOM without React re-render. */
   const applyWidth = useCallback((w: number) => {
@@ -199,24 +227,28 @@ export function ChatPanelShell({
   const panelAVisible = chatTab === "new" || (chatTab === "deck" && panelAOwnsCurrentDeck) || (chatTab === "deck" && panelADeckId !== null && !showPanelB)
   // Panel B is visible when: tab is "deck" and Panel A doesn't own the deck
   const panelBVisible = chatTab === "deck" && showPanelB
+  // On the stage Panel A is shown whatever the tab
+  const panelAShown = panelAVisible || staged
 
   // Tab label for Panel A
   const panelALabel = panelAOwnsCurrentDeck ? (deckName || t("deck")) : t("new")
 
   const chatContent = (
     <ErrorBoundary label="Chat">
-      <div className="flex-1 overflow-hidden relative">
-        {/* Panel A: New / deck-created-from-new */}
-        <div className={`h-full ${panelAVisible ? "" : "hidden"}`}>
+      <div className={staged ? "relative" : "flex-1 overflow-hidden relative"}>
+        {/* Panel A: New / deck-created-from-new (the stage on the home screen while blank) */}
+        <div className={staged ? "" : `h-full ${panelAShown ? "" : "hidden"}`}>
           <ChatPanel
             key={`a-${panelAKey}`}
-            ref={panelAVisible ? chatRef : undefined}
+            ref={panelAShown ? chatRef : undefined}
             deckId={panelADeckId ?? "new"}
             onDeckCreated={handlePanelADeckCreated}
             onPreviewInvalidated={onPreviewInvalidated}
             onWorkflowPhase={onWorkflowPhase}
-            onLoadingChange={panelAVisible ? onLoadingChange : undefined}
-            visible={open && panelAVisible}
+            onLoadingChange={panelAShown ? onLoadingChange : undefined}
+            visible={open && panelAShown}
+            stage={staged}
+            onBlankChange={handlePanelABlank}
           />
         </div>
 
@@ -246,7 +278,7 @@ export function ChatPanelShell({
 
   return (
     <>
-      {open && (
+      {open && !staged && (
         <div
           className="sm:hidden fixed inset-0 z-40 bg-black/60"
           onClick={onClose}
@@ -256,10 +288,14 @@ export function ChatPanelShell({
       <aside
         ref={panelRef}
         data-open={open}
-        className="chat-panel fixed right-0 top-12 bottom-0 z-50 w-full sm:relative sm:right-auto sm:top-auto sm:bottom-auto sm:z-auto sm:h-full sm:flex-none"
-        style={{ width: open ? panelWidth : 0 }}
+        data-stage={staged ? "" : undefined}
+        className={staged
+          ? "chat-stage relative order-first w-full flex-none px-5 sm:px-10"
+          : "chat-panel fixed right-0 top-12 bottom-0 z-50 w-full sm:relative sm:right-auto sm:top-auto sm:bottom-auto sm:z-auto sm:h-full sm:flex-none"}
+        style={staged ? undefined : { width: open ? panelWidth : 0 }}
       >
         {/* Resize handle — absolute, left:-6px, outside inner overflow:hidden */}
+        {!staged && (
         <div
           className="chat-resize-handle hidden sm:flex"
           onMouseDown={handleResizeStart}
@@ -267,16 +303,19 @@ export function ChatPanelShell({
           aria-orientation="vertical"
           aria-label={t("resizePanel")}
         />
+        )}
         {/* Inner — overflow:hidden clips during close, min-width prevents text reflow */}
         <div
-          className="chat-panel-inner h-full flex flex-col bg-background-panel pb-4"
-          style={{
+          data-chat-surface=""
+          className={staged ? "mx-auto flex w-full max-w-[760px] flex-col" : "chat-panel-inner h-full flex flex-col bg-background-panel pb-4"}
+          style={staged ? undefined : {
             "--chat-panel-inner-w": `${panelWidth}px`,
             boxShadow: open
               ? "-1px 0 0 var(--border), -20px 0 40px oklch(0 0 0 / 30%)"
               : "none",
           } as React.CSSProperties}
         >
+        {!staged && (<>
         {/* Header */}
         <div className="flex-none px-4 pt-3 pb-0">
           <div className="flex items-center justify-between mb-3">
@@ -342,6 +381,7 @@ export function ChatPanelShell({
         </div>
 
         <div className="mx-4 mt-3 border-t border-border" />
+        </>)}
 
         {chatContent}
         </div>{/* end chat-panel-inner */}

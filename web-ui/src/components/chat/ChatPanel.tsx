@@ -11,7 +11,7 @@
 
 "use client"
 
-import { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
 import { loadRuntimeConfig } from "@/lib/runtimeConfig"
@@ -61,12 +61,21 @@ interface ChatPanelProps {
   onLoadingChange?: (isLoading: boolean) => void
   /** The panel is on screen. A new deck's `prepare` waits until it is (Cloud). */
   visible?: boolean
+  /**
+   * The panel is the composer at the centre of the home screen: a heading, the large input and,
+   * below it, recent sessions (Local) or example prompts. The shell moves it into the chat sheet
+   * once it is no longer blank; the first send animates that move.
+   */
+  stage?: boolean
+  /** Reports whether the chat is still blank (no messages, no session being continued). */
+  onBlankChange?: (blank: boolean) => void
 }
 
 /** Handle exposed to parents for input insertion and programmatic user messages. */
 export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
   sendMessage: (text: string, options?: { displayContent?: string }) => Promise<void>
+  focus: () => void
 }
 
 function formatRelativeTime(value: string, locale: string): string {
@@ -80,7 +89,7 @@ function formatRelativeTime(value: string, locale: string): string {
   return formatter.format(Math.round(hours / 24), "day")
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, visible = true }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, visible = true, stage = false, onBlankChange }, ref) {
   const t = useTranslations("chat")
   const tCompose = useTranslations("compose")
   const tSessionPicker = useTranslations("sessionPicker")
@@ -318,6 +327,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     async sendMessage(text: string, options?: { displayContent?: string }) {
       await stream.sendMessage(text, undefined, undefined, undefined, options)
     },
+    focus() {
+      chatInputRef.current?.focus()
+    },
   }), [stream.sendMessage])
 
   // --- Load agent config (cloud only) ---
@@ -404,15 +416,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // mounted while the chat is closed or another tab is shown), no re-warm: the first prompt
   // then finds its MCP connections built.
   const preparedRef = useRef(false)
+  const [stageEngaged, setStageEngaged] = useState(false)
+  const shownForPrepare = stage ? stageEngaged : visible
   useEffect(() => {
-    if (IS_LOCAL || deckId !== "new" || !visible || !configLoaded || preparedRef.current) return
+    if (IS_LOCAL || deckId !== "new" || !shownForPrepare || !configLoaded || preparedRef.current) return
     const token = auth.user?.access_token
     if (!token) return
     preparedRef.current = true
     // intentional: best-effort — without it the first prompt builds the session itself
     prepareAgentCore(sessionIdRef.current, token, mode).catch((err: unknown) => console.warn("Prepare failed:", err))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deckId, visible, configLoaded, auth.user?.access_token])
+  }, [deckId, shownForPrepare, configLoaded, auth.user?.access_token])
 
   // --- Auto-scroll ---
   useEffect(() => {
@@ -522,31 +536,83 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [isLoading, onLoadingChange])
 
   const isInitial = stream.messages.length === 0 && !historyLoading
+  // The working-style and format chips belong to the start of a chat.
+  const startChips = isInitial && forkingSession === null
   // Only the initial screen shows the pill, so only it keeps the text: a long chat skips the
   // per-keystroke re-render (the draft bar's blank flag only re-renders when it flips).
   const [inputBlank, setInputBlank] = useState(true)
   const handleInputChange = useCallback((value: string) => {
     if (isInitial) setInputText(value)
     setInputBlank(!stripWhitespace(value))
-  }, [isInitial])
+    if (stage && value) setStageEngaged(true)
+  }, [isInitial, stage])
+
+  // --- Stage → sheet ---
+  // Blank until the first message or a session being continued. Reported in a layout effect so
+  // the shell moves the panel before the next paint (the view transition captures that frame).
+  const blank = stream.messages.length === 0 && forkingSession === null
+  const stageExitRef = useRef<(() => void) | null>(null)
+  useLayoutEffect(() => {
+    onBlankChange?.(blank)
+    if (!blank) stageExitRef.current?.()
+  }, [blank, onBlankChange])
+
+  // The stage focuses its input on desktop only (on a phone that would open the keyboard on load).
+  useEffect(() => {
+    if (stage && window.matchMedia("(min-width: 640px)").matches) chatInputRef.current?.focus()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /** The first send from the stage animates the composer into the chat sheet (where supported). */
+  const handleComposerSend = useCallback((...args: Parameters<typeof handleInputSend>): Promise<void | false> => {
+    const doc = document as Document & { startViewTransition?: (update: () => Promise<void>) => { finished: Promise<void> } }
+    if (!stage || typeof doc.startViewTransition !== "function" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+      return handleInputSend(...args)
+    }
+    const root = document.documentElement
+    root.classList.add("stage-morph")
+    return new Promise((settle) => {
+      const transition = doc.startViewTransition!(() => new Promise<void>((done) => {
+        const timer = setTimeout(() => finish(), 400)
+        function finish() {
+          clearTimeout(timer)
+          stageExitRef.current = null
+          done()
+        }
+        stageExitRef.current = finish
+        handleInputSend(...args).then(
+          (result) => { if (result === false) finish(); settle(result) },
+          () => { finish(); settle(false) },
+        )
+      }))
+      transition.finished.finally(() => root.classList.remove("stage-morph"))
+    })
+  }, [stage, handleInputSend])
 
   return (
     <>
-      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading && !canSendWhileLoading} className="flex flex-col h-full">
+      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading && !canSendWhileLoading} className={stage ? "flex flex-col" : "flex flex-col h-full"}>
       {continuedOrigin && (
         <div className="flex-none px-4 pt-3">
           <ContinuedFromChip origin={continuedOrigin} />
         </div>
       )}
       {/* Messages area */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4" role="log" aria-label={t("chatMessages")}
+      <div ref={scrollContainerRef} className={stage ? "" : "flex-1 overflow-y-auto px-4 py-4"} role="log" aria-label={t("chatMessages")}
         onScroll={() => {
           const el = scrollContainerRef.current
           if (!el) return
           shouldAutoScroll.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
         }}
       >
-        {forkingSession ? (
+        {stage ? (
+          <div className="pt-14 pb-8 text-center sm:pt-24 sm:pb-10">
+            <h1 className="text-3xl font-semibold leading-[1.15] tracking-[-0.035em] text-balance text-foreground sm:text-5xl">
+              {t("stageTitle")}
+            </h1>
+            <p className="mt-3 text-[15px] text-balance text-foreground-secondary">{t("stageSubtitle")}</p>
+          </div>
+        ) : forkingSession ? (
           <ForkProgressCard
             session={forkingSession}
             phase={forkProgress.phase}
@@ -626,8 +692,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 ))}
               </div>
             )}
-            <ModeSelector value={agentMode} onChange={setAgentMode} />
-            <HtmlFormatPill text={inputText} onChange={(next) => chatInputRef.current?.replaceText(next)} />
           </div>
         ) : (
           <div className="space-y-4">
@@ -697,12 +761,16 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       {/* Input area */}
       <ChatInput
           ref={chatInputRef}
-          onSend={handleInputSend}
+          onSend={handleComposerSend}
+          variant={stage ? "stage" : "sheet"}
+          autoFocus={!stage}
           isLoading={isLoading}
           onStop={stream.stopGeneration}
           canSendWhileLoading={canSendWhileLoading}
           disabled={!configLoaded}
-          placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
+          placeholder={stage
+            ? (isMobile ? t("stagePlaceholderMobile") : t("stagePlaceholder"))
+            : (isMobile ? t("placeholderMobile") : t("placeholderDesktop"))}
           topSlot={reviewActive ? <ReviewDraftBar inputBlank={inputBlank} /> : undefined}
           sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading && !canSendWhileLoading, canSend: review.canSubmit } : undefined}
           idToken={auth.user?.id_token}
@@ -715,18 +783,22 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           onSlashOpen={slashPickerItems.ensure}
           onTextareaFocus={slashPickerItems.ensure}
           onInputChange={handleInputChange}
+          footerSlot={
+            <>
+              {startChips && <ModeSelector value={agentMode} onChange={setAgentMode} />}
+              {startChips && <HtmlFormatPill text={inputText} onChange={(next) => chatInputRef.current?.replaceText(next)} />}
+              {/* Local: this chat's kiro-cli model and effort */}
+              {IS_LOCAL && (
+                <LocalModelPicker
+                  sessionId={sessionId}
+                  isNewChat={deckId === "new" && stream.messages.length === 0}
+                  busy={isLoading}
+                  disabled={forkingSession !== null}
+                />
+              )}
+            </>
+          }
         >
-          {/* Local: this chat's kiro-cli model and effort */}
-          {IS_LOCAL && (
-            <div className="px-2 pt-1">
-              <LocalModelPicker
-                sessionId={sessionId}
-                isNewChat={deckId === "new" && stream.messages.length === 0}
-                busy={isLoading}
-                disabled={forkingSession !== null}
-              />
-            </div>
-          )}
           {/* Options expander — the only option (web images) is cloud-only */}
           {!IS_LOCAL && (
           <div className="px-2">
@@ -765,6 +837,62 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           </div>
           )}
         </ChatInput>
+        {stage && (
+          <div className="pt-6 pb-2">
+            {forkError && (
+              <p role="alert" className="mb-4 text-center text-sm text-red-600 dark:text-red-400">
+                {tSessionPicker("forkFailed")}
+              </p>
+            )}
+            {IS_LOCAL && recentSessions.length > 0 ? (
+              <section aria-labelledby="stage-recent-sessions-heading">
+                <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                  <h2 id="stage-recent-sessions-heading" className="text-xs font-medium text-foreground-muted">
+                    {tCompose("recentSessionsHeading")}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setSessionPickerOpen(true)}
+                    className="-mr-2 min-h-9 rounded-lg px-2 text-xs font-medium text-brand-teal motion-safe:transition-colors hover:bg-brand-teal-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
+                  >
+                    {tCompose("pickOtherSession")}
+                  </button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {recentSessions.map((recent) => (
+                    <button
+                      key={recent.sessionId}
+                      type="button"
+                      onClick={() => void forkAndStart(recent)}
+                      className="flex min-w-0 flex-col items-start gap-1.5 rounded-xl border border-border bg-background-raised px-3.5 py-3 text-left shadow-[var(--shadow-card)] motion-safe:transition-colors hover:border-border-hover hover:bg-background-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
+                    >
+                      <span className="flex w-full min-w-0 items-center gap-1.5 text-xs text-foreground-muted">
+                        <GitBranch className="h-3.5 w-3.5 flex-none text-brand-teal" aria-hidden="true" />
+                        <span className="truncate">{formatRelativeTime(recent.updatedAt, locale)}</span>
+                        <EngineBadge engine={recent.engine} />
+                      </span>
+                      <span className="line-clamp-2 text-sm font-medium text-foreground">{recent.title}</span>
+                      <span className="w-full truncate text-xs text-foreground-muted">{recent.project}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <div className="flex flex-wrap justify-center gap-2">
+                {[t("example1"), t("example2"), t("example3")].map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => chatInputRef.current?.insertAtCursor(example)}
+                    className="rounded-full border border-border px-3.5 py-1.5 text-sm text-foreground-secondary motion-safe:transition-colors hover:border-border-hover hover:text-foreground"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
       </FileDropZone>
       {IS_LOCAL && (
         <SessionPickerDialog

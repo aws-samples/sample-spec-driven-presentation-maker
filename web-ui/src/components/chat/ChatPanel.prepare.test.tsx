@@ -85,7 +85,8 @@ describe("ChatPanel prepare (Cloud)", () => {
     expect(ws.closedWith).toBe(1000)
 
     view.rerender(<ChatPanel deckId="new" onLoadingChange={() => {}} />)
-    fireEvent.click(screen.getByRole("button", { name: /Vibe/ }))
+    fireEvent.keyDown(screen.getByRole("button", { name: /Working style/ }), { key: "Enter" })
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /Vibe/ }))
     await act(async () => { vi.advanceTimersByTime(20 * 60 * 1000) })
     expect(prepares()).toHaveLength(1)
     expect(FakeWebSocket.instances).toHaveLength(1)

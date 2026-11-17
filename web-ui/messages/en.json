@@ -46,12 +46,7 @@
     "selectAll": "Select all ({total})",
     "deleteSelected": "Delete",
     "deletingProgress": "Deleting {done} / {total}…",
-    "selectionToolbar": "Selected decks",
-    "heroTitle": "What are we presenting?",
-    "heroSubtitle": "Describe the talk. The agents draft a brief, an art direction and an outline before building the slides.",
-    "heroPlaceholder": "Who is the audience, what should they take away, and roughly how many slides?",
-    "heroHint": "⌘↵ to start",
-    "heroSubmit": "Start"
+    "selectionToolbar": "Selected decks"
   },
   "settings": {
     "title": "Settings",
@@ -323,7 +318,11 @@
     "steerComments": "{count, plural, one {# comment} other {# comments}}",
     "backgroundWorking": "Composers are working in the background. You can keep chatting.",
     "stopping": "Stopping…",
-    "reconnecting": "Reconnecting to the agent…"
+    "reconnecting": "Reconnecting to the agent…",
+    "stageTitle": "What are we presenting?",
+    "stageSubtitle": "Describe the talk. The agents draft a brief, an art direction and an outline before building the slides.",
+    "stagePlaceholder": "Who is the audience, what should they take away, and roughly how many slides?\n/ template · style  ⌘↵ send",
+    "stagePlaceholderMobile": "Who is the audience, and what should they take away?"
   },
   "composerNote": {
     "from": "Composer {group}",
@@ -409,7 +408,8 @@
     "vibePath": "Fast path",
     "specPath": "Review path",
     "vibeSummary": "Start rough. See a first draft sooner.",
-    "specSummary": "Decide the story before the slides."
+    "specSummary": "Decide the story before the slides.",
+    "chipLabel": "Working style: {mode}"
   },
   "htmlFormatPill": {
     "buildAsHtml": "Build as HTML",
