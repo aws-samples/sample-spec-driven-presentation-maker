@@ -270,7 +270,8 @@
     "startNewChat": "新しいチャットを開始",
     "closePanel": "チャットパネルを閉じる",
     "new": "新規",
-    "deck": "デッキ"
+    "deck": "デッキ",
+    "toDecks": "デッキ一覧へ"
   },
   "chat": {
     "errorSaveHistory": "チャット履歴を保存できませんでした",

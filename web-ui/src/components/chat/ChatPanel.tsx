@@ -37,6 +37,7 @@ import { SessionPickerDialog } from "./SessionPickerDialog"
 import { ContinuedFromChip } from "./ContinuedFromChip"
 import { EngineBadge } from "./EngineBadge"
 import { ForkProgressCard } from "./ForkProgressCard"
+import { Collapse } from "@/components/motion/Collapse"
 import { LocalModelPicker } from "./LocalModelPicker"
 import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
@@ -62,11 +63,11 @@ interface ChatPanelProps {
   /** The panel is on screen. A new deck's `prepare` waits until it is (Cloud). */
   visible?: boolean
   /**
-   * The panel is the composer at the centre of the home screen: a heading, the large input and,
-   * below it, recent sessions (Local) or example prompts. The shell moves it into the chat sheet
-   * once it is no longer blank; the first send animates that move.
+   * The panel sits at the centre of the home screen. While blank it is a heading, the large input
+   * and, below it, recent sessions (Local) or example prompts; the first message folds those away
+   * and the conversation goes on in the centre until the shell moves it into the sheet.
    */
-  stage?: boolean
+  centered?: boolean
   /** Reports whether the chat is still blank (no messages, no session being continued). */
   onBlankChange?: (blank: boolean) => void
 }
@@ -89,7 +90,7 @@ function formatRelativeTime(value: string, locale: string): string {
   return formatter.format(Math.round(hours / 24), "day")
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, visible = true, stage = false, onBlankChange }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, visible = true, centered = false, onBlankChange }, ref) {
   const t = useTranslations("chat")
   const tCompose = useTranslations("compose")
   const tSessionPicker = useTranslations("sessionPicker")
@@ -417,7 +418,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // then finds its MCP connections built.
   const preparedRef = useRef(false)
   const [stageEngaged, setStageEngaged] = useState(false)
-  const shownForPrepare = stage ? stageEngaged : visible
+  // The blank home composer prepares once the user starts typing (a visit alone builds no session).
+  const blankCentered = centered && stream.messages.length === 0 && forkingSession === null
+  const shownForPrepare = blankCentered ? stageEngaged : visible
   useEffect(() => {
     if (IS_LOCAL || deckId !== "new" || !shownForPrepare || !configLoaded || preparedRef.current) return
     const token = auth.user?.access_token
@@ -430,8 +433,10 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
 
   // --- Auto-scroll ---
   useEffect(() => {
-    if (shouldAutoScroll.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    // Scroll the message list only: scrollIntoView would also scroll the page around the chat.
+    const list = scrollContainerRef.current
+    if (shouldAutoScroll.current && list) {
+      list.scrollTo?.({ top: list.scrollHeight, behavior: "smooth" })
     }
   }, [stream.messages])
 
@@ -544,75 +549,50 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   const handleInputChange = useCallback((value: string) => {
     if (isInitial) setInputText(value)
     setInputBlank(!stripWhitespace(value))
-    if (stage && value) setStageEngaged(true)
-  }, [isInitial, stage])
+    if (centered && value) setStageEngaged(true)
+  }, [isInitial, centered])
 
-  // --- Stage → sheet ---
-  // Blank until the first message or a session being continued. Reported in a layout effect so
-  // the shell moves the panel before the next paint (the view transition captures that frame).
+  // --- Blank → conversation ---
+  // Blank until the first message or a session being continued. Reported in a layout effect, so
+  // the shell lays itself out (and starts moving) before the next paint.
   const blank = stream.messages.length === 0 && forkingSession === null
-  const stageExitRef = useRef<(() => void) | null>(null)
   useLayoutEffect(() => {
     onBlankChange?.(blank)
-    if (!blank) stageExitRef.current?.()
   }, [blank, onBlankChange])
 
-  // The stage focuses its input on desktop only (on a phone that would open the keyboard on load).
+  // The home composer focuses its input on desktop only (on a phone that would open the keyboard on load).
   useEffect(() => {
-    if (stage && window.matchMedia("(min-width: 640px)").matches) chatInputRef.current?.focus()
+    if (centered && window.matchMedia("(min-width: 640px)").matches) chatInputRef.current?.focus()
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  /** The first send from the stage animates the composer into the chat sheet (where supported). */
-  const handleComposerSend = useCallback((...args: Parameters<typeof handleInputSend>): Promise<void | false> => {
-    const doc = document as Document & { startViewTransition?: (update: () => Promise<void>) => { finished: Promise<void> } }
-    if (!stage || typeof doc.startViewTransition !== "function" || window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-      return handleInputSend(...args)
-    }
-    const root = document.documentElement
-    root.classList.add("stage-morph")
-    return new Promise((settle) => {
-      const transition = doc.startViewTransition!(() => new Promise<void>((done) => {
-        const timer = setTimeout(() => finish(), 400)
-        function finish() {
-          clearTimeout(timer)
-          stageExitRef.current = null
-          done()
-        }
-        stageExitRef.current = finish
-        handleInputSend(...args).then(
-          (result) => { if (result === false) finish(); settle(result) },
-          () => { finish(); settle(false) },
-        )
-      }))
-      transition.finished.finally(() => root.classList.remove("stage-morph"))
-    })
-  }, [stage, handleInputSend])
-
   return (
     <>
-      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading && !canSendWhileLoading} className={stage ? "flex flex-col" : "flex flex-col h-full"}>
+      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading && !canSendWhileLoading} className={blankCentered ? "flex flex-col" : "flex flex-col h-full"}>
       {continuedOrigin && (
         <div className="flex-none px-4 pt-3">
           <ContinuedFromChip origin={continuedOrigin} />
         </div>
       )}
-      {/* Messages area */}
-      <div ref={scrollContainerRef} className={stage ? "" : "flex-1 overflow-y-auto px-4 py-4"} role="log" aria-label={t("chatMessages")}
-        onScroll={() => {
-          const el = scrollContainerRef.current
-          if (!el) return
-          shouldAutoScroll.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
-        }}
-      >
-        {stage ? (
+      {centered && (
+        <Collapse show={blank}>
           <div className="pt-14 pb-8 text-center sm:pt-24 sm:pb-10">
             <h1 className="text-3xl font-semibold leading-[1.15] tracking-[-0.035em] text-balance text-foreground sm:text-5xl">
               {t("stageTitle")}
             </h1>
             <p className="mt-3 text-[15px] text-balance text-foreground-secondary">{t("stageSubtitle")}</p>
           </div>
-        ) : forkingSession ? (
+        </Collapse>
+      )}
+      {/* Messages area */}
+      <div ref={scrollContainerRef} className={blankCentered ? "" : "flex-1 overflow-y-auto px-4 py-4"} role="log" aria-label={t("chatMessages")}
+        onScroll={() => {
+          const el = scrollContainerRef.current
+          if (!el) return
+          shouldAutoScroll.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
+        }}
+      >
+        {blankCentered ? null : forkingSession ? (
           <ForkProgressCard
             session={forkingSession}
             phase={forkProgress.phase}
@@ -761,14 +741,14 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       {/* Input area */}
       <ChatInput
           ref={chatInputRef}
-          onSend={handleComposerSend}
-          variant={stage ? "stage" : "sheet"}
-          autoFocus={!stage}
+          onSend={handleInputSend}
+          variant={centered ? "stage" : "sheet"}
+          autoFocus={!centered}
           isLoading={isLoading}
           onStop={stream.stopGeneration}
           canSendWhileLoading={canSendWhileLoading}
           disabled={!configLoaded}
-          placeholder={stage
+          placeholder={blankCentered
             ? (isMobile ? t("stagePlaceholderMobile") : t("stagePlaceholder"))
             : (isMobile ? t("placeholderMobile") : t("placeholderDesktop"))}
           topSlot={reviewActive ? <ReviewDraftBar inputBlank={inputBlank} /> : undefined}
@@ -837,7 +817,8 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           </div>
           )}
         </ChatInput>
-        {stage && (
+        {centered && (
+          <Collapse show={blank}>
           <div className="pt-6 pb-2">
             {forkError && (
               <p role="alert" className="mb-4 text-center text-sm text-red-600 dark:text-red-400">
@@ -892,6 +873,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
               </div>
             )}
           </div>
+          </Collapse>
         )}
       </FileDropZone>
       {IS_LOCAL && (

@@ -323,7 +323,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         onConfirm={handleSnippetConfirm}
         initialText={editingSnippetId ? snippets.find((s) => s.id === editingSnippetId)?.text : undefined}
       />
-      <div className={stage ? "flex-none" : "flex-none px-3 pb-6 pt-2 safe-bottom"}>
+      <div className={`motion-safe:transition-[padding] motion-safe:duration-500 ${stage ? "flex-none" : "flex-none px-3 pb-6 pt-2 safe-bottom"}`}>
         <form
           ref={formRef}
           onSubmit={handleSubmit}

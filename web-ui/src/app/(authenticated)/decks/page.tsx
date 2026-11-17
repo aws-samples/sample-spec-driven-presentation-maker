@@ -19,14 +19,14 @@
 
 "use client"
 
-import { useState, useRef, useCallback, useEffect, useMemo } from "react"
+import { useState, useRef, useCallback, useEffect, useLayoutEffect, useMemo } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { AppShell } from "@/components/AppShell"
 import { DeckListView, visibleDecks } from "@/components/deck/DeckListView"
 import { SlideCarousel } from "@/components/deck/SlideCarousel"
 import { DeckActions } from "@/components/deck/DeckActions"
 import { ConfirmDialog } from "@/components/ConfirmDialog"
-import { ChatPanelShell } from "@/components/chat/ChatPanelShell"
+import { ChatPanelShell, type ChatLayout } from "@/components/chat/ChatPanelShell"
 import { DeckFormatProvider } from "@/components/chat/DeckFormatContext"
 import { ChatPanelHandle } from "@/components/chat/ChatPanel"
 import { updateVisibility } from "@/services/deckService"
@@ -94,9 +94,26 @@ export default function DecksPage() {
       chatRef.current?.sendMessage(text, options) ?? Promise.resolve(),
   }), [agentIsLoading])
   // Home screen: a blank new chat is the composer at the top (the shell's stage).
-  const [staged, setStaged] = useState(false)
+  // Home screen: a new chat is the composer at the top (stage), then the conversation fills the
+  // page (center) until its deck exists or the user goes back to the list (sheet).
+  const [chatLayout, setChatLayout] = useState<ChatLayout>("sheet")
+  const pageLayout: ChatLayout = ws.isWorkspace ? "sheet" : chatLayout
+  const [chatParked, setChatParked] = useState(false)
   const focusComposer = useCallback(() => chatRef.current?.focus(), [])
   const openChatSheet = useCallback(() => ws.setChatOpen(true), [ws])
+  const parkChat = useCallback(() => { setChatParked(true); ws.setChatOpen(true) }, [ws])
+  const unparkChat = useCallback(() => setChatParked(false), [])
+  // The page that opens beside the chat as it leaves the centre fades in after the move starts.
+  const [pageEnter, setPageEnter] = useState(false)
+  const prevPageLayoutRef = useRef(pageLayout)
+  useLayoutEffect(() => {
+    const prev = prevPageLayoutRef.current
+    prevPageLayoutRef.current = pageLayout
+    if (prev !== "center" || pageLayout !== "sheet") return
+    setPageEnter(true)
+    const timer = setTimeout(() => setPageEnter(false), 1200)
+    return () => clearTimeout(timer)
+  }, [pageLayout])
   const swipeRef = useSwipe(
     () => setActiveTab("preview"),
     () => setActiveTab("chat"),
@@ -137,11 +154,23 @@ export default function DecksPage() {
     <AppShell
       deckName={ws.isWorkspace && ws.deck ? ws.deck.name : undefined}
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
-      chatOpen={staged ? false : ws.chatOpen}
-      onChatToggle={staged ? focusComposer : () => ws.setChatOpen((prev) => !prev)}
+      chatOpen={pageLayout === "sheet" ? ws.chatOpen : false}
+      onChatToggle={pageLayout === "sheet" ? () => ws.setChatOpen((prev) => !prev) : focusComposer}
+      onNavDecks={pageLayout === "center" ? parkChat : undefined}
     >
-      <div className={staged ? "flex-1 overflow-y-auto relative flex flex-col" : "flex-1 overflow-hidden relative sm:flex"}>
-        <main className={staged ? "flex-none min-w-0" : "h-full overflow-y-auto flex-1 min-w-0"}>
+      <div className={
+        pageLayout === "stage" ? "flex-1 overflow-y-auto relative flex flex-col"
+          : pageLayout === "center" ? "flex-1 overflow-hidden relative flex flex-col"
+            : "flex-1 overflow-hidden relative sm:flex"
+      }>
+        <main
+          inert={pageLayout === "center"}
+          className={
+            pageLayout === "stage" ? "flex-none min-w-0 motion-safe:transition-[opacity,transform] motion-safe:duration-500"
+              : pageLayout === "center" ? "flex-none min-w-0 opacity-0 translate-y-6 motion-safe:transition-[opacity,transform] motion-safe:duration-500"
+                : `h-full overflow-y-auto flex-1 min-w-0 ${pageEnter ? "page-enter" : ""}`
+          }
+        >
           {ws.isWorkspace ? (
             <>
               {/* Mobile tab bar */}
@@ -263,8 +292,8 @@ export default function DecksPage() {
                 searchResults={list.searchResults}
                 searching={list.searching}
                 onDeckOpen={ws.openDeck}
-                onNewDeck={staged ? focusComposer : () => { ws.setChatOpen(true); ws.setChatTab("new") }}
-                showNewDeck={!staged}
+                onNewDeck={pageLayout === "sheet" ? () => { ws.setChatOpen(true); ws.setChatTab("new") } : focusComposer}
+                showNewDeck={pageLayout === "sheet"}
                 favoriteIds={list.favoriteIds}
                 onToggleFavorite={list.handleToggleFavorite}
                 onDelete={list.handleDelete}
@@ -303,7 +332,10 @@ export default function DecksPage() {
             onWorkflowPhase={setWorkflowPhase}
             onLoadingChange={setAgentIsLoading}
             stageAllowed={!ws.isWorkspace}
-            onStagedChange={setStaged}
+            parked={chatParked}
+            onPark={parkChat}
+            onUnpark={unparkChat}
+            onLayoutChange={setChatLayout}
             onStageExit={openChatSheet}
           />
           </DeckFormatProvider>
@@ -330,7 +362,7 @@ export default function DecksPage() {
         onConfirm={handleConfirmBulkDelete}
       />
 
-      {isMobile && !ws.isWorkspace && !staged && (
+      {isMobile && !ws.isWorkspace && pageLayout === "sheet" && (
         <div className="fixed right-4 z-40" style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom, 0px))" }}>
           {fabOpen && (
             <>

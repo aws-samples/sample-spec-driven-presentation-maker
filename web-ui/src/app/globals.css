@@ -755,31 +755,32 @@ body {
   }
 }
 
-/* ── Stage → sheet: the first send moves the home composer into the chat sheet ── */
-/* Names exist only while the move runs (html.stage-morph), so nothing else takes part. */
-html.stage-morph .chat-panel {
+/* ── Home conversation → chat sheet (ChatPanelShell, lib/motion) ── */
+/* The centred column has the sheet's border and shadow, only invisible, so they fade in. */
+.chat-surface-center {
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+.chat-panel.is-morphing {
   transition: none;
 }
-/* Only the input box travels; the rest of the page cross-fades. */
-html.stage-morph [data-chat-composer] {
-  view-transition-name: chat-composer;
+.chat-panel.is-morphing .chat-panel-inner {
+  min-width: 0 !important;
+  transition: background-color 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease;
 }
-::view-transition-group(chat-composer) {
-  overflow: hidden;
-  border-radius: 16px;
-  animation-duration: 520ms;
-  animation-timing-function: cubic-bezier(0.2, 0.8, 0.2, 1);
+.chat-panel.is-morphing textarea {
+  transition: height 0.72s cubic-bezier(0.65, 0, 0.35, 1);
 }
-::view-transition-old(chat-composer),
-::view-transition-new(chat-composer) {
-  height: 100%;
-  object-fit: none;
-  object-position: left top;
-  animation-duration: 520ms;
+/* The page beside the chat comes in once the column has started moving. */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: none; }
 }
-::view-transition-old(root),
-::view-transition-new(root) {
-  animation-duration: 280ms;
+.page-enter {
+  animation: page-enter 0.5s cubic-bezier(0.33, 1, 0.68, 1) 0.36s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter { animation: none; }
 }
 
 /* ── Search glow on focus ── */

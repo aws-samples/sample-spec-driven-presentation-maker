@@ -270,7 +270,8 @@
     "startNewChat": "Start new chat",
     "closePanel": "Close chat panel",
     "new": "New",
-    "deck": "Deck"
+    "deck": "Deck",
+    "toDecks": "Back to decks"
   },
   "chat": {
     "errorSaveHistory": "Failed to save chat history",

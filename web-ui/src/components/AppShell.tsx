@@ -36,11 +36,13 @@ interface AppShellProps {
   children: ReactNode
   deckName?: string
   onBack?: () => void
+  /** Overrides the Decks link (e.g. leave the conversation at the centre of the home screen). */
+  onNavDecks?: () => void
   chatOpen?: boolean
   onChatToggle?: () => void
 }
 
-export function AppShell({ children, deckName, onBack, chatOpen = false, onChatToggle }: AppShellProps) {
+export function AppShell({ children, deckName, onBack, onNavDecks, chatOpen = false, onChatToggle }: AppShellProps) {
   const t = useTranslations("appShell")
   const { user, signOut } = useAuth()
   const pathname = usePathname()
@@ -147,7 +149,9 @@ export function AppShell({ children, deckName, onBack, chatOpen = false, onChatT
                   <a
                     key={key}
                     href={href}
-                    onClick={backToList ? (e) => { e.preventDefault(); onBack() } : undefined}
+                    onClick={backToList ? (e) => { e.preventDefault(); onBack() }
+                      : key === "decks" && onNavDecks ? (e) => { e.preventDefault(); onNavDecks() }
+                        : undefined}
                     aria-current={active ? "page" : undefined}
                     className={`group/nav px-2 py-1 rounded-md whitespace-nowrap text-sm font-medium no-underline transition-colors sm:flex sm:flex-col sm:items-center sm:gap-1 sm:w-[72px] sm:px-0 sm:py-1.5 ${
                       active ? "text-foreground" : "text-foreground-muted hover:text-foreground"
