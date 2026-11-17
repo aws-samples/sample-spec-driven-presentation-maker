@@ -29,7 +29,7 @@ These can be set as a `style` object:
 ```json
 "style": {
   "lineWidth": 2.5, "markerSize": 8, "gridlineColor": "#E0E0E0",
-  "fontColor": "#333", "fontSize": 10, "legendPosition": "bottom"
+  "fontColor": "#333333", "fontSize": 10, "legendPosition": "bottom"
 }
 ```
 
