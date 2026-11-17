@@ -60,7 +60,8 @@ describe("SlashPickerPopup", () => {
     const formatHeading = screen.getByText("Format")
     expect(styleHeading.compareDocumentPosition(formatHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     const option = screen.getByRole("option", { name: /HTML/ })
-    expect(option.textContent).toContain("Present in a browser. Can't be edited in PowerPoint.")
+    // Compact cards carry the description as a tooltip.
+    expect(option.getAttribute("title")).toContain("Present in a browser. Can't be edited in PowerPoint.")
     fireEvent.click(option)
     expect(onSelect).toHaveBeenCalledWith(FORMAT_HTML_ITEM)
   })

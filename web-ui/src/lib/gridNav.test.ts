@@ -41,8 +41,9 @@ describe("gallery geometry", () => {
     expect(slashPanelWidth(400)).toBe(376)
   })
 
-  it("uses three columns when the panel is wide enough", () => {
-    expect(galleryColumns(640)).toBe(3)
+  it("fits four compact cards in a full-width panel and fewer as it narrows", () => {
+    expect(galleryColumns(640)).toBe(4)
+    expect(galleryColumns(480)).toBe(3)
     expect(galleryColumns(376)).toBe(2)
   })
 

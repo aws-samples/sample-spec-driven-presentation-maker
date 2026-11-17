@@ -15,9 +15,9 @@ export function slashPanelWidth(viewportWidth: number): number {
   return Math.max(0, Math.min(SLASH_PANEL_MAX_WIDTH, viewportWidth - SLASH_PANEL_MARGIN * 2))
 }
 
-/** Cards per row in a gallery panel `panelWidth` wide. */
+/** Cards per row in the `/` gallery panel `panelWidth` wide (compact cards, about 140px or wider). */
 export function galleryColumns(panelWidth: number): number {
-  return panelWidth >= 520 ? 3 : 2
+  return panelWidth >= 560 ? 4 : panelWidth >= 400 ? 3 : 2
 }
 
 /** Sizes of the runs of consecutive items sharing a key (the sections of a flat, grouped list). */

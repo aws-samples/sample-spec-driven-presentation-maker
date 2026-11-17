@@ -185,10 +185,10 @@ export function SlashPickerPopup({
             const headingId = `${listboxId}-${section.kind}`
             return (
               <section key={section.kind} role="group" aria-labelledby={headingId}>
-                <h3 id={headingId} className="pb-1.5 pt-3 text-[11px] font-medium uppercase tracking-wider text-foreground-muted">
+                <h3 id={headingId} className="pb-1.5 pt-2.5 text-[11px] font-medium uppercase tracking-wider text-foreground-muted">
                   {t(sectionTitleKey(section.kind))}
                 </h3>
-                <div className="grid gap-2.5" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
+                <div className="grid gap-2" style={{ gridTemplateColumns: `repeat(${cols}, minmax(0, 1fr))` }}>
                   {section.items.map((item) => {
                     const index = filtered.indexOf(item)
                     const active = index === activeIndex
@@ -201,6 +201,7 @@ export function SlashPickerPopup({
                         active={active}
                         ariaSelected={active}
                         keepFocus
+                        compact
                         scrollOnActive={index !== pointerIndex}
                         onHover={() => {
                           if (index === activeIndex) return
