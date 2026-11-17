@@ -472,7 +472,7 @@ def _plot_tags(pptx: Path) -> list[str]:
 
 
 def _foreign_chart_pptx(path: Path, kind: str) -> Path:
-    """A one-chart PPTX of a kind sdpm's chartType cannot describe."""
+    """A one-chart PPTX built directly with python-pptx."""
     from copy import deepcopy
 
     from pptx.chart.data import CategoryChartData
