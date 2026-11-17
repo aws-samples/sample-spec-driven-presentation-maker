@@ -24,7 +24,7 @@ import { AnimatePresence, motion } from "motion/react"
 import { SlidePreview, fetchHtmlUrl } from "@/services/deckService"
 import { openInOs } from "@/services/localService"
 import type { ScriptWarning, SpecFiles } from "@/services/deckService"
-import { Download, ExternalLink, Layers, LayoutGrid, Presentation, Printer, Rows3, FolderOpen } from "lucide-react"
+import { Download, ExternalLink, Layers, LayoutGrid, Presentation, Printer, Rows3, FolderOpen, FileText } from "lucide-react"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
@@ -571,46 +571,42 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   }
 
   return (
-    <div className="h-full flex flex-col md:flex-row">
+    <div className="h-full flex flex-col">
       {defsUrl && viewMode === "full" && specTab === "slides" && (
         <DeckDefs defsUrl={defsUrl} onStatusChange={handleDefsStatus} />
       )}
-      {/* Spec step navigation (top tabs on mobile, phase rail on desktop) */}
-      <SpecStepNav
-        specs={specs}
-        activeTab={specTab}
-        onTabChange={setSpecTab}
-        slideCount={slidesWithPreview.length}
-        deckName={deckName}
-      />
-      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
-
-      {/* Header (shown only on Slides tab) */}
-      {specTab === "slides" && (
-        <div className="flex-none flex items-center justify-between px-5 py-3 border-b border-border/40">
-          <div className="flex items-center gap-3">
-            <div>
-              <div className="flex items-center gap-2">
-                <h2 className="md:hidden text-lg font-semibold tracking-[-0.02em] truncate max-w-[360px]">
-                  {deckName ? deckDisplay(deckName).title : t("preview")}
-                </h2>
-                {isHtml && (
-                  <span
-                    className="shrink-0 rounded border border-border px-1.5 py-px text-[11px] font-medium text-foreground-secondary"
-                    title={t("formatBadgeTitle")}
-                  >
-                    {t("formatHtml")}
-                  </span>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">
-                {t("slideCount", { count: slidesWithPreview.length })}
-                {ownerAlias && <span> · {t("byOwner", { owner: ownerAlias })}</span>}
-              </p>
+      {/* Workspace bar: the deck, its phases, and the Slides tools — one row, wrapping when narrow */}
+      <div className="@container flex-none flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-2 border-b border-border/40">
+        <div className="flex min-w-0 items-center gap-2">
+          <div className="min-w-0">
+            <div className="flex items-center gap-2">
+              <h2 className="text-[15px] font-semibold tracking-[-0.02em] truncate max-w-[240px]" title={deckName}>
+                {deckName ? deckDisplay(deckName).title : t("preview")}
+              </h2>
+              {isHtml && (
+                <span
+                  className="shrink-0 rounded border border-border px-1.5 py-px text-[11px] font-medium text-foreground-secondary"
+                  title={t("formatBadgeTitle")}
+                >
+                  {t("formatHtml")}
+                </span>
+              )}
             </div>
-            {headerActions}
+            <p className="text-xs text-muted-foreground whitespace-nowrap">
+              {t("slideCount", { count: slidesWithPreview.length })}
+              {ownerAlias && <span> · {t("byOwner", { owner: ownerAlias })}</span>}
+            </p>
           </div>
-          <div className="flex items-center gap-1">
+          {headerActions}
+        </div>
+        <SpecStepNav
+          specs={specs}
+          activeTab={specTab}
+          onTabChange={setSpecTab}
+          slideCount={slidesWithPreview.length}
+        />
+        {specTab === "slides" && (
+          <div className="ml-auto flex items-center gap-1">
             {reviewOn && <ReviewToolButton on={toolOn} onClick={() => review?.toggleTool()} />}
             {/* View mode toggle */}
             <div className="flex items-center rounded-lg border border-border/40 p-0.5 mr-1">
@@ -634,31 +630,32 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                 onClick={handleFolderOpen}
                 className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
                 aria-label={t("openFolder")}
+                title={t("openFolder")}
               >
                 <FolderOpen className="h-3.5 w-3.5" />
-                {t("folder")}
+                <span className="@max-5xl:sr-only">{t("folder")}</span>
               </button>
             )}
             {isHtml && htmlUrl && (
               IS_LOCAL ? (
-                <button onClick={handleHtmlOpen} className={HEADER_BUTTON} aria-label={t("openHtml")}>
+                <button onClick={handleHtmlOpen} className={HEADER_BUTTON} aria-label={t("openHtml")} title={t("openHtml")}>
                   <ExternalLink className="h-3.5 w-3.5" />
-                  {t("open")}
+                  <span className="@max-5xl:sr-only">{t("open")}</span>
                 </button>
               ) : (
                 <>
                   {scriptWarnings && scriptWarnings.length > 0 && <ScriptWarningBadge warnings={scriptWarnings} />}
-                  <button onClick={() => void handleHtmlPresent("present")} className={HEADER_BUTTON} aria-label={t("presentAria")}>
+                  <button onClick={() => void handleHtmlPresent("present")} className={HEADER_BUTTON} aria-label={t("presentAria")} title={t("presentAria")}>
                     <Presentation className="h-3.5 w-3.5" />
-                    {t("present")}
+                    <span className="@max-5xl:sr-only">{t("present")}</span>
                   </button>
-                  <button onClick={() => void handleHtmlPresent("pdf")} className={HEADER_BUTTON} aria-label={t("pdfAria")}>
+                  <button onClick={() => void handleHtmlPresent("pdf")} className={HEADER_BUTTON} aria-label={t("pdfAria")} title={t("pdfAria")}>
                     <Printer className="h-3.5 w-3.5" />
-                    {t("pdf")}
+                    <span className="@max-5xl:sr-only">{t("pdf")}</span>
                   </button>
-                  <button onClick={() => void handleHtmlDownload()} className={HEADER_BUTTON} aria-label={t("downloadHtml")}>
+                  <button onClick={() => void handleHtmlDownload()} className={HEADER_BUTTON} aria-label={t("downloadHtml")} title={t("downloadHtml")}>
                     <Download className="h-3.5 w-3.5" />
-                    {t("formatHtml")}
+                    <span className="@max-5xl:sr-only">{t("formatHtml")}</span>
                   </button>
                 </>
               )
@@ -669,9 +666,10 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                   onClick={handlePptxOpen}
                   className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
                   aria-label={t("openPptx")}
+                  title={t("openPptx")}
                 >
-                  <FolderOpen className="h-3.5 w-3.5" />
-                  PPTX
+                  <FileText className="h-3.5 w-3.5" />
+                  <span className="@max-5xl:sr-only">PPTX</span>
                 </button>
               ) : (
                 <a
@@ -679,15 +677,16 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                   download
                   className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground no-underline px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
                   aria-label={t("downloadPptx")}
+                  title={t("downloadPptx")}
                 >
                   <Download className="h-3.5 w-3.5" />
-                  PPTX
+                  <span className="@max-5xl:sr-only">PPTX</span>
                 </a>
               )
             )}
           </div>
-        </div>
-      )}
+        )}
+      </div>
 
       {reviewOn && specTab === "slides" && (
         <>
@@ -712,7 +711,6 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
           outlineExists={specTab === "brief" ? (specs?.outline != null) : undefined}
         />
       )}
-      </div>
     </div>
   )
 }

@@ -755,6 +755,11 @@ body {
   }
 }
 
+/* ── Phase track: the first open step is half lit ── */
+.step-track-next {
+  background: linear-gradient(90deg, color-mix(in oklch, var(--foreground) 55%, transparent) 50%, color-mix(in oklch, var(--foreground) 12%, transparent) 50%);
+}
+
 /* ── Home conversation → chat sheet (ChatPanelShell, lib/motion) ── */
 /* The centred column has the sheet's border and shadow, only invisible, so they fade in. */
 .chat-surface-center {

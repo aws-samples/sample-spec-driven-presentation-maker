@@ -486,8 +486,7 @@
     "brief": "ブリーフ",
     "outline": "アウトライン",
     "artDirection": "アートディレクション",
-    "slides": "スライド",
-    "phases": "工程"
+    "slides": "スライド"
   },
   "specWaiting": {
     "draftingBrief": "ブリーフを作成中…",

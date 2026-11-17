@@ -486,8 +486,7 @@
     "brief": "Brief",
     "outline": "Outline",
     "artDirection": "Art Direction",
-    "slides": "Slides",
-    "phases": "Phases"
+    "slides": "Slides"
   },
   "specWaiting": {
     "draftingBrief": "Drafting the brief…",
