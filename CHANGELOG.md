@@ -22,6 +22,14 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
   New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
 
+### Removed
+
+- **Dead layout routing code.** The `_spread_overlapping_bends` pass and the bend-spreading
+  helpers only it used (`_resolve_crossing_search`, `_separate_close_bends`,
+  `_align_same_source_bends`, `_separate_close_horizontal_segments`, `_apply_bend_shift_*`,
+  `_update_bend_x`, `_min_bend_separation`, `_find_first_crossing`) are gone from
+  `sdpm.engine.layout`. Nothing called them, so generated layouts are unchanged.
+
 ### Security
 
 - **deploy.sh: the source bucket is account-scoped and its owner is checked.** `deploy.sh`
