@@ -713,5 +713,20 @@
     "needsTextHint": "コメントかメッセージを書くと送信できます",
     "sendFailed": "修正依頼を送信できませんでした",
     "noComment": "コメントなし"
+  },
+  "choiceChip": {
+    "style": "スタイル",
+    "template": "テンプレート",
+    "chooseStyle": "スタイルを選ぶ",
+    "chooseTemplate": "テンプレートを選ぶ",
+    "chosen": "{kind}: {name}",
+    "clearStyle": "スタイルの指定を外す",
+    "clearTemplate": "テンプレートの指定を外す",
+    "searchStyle": "スタイルを検索…",
+    "searchTemplate": "テンプレートを検索…",
+    "auto": "おまかせ",
+    "autoHint": "ブリーフに合わせてエージェントが選びます",
+    "loading": "読み込み中…",
+    "noMatch": "一致するものがありません"
   }
 }

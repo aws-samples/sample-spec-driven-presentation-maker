@@ -33,6 +33,7 @@ import { useIsMobile } from "@/hooks/UseMobile"
 import { Send, ChevronRight, GitBranch } from "lucide-react"
 import { ModeSelector } from "./ModeSelector"
 import { HtmlFormatPill } from "./HtmlFormatPill"
+import { ChoiceChip } from "./ChoiceChip"
 import { SessionPickerDialog } from "./SessionPickerDialog"
 import { ContinuedFromChip } from "./ContinuedFromChip"
 import { EngineBadge } from "./EngineBadge"
@@ -743,6 +744,7 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           ref={chatInputRef}
           onSend={handleInputSend}
           variant={centered ? "stage" : "sheet"}
+          hideTokenReflection={startChips}
           autoFocus={!centered}
           isLoading={isLoading}
           onStop={stream.stopGeneration}
@@ -767,6 +769,17 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
             <>
               {startChips && <ModeSelector value={agentMode} onChange={setAgentMode} />}
               {startChips && <HtmlFormatPill text={inputText} onChange={(next) => chatInputRef.current?.replaceText(next)} />}
+              {startChips && (["style", "template"] as const).map((kind) => (
+                <ChoiceChip
+                  key={kind}
+                  kind={kind}
+                  text={inputText}
+                  onChange={(next) => chatInputRef.current?.replaceText(next)}
+                  items={slashPickerItems.items}
+                  loading={slashPickerItems.loading}
+                  onOpen={() => void slashPickerItems.ensure()}
+                />
+              ))}
               {/* Local: this chat's kiro-cli model and effort */}
               {IS_LOCAL && (
                 <LocalModelPicker

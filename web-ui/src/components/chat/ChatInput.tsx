@@ -83,6 +83,8 @@ export interface ChatInputProps {
   variant?: "sheet" | "stage"
   /** Focus the textarea on mount (default true). */
   autoFocus?: boolean
+  /** Hide the chosen-token row (the footer chips show the choices instead). */
+  hideTokenReflection?: boolean
 }
 
 export interface ChatInputHandle {
@@ -97,7 +99,7 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, isLoading, onStop, canSendWhileLoading = false, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, onInputChange, slashItems, slashLoading, onSlashOpen, onTextareaFocus, footerSlot, variant = "sheet", autoFocus = true },
+  { onSend, isLoading, onStop, canSendWhileLoading = false, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, onInputChange, slashItems, slashLoading, onSlashOpen, onTextareaFocus, footerSlot, variant = "sheet", autoFocus = true, hideTokenReflection = false },
   ref,
 ) {
   const t = useTranslations("chatInput")
@@ -344,7 +346,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             onEditSnippet={editSnippet}
           />
 
-          {slashEnabled && (
+          {slashEnabled && !hideTokenReflection && (
             <SlashTokenReflection text={input} items={slashItems} onRemove={removeSlashToken} />
           )}
 

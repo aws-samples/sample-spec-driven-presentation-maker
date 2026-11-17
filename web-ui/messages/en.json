@@ -713,5 +713,20 @@
     "needsTextHint": "Add a comment or a message to send",
     "sendFailed": "Couldn't send the change request",
     "noComment": "No comment"
+  },
+  "choiceChip": {
+    "style": "Style",
+    "template": "Template",
+    "chooseStyle": "Choose a style",
+    "chooseTemplate": "Choose a template",
+    "chosen": "{kind}: {name}",
+    "clearStyle": "Remove the style choice",
+    "clearTemplate": "Remove the template choice",
+    "searchStyle": "Search styles…",
+    "searchTemplate": "Search templates…",
+    "auto": "Agent picks",
+    "autoHint": "Chosen to fit the brief",
+    "loading": "Loading…",
+    "noMatch": "No matches"
   }
 }
