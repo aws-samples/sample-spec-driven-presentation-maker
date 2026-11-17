@@ -245,12 +245,12 @@
     "formatHtmlDescription": "ブラウザで発表します。PowerPoint では編集できません",
     "noMatch": "該当なし",
     "loading": "読み込み中…",
-    "keyHint": "↑↓ 移動  ↵ 挿入  Esc 閉じる",
+    "keyHint": "↑↓←→ 移動  ↵ 挿入  Esc 閉じる",
     "listLabel": "テンプレート / スタイル / 形式の候補",
-    "previewAlt": "{name} のプレビュー",
     "unknownName": "このテンプレートまたはスタイルは利用できません",
     "removeToken": "{kind}「{name}」を削除",
-    "layouts": "{count} レイアウト"
+    "all": "すべて",
+    "kindFilter": "表示する種類"
   },
   "chatInput": {
     "maxFilesError": "一度に添付できるファイルは 5 つまでです。",

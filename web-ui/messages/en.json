@@ -245,12 +245,12 @@
     "formatHtmlDescription": "Present in a browser. Can't be edited in PowerPoint.",
     "noMatch": "No matches",
     "loading": "Loading…",
-    "keyHint": "↑↓ move  ↵ insert  Esc close",
+    "keyHint": "↑↓←→ move  ↵ insert  Esc close",
     "listLabel": "Template, style and format suggestions",
-    "previewAlt": "Preview of {name}",
     "unknownName": "This template or style is unavailable",
     "removeToken": "Remove {kind} {name}",
-    "layouts": "{count, plural, one {# layout} other {# layouts}}"
+    "all": "All",
+    "kindFilter": "Show"
   },
   "chatInput": {
     "maxFilesError": "Maximum 5 files can be attached at once.",

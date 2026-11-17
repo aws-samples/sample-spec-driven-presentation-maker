@@ -441,6 +441,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           activeIndex={picker.activeIndex}
           onActiveIndexChange={(index) => picker.setActiveIndex(index)}
           onSelect={picker.select}
+          onKindChange={picker.setKind}
           loading={slashLoading ?? false}
           textareaRef={textareaRef}
           anchorRef={formRef}

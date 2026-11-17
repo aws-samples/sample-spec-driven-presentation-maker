@@ -8,7 +8,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 import type { KeyboardEvent, RefObject } from "react"
-import { buildToken, detectSlashFragment, filterItems, type PickerItem } from "@/lib/slashToken"
+import { galleryColumns, gridMove, runSizes, slashPanelWidth } from "@/lib/gridNav"
+import { buildToken, detectSlashFragment, filterItems, splitQuery, type PickerItem, type PickerKind } from "@/lib/slashToken"
 
 interface UseSlashPickerArgs {
   textareaRef: RefObject<HTMLTextAreaElement | null>
@@ -28,6 +29,8 @@ interface UseSlashPickerResult {
   onSelectionChange: () => void
   onKeyDown: (event: KeyboardEvent<HTMLTextAreaElement>, isComposing: boolean) => boolean
   select: (item: PickerItem) => void
+  /** Narrow to one kind (null: all) by rewriting the `/` fragment, e.g. `/sty` → `/style sty`. */
+  setKind: (kind: PickerKind | null) => void
   close: () => void
 }
 
@@ -144,18 +147,35 @@ export function useSlashPicker({
     })
   }, [onInserted, setValue, textareaRef, value])
 
+  const setKind = useCallback((kind: PickerKind | null) => {
+    const fragment = fragmentRef.current
+    if (!fragment) return
+    const { term } = splitQuery(fragment.query)
+    const nextQuery = kind ? `${kind} ${term}` : term
+    const nextValue = value.slice(0, fragment.start + 1) + nextQuery + value.slice(fragment.caret)
+    const nextCaret = fragment.start + 1 + nextQuery.length
+    setValue(nextValue)
+    onInputChange(nextValue, nextCaret)
+    const textarea = textareaRef.current
+    requestAnimationFrame(() => {
+      textarea?.focus()
+      textarea?.setSelectionRange(nextCaret, nextCaret)
+    })
+  }, [onInputChange, setValue, textareaRef, value])
+
   const onKeyDown = useCallback((event: KeyboardEvent<HTMLTextAreaElement>, isComposing: boolean): boolean => {
     if (isComposing || !open) return false
 
+    // The candidates are a gallery: arrows move through its rows and sections.
+    const cols = galleryColumns(slashPanelWidth(window.innerWidth))
+    const next = filtered.length > 0 ? gridMove(runSizes(filtered, (item) => item.kind), activeIndex, event.key, cols) : null
+    if (next !== null) {
+      event.preventDefault()
+      setActiveIndex(next)
+      return true
+    }
+
     switch (event.key) {
-      case "ArrowDown":
-        event.preventDefault()
-        if (filtered.length > 0) setActiveIndex((current) => (current + 1) % filtered.length)
-        return true
-      case "ArrowUp":
-        event.preventDefault()
-        if (filtered.length > 0) setActiveIndex((current) => (current - 1 + filtered.length) % filtered.length)
-        return true
       case "Enter":
       case "Tab": {
         event.preventDefault()
@@ -183,6 +203,7 @@ export function useSlashPicker({
     onSelectionChange,
     onKeyDown,
     select,
+    setKind,
     close,
   }
 }
