@@ -15,6 +15,12 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Added
 
+- **Scatter charts** (`chartType: "scatter"`, #622). Builds native XY scatter charts
+  (`XL_CHART_TYPE.XY_SCATTER`) from series `points: [[x, y], ...]` without `categories`,
+  supporting marker colors, `style.markerSize`, and `valueAxis` on the Y axis.
+  `pptx_to_json` reads scatter charts back as `scatter` with `points` intact so edited
+  scatter charts rebuild from JSON. New `chart-scatter` guide. Local mode and the AWS
+  stack (SdpmRuntime).
 - **Radar charts** (`chartType: "radar"`, #621). A radar chart takes the same categories and
   series as a line chart; `markers` (default on), series `color`, `style.lineWidth` /
   `style.markerSize` and `valueAxis` (`min` / `max` / `majorUnit` / `gridlines`, the radial

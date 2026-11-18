@@ -151,11 +151,28 @@ class TestLintChart:
         assert any(d["rule"] == "chart-missing-chartType" for d in diags)
 
     def test_invalid_chartType(self):
-        diags = lint(self._base(chartType="scatter"))
+        diags = lint(self._base(chartType="funnel"))
         assert any(d["rule"] == "chart-invalid-chartType" for d in diags)
 
     def test_radar_chartType_ok(self):
         assert lint(self._base(chartType="radar")) == []
+
+    def test_scatter_chartType_ok(self):
+        slides = self._base(
+            chartType="scatter",
+            series=[{"name": "S1", "points": [[1, 2], [3, 4]]}],
+        )
+        del slides[0]["elements"][0]["categories"]
+        assert lint(slides) == []
+
+    def test_scatter_missing_points(self):
+        slides = self._base(
+            chartType="scatter",
+            series=[{"name": "S1", "values": [1, 2]}],
+        )
+        del slides[0]["elements"][0]["categories"]
+        diags = lint(slides)
+        assert any(d["rule"] == "chart-missing-points" for d in diags)
 
     def test_missing_series(self):
         diags = lint(self._base(series=[]))

@@ -26,6 +26,7 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
         XL_CHART_TYPE.DOUGHNUT: ("donut", False, False),
         XL_CHART_TYPE.RADAR: ("radar", False, False),
         XL_CHART_TYPE.RADAR_MARKERS: ("radar", False, False),
+        XL_CHART_TYPE.XY_SCATTER: ("scatter", False, False),
     }
     chart_type, stacked, horizontal = type_map.get(ct, ("bar", False, False))
     # The builder can make this chart again from its JSON only when chartType
@@ -73,11 +74,34 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
 
     # Categories and series
     plot = chart.plots[0]
-    try:
-        cats = [str(c) for c in plot.categories]
-        elem["categories"] = cats
-    except Exception:
-        elem["categories"] = []
+    if chart_type != "scatter":
+        try:
+            cats = [str(c) for c in plot.categories]
+            elem["categories"] = cats
+        except Exception:
+            elem["categories"] = []
+
+    def _read_num_pts(parent, tag_name: str) -> list[float | int | None]:
+        ns_num = {'c': 'http://schemas.openxmlformats.org/drawingml/2006/chart'}
+        val_el = parent.find(f'c:{tag_name}', ns_num)
+        if val_el is None:
+            return []
+        pts = val_el.findall('.//c:pt', ns_num)
+        indexed: list[tuple[int, float | int]] = []
+        for fallback_idx, pt in enumerate(pts):
+            v_el = pt.find('c:v', ns_num)
+            if v_el is None or v_el.text is None:
+                continue
+            try:
+                raw = float(v_el.text)
+                num: float | int = int(raw) if raw.is_integer() else raw
+            except ValueError:
+                continue
+            idx_attr = pt.get('idx')
+            idx = int(idx_attr) if idx_attr is not None else fallback_idx
+            indexed.append((idx, num))
+        indexed.sort(key=lambda pair: pair[0])
+        return [val for _, val in indexed]
 
     series_list = []
     for series in plot.series:
@@ -92,10 +116,20 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
                     s["name"] = tx.text
         except Exception:
             pass
-        try:
-            s["values"] = list(series.values)
-        except Exception:
-            s["values"] = []
+        if chart_type == "scatter":
+            xs = _read_num_pts(series._element, 'xVal')
+            ys = _read_num_pts(series._element, 'yVal')
+            if not ys:
+                try:
+                    ys = [int(v) if isinstance(v, float) and v.is_integer() else v for v in series.values]
+                except Exception:
+                    ys = []
+            s["points"] = [[x, y] for x, y in zip(xs, ys)]
+        else:
+            try:
+                s["values"] = list(series.values)
+            except Exception:
+                s["values"] = []
         # Extract color (solid or gradient fallback)
         try:
             if chart_type in ("bar",):
@@ -110,6 +144,19 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
                 if series._element.find('c:spPr/a:ln/a:solidFill', ns_ln) is not None:
                     rgb = series.format.line.color.rgb
                     s["color"] = f"#{rgb}"
+            elif chart_type == "scatter":
+                ns_mk = {'c': 'http://schemas.openxmlformats.org/drawingml/2006/chart',
+                         'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
+                mk_sf = series._element.find('c:marker/c:spPr/a:solidFill', ns_mk)
+                if mk_sf is not None:
+                    srgb = mk_sf.find('a:srgbClr', ns_mk)
+                    scheme = mk_sf.find('a:schemeClr', ns_mk)
+                    if srgb is not None:
+                        s["color"] = _hex(srgb)
+                    elif scheme is not None:
+                        resolved = _resolve_scheme_color(scheme.get('val'), theme_colors, color_mapping)
+                        if resolved:
+                            s["color"] = resolved
         except Exception:
             # Try gradient: use last stop color as representative
             try:
@@ -193,7 +240,7 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
         # Axis line
         ns_c = {'c': 'http://schemas.openxmlformats.org/drawingml/2006/chart',
                 'a': 'http://schemas.openxmlformats.org/drawingml/2006/main'}
-        valAx_el = chart._chartSpace.find('.//c:valAx', ns_c)
+        valAx_el = val_axis._element
         if valAx_el is not None:
             val_spPr = valAx_el.find('c:spPr', ns_c)
             if val_spPr is not None:
@@ -251,7 +298,11 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
         pass
 
     # Data labels
-    if plot.has_data_labels:
+    try:
+        has_dl = plot.has_data_labels
+    except AttributeError:
+        has_dl = chart._chartSpace.find('.//{http://schemas.openxmlformats.org/drawingml/2006/chart}dLbls') is not None
+    if has_dl:
         # Check if any label type is actually shown
         ns_c = {'c': 'http://schemas.openxmlformats.org/drawingml/2006/chart'}
         dLbls = chart._chartSpace.find('.//c:dLbls', ns_c)

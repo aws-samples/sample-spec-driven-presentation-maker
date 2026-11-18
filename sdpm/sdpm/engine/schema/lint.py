@@ -270,7 +270,7 @@ def _lint_image(si: int, ei: int, elem: dict) -> list[dict]:
 # chart
 # ===================================================================
 
-_CHART_TYPES = {"bar", "line", "pie", "donut", "radar"}
+_CHART_TYPES = {"bar", "line", "pie", "donut", "radar", "scatter"}
 
 
 def _lint_chart(si: int, ei: int, elem: dict) -> list[dict]:
@@ -278,7 +278,7 @@ def _lint_chart(si: int, ei: int, elem: dict) -> list[dict]:
     ct = elem.get("chartType")
     if ct is None:
         results.append(_diag(si, ei, "chart-missing-chartType",
-                             "chart element has no 'chartType'. Specify bar, line, pie, donut, or radar."))
+                             "chart element has no 'chartType'. Specify bar, line, pie, donut, radar, or scatter."))
     elif ct not in _CHART_TYPES:
         results.append(_diag(si, ei, "chart-invalid-chartType",
                              f"chartType '{ct}' is not valid. Allowed: {sorted(_CHART_TYPES)}"))
@@ -287,6 +287,13 @@ def _lint_chart(si: int, ei: int, elem: dict) -> list[dict]:
     if not series:
         results.append(_diag(si, ei, "chart-missing-series",
                              "chart element has no 'series' data."))
+    elif ct == "scatter":
+        for i, s in enumerate(series):
+            pts = s.get("points")
+            if not pts:
+                results.append(_diag(
+                    si, ei, "chart-missing-points",
+                    f"scatter series[{i}] has no 'points' (expected list of [x, y] pairs)."))
     else:
         cats = elem.get("categories", [])
         if cats:
