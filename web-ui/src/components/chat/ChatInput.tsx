@@ -77,6 +77,14 @@ export interface ChatInputProps {
   onSlashOpen?: () => void
   /** Called when the textarea receives focus, to prefetch slash candidates. */
   onTextareaFocus?: () => void
+  /** Chips in the footer row, after the + menu (e.g. working style and output format). */
+  footerSlot?: ReactNode
+  /** `stage`: the large composer at the centre of the home screen; `sheet` (default): the chat sheet. */
+  variant?: "sheet" | "stage"
+  /** Focus the textarea on mount (default true). */
+  autoFocus?: boolean
+  /** Hide the chosen-token row (the footer chips show the choices instead). */
+  hideTokenReflection?: boolean
 }
 
 export interface ChatInputHandle {
@@ -91,10 +99,11 @@ export interface ChatInputHandle {
 }
 
 export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function ChatInput(
-  { onSend, isLoading, onStop, canSendWhileLoading = false, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, onInputChange, slashItems, slashLoading, onSlashOpen, onTextareaFocus },
+  { onSend, isLoading, onStop, canSendWhileLoading = false, disabled, placeholder, idToken, sessionId, children, topSlot, sendOverride, onContinueFromSession, continueFromSessionDisabled, onInputChange, slashItems, slashLoading, onSlashOpen, onTextareaFocus, footerSlot, variant = "sheet", autoFocus = true, hideTokenReflection = false },
   ref,
 ) {
   const t = useTranslations("chatInput")
+  const stage = variant === "stage"
   const [input, setInput] = useState("")
   const [attachments, setAttachments] = useState<Attachment[]>([])
   const [snippetOpen, setSnippetOpen] = useState(false)
@@ -316,11 +325,15 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
         onConfirm={handleSnippetConfirm}
         initialText={editingSnippetId ? snippets.find((s) => s.id === editingSnippetId)?.text : undefined}
       />
-      <div className="flex-none px-3 pb-6 pt-2 safe-bottom">
+      <div className={`motion-safe:transition-[padding] motion-safe:duration-500 ${stage ? "flex-none" : "flex-none px-3 pb-6 pt-2 safe-bottom"}`}>
         <form
           ref={formRef}
           onSubmit={handleSubmit}
-          className="rounded-xl border border-border bg-background-raised search-glow"
+          className={`border border-border bg-background-raised search-glow ${
+            stage ? "rounded-2xl shadow-[var(--shadow-float)]" : "rounded-xl shadow-[var(--shadow-card)]"
+          }`}
+          data-chat-composer=""
+          data-variant={variant}
           data-landed={landed ? "" : undefined}
         >
           {topSlot}
@@ -333,26 +346,17 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
             onEditSnippet={editSnippet}
           />
 
-          {slashEnabled && (
+          {slashEnabled && !hideTokenReflection && (
             <SlashTokenReflection text={input} items={slashItems} onRemove={removeSlashToken} />
           )}
 
           {children}
 
-          <div className="flex items-end gap-2 px-2 py-2">
-            <PlusMenu
-              onFilesSelected={handleFiles}
-              onSnippetRequest={handleSnippetRequest}
-              onContinueFromSession={onContinueFromSession}
-              continueFromSessionDisabled={continueFromSessionDisabled}
-              disabled={sendBlocked}
-            />
-
-            <div className="flex-1 relative">
+          <div className={`relative ${stage ? "px-5 pt-5" : "px-3.5 pt-3"}`}>
               <TextareaAutosize
                 ref={textareaRef}
-                minRows={1}
-                maxRows={5}
+                minRows={stage ? 3 : 1}
+                maxRows={stage ? 12 : 6}
                 value={input}
                 onChange={(e) => {
                   updateInput(e.target.value)
@@ -373,9 +377,23 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 aria-activedescendant={slashEnabled && picker.open && picker.filtered[picker.activeIndex]
                   ? slashOptionId(slashListboxId, picker.activeIndex)
                   : undefined}
-                className="w-full bg-transparent resize-none text-sm py-1 pr-2 focus:outline-none placeholder:text-foreground-muted caret-foreground leading-relaxed font-[inherit] tracking-[inherit]"
-                autoFocus
+                className={`w-full bg-transparent resize-none py-1 focus:outline-none placeholder:text-foreground-muted caret-foreground leading-relaxed font-[inherit] tracking-[inherit] ${
+                  stage ? "text-[15px]" : "text-sm"
+                }`}
+                autoFocus={autoFocus}
               />
+          </div>
+
+          <div className={`flex items-end gap-1.5 ${stage ? "px-3 pb-3 pt-2" : "px-2 pb-2 pt-1"}`}>
+            <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+              <PlusMenu
+                onFilesSelected={handleFiles}
+                onSnippetRequest={handleSnippetRequest}
+                onContinueFromSession={onContinueFromSession}
+                continueFromSessionDisabled={continueFromSessionDisabled}
+                disabled={sendBlocked}
+              />
+              {footerSlot}
             </div>
 
             {isLoading && (
@@ -383,7 +401,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
                 type="button"
                 onClick={onStop}
                 title={t("stopGeneration")}
-                className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target bg-foreground/10 hover:bg-foreground/20"
+                className="flex-none w-8 h-8 rounded-lg flex items-center justify-center transition-all touch-target bg-foreground/10 hover:bg-foreground/20"
                 aria-label={t("stopGeneration")}
               >
                 <Square className="h-3 w-3 fill-current" />
@@ -393,7 +411,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               <button
                 type="submit"
                 disabled={!canSend}
-                className="flex-none h-7 rounded-lg px-3 text-sm font-semibold whitespace-nowrap bg-human text-human-ink transition-opacity disabled:opacity-35 touch-target"
+                className="flex-none h-8 rounded-lg px-3 text-sm font-semibold whitespace-nowrap bg-human text-human-ink transition-opacity disabled:opacity-35 touch-target"
               >
                 {sendOverride.label}
               </button>
@@ -401,7 +419,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
               <button
                 type="submit"
                 disabled={!canSend}
-                className="flex-none w-7 h-7 rounded-lg flex items-center justify-center transition-all touch-target"
+                className={`flex-none flex items-center justify-center transition-all touch-target ${stage ? "w-9 h-9 rounded-xl" : "w-8 h-8 rounded-lg"}`}
                 style={{
                   background: !canSend ? "transparent" : "var(--color-brand-teal)",
                   color: !canSend ? "var(--foreground-muted)" : "var(--background)",
@@ -423,6 +441,7 @@ export const ChatInput = forwardRef<ChatInputHandle, ChatInputProps>(function Ch
           activeIndex={picker.activeIndex}
           onActiveIndexChange={(index) => picker.setActiveIndex(index)}
           onSelect={picker.select}
+          onKindChange={picker.setKind}
           loading={slashLoading ?? false}
           textareaRef={textareaRef}
           anchorRef={formRef}

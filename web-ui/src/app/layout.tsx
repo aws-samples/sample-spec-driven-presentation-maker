@@ -1,15 +1,15 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import type { Metadata } from "next"
-import { Bricolage_Grotesque, Fraunces, Geist_Mono } from "next/font/google"
+import { Fraunces, Geist, Geist_Mono } from "next/font/google"
 import Script from "next/script"
 import { Toaster } from "@/components/ui/sonner"
 import { AppearanceProvider } from "@/components/AppearanceProvider"
 import { LocaleProvider } from "@/i18n/LocaleProvider"
 import "./globals.css"
 
-const bricolage = Bricolage_Grotesque({
-  variable: "--font-bricolage",
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
   display: "swap",
 })
@@ -56,7 +56,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: textScaleScript }} />
       </head>
-      <body className={`${bricolage.variable} ${fraunces.variable} ${geistMono.variable} font-sans antialiased`}>
+      <body className={`${geist.variable} ${fraunces.variable} ${geistMono.variable} font-sans antialiased`}>
         {/* Noise texture overlay */}
         <div
           aria-hidden="true"

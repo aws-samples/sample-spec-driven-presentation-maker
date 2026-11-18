@@ -35,6 +35,38 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   bucket can be deleted. See [Deploy Guide — Source bucket](docs/en/deploy-cloudshell.md#source-bucket)
   for how to check the old bucket.
 
+### Changed
+
+- **The Web UI is laid out anew: a left rail, a home screen that is the chat, and a one-row
+  deck bar.** Decks, Styles and Templates move to a rail on the left (a top bar on phones),
+  with Settings as a gear at its foot; the user menu (name, sign out) is a Cloud-only item
+  below it. The home screen opens on "What are we presenting?" with the chat input in the
+  middle; under it, dashed Style and Template chips open a gallery of style covers and
+  template themes, and choosing one puts the same `@style:` / `@template:` token in the
+  input that `/` does. Once a conversation starts it fills the first screenful, with the deck
+  list below it, until it creates a deck; the conversation then moves into the chat sheet
+  beside the deck, its height and width animated rather than swapped. A deck's name, its
+  steps (brief, art direction, outline, slides) as a progress track, and its tools share one
+  row above the slides, so the slides get about 870px instead of 660px at 1440px with the
+  chat open. The `/` picker is the same card gallery as the chips: up to 640px wide
+  whatever the input's width, opening over the deck beside the chat sheet, with All /
+  Template / Style / Format buttons (they rewrite `/sty` as `/style sty`) and arrow keys in
+  all four directions. Text, surfaces and borders get more contrast steps (WCAG AA for
+  secondary text), on a warm charcoal dark theme and the matching light one. Web UI only
+  (`deploy_webui.sh`).
+- **The chat has one conversation per screen; the New and deck tabs are gone.** The home
+  screen's conversation stays while you open decks and come back, and only New chat clears
+  it; a deck's sheet shows that deck's conversation only. The rail's chat button is gone
+  too: with the sheet closed, Chat at the right of the deck bar opens it again. Web UI only.
+
+### Fixed
+
+- **Phones: the chat button no longer opens the side sheet over a deck's preview tab, and
+  switching to the chat tab keeps the home conversation.** The header button marked the
+  sheet open while the chat tab was showing, so it slid in, 440px wide, over the preview;
+  the chat tab used a second chat panel, which dropped the home conversation (and one that
+  had just created the deck) while it was shown. Web UI only.
+
 ## [0.18.0] - 2026-11-15
 
 Japanese decks read more naturally: a `writing-ja` guide that the orchestrator and composers

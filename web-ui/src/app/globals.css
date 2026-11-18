@@ -56,12 +56,12 @@
 /* Live Design Studio — dark is the default studio experience. */
 :root {
   color-scheme: dark;
-  --radius: 0.75rem;
-  --font-ui: var(--font-bricolage), "Noto Sans JP", "Yu Gothic", sans-serif;
-  --font-display: var(--font-bricolage), "Noto Sans JP", "Yu Gothic", sans-serif;
-  --font-document: var(--font-fraunces), "Noto Serif JP", "Yu Mincho", serif;
+  --radius: 0.625rem;
+  --font-ui: var(--font-geist), "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
+  --font-display: var(--font-geist), "Hiragino Sans", "Hiragino Kaku Gothic ProN", "Noto Sans JP", "Yu Gothic UI", Meiryo, sans-serif;
+  --font-document: var(--font-fraunces), "Hiragino Mincho ProN", "Noto Serif JP", "Yu Mincho", serif;
   --display-weight: 600;
-  --display-tracking: -0.03em;
+  --display-tracking: -0.025em;
   --document-display-weight: 550;
   --document-display-tracking: -0.015em;
 
@@ -91,12 +91,16 @@
   --human: oklch(0.87 0.17 95);
   --human-ink: oklch(0.24 0.04 95);
   --human-text: oklch(0.87 0.17 95);
-  --surface-subtle: oklch(1 0 0 / 3%);
-  --surface-stage: oklch(0.13 0.006 260);
-  --shadow-card: 0 1px 2px oklch(0 0 0 / 30%), 0 8px 24px oklch(0 0 0 / 25%);
-  --shadow-lift: 0 2px 4px oklch(0 0 0 / 35%), 0 16px 48px oklch(0 0 0 / 40%);
+  --surface-subtle: oklch(1 0 0 / 4%);
+  --surface-stage: oklch(0.156 0.004 70);
+  /* Elevation: 0 chrome · 1 canvas · 2 objects (cards, input) · 3 floating (menus, dialogs).
+     Higher = lighter + a 1px top highlight; shadows only grow from 2 upward. */
+  --shadow-card: inset 0 1px 0 oklch(1 0 0 / 6%), 0 1px 2px oklch(0 0 0 / 30%), 0 6px 16px oklch(0 0 0 / 20%);
+  --shadow-sheet: inset 0 1px 0 oklch(1 0 0 / 7%), -2px 0 8px oklch(0 0 0 / 35%);
+  --shadow-float: inset 0 1px 0 oklch(1 0 0 / 8%), 0 0 0 1px oklch(0 0 0 / 45%), 0 2px 6px oklch(0 0 0 / 30%), 0 16px 40px oklch(0 0 0 / 50%);
+  --shadow-lift: inset 0 1px 0 oklch(1 0 0 / 6%), 0 2px 4px oklch(0 0 0 / 30%), 0 16px 40px oklch(0 0 0 / 35%);
   --shadow-slide: 0 4px 24px oklch(0 0 0 / 45%), 0 0 0 1px oklch(1 0 0 / 6%);
-  --storyboard-paper: oklch(0.245 0.006 260);
+  --storyboard-paper: oklch(0.213 0.004 70);
   --storyboard-ink: oklch(0.95 0 0);
   --storyboard-ink-2: oklch(0.78 0 0);
   --storyboard-ink-3: oklch(0.62 0 0);
@@ -104,39 +108,39 @@
   --storyboard-shadow: 0 4px 24px oklch(0 0 0 / 55%), 0 0 0 1px oklch(1 0 0 / 10%);
 
   /* Agent identity tokens are used directly; no waiting-color aliases needed. */
-  --background: oklch(0.11 0.005 260);
-  --background-raised: oklch(0.14 0.005 260);
-  --background-hover: oklch(0.16 0.005 260);
-  --background-panel: oklch(0.08 0.005 260);
+  --background: oklch(0.165 0.004 70);
+  --background-raised: oklch(0.195 0.004 70);
+  --background-hover: oklch(0.219 0.004 70);
+  --background-panel: oklch(0.183 0.004 70);
   --foreground: oklch(0.95 0 0);
-  --foreground-secondary: oklch(0.75 0 0);
-  --foreground-muted: oklch(0.65 0 0);
+  --foreground-secondary: oklch(0.79 0.004 70);
+  --foreground-muted: oklch(0.69 0.004 70);
   --brand: oklch(0.95 0 0);
   --brand-soft: oklch(1 0 0 / 8%);
-  --glow: radial-gradient(ellipse at 30% -10%, oklch(1 0 0 / 2.5%) 0%, transparent 55%);
-  --noise-opacity: 0.025;
-  --card: oklch(0.14 0.005 260);
+  --glow: none;
+  --noise-opacity: 0;
+  --card: oklch(0.195 0.004 70);
   --card-foreground: oklch(0.95 0 0);
-  --popover: oklch(0.14 0.005 260);
+  --popover: oklch(0.225 0.004 70);
   --popover-foreground: oklch(0.95 0 0);
   --primary: oklch(0.95 0 0);
-  --primary-foreground: oklch(0.11 0.005 260);
-  --secondary: oklch(0.20 0.005 260);
+  --primary-foreground: oklch(0.165 0.004 70);
+  --secondary: oklch(0.225 0.004 70);
   --secondary-foreground: oklch(0.88 0 0);
-  --muted: oklch(0.18 0.005 260);
-  --muted-foreground: oklch(0.55 0 0);
-  --accent: oklch(0.20 0.005 260);
+  --muted: oklch(0.207 0.004 70);
+  --muted-foreground: oklch(0.69 0.004 70);
+  --accent: oklch(0.225 0.004 70);
   --accent-foreground: oklch(0.95 0 0);
   --destructive: oklch(0.65 0.2 25);
-  --border: oklch(1 0 0 / 6%);
-  --border-hover: oklch(1 0 0 / 12%);
-  --input: oklch(1 0 0 / 8%);
+  --border: oklch(1 0 0 / 9%);
+  --border-hover: oklch(1 0 0 / 16%);
+  --input: oklch(1 0 0 / 11%);
   --ring: oklch(0.65 0 0 / 40%);
   /* Hearing card: lifted off the chat background, option rows clearly outlined */
-  --hearing-card: oklch(0.165 0.005 260);
-  --hearing-option: oklch(0.21 0.005 260);
+  --hearing-card: oklch(0.207 0.004 70);
+  --hearing-option: oklch(0.231 0.004 70);
   --hearing-option-border: oklch(1 0 0 / 14%);
-  --hearing-field: oklch(0.12 0.005 260);
+  --hearing-field: oklch(0.174 0.004 70);
 }
 
 [data-theme="light"] {
@@ -166,6 +170,8 @@
   --surface-stage: oklch(0.93 0.008 85);
   --shadow-card: 0 1px 2px oklch(0.2 0.02 260 / 8%), 0 8px 24px oklch(0.2 0.02 260 / 8%);
   --shadow-lift: 0 2px 4px oklch(0.2 0.02 260 / 10%), 0 16px 48px oklch(0.2 0.02 260 / 14%);
+  --shadow-sheet: -1px 0 6px oklch(0.2 0.02 260 / 8%);
+  --shadow-float: 0 0 0 1px oklch(0.2 0.02 260 / 6%), 0 2px 6px oklch(0.2 0.02 260 / 8%), 0 16px 40px oklch(0.2 0.02 260 / 16%);
   --shadow-slide: 0 6px 28px oklch(0.2 0.02 260 / 18%), 0 0 0 1px oklch(0.2 0.02 260 / 6%);
   --storyboard-paper: var(--card);
   --storyboard-ink: oklch(0.22 0.01 260);
@@ -179,7 +185,7 @@
   --background-panel: oklch(0.945 0.006 85);
   --foreground: oklch(0.22 0.01 260);
   --foreground-secondary: oklch(0.42 0.008 260);
-  --foreground-muted: oklch(0.55 0.006 260);
+  --foreground-muted: oklch(0.50 0.006 260);
   --brand: oklch(0.22 0.01 260);
   --brand-soft: oklch(0.2 0.01 260 / 7%);
   --glow: radial-gradient(ellipse at 30% -10%, oklch(0.2 0.02 260 / 2%) 0%, transparent 55%);
@@ -633,6 +639,8 @@ body {
 /* Mobile: fixed overlay with slide-in */
 @media (max-width: 639px) {
   .chat-panel {
+    /* The inline width is the desktop sheet's; on a phone the overlay is the screen's width. */
+    width: 100% !important;
     transform: translateX(100%);
     transition: transform 0.35s cubic-bezier(0.4, 0, 0.6, 1);
     will-change: transform;
@@ -687,15 +695,6 @@ body {
   background: var(--foreground-muted);
 }
 
-/* ── Chat toggle pulse (first-visit only) ── */
-@keyframes chat-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--border-hover); }
-  50% { box-shadow: 0 0 0 6px transparent; }
-}
-.chat-toggle-pulse {
-  animation: chat-pulse 3s ease-in-out infinite;
-}
-
 /* ── User menu enter ── */
 .user-menu-enter {
   opacity: 0;
@@ -720,9 +719,66 @@ body {
 
 /* ── Frosted glass header ── */
 .header-glass {
-  backdrop-filter: blur(20px) saturate(180%);
-  -webkit-backdrop-filter: blur(20px) saturate(180%);
-  background: color-mix(in oklch, var(--background) 80%, transparent);
+  background: var(--background);
+}
+
+/* ── Elevation 3: everything that floats over the page ── */
+[data-slot="dialog-content"],
+[data-slot="dropdown-menu-content"],
+[data-slot="dropdown-menu-sub-content"] {
+  background-color: var(--popover);
+  border-color: var(--border-hover);
+  box-shadow: var(--shadow-float);
+}
+
+/* ── Chat floats above the page (desktop only; elevation 2) ── */
+@media (min-width: 640px) {
+  .chat-panel-inner {
+    margin: 8px;
+    height: calc(100% - 16px);
+    min-width: calc(var(--chat-panel-inner-w, 440px) - 16px);
+    border-radius: 12px;
+    border: 1px solid var(--border-hover);
+    background: var(--background-raised);
+    box-shadow: var(--shadow-sheet) !important;
+  }
+  /* Inside the chat sheet the input steps up once more */
+  .chat-panel-inner .search-glow {
+    background: var(--popover);
+  }
+}
+
+/* ── Phase track: the first open step is half lit ── */
+.step-track-next {
+  background: linear-gradient(90deg, color-mix(in oklch, var(--foreground) 55%, transparent) 50%, color-mix(in oklch, var(--foreground) 12%, transparent) 50%);
+}
+
+/* ── Home conversation → chat sheet (ChatPanelShell, lib/motion) ── */
+/* The centred column has the sheet's border and shadow, only invisible, so they fade in. */
+.chat-surface-center {
+  border: 1px solid transparent;
+  border-radius: 12px;
+}
+.chat-panel.is-morphing {
+  transition: none;
+}
+.chat-panel.is-morphing .chat-panel-inner {
+  min-width: 0 !important;
+  transition: background-color 0.6s ease, border-color 0.6s ease, box-shadow 0.6s ease;
+}
+.chat-panel.is-morphing textarea {
+  transition: height 0.72s cubic-bezier(0.65, 0, 0.35, 1);
+}
+/* The page beside the chat comes in once the column has started moving. */
+@keyframes page-enter {
+  from { opacity: 0; transform: translateX(-12px); }
+  to { opacity: 1; transform: none; }
+}
+.page-enter {
+  animation: page-enter 0.5s cubic-bezier(0.33, 1, 0.68, 1) 0.36s both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .page-enter { animation: none; }
 }
 
 /* ── Search glow on focus ── */
@@ -1110,7 +1166,6 @@ body {
   .slide-updated { animation: none; }
   .user-menu-enter { opacity: 1; transform: none; transition: none; }
   .menu-item-stagger { opacity: 1; transform: none; animation: none; }
-  .chat-toggle-pulse { animation: none; }
 }
 
 /* ── Theme-aware prose overrides ── */

@@ -1,15 +1,19 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 /**
- * ModeSelector — Editorial Vibe/Spec working-style selector.
- * Shown on the initial chat screen before any messages are sent.
+ * ModeSelector — Vibe/Spec working-style chip in the composer's footer row.
+ * Shown on the initial chat screen before any messages are sent. The chip names the
+ * current style; its menu explains both.
  */
 
 "use client"
 
-import { useId } from "react"
-import { Check } from "lucide-react"
+import { ChevronDown, Compass, Zap } from "lucide-react"
 import { useTranslations } from "next-intl"
+import {
+  DropdownMenu, DropdownMenuContent, DropdownMenuLabel, DropdownMenuRadioGroup, DropdownMenuRadioItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 
 interface ModeSelectorProps {
   value: "spec" | "vibe"
@@ -18,85 +22,44 @@ interface ModeSelectorProps {
 
 // Labels ("Vibe"/"Spec") are product names; supporting copy is localized.
 const modes = [
-  {
-    key: "vibe" as const,
-    label: "Vibe",
-    pathKey: "vibePath",
-    summaryKey: "vibeSummary",
-  },
-  {
-    key: "spec" as const,
-    label: "Spec",
-    pathKey: "specPath",
-    summaryKey: "specSummary",
-  },
+  { key: "spec" as const, label: "Spec", icon: Compass, pathKey: "specPath", summaryKey: "specSummary" },
+  { key: "vibe" as const, label: "Vibe", icon: Zap, pathKey: "vibePath", summaryKey: "vibeSummary" },
 ] as const
 
 export function ModeSelector({ value, onChange }: ModeSelectorProps) {
   const t = useTranslations("modeSelector")
-  const labelId = useId()
+  const current = modes.find((m) => m.key === value) ?? modes[0]
+  const Icon = current.icon
 
   return (
-    <div className="w-full max-w-[340px]">
-      <p
-        id={labelId}
-        className="mb-3 text-xs font-medium uppercase tracking-[0.08em] text-foreground-muted"
-      >
-        {t("chooseWorkingStyle")}
-      </p>
-      <div
-        role="group"
-        aria-labelledby={labelId}
-        className="overflow-hidden rounded-xl border border-border"
-      >
-        {modes.map((mode, index) => {
-          const active = value === mode.key
-          return (
-            <button
-              key={mode.key}
-              type="button"
-              aria-pressed={active}
-              onClick={() => onChange(mode.key)}
-              className={`relative grid min-h-[82px] w-full grid-cols-[92px_minmax(0,1fr)_44px] items-center gap-3 px-3.5 py-3 text-left transition-colors ${
-                index > 0 ? "border-t border-border" : ""
-              } ${
-                active
-                  ? "bg-foreground/[0.06]"
-                  : "bg-transparent hover:bg-foreground/[0.035]"
-              }`}
-            >
-              {active && (
-                <span
-                  className="absolute inset-y-0 left-0 w-[3px] bg-foreground"
-                  aria-hidden="true"
-                />
-              )}
-              <span className="flex flex-col items-start gap-1">
-                <span className="text-lg font-semibold leading-none tracking-[-0.025em] text-foreground">
-                  {mode.label}
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={t("chipLabel", { mode: current.label })}
+          className="inline-flex h-8 items-center gap-1.5 rounded-full border border-border px-3 text-sm font-medium text-foreground-secondary hover:border-border-hover hover:text-foreground data-[state=open]:border-border-hover data-[state=open]:text-foreground motion-safe:transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
+        >
+          <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+          {current.label}
+          <ChevronDown className="h-3 w-3 text-foreground-muted" aria-hidden="true" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-72 p-1.5">
+        <DropdownMenuLabel className="text-xs font-medium text-foreground-muted">{t("chooseWorkingStyle")}</DropdownMenuLabel>
+        <DropdownMenuRadioGroup value={value} onValueChange={(v) => onChange(v === "vibe" ? "vibe" : "spec")}>
+          {modes.map((mode) => (
+            <DropdownMenuRadioItem key={mode.key} value={mode.key} className="items-start rounded-lg py-2.5">
+              <span className="flex flex-col gap-0.5">
+                <span className="flex items-baseline gap-2">
+                  <span className="text-sm font-semibold text-foreground">{mode.label}</span>
+                  <span className="text-xs text-foreground-muted">{t(mode.pathKey)}</span>
                 </span>
-                <span className="text-xs font-medium uppercase tracking-[0.08em] text-foreground-muted">
-                  {t(mode.pathKey)}
-                </span>
+                <span className="text-xs leading-snug text-foreground-secondary">{t(mode.summaryKey)}</span>
               </span>
-              <span className="text-sm leading-snug text-foreground-secondary">
-                {t(mode.summaryKey)}
-              </span>
-              <span className="touch-target flex items-center justify-end" aria-hidden="true">
-                <span
-                  className={`grid h-5 w-5 place-items-center rounded-full border ${
-                    active
-                      ? "border-foreground bg-foreground text-background"
-                      : "border-border-hover text-transparent"
-                  }`}
-                >
-                  <Check className="h-3 w-3" />
-                </span>
-              </span>
-            </button>
-          )
-        })}
-      </div>
-    </div>
+            </DropdownMenuRadioItem>
+          ))}
+        </DropdownMenuRadioGroup>
+      </DropdownMenuContent>
+    </DropdownMenu>
   )
 }
