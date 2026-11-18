@@ -22,6 +22,19 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
   New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
 
+### Security
+
+- **deploy.sh: the source bucket is account-scoped and its owner is checked.** `deploy.sh`
+  uploads the CodeBuild source to `sdpm-deploy-<account>-<region>-an` in the S3 account
+  regional namespace and passes `--expected-bucket-owner` on every call to that bucket. It
+  stops before uploading when the bucket belongs to another account or cannot be created
+  there (creating it needs AWS CLI v2 2.34.8 or later; the namespace is not available in
+  Middle East (Bahrain) and Middle East (UAE)). A bucket it creates gets all four Block Public
+  Access settings and a 7-day expiry for source zips. Deployed stacks are unaffected and need
+  no redeploy; the next run creates the new bucket, and the old `sdpm-deploy-<account>-<region>`
+  bucket can be deleted. See [Deploy Guide — Source bucket](docs/en/deploy-cloudshell.md#source-bucket)
+  for how to check the old bucket.
+
 ## [0.18.0] - 2026-11-15
 
 Japanese decks read more naturally: a `writing-ja` guide that the orchestrator and composers
