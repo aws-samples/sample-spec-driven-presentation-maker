@@ -22,6 +22,12 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
   New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
 
+### Fixed
+
+- **Shape `paragraphs` accept the documented `list` key** (#586). Shape paragraphs now
+  handle `list: {"type": "disc", ...}` and numbered lists (including `level`), matching
+  `textbox` paragraphs while keeping `bullet` as an alias.
+
 ## [0.18.0] - 2026-11-15
 
 Japanese decks read more naturally: a `writing-ja` guide that the orchestrator and composers
