@@ -21,6 +21,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   scale) work as for `line`. `pptx_to_json` reads a radar chart back as `radar`, so an
   edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
   New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
+- **An SDPM icon.** A slide frame holding a green and an amber face, with a violet block
+  tilting in over its top-left corner. The Web UI uses it for the logo at the top of the
+  rail (the mobile top bar too, drawn without a tile and following the dark/light theme),
+  the favicon (also without a tile, so it fills the browser tab; the SVG favicon follows the
+  dark/light colour scheme), `icon.svg` and the PWA icons, which were blank squares before.
+  The Claude Desktop bundle (`sdpm.mcpb`) now carries it as its icon. Web UI
+  (`deploy_webui.sh`) and the next release's bundle.
 
 ### Security
 
@@ -136,13 +143,6 @@ its data directories, and XML from outside the repository goes through one expli
   Accessibility Checker. `deck.json` takes `title` and `language` (BCP 47), written to the
   document properties; without `title` the first slide's title text is used. Importing a
   PPTX reads all of them back. Elements without `alt` are built as before.
-- **An SDPM icon.** A slide frame holding a green and an amber face, with a violet block
-  tilting in over its top-left corner. The Web UI uses it for the logo at the top of the
-  rail (the mobile top bar too, drawn without a tile and following the dark/light theme),
-  the favicon (also without a tile, so it fills the browser tab; the SVG favicon follows the
-  dark/light colour scheme), `icon.svg` and the PWA icons, which were blank squares before. The Claude
-  Desktop bundle (`sdpm.mcpb`) now carries it as its icon. Web UI (`deploy_webui.sh`)
-  and the next release's bundle.
 
 ### Changed
 
