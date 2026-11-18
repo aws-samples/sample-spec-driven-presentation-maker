@@ -994,6 +994,8 @@ The build resolves both and checks the resolved slide, so a misspelled target is
 refused; it is refused at build rather than at save. If you want the earlier signal on an
 `override` slide, build it.
 
+## Related guides
+
 - `read_guides(["animation-craft"])` — whether to animate at all, how long an effect should
   run, how to stagger a group, and what the published guidance on motion says. This guide
   covers what is possible; that one covers what is worth doing.

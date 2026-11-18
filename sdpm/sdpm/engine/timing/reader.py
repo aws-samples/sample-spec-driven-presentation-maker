@@ -2272,10 +2272,16 @@ class _TimingReader:
         eight of the gallery presets at some durations — sending decks sdpm
         itself had just written to the raw fallback.
 
-        A millisecond of slack is allowed, and only where ``_scaled``'s own
-        docstring records that PowerPoint and this writer may legitimately
-        differ: an exact half, which PowerPoint's float precision splits both
-        ways. Anywhere else the match is exact.
+        The comparison accepts the values a writer can produce, and nothing
+        else. On an exact half ``_scaled``'s own docstring records that
+        PowerPoint and this writer may legitimately differ — PowerPoint's float
+        precision splits those both ways — so there are two. They are *not*
+        symmetric around the expected value: ``_scaled`` rounds a half up, so
+        the expected value is already the upper rounding and PowerPoint's
+        alternative is the lower one. Allowing ``abs(written - expected) <= 1``
+        instead also accepted the value one above, which neither writer emits:
+        `entrance.bounce` at 300 ms took a hand-edited ``@delay`` of 99 for the
+        98 it had written (650 × 300/2000 = 97.5) and wrote 98 back over it.
         """
         from sdpm.engine.timing.writer import _scaled
 
@@ -2288,14 +2294,18 @@ class _TimingReader:
                 expected = source if attribute == "dur" else (
                     max(duration - 1, 0) if source > 0 else source
                 )
-                slack = 0
+                accepted = (expected,)
             else:
                 expected = _scaled(source, ratio)
-                slack = 1 if (Fraction(source) * ratio).denominator == 2 else 0
-            if abs(written - expected) > slack:
+                accepted = (
+                    (expected - 1, expected)
+                    if (Fraction(source) * ratio).denominator == 2
+                    else (expected,)
+                )
+            if written not in accepted:
                 raise _Unsupported(
                     f"{sequence} behavior {tag} @{attribute} {written} is not the measured "
-                    f"{source} at this effect duration ({expected})"
+                    f"{source} at this effect duration ({' or '.join(map(str, accepted))})"
                 )
 
     def _check_bounce_mirror(

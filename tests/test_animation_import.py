@@ -13,6 +13,7 @@ semantic JSON with the attribute quietly missing.
 from __future__ import annotations
 
 import json
+from fractions import Fraction
 from pathlib import Path
 
 import pytest
@@ -1103,6 +1104,128 @@ class TestAMeasuredPresetAtAnUnmeasuredDuration:
         )
         assert not wrong, (
             f"{len(wrong)} measured preset(s) came back at a different duration: {wrong}"
+        )
+
+
+class TestOnlyTheTwoRoundingsOfAHalfAreAccepted:
+    """A scaled half has two legitimate values, and they are not symmetric.
+
+    `_scaled` rounds a half up, so the value it writes is the *upper* rounding
+    and PowerPoint's alternative is the lower one. Allowing
+    `abs(written - expected) <= 1` also accepted the value one above, which
+    neither writer emits — so a hand-edited `@delay` of 99 was taken for the 98
+    sdpm had written, and the next build put 98 back over it.
+
+    The three cases are the ones the review measured. Each `source × ratio` is
+    an exact half, which is the only place any slack applies at all.
+    """
+
+    #: category, effect, duration, the value sdpm writes, element, attribute.
+    HALVES = [
+        ("entrance", "bounce", 300, 98, "animScale", "delay"),
+        ("entrance", "drop", 875, 137, "anim", "dur"),
+        ("exit", "boomerang", 201, 101, "anim", "delay"),
+    ]
+
+    def _retime(self, element, attribute, before, after):
+        def mutate(slide):
+            changed = 0
+            for node in slide.iter(f"{{{NS['p']}}}{element}"):
+                ctn = node.find(f"{{{NS['p']}}}cBhvr").find(f"{{{NS['p']}}}cTn")
+                if attribute == "dur":
+                    target = ctn
+                else:
+                    conditions = ctn.find(f"{{{NS['p']}}}stCondLst")
+                    target = (
+                        None if conditions is None
+                        else conditions.find(f"{{{NS['p']}}}cond")
+                    )
+                if target is None or target.get(attribute) != str(before):
+                    continue
+                target.set(attribute, str(after))
+                changed += 1
+            assert changed, (
+                f"the fixture must carry p:{element}/@{attribute}={before}"
+            )
+        return mutate
+
+    def _read_at(self, tmp_path, case, offset):
+        category, effect, duration, written, element, attribute = case
+        package = _package(tmp_path, _slide(animations={
+            "mainSequence": [_effect(
+                preset={"category": category, "effect": effect},
+                timing={"durationMs": duration},
+            )],
+            "interactiveSequences": [],
+        }), name=f"{category}-{effect}-{written + offset}.pptx")
+        mutate = (
+            (lambda _slide: None) if offset == 0
+            else self._retime(element, attribute, written, written + offset)
+        )
+        return _read(_mutate(package, mutate))
+
+    @pytest.mark.parametrize("case", HALVES, ids=lambda c: f"{c[0]}.{c[1]}@{c[2]}")
+    def test_the_value_above_the_upper_rounding_is_refused(self, tmp_path, case):
+        motion = self._read_at(tmp_path, case, +1)
+        assert motion.animations is None, (
+            f"{case[3] + 1} is neither rounding of the product, so taking it for "
+            f"{case[3]} would write {case[3]} back over a hand edit"
+        )
+        assert motion.raw_timing is not None
+
+    @pytest.mark.parametrize("case", HALVES, ids=lambda c: f"{c[0]}.{c[1]}@{c[2]}")
+    def test_both_roundings_of_the_half_still_import(self, tmp_path, case):
+        """The refusal must not cost the case the slack exists for.
+
+        PowerPoint's float precision splits an exact half both ways, so the
+        lower rounding is a file PowerPoint really writes.
+        """
+        for offset in (-1, 0):
+            motion = self._read_at(tmp_path, case, offset)
+            assert motion.animations is not None, (
+                f"{case[3] + offset} is a rounding of the product: "
+                f"{motion.raw_timing.reasons[0] if motion.raw_timing else ''}"
+            )
+
+    def test_no_half_anywhere_in_the_catalogue_accepts_the_value_above(self, tmp_path):
+        """The three cases above are named; this is every one of them.
+
+        Which timing lands on an exact half depends on the ratio, so the cases
+        cannot be enumerated by hand — the same reason the duration sweep
+        covers the whole catalogue. 64 locations across 97 presets at three
+        durations; 27 of them imported semantically before the fix.
+        """
+        from sdpm.engine.timing.writer import _is_visibility_set, _scaled
+
+        leaked, checked = [], 0
+        for key in SCALABLE_MEASURED:
+            preset, measured = _measured_preset(key)
+            entry = next(item for item in CATALOG["guiItems"] if item["key"] == key)
+            for duration in (300, 875, 1234):
+                if duration == measured:
+                    continue
+                ratio = Fraction(duration, measured)
+                for behavior in entry["ooxml"]["behaviors"]:
+                    if _is_visibility_set(behavior):
+                        continue
+                    element = str(behavior.get("element", ""))[len("p:"):]
+                    for attribute, field in (("dur", "durMs"), ("delay", "delayMs")):
+                        source = behavior.get(field)
+                        if source is None:
+                            continue
+                        if (Fraction(int(source)) * ratio).denominator != 2:
+                            continue
+                        checked += 1
+                        written = _scaled(int(source), ratio)
+                        case = (preset["category"], preset["effect"], duration,
+                                written, element, attribute)
+                        if self._read_at(tmp_path, case, +1).animations is not None:
+                            leaked.append(f"{key}@{duration} p:{element}/@{attribute} "
+                                          f"{written} -> {written + 1}")
+        assert checked, "the catalogue must produce some exact halves to check"
+        assert not leaked, (
+            f"{len(leaked)} of {checked} half timings accepted a value neither "
+            f"writer produces: {leaked[:10]}"
         )
 
 

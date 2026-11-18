@@ -132,3 +132,42 @@ class TestTheIncludeFileIsReadOncePerVersion:
         first = expand_includes(elements, tmp_path)
         first[0]["id"] = "mutated"
         assert [e["id"] for e in expand_includes(elements, tmp_path)] == ["panel"]
+
+    def test_an_unreadable_file_is_named_the_way_the_deck_names_it(self, tmp_path):
+        """By `src`, not by the resolved path.
+
+        On the Remote server the resolved path is a materialised tmpdir, which
+        tells the agent reading the error nothing. Caching the read moved the
+        message into the cached function, where only the absolute path is in
+        scope, so it is raised at the call site instead.
+        """
+        import pytest
+
+        from sdpm.engine.builder import expand_includes
+
+        deck = tmp_path / "deck"
+        (deck / "includes").mkdir(parents=True)
+        (deck / "includes" / "panel.json").write_text("{not json", encoding="utf-8")
+
+        with pytest.raises(ValueError) as caught:
+            expand_includes([{"type": "include", "src": "includes/panel.json"}], deck)
+        message = str(caught.value)
+        assert "includes/panel.json" in message, message
+        assert str(deck) not in message, (
+            f"the resolved path is a tmpdir on Remote: {message}"
+        )
+
+    def test_a_read_error_is_not_cached(self, tmp_path):
+        """So fixing the file and rebuilding works without a restart."""
+        import pytest
+
+        from sdpm.engine.builder import expand_includes
+
+        inc = tmp_path / "panel.json"
+        inc.write_text("{not json", encoding="utf-8")
+        elements = [{"type": "include", "src": "panel.json"}]
+        with pytest.raises(ValueError):
+            expand_includes(elements, tmp_path)
+
+        inc.write_text(json.dumps([{"id": "panel", "type": "shape"}]), encoding="utf-8")
+        assert [e["id"] for e in expand_includes(elements, tmp_path)] == ["panel"]

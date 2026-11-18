@@ -665,11 +665,19 @@ def _include_elements(path: str, _stamp: tuple[int, int]) -> tuple:
     ``_stamp`` is the file's modification time and size, so an edited file is a
     different key rather than a stale hit. It is positional because
     :func:`functools.lru_cache` keys on the arguments it is given.
+
+    One limit worth knowing rather than working around: a rewrite that keeps
+    the same size, within the filesystem's timestamp granularity, is the same
+    key and returns the old content until the process restarts. That needs
+    one-second timestamps — HFS+, FAT, some network filesystems — while APFS
+    and ext4 store nanoseconds.
+
+    A read error is raised rather than cached, and :func:`expand_includes`
+    turns it into a message naming the deck-relative ``src``: on the Remote
+    server the resolved path is a materialised tmpdir, which tells the agent
+    reading the error nothing.
     """
-    try:
-        data = read_json(Path(path))
-    except (json.JSONDecodeError, ValueError) as error:
-        raise ValueError(f"Invalid JSON in include file {path}: {error}")
+    data = read_json(Path(path))
     elements = data if isinstance(data, list) else data.get("elements", [])
     return tuple(elements)
 
@@ -700,7 +708,14 @@ def expand_includes(elements, base_dir: Path) -> list:
             stat = include_path.stat()
         except OSError:
             continue
-        included = _include_elements(str(include_path), (stat.st_mtime_ns, stat.st_size))
+        try:
+            included = _include_elements(
+                str(include_path), (stat.st_mtime_ns, stat.st_size)
+            )
+        except (json.JSONDecodeError, ValueError) as error:
+            # Named by `src`, the way the deck refers to it. The resolved path
+            # is a materialised tmpdir on the Remote server.
+            raise ValueError(f"Invalid JSON in include file {src}: {error}")
         # Copied, because the caller may edit what it gets back and the cache
         # hands the same objects to the next reader.
         expanded.extend(copy.deepcopy(element) for element in included)
