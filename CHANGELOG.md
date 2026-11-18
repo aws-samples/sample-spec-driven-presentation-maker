@@ -22,6 +22,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
   New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
 
+### Fixed
+
+- **Chart axis and plot-area `c:spPr` schema order** (#648). Insert `c:spPr` and
+  `c:majorGridlines` at their OOXML schema positions inside `c:catAx`, `c:valAx`,
+  `c:plotArea`, and `c:chartSpace` instead of appending at the end, avoiding PowerPoint
+  repair warnings on charts with custom axis or background styling.
+
 ## [0.18.0] - 2026-11-15
 
 Japanese decks read more naturally: a `writing-ja` guide that the orchestrator and composers
