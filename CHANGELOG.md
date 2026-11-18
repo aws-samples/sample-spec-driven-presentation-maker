@@ -15,6 +15,11 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Added
 
+- **Area charts** (`chartType: "area"`, #620). Supports unstacked (`AREA`) and stacked
+  (`stacked: true`, `AREA_STACKED`) area charts with axes, gridlines, data labels, and
+  series fill colors. `pptx_to_json` reads area and stacked-area charts back as `area`
+  so edited area charts rebuild from JSON; 100% stacked area charts still keep `_chartXml`.
+  New `chart-area` guide. Local mode and the AWS stack (SdpmRuntime).
 - **Radar charts** (`chartType: "radar"`, #621). A radar chart takes the same categories and
   series as a line chart; `markers` (default on), series `color`, `style.lineWidth` /
   `style.markerSize` and `valueAxis` (`min` / `max` / `majorUnit` / `gridlines`, the radial
