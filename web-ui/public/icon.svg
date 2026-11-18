@@ -1,10 +1,7 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
-  <rect width="512" height="512" rx="96" fill="#1a1a1f"/>
-  <g transform="translate(128,128) scale(0.5)">
-    <rect x="40" y="80" width="432" height="352" rx="16" fill="none" stroke="#e8e8ed" stroke-width="24"/>
-    <rect x="80" y="160" width="160" height="12" rx="6" fill="#e8e8ed" opacity="0.6"/>
-    <rect x="80" y="200" width="240" height="8" rx="4" fill="#e8e8ed" opacity="0.3"/>
-    <rect x="80" y="224" width="200" height="8" rx="4" fill="#e8e8ed" opacity="0.3"/>
-    <circle cx="400" cy="180" r="40" fill="#2d9f93" opacity="0.8"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512"><defs><linearGradient id="bg4-0" x1="0" y1="0" x2="0" y2="512" gradientUnits="userSpaceOnUse"><stop offset="0" stop-color="#1d1f2a"/><stop offset="1" stop-color="#0f1016"/></linearGradient></defs>
+<rect width="512" height="512" rx="112" fill="url(#bg4-0)"/>
+<g transform="translate(48 48) scale(17.333)"><defs><mask id="cut4-1" maskUnits="userSpaceOnUse" x="-4" y="-4" width="32" height="32"><rect x="-4" y="-4" width="32" height="32" fill="#fff"/><g fill="#000" stroke="#000" stroke-width="2.5" stroke-linejoin="round"><path d="M4.7 10.899999999999999H10.799999999999999A0.8 0.8 0 0 1 11.6 11.7V17.55A0.8 0.8 0 0 1 10.799999999999999 18.35H4.7A0.8 0.8 0 0 1 3.9000000000000004 17.55V11.7A0.8 0.8 0 0 1 4.7 10.899999999999999Z" transform="translate(-1 -4.6) rotate(-12 7.75 14.625)"/></g></mask></defs><g transform="translate(0 -1.3)">
+<g mask="url(#cut4-1)"><rect x="2" y="9" width="20" height="11.25" rx="2.3" fill="none" stroke="#f2f2f4" stroke-width="1.9"/>
+<path d="M4.7 10.899999999999999H10.799999999999999A0.8 0.8 0 0 1 11.6 11.7V17.55A0.8 0.8 0 0 1 10.799999999999999 18.35H4.7A0.8 0.8 0 0 1 3.9000000000000004 17.55V11.7A0.8 0.8 0 0 1 4.7 10.899999999999999Z" fill="#b385fb" opacity="0.22"/><path d="M13.4 10.899999999999999H19.3A0.8 0.8 0 0 1 20.1 11.7V13.325A0.8 0.8 0 0 1 19.3 14.125H13.4A0.8 0.8 0 0 1 12.6 13.325V11.7A0.8 0.8 0 0 1 13.4 10.899999999999999Z" fill="#3bc59e"/><path d="M13.4 15.125H19.3A0.8 0.8 0 0 1 20.1 15.925V17.55A0.8 0.8 0 0 1 19.3 18.35H13.4A0.8 0.8 0 0 1 12.6 17.55V15.925A0.8 0.8 0 0 1 13.4 15.125Z" fill="#efac44"/></g>
+<g fill="#b385fb"><path d="M4.7 10.899999999999999H10.799999999999999A0.8 0.8 0 0 1 11.6 11.7V17.55A0.8 0.8 0 0 1 10.799999999999999 18.35H4.7A0.8 0.8 0 0 1 3.9000000000000004 17.55V11.7A0.8 0.8 0 0 1 4.7 10.899999999999999Z" transform="translate(-1 -4.6) rotate(-12 7.75 14.625)"/></g></g></g></svg>
+

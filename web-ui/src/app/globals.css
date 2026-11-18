@@ -74,6 +74,12 @@
   --agent-neutral: oklch(0.55 0 0);
   --team-gradient: linear-gradient(90deg, var(--agent-layout), var(--agent-content), var(--agent-visual), var(--agent-data), var(--agent-decorator));
   --team-spine-gradient: linear-gradient(180deg, var(--agent-layout), var(--agent-content), var(--agent-visual), var(--agent-data), var(--agent-decorator));
+  /* SDPM mark (SdpmMark.tsx): the app icon's colours, drawn without its tile. */
+  --mark-frame: #eeeeee;
+  --mark-visual: #b385fb;
+  --mark-content: #3bc59e;
+  --mark-data: #efac44;
+  --mark-slot-opacity: 0.22;
   --entry-action-spectrum: conic-gradient(
     from var(--team-angle, 0deg),
     var(--agent-layout),
@@ -152,6 +158,12 @@
   --agent-decorator: oklch(0.48 0.20 330);
   --agent-neutral: oklch(0.45 0 0);
   --human-text: oklch(0.55 0.12 95);
+  /* Darker versions of the same mark hues, for light backgrounds. */
+  --mark-frame: #181b1f;
+  --mark-visual: #7a3fd0;
+  --mark-content: #0a9478;
+  --mark-data: #c77a00;
+  --mark-slot-opacity: 0.2;
   --entry-action-spectrum: conic-gradient(
     from var(--team-angle, 0deg),
     oklch(0.60 0.22 262) 0deg,

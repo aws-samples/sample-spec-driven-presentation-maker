@@ -32,6 +32,15 @@ export const metadata: Metadata = {
   title: "spec-driven-presentation-maker",
   description: "AI-powered presentation builder",
   manifest: "/manifest.json",
+  // The favicon is the bare mark (no tile) so it fills the 16px tab slot. Browsers that read SVG
+  // icons take favicon.svg, which follows the dark/light colour scheme; the ICO (light colours) is
+  // the fallback. The ICO is declared with a fixed size, not "any", so Chrome prefers the SVG.
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+  },
   other: {
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",

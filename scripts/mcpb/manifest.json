@@ -16,6 +16,7 @@
   "homepage": "https://github.com/aws-samples/sample-spec-driven-presentation-maker",
   "documentation": "https://github.com/aws-samples/sample-spec-driven-presentation-maker/blob/main/docs/en/getting-started.md",
   "support": "https://github.com/aws-samples/sample-spec-driven-presentation-maker/issues",
+  "icon": "icon.png",
   "server": {
     "type": "uv",
     "entry_point": "servers/local/server.py",
