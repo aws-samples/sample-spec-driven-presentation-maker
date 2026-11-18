@@ -13,6 +13,26 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-11-18
+
+The Web UI is laid out anew. It has a left rail and a home screen that is the chat, with
+the deck list below it. A deck's name, steps and tools share one row above the slides,
+which get about 870px instead of 660px at 1440px. The `/` picker and the new Style and
+Template chips show style covers and template themes. The chat keeps one conversation per
+screen. SDPM gets its own icon, in the Web UI, the favicon, the PWA and the Claude Desktop
+bundle. Charts gain a radar type, and `deploy.sh` checks who owns its source bucket.
+
+### Upgrading from 0.18
+
+**Cloud deployments.**
+
+- Deploy all stacks (`scripts/deploy.sh`), in any order, and the Web UI
+  (`scripts/deploy_webui.sh`). Nothing in `infra/config.yaml` changes.
+- `deploy.sh` now uploads to a new source bucket, `sdpm-deploy-<account>-<region>-an`,
+  and creates it on its first run (AWS CLI v2 2.34.8 or later). The old
+  `sdpm-deploy-<account>-<region>` bucket can be deleted; see
+  [Deploy Guide — Source bucket](docs/en/deploy-cloudshell.md#source-bucket).
+
 ### Added
 
 - **Radar charts** (`chartType: "radar"`, #621). A radar chart takes the same categories and
@@ -2574,7 +2594,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.15.0...v0.16.0
