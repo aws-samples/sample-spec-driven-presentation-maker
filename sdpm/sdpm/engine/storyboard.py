@@ -267,6 +267,41 @@ def _settled_state(slide_frames: Sequence[Mapping[str, Any]]) -> Mapping[str, An
     return (build or list(slide_frames))[-1]["state"]
 
 
+def _interactive_effects(slide: Mapping[str, Any]) -> list[Mapping[str, Any]]:
+    """Every effect on the slide's interactive sequences, in order."""
+    animations = slide.get("animations") or {}
+    return [
+        effect
+        for sequence in (animations.get("interactiveSequences") or [])
+        if isinstance(sequence, Mapping)
+        for effect in (sequence.get("effects") or [])
+        if isinstance(effect, Mapping)
+    ]
+
+
+def _trigger_reveals(
+    slide: Mapping[str, Any], index: Any, slide_size: tuple[int, int]
+) -> set[str]:
+    """Element ids some trigger's effects reveal.
+
+    Read off the effects rather than off the trigger frame's end state. A
+    trigger entrance carrying ``afterEffect: hide`` reveals its target and hides
+    it again within the same click, so the frame ends with the element off
+    screen while a reveal path plainly exists — and reading the end state
+    reported it as "never revealed".
+
+    The same set decides what starts off screen at frame 0, so the two are
+    derived here once instead of twice.
+    """
+    return {
+        effect.target
+        for effect in (
+            _Effect(e, index, slide_size) for e in _interactive_effects(slide)
+        )
+        if effect.reveals and effect.target
+    }
+
+
 def _raw_notes(slide: Mapping[str, Any]) -> list[str]:
     """Say what a preserved fragment carries that these frames cannot show."""
     notes: list[str] = []
@@ -305,17 +340,10 @@ def frames(
     # click too, exactly like one revealed by the main run. Counting the main
     # sequence alone drew it at frame 0 as though it were already there, which
     # is the opposite of what the storyboard exists to show.
-    interactive_effects = [
-        effect
-        for sequence in (animations.get("interactiveSequences") or [])
-        if isinstance(sequence, Mapping)
-        for effect in (sequence.get("effects") or [])
-        if isinstance(effect, Mapping)
-    ]
-    revealed_by_entrance = {r.target for r in reduced if r.reveals} | {
-        r.target for r in (_Effect(e, index, slide_size) for e in interactive_effects)
-        if r.reveals
-    }
+    revealed_by_entrance = (
+        {r.target for r in reduced if r.reveals}
+        | _trigger_reveals(slide, index, slide_size)
+    )
 
     #: id -> state. Anything an entrance reveals starts off screen.
     def initial():
@@ -610,11 +638,11 @@ def storyboard(
         # path, just not one on the clicker. Asking "visible in any frame?"
         # instead would also stop reporting the element hidden at the end of its
         # own build, which is one of the three defects this exists to catch.
-        by_trigger = {
-            element_id
-            for frame in slide_frames if frame.get("kind") == "trigger"
-            for element_id, entry in frame["state"].items() if entry["visible"]
-        }
+        # Read off the trigger's effects, not off its frame's end state: an
+        # entrance carrying `afterEffect: hide` reveals and re-hides within one
+        # click, so the frame ends with the element off screen and the state
+        # reading called it "never revealed".
+        by_trigger = _trigger_reveals(slide, index, size)
         stranded = sorted(
             k for k, v in final.items()
             if not v["visible"] and v.get("hiddenBy") != "exit" and k not in by_trigger

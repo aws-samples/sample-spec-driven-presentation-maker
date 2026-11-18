@@ -255,10 +255,11 @@ pictures again, and several chart and shape properties survive a read-back.
   refused at generation by their catalog key rather than approximated.
   `read_guides(["effect:flyIn"])` answers what a gallery
   animation actually does — measured from
-  PowerPoint rather than guessed: no arguments returns the routing table (which effects
+  PowerPoint rather than guessed: a bare `effect:` returns the routing table (which effects
   move, resize, recolour, rotate, fade, wipe or follow a path), an effect name returns every
   behaviour it writes with keyframes and durations, and a transition name returns the
-  `parameters` sets it accepts. It rides on `read_guides` rather than being a tool of its
+  `parameters` sets it accepts. A name the routing table shows qualified is asked for that
+  way (`effect:entrance.bounce`, which is a different effect from `motionPath.bounce`). It rides on `read_guides` rather than being a tool of its
   own because a tool's description is sent on every turn of every conversation, including the
   decks that carry no animation; the MCP tool count is unchanged.
 - **A storyboard: one still frame per click.** `storyboard()` (CLI: `storyboard <deck>`)

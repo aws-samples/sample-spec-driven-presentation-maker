@@ -224,6 +224,17 @@ def describe(index: Any, *, category: str | None = None, effect: str | None = No
     the option is where the interesting difference usually is: Fly In's eight
     directions differ only in two keyframes.
     """
+    # `axis_table` qualifies a name whenever the bare one would be ambiguous —
+    # `entrance.bounce` and `motionPath.bounce` are different effects — so the
+    # names the routing table advertises have to be names this accepts. A
+    # qualified one was compared against the bare tail and matched nothing,
+    # which made the listed name the one form that did not work.
+    if effect and "." in effect:
+        qualifier, _, effect = effect.partition(".")
+        if category and category != qualifier:
+            # Two different categories asked for at once: nothing matches both.
+            return []
+        category = qualifier
     out: list[dict[str, Any]] = []
     for key, ooxml in _entry_rows(index):
         tail = key.removeprefix("animation.gallery.")
@@ -380,8 +391,8 @@ def effects(
                 for label, names in axis_table(index)
             ],
             "next": (
-                "effects(effect='flyIn') for one effect's measured behaviours "
-                "and its options"
+                "read_guides(['effect:flyIn']) for one effect's measured "
+                "behaviours and its options"
             ),
         }
     described = describe(index, category=category, effect=effect)
@@ -389,8 +400,9 @@ def effects(
         return {
             "effects": [],
             "hint": (
-                "no gallery effect matched; effects() with no argument returns "
-                "the full list"
+                "no gallery effect matched; read_guides(['effect:']) with no name "
+                "returns the full list, and a name listed as qualified is asked "
+                "for that way — read_guides(['effect:entrance.bounce'])"
             ),
         }
     return {"effects": described}

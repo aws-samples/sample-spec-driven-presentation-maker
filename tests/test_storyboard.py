@@ -197,6 +197,30 @@ class TestTheEndOfTheBuild:
             "b has a reveal path, just not one on the clicker"
         )
 
+    def test_a_trigger_that_reveals_then_hides_still_counts_as_a_reveal(self, index):
+        """A reveal path exists even when the same click closes it again.
+
+        The exclusion used to read the trigger frame's end state, and an
+        entrance carrying `afterEffect: hide` reveals its target and hides it
+        again inside one click — so the frame ended with the element off screen
+        and the pass called it "never revealed".
+        """
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[{
+                "id": "peekB", "trigger": {"type": "onShapeClick", "target": "a"},
+                "effects": [_fx(
+                    "b-in", "b", "entrance", "fade",
+                    start="onShapeClick", afterEffect={"type": "hide"},
+                )],
+            }],
+        )
+        _deck, _frames, manifest = storyboard({}, [slide], index)
+        notes = [n for entry in manifest for n in entry["notes"] if "ends with" in n]
+        assert not [n for n in notes if "b off screen" in n], (
+            f"the trigger does reveal b, however briefly: {notes}"
+        )
+
     def test_an_element_hidden_at_the_end_of_its_build_is_still_reported(self, index):
         """The rule cannot become "visible in any frame": that would stop
         reporting one of the three defects the storyboard exists to catch."""
@@ -680,6 +704,39 @@ class TestTheBuildPointsAtTheStoryboard:
 
         on = _resolve_config(str(deck), animation_mode="on", transition_mode=None)
         assert "inert-group-child-identity" in {d["rule"] for d in on.lint_diagnostics}
+
+    @pytest.mark.parametrize("key,switch", [("id", "animation"), ("morphId", "transition")])
+    def test_each_identity_key_is_gated_on_its_own_switch(self, tmp_path, key, switch):
+        """`id` is reachable by an animation, `morphId` by a morph transition.
+
+        The finding is "no effect can target it", so each key answers to the
+        switch that writes the effect reaching it. Dropping it only when *both*
+        were off still warned about a nested `id` with animations off.
+        """
+        from sdpm.api import _resolve_config
+
+        deck = self._deck(tmp_path, animated=False, enabled=False)
+        slide = json.loads((deck / "slides/one.json").read_text())
+        slide["elements"] = [{
+            "type": "group", "x": 0, "y": 0, "width": 400, "height": 200,
+            "elements": [{key: "inner", "type": "shape", "shape": "rectangle",
+                          "x": 0, "y": 0, "width": 50, "height": 50, "fill": "#FFFFFF"}],
+        }]
+        (deck / "slides/one.json").write_text(json.dumps(slide, ensure_ascii=False))
+
+        def rules(on):
+            """Diagnostics with exactly one of the two switches turned on."""
+            modes = {"animation_mode": None, "transition_mode": None}
+            modes[f"{on}_mode"] = "on"
+            return {d["rule"] for d in _resolve_config(str(deck), **modes).lint_diagnostics}
+
+        other = "transition" if switch == "animation" else "animation"
+        assert "inert-group-child-identity" in rules(switch), (
+            f"{key} is reachable once {switch}s are on"
+        )
+        assert "inert-group-child-identity" not in rules(other), (
+            f"the {other} switch writes nothing that can reach {key}"
+        )
 
     def test_a_transition_only_deck_is_not_pointed_at_the_storyboard(self, tmp_path):
         """The count drives a nudge to run `storyboard`, which draws one frame

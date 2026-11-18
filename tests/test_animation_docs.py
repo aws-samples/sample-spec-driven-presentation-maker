@@ -339,6 +339,112 @@ class TestTheDocumentedLookupRouteWorks:
         assert "from sdpm.engine.timing.describe import" not in guide
 
 
+class TestTheNamesListedAreTheNamesAccepted:
+    """A name the routing table shows must be a name the lookup takes.
+
+    The table qualifies a name whenever the bare one is ambiguous, so it lists
+    `entrance.bounce` and `motionPath.bounce` — and the lookup compared the
+    whole thing against the bare tail, which made the listed form the one that
+    returned nothing while the ambiguous `bounce` returned all three.
+    """
+
+    def test_a_qualified_name_returns_exactly_that_effect(self):
+        described = contract.read_guides(["effect:entrance.bounce"])["described"]
+        effects = described["effect:entrance.bounce"]["effects"]
+        assert [(e["category"], e["effect"]) for e in effects] == [("entrance", "bounce")]
+
+    def test_the_bare_name_still_returns_every_category(self):
+        effects = contract.read_guides(["effect:bounce"])["described"]["effect:bounce"]["effects"]
+        assert {e["category"] for e in effects} == {"entrance", "exit", "motionPath"}
+
+    def test_every_qualified_name_the_table_lists_resolves(self):
+        """The table is generated, so this holds for names nobody wrote down."""
+        from sdpm.engine.timing.describe import axis_table
+        from sdpm.engine.timing.writer import load_capability_index
+
+        qualified = sorted({
+            name for _label, names in axis_table(load_capability_index())
+            for name in names if "." in name
+        })
+        assert qualified, "the table must list some qualified names"
+        described = contract.read_guides([f"effect:{name}" for name in qualified])["described"]
+        empty = [key for key, value in described.items() if not value.get("effects")]
+        assert not empty, f"{len(empty)} listed name(s) matched nothing: {empty}"
+
+    def test_a_category_and_a_conflicting_qualifier_match_nothing(self):
+        from sdpm.engine.timing.describe import describe
+        from sdpm.engine.timing.writer import load_capability_index
+
+        index = load_capability_index()
+        assert describe(index, category="exit", effect="entrance.bounce") == []
+
+
+class TestOneBadNameDoesNotLoseTheRest:
+    """`read_docs` raises on the first name it cannot find.
+
+    So a single typo used to take down the whole call, returning nothing for
+    the names that were right. An unknown lookup prefix did the same, because
+    it fell through to the guide reader and was reported as a missing file.
+    """
+
+    def test_an_unknown_guide_name_is_reported_beside_the_ones_that_worked(self):
+        result = contract.read_guides(["animations", "nosuchguide", "effect:flyIn"])
+        assert [doc["name"] for doc in result["documents"]] == ["animations"]
+        assert "effect:flyIn" in result["described"]
+        assert "nosuchguide" in result["errors"]
+
+    def test_an_unknown_prefix_names_the_prefixes_that_exist(self):
+        result = contract.read_guides(["effects:flyIn"])
+        error = result["errors"]["effects:flyIn"]
+        assert "effects" in error
+        for prefix in ("effect:", "transition:", "category:"):
+            assert prefix in error, error
+
+    def test_a_bare_prefix_returns_the_routing_table(self):
+        """Which is the no-argument form the CHANGELOG and the hint name."""
+        described = contract.read_guides(["effect:"])["described"]["effect:"]
+        assert described["changes"], described
+        assert "read_guides" in described["next"]
+
+    def test_the_unmatched_hint_names_a_route_that_works(self):
+        hint = contract.read_guides(["effect:nosuch"])["described"]["effect:nosuch"]["hint"]
+        assert "read_guides" in hint and "effects()" not in hint
+
+
+class TestTheCliSubcommandMatchesTheTool:
+    """SKILL.md promises workflow text calling a tool applies verbatim.
+
+    `read_guides` the subcommand read the guide directory itself, so
+    `read_guides effect:flyIn` reported a missing guide file while
+    `read_guides(["effect:flyIn"])` the tool answered it.
+    """
+
+    def _run(self, *names):
+        import subprocess
+        import sys
+
+        return subprocess.run(
+            [sys.executable, "scripts/pptx_builder.py", "read_guides", *names],
+            capture_output=True, text=True, cwd=_ROOT / "sdpm",
+        )
+
+    def test_a_catalog_lookup_is_answered_rather_than_reported_missing(self):
+        result = self._run("effect:flyIn")
+        assert result.returncode == 0, result.stderr
+        assert "flyIn" in result.stdout
+        assert "not found in guides/" not in result.stdout + result.stderr
+
+    def test_a_guide_name_still_prints_the_guide(self):
+        result = self._run("animations")
+        assert result.returncode == 0, result.stderr
+        assert len(result.stdout) > 1000, "the guide body should come back"
+
+    def test_the_listing_mentions_the_lookup_prefixes(self):
+        result = self._run()
+        assert result.returncode == 0, result.stderr
+        assert "effect:" in result.stdout
+
+
 class TestSpecOnlyPoints:
     """Ordinary composer context must not grow (REQ-1.1)."""
 

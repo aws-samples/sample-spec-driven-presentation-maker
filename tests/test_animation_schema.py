@@ -257,6 +257,129 @@ def test_motion_is_validated_after_overrides_resolve(tmp_path):
     assert "unknown-animation-target" in {d["rule"] for d in broken.lint_diagnostics}
 
 
+def _include_deck(tmp_path, slugs, *, target, broken_slug):
+    """A deck whose slides each carry an `include`, one with a bad target."""
+    import json
+
+    deck = tmp_path / "deck"
+    (deck / "slides").mkdir(parents=True)
+    (deck / "specs").mkdir()
+    (deck / "includes").mkdir()
+    (deck / "deck.json").write_text(json.dumps({
+        "template": "blank-light",
+        "animations": {"enabled": True},
+    }))
+    (deck / "includes" / "panel.json").write_text(json.dumps([
+        {"id": "panel", "type": "shape", "shape": "rectangle",
+         "x": 400, "y": 300, "width": 200, "height": 100, "fill": "#333333"},
+    ]))
+    for slug in slugs:
+        (deck / "slides" / f"{slug}.json").write_text(json.dumps({
+            "id": slug, "layout": "Blank",
+            "elements": [
+                {"id": "hero", "type": "textbox", "text": slug,
+                 "x": 10, "y": 10, "width": 300, "height": 60},
+                {"type": "include", "src": "includes/panel.json"},
+            ],
+            "animations": {
+                "mainSequence": [{
+                    "id": "reveal",
+                    "target": {"element": target if slug == broken_slug else "panel"},
+                    "preset": {"category": "entrance", "effect": "fade"},
+                    "start": {"type": "onPageClick", "delayMs": 0},
+                    "timing": {"durationMs": 400},
+                }],
+                "interactiveSequences": [],
+            },
+        }, ensure_ascii=False))
+    (deck / "specs" / "outline.md").write_text("".join(f"- [{s}] {s}\n" for s in slugs))
+    return deck
+
+
+def test_an_include_does_not_hide_a_misspelled_target_on_the_build_path(tmp_path):
+    """The membership rule is suspended for the linter, not for the build.
+
+    `validate_slide_motion` cannot read an include, so it suspends the rule
+    rather than reporting an included target as unknown. The build resolves the
+    include, so it has no reason to inherit that suspension — and while it did,
+    a misspelled target on a slide with *any* include got no diagnostic at all.
+    """
+    from sdpm.api import _resolve_config
+
+    # The valid case first, so the suspension is doing its job.
+    good = _resolve_config(
+        str(_include_deck(tmp_path / "good", ["only"], target="panel", broken_slug="only")),
+        animation_mode=None, transition_mode=None,
+    )
+    assert "unknown-animation-target" not in {d["rule"] for d in good.lint_diagnostics}, (
+        "the include really does provide `panel`"
+    )
+
+    bad = _resolve_config(
+        str(_include_deck(tmp_path / "bad", ["only"], target="pannel", broken_slug="only")),
+        animation_mode=None, transition_mode=None,
+    )
+    assert "unknown-animation-target" in {d["rule"] for d in bad.lint_diagnostics}, (
+        f"a misspelled target is still a mistake: {bad.lint_diagnostics}"
+    )
+
+
+def test_only_slugs_numbers_a_diagnostic_by_its_deck_position(tmp_path):
+    """A partial build must not renumber the slides it kept.
+
+    On the legacy `presentation.json` path the filter runs inside
+    `_resolve_config`, after `lint` has already numbered the whole deck. Motion
+    is linted on the filtered list, so it numbered from zero — and both sets
+    land in one diagnostics list whose `slide` is a bare integer, where a
+    finding about the third slide read as one about the first. (A deck
+    directory filters at assembly, so there both start from the same list.)
+    """
+    import json
+
+    from sdpm.api import _resolve_config
+
+    slugs = ["title", "intro", "details", "closing"]
+    slides = []
+    for slug in slugs:
+        slides.append({
+            "id": slug, "layout": "Blank",
+            "elements": [{"id": "hero", "type": "textbox", "text": slug,
+                          "x": 10, "y": 10, "width": 300, "height": 60}],
+            "animations": {
+                "mainSequence": [{
+                    "id": "reveal",
+                    "target": {"element": "heor" if slug == "details" else "hero"},
+                    "preset": {"category": "entrance", "effect": "fade"},
+                    "start": {"type": "onPageClick", "delayMs": 0},
+                    "timing": {"durationMs": 400},
+                }],
+                "interactiveSequences": [],
+            },
+        })
+    presentation = tmp_path / "presentation.json"
+    presentation.write_text(json.dumps({
+        "template": "blank-light",
+        "animations": {"enabled": True},
+        "slides": slides,
+    }, ensure_ascii=False))
+
+    def targets(config):
+        return [d["slide"] for d in config.lint_diagnostics
+                if d["rule"] == "unknown-animation-target"]
+
+    whole = _resolve_config(str(presentation), animation_mode=None, transition_mode=None)
+    assert targets(whole) == [slugs.index("details")], whole.lint_diagnostics
+
+    partial = _resolve_config(
+        str(presentation), only_slugs={"details"},
+        animation_mode=None, transition_mode=None,
+    )
+    assert targets(partial) == [slugs.index("details")], (
+        "the kept slide keeps the number it has in the deck: "
+        f"{partial.lint_diagnostics}"
+    )
+
+
 def test_raw_and_semantic_representations_are_mutually_exclusive():
     slide = _slide()
     slide["_rawTiming"] = {"src": "attachments/imports/key/timing.json"}

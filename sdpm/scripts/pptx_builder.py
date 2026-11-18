@@ -440,20 +440,32 @@ def cmd_start(args):
 
 
 def cmd_guides(args):
-    """List or show guide documents."""
-    from sdpm.knowledge.reference import list_category, read_docs
-    d = Path(__file__).parent.parent / "references" / "guides"
+    """List or show guide documents, and describe catalog entries.
+
+    Goes through `tools.read_guides` rather than reading the guide directory
+    itself. Reading it directly meant `read_guides effect:flyIn` reported a
+    missing guide file, while the tool of the same name answered it — and
+    SKILL.md promises that workflow text calling a tool applies verbatim here.
+    """
+    from sdpm import tools
+    from sdpm.knowledge.reference import list_category
     if not args.names:
         print("# Guides")
-        for item in list_category(d):
+        for item in list_category(Path(__file__).parent.parent / "references" / "guides"):
             print(f"  {item['name']:<36} {item['description']}")
-    else:
-        try:
-            for doc in read_docs(d, args.names):
-                print(doc["content"])
-                print()
-        except FileNotFoundError as e:
-            print(f"# {e}", file=sys.stderr)
+        print('\n  effect:<name> / transition:<name> / category:<name> describe a catalog')
+        print('  entry; a bare "effect:" lists which effects change what.')
+        return
+    payload = tools.read_guides(args.names)
+    for doc in payload["documents"]:
+        print(doc["content"])
+        print()
+    for name, described in (payload.get("described") or {}).items():
+        print(f"# {name}")
+        print(json.dumps(described, ensure_ascii=False, indent=2))
+        print()
+    for name, error in (payload.get("errors") or {}).items():
+        print(f"# {name}: {error}", file=sys.stderr)
 
 
 def cmd_init(args):

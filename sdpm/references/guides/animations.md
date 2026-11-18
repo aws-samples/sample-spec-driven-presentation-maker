@@ -456,9 +456,17 @@ read_guides(["effect:flyIn"])
 ```
 
 The answer comes back under `described["effect:flyIn"]`. `"transition:push"` describes a
-slide transition's `parameters` sets instead, and `"category:entrance"` a whole category.
-Anything without one of those three prefixes is read as a guide name, so one call can take
-both.
+slide transition's `parameters` sets instead. Anything without one of those three prefixes is
+read as a guide name, so one call can take both, and a bare `"effect:"` returns the routing
+table above.
+
+Where the table shows a name qualified — `entrance.bounce` against `motionPath.bounce` —
+ask for it that way: `"effect:entrance.bounce"`. The bare `"effect:bounce"` returns all
+three, which is a fine way to compare them and three times the answer.
+
+`"category:entrance"` describes a whole category, and that is a large answer: about 17,700
+characters against about 1,300 for one effect. Reach for it when choosing among a category
+you do not know, not as the normal way in.
 
 It rides on an existing tool rather than being one of its own: a tool's description is sent
 on every turn of every conversation, including the decks with no animation in them, and this
@@ -966,7 +974,7 @@ All of these fail before a PPTX is reported as generated.
 |---|---|
 | Invalid mode value | Names the argument and `inherit`, `on`, `off`. |
 | Duplicate `id` / `morphId` | Lint diagnostic naming both JSON paths. |
-| Unknown `target.element` | Build error naming slide, sequence, effect and target. |
+| Unknown `target.element` | Build error naming slide, sequence, effect and target. On a slide with an `include` or an `override` the diagnostic comes at build time only — see below. |
 | Both or neither of `preset` / `behaviors` | `effect requires exactly one of preset or behaviors`. |
 | Unknown effect name | Lists the catalog's supported names for that category. |
 | Unsupported transition parameters | Lists the supported parameter sets for that effect. |
@@ -975,7 +983,16 @@ All of these fail before a PPTX is reported as generated.
 | Text options plus a chart or SmartArt build on one shape | Names both and tells you to split the effect. |
 | Contradicting `text.sequence` and `text.level` | Names both values and the `p:bldP` attribute they disagree on. |
 
-## Related guides
+### When a target is checked
+
+A slide with an `include` or an `override` does not carry its own element list: the include's
+contents are read at build time and the inherited elements live in another file. Saving such
+a slide therefore reports nothing about `target.element` — checking it against the elements
+the file happens to declare would call a perfectly good inherited target unknown.
+
+The build resolves both and checks the resolved slide, so a misspelled target is still
+refused; it is refused at build rather than at save. If you want the earlier signal on an
+`override` slide, build it.
 
 - `read_guides(["animation-craft"])` — whether to animate at all, how long an effect should
   run, how to stagger a group, and what the published guidance on motion says. This guide

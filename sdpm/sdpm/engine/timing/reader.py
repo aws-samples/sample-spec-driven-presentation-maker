@@ -1387,10 +1387,16 @@ class _TimingReader:
             conditions != [MEDIA_START_DELAY]
             or len([child for child in start if isinstance(child.tag, str)]) != 1
         ):
+            found = (
+                f"carries no start condition, not the builder's single "
+                f"delay={MEDIA_START_DELAY!r}"
+                if start is None or not conditions
+                else f"start condition {conditions} is not the builder's single "
+                     f"delay={MEDIA_START_DELAY!r}"
+            )
             raise _Unsupported(
-                f"p:cMediaNode start condition {conditions or 'is absent'} is not the "
-                f"builder's single delay={MEDIA_START_DELAY!r}; an autoplay or loop setting "
-                "has no slide JSON field, so the tree is preserved instead"
+                f"p:cMediaNode {found}; an autoplay or loop setting has no slide JSON "
+                "field, so the tree is preserved instead"
             )
         self._read_target(media, allow_range=False)
 

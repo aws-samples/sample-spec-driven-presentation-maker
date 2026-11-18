@@ -9,7 +9,9 @@ PPTXBuilder is composed from mixin classes:
 """
 from pathlib import Path
 
+import copy
 import json
+from functools import lru_cache
 
 from sdpm.utils.io import read_json
 
@@ -649,6 +651,29 @@ class PPTXBuilder(
         self.prs.save(str(output_path))
 
 
+@lru_cache(maxsize=256)
+def _include_elements(path: str, _stamp: tuple[int, int]) -> tuple:
+    """The elements one include file names, cached against its own mtime.
+
+    A build expands includes twice, deliberately: `_resolve_config` needs the
+    element ids to lint a slide it must not alter, and `PPTXBuilder` needs the
+    shapes themselves. Keeping one expanded copy for both would put expanded
+    elements into `BuildConfig.slides`, which the layout-balance check and the
+    per-slide summary also read — so the second pass stays and the file read is
+    what gets shared.
+
+    ``_stamp`` is the file's modification time and size, so an edited file is a
+    different key rather than a stale hit. It is positional because
+    :func:`functools.lru_cache` keys on the arguments it is given.
+    """
+    try:
+        data = read_json(Path(path))
+    except (json.JSONDecodeError, ValueError) as error:
+        raise ValueError(f"Invalid JSON in include file {path}: {error}")
+    elements = data if isinstance(data, list) else data.get("elements", [])
+    return tuple(elements)
+
+
 def expand_includes(elements, base_dir: Path) -> list:
     """Replace every ``include`` element with the elements it names.
 
@@ -671,15 +696,14 @@ def expand_includes(elements, base_dir: Path) -> list:
             continue
         src = elem.get("src", "")
         include_path = Path(src) if Path(src).is_absolute() else base_dir / src
-        if not include_path.exists():
-            continue
         try:
-            inc_data = read_json(include_path)
-        except (json.JSONDecodeError, ValueError) as e:
-            raise ValueError(f"Invalid JSON in include file {src}: {e}")
-        expanded.extend(
-            inc_data if isinstance(inc_data, list) else inc_data.get("elements", [])
-        )
+            stat = include_path.stat()
+        except OSError:
+            continue
+        included = _include_elements(str(include_path), (stat.st_mtime_ns, stat.st_size))
+        # Copied, because the caller may edit what it gets back and the cache
+        # hands the same objects to the next reader.
+        expanded.extend(copy.deepcopy(element) for element in included)
     return expanded
 
 

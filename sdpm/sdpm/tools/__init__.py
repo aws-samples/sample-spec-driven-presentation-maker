@@ -284,32 +284,53 @@ _CATALOG_LOOKUPS = ("effect", "transition", "category")
 
 
 def read_guides(
-    names: Annotated[list[str], Field(description='Guide names, or "effect:flyIn" / "transition:push" to describe one catalog entry.')],
+    names: Annotated[list[str], Field(description='Guide names, or "effect:flyIn" / "transition:push" / "effect:" to describe catalog entries.')],
 ) -> dict[str, Any]:
     """Read guide documents, and describe catalog entries named as "effect:<name>"."""
     from sdpm.knowledge.reference import read_docs
 
     guides: list[str] = []
     lookups: list[tuple[str, str]] = []
+    errors: dict[str, str] = {}
     for name in names:
-        kind, _, value = str(name).partition(":")
-        if value and kind in _CATALOG_LOOKUPS:
+        kind, separator, value = str(name).partition(":")
+        if not separator:
+            guides.append(name)
+        elif kind in _CATALOG_LOOKUPS:
+            # An empty value is the no-argument form: `effect:` returns the
+            # routing table rather than every effect in full.
             lookups.append((kind, value))
         else:
-            guides.append(name)
+            # A name carrying a colon is asking for a lookup, so say which
+            # prefixes exist. It used to fall through to the guide reader,
+            # which reported it as a missing guide file — and took the whole
+            # call down with it.
+            errors[str(name)] = (
+                f"unknown lookup prefix {kind!r}; the prefixes are "
+                + ", ".join(f"{prefix}:" for prefix in _CATALOG_LOOKUPS)
+            )
 
-    out: dict[str, Any] = {"documents": read_docs(_REFERENCES_DIR / "guides", guides)}
-    if not lookups:
-        return out
-    from sdpm.engine.timing.describe import effects
-
-    described: dict[str, Any] = {}
-    for kind, value in lookups:
+    # One name at a time: the guide reader raises on the first it cannot find,
+    # so a single typo used to lose every other document in the same call.
+    documents: list[dict[str, Any]] = []
+    for name in guides:
         try:
-            described[f"{kind}:{value}"] = effects(**{kind: value})
-        except (KeyError, ValueError) as error:
-            described[f"{kind}:{value}"] = {"error": str(error)}
-    out["described"] = described
+            documents.extend(read_docs(_REFERENCES_DIR / "guides", [name]))
+        except (FileNotFoundError, OSError) as error:
+            errors[name] = str(error)
+
+    out: dict[str, Any] = {"documents": documents}
+    if lookups:
+        from sdpm.engine.timing.describe import effects
+
+        # `effects` reports an unknown name as a hint rather than raising, so
+        # there is nothing to catch here.
+        out["described"] = {
+            f"{kind}:{value}": effects(**{kind: value}) if value else effects()
+            for kind, value in lookups
+        }
+    if errors:
+        out["errors"] = errors
     return out
 
 

@@ -5,9 +5,11 @@
 from __future__ import annotations
 
 import re
+from typing import Sequence
 
 from sdpm.engine.schema.chart import chart_edit_ignored
 from sdpm.engine.schema.regions import is_comment_element
+from sdpm.engine.timing.model import IDENTITY_KEYS
 
 _COLOR_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
 _ALIGN_VALUES = {"left", "center", "right"}
@@ -39,7 +41,12 @@ def lint(data: list | dict, *, include_motion: bool = True) -> list[dict]:
     return diagnostics
 
 
-def lint_motion(slides: list[dict], *, numbers: list[int] | None = None) -> list[dict]:
+def lint_motion(
+    slides: list[dict],
+    *,
+    numbers: list[int] | None = None,
+    identity_keys: Sequence[str] = IDENTITY_KEYS,
+) -> list[dict]:
     """Motion diagnostics only, for slides whose overrides are resolved.
 
     A build resolves overrides before it validates, because an effect may target
@@ -51,12 +58,17 @@ def lint_motion(slides: list[dict], *, numbers: list[int] | None = None) -> list
     partial build does not renumber them. Without it a filtered list numbered
     from zero while :func:`lint` numbered from the full deck, and both ended up
     in one diagnostics list carrying a bare ``slide`` integer.
+
+    ``identity_keys`` lets a build with one switch off drop the reachability
+    finding for the key that switch governs — ``id`` for animations,
+    ``morphId`` for transitions. See
+    :data:`sdpm.engine.timing.model.IDENTITY_KEYS`.
     """
     diagnostics: list[dict] = []
     for position, slide in enumerate(slides):
         if isinstance(slide, dict):
             si = numbers[position] if numbers is not None else position
-            diagnostics.extend(_lint_slide_motion(si, slide))
+            diagnostics.extend(_lint_slide_motion(si, slide, identity_keys))
     return diagnostics
 
 
@@ -84,13 +96,15 @@ def lint_and_sanitize(slide: dict) -> tuple[dict, list[dict]]:
     return cleaned, diagnostics
 
 
-def _lint_slide_motion(si: int, slide: dict) -> list[dict]:
+def _lint_slide_motion(
+    si: int, slide: dict, identity_keys: Sequence[str] = IDENTITY_KEYS
+) -> list[dict]:
     """Project path-aware motion diagnostics into the existing lint shape."""
     from sdpm.engine.timing import validate_slide_motion
 
     return [
         _diag(si, -1, diagnostic.rule, f"{diagnostic.path}: {diagnostic.message}")
-        for diagnostic in validate_slide_motion(slide)
+        for diagnostic in validate_slide_motion(slide, identity_keys=identity_keys)
     ]
 
 

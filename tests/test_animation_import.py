@@ -973,6 +973,65 @@ class TestAMeasuredPresetMustMatchItsCapture:
         assert b'accel="50000"' in motion.raw_timing.xml
 
 
+class TestTheChildOrderOfAPayloadDoesNotDecideTheEffect:
+    """The same values in a different order are the same effect.
+
+    The writer appends ``to, from, by, tavLst``; the ECMA-376 sequence for
+    `p:animScale` is ``by, from, to``, and PowerPoint writes ``from, to``. The
+    payload comparison keyed on document order, so these two imported
+    semantically from sdpm's own output and raw from a real PowerPoint file —
+    the same effect read two different ways depending on who wrote it.
+    """
+
+    #: Both write a `p:animScale` carrying more than one value child, which is
+    #: where the orders diverge. An effect with a single child cannot show it.
+    CASES = [("entrance", "curveUp"), ("exit", "curveDown")]
+
+    #: The ECMA-376 child sequence, which is not the writer's.
+    SCHEMA_ORDER = {"by": 0, "from": 1, "to": 2, "tavLst": 3}
+
+    def _reorder(self, slide):
+        """Put every multi-value payload into schema order, and count them."""
+        moved = 0
+        for node in slide.iter():
+            if not isinstance(node.tag, str):
+                continue
+            values = [
+                child for child in node
+                if isinstance(child.tag, str) and _local_name(child) in self.SCHEMA_ORDER
+            ]
+            if len(values) < 2:
+                continue
+            for child in sorted(values, key=lambda c: self.SCHEMA_ORDER[_local_name(c)]):
+                node.append(child)
+            moved += 1
+        assert moved, "the fixture must carry a payload with more than one value child"
+
+    @pytest.mark.parametrize("category,effect", CASES)
+    def test_schema_order_imports_as_the_same_effect(self, tmp_path, category, effect):
+        animations = {
+            "mainSequence": [_effect(preset={"category": category, "effect": effect})],
+            "interactiveSequences": [],
+        }
+        written = _package(tmp_path, _slide(animations=animations), name="writer-order.pptx")
+        as_written = _read(written)
+        assert as_written.animations is not None, "sdpm's own order must import"
+
+        reordered = _package(tmp_path, _slide(animations=animations), name="schema-order.pptx")
+        motion = _read(_mutate(reordered, self._reorder))
+        assert motion.animations is not None, (
+            "a real PowerPoint file writes these children in a different order, and "
+            f"{category}.{effect} must not depend on which: {motion.raw_timing.reasons[0] if motion.raw_timing else ''}"
+        )
+        assert motion.animations == as_written.animations, (
+            "the order changed, so the semantic reading must not"
+        )
+
+
+def _local_name(node):
+    return node.tag.split("}")[-1]
+
+
 CATALOG = json.loads(
     (REPO_ROOT / "sdpm" / "references" / "catalogs" / "powerpoint-animation-catalog.json")
     .read_text(encoding="utf-8")

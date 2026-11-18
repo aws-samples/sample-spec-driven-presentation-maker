@@ -16,6 +16,7 @@ from .model import (
     normalize_mode,
     resolve_enabled,
     validate_deck_switches,
+    IDENTITY_KEYS,
     validate_slide_motion,
     validate_xml_resource_limits,
 )
@@ -195,6 +196,7 @@ __all__ = [
     "resolve_transition",
     "validate_catalog",
     "validate_deck_switches",
+    "IDENTITY_KEYS",
     "validate_slide_motion",
     "validate_xml_resource_limits",
     "write_slide_timing",

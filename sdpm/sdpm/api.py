@@ -953,16 +953,23 @@ def _resolve_config(
         expanded["elements"] = expand_includes(slide.get("elements"), base_dir)
         expanded.pop("override", None)
         lint_slides_resolved.append(expanded)
-    motion_diagnostics = lint_motion(lint_slides_resolved, numbers=slide_numbers)
-    if not (animations_enabled or transitions_enabled):
-        # Same reasoning as the two checks above: this one says "no effect can
-        # target it", and with both switches off no effect is written at all.
-        # The invalid-JSON rules still report — a malformed timeline is wrong
-        # whether or not this build writes it — but an unreachable identity is
-        # not a finding about a still deck.
-        motion_diagnostics = [
-            d for d in motion_diagnostics if d.get("rule") != "inert-group-child-identity"
-        ]
+    # Same reasoning as the two checks above, applied per key. The group-child
+    # finding says "no effect can target it", and each identity key is reachable
+    # by exactly one kind of effect — `id` by an animation, `morphId` by a morph
+    # transition — so each is gated on its own switch rather than on both being
+    # off. A deck built with animations off was still being told about a nested
+    # `id` that no animation would have targeted anyway. The invalid-JSON rules
+    # still report either way: a malformed timeline is wrong whether or not this
+    # build writes it.
+    motion_diagnostics = lint_motion(
+        lint_slides_resolved,
+        numbers=slide_numbers,
+        identity_keys=[
+            key for key, reachable in (
+                ("id", animations_enabled), ("morphId", transitions_enabled),
+            ) if reachable
+        ],
+    )
     lint_diagnostics = lint_diagnostics + motion_diagnostics
 
     return BuildConfig(

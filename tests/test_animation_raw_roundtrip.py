@@ -580,6 +580,12 @@ class TestMediaPlaybackSettingsSurvive:
         motion = _read(package)
         assert motion.animations is None, "an absent start condition is not the builder's node"
         assert motion.raw_timing is not None
+        # The reason is the only account of why a deck went raw, so it has to
+        # read as a sentence. Interpolating the empty condition list produced
+        # "start condition is absent is not the builder's single delay=…".
+        reason = motion.raw_timing.reasons[0]
+        assert "carries no start condition" in reason, reason
+        assert "is absent is not" not in reason, reason
 
     def test_a_tampered_media_only_sidecar_is_refused(self, media_dir):
         """Only the full sidecar's digest was checked here. In tree that was

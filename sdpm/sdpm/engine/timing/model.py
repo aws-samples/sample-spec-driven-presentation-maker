@@ -6,7 +6,7 @@ from __future__ import annotations
 
 import re
 from dataclasses import dataclass
-from typing import Any, Mapping
+from typing import Any, Mapping, Sequence
 
 MODE_VALUES = frozenset({"inherit", "on", "off"})
 ANIMATION_CATEGORIES = frozenset({"entrance", "emphasis", "exit", "motionPath", "media", "custom"})
@@ -15,6 +15,13 @@ BEHAVIOR_TYPES = frozenset({"motion", "color", "scale", "rotation", "property", 
 MORPH_OPTIONS = frozenset({"byObject", "byWord", "byChar"})
 AFTER_EFFECT_TYPES = frozenset({"none", "dim", "hide", "hideOnNextClick"})
 RESTART_VALUES = frozenset({"always", "whenNotActive", "never"})
+
+#: The two identity keys a slide element may carry, and the kind of effect
+#: each one is reachable by: `id` names an animation target, `morphId` pairs
+#: a morph transition. A caller that knows one of those is switched off
+#: passes only the other, so a reachability finding is not reported about an
+#: effect this build does not write.
+IDENTITY_KEYS = ("id", "morphId")
 
 MAX_TIMING_XML_DEPTH = 256
 MAX_TIMING_XML_ELEMENTS = 100_000
@@ -201,7 +208,9 @@ def _validate_effect(value: object, path: str, target_ids: set[str] | None) -> l
     return diagnostics
 
 
-def _element_ids(slide: Mapping[str, Any]) -> tuple[set[str], list[MotionDiagnostic]]:
+def _element_ids(
+    slide: Mapping[str, Any], identity_keys: Sequence[str] = IDENTITY_KEYS
+) -> tuple[set[str], list[MotionDiagnostic]]:
     ids: set[str] = set()
     morph_ids: set[str] = set()
     diagnostics: list[MotionDiagnostic] = []
@@ -233,12 +242,18 @@ def _element_ids(slide: Mapping[str, Any]) -> tuple[set[str], list[MotionDiagnos
         and an effect naming it fails the build with "known element ids: none".
         Moving the child out of the group changes no geometry, which is what
         makes this worth saying rather than silently ignoring.
+
+        ``identity_keys`` says which of the two are worth saying anything about:
+        the finding is "no effect can target it", and each key is reachable by
+        only one kind of effect — ``id`` by an animation, ``morphId`` by a morph
+        transition. A build with animations off was still warning about a nested
+        ``id`` no animation would have targeted anyway.
         """
         for index, child in enumerate(element.get("elements") or []):
             if not isinstance(child, Mapping):
                 continue
             child_path = f"{path}.elements[{index}]"
-            for key in ("id", "morphId"):
+            for key in identity_keys:
                 if child.get(key) is not None:
                     diagnostics.append(MotionDiagnostic(
                         f"{child_path}.{key}",
@@ -263,12 +278,17 @@ def _element_ids(slide: Mapping[str, Any]) -> tuple[set[str], list[MotionDiagnos
     return ids, diagnostics
 
 
-def validate_slide_motion(slide: Mapping[str, Any]) -> list[MotionDiagnostic]:
+def validate_slide_motion(
+    slide: Mapping[str, Any], *, identity_keys: Sequence[str] = IDENTITY_KEYS
+) -> list[MotionDiagnostic]:
     """Validate one slide's transition, identities, and animation timeline.
 
     Call this on a slide whose **overrides are already resolved**: an effect may
     legitimately target an element the slide inherits rather than declares, and
     on the unresolved form that reads as an unknown target.
+
+    ``identity_keys`` narrows the reachability finding about a group child to
+    the keys this build can actually reach: see :data:`IDENTITY_KEYS`.
 
     Two things make a slide's element set unknowable from the slide alone: an
     unexpanded ``include``, whose contents the builder reads at build time, and
@@ -278,21 +298,18 @@ def validate_slide_motion(slide: Mapping[str, Any]) -> list[MotionDiagnostic]:
     as unknown. The build resolves both and lints the resolved form, so a
     target that resolves to nothing is still refused there.
     """
-    ids, diagnostics = _element_ids(slide)
-    unresolved = [
-        reason
-        for reason, present in (
-            ("an unexpanded include", any(
-                isinstance(element, Mapping) and element.get("type") == "include"
-                for element in slide.get("elements") or ()
-            )),
-            # The save path (`lint_and_sanitize`) sees one slide at a time and
-            # cannot resolve `override`, so an inherited target read as unknown
-            # on save and clean on build. The two agree now.
-            ("an unresolved override", bool(slide.get("override"))),
-        )
-        if present
-    ]
+    ids, diagnostics = _element_ids(slide, identity_keys)
+    # An unexpanded `include`, whose contents the builder reads at build time;
+    # or an unresolved `override`, whose inherited elements live in another
+    # file. The save path (`lint_and_sanitize`) sees one slide at a time and
+    # can resolve neither, so an inherited target read as unknown on save and
+    # clean on build. Every return here is a finding, with no channel for an
+    # informational note, so this is a plain condition — naming which of the
+    # two it was would build a string nothing can report.
+    unresolved = bool(slide.get("override")) or any(
+        isinstance(element, Mapping) and element.get("type") == "include"
+        for element in slide.get("elements") or ()
+    )
     target_ids = None if unresolved else ids
     transition = slide.get("transition")
     raw_transition = slide.get("_rawTransition")
