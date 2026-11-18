@@ -139,7 +139,8 @@ its data directories, and XML from outside the repository goes through one expli
 - **An SDPM icon.** A slide frame holding a green and an amber face, with a violet block
   tilting in over its top-left corner. The Web UI uses it for the logo at the top of the
   rail (the mobile top bar too, drawn without a tile and following the dark/light theme),
-  the favicon, `icon.svg` and the PWA icons, which were blank squares before. The Claude
+  the favicon (also without a tile, so it fills the browser tab; the SVG favicon follows the
+  dark/light colour scheme), `icon.svg` and the PWA icons, which were blank squares before. The Claude
   Desktop bundle (`sdpm.mcpb`) now carries it as its icon. Web UI (`deploy_webui.sh`)
   and the next release's bundle.
 
