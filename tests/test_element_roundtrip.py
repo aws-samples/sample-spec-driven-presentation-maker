@@ -245,8 +245,6 @@ class TestShapeText:
         assert sp.text_frame.paragraphs[0]._p.pPr is not None
         assert sp.text_frame.paragraphs[0]._p.pPr.find(f"{_A}buChar") is not None
 
-    @pytest.mark.xfail(strict=True, reason="lineOpacity is documented for shape but only "
-                       "applied to freeforms")
     def test_line_opacity(self, tmp_path):
         assert _one(tmp_path, _shape(line="#FFFFFF", lineOpacity=0.5)).get("lineOpacity") == 0.5
 

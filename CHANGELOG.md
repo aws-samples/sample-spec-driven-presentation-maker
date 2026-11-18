@@ -22,6 +22,12 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
   New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
 
+### Fixed
+
+- **Shape `lineOpacity` builds and round-trips** (#586). Shared `_set_line_opacity`
+  between freeforms and shapes, and extracted `lineOpacity` in `_extract_line_from_xml`
+  so shape outlines with `lineOpacity` keep their alpha value through `pptx_to_json`.
+
 ## [0.18.0] - 2026-11-15
 
 Japanese decks read more naturally: a `writing-ja` guide that the orchestrator and composers

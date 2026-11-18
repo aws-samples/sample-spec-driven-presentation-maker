@@ -234,6 +234,9 @@ class ShapeMixin:
                 int(hex_color[4:6], 16)
             )
             shape.line.width = Pt(line_width)
+            line_opacity = elem.get("lineOpacity")
+            if line_opacity is not None and 0 <= line_opacity < 1:
+                self._set_line_opacity(shape, line_opacity)
             if elem.get("_lineCap"):
                 from pptx.oxml.ns import qn as _qn_cap
                 ln_cap = shape._element.spPr.find(_qn_cap('a:ln'))
