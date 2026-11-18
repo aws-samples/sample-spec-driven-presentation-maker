@@ -63,7 +63,14 @@ interface ChatPanelShellProps {
   onWorkflowPhase?: (phase: string) => void
   onLoadingChange?: (isLoading: boolean) => void
   chatRef?: React.RefObject<ChatPanelHandle | null>
-  inline?: boolean
+  /**
+   * Phone deck screen, chat tab: the sheet fills the screen below this y (the page's chat/preview
+   * tab bar), without its own header or backdrop. The shell stays the same instance on every
+   * screen, so no conversation is lost when the phone switches between list, deck and tabs.
+   */
+  phoneTop?: number
+  /** Swipe handling for the phone chat tab (swipe left to the preview). */
+  swipeRef?: React.RefObject<HTMLDivElement | null>
   /** The home screen: the home conversation may take the stage and the centre (no deck is open). */
   stageAllowed?: boolean
   /** Reports the layout (the page lays itself out around it). */
@@ -75,7 +82,7 @@ interface ChatPanelShellProps {
 export function ChatPanelShell({
   open, onClose,
   deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, chatRef: externalChatRef,
-  inline = false, stageAllowed = false, onLayoutChange, onStageExit,
+  phoneTop, swipeRef, stageAllowed = false, onLayoutChange, onStageExit,
 }: ChatPanelShellProps) {
   const t = useTranslations("chatShell")
   const internalChatRef = useRef<ChatPanelHandle>(null)
@@ -110,7 +117,8 @@ export function ChatPanelShell({
 
   // The home conversation is blank (no messages yet); set by the panel itself.
   const [homeBlank, setHomeBlank] = useState(true)
-  const centered = stageAllowed && !inline && deckId === null
+  const phoneTab = phoneTop !== undefined
+  const centered = stageAllowed && !phoneTab && deckId === null
   const layout: ChatLayout = !centered ? "sheet" : homeBlank && !shownDeckChat ? "stage" : "center"
   const staged = layout === "stage"
   const layoutRef = useRef(layout)
@@ -152,11 +160,11 @@ export function ChatPanelShell({
 
   /** Close the panel on Escape (matches dialog conventions on mobile overlay). */
   useEffect(() => {
-    if (!open || inline || layout !== "sheet") return
+    if (!open || phoneTab || layout !== "sheet") return
     const onKey = (e: KeyboardEvent) => { if (e.key === "Escape") onClose() }
     document.addEventListener("keydown", onKey)
     return () => document.removeEventListener("keydown", onKey)
-  }, [open, inline, layout, onClose])
+  }, [open, phoneTab, layout, onClose])
 
   /** Apply width to panel DOM without React re-render. */
   const applyWidth = useCallback((w: number) => {
@@ -266,13 +274,9 @@ export function ChatPanelShell({
     </ErrorBoundary>
   )
 
-  if (inline) {
-    return <div className="h-full flex flex-col">{chatContent}</div>
-  }
-
   return (
     <>
-      {open && layout === "sheet" && (
+      {open && layout === "sheet" && !phoneTab && (
         <div
           className="sm:hidden fixed inset-0 z-40 bg-black/60"
           onClick={onClose}
@@ -289,7 +293,7 @@ export function ChatPanelShell({
           : layout === "center"
             ? "chat-stage relative order-first w-full h-full flex-none px-5 sm:px-10"
             : "chat-panel fixed right-0 top-12 bottom-0 z-50 w-full sm:relative sm:right-auto sm:top-auto sm:bottom-auto sm:z-auto sm:h-full sm:flex-none"}
-        style={layout !== "sheet" ? undefined : { width: open ? panelWidth : 0 }}
+        style={layout !== "sheet" ? undefined : phoneTab ? { top: phoneTop } : { width: open ? panelWidth : 0 }}
       >
         {/* Resize handle — absolute, left:-6px, outside inner overflow:hidden */}
         {layout === "sheet" && (
@@ -303,7 +307,10 @@ export function ChatPanelShell({
         )}
         {/* Inner — overflow:hidden clips during close, min-width prevents text reflow */}
         <div
-          ref={surfaceRef}
+          ref={(el) => {
+            surfaceRef.current = el
+            if (swipeRef) swipeRef.current = el
+          }}
           data-chat-surface=""
           className={layout === "stage"
             ? "mx-auto flex w-full max-w-[760px] flex-col"
@@ -329,7 +336,7 @@ export function ChatPanelShell({
             </button>
           </div>
         )}
-        {layout === "sheet" && (<div ref={sheetHeaderRef} className="flex-none">
+        {layout === "sheet" && !phoneTab && (<div ref={sheetHeaderRef} className="flex-none">
         {/* Header */}
         <div className="flex-none px-4 pt-3 pb-0">
           <div className="flex items-center justify-between mb-3">

@@ -114,10 +114,23 @@ export default function DecksPage() {
   }, [pageLayout])
   // Phones show a deck's chat and preview as two tabs; the side sheet never opens there.
   const mobileTabs = isMobile && ws.isWorkspace && ws.canChat
+  // The chat tab's sheet starts below the tab bar.
+  const tabBarRef = useRef<HTMLDivElement>(null)
+  const [tabBarBottom, setTabBarBottom] = useState(96)
+  useLayoutEffect(() => {
+    const el = tabBarRef.current
+    if (!mobileTabs || !el) return
+    const measure = () => setTabBarBottom(Math.round(el.getBoundingClientRect().bottom))
+    measure()
+    window.addEventListener("resize", measure)
+    return () => window.removeEventListener("resize", measure)
+  }, [mobileTabs])
   const swipeRef = useSwipe(
     () => setActiveTab("preview"),
     () => setActiveTab("chat"),
   )
+  // The chat tab is the persistent shell over the page, so it takes its own swipe.
+  const chatSwipeRef = useSwipe(() => setActiveTab("preview"), () => {})
 
   /* ── Comment tool: one state for the preview and the chat ── */
   const reviewDeckId = ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null
@@ -171,8 +184,8 @@ export default function DecksPage() {
           {ws.isWorkspace ? (
             <>
               {/* Mobile tab bar */}
-              {ws.canChat && isMobile && (
-                <div className="flex border-b border-border">
+              {mobileTabs && (
+                <div ref={tabBarRef} className="flex border-b border-border">
                   <button
                     onClick={() => setActiveTab("chat")}
                     className={`flex-1 flex items-center justify-center gap-1.5 py-3 text-xs font-medium transition-colors ${
@@ -197,22 +210,9 @@ export default function DecksPage() {
 
               {/* Workspace: slide preview */}
               <div ref={isMobile ? swipeRef : undefined} className="h-full">
-                {isMobile && ws.canChat && activeTab === "chat" ? (
-                  /* Mobile chat tab — ChatPanelShell renders inline on mobile */
-                  <DeckFormatProvider value={ws.deck?.outputFormat}>
-                  <ChatPanelShell
-                    open={true}
-                    onClose={() => setActiveTab("preview")}
-                    chatRef={chatRef}
-                    deckId={ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null}
-                    chatSessionId={ws.deck?.chatSessionId}
-                    sessionOrigin={ws.deck?.sessionOrigin}
-                    onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
-                    onWorkflowPhase={setWorkflowPhase}
-                    onLoadingChange={setAgentIsLoading}
-                    inline
-                  />
-                  </DeckFormatProvider>
+                {mobileTabs && activeTab === "chat" ? (
+                  /* Phone chat tab: the persistent ChatPanelShell below fills the screen under the tab bar */
+                  <div className="h-full" />
                 ) : (
                   // Local: defer SlideCarousel mount until deck data loads so
                   // hadSlidesOnMount captures the real slide count, not the
@@ -310,12 +310,13 @@ export default function DecksPage() {
           )}
         </main>
 
-        {/* Chat Panel (persistent, desktop) — hidden on mobile workspace chat tab */}
-        {!(isMobile && ws.isWorkspace && ws.canChat && activeTab === "chat") && (
-          <DeckFormatProvider value={ws.deck?.outputFormat}>
+        {/* Chat Panel — one instance on every screen (on a phone's deck screen it is the chat tab) */}
+        <DeckFormatProvider value={ws.deck?.outputFormat}>
           <ChatPanelShell
-            open={ws.chatOpen && !mobileTabs}
-            onClose={() => ws.setChatOpen(false)}
+            open={mobileTabs ? activeTab === "chat" : ws.chatOpen}
+            onClose={mobileTabs ? () => setActiveTab("preview") : () => ws.setChatOpen(false)}
+            phoneTop={mobileTabs ? tabBarBottom : undefined}
+            swipeRef={mobileTabs ? chatSwipeRef : undefined}
             chatRef={chatRef}
             deckId={ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null}
             chatSessionId={ws.deck?.chatSessionId}
@@ -328,7 +329,6 @@ export default function DecksPage() {
             onStageExit={openChatSheet}
           />
           </DeckFormatProvider>
-        )}
       </div>
 
       <ConfirmDialog
