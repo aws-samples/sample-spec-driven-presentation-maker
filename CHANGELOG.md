@@ -22,6 +22,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
   New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
 
+### Fixed
+
+- **Picture borders (`line` / `lineWidth`) survive `pptx_to_json`** (#586).
+  `extract_picture_element` now extracts picture outline color and width from `p:spPr`
+  using `_extract_line_from_xml` so bordered raster images round-trip without losing
+  their border.
+
 ## [0.18.0] - 2026-11-15
 
 Japanese decks read more naturally: a `writing-ja` guide that the orchestrator and composers

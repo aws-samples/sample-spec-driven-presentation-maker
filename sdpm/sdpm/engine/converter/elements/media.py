@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 from ..constants import _NS, _base_element, _add_flip, _hex
-from ..xml_helpers import _extract_visual_effects
+from ..xml_helpers import _extract_line_from_xml, _extract_visual_effects
 
 def extract_video_element(shape, output_dir=None, slide_idx=0, img_idx=0):
     """Extract video as element dict, saving video file and poster image."""
@@ -191,6 +191,15 @@ def extract_picture_element(shape, output_dir=None, slide_idx=0, img_idx=0, them
     # distorting aspect if needed. The builder default (contain) would
     # shrink e.g. a full-width wave band into a left-anchored blob.
     elem["fit"] = "stretch"
+
+    # Extract picture border (line / lineWidth) when present.
+    sp_pr_pic = shape._element.find(f'{{{_NS["p"]}}}spPr')
+    if sp_pr_pic is not None:
+        line_info = _extract_line_from_xml(sp_pr_pic, theme_colors, color_mapping)
+        if line_info.get("line") not in (None, "none"):
+            elem["line"] = line_info["line"]
+            if "lineWidth" in line_info:
+                elem["lineWidth"] = line_info["lineWidth"]
     
     # Extract image effects into _originalEffects (underscore-prefixed so builder
     # ignores them by default).  When reusing images in new slides, agents should

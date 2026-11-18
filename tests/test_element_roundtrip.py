@@ -705,11 +705,11 @@ class TestImageProperties:
         assert str(pic.line.color.rgb) == "00FF00"
         assert pic.line.width.pt == 2.0
 
-    @pytest.mark.xfail(strict=True, reason="picture borders are not extracted by the converter")
     def test_border_survives(self, tmp_path):
         out = _one(tmp_path, _image(_png(tmp_path / "p.png"), width=200, height=100,
                                     line="#00FF00", lineWidth=2))
         assert out.get("line") == "#00FF00"
+        assert out.get("lineWidth") == 2.0
 
     def test_icon_color_on_raster_warns(self, tmp_path, capsys):
         _built_shapes(tmp_path, [_image(_png(tmp_path / "p.png"), width=20, iconColor="#FF0000")])
