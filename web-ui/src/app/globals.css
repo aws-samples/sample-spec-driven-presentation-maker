@@ -639,6 +639,8 @@ body {
 /* Mobile: fixed overlay with slide-in */
 @media (max-width: 639px) {
   .chat-panel {
+    /* The inline width is the desktop sheet's; on a phone the overlay is the screen's width. */
+    width: 100% !important;
     transform: translateX(100%);
     transition: transform 0.35s cubic-bezier(0.4, 0, 0.6, 1);
     will-change: transform;

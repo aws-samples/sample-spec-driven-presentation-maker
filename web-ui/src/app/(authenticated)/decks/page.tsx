@@ -112,6 +112,9 @@ export default function DecksPage() {
     const timer = setTimeout(() => setPageEnter(false), 1200)
     return () => clearTimeout(timer)
   }, [pageLayout])
+  // Phones show a deck's chat and preview as two tabs; the header's chat button switches them
+  // (the side sheet is never opened there).
+  const mobileTabs = isMobile && ws.isWorkspace && ws.canChat
   const swipeRef = useSwipe(
     () => setActiveTab("preview"),
     () => setActiveTab("chat"),
@@ -152,8 +155,9 @@ export default function DecksPage() {
     <AppShell
       deckName={ws.isWorkspace && ws.deck ? ws.deck.name : undefined}
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
-      chatOpen={pageLayout === "sheet" ? ws.chatOpen : false}
-      onChatToggle={pageLayout === "sheet" ? () => ws.setChatOpen((prev) => !prev) : focusComposer}
+      chatOpen={mobileTabs ? activeTab === "chat" : pageLayout === "sheet" ? ws.chatOpen : false}
+      onChatToggle={mobileTabs ? () => setActiveTab((tab) => (tab === "chat" ? "preview" : "chat"))
+        : pageLayout === "sheet" ? () => ws.setChatOpen((prev) => !prev) : focusComposer}
       onNavDecks={pageLayout === "center" ? scrollToDecks : undefined}
     >
       <div className={
@@ -313,7 +317,7 @@ export default function DecksPage() {
         {!(isMobile && ws.isWorkspace && ws.canChat && activeTab === "chat") && (
           <DeckFormatProvider value={ws.deck?.outputFormat}>
           <ChatPanelShell
-            open={ws.chatOpen}
+            open={ws.chatOpen && !mobileTabs}
             onClose={() => ws.setChatOpen(false)}
             chatRef={chatRef}
             deckId={ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null}
