@@ -267,11 +267,7 @@
     "resizePanel": "チャットパネルの幅を変更",
     "chat": "チャット",
     "newChat": "新しいチャット",
-    "startNewChat": "新しいチャットを開始",
-    "closePanel": "チャットパネルを閉じる",
-    "new": "新規",
-    "deck": "デッキ",
-    "toDecks": "デッキ一覧へ"
+    "closePanel": "チャットパネルを閉じる"
   },
   "chat": {
     "errorSaveHistory": "チャット履歴を保存できませんでした",

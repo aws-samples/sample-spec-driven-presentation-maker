@@ -267,11 +267,7 @@
     "resizePanel": "Resize chat panel",
     "chat": "Chat",
     "newChat": "New chat",
-    "startNewChat": "Start new chat",
-    "closePanel": "Close chat panel",
-    "new": "New",
-    "deck": "Deck",
-    "toDecks": "Back to decks"
+    "closePanel": "Close chat panel"
   },
   "chat": {
     "errorSaveHistory": "Failed to save chat history",

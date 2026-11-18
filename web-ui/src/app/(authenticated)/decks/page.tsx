@@ -93,16 +93,14 @@ export default function DecksPage() {
     sendMessage: (text: string, options?: { displayContent?: string }) =>
       chatRef.current?.sendMessage(text, options) ?? Promise.resolve(),
   }), [agentIsLoading])
-  // Home screen: a blank new chat is the composer at the top (the shell's stage).
-  // Home screen: a new chat is the composer at the top (stage), then the conversation fills the
-  // page (center) until its deck exists or the user goes back to the list (sheet).
+  // Home screen: a blank chat is the composer at the top (stage); once it has messages the
+  // conversation fills the first screenful and the deck list follows below it (center).
   const [chatLayout, setChatLayout] = useState<ChatLayout>("sheet")
   const pageLayout: ChatLayout = ws.isWorkspace ? "sheet" : chatLayout
-  const [chatParked, setChatParked] = useState(false)
   const focusComposer = useCallback(() => chatRef.current?.focus(), [])
   const openChatSheet = useCallback(() => ws.setChatOpen(true), [ws])
-  const parkChat = useCallback(() => { setChatParked(true); ws.setChatOpen(true) }, [ws])
-  const unparkChat = useCallback(() => setChatParked(false), [])
+  const mainRef = useRef<HTMLElement>(null)
+  const scrollToDecks = useCallback(() => mainRef.current?.scrollIntoView({ behavior: "smooth", block: "start" }), [])
   // The page that opens beside the chat as it leaves the centre fades in after the move starts.
   const [pageEnter, setPageEnter] = useState(false)
   const prevPageLayoutRef = useRef(pageLayout)
@@ -126,8 +124,8 @@ export default function DecksPage() {
     () => (deckSlides ?? []).filter((s) => s.previewUrl || s.composeUrl).map((s) => s.slug),
     [deckSlides],
   )
-  const { setChatOpen, setChatTab } = ws
-  const openReviewChat = useCallback(() => { setChatOpen(true); setChatTab("deck") }, [setChatOpen, setChatTab])
+  const { setChatOpen } = ws
+  const openReviewChat = useCallback(() => setChatOpen(true), [setChatOpen])
 
   /** Handle inline style selection — insert a `@style:<name>` token into chat input. */
   const handleStyleSelect = useCallback((name: string) => {
@@ -156,19 +154,18 @@ export default function DecksPage() {
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
       chatOpen={pageLayout === "sheet" ? ws.chatOpen : false}
       onChatToggle={pageLayout === "sheet" ? () => ws.setChatOpen((prev) => !prev) : focusComposer}
-      onNavDecks={pageLayout === "center" ? parkChat : undefined}
+      onNavDecks={pageLayout === "center" ? scrollToDecks : undefined}
     >
       <div className={
         pageLayout === "stage" ? "flex-1 overflow-y-auto relative flex flex-col"
-          : pageLayout === "center" ? "flex-1 overflow-hidden relative flex flex-col"
+          : pageLayout === "center" ? "flex-1 overflow-y-auto relative flex flex-col"
             : "flex-1 overflow-hidden relative sm:flex"
       }>
         <main
-          inert={pageLayout === "center"}
+          ref={mainRef}
           className={
-            pageLayout === "stage" ? "flex-none min-w-0 motion-safe:transition-[opacity,transform] motion-safe:duration-500"
-              : pageLayout === "center" ? "flex-none min-w-0 opacity-0 translate-y-6 motion-safe:transition-[opacity,transform] motion-safe:duration-500"
-                : `h-full overflow-y-auto flex-1 min-w-0 ${pageEnter ? "page-enter" : ""}`
+            pageLayout === "sheet" ? `h-full overflow-y-auto flex-1 min-w-0 ${pageEnter ? "page-enter" : ""}`
+              : "flex-none min-w-0"
           }
         >
           {ws.isWorkspace ? (
@@ -206,11 +203,8 @@ export default function DecksPage() {
                   <ChatPanelShell
                     open={true}
                     onClose={() => setActiveTab("preview")}
-                    chatTab={ws.chatTab}
-                    onChatTabChange={ws.setChatTab}
                     chatRef={chatRef}
                     deckId={ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null}
-                    deckName={ws.deck?.name || null}
                     chatSessionId={ws.deck?.chatSessionId}
                     sessionOrigin={ws.deck?.sessionOrigin}
                     onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
@@ -292,7 +286,7 @@ export default function DecksPage() {
                 searchResults={list.searchResults}
                 searching={list.searching}
                 onDeckOpen={ws.openDeck}
-                onNewDeck={pageLayout === "sheet" ? () => { ws.setChatOpen(true); ws.setChatTab("new") } : focusComposer}
+                onNewDeck={focusComposer}
                 showNewDeck={pageLayout === "sheet"}
                 favoriteIds={list.favoriteIds}
                 onToggleFavorite={list.handleToggleFavorite}
@@ -321,20 +315,14 @@ export default function DecksPage() {
           <ChatPanelShell
             open={ws.chatOpen}
             onClose={() => ws.setChatOpen(false)}
-            chatTab={ws.chatTab}
-            onChatTabChange={ws.setChatTab}
             chatRef={chatRef}
             deckId={ws.isWorkspace ? (ws.isNew ? (ws.createdDeckId ?? null) : ws.activeDeckId) : null}
-            deckName={ws.deck?.name || null}
             chatSessionId={ws.deck?.chatSessionId}
             sessionOrigin={ws.deck?.sessionOrigin}
             onDeckCreated={ws.handleDeckCreated} onPreviewInvalidated={() => ws.setPptxRequested(true)}
             onWorkflowPhase={setWorkflowPhase}
             onLoadingChange={setAgentIsLoading}
             stageAllowed={!ws.isWorkspace}
-            parked={chatParked}
-            onPark={parkChat}
-            onUnpark={unparkChat}
             onLayoutChange={setChatLayout}
             onStageExit={openChatSheet}
           />
@@ -369,7 +357,7 @@ export default function DecksPage() {
               <div className="fixed inset-0 z-30" onClick={() => setFabOpen(false)} />
               <div className="absolute bottom-16 right-0 z-40 flex flex-col gap-2 items-end">
                 <button
-                  onClick={() => { setFabOpen(false); ws.setChatOpen(true); ws.setChatTab("new") }}
+                  onClick={() => { setFabOpen(false); focusComposer() }}
                   className="team-action-btn team-entry-btn flex items-center gap-2 min-h-11 px-4 py-2.5 rounded-full text-sm font-medium animate-card-in"
                 >
                   <Plus className="h-4 w-4" />
