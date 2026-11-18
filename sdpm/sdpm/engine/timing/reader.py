@@ -47,7 +47,7 @@ import re
 from dataclasses import dataclass, field, replace
 from fractions import Fraction
 from functools import lru_cache
-from typing import Any, Iterable, Mapping, Sequence
+from typing import Any, Iterable, Mapping, NamedTuple, Sequence
 
 from lxml import etree
 
@@ -78,6 +78,7 @@ from sdpm.engine.timing.writer import (
     SDPM_EFFECT_EXT_URI,
     TRANSITION_STRATEGIES,
     CapabilityIndex,
+    _is_visibility_set,
     load_capability_index,
     qn,
 )
@@ -1063,6 +1064,122 @@ def _allowed_attrs(allowed: Iterable[str]) -> set[str]:
         else:
             expanded.add(name)
     return expanded
+
+
+class _MeasuredTiming(NamedTuple):
+    """One timing the capture records, paired with the integer the file carries."""
+
+    #: ``p:anim``, ``p:set``, … — the behaviour element, for error messages.
+    tag: str
+    #: ``dur`` or ``delay`` — the attribute, for error messages.
+    attribute: str
+    #: The millisecond value the GUI capture recorded.
+    source: int
+    #: The millisecond value this file carries.
+    written: int
+    #: True when the behaviour is the visibility ``p:set``, whose two timings
+    #: the writer does not scale: the duration stays at 1 ms and the delay is
+    #: recomputed from the effect duration.
+    visibility: bool
+
+
+def _measured_timings(
+    children: etree._Element,
+    measured: Sequence[Mapping[str, Any]],
+    sequence: str,
+) -> list[_MeasuredTiming]:
+    """Every recorded timing of a measured preset, refusing non-integers.
+
+    A recorded timing the file does not carry as an integer is a change, not a
+    gap to skip: ``dur="indefinite"``, a deleted ``@dur`` and a deleted
+    ``@delay`` each used to import as the catalogued preset, and the next build
+    then wrote the catalogue's number over a file that said the effect never
+    ends. Refusing here sends the effect raw, which keeps what the file says.
+
+    This runs before the duration is known, because one of those values *is*
+    how the duration is recovered: a non-numeric ``@dur`` on the only scaled
+    behaviour left the scale unrecoverable, and the comparison that would have
+    caught it was skipped altogether.
+
+    A behaviour with no ``p:cBhvr/p:cTn`` cannot reach here: the caller's own
+    loop refuses it first.
+    """
+    rows: list[_MeasuredTiming] = []
+    for node, behavior in zip(children, measured):
+        tag = f"p:{_local(node)}"
+        carrier = _child(node, "cBhvr")
+        carrier_ctn = None if carrier is None else _child(carrier, "cTn")
+        if carrier_ctn is None:
+            continue
+        for attribute, key, written in (
+            ("dur", "durMs", carrier_ctn.get("dur")),
+            ("delay", "delayMs", _start_delay(carrier_ctn)),
+        ):
+            source = behavior.get(key)
+            if source is None:
+                # The capture records no value, so there is nothing to compare.
+                # A value the file writes anyway is caught by `_check_carrier`.
+                continue
+            if written is None or not str(written).isdigit():
+                raise _Unsupported(
+                    f"{sequence} behavior {tag} @{attribute} is {written!r}, and the capture "
+                    f"records {source}; a measured timing has to be an integer or the effect "
+                    "is not the measured one"
+                )
+            rows.append(_MeasuredTiming(
+                tag, attribute, int(source), int(written), _is_visibility_set(behavior),
+            ))
+    return rows
+
+
+def _recovered_duration(
+    rows: Sequence[_MeasuredTiming],
+    measured_duration: int,
+    *,
+    estimate: int,
+) -> int:
+    """Invert the writer's scaling to the effect duration that produced it.
+
+    A ratio taken from one behaviour's written ``@dur`` is only near the
+    writer's: ``_scaled`` rounded that number, so ``written / source`` carries
+    up to half a millisecond of error, and ``measuredDurationMs`` times it can
+    land one off. `entrance.drop` at 300 ms came back as 301, and every later
+    comparison then missed by a millisecond.
+
+    Every written value constrains the duration instead. ``_scaled`` is
+    ``floor(source × D / M + ½)``, so a written ``w`` means
+
+        (w − ½) × M / source  ≤  D  <  (w + ½) × M / source
+
+    and the intersection of those intervals over every scaled value is exactly
+    the set of durations at which all of them round-trip.
+
+    So the estimate is kept whenever it lands inside: it is then provably
+    right, and that is the common case. Only an estimate outside the
+    intersection is replaced, by its lowest integer — 300, for the case above,
+    from six behaviours whose individual intervals span three milliseconds. An
+    effect with a single distinct timing constrains the duration only loosely
+    (``colorPulse``'s one 250 ms value admits both 499 and 500), which is why
+    the lowest integer cannot simply be taken: it would turn a 500 ms effect
+    into a 499 ms one. The estimate also stands when the intersection holds no
+    integer at all, which is a source that did not scale the way this writer
+    does; the comparison that follows then refuses it.
+    """
+    low = Fraction(1)
+    high: Fraction | None = None
+    for row in rows:
+        if row.visibility or not row.source:
+            # A zero source scales to zero at every duration, so it says
+            # nothing about which duration this is.
+            continue
+        scale = Fraction(measured_duration, row.source)
+        low = max(low, (Fraction(row.written) - Fraction(1, 2)) * scale)
+        bound = (Fraction(row.written) + Fraction(1, 2)) * scale
+        high = bound if high is None else min(high, bound)
+    if high is None or low <= estimate < high:
+        return estimate
+    candidate = -(-low.numerator // low.denominator)  # ceil
+    return candidate if Fraction(candidate) < high else estimate
 
 
 def _start_delay(ctn: etree._Element) -> str | None:
@@ -2095,34 +2212,42 @@ class _TimingReader:
             # effect plays and settles. Only @id and @dur are the writer's.
             self._check_carrier(carrier, carrier_ctn, behavior, tag, sequence)
             targets.add(self._read_target(carrier, allow_range=True))
-            written = carrier_ctn.get("dur")
-            source = behavior.get("durMs")
-            if scale is None and written is not None and source and written.isdigit():
-                # The visibility p:set is skipped as a scale source on purpose:
-                # its duration is 1 ms at every effect duration, so a ratio
-                # taken from it would always read back as 1 ms.
-                if not (tag == "p:set" and int(source) == 1):
-                    scale = Fraction(int(written), int(source))
         if len(targets) != 1:
             raise _Unsupported(
                 f"{sequence} effect animates {len(targets)} different shapes in one effect"
             )
+        # Reading the recorded timings refuses any the file does not carry as an
+        # integer, which has to happen whether or not a duration comes out of
+        # them: a non-numeric `@dur` on the only scaled behaviour used to leave
+        # the scale unrecoverable and skip the comparison entirely.
+        rows = _measured_timings(children, measured, sequence)
         measured_duration = entry.ooxml.get("measuredDurationMs")
+        # The scale source is the first scaled behaviour with a duration. The
+        # visibility p:set is skipped on purpose: its duration is 1 ms at every
+        # effect duration, so a ratio taken from it would always read back as
+        # 1 ms. An entry with no such behaviour carries no duration at all.
+        scale = next(
+            (Fraction(row.written, row.source) for row in rows
+             if row.attribute == "dur" and row.source and not row.visibility),
+            None,
+        )
         if scale is None or measured_duration is None:
             return targets.pop(), None
-        duration = int(round(int(measured_duration) * scale))
-        # Now that the scale is known, the timings themselves can be compared.
-        # The first pass could only check that a delay exists, so a *changed*
-        # delay still read back as the catalogued preset and was regenerated
-        # with the catalog's value.
-        self._check_measured_timings(children, measured, scale, duration, sequence)
+        duration = _recovered_duration(
+            rows, int(measured_duration),
+            estimate=int(round(int(measured_duration) * scale)),
+        )
+        # Now that the duration is known, the timings themselves can be
+        # compared. The first pass could only check that a delay exists, so a
+        # *changed* delay still read back as the catalogued preset and was
+        # regenerated with the catalog's value.
+        self._check_measured_timings(rows, int(measured_duration), duration, sequence)
         return targets.pop(), duration
 
     def _check_measured_timings(
         self,
-        children: etree._Element,
-        measured: Sequence[Mapping[str, Any]],
-        scale: Fraction,
+        rows: Sequence[_MeasuredTiming],
+        measured_duration: int,
         duration: int,
         sequence: str,
     ) -> None:
@@ -2131,38 +2256,41 @@ class _TimingReader:
         The writer's rule is the one inverted here: an animated behaviour's
         duration and delay scale in proportion to the effect duration, while the
         visibility ``p:set`` keeps its measured duration and has its delay
-        recomputed from the effect duration rather than scaled. Using the
-        writer's own ``_scaled`` means a deck sdpm wrote round-trips exactly;
-        where a source file rounded differently, the effect goes raw, which is
-        the module's all-or-nothing rule rather than a silent repair.
-        """
-        from sdpm.engine.timing.writer import _is_visibility_set, _scaled
+        recomputed from the effect duration rather than scaled.
 
-        for node, behavior in zip(children, measured):
-            tag = f"p:{_local(node)}"
-            carrier_ctn = _child(_child(node, "cBhvr"), "cTn")
-            visibility = _is_visibility_set(behavior)
-            for attribute, key, written in (
-                ("dur", "durMs", carrier_ctn.get("dur")),
-                ("delay", "delayMs", _start_delay(carrier_ctn)),
-            ):
-                source = behavior.get(key)
-                if source is None or written is None or not str(written).isdigit():
-                    continue
-                if visibility:
-                    # Measured 2026-11-02: its duration stays at 1 ms however
-                    # long the effect is, and a non-zero delay is recomputed as
-                    # the effect duration less one, not scaled.
-                    expected = int(source) if attribute == "dur" else (
-                        max(duration - 1, 0) if int(source) > 0 else int(source)
-                    )
-                else:
-                    expected = _scaled(int(source), scale)
-                if int(written) != expected:
-                    raise _Unsupported(
-                        f"{sequence} behavior {tag} @{attribute} {written} is not the measured "
-                        f"{source} at this effect duration ({expected})"
-                    )
+        The ratio is rebuilt as ``duration / measuredDurationMs``, which is the
+        fraction :meth:`_duration_scale` hands the writer. The ratio *recovered*
+        from a written ``@dur`` cannot be used: ``_scaled`` has already rounded
+        that number, so ``written / source`` is near the writer's fraction but
+        not equal to it, and the comparison then missed by a millisecond on
+        eight of the gallery presets at some durations — sending decks sdpm
+        itself had just written to the raw fallback.
+
+        A millisecond of slack is allowed, and only where ``_scaled``'s own
+        docstring records that PowerPoint and this writer may legitimately
+        differ: an exact half, which PowerPoint's float precision splits both
+        ways. Anywhere else the match is exact.
+        """
+        from sdpm.engine.timing.writer import _scaled
+
+        ratio = Fraction(duration, measured_duration)
+        for tag, attribute, source, written, visibility in rows:
+            if visibility:
+                # Measured 2026-11-02: its duration stays at 1 ms however long
+                # the effect is, and a non-zero delay is recomputed as the
+                # effect duration less one, not scaled.
+                expected = source if attribute == "dur" else (
+                    max(duration - 1, 0) if source > 0 else source
+                )
+                slack = 0
+            else:
+                expected = _scaled(source, ratio)
+                slack = 1 if (Fraction(source) * ratio).denominator == 2 else 0
+            if abs(written - expected) > slack:
+                raise _Unsupported(
+                    f"{sequence} behavior {tag} @{attribute} {written} is not the measured "
+                    f"{source} at this effect duration ({expected})"
+                )
 
     def _check_bounce_mirror(
         self, attrs: Mapping[str, str], behaviors: etree._Element, sequence: str

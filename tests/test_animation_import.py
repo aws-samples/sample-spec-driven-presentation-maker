@@ -973,6 +973,133 @@ class TestAMeasuredPresetMustMatchItsCapture:
         assert b'accel="50000"' in motion.raw_timing.xml
 
 
+CATALOG = json.loads(
+    (REPO_ROOT / "sdpm" / "references" / "catalogs" / "powerpoint-animation-catalog.json")
+    .read_text(encoding="utf-8")
+)
+
+#: Every preset whose timings the GUI capture measured and which scales with
+#: the effect duration. The two ``notScalable`` tiles are excluded because they
+#: take no duration at all, so there is no non-measured duration to ask for.
+SCALABLE_MEASURED = sorted(
+    entry["key"] for entry in CATALOG["guiItems"]
+    if (entry.get("ooxml") or {}).get("durationScaling", {}).get("rule") == "proportional"
+    and (entry.get("ooxml") or {}).get("measuredDurationMs")
+)
+
+
+def _measured_preset(key):
+    entry = next(item for item in CATALOG["guiItems"] if item["key"] == key)
+    effect = entry["semanticJson"]["animations"]["mainSequence"][0]
+    return effect["preset"], entry["ooxml"]["measuredDurationMs"]
+
+
+class TestAMeasuredPresetAtAnUnmeasuredDuration:
+    """Asking for a duration nobody measured must still come back semantic.
+
+    Every number in a measured preset is scaled from the capture, and reading it
+    back inverts that scaling. The inversion used to recover the ratio from one
+    written ``@dur`` — but the writer had already rounded that number, so the
+    recovered ratio was near the writer's fraction and not equal to it, and the
+    recovered *duration* could land a millisecond out (300 ms came back as 301).
+    Every later comparison then missed by one, and eight of these presets at
+    some durations sent a deck sdpm itself had just written to the raw fallback.
+
+    The whole catalogue is swept rather than those eight, because which preset
+    trips depends on arithmetic nobody can eyeball: the gap only appears where
+    the rounding of one behaviour's value disagrees with another's. A single
+    case would have passed before the fix too.
+    """
+
+    #: Durations deliberately unlike the measured ones: two below the common
+    #: 500/1000/2000 captures, one odd, one above. ``1234`` is where six of the
+    #: eight regressions showed up, and 300 and 700 carry the other two. No
+    #: preset trips at 3000, so that case is a guard rather than a reproduction
+    #: — it is kept because which duration exposes the rounding gap is not
+    #: predictable, which is the whole reason this sweeps the catalogue.
+    DURATIONS = (300, 700, 1234, 3000)
+
+    @pytest.mark.parametrize("duration", DURATIONS)
+    def test_every_measured_preset_round_trips_at_this_duration(self, tmp_path, duration):
+        raw, wrong = [], []
+        for key in SCALABLE_MEASURED:
+            preset, measured = _measured_preset(key)
+            if duration == measured:
+                continue
+            package = _package(tmp_path, _slide(animations={
+                "mainSequence": [_effect(preset=preset, timing={"durationMs": duration})],
+                "interactiveSequences": [],
+            }), name="measured.pptx")
+            motion = _read(_mutate(package, lambda _slide: None))
+            if motion.animations is None:
+                reason = motion.raw_timing.reasons[0] if motion.raw_timing else "no reason"
+                raw.append(f"{key}: {reason}")
+                continue
+            read_back = motion.animations["mainSequence"][0]["timing"]["durationMs"]
+            if read_back != duration:
+                wrong.append(f"{key}: asked {duration}, read {read_back}")
+        assert not raw, (
+            f"{len(raw)} measured preset(s) sdpm wrote at {duration} ms did not import "
+            f"semantically: {raw}"
+        )
+        assert not wrong, (
+            f"{len(wrong)} measured preset(s) came back at a different duration: {wrong}"
+        )
+
+
+class TestAMeasuredTimingMustBeAnInteger:
+    """A recorded timing that is absent or non-numeric is a change, not a gap.
+
+    The comparison skipped any written value that was not a run of digits, so
+    ``dur="indefinite"``, a deleted ``@dur`` and a deleted ``@delay`` all read
+    back as the catalogued preset — and the next build wrote the catalogue's
+    number over a file that said the effect never ends.
+
+    The ``p:animEffect`` case is the one that reaches furthest: its ``@dur`` is
+    also where the effect duration is recovered from, so a non-numeric value
+    there left the duration unrecoverable and the comparison was skipped
+    altogether rather than failing. Fixing only the comparison left this one
+    importing semantically.
+    """
+
+    #: Both of this preset's behaviours carry a recorded timing: the scaled
+    #: `p:animEffect` and the visibility `p:set`, whose duration is fixed at
+    #: 1 ms and whose delay is recomputed. The two take different branches, so
+    #: both are tampered with.
+    MEASURED = {"category": "entrance", "effect": "blinds"}
+    LOCATIONS = [("animEffect", "dur"), ("set", "dur"), ("set", "delay")]
+
+    @pytest.mark.parametrize("element,attribute", LOCATIONS)
+    @pytest.mark.parametrize("value", ["indefinite", None])
+    def test_a_non_integer_timing_does_not_import_as_the_preset(
+        self, tmp_path, element, attribute, value
+    ):
+        def tamper(slide):
+            node = next(iter(slide.iter(f"{{{NS['p']}}}{element}")))
+            ctn = node.find(f"{{{NS['p']}}}cBhvr").find(f"{{{NS['p']}}}cTn")
+            target = ctn if attribute == "dur" else ctn.find(
+                f"{{{NS['p']}}}stCondLst"
+            ).find(f"{{{NS['p']}}}cond")
+            assert target.get(attribute) is not None, (
+                f"the fixture must carry p:{element}/@{attribute} for this to be a change"
+            )
+            if value is None:
+                del target.attrib[attribute]
+            else:
+                target.set(attribute, value)
+
+        package = _package(tmp_path, _slide(animations={
+            "mainSequence": [_effect(preset=self.MEASURED, timing={"durationMs": 500})],
+            "interactiveSequences": [],
+        }), name=f"{element}-{attribute}-{value or 'absent'}.pptx")
+        motion = _read(_mutate(package, tamper))
+        assert motion.animations is None, (
+            f"p:{element}/@{attribute}={value!r} is not the measured integer, so the "
+            "preset's own number must not be written back over it"
+        )
+        assert motion.raw_timing is not None
+
+
 def _slide_xml(path):
     from lxml import etree
 
