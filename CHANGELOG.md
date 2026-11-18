@@ -136,6 +136,12 @@ its data directories, and XML from outside the repository goes through one expli
   Accessibility Checker. `deck.json` takes `title` and `language` (BCP 47), written to the
   document properties; without `title` the first slide's title text is used. Importing a
   PPTX reads all of them back. Elements without `alt` are built as before.
+- **An SDPM icon.** A slide frame holding a green and an amber face, with a violet block
+  tilting in over its top-left corner. The Web UI uses it for the logo at the top of the
+  rail (the mobile top bar too, drawn without a tile and following the dark/light theme),
+  the favicon, `icon.svg` and the PWA icons, which were blank squares before. The Claude
+  Desktop bundle (`sdpm.mcpb`) now carries it as its icon. Web UI (`deploy_webui.sh`)
+  and the next release's bundle.
 
 ### Changed
 
