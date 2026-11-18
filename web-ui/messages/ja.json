@@ -17,8 +17,6 @@
     "decks": "デッキ",
     "styles": "スタイル",
     "templates": "テンプレート",
-    "openChat": "チャットを開く",
-    "closeChat": "チャットを閉じる",
     "userMenu": "ユーザーメニュー",
     "settings": "設定",
     "signOut": "サインアウト"
@@ -166,7 +164,9 @@
     "errorPresent": "発表を開けませんでした",
     "errorPdf": "PDF 用の画面を開けませんでした",
     "errorDownloadHtml": "HTML をダウンロードできませんでした",
-    "errorOpenHtml": "HTML を開けませんでした"
+    "errorOpenHtml": "HTML を開けませんでした",
+    "openChat": "チャットを開く",
+    "chat": "チャット"
   },
   "outline": {
     "body": "本文",

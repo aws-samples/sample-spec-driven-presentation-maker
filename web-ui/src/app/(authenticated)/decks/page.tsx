@@ -112,8 +112,7 @@ export default function DecksPage() {
     const timer = setTimeout(() => setPageEnter(false), 1200)
     return () => clearTimeout(timer)
   }, [pageLayout])
-  // Phones show a deck's chat and preview as two tabs; the header's chat button switches them
-  // (the side sheet is never opened there).
+  // Phones show a deck's chat and preview as two tabs; the side sheet never opens there.
   const mobileTabs = isMobile && ws.isWorkspace && ws.canChat
   const swipeRef = useSwipe(
     () => setActiveTab("preview"),
@@ -155,9 +154,6 @@ export default function DecksPage() {
     <AppShell
       deckName={ws.isWorkspace && ws.deck ? ws.deck.name : undefined}
       onBack={ws.isWorkspace ? ws.navigateToList : undefined}
-      chatOpen={mobileTabs ? activeTab === "chat" : pageLayout === "sheet" ? ws.chatOpen : false}
-      onChatToggle={mobileTabs ? () => setActiveTab((tab) => (tab === "chat" ? "preview" : "chat"))
-        : pageLayout === "sheet" ? () => ws.setChatOpen((prev) => !prev) : focusComposer}
       onNavDecks={pageLayout === "center" ? scrollToDecks : undefined}
     >
       <div className={
@@ -244,6 +240,7 @@ export default function DecksPage() {
                     currentTemplate={ws.deck?.template}
                     idToken={idToken}
                     ownerAlias={!ws.isOwner ? ws.deck?.ownerAlias : undefined}
+                    onOpenChat={!isMobile && !ws.chatOpen ? () => ws.setChatOpen(true) : undefined}
                     headerActions={
                       ws.activeDeckId && !ws.isNew ? (
                         <div className="flex items-center gap-1.5">

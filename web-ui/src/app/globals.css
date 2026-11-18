@@ -695,15 +695,6 @@ body {
   background: var(--foreground-muted);
 }
 
-/* ── Chat toggle pulse (first-visit only) ── */
-@keyframes chat-pulse {
-  0%, 100% { box-shadow: 0 0 0 0 var(--border-hover); }
-  50% { box-shadow: 0 0 0 6px transparent; }
-}
-.chat-toggle-pulse {
-  animation: chat-pulse 3s ease-in-out infinite;
-}
-
 /* ── User menu enter ── */
 .user-menu-enter {
   opacity: 0;
@@ -1175,7 +1166,6 @@ body {
   .slide-updated { animation: none; }
   .user-menu-enter { opacity: 1; transform: none; transition: none; }
   .menu-item-stagger { opacity: 1; transform: none; animation: none; }
-  .chat-toggle-pulse { animation: none; }
 }
 
 /* ── Theme-aware prose overrides ── */

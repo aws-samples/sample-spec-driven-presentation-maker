@@ -24,7 +24,7 @@ import { AnimatePresence, motion } from "motion/react"
 import { SlidePreview, fetchHtmlUrl } from "@/services/deckService"
 import { openInOs } from "@/services/localService"
 import type { ScriptWarning, SpecFiles } from "@/services/deckService"
-import { Download, ExternalLink, Layers, LayoutGrid, Presentation, Printer, Rows3, FolderOpen, FileText } from "lucide-react"
+import { Download, ExternalLink, Layers, LayoutGrid, MessageSquare, Presentation, Printer, Rows3, FolderOpen, FileText } from "lucide-react"
 import { usePreferences } from "@/hooks/usePreferences"
 import { SpecStepNav, SpecMarkdownPreview } from "@/components/deck/SpecStepNav"
 import type { SpecTab } from "@/components/deck/SpecStepNav"
@@ -86,6 +86,8 @@ interface SlideCarouselProps {
   onScrollComplete?: () => void
   /** Optional header actions (e.g. visibility toggle, share button). */
   headerActions?: React.ReactNode
+  /** Reopen the closed chat sheet (desktop); omit while it is open. */
+  onOpenChat?: () => void
   /** Owner alias to display. */
   ownerAlias?: string
   /** Spec files for the deck (null values = not yet created). */
@@ -112,7 +114,7 @@ interface SlideCarouselProps {
 
 const HEADER_BUTTON = "inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
 
-export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outputFormat, htmlUrl, slideSize, scriptWarnings }: SlideCarouselProps) {
+export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, onOpenChat, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outputFormat, htmlUrl, slideSize, scriptWarnings }: SlideCarouselProps) {
   const t = useTranslations("carousel")
   const isHtml = outputFormat === "html"
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
@@ -685,6 +687,17 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
               )
             )}
           </div>
+        )}
+        {onOpenChat && (
+          <button
+            onClick={onOpenChat}
+            className={`${HEADER_BUTTON} ${specTab === "slides" ? "" : "ml-auto"}`}
+            aria-label={t("openChat")}
+            title={t("openChat")}
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            <span className="@max-5xl:sr-only">{t("chat")}</span>
+          </button>
         )}
       </div>
 

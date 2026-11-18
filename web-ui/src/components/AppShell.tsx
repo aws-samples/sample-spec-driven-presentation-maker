@@ -10,8 +10,6 @@
  * @param props.children - Main page content
  * @param props.deckName - When set, header shows ← back nav with deck name
  * @param props.onBack - Callback to navigate back to deck list
- * @param props.chatOpen - Whether the chat panel is currently open
- * @param props.onChatToggle - Callback to toggle chat panel visibility
  * @returns App shell with header and content area
  */
 
@@ -20,7 +18,7 @@
 import { ReactNode, useState, useRef, useEffect, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
-import { Layers, ChevronLeft, MessageSquare, CircleUser, LogOut, Settings as SettingsIcon, Palette, GalleryVerticalEnd, LayoutTemplate } from "lucide-react"
+import { Layers, ChevronLeft, CircleUser, LogOut, Settings as SettingsIcon, Palette, GalleryVerticalEnd, LayoutTemplate } from "lucide-react"
 import { Settings } from "@/components/Settings"
 import { CloudOnly } from "@/lib/mode"
 import { useTranslations } from "next-intl"
@@ -38,11 +36,9 @@ interface AppShellProps {
   onBack?: () => void
   /** Overrides the Decks link (e.g. leave the conversation at the centre of the home screen). */
   onNavDecks?: () => void
-  chatOpen?: boolean
-  onChatToggle?: () => void
 }
 
-export function AppShell({ children, deckName, onBack, onNavDecks, chatOpen = false, onChatToggle }: AppShellProps) {
+export function AppShell({ children, deckName, onBack, onNavDecks }: AppShellProps) {
   const t = useTranslations("appShell")
   const { user, signOut } = useAuth()
   const pathname = usePathname()
@@ -55,19 +51,6 @@ export function AppShell({ children, deckName, onBack, onNavDecks, chatOpen = fa
   const triggerRef = useRef<HTMLButtonElement>(null)
   const itemsRef = useRef<(HTMLButtonElement | null)[]>([])
   const [settingsOpen, setSettingsOpen] = useState(false)
-
-  // Chat pulse: show only until first click
-  const [chatSeen, setChatSeen] = useState(true)
-  useEffect(() => {
-    setChatSeen(localStorage.getItem("sdpm-chat-seen") === "1")
-  }, [])
-  const handleChatToggle = useCallback(() => {
-    if (!chatSeen) {
-      localStorage.setItem("sdpm-chat-seen", "1")
-      setChatSeen(true)
-    }
-    onChatToggle?.()
-  }, [chatSeen, onChatToggle])
 
   // Menu open/close with animation
   const openMenu = useCallback(() => {
@@ -171,22 +154,6 @@ export function AppShell({ children, deckName, onBack, onNavDecks, chatOpen = fa
         </nav>
 
         <div className="flex items-center gap-1.5 sm:flex-col sm:mt-auto sm:gap-2">
-          {/* ── Chat toggle ── */}
-          {onChatToggle && (
-            <button
-              onClick={handleChatToggle}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all duration-200 ${
-                chatOpen
-                  ? "text-brand-teal bg-brand-teal-soft"
-                  : `text-foreground-secondary hover:bg-background-hover hover:text-foreground ${!chatSeen ? "chat-toggle-pulse" : ""}`
-              }`}
-              aria-label={chatOpen ? t("closeChat") : t("openChat")}
-              aria-expanded={chatOpen}
-            >
-              <MessageSquare className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
-            </button>
-          )}
-
           {/* ── User menu ── */}
           <div ref={menuRef} className="relative">
             <button
