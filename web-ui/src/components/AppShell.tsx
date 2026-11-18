@@ -18,8 +18,9 @@
 import { ReactNode, useState, useRef, useEffect, useCallback } from "react"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
-import { Layers, ChevronLeft, CircleUser, LogOut, Settings as SettingsIcon, Palette, GalleryVerticalEnd, LayoutTemplate } from "lucide-react"
+import { ChevronLeft, CircleUser, LogOut, Settings as SettingsIcon, Palette, GalleryVerticalEnd, LayoutTemplate } from "lucide-react"
 import { Settings } from "@/components/Settings"
+import { SdpmMark } from "@/components/SdpmMark"
 import { CloudOnly } from "@/lib/mode"
 import { useTranslations } from "next-intl"
 
@@ -120,8 +121,8 @@ export function AppShell({ children, deckName, onBack, onNavDecks }: AppShellPro
           )}
           <div className={`items-center gap-2.5 sm:flex-col sm:gap-1 ${deckName && onBack ? "hidden sm:flex" : "flex"}`}>
             <a href="/decks/" className="flex items-center no-underline sm:mb-3" aria-label={t("decks")}>
-              <div className="w-6 h-6 sm:w-9 sm:h-9 rounded-md sm:rounded-xl flex items-center justify-center shadow-[var(--shadow-card)]" style={{ background: "var(--team-gradient)" }}>
-                <Layers className="h-3.5 w-3.5 sm:h-[18px] sm:w-[18px] text-background" />
+              <div className="w-6 h-6 sm:w-9 sm:h-9 flex items-center justify-center">
+                <SdpmMark className="h-[22px] w-[22px] sm:h-8 sm:w-8" />
               </div>
             </a>
             <div className="flex items-center gap-0.5 ml-1 sm:ml-0 sm:flex-col sm:gap-1">
