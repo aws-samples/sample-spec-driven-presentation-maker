@@ -121,7 +121,7 @@ See [Architecture](docs/en/architecture.md).
 
 ## Further Documentation
 
-- [Getting Started](docs/en/getting-started.md) — install, AI agent, Web UI, HTML decks
+- [Getting Started]\(docs/en/getting-started.md) — install, AI agent, Web UI, HTML decks
 - [Developer guide](docs/en/developer-guide.md) — checkout setup and CDK deployment
 - [Security](docs/en/security.md) — what the AWS stack sets up and what to review
 - [Architecture](docs/en/architecture.md) — data flow, auth model, MCP tool reference
