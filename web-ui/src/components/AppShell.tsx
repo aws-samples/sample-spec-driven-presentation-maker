@@ -154,67 +154,67 @@ export function AppShell({ children, deckName, onBack, onNavDecks }: AppShellPro
         </nav>
 
         <div className="flex items-center gap-1.5 sm:flex-col sm:mt-auto sm:gap-2">
-          {/* ── User menu ── */}
-          <div ref={menuRef} className="relative">
-            <button
-              ref={triggerRef}
-              onClick={toggleMenu}
-              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all duration-200 ${
-                menuOpen
-                  ? "bg-brand-teal-soft text-brand-teal"
-                  : "text-foreground-secondary hover:bg-background-hover hover:text-foreground"
-              }`}
-              aria-label={t("userMenu")}
-              aria-expanded={menuOpen}
-              aria-haspopup="true"
-            >
-              <CircleUser className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
-            </button>
+          {/* ── Settings ── */}
+          <button
+            onClick={() => setSettingsOpen(true)}
+            className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all duration-200 ${
+              settingsOpen
+                ? "bg-foreground/[0.09] text-foreground"
+                : "text-foreground-secondary hover:bg-background-hover hover:text-foreground"
+            }`}
+            aria-label={t("settings")}
+            title={t("settings")}
+          >
+            <SettingsIcon className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+          </button>
 
-            {menuOpen && (
-              <div
-                role="menu"
+          {/* ── User menu (cloud only: who is signed in, sign out) ── */}
+          <CloudOnly>
+            <div ref={menuRef} className="relative">
+              <button
+                ref={triggerRef}
+                onClick={toggleMenu}
+                className={`w-9 h-9 sm:w-10 sm:h-10 rounded-lg sm:rounded-xl flex items-center justify-center transition-all duration-200 ${
+                  menuOpen
+                    ? "bg-brand-teal-soft text-brand-teal"
+                    : "text-foreground-secondary hover:bg-background-hover hover:text-foreground"
+                }`}
                 aria-label={t("userMenu")}
-                className={`absolute right-0 top-full mt-1.5 sm:right-auto sm:top-auto sm:mt-0 sm:left-full sm:bottom-0 sm:ml-2 w-56 rounded-xl py-1.5 z-[60] border border-border-hover bg-popover shadow-[var(--shadow-float)] user-menu-enter ${menuVisible ? "user-menu-visible" : ""}`}
+                aria-expanded={menuOpen}
+                aria-haspopup="true"
               >
-                {/* User info */}
-                <div className="px-3.5 py-2">
-                  <div className="text-xs text-foreground-secondary font-medium">{alias}</div>
-                  {email && <div className="text-[11px] text-foreground-muted mt-0.5 truncate">{email}</div>}
-                </div>
+                <CircleUser className="h-4 w-4 sm:h-[18px] sm:w-[18px]" />
+              </button>
 
-                <div className="my-1 border-t border-border" />
-
-                {/* Settings */}
-                <button
-                  ref={el => { itemsRef.current[0] = el }}
-                  role="menuitem"
-                  onClick={() => { closeMenu(); setSettingsOpen(true) }}
-                  className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-foreground/70 hover:bg-foreground/[0.06] transition-colors menu-item-stagger"
-                  style={{ "--stagger": "0ms" } as React.CSSProperties}
+              {menuOpen && (
+                <div
+                  role="menu"
+                  aria-label={t("userMenu")}
+                  className={`absolute right-0 top-full mt-1.5 sm:right-auto sm:top-auto sm:mt-0 sm:left-full sm:bottom-0 sm:ml-2 w-56 rounded-xl py-1.5 z-[60] border border-border-hover bg-popover shadow-[var(--shadow-float)] user-menu-enter ${menuVisible ? "user-menu-visible" : ""}`}
                 >
-                  <SettingsIcon className="h-3.5 w-3.5" />
-                  <span>{t("settings")}</span>
-                </button>
+                  {/* User info */}
+                  <div className="px-3.5 py-2">
+                    <div className="text-xs text-foreground-secondary font-medium">{alias}</div>
+                    {email && <div className="text-[11px] text-foreground-muted mt-0.5 truncate">{email}</div>}
+                  </div>
 
-                <div className="my-1 border-t border-border" />
+                  <div className="my-1 border-t border-border" />
 
-                {/* Sign out (cloud only) */}
-                <CloudOnly>
+                  {/* Sign out */}
                   <button
-                    ref={el => { itemsRef.current[1] = el }}
+                    ref={el => { itemsRef.current[0] = el }}
                     role="menuitem"
                     onClick={() => { closeMenu(); signOut() }}
                     className="w-full flex items-center gap-2 px-3.5 py-2.5 text-sm font-medium text-foreground/70 hover:text-red-400 hover:bg-red-500/10 transition-colors menu-item-stagger"
-                    style={{ "--stagger": "30ms" } as React.CSSProperties}
+                    style={{ "--stagger": "0ms" } as React.CSSProperties}
                   >
                     <LogOut className="h-3.5 w-3.5" />
                     <span>{t("signOut")}</span>
                   </button>
-                </CloudOnly>
-              </div>
-            )}
-          </div>
+                </div>
+              )}
+            </div>
+          </CloudOnly>
         </div>
       </header>
 
