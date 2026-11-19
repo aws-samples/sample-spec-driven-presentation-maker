@@ -3,7 +3,7 @@
 /**
  * E2E: the Local chat's model and effort, on each agent engine (stub-agent.mjs's models).
  *
- * New Deck → send → the pill shows the session's model once the turn ended → choose a model
+ * The home composer → send → the pill shows the session's model once the turn ended → choose a model
  * (and on V3 an effort) → the next message runs on it (the stub says which in its reply) → a
  * reload still shows it (the session keeps it). V2 offers no effort. Each test sets the engine
  * first: the one an earlier spec left is not known. A cross-site PUT is refused.
@@ -26,9 +26,16 @@ const DECK_URL = { v2: /#e2e-v2-deck$/, v3: /#e2e-v3-deck$/ } as const
 
 const pill = (page: Page) => page.getByRole("button", { name: /^Model:/ })
 
-async function firstTurn(page: Page, engine: "v2" | "v3") {
+/** The home composer, ready to type into: it takes the focus once the page has hydrated. */
+async function homeComposer(page: Page) {
   await page.goto("/decks")
-  await page.getByRole("button", { name: "New Deck" }).click()
+  const input = page.getByRole("textbox", { name: "Chat message input" })
+  await expect(input).toBeFocused({ timeout: 30_000 })
+  return input
+}
+
+async function firstTurn(page: Page, engine: "v2" | "v3") {
+  await homeComposer(page)
   await send(page, `A deck about models on ${engine}`)
   const chatLog = page.getByRole("log", { name: "Chat messages" })
   await expect(chatLog).toContainText("Done! Your deck is ready.", { timeout: 30_000 })

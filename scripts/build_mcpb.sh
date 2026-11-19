@@ -46,6 +46,7 @@ tar -C "$ROOT" \
   --exclude='*.pyc' \
   -cf - servers/local sdpm shared | tar -C "$STAGE" -xf -
 cp "$ROOT/scripts/mcpb/manifest.json" "$STAGE/manifest.json"
+cp "$ROOT/scripts/mcpb/icon.png" "$STAGE/icon.png"
 cp "$ROOT/scripts/mcpb/.mcpbignore" "$STAGE/.mcpbignore"
 
 # The UV MCPB runtime requires a pyproject.toml at bundle root. Reuse the local
