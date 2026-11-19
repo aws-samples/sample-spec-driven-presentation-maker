@@ -43,6 +43,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   to freeforms, so a shape's outline stayed opaque. It is now applied, and `pptx_to_json`
   reads it back from a shape's outline as it does from a freeform's. Local mode and the
   AWS stack (SdpmRuntime).
+- **An image's border survives `pptx_to_json`** (#586). The builder draws `line` /
+  `lineWidth` on an image, but the converter did not read them back, so the border was
+  lost when the deck was read and built again. Local mode and the AWS stack (SdpmRuntime).
 
 ## [0.19.0] - 2026-11-18
 
@@ -125,13 +128,6 @@ bundle. Charts gain a radar type, and `deploy.sh` checks who owns its source buc
   sheet open while the chat tab was showing, so it slid in, 440px wide, over the preview;
   the chat tab used a second chat panel, which dropped the home conversation (and one that
   had just created the deck) while it was shown. Web UI only.
-
-### Fixed
-
-- **Picture borders (`line` / `lineWidth`) survive `pptx_to_json`** (#586).
-  `extract_picture_element` now extracts picture outline color and width from `p:spPr`
-  using `_extract_line_from_xml` so bordered raster images round-trip without losing
-  their border.
 
 ## [0.18.0] - 2026-11-15
 
