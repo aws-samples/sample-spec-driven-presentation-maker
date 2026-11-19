@@ -95,7 +95,9 @@ export default function DecksPage() {
   }), [agentIsLoading])
   // Home screen: a blank chat is the composer at the top (stage); once it has messages the
   // conversation fills the first screenful and the deck list follows below it (center).
-  const [chatLayout, setChatLayout] = useState<ChatLayout>("sheet")
+  // Starts as the stage, the shell's own first layout on the home screen, so the prerendered
+  // page already lays out the home screen (no deck-screen frame or New Deck until hydration).
+  const [chatLayout, setChatLayout] = useState<ChatLayout>("stage")
   const pageLayout: ChatLayout = ws.isWorkspace ? "sheet" : chatLayout
   const focusComposer = useCallback(() => chatRef.current?.focus(), [])
   const openChatSheet = useCallback(() => ws.setChatOpen(true), [ws])

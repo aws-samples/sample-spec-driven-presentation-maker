@@ -4,7 +4,7 @@
  * E2E: a deck keeps its conversation on a reload and a direct link.
  *
  * The stub agent creates a deck through the chat. Opening it from the deck list shows that
- * conversation in the deck's chat tab; so does reloading the page and opening `/decks/#<id>`
+ * conversation in the deck's chat sheet; so does reloading the page and opening `/decks/#<id>`
  * in a new tab (the hash is read after mount, so the first render matches the prerendered
  * page). Along the way it checks the Local wording: the search box searches decks by name,
  * and the deck header has no private / internal visibility chip (a Cloud feature).
@@ -14,6 +14,14 @@ import { test, expect, type Page } from "@playwright/test"
 const DECK_ID = "e2e-v3-deck"
 const DECK_NAME = "E2E Test Deck (v3)"
 const PROMPT = "Create a deck that survives a reload"
+
+/** The home composer, ready to type into: it takes the focus once the page has hydrated. */
+async function homeComposer(page: Page) {
+  await page.goto("/decks")
+  const input = page.getByRole("textbox", { name: "Chat message input" })
+  await expect(input).toBeFocused({ timeout: 30_000 })
+  return input
+}
 
 /** The deck's chat shows the earlier conversation. */
 async function expectConversation(page: Page) {
@@ -27,9 +35,7 @@ test("a deck opened from the list keeps its conversation on reload and on a dire
   expect(engine.status()).toBe(200)
 
   // A deck with a saved conversation
-  await page.goto("/decks")
-  await page.getByRole("button", { name: "New Deck" }).click()
-  await page.getByRole("textbox", { name: "Chat message input" }).fill(PROMPT)
+  await (await homeComposer(page)).fill(PROMPT)
   await page.getByRole("button", { name: "Send message" }).click()
   await expect(page.getByRole("log", { name: "Chat messages" })).toContainText("Done! Your deck is ready.", { timeout: 30_000 })
   await expect(page).toHaveURL(new RegExp(`#${DECK_ID}$`), { timeout: 15_000 })
