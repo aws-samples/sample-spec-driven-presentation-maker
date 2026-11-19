@@ -647,6 +647,15 @@ body {
   animation-delay: var(--delay, 0ms);
 }
 
+/* ── Page content after a client-side page change (each page mounts its own AppShell) ── */
+@keyframes page-fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .page-fade { animation: page-fade-in 150ms ease-out; }
+}
+
 /* ── Chat panel transition ── */
 /* Mobile: fixed overlay with slide-in */
 @media (max-width: 639px) {

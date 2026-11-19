@@ -13,6 +13,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Fixed
+
+- **Moving between Decks, Styles and Templates no longer flashes the screen.** The rail and
+  the logo were plain links, so every move reloaded the page: the whole screen was drawn
+  again, the text showed in English for a moment before the chosen language, and the Cloud
+  Web UI went blank while it checked the sign-in. They now change pages in place. The rail
+  stays, and only the content changes, with a 150ms fade (none with reduced motion). Web UI
+  only (`deploy_webui.sh`).
+
 ## [0.19.0] - 2026-11-18
 
 The Web UI is laid out anew. It has a left rail and a home screen that is the chat, with

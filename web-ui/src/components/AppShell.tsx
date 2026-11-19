@@ -16,6 +16,7 @@
 "use client"
 
 import { ReactNode, useState, useRef, useEffect, useCallback } from "react"
+import Link from "next/link"
 import { usePathname } from "next/navigation"
 import { useAuth } from "@/hooks/useAuth"
 import { ChevronLeft, CircleUser, LogOut, Settings as SettingsIcon, Palette, GalleryVerticalEnd, LayoutTemplate } from "lucide-react"
@@ -128,16 +129,18 @@ export function AppShell({ children, deckName, onBack, onNavDecks }: AppShellPro
             </button>
           )}
           <div className={`items-center gap-2.5 sm:flex-col sm:gap-1 ${deckName && onBack ? "hidden sm:flex" : "flex"}`}>
-            <a href="/decks/" onClick={onDecksClick} className="flex items-center no-underline sm:mb-3" aria-label={t("decks")}>
+            <Link href="/decks/" onClick={onDecksClick} className="flex items-center no-underline sm:mb-3" aria-label={t("decks")}>
               <div className="w-6 h-6 sm:w-9 sm:h-9 flex items-center justify-center">
                 <SdpmMark className="h-[22px] w-[22px] sm:h-8 sm:w-8" />
               </div>
-            </a>
+            </Link>
             <div className="flex items-center gap-0.5 ml-1 sm:ml-0 sm:flex-col sm:gap-1">
               {NAV_ITEMS.map(({ href, key, icon: Icon }) => {
                 const active = pathname?.startsWith(href.replace(/\/$/, ""))
+                // Client-side navigation: the rail stays, the language and the sign-in carry over,
+                // and only the content changes (a plain <a> reloads the whole document).
                 return (
-                  <a
+                  <Link
                     key={key}
                     href={href}
                     onClick={key === "decks" ? onDecksClick : undefined}
@@ -152,7 +155,7 @@ export function AppShell({ children, deckName, onBack, onNavDecks }: AppShellPro
                       <Icon className="h-[18px] w-[18px]" strokeWidth={active ? 2 : 1.75} />
                     </span>
                     <span className="sm:text-[11px] sm:leading-none">{t(key)}</span>
-                  </a>
+                  </Link>
                 )
               })}
             </div>
@@ -225,7 +228,7 @@ export function AppShell({ children, deckName, onBack, onNavDecks }: AppShellPro
       </header>
 
       {/* ── Content area ── */}
-      <div className="flex-1 min-w-0 min-h-0 flex flex-col">{children}</div>
+      <div className="page-fade flex-1 min-w-0 min-h-0 flex flex-col">{children}</div>
 
       {/* Settings dialog */}
       <Settings open={settingsOpen} onOpenChange={setSettingsOpen} />
