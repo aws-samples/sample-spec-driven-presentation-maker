@@ -29,6 +29,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   The Claude Desktop bundle (`sdpm.mcpb`) now carries it as its icon. Web UI
   (`deploy_webui.sh`) and the next release's bundle.
 
+### Fixed
+
+- Charts: setting `valueAxis` or `categoryAxis` no longer drops theme styling of the
+  axis tick labels, axis lines and title. Only a chart read back from a PPTX keeps the
+  styling it came with; JSON written by hand or by an agent (e.g. a radar chart that sets
+  only the scoring scale) now gets the themed tick-label size, colour and font. (#630)
+
 ### Security
 
 - **deploy.sh: the source bucket is account-scoped and its owner is checked.** `deploy.sh`

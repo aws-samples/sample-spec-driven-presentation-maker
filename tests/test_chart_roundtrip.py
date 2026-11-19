@@ -295,6 +295,55 @@ class TestAxes:
         assert chart.value_axis.tick_labels.font.size.pt == 14
         assert chart.plots[0].data_labels.font.size.pt == 14
 
+    def test_value_axis_scale_keeps_theme_tick_styling(self, tmp_path):
+        # Regression (#630): setting only the scale must not drop theme tick styling.
+        scaled = _built_chart(tmp_path / "a", chartType="bar", categories=["A", "B"],
+                              series=[{"name": "s", "values": [1, 2]}],
+                              valueAxis={"min": 0, "max": 5, "majorUnit": 1})
+        plain = _built_chart(tmp_path / "b", chartType="bar", categories=["A", "B"],
+                             series=[{"name": "s", "values": [1, 2]}])
+        sf = scaled.value_axis.tick_labels.font
+        pf = plain.value_axis.tick_labels.font
+        assert sf.size == pf.size
+        assert sf.name == pf.name
+        assert sf.color.type == pf.color.type
+        assert sf.color.rgb == pf.color.rgb
+        # Theme styling, not the python-pptx default (unset).
+        assert sf.size.pt == 10 and sf.name is not None
+
+    def test_value_axis_scale_keeps_theme_axis_line(self, tmp_path):
+        # The subtle axis line is applied even when only the scale is set.
+        chart = _built_chart(tmp_path, chartType="bar", categories=["A", "B"],
+                             series=[{"name": "s", "values": [1, 2]}], valueAxis={"max": 5})
+        ln = chart._chartSpace.find(f".//{_C}valAx/{_C}spPr/{_A}ln")
+        assert ln is not None and ln.find(f"{_A}solidFill/{_A}srgbClr") is not None
+
+    def test_minimal_round_trip_stays_themed(self, tmp_path):
+        # A --minimal round trip drops the _ keys (incl. _chartFontSize); the
+        # rebuilt chart must look like fresh JSON, not a styling-preserved import.
+        first = _one_chart(tmp_path / "a", chartType="bar", categories=["A", "B"],
+                           series=[{"name": "s", "values": [1, 2]}],
+                           valueAxis={"min": 0, "max": 5, "majorUnit": 1})
+        [stripped] = minimize([{k: v for k, v in first.items()}])
+        chart = _built_chart(tmp_path / "b", **{k: v for k, v in stripped.items() if k != "type"})
+        assert "_chartFontSize" not in stripped
+        f = chart.value_axis.tick_labels.font
+        assert f.size.pt == 10 and f.name is not None and f.color.type is not None
+
+    def test_radar_value_axis_keeps_theme_tick_styling(self, tmp_path):
+        # The chart-radar guide sets valueAxis for the scoring scale; the radial
+        # tick labels must still get theme styling (#630).
+        cats = ["A", "B", "C"]
+        series = [{"name": "s", "values": [1, 2, 3]}]
+        scaled = _built_chart(tmp_path / "a", chartType="radar", categories=cats, series=series,
+                              valueAxis={"min": 0, "max": 5, "majorUnit": 1})
+        plain = _built_chart(tmp_path / "b", chartType="radar", categories=cats, series=series)
+        sf = scaled.value_axis.tick_labels.font
+        pf = plain.value_axis.tick_labels.font
+        assert scaled._chartSpace.find(f".//{_C}radarChart") is not None
+        assert (sf.size, sf.name, sf.color.rgb) == (pf.size, pf.name, pf.color.rgb)
+        assert sf.size.pt == 10 and sf.name is not None
+
 
 class TestBarAndLineStyle:
     def test_gap_width_and_overlap(self, tmp_path):
