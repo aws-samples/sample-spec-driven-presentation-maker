@@ -18,10 +18,17 @@ async function useEngine(page: Page, baseURL: string, engine: "v2" | "v3") {
   expect(switched.status()).toBe(200)
 }
 
-/** A new chat's picker, open. */
-async function openPicker(page: Page) {
+/** The home composer, ready to type into: it takes the focus once the page has hydrated. */
+async function homeComposer(page: Page) {
   await page.goto("/decks")
-  await page.getByRole("button", { name: "New Deck" }).click()
+  const input = page.getByRole("textbox", { name: "Chat message input" })
+  await expect(input).toBeFocused({ timeout: 30_000 })
+  return input
+}
+
+/** The home conversation's picker, open. */
+async function openPicker(page: Page) {
+  await homeComposer(page)
   await page.getByRole("button", { name: "Attach file or snippet" }).click()
   await page.getByRole("button", { name: "Continue from a kiro session" }).click()
   const dialog = page.getByRole("dialog", { name: "Continue from a kiro session" })

@@ -91,7 +91,7 @@ Native PPTX chart (editable in PowerPoint).
 ```json
 {
   "type": "chart",
-  "chartType": "bar|line|pie|donut|radar",
+  "chartType": "bar|line|pie|donut|radar|area",
   "x": 192, "y": 216, "width": 1536, "height": 700,
   "categories": ["A", "B", "C"],
   "series": [{"name": "Series 1", "values": [10, 20, 30], "color": "#FF9900"}],
@@ -107,14 +107,15 @@ Native PPTX chart (editable in PowerPoint).
 }
 ```
 
-- `chartType`: `bar`, `line`, `pie`, `donut`, `radar`
+- `chartType`: `bar`, `line`, `pie`, `donut`, `radar`, `area`
 - Colors, gridlines, and fonts are auto-adjusted from the theme
-- `stacked`/`horizontal`: bar variations. `smooth`/`markers`: line variations (`markers` also for radar). `holeSize`: donut only
+- `stacked`: bar and area variations. `horizontal`: bar only. `smooth`/`markers`: line variations (`markers` also for radar). `holeSize`: donut only
 - For details, variations, axis control, and style overrides, read the relevant guide:
   - `read_guides(["chart-bar"])` — bar/column charts
   - `read_guides(["chart-line"])` — line/trend charts
   - `read_guides(["chart-pie"])` — pie/donut charts
   - `read_guides(["chart-radar"])` — radar/spider charts
+  - `read_guides(["chart-area"])` — area/stacked area charts
 
 ## freeform
 ```json

@@ -331,9 +331,17 @@ class ShapeMixin:
                         para_def = {"text": para_def}
                     para_text = para_def.get("text", "")
                     para_fs = para_def.get("fontSize")  # None = inherit from shape
-                    # Bullet
+                    # Bullet / numbered list (documented `list` key, plus legacy `bullet` alias)
+                    list_def = para_def.get("list")
                     bu = para_def.get("bullet")
-                    if bu:
+                    if list_def and isinstance(list_def, dict):
+                        list_type = list_def.get("type", "disc")
+                        p.level = list_def.get("level", 0)
+                        if list_type == "disc":
+                            self._set_bullet(p)
+                        else:
+                            self._set_numbering(p, list_type)
+                    elif bu:
                         p.level = 0
                         self._set_bullet(p, char=bu if isinstance(bu, str) else None)
                     # Text

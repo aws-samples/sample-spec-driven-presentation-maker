@@ -107,7 +107,7 @@ export default function TemplatesPage() {
         {loading ? (
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
             <div className="mb-8">
-              <h1 className="text-xl font-semibold tracking-[-0.02em]">{t("title")}</h1>
+              <h1 className="text-3xl font-semibold tracking-[-0.03em] leading-tight">{t("title")}</h1>
               <p className="text-sm text-foreground-muted mt-1">{t("subtitle")}</p>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -120,7 +120,7 @@ export default function TemplatesPage() {
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-xl font-semibold tracking-[-0.02em]">{t("title")}</h1>
+                <h1 className="text-3xl font-semibold tracking-[-0.03em] leading-tight">{t("title")}</h1>
                 <p className="text-sm text-foreground-muted mt-1">{t("subtitle")}</p>
               </div>
             </div>
@@ -146,7 +146,7 @@ export default function TemplatesPage() {
                     onClick={() => setUploadOpen(true)}
                   >
                     <Upload className="h-6 w-6 text-brand-teal/30 group-hover:text-brand-teal/60 transition-colors duration-200" />
-                    <span className="text-xs text-foreground/30 group-hover:text-foreground/60 font-medium transition-colors duration-200">{t("uploadTemplate")}</span>
+                    <span className="text-xs text-foreground-muted group-hover:text-foreground-secondary font-medium transition-colors duration-200">{t("uploadTemplate")}</span>
                   </button>
                 </div>
               </section>
@@ -312,7 +312,7 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
                 onBlur={handleDescSubmit}
                 onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleDescSubmit() } if (e.key === "Escape") { setEditValue(template.description || ""); setEditing(false) } }}
                 rows={2}
-                className="w-full mt-1 rounded-md bg-foreground/[0.04] border border-brand-teal/30 focus:border-brand-teal/50 px-2 py-1 text-xs text-foreground placeholder:text-foreground/25 resize-none outline-none transition-colors"
+                className="w-full mt-1 rounded-md bg-foreground/[0.04] border border-brand-teal/30 focus:border-brand-teal/50 px-2 py-1 text-xs text-foreground placeholder:text-foreground-muted resize-none outline-none transition-colors"
                 placeholder={t("descPlaceholder")}
               />
             ) : onEditDescription ? (
@@ -320,7 +320,7 @@ function TemplateCard({ template, onDownload, onDelete, onEditDescription, onRen
                 className="text-xs text-foreground-muted mt-1 line-clamp-2 leading-relaxed cursor-text rounded px-1 -mx-1 hover:bg-foreground/[0.04] transition-colors"
                 onClick={e => { e.stopPropagation(); setEditing(true) }}
               >
-                {template.description || <span className="text-foreground/20 italic">{t("addDescription")}</span>}
+                {template.description || <span className="text-foreground-muted italic">{t("addDescription")}</span>}
               </p>
             ) : template.description ? (
               <p className="text-xs text-foreground-muted mt-1 line-clamp-2 leading-relaxed">{template.description}</p>
@@ -461,8 +461,8 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
             ) : (
               <>
                 <Upload className="h-8 w-8 text-foreground/15 mx-auto mb-2" />
-                <p className="text-sm text-foreground/40">
-                  {t.rich("dropHint", { ext: (chunks) => <span className="text-foreground/60 font-medium">{chunks}</span> })}
+                <p className="text-sm text-foreground-muted">
+                  {t.rich("dropHint", { ext: (chunks) => <span className="text-foreground-secondary font-medium">{chunks}</span> })}
                 </p>
               </>
             )}
@@ -482,7 +482,7 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
           {/* Description */}
           <div>
             <label htmlFor="template-desc" className="block text-xs font-medium text-foreground-muted mb-1.5">
-              {t("descriptionLabel")} <span className="text-foreground/30">{t("optional")}</span>
+              {t("descriptionLabel")} <span className="text-foreground-muted">{t("optional")}</span>
             </label>
             <textarea
               id="template-desc"
@@ -490,7 +490,7 @@ function UploadDialog({ idToken, onClose, onComplete, onError }: {
               onChange={e => setDescription(e.target.value)}
               placeholder={t("descPlaceholder")}
               rows={2}
-              className="w-full rounded-lg bg-foreground/[0.04] border border-border focus:border-brand-teal/40 focus:ring-1 focus:ring-brand-teal/20 px-3 py-2 text-sm text-foreground placeholder:text-foreground/25 resize-none outline-none transition-colors"
+              className="w-full rounded-lg bg-foreground/[0.04] border border-border focus:border-brand-teal/40 focus:ring-1 focus:ring-brand-teal/20 px-3 py-2 text-sm text-foreground placeholder:text-foreground-muted resize-none outline-none transition-colors"
             />
           </div>
         </div>

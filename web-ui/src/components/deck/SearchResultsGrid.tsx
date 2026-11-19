@@ -91,7 +91,7 @@ export function SearchResultsGrid({ results, searching, onSlideClick }: SearchRe
       ) : (
         <div className="flex flex-col items-center justify-center py-24 text-center">
           <Search className="h-8 w-8 text-foreground-muted/20 mb-4" />
-          <p className="text-sm font-medium text-foreground/60 mb-1">{t("noMatches")}</p>
+          <p className="text-sm font-medium text-foreground-secondary mb-1">{t("noMatches")}</p>
           <p className="text-xs text-foreground-muted">{t("noMatchesHint")}</p>
         </div>
       )}

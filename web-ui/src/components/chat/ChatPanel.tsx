@@ -11,7 +11,7 @@
 
 "use client"
 
-import { useEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, useImperativeHandle, forwardRef, useCallback } from "react"
 import { useAuth } from "@/hooks/useAuth"
 import { IS_LOCAL } from "@/lib/mode"
 import { loadRuntimeConfig } from "@/lib/runtimeConfig"
@@ -33,10 +33,12 @@ import { useIsMobile } from "@/hooks/UseMobile"
 import { Send, ChevronRight, GitBranch } from "lucide-react"
 import { ModeSelector } from "./ModeSelector"
 import { HtmlFormatPill } from "./HtmlFormatPill"
+import { ChoiceChip } from "./ChoiceChip"
 import { SessionPickerDialog } from "./SessionPickerDialog"
 import { ContinuedFromChip } from "./ContinuedFromChip"
 import { EngineBadge } from "./EngineBadge"
 import { ForkProgressCard } from "./ForkProgressCard"
+import { Collapse } from "@/components/motion/Collapse"
 import { LocalModelPicker } from "./LocalModelPicker"
 import { usePreferences } from "@/hooks/usePreferences"
 import { notifyError } from "@/lib/errors"
@@ -61,12 +63,21 @@ interface ChatPanelProps {
   onLoadingChange?: (isLoading: boolean) => void
   /** The panel is on screen. A new deck's `prepare` waits until it is (Cloud). */
   visible?: boolean
+  /**
+   * The panel sits at the centre of the home screen. While blank it is a heading, the large input
+   * and, below it, recent sessions (Local) or example prompts; the first message folds those away
+   * and the conversation goes on in the centre until the shell moves it into the sheet.
+   */
+  centered?: boolean
+  /** Reports whether the chat is still blank (no messages, no session being continued). */
+  onBlankChange?: (blank: boolean) => void
 }
 
 /** Handle exposed to parents for input insertion and programmatic user messages. */
 export interface ChatPanelHandle {
   insertAtCursor: (text: string) => void
   sendMessage: (text: string, options?: { displayContent?: string }) => Promise<void>
+  focus: () => void
 }
 
 function formatRelativeTime(value: string, locale: string): string {
@@ -80,7 +91,7 @@ function formatRelativeTime(value: string, locale: string): string {
   return formatter.format(Math.round(hours / 24), "day")
 }
 
-export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, visible = true }, ref) {
+export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function ChatPanel({ deckId, chatSessionId, sessionOrigin, onDeckCreated, onPreviewInvalidated, onWorkflowPhase, onLoadingChange, visible = true, centered = false, onBlankChange }, ref) {
   const t = useTranslations("chat")
   const tCompose = useTranslations("compose")
   const tSessionPicker = useTranslations("sessionPicker")
@@ -318,6 +329,9 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
     async sendMessage(text: string, options?: { displayContent?: string }) {
       await stream.sendMessage(text, undefined, undefined, undefined, options)
     },
+    focus() {
+      chatInputRef.current?.focus()
+    },
   }), [stream.sendMessage])
 
   // --- Load agent config (cloud only) ---
@@ -404,20 +418,26 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   // mounted while the chat is closed or another tab is shown), no re-warm: the first prompt
   // then finds its MCP connections built.
   const preparedRef = useRef(false)
+  const [stageEngaged, setStageEngaged] = useState(false)
+  // The blank home composer prepares once the user starts typing (a visit alone builds no session).
+  const blankCentered = centered && stream.messages.length === 0 && forkingSession === null
+  const shownForPrepare = blankCentered ? stageEngaged : visible
   useEffect(() => {
-    if (IS_LOCAL || deckId !== "new" || !visible || !configLoaded || preparedRef.current) return
+    if (IS_LOCAL || deckId !== "new" || !shownForPrepare || !configLoaded || preparedRef.current) return
     const token = auth.user?.access_token
     if (!token) return
     preparedRef.current = true
     // intentional: best-effort — without it the first prompt builds the session itself
     prepareAgentCore(sessionIdRef.current, token, mode).catch((err: unknown) => console.warn("Prepare failed:", err))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [deckId, visible, configLoaded, auth.user?.access_token])
+  }, [deckId, shownForPrepare, configLoaded, auth.user?.access_token])
 
   // --- Auto-scroll ---
   useEffect(() => {
-    if (shouldAutoScroll.current) {
-      messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
+    // Scroll the message list only: scrollIntoView would also scroll the page around the chat.
+    const list = scrollContainerRef.current
+    if (shouldAutoScroll.current && list) {
+      list.scrollTo?.({ top: list.scrollHeight, behavior: "smooth" })
     }
   }, [stream.messages])
 
@@ -522,31 +542,58 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
   }, [isLoading, onLoadingChange])
 
   const isInitial = stream.messages.length === 0 && !historyLoading
+  // The working-style and format chips belong to the start of a chat.
+  const startChips = isInitial && forkingSession === null
   // Only the initial screen shows the pill, so only it keeps the text: a long chat skips the
   // per-keystroke re-render (the draft bar's blank flag only re-renders when it flips).
   const [inputBlank, setInputBlank] = useState(true)
   const handleInputChange = useCallback((value: string) => {
     if (isInitial) setInputText(value)
     setInputBlank(!stripWhitespace(value))
-  }, [isInitial])
+    if (centered && value) setStageEngaged(true)
+  }, [isInitial, centered])
+
+  // --- Blank → conversation ---
+  // Blank until the first message or a session being continued. Reported in a layout effect, so
+  // the shell lays itself out (and starts moving) before the next paint.
+  const blank = stream.messages.length === 0 && forkingSession === null
+  useLayoutEffect(() => {
+    onBlankChange?.(blank)
+  }, [blank, onBlankChange])
+
+  // The home composer focuses its input on desktop only (on a phone that would open the keyboard on load).
+  useEffect(() => {
+    if (centered && window.matchMedia("(min-width: 640px)").matches) chatInputRef.current?.focus()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   return (
     <>
-      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading && !canSendWhileLoading} className="flex flex-col h-full">
+      <FileDropZone onFiles={(files) => chatInputRef.current?.addFiles(Array.from(files))} disabled={isLoading && !canSendWhileLoading} className={blankCentered ? "flex flex-col" : "flex flex-col h-full"}>
       {continuedOrigin && (
         <div className="flex-none px-4 pt-3">
           <ContinuedFromChip origin={continuedOrigin} />
         </div>
       )}
+      {centered && (
+        <Collapse show={blank}>
+          <div className="pt-14 pb-8 text-center sm:pt-24 sm:pb-10">
+            <h1 className="text-3xl font-semibold leading-[1.15] tracking-[-0.035em] text-balance text-foreground sm:text-5xl">
+              {t("stageTitle")}
+            </h1>
+            <p className="mt-3 text-[15px] text-balance text-foreground-secondary">{t("stageSubtitle")}</p>
+          </div>
+        </Collapse>
+      )}
       {/* Messages area */}
-      <div ref={scrollContainerRef} className="flex-1 overflow-y-auto px-4 py-4" role="log" aria-label={t("chatMessages")}
+      <div ref={scrollContainerRef} className={blankCentered ? "" : "flex-1 overflow-y-auto px-4 py-4"} role="log" aria-label={t("chatMessages")}
         onScroll={() => {
           const el = scrollContainerRef.current
           if (!el) return
           shouldAutoScroll.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80
         }}
       >
-        {forkingSession ? (
+        {blankCentered ? null : forkingSession ? (
           <ForkProgressCard
             session={forkingSession}
             phase={forkProgress.phase}
@@ -626,8 +673,6 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
                 ))}
               </div>
             )}
-            <ModeSelector value={agentMode} onChange={setAgentMode} />
-            <HtmlFormatPill text={inputText} onChange={(next) => chatInputRef.current?.replaceText(next)} />
           </div>
         ) : (
           <div className="space-y-4">
@@ -698,11 +743,16 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
       <ChatInput
           ref={chatInputRef}
           onSend={handleInputSend}
+          variant={centered ? "stage" : "sheet"}
+          hideTokenReflection={startChips}
+          autoFocus={!centered}
           isLoading={isLoading}
           onStop={stream.stopGeneration}
           canSendWhileLoading={canSendWhileLoading}
           disabled={!configLoaded}
-          placeholder={isMobile ? t("placeholderMobile") : t("placeholderDesktop")}
+          placeholder={blankCentered
+            ? (isMobile ? t("stagePlaceholderMobile") : t("stagePlaceholder"))
+            : (isMobile ? t("placeholderMobile") : t("placeholderDesktop"))}
           topSlot={reviewActive ? <ReviewDraftBar inputBlank={inputBlank} /> : undefined}
           sendOverride={hasReviewDrafts && review ? { label: tReview("send"), blocked: isLoading && !canSendWhileLoading, canSend: review.canSubmit } : undefined}
           idToken={auth.user?.id_token}
@@ -715,18 +765,33 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           onSlashOpen={slashPickerItems.ensure}
           onTextareaFocus={slashPickerItems.ensure}
           onInputChange={handleInputChange}
+          footerSlot={
+            <>
+              {startChips && <ModeSelector value={agentMode} onChange={setAgentMode} />}
+              {startChips && <HtmlFormatPill text={inputText} onChange={(next) => chatInputRef.current?.replaceText(next)} />}
+              {startChips && (["style", "template"] as const).map((kind) => (
+                <ChoiceChip
+                  key={kind}
+                  kind={kind}
+                  text={inputText}
+                  onChange={(next) => chatInputRef.current?.replaceText(next)}
+                  items={slashPickerItems.items}
+                  loading={slashPickerItems.loading}
+                  onOpen={() => void slashPickerItems.ensure()}
+                />
+              ))}
+              {/* Local: this chat's kiro-cli model and effort */}
+              {IS_LOCAL && (
+                <LocalModelPicker
+                  sessionId={sessionId}
+                  isNewChat={deckId === "new" && stream.messages.length === 0}
+                  busy={isLoading}
+                  disabled={forkingSession !== null}
+                />
+              )}
+            </>
+          }
         >
-          {/* Local: this chat's kiro-cli model and effort */}
-          {IS_LOCAL && (
-            <div className="px-2 pt-1">
-              <LocalModelPicker
-                sessionId={sessionId}
-                isNewChat={deckId === "new" && stream.messages.length === 0}
-                busy={isLoading}
-                disabled={forkingSession !== null}
-              />
-            </div>
-          )}
           {/* Options expander — the only option (web images) is cloud-only */}
           {!IS_LOCAL && (
           <div className="px-2">
@@ -765,6 +830,64 @@ export const ChatPanel = forwardRef<ChatPanelHandle, ChatPanelProps>(function Ch
           </div>
           )}
         </ChatInput>
+        {centered && (
+          <Collapse show={blank}>
+          <div className="pt-6 pb-2">
+            {forkError && (
+              <p role="alert" className="mb-4 text-center text-sm text-red-600 dark:text-red-400">
+                {tSessionPicker("forkFailed")}
+              </p>
+            )}
+            {IS_LOCAL && recentSessions.length > 0 ? (
+              <section aria-labelledby="stage-recent-sessions-heading">
+                <div className="mb-2 flex items-center justify-between gap-2 px-1">
+                  <h2 id="stage-recent-sessions-heading" className="text-xs font-medium text-foreground-muted">
+                    {tCompose("recentSessionsHeading")}
+                  </h2>
+                  <button
+                    type="button"
+                    onClick={() => setSessionPickerOpen(true)}
+                    className="-mr-2 min-h-9 rounded-lg px-2 text-xs font-medium text-brand-teal motion-safe:transition-colors hover:bg-brand-teal-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
+                  >
+                    {tCompose("pickOtherSession")}
+                  </button>
+                </div>
+                <div className="grid gap-2 sm:grid-cols-3">
+                  {recentSessions.map((recent) => (
+                    <button
+                      key={recent.sessionId}
+                      type="button"
+                      onClick={() => void forkAndStart(recent)}
+                      className="flex min-w-0 flex-col items-start gap-1.5 rounded-xl border border-border bg-background-raised px-3.5 py-3 text-left shadow-[var(--shadow-card)] motion-safe:transition-colors hover:border-border-hover hover:bg-background-hover focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-brand-teal"
+                    >
+                      <span className="flex w-full min-w-0 items-center gap-1.5 text-xs text-foreground-muted">
+                        <GitBranch className="h-3.5 w-3.5 flex-none text-brand-teal" aria-hidden="true" />
+                        <span className="truncate">{formatRelativeTime(recent.updatedAt, locale)}</span>
+                        <EngineBadge engine={recent.engine} />
+                      </span>
+                      <span className="line-clamp-2 text-sm font-medium text-foreground">{recent.title}</span>
+                      <span className="w-full truncate text-xs text-foreground-muted">{recent.project}</span>
+                    </button>
+                  ))}
+                </div>
+              </section>
+            ) : (
+              <div className="flex flex-wrap justify-center gap-2">
+                {[t("example1"), t("example2"), t("example3")].map((example) => (
+                  <button
+                    key={example}
+                    type="button"
+                    onClick={() => chatInputRef.current?.insertAtCursor(example)}
+                    className="rounded-full border border-border px-3.5 py-1.5 text-sm text-foreground-secondary motion-safe:transition-colors hover:border-border-hover hover:text-foreground"
+                  >
+                    {example}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+          </Collapse>
+        )}
       </FileDropZone>
       {IS_LOCAL && (
         <SessionPickerDialog

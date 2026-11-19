@@ -49,11 +49,13 @@ export function PlusMenu({
         type="button"
         onClick={() => setOpen(!open)}
         disabled={disabled}
-        className="p-2.5 rounded-lg text-muted-foreground hover:text-foreground hover:bg-muted transition-colors disabled:opacity-30 touch-target flex items-center justify-center"
+        className="group/plus text-foreground-secondary hover:text-foreground transition-colors disabled:opacity-30 touch-target flex items-center justify-center"
         aria-label={t("attachLabel")}
         aria-expanded={open}
       >
-        <Plus className="h-4 w-4" />
+        <span className="flex w-8 h-8 items-center justify-center rounded-full border border-border group-hover/plus:border-border-hover group-hover/plus:bg-background-hover transition-colors">
+          <Plus className="h-4 w-4" />
+        </span>
       </button>
 
       {open && (

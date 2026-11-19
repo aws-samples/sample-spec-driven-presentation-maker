@@ -8,43 +8,42 @@ import { renderWithIntl } from "@/test/renderWithIntl"
 
 afterEach(cleanup)
 
+const chip = () => screen.getByRole("button", { name: /Working style/ })
+const open = () => fireEvent.keyDown(chip(), { key: "Enter" })
+
 describe("ModeSelector", () => {
-  it("presents Vibe and Spec as two readable working styles", () => {
+  it("names the current working style on the chip", () => {
     renderWithIntl(<ModeSelector value="spec" onChange={() => {}} />)
 
-    expect(screen.getByText("Choose your working style")).toBeTruthy()
+    expect(chip().getAttribute("aria-label")).toBe("Working style: Spec")
+    expect(chip().textContent).toContain("Spec")
+  })
+
+  it("explains both working styles in its menu", async () => {
+    renderWithIntl(<ModeSelector value="spec" onChange={() => {}} />)
+    open()
+
+    expect(await screen.findByText("Choose your working style")).toBeTruthy()
     expect(screen.getByText("Fast path")).toBeTruthy()
     expect(screen.getByText("Review path")).toBeTruthy()
     expect(screen.getByText("Start rough. See a first draft sooner.")).toBeTruthy()
     expect(screen.getByText("Decide the story before the slides.")).toBeTruthy()
   })
 
-  it("exposes the selected mode with aria-pressed", () => {
+  it("marks the selected style in the menu", async () => {
     renderWithIntl(<ModeSelector value="spec" onChange={() => {}} />)
+    open()
 
-    expect(screen.getByRole("button", { name: /Vibe/ }).getAttribute("aria-pressed")).toBe("false")
-    expect(screen.getByRole("button", { name: /Spec/ }).getAttribute("aria-pressed")).toBe("true")
+    expect((await screen.findByRole("menuitemradio", { name: /Spec/ })).getAttribute("aria-checked")).toBe("true")
+    expect(screen.getByRole("menuitemradio", { name: /Vibe/ }).getAttribute("aria-checked")).toBe("false")
   })
 
-  it("changes mode when a row is selected", () => {
+  it("changes mode when a style is chosen", async () => {
     const onChange = vi.fn()
     renderWithIntl(<ModeSelector value="spec" onChange={onChange} />)
+    open()
 
-    fireEvent.click(screen.getByRole("button", { name: /Vibe/ }))
+    fireEvent.click(await screen.findByRole("menuitemradio", { name: /Vibe/ }))
     expect(onChange).toHaveBeenCalledWith("vibe")
-  })
-
-  it("uses full-row touch targets", () => {
-    renderWithIntl(<ModeSelector value="vibe" onChange={() => {}} />)
-
-    expect(screen.getByRole("button", { name: /Vibe/ }).className).toContain("min-h-[82px]")
-    expect(screen.getByRole("button", { name: /Spec/ }).className).toContain("min-h-[82px]")
-  })
-
-  it("does not render the old Great for detail list", () => {
-    renderWithIntl(<ModeSelector value="spec" onChange={() => {}} />)
-
-    expect(screen.queryByText("Great for")).toBeNull()
-    expect(screen.queryByText("Proposals & pitch decks")).toBeNull()
   })
 })

@@ -237,13 +237,16 @@ class TestShapeText:
         assert ps[1]._p.pPr.find(f"{_A}buChar").get("char") == "–"
         assert ps[2]._p.find(f"{_A}endParaRPr").get("sz") == "2000"
 
-    @pytest.mark.xfail(strict=True, reason="shape paragraphs read 'bullet'; the documented "
-                       "key is list: {type: disc} (slide-json-elements.md), which is ignored")
     def test_documented_paragraph_list_makes_a_bullet(self, tmp_path):
         (sp,) = _built_shapes(tmp_path, [_shape(paragraphs=[
-            {"text": "Body", "list": {"type": "disc"}}])])
-        assert sp.text_frame.paragraphs[0]._p.pPr is not None
-        assert sp.text_frame.paragraphs[0]._p.pPr.find(f"{_A}buChar") is not None
+            {"text": "Body", "list": {"type": "disc"}},
+            {"text": "Step 1", "list": {"type": "arabicPeriod", "level": 1}},
+        ])])
+        ps = sp.text_frame.paragraphs
+        assert ps[0]._p.pPr is not None
+        assert ps[0]._p.pPr.find(f"{_A}buChar") is not None
+        assert ps[1].level == 1
+        assert ps[1]._p.pPr.find(f"{_A}buAutoNum").get("type") == "arabicPeriod"
 
     def test_line_opacity(self, tmp_path):
         assert _one(tmp_path, _shape(line="#FFFFFF", lineOpacity=0.5)).get("lineOpacity") == 0.5
