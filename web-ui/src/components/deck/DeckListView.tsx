@@ -58,6 +58,8 @@ interface DeckListViewProps {
   searching?: boolean
   onDeckOpen: (deckId: string) => void
   onNewDeck: () => void
+  /** Show the New Deck button (off while the composer is on the home screen). */
+  showNewDeck?: boolean
   favoriteIds: Set<string>
   onToggleFavorite: (deckId: string, action: "add" | "remove") => void
   onDelete: (deckId: string) => void
@@ -91,7 +93,7 @@ export function visibleDecks(decks: DeckSummary[], searchQuery: string): DeckSum
 
 export function DeckListView({
   decks, activeTab, onTabChange, searchQuery, onSearchChange,
-  searchResults, searching, onDeckOpen, onNewDeck, favoriteIds,
+  searchResults, searching, onDeckOpen, onNewDeck, showNewDeck = true, favoriteIds,
   onToggleFavorite, onDelete, onToggleVisibility, onDownload, onOpenPptx, onOpenFolder, loading,
   selection,
 }: DeckListViewProps) {
@@ -102,59 +104,57 @@ export function DeckListView({
   const selecting = canSelect && selection.selectionMode
 
   return (
-    <div className={`max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12 ${selecting ? "pb-28" : ""}`}>
-      {/* Title + actions */}
-      <div className="animate-card-in flex items-end justify-between mb-10">
-        <div>
-          <h1 className="text-[36px] sm:text-[42px] font-extrabold tracking-[-0.04em] leading-[1]">
-            {t("title")}
-          </h1>
-          <p className="text-sm text-foreground-muted mt-2.5 font-medium tracking-wide uppercase">
-            {t("presentationCount", { count: decks.length })}
-          </p>
+    <div className={`max-w-6xl mx-auto px-5 sm:px-10 pt-10 sm:pt-12 pb-12 ${selecting ? "pb-28" : ""}`}>
+      {/* ── Library ── */}
+      <div className="animate-card-in flex flex-wrap items-center justify-between gap-3 mb-6" style={{ "--delay": "50ms" } as React.CSSProperties}>
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-xl font-semibold tracking-[-0.025em]">{t("title")}</h2>
+          <span className="text-sm text-foreground-muted">{t("presentationCount", { count: decks.length })}</span>
         </div>
-        <div className="hidden sm:flex items-center gap-2">
+        <div className="flex items-center gap-2 w-full sm:w-auto">
+          <div className="search-glow relative flex-1 sm:w-72 rounded-lg border border-border bg-background-raised">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-3.5 w-3.5 text-foreground-muted" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => onSearchChange(e.target.value)}
+              onKeyDown={(e) => { if (e.key === "Escape") onSearchChange("") }}
+              placeholder={IS_LOCAL ? t("searchPlaceholderLocal") : t("searchPlaceholder")}
+              aria-label={IS_LOCAL ? t("searchPlaceholderLocal") : t("searchPlaceholder")}
+              className="w-full h-9 pl-9 pr-8 text-sm bg-transparent focus:outline-none placeholder:text-foreground-muted"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => onSearchChange("")}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-background-hover text-foreground-muted transition-all"
+                aria-label={t("clearSearch")}
+              >
+                <X className="h-3.5 w-3.5" />
+              </button>
+            )}
+          </div>
           {canSelect && (
             <button
               type="button"
               onClick={() => (selecting ? selection.exit() : selection.enter())}
               aria-pressed={selecting}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:bg-background-hover transition-colors"
+              className="hidden sm:inline-flex items-center gap-1.5 h-9 px-3 text-sm font-medium rounded-lg border border-border text-foreground-secondary hover:text-foreground hover:bg-background-hover transition-colors"
             >
               <CheckSquare className="h-3.5 w-3.5" aria-hidden="true" />
               {selecting ? t("cancelSelection") : t("select")}
             </button>
           )}
-          <button
-            onClick={onNewDeck}
-            className="team-action-btn team-entry-btn inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold rounded-lg transition-all"
-          >
-            <Plus className="h-3.5 w-3.5" />
-            {t("newDeck")}
-          </button>
+          {showNewDeck && (
+            <button
+              type="button"
+              onClick={onNewDeck}
+              className="team-action-btn team-entry-btn hidden sm:inline-flex items-center gap-1.5 h-9 px-3.5 text-sm font-semibold rounded-lg transition-all"
+            >
+              <Plus className="h-3.5 w-3.5" aria-hidden="true" />
+              {t("newDeck")}
+            </button>
+          )}
         </div>
-      </div>
-
-      {/* Search */}
-      <div className="animate-card-in search-glow relative mb-7 rounded-xl border border-border bg-background-raised" style={{ "--delay": "50ms" } as React.CSSProperties}>
-        <Search className="absolute left-4 top-1/2 -translate-y-1/2 h-4 w-4 text-foreground-muted" />
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => onSearchChange(e.target.value)}
-          onKeyDown={(e) => { if (e.key === "Escape") onSearchChange("") }}
-          placeholder={IS_LOCAL ? t("searchPlaceholderLocal") : t("searchPlaceholder")}
-          className="w-full pl-11 pr-10 py-3 text-sm bg-transparent focus:outline-none placeholder:text-foreground-muted tracking-[-0.01em]"
-        />
-        {searchQuery && (
-          <button
-            onClick={() => onSearchChange("")}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-1 rounded-md hover:bg-background-hover text-foreground-muted transition-all"
-            aria-label={t("clearSearch")}
-          >
-            <X className="h-3.5 w-3.5" />
-          </button>
-        )}
       </div>
 
       {/* Search results OR Tabs + Cards */}
@@ -167,7 +167,7 @@ export function DeckListView({
       ) : (
         <>
           {/* Tabs */}
-          <div className="animate-card-in flex gap-0 mb-8 border-b border-border" style={{ "--delay": "100ms" } as React.CSSProperties}>
+          <div className={`animate-card-in flex gap-0 mb-8 border-b border-border ${TABS.length ? "" : "hidden"}`} style={{ "--delay": "100ms" } as React.CSSProperties}>
             {TABS.map((tab) => (
               <button
                 key={tab.key}
@@ -192,11 +192,11 @@ export function DeckListView({
 
           {/* Card grid */}
           {loading ? (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-9">
               {Array.from({ length: 6 }).map((_, i) => (
-                <div key={i} className="rounded-xl overflow-hidden border border-border bg-card">
-                  <Skeleton className="aspect-[16/9.5] rounded-none" />
-                  <div className="px-3.5 py-3 space-y-2">
+                <div key={i}>
+                  <Skeleton className="aspect-video rounded-lg" />
+                  <div className="pt-3 space-y-2">
                     <Skeleton className="h-4 w-3/4" />
                     <Skeleton className="h-3 w-1/2" />
                   </div>
@@ -212,7 +212,7 @@ export function DeckListView({
               onAction={activeTab === "mine" ? onNewDeck : undefined}
             />
           ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-9">
               {filteredDecks.map((deck, i) => (
                 <DeckCard
                   key={deck.deckId}

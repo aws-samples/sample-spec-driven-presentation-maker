@@ -1,15 +1,15 @@
 // Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 // SPDX-License-Identifier: MIT-0
 import type { Metadata } from "next"
-import { Bricolage_Grotesque, Fraunces, Geist_Mono } from "next/font/google"
+import { Fraunces, Geist, Geist_Mono } from "next/font/google"
 import Script from "next/script"
 import { Toaster } from "@/components/ui/sonner"
 import { AppearanceProvider } from "@/components/AppearanceProvider"
 import { LocaleProvider } from "@/i18n/LocaleProvider"
 import "./globals.css"
 
-const bricolage = Bricolage_Grotesque({
-  variable: "--font-bricolage",
+const geist = Geist({
+  variable: "--font-geist",
   subsets: ["latin"],
   display: "swap",
 })
@@ -32,6 +32,15 @@ export const metadata: Metadata = {
   title: "spec-driven-presentation-maker",
   description: "AI-powered presentation builder",
   manifest: "/manifest.json",
+  // The favicon is the bare mark (no tile) so it fills the 16px tab slot. Browsers that read SVG
+  // icons take favicon.svg, which follows the dark/light colour scheme; the ICO (light colours) is
+  // the fallback. The ICO is declared with a fixed size, not "any", so Chrome prefers the SVG.
+  icons: {
+    icon: [
+      { url: "/favicon.ico", sizes: "32x32" },
+      { url: "/favicon.svg", type: "image/svg+xml" },
+    ],
+  },
   other: {
     "mobile-web-app-capable": "yes",
     "apple-mobile-web-app-capable": "yes",
@@ -56,7 +65,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: textScaleScript }} />
       </head>
-      <body className={`${bricolage.variable} ${fraunces.variable} ${geistMono.variable} font-sans antialiased`}>
+      <body className={`${geist.variable} ${fraunces.variable} ${geistMono.variable} font-sans antialiased`}>
         {/* Noise texture overlay */}
         <div
           aria-hidden="true"

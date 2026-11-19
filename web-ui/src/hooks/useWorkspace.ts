@@ -14,7 +14,6 @@
 
 import { useEffect, useState, useRef, useCallback } from "react"
 import { getDeck, DeckDetail } from "@/services/deckService"
-import { ChatTabKey } from "@/components/chat/ChatPanelShell"
 import { isHtmlPreview, previewIdentity } from "@/lib/preview"
 import { MOBILE_BREAKPOINT } from "@/hooks/UseMobile"
 
@@ -64,7 +63,6 @@ export function useWorkspace(
   const [pptxRequested, setPptxRequested] = useState(false)
   const pptxRequestedRef = useRef(false)
   const [chatOpen, setChatOpen] = useState(false)
-  const [chatTab, setChatTab] = useState<ChatTabKey>("new")
   const [scrollToSlide, setScrollToSlide] = useState<string>("")
 
   /* ── Hash routing ── */
@@ -79,22 +77,18 @@ export function useWorkspace(
 
   // The hash is read after mount, not in the initial state: the prerendered page has no
   // hash, so reading it during the first render would not match the server markup.
-  // A deck hash opens that deck's chat tab (its saved conversation), as openDeck does, so a
+  // A deck hash opens the chat (the deck's saved conversation), as openDeck does, so a
   // reload or a direct /decks/#<id> link shows the conversation as a click in the list does.
   useEffect(() => {
     const deckId = parseDeckIdFromHash(window.location.hash)
     if (deckId) {
       setActiveDeckId(deckId)
-      if (deckId !== "new") {
-        setChatTab("deck")
-        if (window.innerWidth >= MOBILE_BREAKPOINT) setChatOpen(true)
-      }
+      if (deckId !== "new" && window.innerWidth >= MOBILE_BREAKPOINT) setChatOpen(true)
     }
     const onHashChange = () => {
       const deckId = parseDeckIdFromHash(window.location.hash)
       if (!deckId) return
       setActiveDeckId(deckId)
-      if (deckId !== "new") setChatTab("deck")
     }
     window.addEventListener("hashchange", onHashChange)
     return () => window.removeEventListener("hashchange", onHashChange)
@@ -207,7 +201,6 @@ export function useWorkspace(
   /* ── Navigation callbacks ── */
   const navigateToList = useCallback(() => {
     setActiveDeckId(null)
-    setChatTab("new")
     window.location.hash = ""
   }, [])
 
@@ -217,14 +210,12 @@ export function useWorkspace(
     window.location.hash = deckId
     setScrollToSlide(slug)
     setChatOpen(true)
-    setChatTab("deck")
   }, [])
 
   const handleDeckCreated = useCallback((signal: string) => {
     if (createdDeckId === signal) return
     setCreatedDeckId(signal)
     window.location.hash = signal
-    setChatTab("deck")
   }, [createdDeckId])
 
   /* ── Derived state ── */
@@ -248,7 +239,7 @@ export function useWorkspace(
 
   return {
     activeDeckId, deck, setDeck, createdDeckId,
-    chatOpen, setChatOpen, chatTab, setChatTab,
+    chatOpen, setChatOpen,
     isWorkspace, isNew, isOwner, canChat, hasSlides, waitingForPng,
     navigateToList, openDeck, handleDeckCreated, setPptxRequested,
     scrollToSlide, setScrollToSlide,

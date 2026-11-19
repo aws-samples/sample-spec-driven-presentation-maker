@@ -352,7 +352,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
             )}
             {/* Thinking dots when no content yet */}
             {isStreaming && !cleanContent && toolUses.length === 0 && (
-              <span className="inline-flex items-center gap-1.5 text-foreground/30 text-sm">
+              <span className="inline-flex items-center gap-1.5 text-foreground-muted text-sm">
                 <span className="flex gap-0.5">
                   <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out infinite" }} />
                   <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out 0.2s infinite" }} />
@@ -373,7 +373,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                     </Markdown>
                   </div>
                 ) : (
-                  <span className="inline-flex items-center gap-1.5 text-foreground/30 text-sm">
+                  <span className="inline-flex items-center gap-1.5 text-foreground-muted text-sm">
                     <span className="flex gap-0.5">
                       <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out infinite" }} />
                       <span className="w-1 h-1 rounded-full bg-brand-teal/60" style={{ animation: "cursor-blink 1.4s ease-in-out 0.2s infinite" }} />
@@ -402,7 +402,7 @@ export function ChatMessage({ role, content, toolUses = [], blocks, snippets = [
                   <>
                     <button
                       onClick={() => setExpanded(!expanded)}
-                      className="inline-flex items-center gap-1 text-[11px] text-foreground/25 hover:text-foreground/40 transition-colors"
+                      className="inline-flex items-center gap-1 text-[11px] text-foreground-muted hover:text-foreground-secondary transition-colors"
                       aria-expanded={expanded}
                     >
                       <ChevronRight className={`h-2.5 w-2.5 transition-transform duration-200 ${expanded ? "rotate-90" : ""}`} />

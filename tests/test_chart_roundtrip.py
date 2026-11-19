@@ -645,3 +645,39 @@ def test_extracted_chart_is_json_serialisable(tmp_path):
     json.dumps(ch)
     out = pptx_to_json(tmp_path / "out.pptx", tmp_path / "again")
     assert _charts(out["slides"][0])[0]["holeSize"] == 50
+
+
+@pytest.mark.parametrize("chart_type", ["bar", "line", "radar"])
+@pytest.mark.parametrize("extra", [{}, {"valueAxis": {"line": "none"}}])
+def test_axis_sppr_follows_ooxml_schema_order(tmp_path, chart_type, extra):
+    chart = _built_chart(
+        tmp_path,
+        chartType=chart_type,
+        categories=["A", "B", "C"],
+        series=[{"name": "s", "values": [1, 2, 3]}],
+        **extra,
+    )
+    cs = chart._chartSpace
+    cs_tags = [child.tag for child in cs]
+    assert f"{_C}spPr" in cs_tags
+    for later in (f"{_C}txPr", f"{_C}externalData", f"{_C}printSettings", f"{_C}userShapes", f"{_C}extLst"):
+        if later in cs_tags:
+            assert cs_tags.index(f"{_C}spPr") < cs_tags.index(later)
+
+    ax_tags = ["valAx"] if extra else ["valAx", "catAx"]
+    for ax_name in ax_tags:
+        ax = cs.find(f".//{_C}{ax_name}")
+        assert ax is not None
+        tags = [child.tag for child in ax]
+        assert f"{_C}spPr" in tags
+        sppr_idx = tags.index(f"{_C}spPr")
+        if f"{_C}tickLblPos" in tags:
+            assert tags.index(f"{_C}tickLblPos") < sppr_idx
+        for later in (f"{_C}txPr", f"{_C}crossAx", f"{_C}crosses", f"{_C}crossBetween"):
+            if later in tags:
+                assert sppr_idx < tags.index(later)
+        if f"{_C}majorGridlines" in tags:
+            gl_idx = tags.index(f"{_C}majorGridlines")
+            for later in (f"{_C}numFmt", f"{_C}tickLblPos", f"{_C}spPr", f"{_C}txPr", f"{_C}crossAx"):
+                if later in tags:
+                    assert gl_idx < tags.index(later)

@@ -191,7 +191,7 @@ export default function StylesPage() {
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-xl font-semibold tracking-[-0.02em]">{t("title")}</h1>
+                <h1 className="text-3xl font-semibold tracking-[-0.03em] leading-tight">{t("title")}</h1>
                 <p className="text-sm text-foreground-muted mt-1">{t("subtitle")}</p>
               </div>
             </div>
@@ -280,7 +280,7 @@ export default function StylesPage() {
           <div className="max-w-5xl mx-auto px-5 sm:px-8 py-8 sm:py-12">
             <div className="flex items-center justify-between mb-8">
               <div>
-                <h1 className="text-xl font-semibold tracking-[-0.02em]">{t("title")}</h1>
+                <h1 className="text-3xl font-semibold tracking-[-0.03em] leading-tight">{t("title")}</h1>
                 <p className="text-sm text-foreground-muted mt-1">{t("subtitle")}</p>
               </div>
             </div>
@@ -313,10 +313,10 @@ export default function StylesPage() {
                       onClick={handleCreateStyle}
                     >
                       <Sparkles className="h-6 w-6 text-brand-teal/30 group-hover:text-brand-teal/60 transition-colors duration-200" />
-                      <span className="text-xs text-foreground/30 group-hover:text-foreground/60 font-medium transition-colors duration-200">{t("createWithAI")}</span>
+                      <span className="text-xs text-foreground-muted group-hover:text-foreground-secondary font-medium transition-colors duration-200">{t("createWithAI")}</span>
                     </button>
                     <button
-                      className="mt-2 py-1.5 text-xs text-foreground/25 hover:text-foreground/50 transition-colors text-center"
+                      className="mt-2 py-1.5 text-xs text-foreground-muted hover:text-foreground-secondary transition-colors text-center"
                       onClick={() => fileInputRef.current?.click()}
                     >
                       {t("importStyle")}

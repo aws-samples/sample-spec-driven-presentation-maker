@@ -229,3 +229,28 @@ export function toggleFormatToken(text: string): string {
   }
   return next + text.slice(cursor)
 }
+
+/** The name the first `@<kind>:` token in `text` carries, or null. */
+export function tokenName(text: string, kind: PickerKind): string | null {
+  return parseTokens(text).find((match) => match.kind === kind)?.name ?? null
+}
+
+/**
+ * Set the `@<kind>:` choice in `text`: remove every token of that kind (and one trailing space
+ * each), then, when `name` is given, prepend the new token. Other text and tokens stay.
+ *
+ * @param text - Current chat input
+ * @param kind - Token kind to set
+ * @param name - The choice, or null to leave it to the agent
+ */
+export function setKindToken(text: string, kind: PickerKind, name: string | null): string {
+  let rest = ""
+  let cursor = 0
+  for (const match of parseTokens(text)) {
+    if (match.kind !== kind) continue
+    rest += text.slice(cursor, match.start)
+    cursor = text[match.end] === " " ? match.end + 1 : match.end
+  }
+  rest += text.slice(cursor)
+  return name ? buildToken({ kind, name }) + rest : rest
+}
