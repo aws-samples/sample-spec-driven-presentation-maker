@@ -15,6 +15,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Added
 
+- **Speaker notes policy** (`deck.json` `"notesMode"`). `"keep"` (the default, unchanged
+  behaviour) writes each slide's `notes` as speaker notes; `"strip"` leaves them out of the
+  .pptx; `"export"` leaves them out and writes them to `<output stem>.notes.md` next to the
+  .pptx (one `## pageNN — title` section per slide, `{{...}}` styling removed), returned as
+  `notes_path` by `generate_pptx`. A deck handed to an audience no longer carries the
+  presenter's script, which imported slides often bring along in their original notes. The
+  slide files keep their `notes`, so composing and `check_specs` are unchanged; an invalid
+  value is a `check_specs` error and stops the build. Partial builds (`iso.pptx`) write no
+  notes file.
 - **Area charts** (`chartType: "area"`, #620). An area chart takes the same categories and
   series as a bar chart; `stacked: true` stacks the areas, and series `color`, `valueAxis`,
   `categoryAxis`, `style`, `legend` and `dataLabels` work as for `bar`. `pptx_to_json`
