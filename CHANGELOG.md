@@ -21,6 +21,11 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   Web UI went blank while it checked the sign-in. They now change pages in place. The rail
   stays, and only the content changes, with a 150ms fade (none with reduced motion). Web UI
   only (`deploy_webui.sh`).
+- **Chart XML follows the OOXML schema order** (#648). A chart's axis line, gridline and
+  background styling (`c:spPr`, `c:majorGridlines`) was appended as the last child of its
+  axis, plot area or chart space, out of schema order. PowerPoint accepts that, but strict
+  readers and validators can reject the file. It is now inserted at its schema position.
+  Local mode and the AWS stack (SdpmRuntime).
 
 ## [0.19.0] - 2026-11-18
 
