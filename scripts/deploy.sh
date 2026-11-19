@@ -181,21 +181,52 @@ if [ "${ENABLE_INVOCATION_LOGGING}" = "true" ] && [ "${CDK_COMMAND}" = "deploy" 
 fi
 
 # ---- S3 bucket for source upload ----
-SOURCE_BUCKET="${PROJECT_NAME}-${ACCOUNT_ID}-${REGION}"
+# The "-an" suffix places the bucket in the S3 account regional namespace, where only
+# this account can create a bucket with this name. Every call against the bucket also
+# passes --expected-bucket-owner, so the script stops unless the bucket belongs to
+# ${ACCOUNT_ID}. There is no fallback to a global-namespace name.
+SOURCE_BUCKET="${PROJECT_NAME}-${ACCOUNT_ID}-${REGION}-an"
 
-# Create bucket if it doesn't exist
-if ! aws s3api head-bucket --bucket "${SOURCE_BUCKET}" ${AWS_OPTS} 2>/dev/null; then
+if HEAD_ERR=$(aws s3api head-bucket --bucket "${SOURCE_BUCKET}" --expected-bucket-owner "${ACCOUNT_ID}" ${AWS_OPTS} 2>&1 >/dev/null); then
+  echo "Source bucket: ${SOURCE_BUCKET}"
+elif [[ "${HEAD_ERR}" == *"(404)"* ]]; then
   echo "Creating source bucket: ${SOURCE_BUCKET}"
-  if [ "${REGION}" = "us-east-1" ]; then
-    aws s3api create-bucket \
-      --bucket "${SOURCE_BUCKET}" \
-      ${AWS_OPTS}
-  else
-    aws s3api create-bucket \
-      --bucket "${SOURCE_BUCKET}" \
-      --create-bucket-configuration LocationConstraint="${REGION}" \
-      ${AWS_OPTS}
+  CREATE_ARGS=(--bucket "${SOURCE_BUCKET}" --bucket-namespace account-regional)
+  if [ "${REGION}" != "us-east-1" ]; then
+    CREATE_ARGS+=(--create-bucket-configuration "LocationConstraint=${REGION}")
   fi
+  # create-bucket takes no --expected-bucket-owner; the account regional namespace
+  # guarantees that a bucket created under this name belongs to this account.
+  if ! CREATE_ERR=$(aws s3api create-bucket "${CREATE_ARGS[@]}" ${AWS_OPTS} 2>&1 >/dev/null); then
+    if [[ "${CREATE_ERR}" == *"Unknown options"* ]]; then
+      echo "ERROR: The AWS CLI is too old to create a bucket in the S3 account regional namespace." >&2
+      echo "  Installed: $(aws --version 2>&1)" >&2
+      echo "  Update to AWS CLI v2 2.34.8 or later and run deploy.sh again." >&2
+    else
+      echo "ERROR: Could not create source bucket ${SOURCE_BUCKET} in the S3 account regional namespace in ${REGION}." >&2
+      echo "${CREATE_ERR}" | sed -e '/^[[:space:]]*$/d' -e 's/^/  /' >&2
+      echo "  The account regional namespace is not available in Middle East (Bahrain) and Middle East (UAE)." >&2
+      echo "  deploy.sh does not fall back to a global-namespace bucket name." >&2
+    fi
+    echo "Nothing was uploaded." >&2
+    exit 1
+  fi
+  # New bucket only: an existing bucket keeps its own configuration.
+  aws s3api put-public-access-block \
+    --bucket "${SOURCE_BUCKET}" \
+    --public-access-block-configuration "BlockPublicAcls=true,IgnorePublicAcls=true,BlockPublicPolicy=true,RestrictPublicBuckets=true" \
+    --expected-bucket-owner "${ACCOUNT_ID}" \
+    ${AWS_OPTS} > /dev/null
+  aws s3api put-bucket-lifecycle-configuration \
+    --bucket "${SOURCE_BUCKET}" \
+    --lifecycle-configuration '{"Rules":[{"ID":"expire-source-zips","Status":"Enabled","Filter":{"Prefix":"source/"},"Expiration":{"Days":7}}]}' \
+    --expected-bucket-owner "${ACCOUNT_ID}" \
+    ${AWS_OPTS} > /dev/null
+else
+  echo "ERROR: Source bucket ${SOURCE_BUCKET} is not owned by account ${ACCOUNT_ID} or cannot be accessed." >&2
+  echo "${HEAD_ERR}" | sed -e '/^[[:space:]]*$/d' -e 's/^/  /' >&2
+  echo "Nothing was uploaded. Check that the caller has S3 permissions for this bucket in ${REGION}." >&2
+  exit 1
 fi
 
 # ---- Zip and upload source ----
@@ -231,11 +262,16 @@ zip -r "${SOURCE_ZIP}" . \
 
 SOURCE_KEY="source/$(date +%Y%m%d-%H%M%S).zip"
 echo "Uploading to s3://${SOURCE_BUCKET}/${SOURCE_KEY} ..."
-aws s3 cp "${SOURCE_ZIP}" "s3://${SOURCE_BUCKET}/${SOURCE_KEY}" ${AWS_OPTS} --quiet
+aws s3api put-object \
+  --bucket "${SOURCE_BUCKET}" \
+  --key "${SOURCE_KEY}" \
+  --body "${SOURCE_ZIP}" \
+  --expected-bucket-owner "${ACCOUNT_ID}" \
+  ${AWS_OPTS} > /dev/null
 rm -rf "${TMPDIR}"
 
 # Verify upload
-if ! aws s3api head-object --bucket "${SOURCE_BUCKET}" --key "${SOURCE_KEY}" ${AWS_OPTS} > /dev/null 2>&1; then
+if ! aws s3api head-object --bucket "${SOURCE_BUCKET}" --key "${SOURCE_KEY}" --expected-bucket-owner "${ACCOUNT_ID}" ${AWS_OPTS} > /dev/null 2>&1; then
   echo "ERROR: Upload verification failed — ${SOURCE_KEY} not found in S3."
   echo "The zip may be too large for the available disk space (CloudShell has 1GB limit)."
   exit 1

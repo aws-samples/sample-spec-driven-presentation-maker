@@ -53,7 +53,7 @@ labels and notes follow it.
   style spec — use it for rectangular arrangements instead of hand-placing; compute
   non-rectangular positions (arcs, radial, curves) yourself.
 - Guides exist for specific needs, load only when a slide calls for one:
-  `grid`, `table`, `chart-bar` / `chart-line` / `chart-pie`, `freeform`,
+  `grid`, `table`, `chart-bar` / `chart-line` / `chart-pie` / `chart-radar`, `freeform`,
   `arch-layout-engine` + `arch-elements` (architecture diagrams via `arch_diagram`),
   `design-rules`.
 - Animations and transitions are off by default and are **not** ordinary composition. Load

@@ -17,8 +17,6 @@
     "decks": "Decks",
     "styles": "Styles",
     "templates": "Templates",
-    "openChat": "Open chat",
-    "closeChat": "Close chat",
     "userMenu": "User menu",
     "settings": "Settings",
     "signOut": "Sign out"
@@ -106,7 +104,8 @@
     "previewAlt": "Preview of {name}",
     "internal": "Internal",
     "private": "Private",
-    "selectDeck": "Select {name}"
+    "selectDeck": "Select {name}",
+    "slideCountShort": "{count, plural, one {# slide} other {# slides}}"
   },
   "deckActions": {
     "internal": "Internal",
@@ -165,7 +164,9 @@
     "errorPresent": "Couldn't open the presentation",
     "errorPdf": "Couldn't open the PDF view",
     "errorDownloadHtml": "Couldn't download the HTML",
-    "errorOpenHtml": "Couldn't open the HTML"
+    "errorOpenHtml": "Couldn't open the HTML",
+    "openChat": "Open chat",
+    "chat": "Chat"
   },
   "outline": {
     "body": "Body",
@@ -244,12 +245,12 @@
     "formatHtmlDescription": "Present in a browser. Can't be edited in PowerPoint.",
     "noMatch": "No matches",
     "loading": "Loading…",
-    "keyHint": "↑↓ move  ↵ insert  Esc close",
+    "keyHint": "↑↓←→ move  ↵ insert  Esc close",
     "listLabel": "Template, style and format suggestions",
-    "previewAlt": "Preview of {name}",
     "unknownName": "This template or style is unavailable",
     "removeToken": "Remove {kind} {name}",
-    "layouts": "{count, plural, one {# layout} other {# layouts}}"
+    "all": "All",
+    "kindFilter": "Show"
   },
   "chatInput": {
     "maxFilesError": "Maximum 5 files can be attached at once.",
@@ -266,10 +267,7 @@
     "resizePanel": "Resize chat panel",
     "chat": "Chat",
     "newChat": "New chat",
-    "startNewChat": "Start new chat",
-    "closePanel": "Close chat panel",
-    "new": "New",
-    "deck": "Deck"
+    "closePanel": "Close chat panel"
   },
   "chat": {
     "errorSaveHistory": "Failed to save chat history",
@@ -317,7 +315,11 @@
     "steerComments": "{count, plural, one {# comment} other {# comments}}",
     "backgroundWorking": "Composers are working in the background. You can keep chatting.",
     "stopping": "Stopping…",
-    "reconnecting": "Reconnecting to the agent…"
+    "reconnecting": "Reconnecting to the agent…",
+    "stageTitle": "What are we presenting?",
+    "stageSubtitle": "Describe the talk. The agents draft a brief, an art direction and an outline before building the slides.",
+    "stagePlaceholder": "Who is the audience, what should they take away, and roughly how many slides?\n/ template · style  ⌘↵ send",
+    "stagePlaceholderMobile": "Who is the audience, and what should they take away?"
   },
   "composerNote": {
     "from": "Composer {group}",
@@ -403,7 +405,8 @@
     "vibePath": "Fast path",
     "specPath": "Review path",
     "vibeSummary": "Start rough. See a first draft sooner.",
-    "specSummary": "Decide the story before the slides."
+    "specSummary": "Decide the story before the slides.",
+    "chipLabel": "Working style: {mode}"
   },
   "htmlFormatPill": {
     "buildAsHtml": "Build as HTML",
@@ -706,5 +709,20 @@
     "needsTextHint": "Add a comment or a message to send",
     "sendFailed": "Couldn't send the change request",
     "noComment": "No comment"
+  },
+  "choiceChip": {
+    "style": "Style",
+    "template": "Template",
+    "chooseStyle": "Choose a style",
+    "chooseTemplate": "Choose a template",
+    "chosen": "{kind}: {name}",
+    "clearStyle": "Remove the style choice",
+    "clearTemplate": "Remove the template choice",
+    "searchStyle": "Search styles…",
+    "searchTemplate": "Search templates…",
+    "auto": "Agent picks",
+    "autoHint": "Chosen to fit the brief",
+    "loading": "Loading…",
+    "noMatch": "No matches"
   }
 }

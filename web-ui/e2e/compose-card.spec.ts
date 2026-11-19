@@ -16,10 +16,16 @@ async function useEngine(page: Page, baseURL: string, engine: "v2" | "v3") {
   expect(switched.status()).toBe(200)
 }
 
-async function composeCard(page: Page, engine: "v2" | "v3") {
+/** The home composer, ready to type into: it takes the focus once the page has hydrated. */
+async function homeComposer(page: Page) {
   await page.goto("/decks")
-  await page.getByRole("button", { name: "New Deck" }).click()
   const input = page.getByRole("textbox", { name: "Chat message input" })
+  await expect(input).toBeFocused({ timeout: 30_000 })
+  return input
+}
+
+async function composeCard(page: Page, engine: "v2" | "v3") {
+  const input = await homeComposer(page)
   await input.fill(`Compose a two-part deck on ${engine}`)
   await page.getByRole("button", { name: "Send message" }).click()
 
