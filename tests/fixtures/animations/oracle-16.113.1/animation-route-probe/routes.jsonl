@@ -1,0 +1,6 @@
+{"record":"application","version":"16.113.1"}
+{"route":"A","call":"add effect (main sequence of timeline of slide)","slideIndex":1,"ok":false,"detail":"-1708 Microsoft PowerPoint got an error: main sequence of timeline of slide 1 of presentation \"Presentation3\" doesn’t understand the “add effect” message.","effectsOnSlide":0}
+{"route":"B","call":"make new effect at end of (main sequence of timeline of slide)","slideIndex":2,"ok":false,"detail":"-2710 Microsoft PowerPoint got an error: Can’t make class effect.","effectsOnSlide":0}
+{"route":"C","call":"make new effect at end of (sequence 1 of timeline of slide)","slideIndex":3,"ok":false,"detail":"-2710 Microsoft PowerPoint got an error: Can’t make class effect.","effectsOnSlide":0}
+{"route":"D","call":"add effect (sequence 1 of timeline of slide)","slideIndex":4,"ok":false,"detail":"-1728 The object you are trying to access does not exist","effectsOnSlide":0}
+{"record":"package","path":"/tmp/sdpm-probe/routes.pptx","saved":true}

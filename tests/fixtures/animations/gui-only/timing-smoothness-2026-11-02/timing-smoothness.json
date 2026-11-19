@@ -1,0 +1,69 @@
+{
+  "record": "paneSettingMeasurement",
+  "application": "Microsoft PowerPoint",
+  "version": "16.113.1",
+  "platform": "macOS",
+  "mechanism": "Animation Pane checkbox toggled through the macOS Accessibility API, then File saved and the written package read",
+  "measuredAt": "2026-11-02",
+  "document": "a scratch deck carrying the seven Complex motion paths, one effect per shape",
+  "selectedEffect": {
+    "cTnId": "29",
+    "presetID": "48",
+    "presetClass": "path",
+    "note": "the Waves motion path, which is what the Animation Pane had selected"
+  },
+  "finding": "Smooth Start and Smooth End are p:cTn attributes, not behaviour children, and both are ON by default on a motion path. So the cleared state is what changes the bytes: the attribute is simply absent.",
+  "settings": {
+    "animation.timing.smoothStart": {
+      "control": "Animation Pane / Effect Options / Smooth Start",
+      "defaultChecked": true,
+      "element": "p:cTn",
+      "attribute": "accel",
+      "checkedValue": "50000",
+      "clearedForm": "the accel attribute is absent",
+      "evidence": {
+        "checked": "<p:cTn id=\"29\" presetID=\"48\" presetClass=\"path\" presetSubtype=\"0\" accel=\"50000\" decel=\"50000\" fill=\"hold\" grpId=\"0\" nodeType=\"clickEffect\">",
+        "cleared": "<p:cTn id=\"29\" presetID=\"48\" presetClass=\"path\" presetSubtype=\"0\" decel=\"50000\" fill=\"hold\" grpId=\"0\" nodeType=\"clickEffect\">"
+      }
+    },
+    "animation.timing.smoothEnd": {
+      "control": "Animation Pane / Effect Options / Smooth End",
+      "defaultChecked": true,
+      "element": "p:cTn",
+      "attribute": "decel",
+      "checkedValue": "50000",
+      "clearedForm": "the decel attribute is absent",
+      "evidence": {
+        "checked": "<p:cTn id=\"29\" presetID=\"48\" presetClass=\"path\" presetSubtype=\"0\" decel=\"50000\" fill=\"hold\" grpId=\"0\" nodeType=\"clickEffect\">",
+        "cleared": "<p:cTn id=\"29\" presetID=\"48\" presetClass=\"path\" presetSubtype=\"0\" fill=\"hold\" grpId=\"0\" nodeType=\"clickEffect\">"
+      }
+    }
+  },
+  "defaultsAcrossEveryEffect": {
+    "note": "all seven effects in the untouched deck carried both attributes, so 50000 is the applied default rather than something this one effect had been given",
+    "accel=50000": 7,
+    "decel=50000": 7
+  },
+  "corroborationForTheEmptyBuildEntry": {
+    "note": "the same deck's p:bldLst carries one attribute-free p:bldP per animated shape. That is independent confirmation, from a deck PowerPoint itself wrote, that an empty p:bldP is what a preset writes — which is why text.level/sequence 'asOneObject' cannot be recovered from it.",
+    "observed": [
+      "<p:bldP spid=\"2\" grpId=\"0\"/>",
+      "<p:bldP spid=\"4\" grpId=\"0\"/>",
+      "<p:bldP spid=\"6\" grpId=\"0\"/>",
+      "<p:bldP spid=\"8\" grpId=\"0\"/>",
+      "<p:bldP spid=\"10\" grpId=\"0\"/>",
+      "<p:bldP spid=\"12\" grpId=\"0\"/>",
+      "<p:bldP spid=\"14\" grpId=\"0\"/>"
+    ]
+  },
+  "notMeasured": {
+    "animation.timing.bounceEnd": "the run that would have measured it wiped the deck's p:timing instead; see methodCaveats",
+    "animation.timing.rewind": "not attempted after the wipe",
+    "animation.afterAnimation.*": "not attempted after the wipe"
+  },
+  "methodCaveats": [
+    "Saving costs the headless promise. File > Save is readable on the menubar surface but its refs cannot be pressed: the snapshot resolves the app as 'Microsoft PowerPoint' while the process owning the menubar reports 'PowerPoint', so a click returns STALE_REF on a source_process_identity mismatch, and --app PowerPoint is APP_NOT_FOUND. cmd+s is posted physically, so the window has to be focused first. Reading the pane stays headless; only the save does not.",
+    "A landed toggle is often reported as TIMEOUT (ax_error -25204) with postcondition_satisfied true, so the error has to be read rather than trusted.",
+    "Toggling Bounce End removed every p:timing element from the slide. The pane's Delete button sits beside these checkboxes, and refs on this pane were mis-resolving under memory pressure, so the likeliest cause is a ref landing on the wrong control rather than anything about Bounce End. The committed fixtures were unaffected — the damage was confined to the scratch deck — but it is why the remaining nine values are unmeasured: a surface that can mis-resolve onto Delete should be driven by gui_capture.py, which attributes every press to the effect it changed, not ad hoc."
+  ]
+}

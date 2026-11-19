@@ -1,0 +1,72 @@
+{
+  "source": "sdpm GUI capture",
+  "application": "Microsoft PowerPoint",
+  "version": "16.113.1",
+  "package": "powerpoint-oracle.pptx",
+  "counts": {
+    "resolved": 1
+  },
+  "targets": [
+    {
+      "key": "animation.effectOptions.amount.emphasis.transparency.percent25",
+      "effectKey": "animation.gallery.emphasis.transparency",
+      "setting": "Amount",
+      "value": "25%",
+      "shapeSpid": "2",
+      "effectsOnShape": 1,
+      "outcome": "resolved",
+      "mechanism": "modifiedInPlace",
+      "effectAttributes": {
+        "grpId": "0",
+        "nodeType": "clickEffect",
+        "presetClass": "emph",
+        "presetID": "9",
+        "presetSubtype": "0"
+      },
+      "behaviors": [
+        {
+          "element": "p:set",
+          "attributes": {},
+          "carrier": {},
+          "timing": {
+            "dur": "indefinite"
+          },
+          "attrNames": [
+            "style.opacity"
+          ],
+          "values": {
+            "to": {
+              "element": "p:to",
+              "attributes": {},
+              "children": [
+                {
+                  "element": "p:strVal",
+                  "attributes": {
+                    "val": "0.75"
+                  },
+                  "children": []
+                }
+              ]
+            }
+          }
+        },
+        {
+          "element": "p:animEffect",
+          "attributes": {
+            "filter": "image",
+            "prLst": "opacity: 0.75"
+          },
+          "carrier": {
+            "rctx": "IE"
+          },
+          "timing": {
+            "dur": "indefinite"
+          },
+          "attrNames": [],
+          "values": {}
+        }
+      ],
+      "measuredDurationMs": null
+    }
+  ]
+}

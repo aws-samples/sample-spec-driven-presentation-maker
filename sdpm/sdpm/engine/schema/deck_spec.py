@@ -22,6 +22,11 @@ DECK_JSON_SKELETON: dict[str, Any] = {
 
 # deck.json "outputFormat" values. Absent means "pptx"; the field is written only for
 # HTML decks so PPTX deck.json stays unchanged (not part of DECK_JSON_SKELETON).
+#
+# The animation and transition switches follow the same rule and for the same reason:
+# a new deck.json carries neither, because an absent switch already reads as off
+# (resolve_enabled) and test_api_init_pptx_deck_json_is_byte_identical pins what a new
+# PPTX deck.json contains. A deck opts in by adding the switch itself.
 OUTPUT_FORMATS: tuple[str, ...] = ("pptx", "html")
 
 _SUB_ITEM_RE = re.compile(r"^\s{2,}-\s+(body|visual|evidence)\s*:")
@@ -214,6 +219,10 @@ def validate_specs(
             output_format = deck_output_format(deck_json)
         except ValueError:
             errors.append('deck.json outputFormat must be "pptx" or "html"')
+
+    from sdpm.engine.timing import validate_deck_switches
+
+    errors.extend(f"deck.json {diagnostic.path}: {diagnostic.message}" for diagnostic in validate_deck_switches(deck_json))
 
     if not _is_non_empty(fonts.get("halfwidth")):
         errors.append("deck.json fonts.halfwidth is empty")

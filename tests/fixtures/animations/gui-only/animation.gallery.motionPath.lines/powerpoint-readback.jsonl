@@ -1,0 +1,2 @@
+{"record":"application","application":"Microsoft PowerPoint","version":"16.113.1","platform":"macOS","oracle":"kirocrew-computer (Accessibility API)","note":"animations are unscriptable on this build; applied through the ribbon by AXPress"}
+{"key":"animation.gallery.motionPath.lines","slideIndex":1,"applied":"Path Animation > Basic > Lines","rejected":false,"resolvedBy":"guiPathAnimation","guiPath":"Animations > Path Animation > Basic > Lines","readback":{"startShown":"On Click","durationShown":"02.00","thumbnailLabel":"Has Animation"}}

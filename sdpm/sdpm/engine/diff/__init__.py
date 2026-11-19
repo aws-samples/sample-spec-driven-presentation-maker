@@ -137,6 +137,188 @@ def align_slides(base_slides, edit_slides, threshold=0.1):
     return result
 
 
+# ---------------------------------------------------------------------------
+# Motion: transitions, animation timelines, preserved raw fallback
+# ---------------------------------------------------------------------------
+def _effect_target(effect: dict) -> str:
+    target = effect.get("target")
+    return str(target.get("element", "?")) if isinstance(target, dict) else "?"
+
+
+def _effect_label(effect: dict) -> str:
+    """One short line naming what an effect does, for the diff report."""
+    preset = effect.get("preset")
+    if isinstance(preset, dict):
+        parts = [
+            str(preset[key]) for key in ("category", "effect")
+            if preset.get(key) is not None
+        ]
+        options = preset.get("options")
+        if isinstance(options, dict) and options:
+            # Named in the line because a changed direction is a changed
+            # animation, and a diff that showed only "entrance/flyIn" on both
+            # sides would report no difference where the reader sees one.
+            parts.append(
+                ",".join(f"{setting}={value}" for setting, value in sorted(options.items()))
+            )
+        name = "/".join(parts)
+    else:
+        behaviors = effect.get("behaviors")
+        kinds = [
+            str(b.get("type", "?")) for b in behaviors if isinstance(b, dict)
+        ] if isinstance(behaviors, list) else []
+        name = f"behaviors({','.join(kinds)})"
+    return f"{name or '?'} on {_effect_target(effect)}"
+
+
+def _effect_entries(sequence: str, effects) -> list[tuple[str, dict]]:
+    """Return ``(stable id, effect)`` in sequence order.
+
+    An effect that carries no explicit ``id`` gets the same deterministic
+    fingerprint the writer and the importer derive, so the two sides of a diff
+    compare by the identity REQ-2.5 makes stable rather than by array index.
+    """
+    from sdpm.engine.timing.identity import EffectIdAllocator
+
+    allocator = EffectIdAllocator()
+    entries: list[tuple[str, dict]] = []
+    for effect in effects if isinstance(effects, list) else []:
+        if not isinstance(effect, dict):
+            continue
+        entries.append((
+            allocator.allocate(sequence=sequence, target=_effect_target(effect), effect=effect),
+            effect,
+        ))
+    return entries
+
+
+def _diff_properties(base: dict, edit: dict, *, skip=("id",)) -> list[str]:
+    changes = []
+    for key in sorted((set(base) | set(edit)) - set(skip)):
+        if base.get(key) != edit.get(key):
+            changes.append(_diff_value(key, base.get(key), edit.get(key)))
+    return changes
+
+
+def _diff_sequence(label: str, sequence: str, base_effects, edit_effects) -> list[str]:
+    """Compare one animation sequence by stable effect ID and order."""
+    base_entries = _effect_entries(sequence, base_effects)
+    edit_entries = _effect_entries(sequence, edit_effects)
+    base_at = {eid: i for i, (eid, _) in enumerate(base_entries)}
+    edit_at = {eid: i for i, (eid, _) in enumerate(edit_entries)}
+    edit_by_id = dict(edit_entries)
+    lines: list[str] = []
+
+    for position, (eid, effect) in enumerate(base_entries):
+        if eid not in edit_at:
+            lines.append(f"  animation REMOVED {label}[{position}] {eid}: {_effect_label(effect)}")
+    for position, (eid, effect) in enumerate(edit_entries):
+        if eid not in base_at:
+            lines.append(f"  animation ADDED {label}[{position}] {eid}: {_effect_label(effect)}")
+    for position, (eid, effect) in enumerate(base_entries):
+        if eid not in edit_at:
+            continue
+        edited = edit_by_id[eid]
+        if edit_at[eid] != position:
+            lines.append(
+                f"  animation MOVED {label}[{position}] → [{edit_at[eid]}] {eid}: "
+                f"{_effect_label(effect)}"
+            )
+        changes = _diff_properties(effect, edited)
+        if changes:
+            lines.append(f"  animation {label}[{edit_at[eid]}] {eid} ({_effect_label(effect)}):")
+            lines.extend(f"    {change}" for change in changes)
+    return lines
+
+
+def _diff_animations(base_slide: dict, edit_slide: dict) -> list[str]:
+    base = base_slide.get("animations") if isinstance(base_slide.get("animations"), dict) else {}
+    edit = edit_slide.get("animations") if isinstance(edit_slide.get("animations"), dict) else {}
+    if not base and not edit:
+        return []
+    lines = _diff_sequence(
+        "mainSequence", "mainSequence", base.get("mainSequence"), edit.get("mainSequence"),
+    )
+
+    def by_id(value) -> dict[str, dict]:
+        return {
+            str(item.get("id")): item
+            for item in (value if isinstance(value, list) else [])
+            if isinstance(item, dict)
+        }
+
+    base_sequences = by_id(base.get("interactiveSequences"))
+    edit_sequences = by_id(edit.get("interactiveSequences"))
+    for sequence_id in sorted(set(base_sequences) | set(edit_sequences)):
+        label = f"interactive[{sequence_id}]"
+        before, after = base_sequences.get(sequence_id), edit_sequences.get(sequence_id)
+        if before is None:
+            lines.append(f"  animation ADDED sequence {label}")
+            after = after or {}
+        elif after is None:
+            lines.append(f"  animation REMOVED sequence {label}")
+            before = before or {}
+        if before and after and before.get("trigger") != after.get("trigger"):
+            lines.append(f"  {_diff_value(f'{label}.trigger', before.get('trigger'), after.get('trigger'))}")
+        lines.extend(_diff_sequence(
+            label, "interactiveSequences",
+            (before or {}).get("effects"), (after or {}).get("effects"),
+        ))
+    return lines
+
+
+def _diff_transition(base_slide: dict, edit_slide: dict) -> list[str]:
+    before, after = base_slide.get("transition"), edit_slide.get("transition")
+    if before == after:
+        return []
+    if not isinstance(before, dict):
+        name = after.get("effect", "?") if isinstance(after, dict) else after
+        return [f"  transition ADDED: {name}"]
+    if not isinstance(after, dict):
+        return [f"  transition REMOVED: {before.get('effect', '?')}"]
+    return [f"  transition.{change}" for change in _diff_properties(before, after, skip=())]
+
+
+def _raw_targets(manifest, sidecar: str) -> list[str]:
+    """Return the logical element names one preserved sidecar animates."""
+    for record in (manifest or {}).get("sidecars") or []:
+        if isinstance(record, dict) and record.get("path") == sidecar:
+            mappings = record.get("shapeMappings")
+            return sorted(set(mappings.values())) if isinstance(mappings, dict) else []
+    return []
+
+
+def _raw_summary(reference: dict, manifest) -> str:
+    """Summarize a preserved fragment by digest and affected targets.
+
+    Never the XML itself: a raw sidecar is a whole timing tree, and dumping it
+    into a hand-edit report would bury the one line a reader needs (REQ-8.4).
+    """
+    digest = str(reference.get("sha256", ""))[:12] or "(no digest)"
+    targets = _raw_targets(manifest, str(reference.get("sidecar", "")))
+    suffix = f", targets: {', '.join(targets)}" if targets else ""
+    return f"{digest}{suffix}"
+
+
+def _diff_raw(base_slide: dict, edit_slide: dict, base_manifest, edit_manifest) -> list[str]:
+    lines: list[str] = []
+    for key, feature in (("_rawTiming", "timing"), ("_rawTransition", "transition")):
+        before = base_slide.get(key) if isinstance(base_slide.get(key), dict) else None
+        after = edit_slide.get(key) if isinstance(edit_slide.get(key), dict) else None
+        if before is None and after is None:
+            continue
+        if before is None:
+            lines.append(f"  raw {feature} ADDED: {_raw_summary(after, edit_manifest)}")
+        elif after is None:
+            lines.append(f"  raw {feature} REMOVED: {_raw_summary(before, base_manifest)}")
+        elif before.get("sha256") != after.get("sha256"):
+            lines.append(
+                f"  raw {feature} CHANGED: {_raw_summary(before, base_manifest)} → "
+                f"{_raw_summary(after, edit_manifest)}"
+            )
+    return lines
+
+
 def diff_slides(base: dict, edit: dict) -> dict:
     """Compare two loaded slide structures and return a hand-edit diff report.
 
@@ -152,6 +334,10 @@ def diff_slides(base: dict, edit: dict) -> dict:
     base_slides = base.get("slides", [])
     edit_slides = edit.get("slides", [])
     skip_keys = {"masterIndex", "_comment"}
+    # Attached by the loader (sdpm.api) while the converted deck still exists;
+    # it is what turns a raw sidecar digest into the target names it animates.
+    base_manifest = base.get("_rawManifest")
+    edit_manifest = edit.get("_rawManifest")
     lines: list[str] = []
 
     alignment = align_slides(base_slides, edit_slides)
@@ -180,6 +366,12 @@ def diff_slides(base: dict, edit: dict) -> dict:
             bv, ev = bs.get(key), es.get(key)
             if bv != ev and (bv or ev):
                 slide_diffs.append(_diff_value(key, bv, ev))
+
+        motion_diffs = (
+            _diff_transition(bs, es)
+            + _diff_animations(bs, es)
+            + _diff_raw(bs, es, base_manifest, edit_manifest)
+        )
 
         # Compare placeholders (title/body text captured by idx) — hand-edits
         # to titles land here, not in elements.
@@ -235,7 +427,7 @@ def diff_slides(base: dict, edit: dict) -> dict:
             elem_diffs.append(f"    {json.dumps(ee, ensure_ascii=False)[:300]}")
 
         moved = bi != ei
-        if slide_diffs or elem_diffs or moved:
+        if slide_diffs or elem_diffs or motion_diffs or moved:
             title = bs.get("title", es.get("title", ""))
             if isinstance(title, dict):
                 title = title.get("text", "")
@@ -243,6 +435,8 @@ def diff_slides(base: dict, edit: dict) -> dict:
             lines.append(f'\n=== Slide (baseline #{bi + 1} ↔ edited #{ei + 1}) "{title[:40]}"{moved_str} ===')
             for d in slide_diffs:
                 lines.append(f"  {d}")
+            for d in motion_diffs:
+                lines.append(d)
             for d in elem_diffs:
                 lines.append(d)
 

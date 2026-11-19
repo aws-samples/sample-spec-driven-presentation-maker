@@ -1,0 +1,99 @@
+{
+  "plan": "effect-options",
+  "driver": "scripts/animation_catalog/gui_capture.py",
+  "shapeNames": {
+    "animation.effectOptions.amount.emphasis.transparency.percent25": "Rounded Rectangle 1",
+    "animation.effectOptions.direction.entrance.stretch.fromTop": "Rounded Rectangle 3"
+  },
+  "deck": {
+    "slides": 1,
+    "targetsPerSlide": 2,
+    "columns": 2,
+    "rows": 1,
+    "basisPx": [
+      1920.0,
+      1080.0
+    ],
+    "cellPx": [
+      912.0,
+      984.0
+    ],
+    "shapePx": [
+      884,
+      948
+    ],
+    "clickMarginPx": 20.0,
+    "neighbourClearancePx": 20.0,
+    "split": false,
+    "note": "2 targets fit one slide as a 2x1 grid"
+  },
+  "generatedFrom": {
+    "discovery": "effect-options.json",
+    "document": "capture-deck",
+    "tilesRead": 95,
+    "selection": "every enabled AXMenuButton at depth 2 of a tile's Effect Options window, grouped under the disabled one before it, excluding Sequence"
+  },
+  "counts": {
+    "targets": 2,
+    "settings": 2,
+    "effects": 2
+  },
+  "targets": [
+    {
+      "key": "animation.effectOptions.amount.emphasis.transparency.percent25",
+      "effectKey": "animation.gallery.emphasis.transparency",
+      "setting": "Amount",
+      "value": "25%",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Transparency"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "25%"
+      ],
+      "titleAlternatives": [],
+      "verifyChange": true,
+      "targetIndex": 1,
+      "slideIndex": 1,
+      "cellIndex": 1,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 58,
+        "width": 884,
+        "height": 948
+      },
+      "shapeName": "Rounded Rectangle 1"
+    },
+    {
+      "key": "animation.effectOptions.direction.entrance.stretch.fromTop",
+      "effectKey": "animation.gallery.entrance.stretch",
+      "setting": "Direction",
+      "value": "From Top",
+      "prerequisite": [
+        "Animations",
+        "Entrance Effects",
+        "Stretch"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "From Top"
+      ],
+      "titleAlternatives": [],
+      "verifyChange": true,
+      "targetIndex": 2,
+      "slideIndex": 1,
+      "cellIndex": 2,
+      "shapeRectPx": {
+        "x": 974,
+        "y": 58,
+        "width": 884,
+        "height": 948
+      },
+      "shapeName": "Rounded Rectangle 3"
+    }
+  ]
+}

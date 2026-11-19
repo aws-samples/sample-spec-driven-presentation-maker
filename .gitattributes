@@ -2,3 +2,10 @@
 sdpm/vendor/** -text
 # Slide JSON of the documentation diagrams and the key visual: collapsed in GitHub diffs.
 docs/assets/src/**/*.json linguist-generated
+# The animation capability catalog is produced by scripts/animation_catalog/generate.py
+# and the GUI capture evidence is written by the capture drivers: collapsed in GitHub diffs
+# so a review of this area reads the code rather than ~240k lines of data.
+sdpm/references/catalogs/*.json linguist-generated
+tests/fixtures/animations/** linguist-generated
+# The seven READMEs in that tree are written by hand and explain the captures.
+tests/fixtures/animations/**/README.md -linguist-generated

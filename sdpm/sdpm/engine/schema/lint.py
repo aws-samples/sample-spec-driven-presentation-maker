@@ -5,20 +5,25 @@
 from __future__ import annotations
 
 import re
+from typing import Sequence
 
 from sdpm.engine.schema.chart import chart_edit_ignored
 from sdpm.engine.schema.regions import is_comment_element
+from sdpm.engine.timing.model import IDENTITY_KEYS
 
 _COLOR_RE = re.compile(r'^#[0-9A-Fa-f]{6}$')
 _ALIGN_VALUES = {"left", "center", "right"}
 _VALIGN_VALUES = {"top", "middle", "bottom"}
 
 
-def lint(data: list | dict) -> list[dict]:
+def lint(data: list | dict, *, include_motion: bool = True) -> list[dict]:
     """Lint slide JSON and return diagnostics.
 
     Args:
         data: Slide list or presentation dict with "slides" key.
+        include_motion: Also validate transitions, identities and the animation
+            timeline. Pass False when the caller will resolve overrides first
+            and then call :func:`lint_motion`, which is what a build does.
 
     Returns:
         List of diagnostic dicts with slide, element, rule, message.
@@ -29,8 +34,41 @@ def lint(data: list | dict) -> list[dict]:
         return []
     diagnostics: list[dict] = []
     for si, slide in enumerate(slides):
+        if include_motion:
+            diagnostics.extend(_lint_slide_motion(si, slide))
         for ei, elem in enumerate(slide.get("elements") or []):
             diagnostics.extend(_lint_element(si, ei, elem))
+    return diagnostics
+
+
+def lint_motion(
+    slides: list[dict],
+    *,
+    numbers: list[int] | None = None,
+    identity_keys: Sequence[str] = IDENTITY_KEYS,
+) -> list[dict]:
+    """Motion diagnostics only, for slides whose overrides are resolved.
+
+    A build resolves overrides before it validates, because an effect may target
+    an element the slide inherits rather than declares: on the unresolved form
+    that reads as ``unknown-animation-target``. :func:`lint` therefore takes
+    ``include_motion=False`` there and the build calls this afterwards.
+
+    ``numbers`` gives each slide the index it has in the caller's own list, so a
+    partial build does not renumber them. Without it a filtered list numbered
+    from zero while :func:`lint` numbered from the full deck, and both ended up
+    in one diagnostics list carrying a bare ``slide`` integer.
+
+    ``identity_keys`` lets a build with one switch off drop the reachability
+    finding for the key that switch governs — ``id`` for animations,
+    ``morphId`` for transitions. See
+    :data:`sdpm.engine.timing.model.IDENTITY_KEYS`.
+    """
+    diagnostics: list[dict] = []
+    for position, slide in enumerate(slides):
+        if isinstance(slide, dict):
+            si = numbers[position] if numbers is not None else position
+            diagnostics.extend(_lint_slide_motion(si, slide, identity_keys))
     return diagnostics
 
 
@@ -48,7 +86,7 @@ def lint_and_sanitize(slide: dict) -> tuple[dict, list[dict]]:
     """
     import copy
     cleaned = copy.deepcopy(slide)
-    diagnostics: list[dict] = []
+    diagnostics: list[dict] = _lint_slide_motion(0, cleaned)
     for ei, elem in enumerate(cleaned.get("elements") or []):
         diagnostics.extend(_lint_element(0, ei, elem))
         if elem.pop("_spAutoFit", None):
@@ -56,6 +94,18 @@ def lint_and_sanitize(slide: dict) -> tuple[dict, list[dict]]:
                 "_spAutoFit is deprecated and was removed. "
                 "Use measure to detect overflow instead."))
     return cleaned, diagnostics
+
+
+def _lint_slide_motion(
+    si: int, slide: dict, identity_keys: Sequence[str] = IDENTITY_KEYS
+) -> list[dict]:
+    """Project path-aware motion diagnostics into the existing lint shape."""
+    from sdpm.engine.timing import validate_slide_motion
+
+    return [
+        _diag(si, -1, diagnostic.rule, f"{diagnostic.path}: {diagnostic.message}")
+        for diagnostic in validate_slide_motion(slide, identity_keys=identity_keys)
+    ]
 
 
 def _diag(slide: int, element: int, rule: str, message: str) -> dict:

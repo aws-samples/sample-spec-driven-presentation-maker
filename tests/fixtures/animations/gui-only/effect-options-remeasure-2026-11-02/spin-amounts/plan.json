@@ -1,0 +1,99 @@
+{
+  "plan": "effect-options",
+  "driver": "scripts/animation_catalog/gui_capture.py",
+  "shapeNames": {
+    "animation.effectOptions.amount.emphasis.spin.halfSpin": "Rounded Rectangle 1",
+    "animation.effectOptions.amount.emphasis.spin.quarterSpin": "Rounded Rectangle 3"
+  },
+  "deck": {
+    "slides": 1,
+    "targetsPerSlide": 2,
+    "columns": 2,
+    "rows": 1,
+    "basisPx": [
+      1920.0,
+      1080.0
+    ],
+    "cellPx": [
+      912.0,
+      984.0
+    ],
+    "shapePx": [
+      884,
+      948
+    ],
+    "clickMarginPx": 20.0,
+    "neighbourClearancePx": 20.0,
+    "split": false,
+    "note": "2 targets fit one slide as a 2x1 grid"
+  },
+  "generatedFrom": {
+    "discovery": "effect-options.json",
+    "document": "capture-deck",
+    "tilesRead": 95,
+    "selection": "every enabled AXMenuButton at depth 2 of a tile's Effect Options window, grouped under the disabled one before it, excluding Sequence"
+  },
+  "counts": {
+    "targets": 2,
+    "settings": 1,
+    "effects": 1
+  },
+  "targets": [
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.halfSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Half Spin",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Half Spin"
+      ],
+      "titleAlternatives": [],
+      "verifyChange": true,
+      "targetIndex": 1,
+      "slideIndex": 1,
+      "cellIndex": 1,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 58,
+        "width": 884,
+        "height": 948
+      },
+      "shapeName": "Rounded Rectangle 1"
+    },
+    {
+      "key": "animation.effectOptions.amount.emphasis.spin.quarterSpin",
+      "effectKey": "animation.gallery.emphasis.spin",
+      "setting": "Amount",
+      "value": "Quarter Spin",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Spin"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "Quarter Spin"
+      ],
+      "titleAlternatives": [],
+      "verifyChange": true,
+      "targetIndex": 2,
+      "slideIndex": 1,
+      "cellIndex": 2,
+      "shapeRectPx": {
+        "x": 974,
+        "y": 58,
+        "width": 884,
+        "height": 948
+      },
+      "shapeName": "Rounded Rectangle 3"
+    }
+  ]
+}

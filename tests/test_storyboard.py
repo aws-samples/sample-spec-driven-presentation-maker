@@ -1,0 +1,946 @@
+"""The storyboard: one still frame per click, derived from the catalog.
+
+The motion-path test here is a regression guard. The first implementation read
+the catalog through an index method that does not exist and caught the
+AttributeError, so every motion path silently contributed no offset while the
+storyboard still produced plausible-looking frames. Only the rendered PNG
+showed it, and only because the icon was somewhere it should not have been.
+"""
+
+import json
+from pathlib import Path
+
+import pytest
+from lxml import etree
+
+from sdpm.engine.storyboard import (
+    DIM_TEXT,
+    _entry,
+    _motion_offset,
+    click_steps,
+    frame_slide,
+    frames,
+    storyboard,
+)
+from sdpm.engine.timing.writer import load_capability_index
+
+P = "http://schemas.openxmlformats.org/presentationml/2006/main"
+
+
+@pytest.fixture(scope="module")
+def index():
+    return load_capability_index()
+
+
+def _fx(effect_id, element, category, effect, start="onPageClick", **patch):
+    out = {
+        "id": effect_id,
+        "target": {"element": element},
+        "preset": {"category": category, "effect": effect},
+        "start": {"type": start, "delayMs": 0},
+        "timing": {"durationMs": 500},
+    }
+    for key in ("afterEffect", "text"):
+        if key in patch:
+            out[key] = patch.pop(key)
+    if patch:
+        out["timing"].update(patch)
+    return out
+
+
+def _slide(effects, elements=None, interactive=None, slide_id="probe"):
+    return {
+        "id": slide_id,
+        "layout": "Blank",
+        "elements": elements or [
+            {"id": "a", "type": "shape", "shape": "rectangle",
+             "x": 100, "y": 100, "width": 200, "height": 100, "fill": "#FFFFFF"},
+            {"id": "b", "type": "shape", "shape": "rectangle",
+             "x": 400, "y": 100, "width": 200, "height": 100, "fill": "#FFFFFF"},
+            {"id": "icon", "type": "image", "src": "assets:material/train",
+             "x": 150, "y": 120, "width": 40, "height": 40},
+        ],
+        "animations": {
+            "mainSequence": effects,
+            "interactiveSequences": interactive or [],
+        },
+    }
+
+
+class TestRawPreservedMotion:
+    """A frame is a still, so the raw references must not travel into one."""
+
+    def _raw_slide(self):
+        slide = _slide([], elements=[
+            {"id": "a", "type": "shape", "shape": "rectangle",
+             "x": 100, "y": 100, "width": 200, "height": 100, "fill": "#FFFFFF"},
+        ])
+        del slide["animations"]
+        slide["_rawTiming"] = {
+            "sidecar": "animations/probe-timing.xml",
+            "sha256": "0" * 64,
+            "manifest": "animations/manifest.json",
+            "reason": "p:seq carries futureThing",
+        }
+        slide["_rawTransition"] = {
+            "sidecar": "animations/probe-transition.xml",
+            "sha256": "1" * 64,
+            "manifest": "animations/manifest.json",
+            "reason": "an unknown effect element",
+        }
+        return slide
+
+    def test_a_frame_carries_no_raw_reference(self, index):
+        """The frame deck is built with animations off, so a raw timing replays
+        its media-only tree — a RawReplayError whenever the media/object
+        boundary could not be classified. Where it succeeded it recreated the
+        fragment's media parts once per frame."""
+        slide = self._raw_slide()
+        frame = frames(slide, index)[0]
+        derived = frame_slide(slide, frame, "-f00")
+        assert "_rawTiming" not in derived
+        assert "_rawTransition" not in derived
+        assert "animations" not in derived and "transition" not in derived
+
+    def test_the_frame_says_the_motion_is_not_shown(self, index):
+        """Without this the slide rendered as one still with no notes, which
+        reads as "this slide has no animation" rather than "not shown here"."""
+        notes = frames(self._raw_slide(), index)[0]["notes"]
+        assert len(notes) == 2, notes
+        assert any("_rawTiming" in note and "cannot show it" in note for note in notes)
+        assert any("_rawTransition" in note for note in notes)
+        assert any("futureThing" in note for note in notes), "the recorded reason is carried"
+
+
+class TestInteractiveFramesAreIndependent:
+    def _two_triggers(self):
+        return _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[
+                {"id": "showB", "trigger": {"type": "onShapeClick", "target": "a"},
+                 "effects": [_fx("b-in", "b", "entrance", "fade", start="onShapeClick")]},
+                {"id": "hideIcon", "trigger": {"type": "onShapeClick", "target": "a"},
+                 "effects": [_fx("icon-out", "icon", "exit", "fade", start="onShapeClick")]},
+            ],
+        )
+
+    def test_one_trigger_frame_does_not_show_another_triggers_effects(self, index):
+        """Two triggers are alternatives the viewer picks between, not a
+        sequence. They shared one mutable state, so the second frame showed the
+        first trigger's effects as well and nothing said both were clicked."""
+        out = frames(self._two_triggers(), index)
+        first = next(f for f in out if "showB" in f["label"])
+        second = next(f for f in out if "hideIcon" in f["label"])
+
+        assert first["state"]["b"]["visible"] is True
+        assert first["state"]["icon"]["visible"] is True, "the other trigger did not fire"
+        assert second["state"]["icon"]["visible"] is False
+        assert second["state"]["b"]["visible"] is False, "showB did not fire in this frame"
+
+    def test_an_element_only_a_trigger_reveals_starts_off_screen(self, index):
+        """Initial visibility came from main-sequence entrances only, so an
+        element a trigger reveals was drawn at frame 0 as if already there."""
+        out = frames(self._two_triggers(), index)
+        assert out[0]["state"]["b"]["visible"] is False
+
+    def test_a_trigger_records_why_an_element_left(self, index):
+        out = frames(self._two_triggers(), index)
+        second = next(f for f in out if "hideIcon" in f["label"])
+        assert second["state"]["icon"]["hiddenBy"] == "exit"
+
+    def test_a_trigger_applies_its_after_effect(self, index):
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[{
+                "id": "flash", "trigger": {"type": "onShapeClick", "target": "a"},
+                "effects": [_fx("b-in", "b", "entrance", "fade", start="onShapeClick",
+                                afterEffect={"type": "hide"})],
+            }],
+        )
+        frame = next(f for f in frames(slide, index) if "flash" in f["label"])
+        assert frame["state"]["b"]["visible"] is False
+        assert frame["state"]["b"]["hiddenBy"] == "afterEffect hide"
+        assert any("afterEffect hide" in note for note in frame["notes"])
+
+    def test_a_trigger_target_that_is_not_on_the_slide_is_reported(self, index):
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[{
+                "id": "ghost", "trigger": {"type": "onShapeClick", "target": "a"},
+                "effects": [_fx("x", "missing", "entrance", "fade", start="onShapeClick")],
+            }],
+        )
+        frame = next(f for f in frames(slide, index) if "ghost" in f["label"])
+        assert any("not an element on this slide" in note for note in frame["notes"])
+
+
+class TestTheEndOfTheBuild:
+    """"ends with …" is a statement about the build, not about the last frame.
+
+    Making each trigger frame independent left this pass reading the last frame
+    in the list, which is a trigger's. With two triggers it reported everything
+    the *other* trigger reveals as "never revealed".
+    """
+
+    def test_an_element_a_trigger_reveals_is_not_stranded(self, index):
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[
+                {"id": "showB", "trigger": {"type": "onShapeClick", "target": "a"},
+                 "effects": [_fx("b-in", "b", "entrance", "fade", start="onShapeClick")]},
+                {"id": "hideIcon", "trigger": {"type": "onShapeClick", "target": "a"},
+                 "effects": [_fx("icon-out", "icon", "exit", "fade", start="onShapeClick")]},
+            ],
+        )
+        _deck, _frames, manifest = storyboard({}, [slide], index)
+        assert not [n for entry in manifest for n in entry["notes"] if "ends with" in n], (
+            "b has a reveal path, just not one on the clicker"
+        )
+
+    def test_a_trigger_that_reveals_then_hides_still_counts_as_a_reveal(self, index):
+        """A reveal path exists even when the same click closes it again.
+
+        The exclusion used to read the trigger frame's end state, and an
+        entrance carrying `afterEffect: hide` reveals its target and hides it
+        again inside one click — so the frame ended with the element off screen
+        and the pass called it "never revealed".
+        """
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[{
+                "id": "peekB", "trigger": {"type": "onShapeClick", "target": "a"},
+                "effects": [_fx(
+                    "b-in", "b", "entrance", "fade",
+                    start="onShapeClick", afterEffect={"type": "hide"},
+                )],
+            }],
+        )
+        _deck, _frames, manifest = storyboard({}, [slide], index)
+        notes = [n for entry in manifest for n in entry["notes"] if "ends with" in n]
+        assert not [n for n in notes if "b off screen" in n], (
+            f"the trigger does reveal b, however briefly: {notes}"
+        )
+
+    def test_an_element_hidden_at_the_end_of_its_build_is_still_reported(self, index):
+        """The rule cannot become "visible in any frame": that would stop
+        reporting one of the three defects the storyboard exists to catch."""
+        slide = _slide([_fx("in", "a", "entrance", "fade", afterEffect={"type": "hide"})])
+        _deck, _frames, manifest = storyboard({}, [slide], index)
+        ends = [(e["kind"], n) for e in manifest for n in e["notes"] if "ends with" in n]
+        assert len(ends) == 1, ends
+        kind, note = ends[0]
+        assert "a off screen (afterEffect hide)" in note
+        assert kind == "build", "the note belongs on the last frame of the build"
+
+    def test_every_frame_says_whether_it_is_build_or_trigger(self, index):
+        """`_settled_state` reads this rather than parsing the label."""
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[{
+                "id": "t", "trigger": {"type": "onShapeClick", "target": "a"},
+                "effects": [_fx("b-in", "b", "entrance", "fade", start="onShapeClick")],
+            }],
+        )
+        kinds = [frame["kind"] for frame in frames(slide, index)]
+        assert kinds == ["build", "build", "trigger"], kinds
+
+
+class TestPlaceholderTargets:
+    """A placeholder is as addressable as an element."""
+
+    def _slide_with_placeholder(self, effects):
+        return {
+            "id": "probe", "layout": "Title and Content",
+            "placeholders": {"title": {"text": "Hero", "id": "hero"}},
+            "elements": [
+                {"id": "a", "type": "shape", "shape": "rectangle",
+                 "x": 100, "y": 100, "width": 200, "height": 100, "fill": "#FFFFFF"},
+            ],
+            "animations": {"mainSequence": effects, "interactiveSequences": []},
+        }
+
+    def test_a_placeholder_target_is_not_reported_as_missing(self, index):
+        slide = self._slide_with_placeholder([_fx("in", "hero", "entrance", "fade")])
+        out = frames(slide, index)
+        assert not any("not an element on this slide" in n for f in out for n in f["notes"])
+        assert out[0]["state"]["hero"]["visible"] is False, "an entrance hides it at frame 0"
+        assert out[1]["state"]["hero"]["visible"] is True
+
+    def test_a_placeholder_an_entrance_reveals_is_absent_from_frame_zero(self, index):
+        slide = self._slide_with_placeholder([_fx("in", "hero", "entrance", "fade")])
+        out = frames(slide, index)
+        before = frame_slide(slide, out[0], "-f00")
+        after = frame_slide(slide, out[1], "-f01")
+        assert "title" not in before["placeholders"], "it has not arrived yet"
+        assert after["placeholders"]["title"]["text"] == "Hero"
+
+    def test_a_placeholder_appears_in_the_on_screen_inventory(self, index):
+        slide = self._slide_with_placeholder([_fx("in", "hero", "entrance", "fade")])
+        _deck, _frame_slides, manifest = storyboard({}, [slide], index)
+        assert "hero" in manifest[0]["offScreen"]
+        assert "hero" in manifest[-1]["onScreen"]
+
+
+class TestClickSteps:
+    def test_each_on_page_click_opens_a_step(self):
+        steps = click_steps([
+            _fx("1", "a", "entrance", "fade"),
+            _fx("2", "b", "entrance", "fade", start="withPrevious"),
+            _fx("3", "a", "emphasis", "pulse"),
+        ])
+        assert [[e["id"] for e in s] for s in steps] == [["1", "2"], ["3"]]
+
+    def test_with_previous_and_after_previous_join_the_open_step(self):
+        steps = click_steps([
+            _fx("1", "a", "entrance", "fade"),
+            _fx("2", "b", "entrance", "fade", start="afterPrevious"),
+            _fx("3", "b", "entrance", "fade", start="withPrevious"),
+        ])
+        assert len(steps) == 1
+
+    def test_a_sequence_that_does_not_open_with_a_page_click_still_starts_a_step(self):
+        """The first thing in a sequence waits for the sequence's own trigger,
+        so it is a step even when its start type is not onPageClick."""
+        steps = click_steps([_fx("1", "a", "emphasis", "spin", start="onShapeClick")])
+        assert len(steps) == 1
+
+    def test_no_effects_means_no_steps(self):
+        assert click_steps([]) == []
+
+    def test_a_non_mapping_effect_is_skipped(self):
+        assert click_steps(["nonsense", None]) == []
+
+
+class TestFrameZero:
+    def test_anything_an_entrance_reveals_starts_off_screen(self, index):
+        result = frames(_slide([_fx("in", "a", "entrance", "fade")]), index)
+        assert result[0]["state"]["a"]["visible"] is False
+
+    def test_anything_with_no_entrance_is_on_screen_from_the_start(self, index):
+        """This is the defect the storyboard was built to show: an icon with no
+        entrance of its own hangs in empty space until its tile arrives."""
+        result = frames(_slide([_fx("in", "a", "entrance", "fade")]), index)
+        assert result[0]["state"]["icon"]["visible"] is True
+        assert result[0]["state"]["b"]["visible"] is True
+
+    def test_frame_zero_is_labelled_as_before_the_first_click(self, index):
+        result = frames(_slide([_fx("in", "a", "entrance", "fade")]), index)
+        assert result[0]["frame"] == 0
+        assert "before the first click" in result[0]["label"]
+
+
+class TestVisibility:
+    def test_an_entrance_reveals_its_target_in_its_own_step(self, index):
+        result = frames(_slide([_fx("in", "a", "entrance", "fade")]), index)
+        assert result[1]["state"]["a"]["visible"] is True
+
+    def test_an_exit_hides_its_target(self, index):
+        result = frames(_slide([
+            _fx("in", "a", "entrance", "fade"),
+            _fx("out", "a", "exit", "fade"),
+        ]), index)
+        assert result[1]["state"]["a"]["visible"] is True
+        assert result[2]["state"]["a"]["visible"] is False
+
+    def test_visibility_comes_from_the_catalog_preset_class(self, index):
+        """entrance.fade records no behaviours at all, only presetClass 'entr',
+        so the reveal has to come from there rather than from a behaviour."""
+        assert _entry(index, "entrance", "fade").get("presetClass") == "entr"
+        assert _entry(index, "exit", "fade").get("presetClass") == "exit"
+
+    def test_an_effect_aimed_at_a_missing_element_is_reported(self, index):
+        result = frames(_slide([_fx("in", "ghost", "entrance", "fade")]), index)
+        assert any("not an element on this slide" in n for n in result[1]["notes"])
+
+
+class TestMotionPaths:
+    def test_the_catalog_gives_the_path_end_as_an_offset(self, index):
+        """motionPath.lines records path 'M 0 0 L 0 0.25 E' in slide-relative
+        units, so on a 1080-high slide it ends 270px below where it started."""
+        assert _motion_offset(_entry(index, "motionPath", "lines"), (1920, 1080)) == (0.0, 270.0)
+
+    def test_a_motion_path_moves_its_target_in_the_frame(self, index):
+        result = frames(_slide([_fx("move", "icon", "motionPath", "lines")]), index)
+        assert result[1]["state"]["icon"]["dy"] == 270.0
+
+    def test_the_offset_reaches_the_rendered_slide(self, index):
+        """The guard for the swallowed-AttributeError bug: the offset has to
+        survive all the way into the element's y, not just into the state."""
+        slide = _slide([_fx("move", "icon", "motionPath", "lines")])
+        result = frames(slide, index)
+        derived = frame_slide(slide, result[1], "-f01")
+        icon = next(e for e in derived["elements"] if e["id"] == "icon")
+        assert icon["y"] == 120 + 270.0
+
+    def test_a_rewound_path_ends_where_it_began(self, index):
+        result = frames(_slide([_fx("move", "icon", "motionPath", "lines", rewind=True)]), index)
+        assert result[1]["state"]["icon"]["dy"] == 0.0
+
+    def test_an_effect_with_no_motion_behaviour_offsets_nothing(self, index):
+        assert _motion_offset(_entry(index, "entrance", "wipe"), (1920, 1080)) == (0.0, 0.0)
+
+
+class TestAfterEffects:
+    def test_hide_removes_its_target_in_the_same_click(self, index):
+        """Measured this session: masterRel='sameClick' on the effect's own
+        end, so once the click has settled the element is already gone."""
+        result = frames(_slide([
+            _fx("in", "a", "entrance", "fade", afterEffect={"type": "hide"}),
+        ]), index)
+        assert result[1]["state"]["a"]["visible"] is False
+        assert any("afterEffect hide" in n for n in result[1]["notes"])
+
+    def test_hide_on_next_click_survives_its_own_click_and_goes_on_the_next(self, index):
+        result = frames(_slide([
+            _fx("in", "a", "entrance", "fade", afterEffect={"type": "hideOnNextClick"}),
+            _fx("next", "b", "entrance", "fade"),
+        ]), index)
+        assert result[1]["state"]["a"]["visible"] is True
+        assert result[2]["state"]["a"]["visible"] is False
+
+    def test_dim_keeps_its_target_but_records_the_colour(self, index):
+        result = frames(_slide([
+            _fx("in", "a", "entrance", "fade",
+                afterEffect={"type": "dim", "color": "#808080"}),
+        ]), index)
+        assert result[1]["state"]["a"]["visible"] is True
+        assert result[1]["state"]["a"]["dim"] == "#808080"
+
+    def test_a_dim_without_a_colour_records_the_theme_default(self, index):
+        result = frames(_slide([
+            _fx("in", "a", "entrance", "fade", afterEffect={"type": "dim"}),
+        ]), index)
+        assert result[1]["state"]["a"]["dim"] == "theme accent"
+
+    def test_a_dimmed_element_has_its_text_recoloured_not_its_fill(self, index):
+        """PowerPoint dims by animating ppt_c — the text colour — and leaves
+        the fill alone. Dropping the fill's opacity instead made a correct
+        recede look like a broken tile."""
+        slide = _slide([_fx("in", "a", "entrance", "fade", afterEffect={"type": "dim"})])
+        derived = frame_slide(slide, frames(slide, index)[1], "-f01")
+        dimmed = next(e for e in derived["elements"] if e["id"] == "a")
+        assert dimmed["fontColor"] == DIM_TEXT
+        assert "opacity" not in dimmed
+        assert dimmed["fill"] == "#FFFFFF"
+
+    def test_a_dim_rewrites_the_inline_colour_tags_in_its_paragraphs(self, index):
+        """A tile sets its colours with inline {{#RRGGBB:}} tags, so a dim that
+        only set fontColor would visibly dim nothing."""
+        elements = [
+            {"id": "a", "type": "shape", "shape": "rectangle",
+             "x": 100, "y": 100, "width": 200, "height": 100, "fill": "#FFFFFF",
+             "paragraphs": [{"text": "{{#66666B:LABEL}}"}, {"text": "{{#1D1D1F:42%}}"}]},
+        ]
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade", afterEffect={"type": "dim"})],
+            elements=elements,
+        )
+        derived = frame_slide(slide, frames(slide, index)[1], "-f01")
+        texts = [p["text"] for p in derived["elements"][0]["paragraphs"]]
+        assert texts == [f"{{{{{DIM_TEXT}:LABEL}}}}", f"{{{{{DIM_TEXT}:42%}}}}"]
+
+    def test_an_authors_dim_colour_is_used_instead_of_the_stand_in(self, index):
+        slide = _slide([
+            _fx("in", "a", "entrance", "fade",
+                afterEffect={"type": "dim", "color": "#808080"}),
+        ])
+        derived = frame_slide(slide, frames(slide, index)[1], "-f01")
+        assert next(e for e in derived["elements"] if e["id"] == "a")["fontColor"] == "#808080"
+
+    def test_none_changes_nothing(self, index):
+        result = frames(_slide([
+            _fx("in", "a", "entrance", "fade", afterEffect={"type": "none"}),
+        ]), index)
+        assert result[1]["state"]["a"] == {
+            "visible": True, "dx": 0.0, "dy": 0.0,
+            "dim": None, "fill": None, "hiddenBy": None,
+        }
+
+
+class TestWhatAStillFrameCannotShow:
+    def test_an_emphasis_is_recorded_as_showing_nothing(self, index):
+        result = frames(_slide([
+            _fx("in", "a", "entrance", "fade"),
+            _fx("pulse", "a", "emphasis", "pulse"),
+        ]), index)
+        assert any("cannot show it" in n for n in result[2]["notes"])
+
+    def test_an_emphasis_does_not_change_the_state(self, index):
+        result = frames(_slide([
+            _fx("in", "a", "entrance", "fade"),
+            _fx("pulse", "a", "emphasis", "pulse"),
+        ]), index)
+        assert result[2]["state"]["a"]["visible"] is True
+        assert result[2]["state"]["a"]["dx"] == 0.0
+
+
+class TestRenderedFrame:
+    def test_a_hidden_element_is_left_out_entirely(self, index):
+        slide = _slide([_fx("in", "a", "entrance", "fade")])
+        derived = frame_slide(slide, frames(slide, index)[0], "-f00")
+        assert [e["id"] for e in derived["elements"]] == ["b", "icon"]
+
+    def test_the_frame_slide_drops_animations_and_transition(self, index):
+        slide = dict(_slide([_fx("in", "a", "entrance", "fade")]),
+                     transition={"effect": "morph"})
+        derived = frame_slide(slide, frames(slide, index)[1], "-f01")
+        assert "animations" not in derived
+        assert "transition" not in derived
+
+    def test_each_frame_slide_gets_its_own_id(self, index):
+        slide = _slide([_fx("in", "a", "entrance", "fade")])
+        derived = frame_slide(slide, frames(slide, index)[1], "-f01")
+        assert derived["id"] == "probe-f01"
+
+    def test_the_source_slide_is_not_mutated(self, index):
+        slide = _slide([_fx("move", "icon", "motionPath", "lines")])
+        original = slide["elements"][2]["y"]
+        frame_slide(slide, frames(slide, index)[1], "-f01")
+        assert slide["elements"][2]["y"] == original
+
+
+class TestInteractiveSequences:
+    def test_a_trigger_sequence_gets_its_own_frame_after_the_run(self, index):
+        slide = _slide(
+            [_fx("in", "a", "entrance", "fade")],
+            interactive=[{
+                "id": "on-icon",
+                "trigger": {"type": "onShapeClick", "target": "icon"},
+                "effects": [_fx("reveal", "b", "entrance", "fade", start="onShapeClick")],
+            }],
+        )
+        result = frames(slide, index)
+        assert "after clicking 'icon'" in result[-1]["label"]
+        assert "on-icon" in result[-1]["label"]
+
+
+class TestStoryboard:
+    def test_it_numbers_pages_across_slides_and_maps_them_back(self, index):
+        deck = {"slideSize": {"width": 1920, "height": 1080}}
+        slides = [
+            _slide([_fx("in", "a", "entrance", "fade")], slide_id="one"),
+            _slide([_fx("in", "a", "entrance", "fade")], slide_id="two"),
+        ]
+        _, frame_slides, manifest = storyboard(deck, slides, index)
+        assert len(frame_slides) == len(manifest) == 4
+        assert [m["page"] for m in manifest] == [1, 2, 3, 4]
+        assert [m["slide"] for m in manifest] == ["one", "one", "two", "two"]
+        assert [m["frame"] for m in manifest] == [0, 1, 0, 1]
+
+    def test_it_flags_a_build_that_ends_with_an_element_off_screen(self, index):
+        """The METHOD A defect: an afterEffect hide on the last step leaves a
+        hole that neither the ordinary preview nor a round-trip check shows."""
+        deck = {}
+        slides = [_slide([
+            _fx("in", "a", "entrance", "fade", afterEffect={"type": "hide"}),
+        ], slide_id="holes")]
+        _, _, manifest = storyboard(deck, slides, index)
+        assert any("a off screen (afterEffect hide)" in n for n in manifest[-1]["notes"])
+
+    def test_an_element_the_author_exited_is_not_called_stranded(self, index):
+        """A motion-led deck sends its travelling parts off stage on purpose.
+        Flagging those buries the real finding under noise."""
+        deck = {}
+        slides = [_slide([
+            _fx("in", "a", "entrance", "fade"),
+            _fx("out", "a", "exit", "fade", start="afterPrevious"),
+        ], slide_id="departs")]
+        _, _, manifest = storyboard(deck, slides, index)
+        assert not any("off screen" in n for n in manifest[-1]["notes"])
+
+    def test_the_stranding_note_names_why_each_element_is_gone(self, index):
+        deck = {}
+        slides = [_slide([
+            _fx("in", "a", "entrance", "fade", afterEffect={"type": "hideOnNextClick"}),
+            _fx("next", "b", "entrance", "fade"),
+        ], slide_id="reasons")]
+        _, _, manifest = storyboard(deck, slides, index)
+        note = next(n for n in manifest[-1]["notes"] if "off screen" in n)
+        assert "a off screen (afterEffect hideOnNextClick)" in note
+
+    def test_a_clean_build_is_not_flagged(self, index):
+        deck = {}
+        slides = [_slide([
+            _fx("in", "a", "entrance", "fade"),
+            _fx("in-b", "b", "entrance", "fade"),
+        ], slide_id="clean")]
+        _, _, manifest = storyboard(deck, slides, index)
+        assert not any("off screen" in n for n in manifest[-1]["notes"])
+
+    def test_the_derived_deck_turns_animation_off(self, index):
+        deck = {"animations": {"enabled": True}, "transitions": {"enabled": True}}
+        derived, _, _ = storyboard(deck, [_slide([])], index)
+        assert derived["animations"] == {"enabled": False}
+        assert derived["transitions"] == {"enabled": False}
+
+    def test_the_slide_size_is_taken_from_the_deck(self, index):
+        """A path offset is a fraction of the slide, so the deck's own size has
+        to reach it rather than the module default."""
+        deck = {"slideSize": {"width": 960, "height": 540}}
+        slides = [_slide([_fx("move", "icon", "motionPath", "lines")], slide_id="small")]
+        _, frame_slides, _ = storyboard(deck, slides, index)
+        icon = next(e for e in frame_slides[1]["elements"] if e["id"] == "icon")
+        assert icon["y"] == 120 + 0.25 * 540
+
+    def test_the_manifest_lists_what_is_on_and_off_screen(self, index):
+        deck = {}
+        slides = [_slide([_fx("in", "a", "entrance", "fade")], slide_id="one")]
+        _, _, manifest = storyboard(deck, slides, index)
+        assert manifest[0]["offScreen"] == ["a"]
+        assert manifest[0]["onScreen"] == ["b", "icon"]
+
+
+class TestTheBuildPointsAtTheStoryboard:
+    """A deck with motion has to be told to look at its frames.
+
+    The guide carries the rule, but a guide is only read when someone goes
+    looking. The build output is read every time, so the count of animated
+    slides is reported there and the CLI turns it into the command to run.
+    """
+
+    def _deck(self, tmp_path, *, animated, enabled=True):
+        import json
+
+        deck = tmp_path / "deck"
+        (deck / "slides").mkdir(parents=True)
+        (deck / "specs").mkdir()
+        (deck / "deck.json").write_text(json.dumps({
+            "template": "blank-light",
+            "animations": {"enabled": enabled},
+            "transitions": {"enabled": enabled},
+            "slideSize": {"width": 1920, "height": 1080, "ptPerPx": 0.5},
+        }))
+        slide = {
+            "id": "one",
+            "layout": "Blank",
+            "elements": [
+                {"id": "a", "type": "shape", "shape": "rectangle", "x": 100, "y": 200,
+                 "width": 400, "height": 200, "fill": "#FFFFFF"},
+            ],
+        }
+        if animated:
+            slide["animations"] = {
+                "mainSequence": [{
+                    "id": "in", "target": {"element": "a"},
+                    "preset": {"category": "entrance", "effect": "fade"},
+                    "start": {"type": "onPageClick", "delayMs": 0},
+                    "timing": {"durationMs": 400},
+                }],
+                "interactiveSequences": [],
+            }
+        (deck / "slides/one.json").write_text(json.dumps(slide, ensure_ascii=False))
+        (deck / "specs/outline.md").write_text("- [one] one\n")
+        return deck
+
+    def test_a_deck_with_motion_reports_how_many_slides_carry_it(self, tmp_path):
+        from sdpm.api import generate
+
+        deck = self._deck(tmp_path, animated=True)
+        result = generate(str(deck), output_path=str(tmp_path / "out.pptx"))
+        assert result["animated_slides"] == 1
+
+    def test_a_deck_with_no_motion_reports_none(self, tmp_path):
+        from sdpm.api import generate
+
+        deck = self._deck(tmp_path, animated=False)
+        result = generate(str(deck), output_path=str(tmp_path / "out.pptx"))
+        assert result["animated_slides"] == 0
+
+    def test_motion_switched_off_reports_none_even_though_the_slide_has_it(self, tmp_path):
+        """The nudge follows what reached the package, not what the JSON says:
+        a deck built with animations off has no build order to inspect."""
+        from sdpm.api import generate
+
+        deck = self._deck(tmp_path, animated=True, enabled=False)
+        result = generate(str(deck), output_path=str(tmp_path / "out.pptx"))
+        assert result["animated_slides"] == 0
+
+    def test_a_still_deck_gets_no_motion_warnings(self, tmp_path):
+        """`check_text_build` and `check_morph_pairing` describe what the build
+        will write, and neither writes anything with its switch off. They ran
+        unconditionally, so a deck built as a still was warned about a text
+        build and an unpaired morph identity it was never going to get."""
+        from sdpm.api import _resolve_config
+
+        deck = self._deck(tmp_path, animated=True, enabled=False)
+        slide = json.loads((deck / "slides/one.json").read_text())
+        slide["elements"][0]["morphId"] = "lonely"
+        slide["animations"]["mainSequence"][0]["text"] = {"sequence": "byParagraph", "level": 3}
+        (deck / "slides/one.json").write_text(json.dumps(slide, ensure_ascii=False))
+
+        off = _resolve_config(str(deck), animation_mode=None, transition_mode=None)
+        assert off.animations_enabled is False and off.transitions_enabled is False
+        assert not [w for w in off.warnings if "morph" in w.lower() or "text build" in w.lower()], (
+            off.warnings
+        )
+
+        # With the switches on, the same deck does report them — so the gate is
+        # what changed, not the fixture.
+        on = _resolve_config(str(deck), animation_mode="on", transition_mode="on")
+        assert on.warnings, "the fixture must be one the checks have something to say about"
+
+    def test_a_still_deck_gets_no_inert_group_identity_diagnostic(self, tmp_path):
+        """It says "no effect can target it", and a still deck writes no effect.
+
+        The sibling text-build and Morph checks are gated on their switches, so
+        this one is too — on the build path. The save path keeps reporting it,
+        having no switch context and nothing to build.
+        """
+        from sdpm.api import _resolve_config
+
+        deck = self._deck(tmp_path, animated=False, enabled=False)
+        slide = json.loads((deck / "slides/one.json").read_text())
+        slide["elements"] = [{
+            "type": "group", "x": 0, "y": 0, "width": 400, "height": 200,
+            "elements": [{"id": "inner", "type": "shape", "shape": "rectangle",
+                          "x": 0, "y": 0, "width": 50, "height": 50, "fill": "#FFFFFF"}],
+        }]
+        (deck / "slides/one.json").write_text(json.dumps(slide, ensure_ascii=False))
+
+        off = _resolve_config(str(deck), animation_mode=None, transition_mode=None)
+        assert "inert-group-child-identity" not in {
+            d["rule"] for d in off.lint_diagnostics
+        }, off.lint_diagnostics
+
+        on = _resolve_config(str(deck), animation_mode="on", transition_mode=None)
+        assert "inert-group-child-identity" in {d["rule"] for d in on.lint_diagnostics}
+
+    @pytest.mark.parametrize("key,switch", [("id", "animation"), ("morphId", "transition")])
+    def test_each_identity_key_is_gated_on_its_own_switch(self, tmp_path, key, switch):
+        """`id` is reachable by an animation, `morphId` by a morph transition.
+
+        The finding is "no effect can target it", so each key answers to the
+        switch that writes the effect reaching it. Dropping it only when *both*
+        were off still warned about a nested `id` with animations off.
+        """
+        from sdpm.api import _resolve_config
+
+        deck = self._deck(tmp_path, animated=False, enabled=False)
+        slide = json.loads((deck / "slides/one.json").read_text())
+        slide["elements"] = [{
+            "type": "group", "x": 0, "y": 0, "width": 400, "height": 200,
+            "elements": [{key: "inner", "type": "shape", "shape": "rectangle",
+                          "x": 0, "y": 0, "width": 50, "height": 50, "fill": "#FFFFFF"}],
+        }]
+        (deck / "slides/one.json").write_text(json.dumps(slide, ensure_ascii=False))
+
+        def rules(on):
+            """Diagnostics with exactly one of the two switches turned on."""
+            modes = {"animation_mode": None, "transition_mode": None}
+            modes[f"{on}_mode"] = "on"
+            return {d["rule"] for d in _resolve_config(str(deck), **modes).lint_diagnostics}
+
+        other = "transition" if switch == "animation" else "animation"
+        assert "inert-group-child-identity" in rules(switch), (
+            f"{key} is reachable once {switch}s are on"
+        )
+        assert "inert-group-child-identity" not in rules(other), (
+            f"the {other} switch writes nothing that can reach {key}"
+        )
+
+    def test_a_transition_only_deck_is_not_pointed_at_the_storyboard(self, tmp_path):
+        """The count drives a nudge to run `storyboard`, which draws one frame
+        per click step. A transition happens between slides and has no build
+        order, so there is nothing for those frames to show."""
+        from sdpm.api import generate
+
+        deck = self._deck(tmp_path, animated=False)
+        slide = json.loads((deck / "slides/one.json").read_text())
+        slide["transition"] = {
+            "effect": "fade", "parameters": {}, "durationMs": 700,
+            "advance": {"onClick": True, "afterMs": None}, "sound": None,
+        }
+        (deck / "slides/one.json").write_text(json.dumps(slide, ensure_ascii=False))
+
+        result = generate(str(deck), output_path=str(tmp_path / "out.pptx"))
+        assert result["animated_slides"] == 0, "a transition is not build order"
+
+    def test_a_raw_preserved_slide_is_counted(self, tmp_path):
+        """Timing sdpm could not decode still carries build order, and a
+        storyboard of it is the only way to see what those frames do and do not
+        show. It used to be counted as no motion at all.
+
+        The deck is a real import, closure and all, so the count is taken from
+        a package that actually built rather than from a hand-written reference.
+        """
+        from pptx import Presentation
+
+        from sdpm.api import generate
+        from sdpm.engine.builder import PPTXBuilder
+        from sdpm.engine.converter.pipeline import pptx_to_json
+
+        template = Path(__file__).resolve().parent.parent / "sdpm" / "templates" / "blank-dark.pptx"
+        builder = PPTXBuilder(
+            template,
+            fonts={"fullwidth": "Meiryo", "halfwidth": "Arial"},
+            default_text_color="#FFFFFF",
+            base_dir=tmp_path,
+            animations_enabled=True,
+            transitions_enabled=False,
+        )
+        builder.add_slide({
+            "id": "one", "layout": "Blank",
+            "elements": [
+                {"id": "a", "type": "textbox", "text": "A", "x": 10, "y": 10,
+                 "width": 300, "height": 60},
+            ],
+        })
+        source = tmp_path / "source.pptx"
+        builder.save(source)
+
+        # A timing branch no sdpm version understands, so import preserves it.
+        presentation = Presentation(str(source))
+        slide = list(presentation.slides)[0]
+        for node in slide._element.findall("{%s}timing" % P):
+            slide._element.remove(node)
+        slide._element.append(etree.fromstring(
+            '<p:timing xmlns:p="%s"><p:tnLst><p:par>'
+            '<p:cTn id="1" dur="indefinite" restart="never" nodeType="tmRoot"><p:childTnLst>'
+            '<p:seq concurrent="1" nextAc="seek"><p:cTn id="2" nodeType="mainSeq">'
+            '<p:childTnLst><p:par><p:cTn id="3" futureThing="7">'
+            '<p:tgtEl><p:spTgt spid="%d"/></p:tgtEl>'
+            "</p:cTn></p:par></p:childTnLst></p:cTn></p:seq>"
+            "</p:childTnLst></p:cTn></p:par></p:tnLst></p:timing>"
+            % (P, slide.shapes[0].shape_id)
+        ))
+        presentation.save(str(source))
+
+        deck = tmp_path / "imported"
+        pptx_to_json(source, deck)
+        imported = json.loads((deck / "slides" / "slide-001.json").read_text())
+        assert imported.get("animations") is None, "the fixture must import raw"
+        assert imported["_rawTiming"], "the fixture must carry a raw reference"
+
+        deck_json = json.loads((deck / "deck.json").read_text())
+        deck_json["template"] = str(template)
+        deck_json["animations"] = {"enabled": True}
+        (deck / "deck.json").write_text(json.dumps(deck_json, ensure_ascii=False))
+        (deck / "specs").mkdir(exist_ok=True)
+        (deck / "specs" / "outline.md").write_text("- [slide-001] one\n")
+
+        result = generate(str(deck), output_path=str(tmp_path / "raw.pptx"))
+        assert result["animated_slides"] == 1
+
+
+def _bfx(effect_id, element, behaviors, start="onPageClick", **timing):
+    """An effect in the advanced form: primitives instead of a gallery preset."""
+    out = {
+        "id": effect_id,
+        "target": {"element": element},
+        "behaviors": behaviors,
+        "start": {"type": start, "delayMs": 0},
+        "timing": {"durationMs": 800},
+    }
+    out["timing"].update(timing)
+    return out
+
+
+class TestDirectlyAuthoredBehaviors:
+    """A motion-led deck is written almost entirely in the `behaviors` form.
+
+    These effects carry no presetClass, so the first version of this module
+    read only the catalog and silently did nothing for all of them: a packet
+    authored to cross the slide stayed where it was, the markers it was meant
+    to light stayed dark, and no note said anything was unmodelled. Only the
+    rendered frame showed it.
+    """
+
+    def test_an_authored_motion_path_moves_its_target(self, index):
+        slide = _slide([_bfx("fly", "icon", [
+            {"type": "motion", "path": "M 0 0 C 0.16 -0.16 0.49 -0.16 0.6458 0 E",
+             "pathEditMode": "relative", "origin": "layout"},
+        ])])
+        result = frames(slide, index, slide_size=(1920, 1080))
+        assert round(result[1]["state"]["icon"]["dx"]) == round(0.6458 * 1920)
+        assert result[1]["state"]["icon"]["dy"] == 0.0
+
+    def test_the_authored_offset_reaches_the_rendered_slide(self, index):
+        slide = _slide([_bfx("fly", "icon", [
+            {"type": "motion", "path": "M 0 0 L 0.25 0 E"},
+        ])])
+        derived = frame_slide(slide, frames(slide, index)[1], "-f01")
+        icon = next(e for e in derived["elements"] if e["id"] == "icon")
+        assert icon["x"] == 150 + 0.25 * 1920
+
+    def test_a_round_trip_path_is_noted_not_moved(self, index):
+        """A hop that leaves and comes back ends where it began, so the frame
+        cannot show the journey — and silence would read as "nothing happens"."""
+        slide = _slide([_bfx("hop", "icon", [
+            {"type": "motion", "path": "M 0 0 C 0.05 -0.07 0.13 -0.07 0.177 0 "
+                                       "C 0.13 0.07 0.05 0.07 0 0 E"},
+        ])])
+        result = frames(slide, index)
+        assert result[1]["state"]["icon"]["dx"] == 0.0
+        assert any("leaves and returns" in n for n in result[1]["notes"])
+
+    def test_a_path_that_settles_into_place_is_not_reported_as_motionless(self, index):
+        """`M 0 0.035 L 0 0` is how a line of text rises into position: it
+        starts displaced and finishes where it is authored. The frame shows
+        that correctly, so warning about it would be crying wolf on the most
+        ordinary motion idiom there is."""
+        slide = _slide([_bfx("rise", "a", [
+            {"type": "motion", "path": "M 0 0.035 L 0 0 E"},
+        ])])
+        result = frames(slide, index)
+        assert result[1]["state"]["a"]["dy"] == 0.0
+        assert result[1]["notes"] == []
+
+    def test_a_reversed_path_ends_where_it_began(self, index):
+        slide = _slide([_bfx("there-and-back", "icon", [
+            {"type": "motion", "path": "M 0 0 L 0.25 0 E"},
+        ], autoReverse=True)])
+        result = frames(slide, index)
+        assert result[1]["state"]["icon"]["dx"] == 0.0
+        assert any("reversed" in n for n in result[1]["notes"])
+
+    def test_a_colour_behaviour_recolours_its_target(self, index):
+        slide = _slide([_bfx("light-up", "a", [{"type": "color", "to": "#3B5BFF"}])])
+        result = frames(slide, index)
+        assert result[1]["state"]["a"]["fill"] == "#3B5BFF"
+
+    def test_a_colour_without_its_hash_is_still_understood(self, index):
+        """The reader returns `3B5BFF`, so a re-imported deck must work too."""
+        slide = _slide([_bfx("light-up", "a", [{"type": "color", "to": "3B5BFF"}])])
+        assert frames(slide, index)[1]["state"]["a"]["fill"] == "#3B5BFF"
+
+    def test_the_recolour_reaches_the_rendered_slide(self, index):
+        slide = _slide([_bfx("light-up", "a", [{"type": "color", "to": "#3B5BFF"}])])
+        derived = frame_slide(slide, frames(slide, index)[1], "-f01")
+        assert next(e for e in derived["elements"] if e["id"] == "a")["fill"] == "#3B5BFF"
+
+    def test_a_scale_is_named_as_something_the_frame_cannot_show(self, index):
+        slide = _slide([_bfx("swell", "a", [{"type": "scale", "to": {"x": 1.4, "y": 1.4}}])])
+        assert any("a scale that this frame cannot show" in n
+                   for n in frames(slide, index)[1]["notes"])
+
+    def test_a_rotation_is_named_too(self, index):
+        slide = _slide([_bfx("spin", "a", [{"type": "rotation", "by": 360}])])
+        assert any("a rotation that this frame cannot show" in n
+                   for n in frames(slide, index)[1]["notes"])
+
+    def test_a_set_of_visibility_reveals_its_target(self, index):
+        slide = _slide([_bfx("show", "a", [
+            {"type": "set", "attrName": "style.visibility", "to": "visible"},
+        ])])
+        assert frames(slide, index)[1]["state"]["a"]["visible"] is True
+
+    def test_an_unmodelled_behaviour_is_named_rather_than_ignored(self, index):
+        """The failure that mattered was silence, not inaccuracy."""
+        slide = _slide([_bfx("odd", "a", [{"type": "property", "attrName": "ppt_w", "to": "2"}])])
+        assert any("not modelled" in n for n in frames(slide, index)[1]["notes"])
+
+    def test_an_unknown_behaviour_type_is_named(self, index):
+        slide = _slide([_bfx("weird", "a", [{"type": "teleport"}])])
+        assert any("unknown behavior 'teleport'" in n
+                   for n in frames(slide, index)[1]["notes"])
+
+    def test_motion_and_scale_in_one_effect_both_register(self, index):
+        """One effect carrying several primitives is how a packet travels and
+        shrinks at once; the storyboard has to read the whole list."""
+        slide = _slide([_bfx("fly-and-shrink", "icon", [
+            {"type": "motion", "path": "M 0 0 L 0.25 0 E"},
+            {"type": "scale", "to": {"x": 0.5, "y": 0.5}},
+        ])])
+        result = frames(slide, index)
+        assert result[1]["state"]["icon"]["dx"] == 0.25 * 1920
+        assert any("a scale that this frame cannot show" in n for n in result[1]["notes"])

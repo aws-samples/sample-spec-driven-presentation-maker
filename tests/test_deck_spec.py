@@ -53,6 +53,9 @@ def test_complete_deck_skeleton_fills_fields_without_mutating_input() -> None:
 
     completed = complete_deck_skeleton(original)
 
+    # The animation and transition switches are deliberately absent: an absent switch
+    # already reads as off, and test_api_init_pptx_deck_json_is_byte_identical pins what a
+    # new PPTX deck.json contains — the same rule outputFormat follows.
     assert completed == {
         "template": "custom",
         "fonts": {"fullwidth": "", "halfwidth": "Inter"},
@@ -85,6 +88,17 @@ def test_validate_specs_rejects_missing_halfwidth_font_key_only() -> None:
     result = _validate(deck=deck)
     assert not [e for e in result["errors"] if "fullwidth" in e]
     assert "deck.json fonts.fullwidth is empty" in result["warnings"]
+
+
+def test_validate_specs_accepts_missing_optional_motion_switches() -> None:
+    assert _validate()["ok"] is True
+
+
+def test_validate_specs_rejects_invalid_optional_motion_switches() -> None:
+    deck = deepcopy(_VALID_DECK)
+    deck["animations"] = {"enabled": "yes"}
+    result = _validate(deck=deck)
+    assert "deck.json animations.enabled: animations.enabled must be boolean" in result["errors"]
 
 
 def test_validate_specs_rejects_empty_template() -> None:

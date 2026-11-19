@@ -104,6 +104,8 @@ def cmd_generate(args):
         result = generate(
             json_path=args.input if args.input and args.input != "-" else None,
             output_path=args.output,
+            animation_mode=args.animation_mode,
+            transition_mode=args.transition_mode,
         )
     except FileNotFoundError as e:
         print(f"Error: {e}", file=sys.stderr)
@@ -165,6 +167,50 @@ def cmd_generate(args):
 
         for w in other_warnings:
             print(f"  {w}")
+
+    if result.get("animated_slides"):
+        print(
+            f"\n▶  {result['animated_slides']} slide(s) carry motion. The PNGs above show every "
+            f"element where it is authored, so they cannot show build order."
+        )
+        print(f"  → storyboard {args.input} -o {{deck_dir}}/storyboard")
+        print("  → then LOOK AT the frames: frame 0 should not show an element whose tile has "
+              "not arrived, and the last frame should be the whole composition.")
+
+
+def cmd_storyboard(args):
+    """Export one still frame per click step and report what each frame shows."""
+    from sdpm.api import storyboard as api_storyboard
+
+    only = None
+    if getattr(args, "slides", None):
+        only = {s.strip() for s in args.slides.split(",") if s.strip()}
+
+    try:
+        result = api_storyboard(
+            deck_dir=args.input,
+            output_dir=args.output_dir,
+            only_slugs=only,
+        )
+    except (FileNotFoundError, RuntimeError, ValueError) as e:
+        print(f"Error: {e}", file=sys.stderr)
+        sys.exit(1)
+
+    current = None
+    for entry in result["manifest"]:
+        if entry["slide"] != current:
+            current = entry["slide"]
+            print(f"\n{current}")
+        print(
+            f"  page{entry['page']:02d}  frame {entry['frame']}  {entry['label']}"
+            f"  on screen: {len(entry['onScreen'])}"
+        )
+        if entry["offScreen"]:
+            print(f"           off screen: {', '.join(entry['offScreen'])}")
+        for note in entry["notes"]:
+            print(f"           ! {note}")
+    print(f"\nStoryboard: {result['preview_dir']}")
+    print(f"Frames JSON: {result['frames_json']}")
 
 
 def cmd_preview(args):
@@ -394,20 +440,32 @@ def cmd_start(args):
 
 
 def cmd_guides(args):
-    """List or show guide documents."""
-    from sdpm.knowledge.reference import list_category, read_docs
-    d = Path(__file__).parent.parent / "references" / "guides"
+    """List or show guide documents, and describe catalog entries.
+
+    Goes through `tools.read_guides` rather than reading the guide directory
+    itself. Reading it directly meant `read_guides effect:flyIn` reported a
+    missing guide file, while the tool of the same name answered it — and
+    SKILL.md promises that workflow text calling a tool applies verbatim here.
+    """
+    from sdpm import tools
+    from sdpm.knowledge.reference import list_category
     if not args.names:
         print("# Guides")
-        for item in list_category(d):
+        for item in list_category(Path(__file__).parent.parent / "references" / "guides"):
             print(f"  {item['name']:<36} {item['description']}")
-    else:
-        try:
-            for doc in read_docs(d, args.names):
-                print(doc["content"])
-                print()
-        except FileNotFoundError as e:
-            print(f"# {e}", file=sys.stderr)
+        print('\n  effect:<name> / transition:<name> / category:<name> describe a catalog')
+        print('  entry; a bare "effect:" lists which effects change what.')
+        return
+    payload = tools.read_guides(args.names)
+    for doc in payload["documents"]:
+        print(doc["content"])
+        print()
+    for name, described in (payload.get("described") or {}).items():
+        print(f"# {name}")
+        print(json.dumps(described, ensure_ascii=False, indent=2))
+        print()
+    for name, error in (payload.get("errors") or {}).items():
+        print(f"# {name}: {error}", file=sys.stderr)
 
 
 def cmd_init(args):
@@ -665,6 +723,12 @@ def main():
     p_gen.add_argument("input", nargs="?", help="Input JSON file (or - for stdin)")
     p_gen.add_argument("-o", "--output", required=True, help="Output PPTX path")
     p_gen.add_argument("--keep-empty-placeholders", action="store_true", help="Keep empty placeholders visible")
+    # Independent render-time overrides. The engine validates the value (one
+    # definition of the accepted set) so every surface reports it identically.
+    p_gen.add_argument("--animation-mode", default="inherit",
+                       help="Object animations: inherit|on|off (overrides deck.json animations.enabled)")
+    p_gen.add_argument("--transition-mode", default="inherit",
+                       help="Slide transitions: inherit|on|off (overrides deck.json transitions.enabled)")
 
     p_html = subparsers.add_parser("generate_html", help="Build output.html for an HTML deck (deck.json outputFormat html)")
     p_html.add_argument("input", help="Deck directory")
@@ -678,6 +742,19 @@ def main():
         "-o", "--output-dir",
         help="Directory for the PNG files (e.g. {deck_dir}/preview). "
              "Default: a fresh temporary directory under _work/",
+    )
+
+    p_story = subparsers.add_parser(
+        "storyboard",
+        help="Export one still frame per click step, to inspect animation build order",
+    )
+    p_story.add_argument("input", help="Deck directory (deck.json + slides/)")
+    p_story.add_argument(
+        "-o", "--output-dir",
+        help="Directory for the PNG files. Default: {deck_dir}/storyboard",
+    )
+    p_story.add_argument(
+        "--slides", help="Only these slugs (comma separated)",
     )
 
     p_meas = subparsers.add_parser("measure", help="Measure text bounding boxes from slides JSON")
@@ -766,6 +843,8 @@ def main():
         cmd_generate_html(args)
     elif args.command == "preview":
         cmd_preview(args)
+    elif args.command == "storyboard":
+        cmd_storyboard(args)
     elif args.command == "measure":
         cmd_measure(args)
     elif args.command == "search_assets":

@@ -630,6 +630,15 @@ def _import_pptx(
     """Convert a PPTX, resuming from the latest verified cached stage."""
     from sdpm.engine.converter import pptx_to_json as _convert
     from sdpm.engine.converter.template import extract_placeholder_template
+    from sdpm.engine.timing.raw import (
+        ASSET_DIR,
+        MANIFEST_PATH,
+        RAW_DIR,
+        RawManifestError,
+        load_raw_manifest,
+        validate_raw_manifest,
+    )
+    from sdpm.engine.timing.reader import ImportLimitExceeded as TimingLimitExceeded
 
     converted = staging / ".converted-pptx"
     deck_dir = staging / "deck"
@@ -637,6 +646,11 @@ def _import_pptx(
         check_deadline()
         try:
             _convert(source_path, output_dir=converted)
+        except TimingLimitExceeded as error:
+            # REQ-5.3a: the timing/transition depth and element boundaries are
+            # measured on the uncompressed XML and surface with the same
+            # structured code as every other import limit.
+            raise ImportLimitExceeded(str(error))
         except Exception as error:
             raise ImportConversionFailed(f"PPTX conversion failed: {error}")
         source_deck_json = converted / "deck.json"
@@ -646,6 +660,22 @@ def _import_pptx(
         deck_dir.mkdir(exist_ok=True)
         shutil.copy2(source_deck_json, deck_dir / "deck.json")
         shutil.copytree(source_slides, deck_dir / "slides", dirs_exist_ok=True)
+        # The slide JSON references animation sidecars and semantic sound
+        # assets by deck-relative path, so the whole dependency closure moves
+        # into the bundle with the deck — before the conversion scratch
+        # directory is deleted below (REQ-5.5).
+        for subtree in (RAW_DIR, ASSET_DIR):
+            source_subtree = converted / subtree
+            if source_subtree.is_dir():
+                shutil.copytree(source_subtree, deck_dir / subtree, dirs_exist_ok=True)
+        manifest_path = deck_dir / MANIFEST_PATH
+        if manifest_path.is_file():
+            try:
+                validate_raw_manifest(load_raw_manifest(manifest_path), root=deck_dir)
+            except RawManifestError as error:
+                raise ImportConversionFailed(
+                    f"Preserved animation dependency closure is incomplete: {error}"
+                )
         complete_stage("extract_text")
 
     if "extract_images" not in completed_stages:

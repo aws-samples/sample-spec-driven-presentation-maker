@@ -154,9 +154,14 @@ def _is_html_deck(deck_id: str) -> bool:
     return read_deck_format(deck_id) == "html"
 
 
-def generate_pptx(deck_id: Annotated[str, Field(description='Deck directory path.')]) -> dict[str, Any]:
+def generate_pptx(
+    deck_id: Annotated[str, Field(description='Deck directory path.')],
+    animation_mode: Annotated[str, Field(description='Object animations: inherit|on|off, overriding deck.json.')] = "inherit",
+    transition_mode: Annotated[str, Field(description='Slide transitions: inherit|on|off, overriding deck.json.')] = "inherit",
+) -> dict[str, Any]:
     """Build output.pptx from the deck workspace (deck.json + slides/*.json). run_python
-    already rebuilds after edits; use this for an explicit full build.
+    already rebuilds after edits; use this for an explicit full build. The two mode
+    arguments render without animations or transitions without editing the deck.
     """
     if _is_html_deck(deck_id):
         return {
@@ -170,6 +175,8 @@ def generate_pptx(deck_id: Annotated[str, Field(description='Deck directory path
     return generate(
         json_path=deck_id,
         output_path=str(Path(deck_id) / "output.pptx"),
+        animation_mode=animation_mode,
+        transition_mode=transition_mode,
     )
 
 
@@ -268,13 +275,63 @@ def list_templates() -> dict[str, Any]:
     return {"templates": list_templates_with_metadata(templates_dirs, metadata, get_builtin_template_notes())}
 
 
+#: Prefixes `read_guides` answers from the animation catalog rather than from a
+#: guide file. They live on `names` instead of a parameter of their own because
+#: a new schema property costs about 150 characters of the per-turn tool budget
+#: and the whole surface has roughly 160 to spare; widening one description
+#: costs 60 and is just as discoverable.
+_CATALOG_LOOKUPS = ("effect", "transition", "category")
+
+
 def read_guides(
-    names: Annotated[list[str], Field(description='Guide names to read.')],
+    names: Annotated[list[str], Field(description='Guide names, or "effect:flyIn" / "transition:push" / "effect:" to describe catalog entries.')],
 ) -> dict[str, Any]:
-    """Read guide documents."""
+    """Read guide documents, and describe catalog entries named as "effect:<name>"."""
     from sdpm.knowledge.reference import read_docs
 
-    return {"documents": read_docs(_REFERENCES_DIR / "guides", names)}
+    guides: list[str] = []
+    lookups: list[tuple[str, str]] = []
+    errors: dict[str, str] = {}
+    for name in names:
+        kind, separator, value = str(name).partition(":")
+        if not separator:
+            guides.append(name)
+        elif kind in _CATALOG_LOOKUPS:
+            # An empty value is the no-argument form: `effect:` returns the
+            # routing table rather than every effect in full.
+            lookups.append((kind, value))
+        else:
+            # A name carrying a colon is asking for a lookup, so say which
+            # prefixes exist. It used to fall through to the guide reader,
+            # which reported it as a missing guide file — and took the whole
+            # call down with it.
+            errors[str(name)] = (
+                f"unknown lookup prefix {kind!r}; the prefixes are "
+                + ", ".join(f"{prefix}:" for prefix in _CATALOG_LOOKUPS)
+            )
+
+    # One name at a time: the guide reader raises on the first it cannot find,
+    # so a single typo used to lose every other document in the same call.
+    documents: list[dict[str, Any]] = []
+    for name in guides:
+        try:
+            documents.extend(read_docs(_REFERENCES_DIR / "guides", [name]))
+        except (FileNotFoundError, OSError) as error:
+            errors[name] = str(error)
+
+    out: dict[str, Any] = {"documents": documents}
+    if lookups:
+        from sdpm.engine.timing.describe import effects
+
+        # `effects` reports an unknown name as a hint rather than raising, so
+        # there is nothing to catch here.
+        out["described"] = {
+            f"{kind}:{value}": effects(**{kind: value}) if value else effects()
+            for kind, value in lookups
+        }
+    if errors:
+        out["errors"] = errors
+    return out
 
 
 def code_to_slide(

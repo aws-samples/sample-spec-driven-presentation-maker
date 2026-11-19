@@ -846,7 +846,12 @@ def test_prepare_rejects_refs_outside_the_deck(tmp_path, cache_root):
 
 
 def test_remote_tool_count_unchanged():
-    """20 tools as before; a configured knowledge base adds only search_slides."""
+    """20 tools; a configured knowledge base adds only search_slides.
+
+    `effects()` is reached through `run_python` rather than bound as a tool, so the
+    count is unchanged by the animation work and AGENTS.md's install check still
+    reads the number it tells an agent to expect.
+    """
     import asyncio
 
     without_kb = {t.name for t in asyncio.run(remote_server.mcp.list_tools())}

@@ -1,0 +1,525 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+"""The optional `animations` guide: discoverable, complete against the engine, and
+conditionally loaded so ordinary composer context does not grow.
+
+Every expectation here is **derived** from the engine and the generated capability
+catalog rather than from a list copied into the test, so the contract growing (a new
+validated field, a preset whose PowerPoint capture closes, a refusal that lifts) fails
+these tests until the guide says so too.
+"""
+
+import ast
+import re
+from pathlib import Path
+
+import pytest
+
+from sdpm import tools as contract
+from sdpm.engine.timing import model
+from sdpm.engine.timing.writer import (
+    CHART_BUILD,
+    SMARTART_BUILD,
+    TEXT_LEVEL_BUILD,
+    TEXT_SEQUENCE_BUILD,
+    CapabilityGapError,
+    TimingWriteError,
+    load_capability_index,
+)
+from sdpm.knowledge.reference import list_category
+
+_ROOT = Path(__file__).resolve().parents[1]
+_REFERENCES = _ROOT / "sdpm" / "references"
+_GUIDES = _REFERENCES / "guides"
+_WORKFLOWS = _REFERENCES / "workflows"
+
+_GUIDE_NAME = "animations"
+_GUIDE_PATH = _GUIDES / f"{_GUIDE_NAME}.md"
+_SPEC_PATH = _GUIDES / "slide-json-spec.md"
+
+#: The only motion field names the always-loaded slide spec may mention. Everything
+#: else the engine validates belongs in the optional guide, so a field added to the
+#: contract lands in the forbidden set by default.
+_SPEC_MAY_NAME = frozenset(
+    {"animations", "transitions", "transition", "enabled", "id", "morphId", "elements", "placeholders"}
+)
+
+#: Catalog key prefixes that name a gallery tile or an effect direction. Those are
+#: enumerated as tables/prose in the guide rather than key by key.
+_BULK_KEY_PREFIXES = (
+    "animation.gallery.",
+    "transition.gallery.",
+    "transition.standardElement.",
+    "animation.effectOptions.direction.",
+)
+
+
+@pytest.fixture(scope="module")
+def guide() -> str:
+    return _GUIDE_PATH.read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def index():
+    return load_capability_index()
+
+
+def _public_json_fields() -> set[str]:
+    """Return the public JSON field names ``model.py`` validates.
+
+    ``model.py`` is the frozen public contract (the writer's own docstring says so),
+    so its ``.get("field")`` lookups and the key tuples it iterates are the field
+    list, read out of the source instead of retyped here.
+    """
+    tree = ast.parse(_ROOT.joinpath("sdpm/sdpm/engine/timing/model.py").read_text(encoding="utf-8"))
+    identifier = re.compile(r"^_?[a-z][A-Za-z0-9]*$")
+    names: set[str] = set()
+    for node in ast.walk(tree):
+        if (
+            isinstance(node, ast.Call)
+            and isinstance(node.func, ast.Attribute)
+            and node.func.attr == "get"
+            and node.args
+            and isinstance(node.args[0], ast.Constant)
+            and isinstance(node.args[0].value, str)
+        ):
+            names.add(node.args[0].value)
+        if isinstance(node, (ast.Tuple, ast.List)):
+            names.update(
+                element.value
+                for element in node.elts
+                if isinstance(element, ast.Constant) and isinstance(element.value, str)
+            )
+    return {name for name in names if identifier.match(name)}
+
+
+def _validated_vocabulary() -> dict[str, frozenset[str]]:
+    """Return every enumeration the model validates a public value against."""
+    return {
+        name: value
+        for name, value in vars(model).items()
+        if isinstance(value, frozenset) and name.isupper() and all(isinstance(v, str) for v in value)
+    }
+
+
+def _writable_presets(index) -> dict[str, set[str]]:
+    """Return the preset names the writer can actually generate, per category."""
+    writable: dict[str, set[str]] = {}
+    for category in sorted(model.ANIMATION_CATEGORIES):
+        names = set()
+        for name in index.preset_names(category):
+            try:
+                index.preset(category, name)
+            except (CapabilityGapError, TimingWriteError):
+                continue
+            names.add(name)
+        writable[category] = names
+    return writable
+
+
+def _table_row_tokens(text: str, first_cell: str) -> set[str]:
+    """Return the backticked tokens of the markdown table row keyed by ``first_cell``."""
+    pattern = re.compile(r"^\|\s*`" + re.escape(first_cell) + r"`\s*\|(.*)\|\s*$", re.MULTILINE)
+    match = pattern.search(text)
+    assert match, f"the guide has no table row for `{first_cell}`"
+    return set(re.findall(r"`([^`]+)`", match.group(1)))
+
+
+def _first_column_tokens(text: str, heading: str) -> set[str]:
+    """Return the backticked first-column token of every row under one heading."""
+    start = text.index(heading)
+    end = text.find("\n## ", start + len(heading))
+    section = text[start : end if end != -1 else len(text)]
+    return {
+        match.group(1)
+        for match in re.finditer(r"^\|\s*`([^`]+)`\s*\|", section, re.MULTILINE)
+    }
+
+
+# --- discoverability --------------------------------------------------------
+class TestDiscoverable:
+    """The guide is reached exactly like every other guide: no new mechanism."""
+
+    def test_read_guides_serves_it(self):
+        result = contract.read_guides([_GUIDE_NAME])
+        assert len(result["documents"]) == 1
+        document = result["documents"][0]
+        assert document["name"] == _GUIDE_NAME
+        assert document["content"].strip()
+        # Frontmatter is stripped by the same reader path as the other guides.
+        assert not document["content"].lstrip().startswith("---")
+        assert "animations.mainSequence" in document["content"] or "mainSequence" in document["content"]
+
+    def test_the_catalogue_in_the_tool_description_names_it(self):
+        assert _GUIDE_NAME in contract.read_guides.__doc__
+
+    def test_the_category_listing_carries_a_description(self):
+        items = {item["name"]: item["description"] for item in list_category(_GUIDES)}
+        assert _GUIDE_NAME in items
+        assert items[_GUIDE_NAME].strip()
+
+
+# --- completeness against the engine ---------------------------------------
+class TestCompleteAgainstTheEngine:
+    """The guide documents the contract the engine actually enforces."""
+
+    def test_every_public_json_field_is_documented(self, guide):
+        missing = sorted(field for field in _public_json_fields() if field not in guide)
+        assert not missing, f"undocumented public JSON fields: {missing}"
+
+    @pytest.mark.parametrize("name", sorted(_validated_vocabulary()))
+    def test_every_validated_value_is_documented(self, guide, name):
+        missing = sorted(value for value in _validated_vocabulary()[name] if value not in guide)
+        assert not missing, f"{name} values missing from the guide: {missing}"
+
+    def test_the_xml_limits_are_documented(self, guide):
+        assert str(model.MAX_TIMING_XML_DEPTH) in guide
+        assert f"{model.MAX_TIMING_XML_ELEMENTS:,}" in guide
+
+    def test_the_preset_table_matches_what_the_writer_can_generate(self, guide, index):
+        writable = _writable_presets(index)
+        for category, names in writable.items():
+            documented = _table_row_tokens(guide, category)
+            assert documented == names, (
+                f"category {category!r}: guide lists {sorted(documented)}, "
+                f"writer can generate {sorted(names)}"
+            )
+
+    def test_every_transition_effect_is_listed(self, guide, index):
+        documented = _first_column_tokens(guide, "### Transition effects and their option sets")
+        assert documented == set(index.transition_slugs())
+
+    def test_every_build_value_is_documented(self, guide, index):
+        for family in (TEXT_SEQUENCE_BUILD, TEXT_LEVEL_BUILD, CHART_BUILD, SMARTART_BUILD):
+            name, element, child = family
+            values = index.build_values(name, element=element, child=child)
+            missing = sorted(value for value in values if value not in guide)
+            assert not missing, f"{name} ({element}) build values missing: {missing}"
+
+    def test_every_refused_capability_is_named_with_its_key(self, guide, index):
+        entries = {**index.items, **index.candidates}
+        refused = sorted(
+            key
+            for key, entry in entries.items()
+            if entry.status == "accepted"
+            and not entry.writable
+            and re.match(r"^(animation|transition)\.", key)
+            and not key.startswith(_BULK_KEY_PREFIXES)
+        )
+        assert refused, "the catalog records no refused control keys; this test needs rethinking"
+        missing = [key for key in refused if key not in guide]
+        assert not missing, f"refused capabilities not disclosed in the guide: {missing}"
+        # The 45 directions are disclosed as a family rather than key by key.
+        assert "animation.effectOptions.direction." in guide
+
+
+# --- the rules the requirements put on the guide ----------------------------
+class TestGuideRules:
+    """REQ-8.1 / REQ-8.2 content the guide has to carry as a rule, not a footnote."""
+
+    def test_static_comprehensibility_is_a_rule(self, guide):
+        heading = next(
+            (line for line in guide.splitlines() if line.startswith("## ") and "motion off" in line),
+            None,
+        )
+        assert heading, "the guide has no top-level rule section about motion being off"
+        section = guide[guide.index(heading) : guide.index("\n## ", guide.index(heading) + len(heading))]
+        assert "only" in section and "PDF" in section and "print" in section
+
+    def test_inspecting_the_storyboard_is_a_rule(self, guide):
+        """An animated deck looks finished in the ordinary preview no matter
+        what its build order does, so "look at the frames" has to be a rule in
+        the guide rather than advice buried in a section about something else."""
+        heading = next(
+            (line for line in guide.splitlines()
+             if line.startswith("## ") and "storyboard" in line.lower()),
+            None,
+        )
+        assert heading, "the guide has no top-level rule section about the storyboard"
+        section = guide[guide.index(heading):guide.index("\n## ", guide.index(heading) + len(heading))]
+        # named the way it is reachable from both the CLI and run_python, not
+        # as a CLI script: test_reference_vocabulary_is_environment_neutral
+        # bans the script name from a guide, and rightly.
+        assert "from sdpm.api import storyboard" in section, "the rule does not give the call"
+        # the three things to look at, and why preview cannot stand in
+        assert "Frame 0" in section and "last frame" in section
+        assert "where it is authored" in section
+        # what a still frame cannot show, so silence is not read as "nothing happens"
+        for token in ("pulse", "colorPulse", "teeter", "spin", "growShrink"):
+            assert token in section
+        # and that it is a derived model rather than ground truth
+        assert "not fidelity" in section
+
+    def test_it_explains_the_switches_and_the_override_precedence(self, guide):
+        for token in ("animations.enabled", "transitions.enabled", "inherit", "independent"):
+            assert token in guide
+        assert "caller override" in guide
+
+    def test_it_explains_raw_preservation_and_morph(self, guide):
+        for token in ("_rawTiming", "_rawTransition", "animations/manifest.json", "IMPORT_LIMIT_EXCEEDED"):
+            assert token in guide
+        assert "## `animations`" in guide and "### Morph" in guide
+
+
+# --- the always-loaded spec stays a pointer ---------------------------------
+@pytest.fixture(scope="module")
+def section() -> str:
+    """The slide spec's motion section — everything it is allowed to say."""
+    text = _SPEC_PATH.read_text(encoding="utf-8")
+    start = text.index("## Animations and Transitions")
+    return text[start : text.index("\n## ", start + 4)]
+
+
+@pytest.fixture(scope="module")
+def composer() -> str:
+    return (_WORKFLOWS / "composer.md").read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def orchestrator() -> str:
+    return (_WORKFLOWS / "orchestrator.md").read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def import_guide() -> str:
+    return (_GUIDES / "import-pptx.md").read_text(encoding="utf-8")
+
+
+@pytest.fixture(scope="module")
+def sync_guide() -> str:
+    return (_GUIDES / "hand-edit-sync.md").read_text(encoding="utf-8")
+
+
+class TestTheDocumentedLookupRouteWorks:
+    """The guide may only name a route an author can actually take.
+
+    `effects` was first documented as `from sdpm.engine.timing.describe import
+    effects` inside `run_python`. That could never work: the local sandbox
+    rejects every import at parse time and the Cloud runner has no `sdpm`
+    installed. The tests passed because they imported the function directly,
+    which is the one thing an author cannot do — a test that bypasses the
+    documented route does not test the documented route.
+    """
+
+    def test_the_route_the_guide_names_returns_a_description(self, guide):
+        assert 'read_guides(["effect:flyIn"])' in guide
+        result = contract.read_guides(["effect:flyIn"])
+        assert "effect:flyIn" in result["described"]
+        assert result["described"]["effect:flyIn"]["effects"], result
+
+    def test_a_transition_and_a_category_route_the_same_way(self):
+        described = contract.read_guides(["transition:push", "category:entrance"])["described"]
+        assert set(described) == {"transition:push", "category:entrance"}
+        assert "error" not in described["transition:push"]
+        assert "error" not in described["category:entrance"]
+
+    def test_a_guide_and_a_lookup_come_back_from_one_call(self):
+        result = contract.read_guides(["animations", "effect:flyIn"])
+        assert len(result["documents"]) == 1
+        assert "effect:flyIn" in result["described"]
+
+    def test_a_plain_name_is_still_a_guide(self):
+        result = contract.read_guides(["animations"])
+        assert len(result["documents"]) == 1
+        assert "described" not in result
+
+    def test_the_guide_does_not_name_the_route_the_sandbox_rejects(self, guide):
+        """And the sandbox really does reject it, which is why the route moved."""
+        import sys
+
+        sys.path.insert(0, str(_ROOT / "servers" / "local"))
+        try:
+            from sandbox import check_code
+        finally:
+            sys.path.pop(0)
+
+        snippet = "from sdpm.engine.timing.describe import effects\nprint(effects())\n"
+        assert check_code(snippet), "the sandbox must reject an import"
+        assert "import statement is not allowed" in check_code(snippet)[0]
+        assert "from sdpm.engine.timing.describe import" not in guide
+
+
+class TestTheNamesListedAreTheNamesAccepted:
+    """A name the routing table shows must be a name the lookup takes.
+
+    The table qualifies a name whenever the bare one is ambiguous, so it lists
+    `entrance.bounce` and `motionPath.bounce` — and the lookup compared the
+    whole thing against the bare tail, which made the listed form the one that
+    returned nothing while the ambiguous `bounce` returned all three.
+    """
+
+    def test_a_qualified_name_returns_exactly_that_effect(self):
+        described = contract.read_guides(["effect:entrance.bounce"])["described"]
+        effects = described["effect:entrance.bounce"]["effects"]
+        assert [(e["category"], e["effect"]) for e in effects] == [("entrance", "bounce")]
+
+    def test_the_bare_name_still_returns_every_category(self):
+        effects = contract.read_guides(["effect:bounce"])["described"]["effect:bounce"]["effects"]
+        assert {e["category"] for e in effects} == {"entrance", "exit", "motionPath"}
+
+    def test_every_qualified_name_the_table_lists_resolves(self):
+        """The table is generated, so this holds for names nobody wrote down."""
+        from sdpm.engine.timing.describe import axis_table
+        from sdpm.engine.timing.writer import load_capability_index
+
+        qualified = sorted({
+            name for _label, names in axis_table(load_capability_index())
+            for name in names if "." in name
+        })
+        assert qualified, "the table must list some qualified names"
+        described = contract.read_guides([f"effect:{name}" for name in qualified])["described"]
+        empty = [key for key, value in described.items() if not value.get("effects")]
+        assert not empty, f"{len(empty)} listed name(s) matched nothing: {empty}"
+
+    def test_a_category_and_a_conflicting_qualifier_match_nothing(self):
+        from sdpm.engine.timing.describe import describe
+        from sdpm.engine.timing.writer import load_capability_index
+
+        index = load_capability_index()
+        assert describe(index, category="exit", effect="entrance.bounce") == []
+
+
+class TestOneBadNameDoesNotLoseTheRest:
+    """`read_docs` raises on the first name it cannot find.
+
+    So a single typo used to take down the whole call, returning nothing for
+    the names that were right. An unknown lookup prefix did the same, because
+    it fell through to the guide reader and was reported as a missing file.
+    """
+
+    def test_an_unknown_guide_name_is_reported_beside_the_ones_that_worked(self):
+        result = contract.read_guides(["animations", "nosuchguide", "effect:flyIn"])
+        assert [doc["name"] for doc in result["documents"]] == ["animations"]
+        assert "effect:flyIn" in result["described"]
+        assert "nosuchguide" in result["errors"]
+
+    def test_an_unknown_prefix_names_the_prefixes_that_exist(self):
+        result = contract.read_guides(["effects:flyIn"])
+        error = result["errors"]["effects:flyIn"]
+        assert "effects" in error
+        for prefix in ("effect:", "transition:", "category:"):
+            assert prefix in error, error
+
+    def test_a_bare_prefix_returns_the_routing_table(self):
+        """Which is the no-argument form the CHANGELOG and the hint name."""
+        described = contract.read_guides(["effect:"])["described"]["effect:"]
+        assert described["changes"], described
+        assert "read_guides" in described["next"]
+
+    def test_the_unmatched_hint_names_a_route_that_works(self):
+        hint = contract.read_guides(["effect:nosuch"])["described"]["effect:nosuch"]["hint"]
+        assert "read_guides" in hint and "effects()" not in hint
+
+
+class TestTheCliSubcommandMatchesTheTool:
+    """SKILL.md promises workflow text calling a tool applies verbatim.
+
+    `read_guides` the subcommand read the guide directory itself, so
+    `read_guides effect:flyIn` reported a missing guide file while
+    `read_guides(["effect:flyIn"])` the tool answered it.
+    """
+
+    def _run(self, *names):
+        import subprocess
+        import sys
+
+        return subprocess.run(
+            [sys.executable, "scripts/pptx_builder.py", "read_guides", *names],
+            capture_output=True, text=True, cwd=_ROOT / "sdpm",
+        )
+
+    def test_a_catalog_lookup_is_answered_rather_than_reported_missing(self):
+        result = self._run("effect:flyIn")
+        assert result.returncode == 0, result.stderr
+        assert "flyIn" in result.stdout
+        assert "not found in guides/" not in result.stdout + result.stderr
+
+    def test_a_guide_name_still_prints_the_guide(self):
+        result = self._run("animations")
+        assert result.returncode == 0, result.stderr
+        assert len(result.stdout) > 1000, "the guide body should come back"
+
+    def test_the_listing_mentions_the_lookup_prefixes(self):
+        result = self._run()
+        assert result.returncode == 0, result.stderr
+        assert "effect:" in result.stdout
+
+
+class TestSpecOnlyPoints:
+    """Ordinary composer context must not grow (REQ-1.1)."""
+
+    def test_it_points_at_the_optional_guide(self, section):
+        assert 'read_guides(["animations"])' in section
+
+    def test_the_pointer_stays_short(self, section):
+        lines = [line for line in section.strip().splitlines() if line.strip()]
+        assert len(lines) <= 12, f"the pointer grew to {len(lines)} lines"
+
+    def test_it_carries_no_detail_table(self, section):
+        assert "|---" not in section and "```" not in section
+
+    def test_it_names_no_field_that_belongs_to_the_guide(self, section):
+        leaked = sorted(
+            field
+            for field in _public_json_fields() - _SPEC_MAY_NAME
+            if re.search(rf"`{re.escape(field)}", section)
+        )
+        assert not leaked, f"the slide-spec pointer names optional-guide fields: {leaked}"
+
+    def test_it_states_the_off_requirement(self, section):
+        assert "motion off" in section
+
+
+# --- conditional loading ----------------------------------------------------
+class TestConditionalLoading:
+    """A composer with neither switch on and no motion field never loads the guide."""
+
+    def test_composer_loads_it_only_on_a_stated_condition(self, composer):
+        assert 'read_guides(["animations"])' in composer
+        for token in ("animations.enabled", "transitions.enabled", "existing_slides", "morphId"):
+            assert token in composer
+        assert "only when" in composer
+        assert "do not load" in composer
+
+    def test_composer_requires_the_slide_to_work_with_motion_off(self, composer):
+        assert "disabled" in composer
+        assert "only in an" in composer
+
+    def test_composer_does_not_own_the_switches(self, composer):
+        assert "deck.json" in composer and "orchestrator" in composer
+
+    def test_orchestrator_decides_the_switches(self, orchestrator):
+        for token in ("animations.enabled", "transitions.enabled", "deck.json", "inherit"):
+            assert token in orchestrator
+        assert 'read_guides(["animations"])' in orchestrator
+
+
+# --- import and hand-edit sync ---------------------------------------------
+class TestImportAndSyncGuides:
+    """REQ-8.3: semantic extraction, raw fallback, sidecars, switches, verification."""
+
+    def test_import_covers_extraction_fallback_and_switches(self, import_guide):
+        for token in (
+            "_rawTiming",
+            "_rawTransition",
+            "animations/manifest.json",
+            "animations.enabled",
+            "transitions.enabled",
+            "SHA-256",
+            'read_guides(["animations"])',
+        ):
+            assert token in import_guide, token
+
+    def test_import_states_switch_derivation_and_preservation(self, import_guide):
+        assert "derive" in import_guide and "preserve" in import_guide.lower()
+
+    def test_import_requires_verification_after_the_build(self, import_guide):
+        assert "Verification" in import_guide
+
+    def test_sync_reflects_powerpoint_added_motion_back_into_json(self, sync_guide):
+        for token in ("mainSequence", "interactiveSequences", "morphId", "target.element", "_rawTiming"):
+            assert token in sync_guide, token
+
+    def test_sync_preserves_an_explicit_switch(self, sync_guide):
+        assert "animations" in sync_guide and "transitions" in sync_guide
+        assert "preserve" in sync_guide.lower() and "Derive a switch only when" in sync_guide

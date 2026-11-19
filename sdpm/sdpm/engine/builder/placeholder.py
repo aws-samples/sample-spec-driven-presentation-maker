@@ -142,6 +142,38 @@ class PlaceholderMixin:
     def _fill_title_only(self, slide, d):
         self._set_or_remove_title(slide, d)
 
+    def _register_placeholder_identity(self, slide, d, registry):
+        """Register logical ids declared on placeholder objects.
+
+        This runs **before** ``_fill_placeholders``, because filling can remove
+        a placeholder (an empty title is deleted) and the registry recognises a
+        detached shape: an animation aimed at a removed placeholder then fails
+        with "produced no shape" instead of "unknown animation target". The
+        placeholder already carries its final ``p:cNvPr/@id`` at this point,
+        since the layout clone assigns it. ``morphId`` renames the shape to
+        PowerPoint's ``!!`` Morph convention; accessibility title and
+        description are never touched.
+        """
+        ph_dict = d.get("placeholders")
+        if not isinstance(ph_dict, dict):
+            return
+        for ph in slide.placeholders:
+            idx = str(ph.placeholder_format.idx)
+            val = ph_dict.get(idx)
+            if not isinstance(val, dict):
+                continue
+            logical_id = val.get("id")
+            morph_id = val.get("morphId")
+            if logical_id is None and morph_id is None:
+                continue
+            registry.register(
+                logical_id,
+                [ph._element],
+                kind="placeholder",
+                source_path=f"placeholders[{idx!r}]",
+                morph_id=morph_id,
+            )
+
     def _fill_placeholders(self, slide, d):
         """Fill placeholders from idx-based placeholders dict."""
         ph_dict = d.get("placeholders", {})

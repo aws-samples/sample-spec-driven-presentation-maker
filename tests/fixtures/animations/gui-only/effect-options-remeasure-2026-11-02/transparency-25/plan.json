@@ -1,0 +1,70 @@
+{
+  "plan": "effect-options",
+  "driver": "scripts/animation_catalog/gui_capture.py",
+  "shapeNames": {
+    "animation.effectOptions.amount.emphasis.transparency.percent25": "Rounded Rectangle 1"
+  },
+  "deck": {
+    "slides": 1,
+    "targetsPerSlide": 1,
+    "columns": 1,
+    "rows": 1,
+    "basisPx": [
+      1920.0,
+      1080.0
+    ],
+    "cellPx": [
+      1824.0,
+      984.0
+    ],
+    "shapePx": [
+      1796,
+      948
+    ],
+    "clickMarginPx": 20.0,
+    "neighbourClearancePx": 20.0,
+    "split": false,
+    "note": "1 targets fit one slide as a 1x1 grid"
+  },
+  "generatedFrom": {
+    "discovery": "effect-options.json",
+    "document": "capture-deck",
+    "tilesRead": 95,
+    "selection": "every enabled AXMenuButton at depth 2 of a tile's Effect Options window, grouped under the disabled one before it, excluding Sequence"
+  },
+  "counts": {
+    "targets": 1,
+    "settings": 1,
+    "effects": 1
+  },
+  "targets": [
+    {
+      "key": "animation.effectOptions.amount.emphasis.transparency.percent25",
+      "effectKey": "animation.gallery.emphasis.transparency",
+      "setting": "Amount",
+      "value": "25%",
+      "prerequisite": [
+        "Animations",
+        "Emphasis Effects",
+        "Transparency"
+      ],
+      "guiPath": [
+        "Animations",
+        "Effect Options",
+        "25%"
+      ],
+      "titleAlternatives": [],
+      "verifyChange": true,
+      "targetIndex": 1,
+      "slideIndex": 1,
+      "cellIndex": 1,
+      "shapeRectPx": {
+        "x": 62,
+        "y": 58,
+        "width": 1796,
+        "height": 948
+      },
+      "shapeName": "Rounded Rectangle 1"
+    }
+  ]
+}
