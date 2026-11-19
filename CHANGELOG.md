@@ -35,6 +35,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   axis, plot area or chart space, out of schema order. PowerPoint accepts that, but strict
   readers and validators can reject the file. It is now inserted at its schema position.
   Local mode and the AWS stack (SdpmRuntime).
+- **A shape's `paragraphs` take the documented `list` key** (#586). `list: {"type": "disc"}`
+  was ignored on shapes, so the paragraph had no bullet; it now makes a bullet, and a
+  numbered `type` and `level` work as in a textbox. `bullet` still works as before. Local
+  mode and the AWS stack (SdpmRuntime).
 
 ## [0.19.0] - 2026-11-18
 
@@ -117,12 +121,6 @@ bundle. Charts gain a radar type, and `deploy.sh` checks who owns its source buc
   sheet open while the chat tab was showing, so it slid in, 440px wide, over the preview;
   the chat tab used a second chat panel, which dropped the home conversation (and one that
   had just created the deck) while it was shown. Web UI only.
-
-### Fixed
-
-- **Shape `paragraphs` accept the documented `list` key** (#586). Shape paragraphs now
-  handle `list: {"type": "disc", ...}` and numbered lists (including `level`), matching
-  `textbox` paragraphs while keeping `bullet` as an alias.
 
 ## [0.18.0] - 2026-11-15
 
