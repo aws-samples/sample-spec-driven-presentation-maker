@@ -16,7 +16,7 @@ class ChartMixin:
         from lxml import etree
         from pptx.oxml.ns import qn
         from pptx.enum.chart import XL_CHART_TYPE, XL_LEGEND_POSITION, XL_MARKER_STYLE, XL_TICK_MARK
-        from pptx.chart.data import CategoryChartData
+        from pptx.chart.data import CategoryChartData, XyChartData
     
         chart_type = elem.get("chartType", "bar")
         categories = elem.get("categories", [])
@@ -65,20 +65,29 @@ class ChartMixin:
             ("pie", False, False): XL_CHART_TYPE.PIE,
             ("donut", False, False): XL_CHART_TYPE.DOUGHNUT,
             ("radar", False, False): XL_CHART_TYPE.RADAR_MARKERS if markers else XL_CHART_TYPE.RADAR,
+            ("scatter", False, False): XL_CHART_TYPE.XY_SCATTER,
         }
         xl_type = type_map.get((chart_type, stacked, horizontal))
         if xl_type is None:
             xl_type = type_map.get((chart_type, False, False), XL_CHART_TYPE.COLUMN_CLUSTERED)
     
         # Build chart data
-        chart_data = CategoryChartData()
-        # Generate dummy categories if missing (e.g. donut charts)
-        if not categories and series_defs:
-            max_vals = max(len(s.get("values", [])) for s in series_defs)
-            categories = [f"Cat{i+1}" for i in range(max_vals)]
-        chart_data.categories = categories
-        for s in series_defs:
-            chart_data.add_series(s.get("name", ""), s.get("values", []))
+        if chart_type == "scatter":
+            chart_data = XyChartData()
+            for s in series_defs:
+                xy_series = chart_data.add_series(s.get("name", ""))
+                for pt in s.get("points", []):
+                    if isinstance(pt, (list, tuple)) and len(pt) >= 2:
+                        xy_series.add_data_point(pt[0], pt[1])
+        else:
+            chart_data = CategoryChartData()
+            # Generate dummy categories if missing (e.g. donut charts)
+            if not categories and series_defs:
+                max_vals = max(len(s.get("values", [])) for s in series_defs)
+                categories = [f"Cat{i+1}" for i in range(max_vals)]
+            chart_data.categories = categories
+            for s in series_defs:
+                chart_data.add_series(s.get("name", ""), s.get("values", []))
     
         # Add chart to slide
         x = self._px_to_emu(elem.get("x", 192))
@@ -194,7 +203,7 @@ class ChartMixin:
                 chart.value_axis.major_unit = val_axis_def["majorUnit"]
             
             # Gridlines
-            val_axis_el = chart._chartSpace.find(f'.//{qn("c:valAx")}')
+            val_axis_el = chart.value_axis._element
             if val_axis_def.get("gridlines") is False:
                 # Remove gridlines
                 if val_axis_el is not None:
@@ -219,8 +228,7 @@ class ChartMixin:
     
             # Axis lines: subtle solid (skip for roundtrip)
             if not val_axis_def and not cat_axis_def:
-                for ax_tag in ['c:valAx', 'c:catAx']:
-                    ax_el = chart._chartSpace.find(f'.//{qn(ax_tag)}')
+                for ax_el in (chart.value_axis._element, chart.category_axis._element):
                     if ax_el is None:
                         continue
                     ax_sp_pr = ax_el.find(qn('c:spPr'))
@@ -236,11 +244,10 @@ class ChartMixin:
             else:
                 # Roundtrip: apply axis line settings
                 if val_axis_def.get("line") == "none":
-                    ax_el = chart._chartSpace.find(f'.//{qn("c:valAx")}')
-                    if ax_el is not None:
-                        ax_sp_pr = ax_el.find(qn('c:spPr'))
+                    if val_axis_el is not None:
+                        ax_sp_pr = val_axis_el.find(qn('c:spPr'))
                         if ax_sp_pr is None:
-                            ax_sp_pr = etree.SubElement(ax_el, qn('c:spPr'))
+                            ax_sp_pr = etree.SubElement(val_axis_el, qn('c:spPr'))
                         for old_ln in ax_sp_pr.findall(qn('a:ln')):
                             ax_sp_pr.remove(old_ln)
                         ln = etree.SubElement(ax_sp_pr, qn('a:ln'))
@@ -336,6 +343,13 @@ class ChartMixin:
                     c = c.lstrip("#") if c else default_series_colors[j % len(default_series_colors)]
                     point.format.fill.solid()
                     point.format.fill.fore_color.rgb = RGBColor.from_string(c)
+            elif chart_type == "scatter":
+                series.marker.style = XL_MARKER_STYLE.CIRCLE
+                series.marker.size = style_marker_size or 8
+                series.marker.format.fill.solid()
+                series.marker.format.fill.fore_color.rgb = rgb
+                series.marker.format.line.color.rgb = rgb
+                series.marker.format.line.width = Pt(1.5)
             elif chart_type in ("line", "radar"):
                 series.format.line.color.rgb = rgb
                 series.format.line.width = Pt(style_line_width or 2.5)
@@ -379,7 +393,7 @@ class ChartMixin:
                             pass
     
         # --- Data labels ---
-        if show_data_labels:
+        if show_data_labels and hasattr(plot._element, "dLbls"):
             plot.has_data_labels = True
             dl = plot.data_labels
             val_axis_def = elem.get("valueAxis", {})

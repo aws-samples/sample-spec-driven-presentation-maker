@@ -91,6 +91,39 @@ class TestChartTypes:
         assert chart._chartSpace.find(f".//{_C}radarChart") is not None
         assert chart._chartSpace.find(f".//{_C}barChart") is None
 
+    def test_scatter_roundtrip(self, tmp_path):
+        pts_a = [[128, 45], [256, 30.5], [512, 22]]
+        pts_b = [[128, 60], [512, 35]]
+        ch = _one_chart(
+            tmp_path,
+            chartType="scatter",
+            series=[
+                {"name": "Lambda", "points": pts_a, "color": "#FF9900"},
+                {"name": "Fargate", "points": pts_b, "color": "#41B3FF"},
+            ],
+            valueAxis={"min": 0},
+        )
+        assert ch["chartType"] == "scatter"
+        assert "categories" not in ch
+        assert [s["name"] for s in ch["series"]] == ["Lambda", "Fargate"]
+        assert [s["points"] for s in ch["series"]] == [pts_a, pts_b]
+        assert all("values" not in s for s in ch["series"])
+        assert [s["color"] for s in ch["series"]] == ["#FF9900", "#41B3FF"]
+        assert ch["valueAxis"]["min"] == 0
+        assert "_chartRebuildable" not in ch
+
+    def test_scatter_builds_a_scatter_chart(self, tmp_path):
+        chart = _built_chart(
+            tmp_path,
+            chartType="scatter",
+            series=[{"name": "s", "points": [[1, 2], [3, 4]]}],
+            style={"markerSize": 10},
+        )
+        assert chart._chartSpace.find(f".//{_C}scatterChart") is not None
+        assert chart._chartSpace.find(f".//{_C}barChart") is None
+        size_el = chart._chartSpace.find(f".//{_C}ser/{_C}marker/{_C}size")
+        assert size_el is not None and size_el.get("val") == "10"
+
     def test_pie(self, tmp_path):
         ch = _one_chart(tmp_path, chartType="pie", categories=["A", "B", "C"],
                         series=[{"name": "share", "values": [20, 30, 50]}])
@@ -459,6 +492,20 @@ class TestRebuildFromExtracted:
         [frame] = [s for s in Presentation(str(tmp_path / "b" / "out.pptx")).slides[0].shapes if s.has_chart]
         assert frame.chart._chartSpace.find(f".//{_C}ser/{_C}spPr/{_A}ln") is None
 
+    def test_edited_scatter_is_built_from_json(self, tmp_path):
+        ch = _one_chart(
+            tmp_path / "a",
+            chartType="scatter",
+            series=[{"name": "s", "points": [[1, 10], [2, 20]], "color": "#FF9900"}],
+        )
+        ch["series"][0]["points"] = [[1, 10], [2, 99]]
+        deck = _make_deck(tmp_path / "b", [ch])
+        result = generate(deck, output_path=tmp_path / "b" / "out.pptx")
+        assert "errors" not in result
+        assert _plot_tags(tmp_path / "b" / "out.pptx") == ["scatterChart"]
+        [again] = _charts(pptx_to_json(tmp_path / "b" / "out.pptx", tmp_path / "c")["slides"][-1])
+        assert again["series"][0]["points"] == [[1, 10], [2, 99]]
+
 
 _USER_SHAPES = ('<c:userShapes xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" '
                 'xmlns:cdr="http://schemas.openxmlformats.org/drawingml/2006/chartDrawing"/>')
@@ -555,7 +602,7 @@ class TestChartsTheJsonCannotDescribe:
 
 class TestInvalidInput:
     def test_unknown_chart_type_degrades_to_bar(self, tmp_path):
-        ch = _one_chart(tmp_path, chartType="scatter", categories=["A"], series=[{"name": "s", "values": [1]}])
+        ch = _one_chart(tmp_path, chartType="funnel", categories=["A"], series=[{"name": "s", "values": [1]}])
         assert ch["chartType"] == "bar"
 
     def test_unsupported_combination_drops_flag(self, tmp_path):
