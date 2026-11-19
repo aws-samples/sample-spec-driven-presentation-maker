@@ -58,9 +58,9 @@ bundle. Charts gain a radar type, and `deploy.sh` checks who owns its source buc
   there (creating it needs AWS CLI v2 2.34.8 or later; the namespace is not available in
   Middle East (Bahrain) and Middle East (UAE)). A bucket it creates gets all four Block Public
   Access settings and a 7-day expiry for source zips. Deployed stacks are unaffected and need
-  no redeploy; the next run creates the new bucket, and the old `sdpm-deploy-<account>-<region>`
-  bucket can be deleted. See [Deploy Guide — Source bucket](docs/en/deploy-cloudshell.md#source-bucket)
-  for how to check the old bucket.
+  no redeploy; the next run creates the new bucket. Keep the old `sdpm-deploy-<account>-<region>`
+  bucket until every copy of `deploy.sh` you run is updated, then delete it. See
+  [Deploy Guide — Source bucket](docs/en/deploy-cloudshell.md#source-bucket) for how to check it.
 
 ### Changed
 
