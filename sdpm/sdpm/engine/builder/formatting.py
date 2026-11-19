@@ -188,19 +188,7 @@ class FormattingMixin:
             # Apply line opacity
             line_opacity = elem.get("lineOpacity")
             if line_opacity is not None and 0 <= line_opacity < 1:
-                try:
-                    from lxml import etree
-                    from pptx.oxml.ns import qn as _qn
-                    _ln = shape._element.spPr.find(_qn('a:ln'))
-                    if _ln is not None:
-                        _sf = _ln.find(_qn('a:solidFill'))
-                        if _sf is not None:
-                            _clr = _sf.find(_qn('a:srgbClr'))
-                            if _clr is not None:
-                                _alpha = etree.SubElement(_clr, _qn('a:alpha'))
-                                _alpha.set('val', str(int(line_opacity * 100000)))
-                except Exception:
-                    pass
+                self._set_line_opacity(shape, line_opacity)
         elif line_color == "none":
             shape.line.fill.background()
             if elem.get("_lineWidthEmu") is not None:
@@ -268,6 +256,25 @@ class FormattingMixin:
                 # Add alpha element
                 alpha_elem = etree.SubElement(srgbClr, '{http://schemas.openxmlformats.org/drawingml/2006/main}alpha')
                 alpha_elem.set('val', str(alpha_val))
+
+    def _set_line_opacity(self, shape, opacity):
+        """Set line opacity (0.0 = fully transparent, 1.0 = fully opaque) via XML."""
+        from lxml import etree
+        from pptx.oxml.ns import qn
+
+        ln = shape._element.spPr.find(qn('a:ln'))
+        if ln is None:
+            return
+        solid_fill = ln.find(qn('a:solidFill'))
+        if solid_fill is None:
+            return
+        srgb_clr = solid_fill.find(qn('a:srgbClr'))
+        if srgb_clr is None:
+            return
+        for existing in srgb_clr.findall(qn('a:alpha')):
+            srgb_clr.remove(existing)
+        alpha_elem = etree.SubElement(srgb_clr, qn('a:alpha'))
+        alpha_elem.set('val', str(int(opacity * 100000)))
     
 
     def _apply_styled_text(self, paragraph, text, default_color=None, default_font_size=None, font_family=None, no_default_color=False, no_default_font=False):

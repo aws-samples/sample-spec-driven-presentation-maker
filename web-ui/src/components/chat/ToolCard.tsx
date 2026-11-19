@@ -409,7 +409,7 @@ export function ToolCardCompact({ name, input }: { name: string; input?: Record<
   const detail = getDetail(name, input)
 
   return (
-    <span className="ledger-compact inline-flex items-center gap-1.5 text-[11px] text-foreground/30 py-0.5">
+    <span className="ledger-compact inline-flex items-center gap-1.5 text-[11px] text-foreground-muted py-0.5">
       {/* Small muted dot marker */}
       <span
         className="flex-none w-1 h-1 rounded-full"

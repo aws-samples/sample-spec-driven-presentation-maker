@@ -316,20 +316,8 @@ def extract_freeform_element(shape, theme_colors=None, color_mapping=None, build
         if dash:
             elem["dashStyle"] = dash
 
-        # Line opacity
-        ln = sp_pr.find(f'.//{{{_NS["a"]}}}ln')
-        if ln is not None:
-            solid = ln.find(f'{{{_NS["a"]}}}solidFill')
-            if solid is not None:
-                for clr_tag in ('srgbClr', 'schemeClr'):
-                    clr = solid.find(f'{{{_NS["a"]}}}{clr_tag}')
-                    if clr is not None:
-                        alpha = clr.find(f'{{{_NS["a"]}}}alpha')
-                        if alpha is not None:
-                            elem["lineOpacity"] = round(int(alpha.get('val')) / 100000, 2)
-                        break
-
         # Arrow heads
+        ln = sp_pr.find(f'.//{{{_NS["a"]}}}ln')
         try:
             if ln is not None:
                 for attr, tag in [("headEnd", "headEnd"), ("tailEnd", "tailEnd")]:

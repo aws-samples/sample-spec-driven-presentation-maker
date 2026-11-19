@@ -112,7 +112,7 @@ export function AttachmentPreview({ attachments, snippets, onRemove, onRemoveSni
           <span className="max-w-[160px] truncate text-muted-foreground">
             {snip.text.slice(0, 60)}{snip.text.length > 60 ? "…" : ""}
           </span>
-          <span className="text-muted-foreground/60">{snip.text.length.toLocaleString()}c</span>
+          <span className="text-muted-foreground">{snip.text.length.toLocaleString()}c</span>
           <button
             type="button"
             onClick={(e) => { e.stopPropagation(); onRemoveSnippet?.(snip.id) }}

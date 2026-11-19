@@ -157,6 +157,10 @@ class TestLintChart:
     def test_radar_chartType_ok(self):
         assert lint(self._base(chartType="radar")) == []
 
+    def test_area_chartType_ok(self):
+        assert lint(self._base(chartType="area")) == []
+        assert lint(self._base(chartType="area", stacked=True)) == []
+
     def test_missing_series(self):
         diags = lint(self._base(series=[]))
         assert any(d["rule"] == "chart-missing-series" for d in diags)

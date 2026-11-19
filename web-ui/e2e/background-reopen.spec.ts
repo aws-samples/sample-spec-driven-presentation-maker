@@ -3,7 +3,7 @@
 /**
  * E2E: a reopened deck follows its chat's work, on each agent engine.
  *
- * A deck is made from New Deck in a slow turn (`[slow=<n>]`), and its tab is closed once the deck
+ * A deck is made from the home composer in a slow turn (`[slow=<n>]`), and its tab is closed once the deck
  * opens. When the turn ended while no tab was open, opening the deck again shows the prompt once
  * and the whole reply, with no Stop button; a reload shows the same (the server has nothing
  * running, and the history comes from `.chat.json`). When the turn still runs, the reopened deck
@@ -23,12 +23,18 @@ async function useEngine(page: Page, baseURL: string, engine: "v2" | "v3") {
   expect(switched.status()).toBe(200)
 }
 
-/** Send `message` from New Deck on a new page, and wait until its deck opens. */
+/** The home composer, ready to type into: it takes the focus once the page has hydrated. */
+async function homeComposer(page: Page) {
+  await page.goto("/decks")
+  const input = page.getByRole("textbox", { name: "Chat message input" })
+  await expect(input).toBeFocused({ timeout: 30_000 })
+  return input
+}
+
+/** Send `message` from the home composer on a new page, and wait until its deck opens. */
 async function startDeck(context: BrowserContext, message: string, deckId: string): Promise<Page> {
   const page = await context.newPage()
-  await page.goto("/decks")
-  await page.getByRole("button", { name: "New Deck" }).click()
-  await page.getByRole("textbox", { name: "Chat message input" }).fill(message)
+  await (await homeComposer(page)).fill(message)
   await page.getByRole("button", { name: "Send message" }).click()
   await expect(page.getByRole("log", { name: "Chat messages" })).toContainText("Creating your deck", { timeout: 15_000 })
   await expect(page).toHaveURL((url) => url.hash === `#${deckId}`, { timeout: 15_000 })

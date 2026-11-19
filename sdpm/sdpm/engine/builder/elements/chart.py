@@ -7,6 +7,62 @@ from pptx.util import Pt
 from sdpm.engine.schema.chart import restores_chart_xml
 from sdpm.utils import xml_safe
 
+# OOXML child elements that follow c:spPr / c:majorGridlines in each parent type.
+_AXIS_AFTER_SPPR = (
+    "c:txPr",
+    "c:crossAx",
+    "c:crosses",
+    "c:crossesAt",
+    "c:auto",
+    "c:lblAlgn",
+    "c:lblOffset",
+    "c:tickLblSkip",
+    "c:tickMarkSkip",
+    "c:noMultiLvlLbl",
+    "c:crossBetween",
+    "c:majorUnit",
+    "c:minorUnit",
+    "c:dispUnits",
+    "c:extLst",
+)
+_AXIS_AFTER_MAJOR_GRIDLINES = (
+    "c:minorGridlines",
+    "c:title",
+    "c:numFmt",
+    "c:majorTickMark",
+    "c:minorTickMark",
+    "c:tickLblPos",
+    "c:spPr",
+    *_AXIS_AFTER_SPPR,
+)
+_CHARTSPACE_AFTER_SPPR = (
+    "c:txPr",
+    "c:externalData",
+    "c:printSettings",
+    "c:userShapes",
+    "c:extLst",
+)
+_PLOTAREA_AFTER_SPPR = ("c:extLst",)
+
+
+def _insert_in_order(parent, tag_name: str, before_tags: tuple[str, ...]):
+    """Return existing child `tag_name`, or insert a new one before the first tag in `before_tags`."""
+    from lxml import etree
+    from pptx.oxml.ns import qn
+
+    tag = qn(tag_name)
+    existing = parent.find(tag)
+    if existing is not None:
+        return existing
+    el = etree.Element(tag)
+    before = {qn(t) for t in before_tags}
+    for idx, child in enumerate(parent):
+        if child.tag in before:
+            parent.insert(idx, el)
+            return el
+    parent.append(el)
+    return el
+
 
 class ChartMixin:
     """Mixin providing chart element methods."""
@@ -65,6 +121,8 @@ class ChartMixin:
             ("pie", False, False): XL_CHART_TYPE.PIE,
             ("donut", False, False): XL_CHART_TYPE.DOUGHNUT,
             ("radar", False, False): XL_CHART_TYPE.RADAR_MARKERS if markers else XL_CHART_TYPE.RADAR,
+            ("area", False, False): XL_CHART_TYPE.AREA,
+            ("area", True, False): XL_CHART_TYPE.AREA_STACKED,
         }
         xl_type = type_map.get((chart_type, stacked, horizontal))
         if xl_type is None:
@@ -164,18 +222,14 @@ class ChartMixin:
     
         # Transparent background (chartSpace + plotArea)
         for target in [chart._chartSpace]:
-            sp_pr = target.find(qn('c:spPr'))
-            if sp_pr is None:
-                sp_pr = etree.SubElement(target, qn('c:spPr'))
+            sp_pr = _insert_in_order(target, 'c:spPr', _CHARTSPACE_AFTER_SPPR)
             for child in list(sp_pr):
                 sp_pr.remove(child)
             etree.SubElement(sp_pr, qn('a:noFill'))
     
         plot_area = chart._chartSpace.find(f'.//{qn("c:plotArea")}')
         if plot_area is not None:
-            pa_sp_pr = plot_area.find(qn('c:spPr'))
-            if pa_sp_pr is None:
-                pa_sp_pr = etree.SubElement(plot_area, qn('c:spPr'))
+            pa_sp_pr = _insert_in_order(plot_area, 'c:spPr', _PLOTAREA_AFTER_SPPR)
             for child in list(pa_sp_pr):
                 pa_sp_pr.remove(child)
             etree.SubElement(pa_sp_pr, qn('a:noFill'))
@@ -201,9 +255,7 @@ class ChartMixin:
                     for gl in val_axis_el.findall(qn('c:majorGridlines')):
                         val_axis_el.remove(gl)
             elif val_axis_el is not None:
-                major_gl = val_axis_el.find(qn('c:majorGridlines'))
-                if major_gl is None:
-                    major_gl = etree.SubElement(val_axis_el, qn('c:majorGridlines'))
+                major_gl = _insert_in_order(val_axis_el, 'c:majorGridlines', _AXIS_AFTER_MAJOR_GRIDLINES)
                 gl_sp_pr = major_gl.find(qn('c:spPr'))
                 if gl_sp_pr is None:
                     gl_sp_pr = etree.SubElement(major_gl, qn('c:spPr'))
@@ -223,9 +275,7 @@ class ChartMixin:
                     ax_el = chart._chartSpace.find(f'.//{qn(ax_tag)}')
                     if ax_el is None:
                         continue
-                    ax_sp_pr = ax_el.find(qn('c:spPr'))
-                    if ax_sp_pr is None:
-                        ax_sp_pr = etree.SubElement(ax_el, qn('c:spPr'))
+                    ax_sp_pr = _insert_in_order(ax_el, 'c:spPr', _AXIS_AFTER_SPPR)
                     for old_ln in ax_sp_pr.findall(qn('a:ln')):
                         ax_sp_pr.remove(old_ln)
                     ln = etree.SubElement(ax_sp_pr, qn('a:ln'))
@@ -238,9 +288,7 @@ class ChartMixin:
                 if val_axis_def.get("line") == "none":
                     ax_el = chart._chartSpace.find(f'.//{qn("c:valAx")}')
                     if ax_el is not None:
-                        ax_sp_pr = ax_el.find(qn('c:spPr'))
-                        if ax_sp_pr is None:
-                            ax_sp_pr = etree.SubElement(ax_el, qn('c:spPr'))
+                        ax_sp_pr = _insert_in_order(ax_el, 'c:spPr', _AXIS_AFTER_SPPR)
                         for old_ln in ax_sp_pr.findall(qn('a:ln')):
                             ax_sp_pr.remove(old_ln)
                         ln = etree.SubElement(ax_sp_pr, qn('a:ln'))

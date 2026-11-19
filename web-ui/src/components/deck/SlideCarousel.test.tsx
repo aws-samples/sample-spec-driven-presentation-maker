@@ -94,6 +94,20 @@ describe("SlideCarousel — HTML decks", () => {
   })
 })
 
+describe("SlideCarousel — chat button", () => {
+  afterEach(cleanup)
+
+  it("offers to reopen the closed chat sheet and has no button while it is open", () => {
+    const onOpenChat = vi.fn()
+    const view = renderCarousel({ onOpenChat })
+    fireEvent.click(screen.getByRole("button", { name: "Open chat" }))
+    expect(onOpenChat).toHaveBeenCalledTimes(1)
+
+    view.rerender(<SlideCarousel slides={[]} />)
+    expect(screen.queryByRole("button", { name: "Open chat" })).toBeNull()
+  })
+})
+
 describe("SlideCarousel — comment tool", () => {
   beforeEach(() => {
     viewMode.current = "grid"
