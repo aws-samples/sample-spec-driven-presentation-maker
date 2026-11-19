@@ -40,6 +40,14 @@ interface AppShellProps {
 }
 
 export function AppShell({ children, deckName, onBack, onNavDecks }: AppShellProps) {
+  // The logo and the rail's Decks item go to the list in place, so the home conversation stays
+  // (a plain link to /decks/ would load the page anew). On a deck: back to the list; on the
+  // home screen with a conversation: scroll to the list below it.
+  const onDecksClick = onBack
+    ? (e: React.MouseEvent) => { e.preventDefault(); onBack() }
+    : onNavDecks
+      ? (e: React.MouseEvent) => { e.preventDefault(); onNavDecks() }
+      : undefined
   const t = useTranslations("appShell")
   const { user, signOut } = useAuth()
   const pathname = usePathname()
@@ -120,7 +128,7 @@ export function AppShell({ children, deckName, onBack, onNavDecks }: AppShellPro
             </button>
           )}
           <div className={`items-center gap-2.5 sm:flex-col sm:gap-1 ${deckName && onBack ? "hidden sm:flex" : "flex"}`}>
-            <a href="/decks/" className="flex items-center no-underline sm:mb-3" aria-label={t("decks")}>
+            <a href="/decks/" onClick={onDecksClick} className="flex items-center no-underline sm:mb-3" aria-label={t("decks")}>
               <div className="w-6 h-6 sm:w-9 sm:h-9 flex items-center justify-center">
                 <SdpmMark className="h-[22px] w-[22px] sm:h-8 sm:w-8" />
               </div>
@@ -128,14 +136,11 @@ export function AppShell({ children, deckName, onBack, onNavDecks }: AppShellPro
             <div className="flex items-center gap-0.5 ml-1 sm:ml-0 sm:flex-col sm:gap-1">
               {NAV_ITEMS.map(({ href, key, icon: Icon }) => {
                 const active = pathname?.startsWith(href.replace(/\/$/, ""))
-                const backToList = key === "decks" && deckName && onBack
                 return (
                   <a
                     key={key}
                     href={href}
-                    onClick={backToList ? (e) => { e.preventDefault(); onBack() }
-                      : key === "decks" && onNavDecks ? (e) => { e.preventDefault(); onNavDecks() }
-                        : undefined}
+                    onClick={key === "decks" ? onDecksClick : undefined}
                     aria-current={active ? "page" : undefined}
                     className={`group/nav px-2 py-1 rounded-md whitespace-nowrap text-sm font-medium no-underline transition-colors sm:flex sm:flex-col sm:items-center sm:gap-1 sm:w-[72px] sm:px-0 sm:py-1.5 ${
                       active ? "text-foreground" : "text-foreground-muted hover:text-foreground"

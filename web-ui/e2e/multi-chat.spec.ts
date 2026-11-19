@@ -63,9 +63,10 @@ async function stubPid(deckId: string): Promise<string> {
   return id.split("-")[2]
 }
 
-/** The rail's Decks item, which goes back to the list in place (the logo link loads the page anew). */
-async function backToList(page: Page) {
-  await page.getByRole("link", { name: "Decks", exact: true }).filter({ hasText: "Decks" }).click()
+/** The rail's Decks item, or the logo: both go back to the list in place. */
+async function backToList(page: Page, via: "rail" | "logo" = "rail") {
+  const decks = page.getByRole("link", { name: "Decks", exact: true })
+  await (via === "rail" ? decks.filter({ hasText: "Decks" }) : decks.filter({ hasNotText: "Decks" })).click()
   await expect(page).toHaveURL((url) => url.hash === "")
 }
 
@@ -130,6 +131,14 @@ test.describe("one conversation per screen", () => {
     await backToList(page)
     await expect(chatLog).toContainText("What is 17 × 3?")
     await expect(chatLog).toContainText("51")
+
+    // The logo goes back in place too: no reload, the conversation stays.
+    await page.evaluate(() => { (window as unknown as { __noReload: boolean }).__noReload = true })
+    await page.getByText(SEEDED.name).first().click()
+    await expect(page).toHaveURL(new RegExp(`#${SEEDED.id}$`))
+    await backToList(page, "logo")
+    expect(await page.evaluate(() => (window as unknown as { __noReload?: boolean }).__noReload)).toBe(true)
+    await expect(chatLog).toContainText("What is 17 × 3?")
 
     // New chat clears it: the stage again.
     await newChat.click()
