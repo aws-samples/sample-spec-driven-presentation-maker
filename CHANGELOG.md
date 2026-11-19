@@ -43,6 +43,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   to freeforms, so a shape's outline stayed opaque. It is now applied, and `pptx_to_json`
   reads it back from a shape's outline as it does from a freeform's. Local mode and the
   AWS stack (SdpmRuntime).
+- **An image's border survives `pptx_to_json`** (#586). The builder draws `line` /
+  `lineWidth` on an image, but the converter did not read them back, so the border was
+  lost when the deck was read and built again. Local mode and the AWS stack (SdpmRuntime).
 
 ## [0.19.0] - 2026-11-18
 
