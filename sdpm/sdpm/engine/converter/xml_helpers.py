@@ -438,17 +438,25 @@ def _extract_line_from_xml(sp_pr, theme_colors=None, color_mapping=None):
     if solid is not None:
         srgb = solid.find('a:srgbClr', _NS)
         scheme = solid.find('a:schemeClr', _NS)
+        clr_el = None
         if srgb is not None:
             from .color import apply_element_transforms
             result["line"] = apply_element_transforms(_hex(srgb), srgb)
+            clr_el = srgb
         elif scheme is not None:
             resolved = _resolve_color_with_transforms(scheme, theme_colors, color_mapping)
             if resolved:
                 result["line"] = resolved
+            clr_el = scheme
         else:
             sys_hex = _sys_hex(solid)
             if sys_hex:
                 result["line"] = sys_hex
+                clr_el = solid.find('a:sysClr', _NS)
+        if clr_el is not None:
+            alpha = clr_el.find('a:alpha', _NS)
+            if alpha is not None and alpha.get('val') is not None:
+                result["lineOpacity"] = round(int(alpha.get('val')) / 100000, 2)
     if "line" not in result and "lineGradient" not in result:
         # Only set none if ln has noFill; otherwise leave unset for style resolution
         if ln.find('a:noFill', _NS) is not None:
