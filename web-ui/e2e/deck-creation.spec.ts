@@ -3,7 +3,7 @@
 /**
  * E2E: deck creation happy path (roadmap 2-5b-4), on each agent engine.
  *
- * Deck list → New Deck → send a chat message → stub agent creates a deck
+ * Home screen → type into its composer and send → stub agent creates a deck
  * and streams tool events → UI navigates to the workspace and shows the
  * slide preview. Exercises the full Local-mode stack: React UI, Next.js
  * API routes, ACP process manager and engine adapters, SSE bridge, and
@@ -21,10 +21,11 @@ async function createDeck(page: Page, engine: "v2" | "v3") {
   await page.goto("/decks")
   await expect(page.getByRole("heading", { name: "Decks" })).toBeVisible()
 
-  // Open the new-deck chat panel
-  await page.getByRole("button", { name: "New Deck" }).click()
+  // The home composer, at the stage of the home screen (no New Deck there); it takes the
+  // focus once the page has hydrated
+  await expect(page.getByRole("button", { name: "New Deck" })).toHaveCount(0)
   const input = page.getByRole("textbox", { name: "Chat message input" })
-  await expect(input).toBeVisible()
+  await expect(input).toBeFocused({ timeout: 30_000 })
 
   // Send a message
   await input.fill(`Create a deck about end-to-end testing on ${engine}`)

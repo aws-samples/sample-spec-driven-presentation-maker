@@ -38,10 +38,17 @@ async function send(page: Page, message: string) {
   await page.getByRole("button", { name: "Send message" }).click()
 }
 
-/** New Deck, then a dispatching prompt; resolves once the deck's chat opened and the compose card shows. */
-async function startCompose(page: Page, prompt: string, deckId: string) {
+/** The home composer, ready to type into: it takes the focus once the page has hydrated. */
+async function homeComposer(page: Page) {
   await page.goto("/decks")
-  await page.getByRole("button", { name: "New Deck" }).click()
+  const input = page.getByRole("textbox", { name: "Chat message input" })
+  await expect(input).toBeFocused({ timeout: 30_000 })
+  return input
+}
+
+/** A dispatching prompt from the home composer; resolves once the deck's chat opened and the compose card shows. */
+async function startCompose(page: Page, prompt: string, deckId: string) {
+  await homeComposer(page)
   await send(page, prompt)
   const chatLog = page.getByRole("log", { name: "Chat messages" })
   await expect(chatLog).toContainText("The composers are on it.", { timeout: 20_000 })
