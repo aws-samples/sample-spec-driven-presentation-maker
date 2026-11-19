@@ -29,8 +29,9 @@ bundle. Charts gain a radar type, and `deploy.sh` checks who owns its source buc
 - Deploy all stacks (`scripts/deploy.sh`), in any order, and the Web UI
   (`scripts/deploy_webui.sh`). Nothing in `infra/config.yaml` changes.
 - `deploy.sh` now uploads to a new source bucket, `sdpm-deploy-<account>-<region>-an`,
-  and creates it on its first run (AWS CLI v2 2.34.8 or later). The old
-  `sdpm-deploy-<account>-<region>` bucket can be deleted; see
+  and creates it on its first run (AWS CLI v2 2.34.8 or later). Keep the old
+  `sdpm-deploy-<account>-<region>` bucket until every copy of `deploy.sh` you run is
+  updated, then delete it; see
   [Deploy Guide — Source bucket](docs/en/deploy-cloudshell.md#source-bucket).
 
 ### Added
