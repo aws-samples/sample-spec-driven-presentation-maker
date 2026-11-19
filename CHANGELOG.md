@@ -39,6 +39,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   was ignored on shapes, so the paragraph had no bullet; it now makes a bullet, and a
   numbered `type` and `level` work as in a textbox. `bullet` still works as before. Local
   mode and the AWS stack (SdpmRuntime).
+- **`lineOpacity` works on shapes** (#586). It was documented for shapes but only applied
+  to freeforms, so a shape's outline stayed opaque. It is now applied, and `pptx_to_json`
+  reads it back from a shape's outline as it does from a freeform's. Local mode and the
+  AWS stack (SdpmRuntime).
 
 ## [0.19.0] - 2026-11-18
 
@@ -121,12 +125,6 @@ bundle. Charts gain a radar type, and `deploy.sh` checks who owns its source buc
   sheet open while the chat tab was showing, so it slid in, 440px wide, over the preview;
   the chat tab used a second chat panel, which dropped the home conversation (and one that
   had just created the deck) while it was shown. Web UI only.
-
-### Fixed
-
-- **Shape `lineOpacity` builds and round-trips** (#586). Shared `_set_line_opacity`
-  between freeforms and shapes, and extracted `lineOpacity` in `_extract_line_from_xml`
-  so shape outlines with `lineOpacity` keep their alpha value through `pptx_to_json`.
 
 ## [0.18.0] - 2026-11-15
 
