@@ -121,6 +121,8 @@ class ChartMixin:
             ("pie", False, False): XL_CHART_TYPE.PIE,
             ("donut", False, False): XL_CHART_TYPE.DOUGHNUT,
             ("radar", False, False): XL_CHART_TYPE.RADAR_MARKERS if markers else XL_CHART_TYPE.RADAR,
+            ("area", False, False): XL_CHART_TYPE.AREA,
+            ("area", True, False): XL_CHART_TYPE.AREA_STACKED,
         }
         xl_type = type_map.get((chart_type, stacked, horizontal))
         if xl_type is None:

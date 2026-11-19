@@ -13,6 +13,15 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
+### Added
+
+- **Area charts** (`chartType: "area"`, #620). An area chart takes the same categories and
+  series as a bar chart; `stacked: true` stacks the areas, and series `color`, `valueAxis`,
+  `categoryAxis`, `style`, `legend` and `dataLabels` work as for `bar`. `pptx_to_json`
+  reads an area or stacked area chart back as `area`, so an edited one is rebuilt from its
+  JSON; a 100% stacked area chart still keeps its `_chartXml`. New `chart-area` guide.
+  Local mode and the AWS stack (SdpmRuntime).
+
 ### Fixed
 
 - **Moving between Decks, Styles and Templates no longer flashes the screen.** The rail and

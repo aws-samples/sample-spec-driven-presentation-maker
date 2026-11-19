@@ -53,7 +53,7 @@ labels and notes follow it.
   style spec — use it for rectangular arrangements instead of hand-placing; compute
   non-rectangular positions (arcs, radial, curves) yourself.
 - Guides exist for specific needs, load only when a slide calls for one:
-  `grid`, `table`, `chart-bar` / `chart-line` / `chart-pie` / `chart-radar`, `freeform`,
+  `grid`, `table`, `chart-bar` / `chart-line` / `chart-pie` / `chart-radar` / `chart-area`, `freeform`,
   `arch-layout-engine` + `arch-elements` (architecture diagrams via `arch_diagram`),
   `design-rules`.
 - Slugs sharing a prefix (`demo-1`, `demo-2`) are one override group: later slides inherit
