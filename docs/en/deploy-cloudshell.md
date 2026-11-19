@@ -185,16 +185,19 @@ without checking the bucket owner.
 
 - Deployed stacks are unaffected and need no redeploy: the source bucket is used only while
   `deploy.sh` runs.
-- The next `deploy.sh` run creates the new `-an` bucket. The old bucket is no longer used and
-  can be deleted.
+- The next `deploy.sh` run creates the new `-an` bucket and stops using the old one.
+- Keep the old bucket until every copy of `deploy.sh` you or your team run is updated. A
+  copy from before this change still uploads to the old bucket name, and once the bucket is
+  deleted that name is free for any account to create. While you own the bucket, an old copy
+  uploads only to you.
 - Check who owns the old bucket:
 
   ```bash
   aws s3api head-bucket --bucket sdpm-deploy-<account-id>-<region> --expected-bucket-owner <account-id>
   ```
 
-  - Success: the bucket is yours. Delete it when you no longer need it
-    (`aws s3 rb s3://sdpm-deploy-<account-id>-<region> --force`).
+  - Success: the bucket is yours. Once no old copy of `deploy.sh` is run any more, you can
+    empty and delete it (`aws s3 rb s3://sdpm-deploy-<account-id>-<region> --force`).
   - `403 Forbidden`: the bucket may belong to another account. Review the build history of the
     `sdpm-deploy` CodeBuild project (the source location of each build) and the CloudTrail
     activity of the `sdpm-deploy-role` IAM role, and rotate credentials as needed.
