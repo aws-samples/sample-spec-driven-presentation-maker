@@ -2,12 +2,10 @@
 // SPDX-License-Identifier: MIT-0
 
 import { afterEach, describe, expect, it, vi } from "vitest"
-import { cleanup, fireEvent, screen } from "@testing-library/react"
+import { cleanup, fireEvent, screen, within } from "@testing-library/react"
 import { renderWithIntl } from "@/test/renderWithIntl"
 import { FORMAT_HTML_ITEM, type PickerItem } from "@/lib/slashToken"
-import { SlashPickerPopup, type SlashPickerPopupProps } from "./SlashPickerPopup"
-
-vi.mock("@/hooks/UseMobile", () => ({ useIsMobile: () => false }))
+import { SlashPickerPopup, placeSlashPanel, type SlashPickerPopupProps } from "./SlashPickerPopup"
 
 const items: PickerItem[] = [
   {
@@ -62,7 +60,8 @@ describe("SlashPickerPopup", () => {
     const formatHeading = screen.getByText("Format")
     expect(styleHeading.compareDocumentPosition(formatHeading) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
     const option = screen.getByRole("option", { name: /HTML/ })
-    expect(option.textContent).toContain("Present in a browser. Can't be edited in PowerPoint.")
+    // Compact cards carry the description as a tooltip.
+    expect(option.getAttribute("title")).toContain("Present in a browser. Can't be edited in PowerPoint.")
     fireEvent.click(option)
     expect(onSelect).toHaveBeenCalledWith(FORMAT_HTML_ITEM)
   })
@@ -127,30 +126,51 @@ describe("SlashPickerPopup", () => {
     expect(screen.queryByRole("listbox")).toBeNull()
   })
 
-  describe("preview placement", () => {
-    function anchorAt(left: number, width: number) {
-      const anchor = document.createElement("form")
-      anchor.getBoundingClientRect = () =>
-        ({ left, right: left + width, width, top: 600, bottom: 660, height: 60, x: left, y: 600, toJSON: () => ({}) }) as DOMRect
-      return { current: anchor }
-    }
+  it("narrows by kind through the kind buttons without taking focus", () => {
+    const onKindChange = vi.fn()
+    renderPopup({ onKindChange, query: "style lu" })
 
-    it("shows the preview at the default panel width by growing leftwards over the main pane", () => {
-      // 1280px window, 440px chat panel at the right edge: input frame starts around x=852.
-      renderPopup({ anchorRef: anchorAt(852, 416), activeIndex: 0 })
+    const group = screen.getByRole("group", { name: "Show" })
+    const style = within(group).getByRole("button", { name: "Style" })
+    expect(style.getAttribute("aria-pressed")).toBe("true")
+    expect(within(group).getByRole("button", { name: "All" }).getAttribute("aria-pressed")).toBe("false")
+    expect(screen.getByText("lu")).toBeTruthy()
 
-      expect(screen.getByText("Arial / Noto Sans JP")).toBeTruthy()
-      const popup = screen.getByRole("listbox").parentElement as HTMLElement
-      expect(popup.style.right).toBe(`${window.innerWidth - (852 + 416)}px`)
-      expect(popup.style.width).toBe(`${416 + 240 + 8}px`)
+    const all = within(group).getByRole("button", { name: "All" })
+    expect(fireEvent.mouseDown(all)).toBe(false)
+    fireEvent.click(all)
+    expect(onKindChange).toHaveBeenCalledWith(null)
+  })
+
+  describe("placement", () => {
+    const rect = (left: number, top: number, width: number, height: number) => ({ left, top, width, right: left + width, bottom: top + height })
+
+    it("is as wide as the window allows, not as wide as the input", () => {
+      // 1440 x 900 window, chat panel at the right edge: input frame 416px wide from x=1008.
+      const p = placeSlashPanel(rect(1008, 780, 416, 100), 1440, 900)
+      expect(p.width).toBe(640)
+      // Ends at the input's right edge and opens leftwards over the deck.
+      expect(p.left + p.width).toBe(1424)
+      expect(p.bottom).toBe(900 - 780 + 8)
+      expect(p.maxHeight).toBe(480)
     })
 
-    it("drops the preview only when the window has no room to its left", () => {
-      renderPopup({ anchorRef: anchorAt(100, 416), activeIndex: 0 })
+    it("centres on a wide input", () => {
+      const p = placeSlashPanel(rect(360, 700, 720, 120), 1440, 900)
+      expect(p.left).toBe(360 + 360 - 320)
+    })
 
-      expect(screen.queryByText("Arial / Noto Sans JP")).toBeNull()
-      const popup = screen.getByRole("listbox").parentElement as HTMLElement
-      expect(popup.style.width).toBe("416px")
+    it("opens below when there is little room above and more below", () => {
+      const p = placeSlashPanel(rect(360, 200, 720, 120), 1440, 900)
+      expect(p.top).toBe(328)
+      expect(p.bottom).toBeUndefined()
+      expect(p.maxHeight).toBe(480)
+    })
+
+    it("stays inside a narrow window", () => {
+      const p = placeSlashPanel(rect(8, 600, 384, 80), 400, 800)
+      expect(p.left).toBe(12)
+      expect(p.width).toBe(376)
     })
   })
 })

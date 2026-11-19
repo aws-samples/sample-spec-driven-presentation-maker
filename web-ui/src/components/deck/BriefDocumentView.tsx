@@ -130,7 +130,7 @@ function getTextContent(node: React.ReactNode): string {
 const briefComponents = {
   h1: ({ children, ...props }: React.ComponentProps<"h1">) => (
     <h1
-      className="text-2xl font-semibold tracking-tight mt-0 mb-4 pb-3 border-b border-foreground/[0.08]"
+      className="text-3xl font-semibold tracking-[-0.025em] leading-tight mt-0 mb-6 pb-4 border-b border-border"
       {...props}
     >
       {typeof children === "string" ? processTextContent(children) : children}
@@ -138,7 +138,7 @@ const briefComponents = {
   ),
   h2: ({ children, ...props }: React.ComponentProps<"h2">) => (
     <h2
-      className="text-lg font-semibold tracking-tight mt-8 mb-3"
+      className="text-lg font-semibold tracking-[-0.015em] text-foreground mt-10 mb-3"
       {...props}
     >
       {typeof children === "string" ? processTextContent(children) : children}
@@ -146,19 +146,19 @@ const briefComponents = {
   ),
   h3: ({ children, ...props }: React.ComponentProps<"h3">) => (
     <h3
-      className="text-[15px] font-medium mt-6 mb-2 text-foreground/80"
+      className="text-[15px] font-semibold mt-6 mb-2 text-foreground"
       {...props}
     >
       {typeof children === "string" ? processTextContent(children) : children}
     </h3>
   ),
   p: ({ children, ...props }: React.ComponentProps<"p">) => (
-    <p className="text-sm leading-relaxed mb-3 text-foreground/90" {...props}>
+    <p className="text-sm leading-relaxed mb-3 text-foreground-secondary" {...props}>
       {typeof children === "string" ? processTextContent(children) : children}
     </p>
   ),
   li: ({ children, ...props }: React.ComponentProps<"li">) => (
-    <li className="text-sm leading-relaxed text-foreground/90" {...props}>
+    <li className="text-sm leading-relaxed text-foreground-secondary" {...props}>
       {typeof children === "string" ? processTextContent(children) : children}
     </li>
   ),
@@ -190,7 +190,7 @@ const briefComponents = {
   ),
   th: ({ children, ...props }: React.ComponentProps<"th">) => (
     <th
-      className="text-left text-xs font-semibold uppercase tracking-wider text-foreground/60 px-3 py-2 border-b border-foreground/[0.08]"
+      className="text-left text-xs font-semibold uppercase tracking-wider text-foreground-secondary px-3 py-2 border-b border-foreground/[0.08]"
       {...props}
     >
       {children}
@@ -252,7 +252,7 @@ function ApprovalStatus({ approved }: ApprovalStatusProps) {
 
   if (approved) {
     return (
-      <div className="flex items-center gap-2 text-xs text-foreground/60" role="status" aria-label={t("approvedAria")}>
+      <div className="flex items-center gap-2 text-xs text-foreground-muted" role="status" aria-label={t("approvedAria")}>
         <FileCheck2 className="h-3.5 w-3.5" aria-hidden="true" />
         <span>{t("approved")}</span>
       </div>
@@ -260,7 +260,7 @@ function ApprovalStatus({ approved }: ApprovalStatusProps) {
   }
 
   return (
-    <div className="flex items-center gap-2 text-xs text-foreground/50" role="status" aria-label={t("pendingAria")}>
+    <div className="flex items-center gap-2 text-xs text-foreground-muted" role="status" aria-label={t("pendingAria")}>
       <FileClock className="h-3.5 w-3.5" aria-hidden="true" />
       <span>{t("pending")}</span>
     </div>
@@ -286,7 +286,7 @@ export function BriefDocumentView({ content, outlineExists }: BriefDocumentViewP
       {/* Document header — contract metaphor */}
       <div className="max-w-3xl mx-auto mb-4">
         <div className="flex items-center justify-between">
-          <span className="text-xs font-mono text-foreground/40 tracking-wide">
+          <span className="text-xs font-mono text-foreground-muted tracking-wide">
             {t("filePath")}
           </span>
           <ApprovalStatus approved={approved} />

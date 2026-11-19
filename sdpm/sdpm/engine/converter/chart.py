@@ -26,10 +26,12 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
         XL_CHART_TYPE.DOUGHNUT: ("donut", False, False),
         XL_CHART_TYPE.RADAR: ("radar", False, False),
         XL_CHART_TYPE.RADAR_MARKERS: ("radar", False, False),
+        XL_CHART_TYPE.AREA: ("area", False, False),
+        XL_CHART_TYPE.AREA_STACKED: ("area", True, False),
     }
     chart_type, stacked, horizontal = type_map.get(ct, ("bar", False, False))
     # The builder can make this chart again from its JSON only when chartType
-    # describes it: one plot of a mapped type. Anything else (area, filled radar,
+    # describes it: one plot of a mapped type. Anything else (filled radar,
     # 100% stacked, combo charts…) is read as a bar chart and only _chartXml keeps it.
     rebuildable = ct in type_map and len(chart.plots) == 1
     elem["chartType"] = chart_type
@@ -98,7 +100,7 @@ def extract_chart_element(shape, theme_colors=None, color_mapping=None):
             s["values"] = []
         # Extract color (solid or gradient fallback)
         try:
-            if chart_type in ("bar",):
+            if chart_type in ("bar", "area"):
                 rgb = series.format.fill.fore_color.rgb
                 s["color"] = f"#{rgb}"
             elif chart_type == "line":

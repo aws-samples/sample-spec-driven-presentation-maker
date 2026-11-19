@@ -15,12 +15,108 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Added
 
+- **Area charts** (`chartType: "area"`, #620). An area chart takes the same categories and
+  series as a bar chart; `stacked: true` stacks the areas, and series `color`, `valueAxis`,
+  `categoryAxis`, `style`, `legend` and `dataLabels` work as for `bar`. `pptx_to_json`
+  reads an area or stacked area chart back as `area`, so an edited one is rebuilt from its
+  JSON; a 100% stacked area chart still keeps its `_chartXml`. New `chart-area` guide.
+  Local mode and the AWS stack (SdpmRuntime).
+
+### Fixed
+
+- **Moving between Decks, Styles and Templates no longer flashes the screen.** The rail and
+  the logo were plain links, so every move reloaded the page: the whole screen was drawn
+  again, the text showed in English for a moment before the chosen language, and the Cloud
+  Web UI went blank while it checked the sign-in. They now change pages in place. The rail
+  stays, and only the content changes, with a 150ms fade (none with reduced motion). Web UI
+  only (`deploy_webui.sh`).
+- **Chart XML follows the OOXML schema order** (#648). A chart's axis line, gridline and
+  background styling (`c:spPr`, `c:majorGridlines`) was appended as the last child of its
+  axis, plot area or chart space, out of schema order. PowerPoint accepts that, but strict
+  readers and validators can reject the file. It is now inserted at its schema position.
+  Local mode and the AWS stack (SdpmRuntime).
+
+## [0.19.0] - 2026-11-18
+
+The Web UI is laid out anew. It has a left rail and a home screen that is the chat, with
+the deck list below it. A deck's name, steps and tools share one row above the slides,
+which get about 870px instead of 660px at 1440px. The `/` picker and the new Style and
+Template chips show style covers and template themes. The chat keeps one conversation per
+screen. SDPM gets its own icon, in the Web UI, the favicon, the PWA and the Claude Desktop
+bundle. Charts gain a radar type, and `deploy.sh` checks who owns its source bucket.
+
+### Upgrading from 0.18
+
+**Cloud deployments.**
+
+- Deploy all stacks (`scripts/deploy.sh`), in any order, and the Web UI
+  (`scripts/deploy_webui.sh`). Nothing in `infra/config.yaml` changes.
+- `deploy.sh` now uploads to a new source bucket, `sdpm-deploy-<account>-<region>-an`,
+  and creates it on its first run (AWS CLI v2 2.34.8 or later). Keep the old
+  `sdpm-deploy-<account>-<region>` bucket until every copy of `deploy.sh` you run is
+  updated, then delete it; see
+  [Deploy Guide — Source bucket](docs/en/deploy-cloudshell.md#source-bucket).
+
+### Added
+
 - **Radar charts** (`chartType: "radar"`, #621). A radar chart takes the same categories and
   series as a line chart; `markers` (default on), series `color`, `style.lineWidth` /
   `style.markerSize` and `valueAxis` (`min` / `max` / `majorUnit` / `gridlines`, the radial
   scale) work as for `line`. `pptx_to_json` reads a radar chart back as `radar`, so an
   edited one is rebuilt from its JSON; a filled radar chart still keeps its `_chartXml`.
   New `chart-radar` guide. Local mode and the AWS stack (SdpmRuntime).
+- **An SDPM icon.** A slide frame holding a green and an amber face, with a violet block
+  tilting in over its top-left corner. The Web UI uses it for the logo at the top of the
+  rail (the mobile top bar too, drawn without a tile and following the dark/light theme),
+  the favicon (also without a tile, so it fills the browser tab; the SVG favicon follows the
+  dark/light colour scheme), `icon.svg` and the PWA icons, which were blank squares before.
+  The Claude Desktop bundle (`sdpm.mcpb`) now carries it as its icon. Web UI
+  (`deploy_webui.sh`) and the next release's bundle.
+
+### Security
+
+- **deploy.sh: the source bucket is account-scoped and its owner is checked.** `deploy.sh`
+  uploads the CodeBuild source to `sdpm-deploy-<account>-<region>-an` in the S3 account
+  regional namespace and passes `--expected-bucket-owner` on every call to that bucket. It
+  stops before uploading when the bucket belongs to another account or cannot be created
+  there (creating it needs AWS CLI v2 2.34.8 or later; the namespace is not available in
+  Middle East (Bahrain) and Middle East (UAE)). A bucket it creates gets all four Block Public
+  Access settings and a 7-day expiry for source zips. Deployed stacks are unaffected and need
+  no redeploy; the next run creates the new bucket. Keep the old `sdpm-deploy-<account>-<region>`
+  bucket until every copy of `deploy.sh` you run is updated, then delete it. See
+  [Deploy Guide — Source bucket](docs/en/deploy-cloudshell.md#source-bucket) for how to check it.
+
+### Changed
+
+- **The Web UI is laid out anew: a left rail, a home screen that is the chat, and a one-row
+  deck bar.** Decks, Styles and Templates move to a rail on the left (a top bar on phones),
+  with Settings as a gear at its foot; the user menu (name, sign out) is a Cloud-only item
+  below it. The home screen opens on "What are we presenting?" with the chat input in the
+  middle; under it, dashed Style and Template chips open a gallery of style covers and
+  template themes, and choosing one puts the same `@style:` / `@template:` token in the
+  input that `/` does. Once a conversation starts it fills the first screenful, with the deck
+  list below it, until it creates a deck; the conversation then moves into the chat sheet
+  beside the deck, its height and width animated rather than swapped. A deck's name, its
+  steps (brief, art direction, outline, slides) as a progress track, and its tools share one
+  row above the slides, so the slides get about 870px instead of 660px at 1440px with the
+  chat open. The `/` picker is the same card gallery as the chips: up to 640px wide
+  whatever the input's width, opening over the deck beside the chat sheet, with All /
+  Template / Style / Format buttons (they rewrite `/sty` as `/style sty`) and arrow keys in
+  all four directions. Text, surfaces and borders get more contrast steps (WCAG AA for
+  secondary text), on a warm charcoal dark theme and the matching light one. Web UI only
+  (`deploy_webui.sh`).
+- **The chat has one conversation per screen; the New and deck tabs are gone.** The home
+  screen's conversation stays while you open decks and come back, and only New chat clears
+  it; a deck's sheet shows that deck's conversation only. The rail's chat button is gone
+  too: with the sheet closed, Chat at the right of the deck bar opens it again. Web UI only.
+
+### Fixed
+
+- **Phones: the chat button no longer opens the side sheet over a deck's preview tab, and
+  switching to the chat tab keeps the home conversation.** The header button marked the
+  sheet open while the chat tab was showing, so it slid in, 440px wide, over the preview;
+  the chat tab used a second chat panel, which dropped the home conversation (and one that
+  had just created the deck) while it was shown. Web UI only.
 
 ### Fixed
 
@@ -2528,7 +2624,8 @@ decks and cloud data keep working. See the
 - Initial release: spec-driven slide generation (Engine json ↔ pptx, CLI,
   local/remote MCP servers, Strands Agent, React Web UI, CDK stacks)
 
-[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.18.0...HEAD
+[Unreleased]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.19.0...HEAD
+[0.19.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.18.0...v0.19.0
 [0.18.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.17.0...v0.18.0
 [0.17.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.16.0...v0.17.0
 [0.16.0]: https://github.com/aws-samples/sample-spec-driven-presentation-maker/compare/v0.15.0...v0.16.0

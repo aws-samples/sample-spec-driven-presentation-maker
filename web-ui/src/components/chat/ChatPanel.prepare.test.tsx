@@ -85,7 +85,8 @@ describe("ChatPanel prepare (Cloud)", () => {
     expect(ws.closedWith).toBe(1000)
 
     view.rerender(<ChatPanel deckId="new" onLoadingChange={() => {}} />)
-    fireEvent.click(screen.getByRole("button", { name: /Vibe/ }))
+    fireEvent.keyDown(screen.getByRole("button", { name: /Working style/ }), { key: "Enter" })
+    fireEvent.click(screen.getByRole("menuitemradio", { name: /Vibe/ }))
     await act(async () => { vi.advanceTimersByTime(20 * 60 * 1000) })
     expect(prepares()).toHaveLength(1)
     expect(FakeWebSocket.instances).toHaveLength(1)
@@ -125,21 +126,21 @@ describe("ChatPanel prepare (Cloud)", () => {
     expect(FakeWebSocket.instances).toHaveLength(1)
   })
 
-  it("does not prepare when a page loads with the chat closed or on a deck's own tab", async () => {
-    const shell = (open: boolean, chatTab: "new" | "deck", deckId: string | null) => (
-      <ChatPanelShell open={open} onClose={() => {}} chatTab={chatTab} onChatTabChange={() => {}} deckId={deckId} deckName="d" />
+  it("does not prepare when a page loads with the chat closed or on a deck", async () => {
+    const shell = (open: boolean, deckId: string | null) => (
+      <ChatPanelShell open={open} onClose={() => {}} deckId={deckId} />
     )
-    const view = renderWithIntl(shell(false, "new", null))
+    const view = renderWithIntl(shell(false, null))
     await waitFor(() => expect(getChatHistory).toHaveBeenCalled())
     await act(async () => { vi.advanceTimersByTime(1000) })
     expect(FakeWebSocket.instances).toHaveLength(0)
 
-    view.rerender(shell(true, "deck", "d1"))
+    view.rerender(shell(true, "d1"))
     await act(async () => { vi.advanceTimersByTime(1000) })
     expect(FakeWebSocket.instances).toHaveLength(0)
 
-    // New Deck: the chat opens on the New tab.
-    view.rerender(shell(true, "new", "d1"))
+    // Back on the home screen, the home conversation is shown.
+    view.rerender(shell(true, null))
     await waitFor(() => expect(FakeWebSocket.instances).toHaveLength(1))
     act(() => FakeWebSocket.last().open())
     expect(prepares()).toEqual([{ type: "prepare", mode: "spec" }])

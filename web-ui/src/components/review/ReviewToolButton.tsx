@@ -20,8 +20,9 @@ export function ReviewToolButton({ on, onClick }: { on: boolean; onClick: () => 
       }`}
     >
       <MessageSquarePlus className="h-3.5 w-3.5" />
-      {t("tool")}
-      <kbd className={`rounded border px-1 py-px font-mono text-[11px] leading-none ${on ? "border-black/20 text-human-ink" : "border-border-hover text-muted-foreground"}`}>C</kbd>
+      {/* Icon only when the workspace bar is narrow (its @container); the name stays for screen readers */}
+      <span className="@max-5xl:sr-only">{t("tool")}</span>
+      <kbd className={`@max-5xl:hidden rounded border px-1 py-px font-mono text-[11px] leading-none ${on ? "border-black/20 text-human-ink" : "border-border-hover text-muted-foreground"}`}>C</kbd>
     </button>
   )
 }

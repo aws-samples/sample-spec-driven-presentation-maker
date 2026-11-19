@@ -4,7 +4,7 @@
  * E2E: a deck an MCP client made, opened by its direct link (`sdpm open <deck>` opens
  * `/decks/#<id>`), on each agent engine.
  *
- * The deck has deck.json and specs/ but no `.session`, as an MCP client leaves it. Its chat tab
+ * The deck has deck.json and specs/ but no `.session`, as an MCP client leaves it. Its chat sheet
  * opens empty; the first turn runs in a new session whose first prompt names the deck
  * (`Current deck: <dir>`, from the stub's trace) and shows no "no Kiro session" notice. The turn
  * saves `.session`, and a reload shows the conversation (it continues from then on).
@@ -50,9 +50,10 @@ for (const engine of ["v3", "v2"] as const) {
 
     await page.goto(`/decks/#${deckId}`)
     const chatLog = page.getByRole("log", { name: "Chat messages" })
-    // The prerendered page shows the New chat's input until the hash is read after hydration;
-    // type only once the deck's own chat tab (labelled with the loaded deck's name) is there.
-    await expect(page.getByRole("button", { name: `MCP-made deck (${deckId})`, exact: true })).toBeVisible({ timeout: 30_000 })
+    // The prerendered page shows the home composer until the hash is read after hydration;
+    // type only once the deck is open (its bar shows the loaded deck's name; a name without a
+    // folder timestamp shows as it is) and its chat sheet is the only input.
+    await expect(page.getByRole("heading", { name: `MCP-made deck (${deckId})`, exact: true })).toBeVisible({ timeout: 30_000 })
     await expect(page.getByRole("textbox", { name: "Chat message input" })).toBeVisible()
     await expect(chatLog).not.toContainText("51")
 
