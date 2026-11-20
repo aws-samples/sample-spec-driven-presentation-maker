@@ -186,6 +186,9 @@ its data directories, and XML from outside the repository goes through one expli
 
 ### Added
 
+- **Font-size token check covers inline directives.** `{{22pt:text}}`, `{{bold,18pt:text}}` and
+  `{{24pt,link:URL:text}}` are now checked against the style's `--fs-*` tokens like `fontSize`
+  fields, and reported with an `:inline` location (part of #135).
 - **A writing guide for Japanese decks (`writing-ja`).** For a Japanese deck the
   orchestrator reads it before writing the outline, and composers read it before writing any
   slide text in every pass, in both PPTX and HTML. It says how headlines, bullets, diagram labels and speaker notes are
