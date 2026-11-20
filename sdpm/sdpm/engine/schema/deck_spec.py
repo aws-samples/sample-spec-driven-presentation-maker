@@ -24,6 +24,12 @@ DECK_JSON_SKELETON: dict[str, Any] = {
 # HTML decks so PPTX deck.json stays unchanged (not part of DECK_JSON_SKELETON).
 OUTPUT_FORMATS: tuple[str, ...] = ("pptx", "html")
 
+# deck.json "notesMode" values: what the PPTX build does with slide "notes".
+# "keep" (the default when absent) writes them as speaker notes; "strip" leaves
+# them out of the .pptx; "export" leaves them out and writes them to a Markdown
+# file next to the .pptx. Optional, so not part of DECK_JSON_SKELETON.
+NOTES_MODES: tuple[str, ...] = ("keep", "strip", "export")
+
 _SUB_ITEM_RE = re.compile(r"^\s{2,}-\s+(body|visual|evidence)\s*:")
 _COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
 _REQUIRED_SUB_ITEMS = ("body", "visual", "evidence")
@@ -105,6 +111,27 @@ def deck_output_format(deck_json: Any) -> Literal["pptx", "html"]:
     if value == "html":
         return "html"
     raise ValueError(f'deck.json outputFormat must be "pptx" or "html", got {value!r}')
+
+
+def deck_notes_mode(deck_json: Any) -> Literal["keep", "strip", "export"]:
+    """Return the deck's speaker-notes policy: "keep" when notesMode is absent or None,
+    or when deck.json is not an object.
+
+    Raises ValueError naming the value when notesMode is anything other than
+    "keep", "strip" or "export".
+    """
+    if not isinstance(deck_json, dict):
+        return "keep"
+    value = deck_json.get("notesMode")
+    if value is None:
+        return "keep"
+    if value == "keep":
+        return "keep"
+    if value == "strip":
+        return "strip"
+    if value == "export":
+        return "export"
+    raise ValueError(f'deck.json notesMode must be "keep", "strip" or "export", got {value!r}')
 
 
 def read_deck_format(deck_dir: str | Path) -> Literal["pptx", "html"]:
@@ -214,6 +241,12 @@ def validate_specs(
             output_format = deck_output_format(deck_json)
         except ValueError:
             errors.append('deck.json outputFormat must be "pptx" or "html"')
+
+    if "notesMode" in deck_json:
+        try:
+            deck_notes_mode(deck_json)
+        except ValueError:
+            errors.append('deck.json notesMode must be "keep", "strip" or "export"')
 
     if not _is_non_empty(fonts.get("halfwidth")):
         errors.append("deck.json fonts.halfwidth is empty")

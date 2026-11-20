@@ -39,6 +39,7 @@ Metadata only. Do NOT put slides here.
 - `"defaultBackground"`: Optional. Solid ground for every slide that does not set its own `background` (e.g. `"#FFF6E5"`). `apply_style` fills it from the style's `--color-bg`; omit to keep the template background. Table auto-colors and icon theme (dark/light) follow it.
 - `"title"`: Optional. Document title written to the PPTX properties (shown by PowerPoint and read by screen readers). Defaults to the first slide's title text.
 - `"language"`: Optional. Document language as a BCP 47 tag (e.g. `"en-US"`, `"ja-JP"`), written to the PPTX properties.
+- `"notesMode"`: Optional. What the build does with each slide's `notes`: `"keep"` (default) writes them as speaker notes; `"strip"` leaves them out of the .pptx; `"export"` leaves them out and writes them to `<output stem>.notes.md` next to the .pptx (`output.pptx` → `output.notes.md`, one `## pageNN — title` section per slide, styling removed). Use `strip` or `export` for a deck handed to the audience: imported slides often carry their presenter's internal notes. The slide files keep their `notes` either way, so composing is unchanged. A full build in `keep` or `strip` mode deletes a `<output stem>.notes.md` left by an earlier `export` build. PPTX decks only: an HTML deck keeps its `<aside class="notes">` whatever the value. Any other value stops the build.
 - Line color, table color, and chart color are auto-resolved from the template's theme colors.
 
 ### slides/{slug}.json

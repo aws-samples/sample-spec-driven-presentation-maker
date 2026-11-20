@@ -3,8 +3,10 @@
 
 from sdpm.engine.schema.deck_spec import (
     DECK_JSON_SKELETON,
+    NOTES_MODES,
     OUTPUT_FORMATS,
     complete_deck_skeleton,
+    deck_notes_mode,
     deck_output_format,
     is_html_build_input,
     is_pptx_build_input,
@@ -18,11 +20,13 @@ from sdpm.engine.schema.slugs import OUTLINE_SLUG_RE, SLUG_RE, parse_outline_ent
 
 __all__ = [
     "DECK_JSON_SKELETON",
+    "NOTES_MODES",
     "OUTLINE_SLUG_RE",
     "OUTPUT_FORMATS",
     "SLUG_RE",
     "affected_slugs",
     "complete_deck_skeleton",
+    "deck_notes_mode",
     "deck_output_format",
     "extract_regions",
     "is_comment_element",
