@@ -13,7 +13,15 @@ Please read [AGENTS.md](AGENTS.md) first for project structure, layer architectu
 5. Commit with a [Conventional Commits](https://www.conventionalcommits.org/) message (`feat: ...`, `fix: ...`, `docs: ...`, etc.)
 6. Push and open a Pull Request
 
-CI runs ruff, pytest, and ASH (security scan) on every PR. Failing checks block merge.
+CI runs ruff, pytest, and ASH (security scan) on PRs. On a PR from a fork, CI does not start by itself: a maintainer approves the run first, so "waiting for approval" is normal. Failing checks block merge.
+
+## First contribution
+
+1. Pick an Issue labeled [`good first issue`](https://github.com/aws-samples/sample-spec-driven-presentation-maker/labels/good%20first%20issue) and comment that you are taking it.
+2. Check locally: `uv sync`, then `make all`.
+3. For a user-visible change, add an entry under `## [Unreleased]` in [CHANGELOG.md](CHANGELOG.md): a bold one-line summary with the Issue number, a short plain description, and where it applies (for example `Local mode and the AWS stack (SdpmRuntime)`). Internal-only changes need no entry.
+
+The `blog:*` label check is for maintainers. You can ignore it if it fails.
 
 ## Development setup
 
