@@ -20,6 +20,8 @@ the findings as warnings, each naming its fix.
 └─ output.html          generated — open it in a browser
 ```
 
+The `deck.json` fields are in the `deck-json-spec` guide.
+
 ## What a slide can use
 
 A slide is a web page: HTML, CSS and JS within this range.

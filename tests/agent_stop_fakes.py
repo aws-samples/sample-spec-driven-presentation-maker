@@ -84,7 +84,7 @@ class ScriptedModel(Model):
 # (check_specs, start_presentation / start_composing static parts and deck part, generate_pptx).
 _PAYLOAD = {
     "ok": True, "errors": [], "warnings": [], "slugs": ["a", "b"],
-    "static": {"workflow": "Compose slides.", "slide_spec": "Slide spec."},
+    "static": {"workflow": "Compose slides.", "slide_spec": "Slide spec.", "deck_spec": "Deck spec."},
     "styles": [], "templates": [], "deck": {"specs_ok": True}, "specs_ok": True,
 }
 
