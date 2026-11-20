@@ -83,6 +83,7 @@ Expands an external JSON file's elements array. Draw order is controlled by posi
 - `autoWidth`: true → word_wrap disabled (width fits text)
 - `line`: border color. Omit or `"none"` for no border
 - `lineWidth`: border thickness (pt, default 1)
+- `lineOpacity`: border opacity (default 1.0)
 - `margin*`: px (same 1920-wide canvas basis as other coordinates)
 - `verticalAlign`: `top`, `middle`, `bottom` (default: top for textbox)
 - **Line breaks**: `\n` creates a line break (internally split into paragraphs)

@@ -497,6 +497,15 @@ class TestTextboxBox:
         assert (out["verticalAlign"], out["textDirection"]) == ("bottom", "vert270")
         assert (out["marginTop"], out["autoWidth"]) == (5, True)
 
+    def test_border_opacity_survives(self, tmp_path):
+        border = {"text": "t", "line": "#FF0000", "lineWidth": 2}
+        (sp,) = _built_shapes(tmp_path, [_textbox(**border, lineOpacity=0.5)])
+        assert sp._element.spPr.find(f"{_A}ln/{_A}solidFill/{_A}srgbClr/{_A}alpha").get("val") == "50000"
+        assert _one(tmp_path / "rt", _textbox(**border, lineOpacity=0.5))["lineOpacity"] == 0.5
+        for extra in ({}, {"lineOpacity": 1}):
+            (sp,) = _built_shapes(tmp_path / f"o{len(extra)}", [_textbox(**border, **extra)])
+            assert sp._element.spPr.find(f".//{_A}alpha") is None
+
     def test_text_gradient_survives(self, tmp_path):
         out = _one(tmp_path, _textbox(text="grad", fontSize=40,
                                       textGradient={"angle": 0, "stops": GRADIENT["stops"]}))

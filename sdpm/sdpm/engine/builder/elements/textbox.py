@@ -308,6 +308,9 @@ class TextboxMixin:
                 int(hex_color[4:6], 16)
             )
             textbox.line.width = Pt(line_width)
+            line_opacity = elem.get("lineOpacity")
+            if line_opacity is not None and 0 <= line_opacity < 1:
+                self._set_line_opacity(textbox, line_opacity)
         
         # Apply text frame margins (px input → EMU)
         margin_left = elem.get("marginLeft")
