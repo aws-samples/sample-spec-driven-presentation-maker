@@ -82,6 +82,7 @@ class _FakeS3:
     def __init__(self, objects: dict[str, bytes]):
         self.objects = objects
         self.presigned: list[dict] = []
+        self.puts: list[tuple[str, str]] = []
 
     def get_object(self, Bucket, Key):
         if Key not in self.objects:
@@ -94,6 +95,15 @@ class _FakeS3:
     def generate_presigned_url(self, op, Params, ExpiresIn):
         self.presigned.append(Params)
         return f"https://app-origin.example/{Params['Key']}"
+
+    def head_object(self, Bucket, Key):
+        if Key not in self.objects:
+            raise KeyError(Key)
+        return {}
+
+    def put_object(self, Bucket, Key, Body, ContentType):
+        self.puts.append((Key, ContentType))
+        self.objects[Key] = Body
 
 
 @pytest.fixture()
@@ -316,6 +326,93 @@ def test_deck_summary_says_whether_a_pptx_exists_without_a_url(index, record, ex
     assert "pptxUrl" not in summary
 
 
+# --- GET /decks/{id}/pptx?notes=without ---------------------------------------
+
+
+NO_NOTES_KEY = "pptx/d1/0b0e6c3e-7f6b-4c4c-9a39-1d0f8f5f0a11.nonotes.pptx"
+_TEMPLATE = Path(__file__).resolve().parent.parent / "sdpm" / "templates" / "blank-dark.pptx"
+
+
+def _pptx_with_notes() -> bytes:
+    """The template plus two slides that carry speaker notes."""
+    from pptx import Presentation
+
+    prs = Presentation(str(_TEMPLATE))
+    for text in ("Presenter script one.", "Presenter script two."):
+        slide = prs.slides.add_slide(prs.slide_layouts[0])
+        slide.notes_slide.notes_text_frame.text = text
+    out = io.BytesIO()
+    prs.save(out)
+    return out.getvalue()
+
+
+def _notes_parts(data: bytes) -> list[str]:
+    import zipfile
+
+    return [n for n in zipfile.ZipFile(io.BytesIO(data)).namelist() if n.startswith("ppt/notesSlides/")]
+
+
+@pytest.mark.parametrize("role", ["owner", "viewer"])
+def test_pptx_without_notes_signs_a_stripped_copy_beside_the_build(monkeypatch, index, role):
+    from pptx import Presentation
+
+    original = _pptx_with_notes()
+    assert _notes_parts(original)
+    _setup(monkeypatch, index, role=role, deck={"pptxS3Key": PPTX_KEY}, objects={PPTX_KEY: original},
+           query={"notes": "without"})
+    result = index.get_deck_pptx("d1")
+    assert result["url"] == f"https://app-origin.example/{NO_NOTES_KEY}"
+    assert index.s3_client.presigned[-1]["ResponseContentDisposition"] == (
+        "attachment; filename=\"Q3 Review.pptx\"; filename*=UTF-8''Q3%20Review.pptx"
+    )
+    s3 = index.s3_client
+    assert s3.puts == [(NO_NOTES_KEY, index.PPTX_CONTENT_TYPE)]
+    copy = s3.objects[NO_NOTES_KEY]
+    assert _notes_parts(copy) == []
+    slides = Presentation(io.BytesIO(copy)).slides
+    assert len(slides) == len(Presentation(io.BytesIO(original)).slides)
+    assert not any(slide.has_notes_slide for slide in slides)
+    assert s3.objects[PPTX_KEY] == original  # the stored PPTX is untouched
+
+    # The copy is reused
+    assert index.get_deck_pptx("d1")["url"] == f"https://app-origin.example/{NO_NOTES_KEY}"
+    assert len(s3.puts) == 1
+
+
+@pytest.mark.parametrize("query", [None, {"notes": "with"}, {"notes": ""}])
+def test_pptx_with_notes_signs_the_stored_build(monkeypatch, index, query):
+    _setup(monkeypatch, index, deck={"pptxS3Key": PPTX_KEY}, objects={PPTX_KEY: _pptx_with_notes()}, query=query)
+    assert index.get_deck_pptx("d1")["url"] == f"https://app-origin.example/{PPTX_KEY}"
+    assert index.s3_client.puts == []
+
+
+@pytest.mark.parametrize("deck, objects", [
+    ({}, {}),
+    ({"pptxS3Key": "uploads/u1/a.pptx"}, {"uploads/u1/a.pptx": b"PK"}),
+    ({"pptxS3Key": PPTX_KEY, "htmlS3Key": HTML_KEY},
+     {PPTX_KEY: b"PK", "decks/d1/deck.json": json.dumps({"outputFormat": "html"}).encode()}),
+])
+def test_pptx_without_notes_is_404_where_the_download_is(monkeypatch, index, deck, objects):
+    _setup(monkeypatch, index, deck=deck, objects=objects, query={"notes": "without"})
+    assert index.get_deck_pptx("d1") == ({"error": "PPTX not built yet"}, 404)
+    assert index.s3_client.puts == []
+
+
+def test_pptx_without_notes_denied_is_403(monkeypatch, index):
+    _setup(monkeypatch, index, allowed=False, query={"notes": "without"})
+    assert index.get_deck_pptx("d1") == ({"error": "no access"}, 403)
+    assert index.s3_client.puts == []
+
+
+@pytest.mark.parametrize("record, expected", [
+    ({"pptxS3Key": PPTX_KEY, "notesS3Key": "pptx/d1/0b0e.notes.md"}, "markdown"),
+    ({"pptxS3Key": PPTX_KEY}, "pptx"),
+    ({"pptxS3Key": PPTX_KEY, "notesS3Key": None}, "pptx"),
+])
+def test_deck_summary_says_where_the_speaker_notes_are(index, record, expected):
+    assert index._deck_summary({"SK": "DECK#d1", **record}, {})["speakerNotes"] == expected
+
+
 # --- GET /decks/{id} ---------------------------------------------------------
 
 
@@ -354,6 +451,13 @@ def test_get_deck_pptx_shape_unchanged(monkeypatch, index):
         "attachment; filename=\"Q3 Review.pptx\"; filename*=UTF-8''Q3%20Review.pptx"
     )
     assert result["template"] == "blank-dark" and result["isOwner"] is True
+    assert result["speakerNotes"] == "pptx"
+
+
+def test_get_deck_says_the_speaker_notes_are_markdown(monkeypatch, index):
+    _setup(monkeypatch, index, deck={"pptxS3Key": "pptx/d1/out.pptx", "notesS3Key": "pptx/d1/out.notes.md"},
+           objects={"decks/d1/deck.json": b"{}", "decks/d1/specs/outline.md": _OUTLINE})
+    assert index.get_deck("d1")["speakerNotes"] == "markdown"
 
 
 def _compose_urls(result) -> dict:

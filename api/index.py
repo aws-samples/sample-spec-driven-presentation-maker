@@ -14,6 +14,7 @@ Single Lambda with Powertools APIGatewayHttpResolver.
 Ported from spec-driven-presentation-maker-web deck-api, upload-api.
 """
 
+import io
 import json
 import os
 import re
@@ -44,7 +45,7 @@ from html_presign import (
     presigned_html_url,
     slide_size,
 )
-from shared.artifact_keys import build_html_preview_key_map, preview_prefix as html_preview_prefix
+from shared.artifact_keys import build_html_preview_key_map, no_notes_pptx_key, preview_prefix as html_preview_prefix
 from shared.review import (
     MAX_BODY_BYTES as REVIEW_MAX_BODY_BYTES,
     build_review_file,
@@ -197,6 +198,14 @@ def _html_presigned(key: str, purpose: str = "view", deck_name: str = "") -> Opt
         return None
 
 
+PPTX_CONTENT_TYPE = "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+
+def _is_pptx_key(key: object) -> bool:
+    """A key under ``pptx/`` ending in ``.pptx``, without ``..``."""
+    return isinstance(key, str) and key.startswith("pptx/") and key.endswith(".pptx") and ".." not in key
+
+
 def _pptx_download_url(key: str, deck_name: str = "") -> Optional[str]:
     """Signed URL that downloads a built PPTX as ``<deck title>.pptx``.
 
@@ -206,7 +215,7 @@ def _pptx_download_url(key: str, deck_name: str = "") -> Optional[str]:
     Without CloudFront configured, an S3 presign on the API's client (as before).
     None for a key outside ``pptx/**.pptx``.
     """
-    if not isinstance(key, str) or not key.startswith("pptx/") or not key.endswith(".pptx") or ".." in key:
+    if not _is_pptx_key(key):
         return None
     disposition = attachment_disposition(deck_name, ".pptx")
     return _cf_signed_url(key, query={"response-content-disposition": disposition}) or s3_client.generate_presigned_url(
@@ -267,6 +276,13 @@ def _get_deck_extras(deck_items: List[Dict]) -> Dict[str, Dict]:
     return extras
 
 
+def _speaker_notes(record: Dict) -> str:
+    """How the stored PPTX holds its speaker notes: ``"markdown"`` when the last build
+    wrote them to a separate file (``notesS3Key``, deck.json ``speakerNotes``
+    ``"markdown"``), so there is no download with notes; ``"pptx"`` otherwise."""
+    return "markdown" if record.get("notesS3Key") else "pptx"
+
+
 def _deck_summary(item: Dict, extras: Dict[str, Dict], owner: bool = False) -> Dict[str, Any]:
     """Build a consistent deck summary dict from a DDB item.
 
@@ -290,6 +306,7 @@ def _deck_summary(item: Dict, extras: Dict[str, Dict], owner: bool = False) -> D
         "visibility": item.get("visibility", "private"),
         # A built PPTX exists (GET /decks/{id}/pptx signs it on demand; the list stays URL-free).
         "hasPptx": bool(item.get("pptxS3Key")),
+        "speakerNotes": _speaker_notes(item),
     }
     if owner:
         summary["chatSessionId"] = _chat_session_id(item)
@@ -1072,6 +1089,13 @@ def get_deck_pptx(deck_id: str) -> Any:
     Same read permission as get_deck (owner, or viewer of a public deck); 404 when no
     PPTX is built or the deck is an HTML deck (get_deck gives those no pptxUrl either).
 
+    Query parameters:
+        notes: ``without`` signs a copy without speaker notes, made from the stored
+            PPTX on the first such request and kept beside it
+            (``pptx/<deck>/<build>.nonotes.pptx``; a rebuild has a new build id, so the
+            copy always matches the stored PPTX). Any other value, or none, signs the
+            stored PPTX.
+
     Returns:
         Dict with url and expiresIn (seconds).
     """
@@ -1083,10 +1107,38 @@ def get_deck_pptx(deck_id: str) -> Any:
 
     deck = decision.deck
     pptx_key = deck.get("pptxS3Key")
-    url = _pptx_download_url(pptx_key, deck.get("name", "")) if pptx_key else None
-    if not url or is_html_deck(_read_deck_json(deck_id)):
+    if not _is_pptx_key(pptx_key) or is_html_deck(_read_deck_json(deck_id)):
         return {"error": "PPTX not built yet"}, 404
+    if app.current_event.get_query_string_value("notes") == "without":
+        pptx_key = _no_notes_copy(pptx_key)
+    url = _pptx_download_url(pptx_key, deck.get("name", ""))
     return {"url": url, "expiresIn": PRESIGNED_URL_EXPIRY}
+
+
+def _no_notes_copy(pptx_key: str) -> str:
+    """Key of the copy of ``pptx_key`` without speaker notes, made on first use.
+
+    The copy is ``sdpm.engine.notes.strip_speaker_notes`` of the stored PPTX (no
+    rebuild); a read error or a broken PPTX propagates (500).
+    """
+    from sdpm.engine.notes import strip_speaker_notes
+
+    key = no_notes_pptx_key(pptx_key)
+    if key is None:
+        raise ValueError(f"not a stored PPTX key: {pptx_key!r}")
+    try:
+        s3_client.head_object(Bucket=BUCKET_NAME, Key=key)
+        exists = True
+    except Exception:
+        exists = False
+    if exists:
+        return key
+    body = s3_client.get_object(Bucket=BUCKET_NAME, Key=pptx_key)["Body"].read()
+    out = io.BytesIO()
+    removed = strip_speaker_notes(io.BytesIO(body), out)
+    s3_client.put_object(Bucket=BUCKET_NAME, Key=key, Body=out.getvalue(), ContentType=PPTX_CONTENT_TYPE)
+    logger.info(f"Made {key} ({removed} notes slides removed)")
+    return key
 
 
 @app.get("/decks/<deck_id>")
@@ -1175,6 +1227,7 @@ def get_deck(deck_id: str) -> Dict[str, Any]:
         "template": template,
         "defsUrl": preview_url(defs_key) if has_defs else None,
         "pptxUrl": _pptx_download_url(pptx_key, deck.get("name", "")) if pptx_key else None,
+        "speakerNotes": _speaker_notes(deck),
         "slideSize": slide_size(deck_json),
         "updatedAt": deck.get("updatedAt", ""),
         "chatSessionId": _owner_chat_session_id(decision),
