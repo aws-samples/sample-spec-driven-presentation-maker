@@ -152,7 +152,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ id: str
     ...(isHtml ? {
       outputFormat: "html",
       htmlUrl: versionedUrl(path.join(dp, "output.html"), `/api/preview/${deckId}/output.html`),
-    } : {}),
+    } : {
+      // How output.pptx holds its speaker notes (see the deck list route)
+      speakerNotes: fs.existsSync(pptxPath) && fs.existsSync(path.join(dp, "output.notes.md")) ? "markdown" : "pptx",
+    }),
   })
 }
 
