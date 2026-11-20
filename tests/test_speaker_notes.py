@@ -1,10 +1,10 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""deck.json ``notesMode``: what the PPTX build does with slide ``notes``.
+"""deck.json ``speakerNotes``: where the PPTX build puts slide ``notes``.
 
-``keep`` (default) writes speaker notes as before; ``strip`` leaves them out of the
-.pptx; ``export`` leaves them out and writes ``<output stem>.notes.md`` next to it.
-The slide files are never touched, so composing is unchanged.
+``pptx`` (default) writes them as speaker notes; ``markdown`` leaves them out of the
+.pptx and writes ``<output stem>.notes.md`` next to it. The slide files are never
+touched, so composing is unchanged.
 """
 
 import json
@@ -16,7 +16,7 @@ from pptx import Presentation
 
 from sdpm.api import check_specs, generate
 from sdpm.engine.notes import plain_notes_text, speaker_notes_markdown
-from sdpm.engine.schema import NOTES_MODES, deck_notes_mode, validate_specs
+from sdpm.engine.schema import SPEAKER_NOTES, deck_speaker_notes, validate_specs
 
 _DECK_JSON = {
     "template": "blank-dark.pptx",
@@ -62,45 +62,45 @@ def _notes_in(pptx: Path) -> list[str]:
 @pytest.mark.parametrize(
     "deck,expected",
     [
-        ({}, "keep"),
-        ({"notesMode": None}, "keep"),
-        ({"notesMode": "keep"}, "keep"),
-        ({"notesMode": "strip"}, "strip"),
-        ({"notesMode": "export"}, "export"),
-        ("not a dict", "keep"),
+        ({}, "pptx"),
+        ({"speakerNotes": None}, "pptx"),
+        ({"speakerNotes": "pptx"}, "pptx"),
+        ({"speakerNotes": "markdown"}, "markdown"),
+        ("not a dict", "pptx"),
     ],
 )
-def test_deck_notes_mode_default_and_explicit(deck, expected: str) -> None:
-    assert deck_notes_mode(deck) == expected
-    assert NOTES_MODES == ("keep", "strip", "export")
+def test_deck_speaker_notes_default_and_explicit(deck, expected: str) -> None:
+    assert deck_speaker_notes(deck) == expected
+    assert SPEAKER_NOTES == ("pptx", "markdown")
 
 
-@pytest.mark.parametrize("value", ["KEEP", "remove", "", 1, True])
-def test_deck_notes_mode_rejects_unknown_value(value: object) -> None:
-    with pytest.raises(ValueError, match="notesMode"):
-        deck_notes_mode({"notesMode": value})
+@pytest.mark.parametrize("value", ["PPTX", "keep", "strip", "export", "", 1, True])
+def test_deck_speaker_notes_rejects_unknown_value(value: object) -> None:
+    with pytest.raises(ValueError, match="speakerNotes"):
+        deck_speaker_notes({"speakerNotes": value})
 
 
-def test_validate_specs_rejects_invalid_notes_mode() -> None:
+def test_validate_specs_rejects_invalid_speaker_notes() -> None:
     deck = deepcopy(_DECK_JSON)
-    deck["notesMode"] = "remove"
+    deck["speakerNotes"] = "strip"
     result = validate_specs(deck, "- [intro] Intro\n")
-    assert 'deck.json notesMode must be "keep", "strip" or "export"' in result["errors"]
+    assert 'deck.json speakerNotes must be "pptx" or "markdown"' in result["errors"]
     assert result["ok"] is False
 
 
-@pytest.mark.parametrize("mode", NOTES_MODES)
-def test_check_specs_accepts_every_notes_mode(tmp_path: Path, mode: str) -> None:
-    result = check_specs(_make_deck(tmp_path, notesMode=mode))
+@pytest.mark.parametrize("value", SPEAKER_NOTES)
+def test_check_specs_accepts_every_speaker_notes_value(tmp_path: Path, value: str) -> None:
+    result = check_specs(_make_deck(tmp_path, speakerNotes=value))
     assert result["errors"] == []
 
 
 # ── build ───────────────────────────────────────────────────────────────────
 
 
-def test_default_keeps_speaker_notes_in_the_pptx(tmp_path: Path) -> None:
+@pytest.mark.parametrize("deck_extra", [{}, {"speakerNotes": "pptx"}])
+def test_default_and_pptx_keep_speaker_notes_in_the_pptx(tmp_path: Path, deck_extra: dict) -> None:
     out = tmp_path / "out.pptx"
-    result = generate(_make_deck(tmp_path), output_path=out)
+    result = generate(_make_deck(tmp_path, **deck_extra), output_path=out)
     notes = _notes_in(out)
     assert notes[0].startswith("Welcome everyone.")
     assert notes[2] == "Internal: pricing is confidential."
@@ -108,19 +108,9 @@ def test_default_keeps_speaker_notes_in_the_pptx(tmp_path: Path) -> None:
     assert not out.with_name("out.notes.md").exists()
 
 
-def test_strip_leaves_notes_out_of_the_pptx_and_writes_no_file(tmp_path: Path) -> None:
+def test_markdown_leaves_the_pptx_without_notes_and_writes_notes_markdown(tmp_path: Path) -> None:
     out = tmp_path / "out.pptx"
-    result = generate(_make_deck(tmp_path, notesMode="strip"), output_path=out)
-    assert _notes_in(out) == ["", "", ""]
-    assert "notes_path" not in result
-    assert not out.with_name("out.notes.md").exists()
-    # The slide files are the source of truth and keep their notes.
-    assert json.loads((tmp_path / "deck" / "slides" / "intro.json").read_text(encoding="utf-8"))["notes"]
-
-
-def test_export_strips_the_pptx_and_writes_notes_markdown(tmp_path: Path) -> None:
-    out = tmp_path / "out.pptx"
-    result = generate(_make_deck(tmp_path, notesMode="export", title="Quarterly review"), output_path=out)
+    result = generate(_make_deck(tmp_path, speakerNotes="markdown", title="Quarterly review"), output_path=out)
     assert _notes_in(out) == ["", "", ""]
     notes_path = Path(result["notes_path"])
     assert notes_path == out.with_name("out.notes.md")
@@ -134,39 +124,52 @@ def test_export_strips_the_pptx_and_writes_notes_markdown(tmp_path: Path) -> Non
     assert "{{" not in text
     assert "(no notes)" in text
     assert "Internal: pricing is confidential." in text
+    # The slide files are the source of truth and keep their notes.
+    assert json.loads((tmp_path / "deck" / "slides" / "intro.json").read_text(encoding="utf-8"))["notes"]
 
 
-def test_export_partial_build_writes_no_notes_file(tmp_path: Path) -> None:
+def test_markdown_partial_build_writes_no_notes_file(tmp_path: Path) -> None:
     out = tmp_path / "iso.pptx"
-    result = generate(_make_deck(tmp_path, notesMode="export"), output_path=out, only_slugs={"intro"})
+    result = generate(_make_deck(tmp_path, speakerNotes="markdown"), output_path=out, only_slugs={"intro"})
     assert result["slide_count"] == 1
     assert _notes_in(out) == [""]
     assert "notes_path" not in result
     assert not out.with_name("iso.notes.md").exists()
 
 
-@pytest.mark.parametrize("mode", ["keep", "strip"])
-def test_full_build_without_export_deletes_a_stale_notes_file(tmp_path: Path, mode: str) -> None:
+def test_full_pptx_build_deletes_a_stale_notes_file(tmp_path: Path) -> None:
     out = tmp_path / "out.pptx"
-    deck = _make_deck(tmp_path, notesMode="export")
+    deck = _make_deck(tmp_path, speakerNotes="markdown")
     generate(deck, output_path=out)
     stale = out.with_name("out.notes.md")
     assert stale.exists()
     meta = json.loads((deck / "deck.json").read_text(encoding="utf-8"))
-    (deck / "deck.json").write_text(json.dumps({**meta, "notesMode": mode}), encoding="utf-8")
+    (deck / "deck.json").write_text(json.dumps({**meta, "speakerNotes": "pptx"}), encoding="utf-8")
     generate(deck, output_path=out)
     assert not stale.exists()
     # A partial build never touches it
-    (deck / "deck.json").write_text(json.dumps({**meta, "notesMode": "export"}), encoding="utf-8")
+    (deck / "deck.json").write_text(json.dumps({**meta, "speakerNotes": "markdown"}), encoding="utf-8")
     generate(deck, output_path=out)
-    (deck / "deck.json").write_text(json.dumps({**meta, "notesMode": mode}), encoding="utf-8")
+    (deck / "deck.json").write_text(json.dumps({**meta, "speakerNotes": "pptx"}), encoding="utf-8")
     generate(deck, output_path=out, only_slugs={"intro"})
     assert stale.exists()
 
 
-def test_invalid_notes_mode_stops_the_build(tmp_path: Path) -> None:
-    with pytest.raises(ValueError, match="notesMode"):
-        generate(_make_deck(tmp_path, notesMode="remove"), output_path=tmp_path / "out.pptx")
+def test_invalid_speaker_notes_stops_the_build(tmp_path: Path) -> None:
+    with pytest.raises(ValueError, match="speakerNotes"):
+        generate(_make_deck(tmp_path, speakerNotes="strip"), output_path=tmp_path / "out.pptx")
+
+
+def test_former_notes_mode_key_is_ignored(tmp_path: Path) -> None:
+    """notesMode is not a deck.json field: it is ignored like any unknown key."""
+    out = tmp_path / "out.pptx"
+    deck = _make_deck(tmp_path)
+    meta = json.loads((deck / "deck.json").read_text(encoding="utf-8"))
+    (deck / "deck.json").write_text(json.dumps({**meta, "notesMode": "export"}), encoding="utf-8")
+    result = generate(deck, output_path=out)
+    assert _notes_in(out)[0].startswith("Welcome everyone.")
+    assert "notes_path" not in result
+    assert check_specs(deck)["errors"] == []
 
 
 # ── markdown rendering ──────────────────────────────────────────────────────

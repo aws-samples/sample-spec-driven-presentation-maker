@@ -77,13 +77,13 @@ def test_generate_pptx_via_api_facade(mock_storage, monkeypatch):
     assert mock_storage.update_deck.called
 
 
-def test_generate_pptx_export_uploads_notes_beside_the_deck(mock_storage, monkeypatch):
-    """deck.json notesMode "export": the notes file written into the temp workspace is
+def test_generate_pptx_markdown_uploads_notes_beside_the_deck(mock_storage, monkeypatch):
+    """deck.json speakerNotes "markdown": the notes file written into the temp workspace is
     uploaded next to the pptx (same build id), recorded as notesS3Key and returned."""
     import server_utils
     monkeypatch.setattr(server_utils, "schedule_webp_background", MagicMock())
     mock_storage.get_deck_json.return_value = {
-        "template": "", "fonts": {"fullwidth": "", "halfwidth": ""}, "notesMode": "export",
+        "template": "", "fonts": {"fullwidth": "", "halfwidth": ""}, "speakerNotes": "markdown",
     }
     mock_storage.update_deck.return_value = {"pptxS3Key": "pptx/d1/old.pptx", "notesS3Key": "pptx/d1/old.notes.md"}
     mock_storage.presign_url.return_value = "https://signed.example/notes"
@@ -111,8 +111,8 @@ def test_generate_pptx_export_uploads_notes_beside_the_deck(mock_storage, monkey
     assert deleted == {"pptx/d1/old.pptx", "pptx/d1/old.notes.md"}
 
 
-def test_generate_pptx_keep_clears_notes_key_and_deletes_old_notes(mock_storage, monkeypatch):
-    """A rebuild without "export" clears notesS3Key and removes the old notes object."""
+def test_generate_pptx_pptx_clears_notes_key_and_deletes_old_notes(mock_storage, monkeypatch):
+    """A rebuild with "pptx" (the default) clears notesS3Key and removes the old notes object."""
     import server_utils
     monkeypatch.setattr(server_utils, "schedule_webp_background", MagicMock())
     mock_storage.update_deck.return_value = {"pptxS3Key": "pptx/d1/old.pptx", "notesS3Key": "pptx/d1/old.notes.md"}

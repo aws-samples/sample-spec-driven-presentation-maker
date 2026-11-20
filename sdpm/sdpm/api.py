@@ -649,7 +649,7 @@ class BuildConfig:
     default_background: str | None = None  # deck.json "defaultBackground"; None keeps template ground
     title: str | None = None  # deck.json "title" -> dc:title; None falls back to the first slide's title
     language: str | None = None  # deck.json "language" -> dc:language (BCP 47, e.g. "en-US")
-    notes_mode: str = "keep"  # deck.json "notesMode": keep | strip | export (sdpm.engine.schema.NOTES_MODES)
+    speaker_notes: str = "pptx"  # deck.json "speakerNotes": pptx | markdown (sdpm.engine.schema.SPEAKER_NOTES)
 
 
 def _assemble_slides_from_dir(
@@ -794,10 +794,10 @@ def _resolve_config(
 
     template_file, custom = _resolve_template(data, str(input_path), templates_dirs)
 
-    # Speaker notes policy; an invalid value stops the build (no silent default)
-    from sdpm.engine.schema import deck_notes_mode
+    # Where the speaker notes go; an invalid value stops the build (no silent default)
+    from sdpm.engine.schema import deck_speaker_notes
 
-    notes_mode = deck_notes_mode(data)
+    speaker_notes = deck_speaker_notes(data)
 
     # Auto-fill fonts
     from sdpm.engine.analyzer import extract_fonts as _extract_fonts
@@ -894,7 +894,7 @@ def _resolve_config(
         default_background=data.get("defaultBackground") or None,
         title=data.get("title") or None,
         language=data.get("language") or None,
-        notes_mode=notes_mode,
+        speaker_notes=speaker_notes,
     )
 
 
@@ -910,7 +910,7 @@ def _build(config: BuildConfig, output_path: Path) -> Path:
         default_text_color=config.default_text_color,
         auto_spacing=config.auto_spacing,
         default_background=config.default_background,
-        write_notes=config.notes_mode == "keep",
+        write_notes=config.speaker_notes == "pptx",
     )
     for s in config.slides:
         builder.add_slide(s)
@@ -918,8 +918,8 @@ def _build(config: BuildConfig, output_path: Path) -> Path:
     return output_path, builder.invalid_layouts
 
 
-def _notes_export_path(output_path: Path) -> Path:
-    """Where ``notesMode: "export"`` writes the speaker notes: ``<output stem>.notes.md``
+def _notes_markdown_path(output_path: Path) -> Path:
+    """Where ``speakerNotes: "markdown"`` writes the speaker notes: ``<output stem>.notes.md``
     next to the .pptx (``output.pptx`` -> ``output.notes.md``)."""
     return output_path.with_name(f"{output_path.stem}.notes.md")
 
@@ -946,7 +946,7 @@ def generate(
 
     Returns:
         Dict with output_path, slide_count, slides summary, warnings. With deck.json
-        ``"notesMode": "export"`` and a full build (``only_slugs`` None), also
+        ``"speakerNotes": "markdown"`` and a full build (``only_slugs`` None), also
         ``notes_path``: the Markdown file holding the speaker notes that were left
         out of the .pptx (``<output stem>.notes.md`` next to it).
     """
@@ -965,20 +965,20 @@ def generate(
 
     _, invalid_layouts = _build(config, out)
 
-    # "export": the notes stay out of the .pptx and go to a Markdown file beside it.
+    # "markdown": the notes stay out of the .pptx and go to a Markdown file beside it.
     # A partial build (only_slugs, e.g. iso.pptx) does not write one: it would hold
     # only the rebuilt slides and overwrite nothing useful.
     notes_path: Path | None = None
     if only_slugs is None:
-        if config.notes_mode == "export":
+        if config.speaker_notes == "markdown":
             from sdpm.engine.notes import speaker_notes_markdown
 
-            notes_path = _notes_export_path(out)
+            notes_path = _notes_markdown_path(out)
             notes_path.write_text(speaker_notes_markdown(config.slides, title=config.title), encoding="utf-8")
         else:
-            # A notes file from an earlier "export" build must not outlive the mode
-            # change: with "strip" it is the very script the deck now leaves out.
-            stale = _notes_export_path(out)
+            # A notes file from an earlier "markdown" build must not outlive the
+            # switch back to "pptx": the notes now live in the .pptx itself.
+            stale = _notes_markdown_path(out)
             if stale.is_file():
                 stale.unlink()
 

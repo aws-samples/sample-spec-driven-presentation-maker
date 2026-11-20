@@ -2,7 +2,7 @@
 # SPDX-License-Identifier: MIT-0
 """Speaker notes export: slide ``notes`` as a Markdown document.
 
-Used by the PPTX build when deck.json ``notesMode`` is ``"export"``: the notes
+Used by the PPTX build when deck.json ``speakerNotes`` is ``"markdown"``: the notes
 stay out of the .pptx (a deck handed to an audience must not carry the
 presenter's script) and are written next to it instead.
 """
