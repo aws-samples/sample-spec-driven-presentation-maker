@@ -681,3 +681,16 @@ def test_axis_sppr_follows_ooxml_schema_order(tmp_path, chart_type, extra):
             for later in (f"{_C}numFmt", f"{_C}tickLblPos", f"{_C}spPr", f"{_C}txPr", f"{_C}crossAx"):
                 if later in tags:
                     assert gl_idx < tags.index(later)
+
+
+@pytest.mark.parametrize("stacked", [False, True])
+@pytest.mark.parametrize("horizontal", [False, True])
+def test_bar_gap_width_and_overlap_follow_ooxml_schema_order(tmp_path, stacked, horizontal):
+    chart = _built_chart(tmp_path, chartType="bar", categories=["A", "B", "C"],
+                         series=TWO_SERIES, stacked=stacked, horizontal=horizontal)
+    bar = chart._chartSpace.find(f".//{_C}barChart")
+    tags = [child.tag.removeprefix(_C) for child in bar]
+    gap_idx, overlap_idx = tags.index("gapWidth"), tags.index("overlap")
+    last_ser = max(i for i, t in enumerate(tags) if t in ("ser", "dLbls"))
+    first_ax = tags.index("axId")
+    assert last_ser < gap_idx < overlap_idx < first_ax
