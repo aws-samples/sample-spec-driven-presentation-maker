@@ -518,7 +518,7 @@ def start_presentation() -> str:
     restyling a deck. Call it before any other sdpm tool.
 
     Returns the orchestrator role document (how to run the work end to end) plus what
-    it needs first: PPTX templates.
+    it needs first: the deck.json field reference and PPTX templates.
     """
     from sdpm.entry import start_presentation as _start
 

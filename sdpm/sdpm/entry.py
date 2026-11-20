@@ -6,7 +6,7 @@ Each ``start_*`` function returns the role document plus what that role always
 reads at the start of its work, so a model gets its role and its inputs in one
 call instead of six to eight. The payload is split in two:
 
-- ``static`` — deck-independent (role document, slide spec). Identical across
+- ``static`` — deck-independent (role document, slide or deck.json spec). Identical across
   calls, so an outer agent may cache it (L4 places it in the system prompt).
 - ``deck`` / role-specific keys — dynamic, per invocation.
 
@@ -62,7 +62,7 @@ def preload_references() -> None:
         _reference_cache = {}
     for role in ("orchestrator", "composer", "composer-html", "style", "translate"):
         _workflow(role)
-    for guide in ("slide-json-spec", "slide-html-spec", *_FORMAT_NOTES.values()):
+    for guide in ("slide-json-spec", "slide-html-spec", "deck-json-spec", *_FORMAT_NOTES.values()):
         _read_reference(_GUIDES_DIR, guide)
 
 
@@ -72,6 +72,10 @@ def _workflow(role: str) -> str:
 
 def _slide_spec() -> str:
     return _read_reference(_GUIDES_DIR, "slide-json-spec")
+
+
+def _deck_spec() -> str:
+    return _read_reference(_GUIDES_DIR, "deck-json-spec")
 
 
 # Orchestrator notes per deck format: the guide init_deck_workspace returns as
@@ -138,7 +142,8 @@ def start_presentation(
     templates: list[dict] | None = None,
     output_dir: str | None = None,
 ) -> dict[str, Any]:
-    """Orchestrator entry: role document + the environment it always asks about first.
+    """Orchestrator entry: role document and deck.json reference (``static``) + the
+    environment it always asks about first.
 
     The styles come from ``list_styles``, which the orchestrator calls when it picks
     one. Keyword overrides let a server whose templates live elsewhere (S3) supply
@@ -151,7 +156,7 @@ def start_presentation(
 
         output_dir = str(_get_output_base_dir())
     return {
-        "static": {"workflow": _workflow("orchestrator")},
+        "static": {"workflow": _workflow("orchestrator"), "deck_spec": _deck_spec()},
         "templates": templates,
         "output_dir": output_dir,
     }

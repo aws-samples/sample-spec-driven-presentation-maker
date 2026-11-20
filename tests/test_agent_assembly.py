@@ -111,7 +111,7 @@ class _PresentationMaker:
         self.calls.append((self.user, name, arguments))
         self.called.set()
         payload = {
-            "static": {"workflow": f"# Orchestrator (fetched for {self.user})"},
+            "static": {"workflow": f"# Orchestrator (fetched for {self.user})", "deck_spec": "# deck.json fields"},
             "templates": [{"name": f"template-of-{self.user}"}],
         }
         return {"status": "success", "content": [{"text": json.dumps(payload)}]}
@@ -215,6 +215,7 @@ def test_start_presentation_and_memory_do_not_wait_for_optional_servers(assembly
     assert built["thread"] != request_thread
     assert agent.kwargs["session_manager"] is memory
     assert "# Orchestrator" in _text(agent.system_prompt)
+    assert "# deck.json fields" in _text(agent.system_prompt)
     assert status == [
         {"name": "Presentation Maker", "status": "ok"},
         {"name": "AWS Knowledge", "status": "error", "error": factory._LATE_ERROR},

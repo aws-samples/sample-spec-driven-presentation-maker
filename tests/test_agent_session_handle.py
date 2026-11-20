@@ -64,7 +64,7 @@ class _PM:
 
     def call_tool_sync(self, tool_use_id, name, arguments, **kwargs):
         self.state["calls"].append((self.token.token if self.token else "", name))
-        payload = {"static": {"workflow": "# Orchestrator"}, "styles": [], "templates": []}
+        payload = {"static": {"workflow": "# Orchestrator", "deck_spec": "# deck.json"}, "styles": [], "templates": []}
         return {"status": "success", "content": [{"text": json.dumps(payload)}]}
 
 

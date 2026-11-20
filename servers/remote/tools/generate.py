@@ -375,7 +375,7 @@ def generate_pptx(
             content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         )
 
-        # deck.json "notesMode": "export" — the speaker notes left out of the .pptx
+        # deck.json "speakerNotes": "markdown" — the speaker notes left out of the .pptx
         # were written next to it; they go to S3 beside the deck (same build id) so
         # the remote user gets them too (the temp workspace is deleted below).
         notes_key: str | None = None
@@ -390,8 +390,8 @@ def generate_pptx(
         deck = storage.get_deck(deck_id, user_id)
         now = datetime.now(timezone.utc).isoformat()
         updates: dict = {"pptxS3Key": pptx_key, "updatedAt": now, "slideCount": len(slides)}
-        # notesS3Key follows the build: set with "export", cleared otherwise, so a
-        # deck rebuilt with "keep" / "strip" does not keep pointing at old notes.
+        # notesS3Key follows the build: set with "markdown", cleared with "pptx", so a
+        # deck rebuilt with "pptx" does not keep pointing at old notes.
         updates["notesS3Key"] = notes_key
         old = storage.update_deck(deck_id=deck_id, user_id=user_id, updates=updates)
         # Delete the superseded artifacts (best effort) — every refresh

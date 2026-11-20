@@ -91,7 +91,7 @@ class PPTXBuilder(
                    not set its own "background" (deck.json "defaultBackground").
                    None keeps the template background.
             write_notes: Write each slide's "notes" as speaker notes. False leaves
-                   them out of the .pptx (deck.json "notesMode" strip / export).
+                   them out of the .pptx (deck.json "speakerNotes" "markdown").
 
         Raises:
             ValueError: If fonts or default_text_color is not provided.

@@ -24,11 +24,11 @@ DECK_JSON_SKELETON: dict[str, Any] = {
 # HTML decks so PPTX deck.json stays unchanged (not part of DECK_JSON_SKELETON).
 OUTPUT_FORMATS: tuple[str, ...] = ("pptx", "html")
 
-# deck.json "notesMode" values: what the PPTX build does with slide "notes".
-# "keep" (the default when absent) writes them as speaker notes; "strip" leaves
-# them out of the .pptx; "export" leaves them out and writes them to a Markdown
-# file next to the .pptx. Optional, so not part of DECK_JSON_SKELETON.
-NOTES_MODES: tuple[str, ...] = ("keep", "strip", "export")
+# deck.json "speakerNotes" values: where the PPTX build puts slide "notes".
+# "pptx" (the default when absent) writes them as speaker notes; "markdown" leaves
+# them out of the .pptx and writes them to a Markdown file beside it.
+# Optional, so not part of DECK_JSON_SKELETON.
+SPEAKER_NOTES: tuple[str, ...] = ("pptx", "markdown")
 
 _SUB_ITEM_RE = re.compile(r"^\s{2,}-\s+(body|visual|evidence)\s*:")
 _COLOR_RE = re.compile(r"^#[0-9A-Fa-f]{6}$")
@@ -113,25 +113,23 @@ def deck_output_format(deck_json: Any) -> Literal["pptx", "html"]:
     raise ValueError(f'deck.json outputFormat must be "pptx" or "html", got {value!r}')
 
 
-def deck_notes_mode(deck_json: Any) -> Literal["keep", "strip", "export"]:
-    """Return the deck's speaker-notes policy: "keep" when notesMode is absent or None,
-    or when deck.json is not an object.
+def deck_speaker_notes(deck_json: Any) -> Literal["pptx", "markdown"]:
+    """Return where the deck's speaker notes go: "pptx" when speakerNotes is absent or
+    None, or when deck.json is not an object.
 
-    Raises ValueError naming the value when notesMode is anything other than
-    "keep", "strip" or "export".
+    Raises ValueError naming the value when speakerNotes is anything other than
+    "pptx" or "markdown".
     """
     if not isinstance(deck_json, dict):
-        return "keep"
-    value = deck_json.get("notesMode")
+        return "pptx"
+    value = deck_json.get("speakerNotes")
     if value is None:
-        return "keep"
-    if value == "keep":
-        return "keep"
-    if value == "strip":
-        return "strip"
-    if value == "export":
-        return "export"
-    raise ValueError(f'deck.json notesMode must be "keep", "strip" or "export", got {value!r}')
+        return "pptx"
+    if value == "pptx":
+        return "pptx"
+    if value == "markdown":
+        return "markdown"
+    raise ValueError(f'deck.json speakerNotes must be "pptx" or "markdown", got {value!r}')
 
 
 def read_deck_format(deck_dir: str | Path) -> Literal["pptx", "html"]:
@@ -242,11 +240,11 @@ def validate_specs(
         except ValueError:
             errors.append('deck.json outputFormat must be "pptx" or "html"')
 
-    if "notesMode" in deck_json:
+    if "speakerNotes" in deck_json:
         try:
-            deck_notes_mode(deck_json)
+            deck_speaker_notes(deck_json)
         except ValueError:
-            errors.append('deck.json notesMode must be "keep", "strip" or "export"')
+            errors.append('deck.json speakerNotes must be "pptx" or "markdown"')
 
     if not _is_non_empty(fonts.get("halfwidth")):
         errors.append("deck.json fonts.halfwidth is empty")
