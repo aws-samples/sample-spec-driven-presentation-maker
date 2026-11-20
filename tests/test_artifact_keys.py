@@ -105,3 +105,9 @@ def test_superseded_compose_keys():
     assert ak.superseded_compose_keys(keys, prefix, [ak.COMPOSE_DEFS], 300) == [f"{prefix}defs_100.json"]
     assert ak.superseded_compose_keys(keys, prefix, ["intro", ak.COMPOSE_DEFS], 100) == []
     assert ak.superseded_compose_keys(["intro_1.json", "intro_2_1.json"], "", ["intro"], 5) == ["intro_1.json"]
+
+
+def test_no_notes_pptx_key_sits_beside_the_build():
+    assert ak.no_notes_pptx_key("pptx/d1/0b0e6c3e.pptx") == "pptx/d1/0b0e6c3e.nonotes.pptx"
+    for key in ("uploads/u1/a.pptx", "pptx/../a.pptx", "pptx/d1/a.pdf", "pptx/d1/a.nonotes.pptx", None, 1):
+        assert ak.no_notes_pptx_key(key) is None

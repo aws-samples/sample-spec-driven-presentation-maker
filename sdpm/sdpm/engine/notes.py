@@ -1,13 +1,22 @@
 # Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
 # SPDX-License-Identifier: MIT-0
-"""Speaker notes export: slide ``notes`` as a Markdown document.
+"""Speaker notes: Markdown export and removal from a built PPTX.
 
-Used by the PPTX build when deck.json ``speakerNotes`` is ``"markdown"``: the notes
-stay out of the .pptx (a deck handed to an audience must not carry the
-presenter's script) and are written next to it instead.
+``speaker_notes_markdown`` is used by the PPTX build when deck.json ``speakerNotes``
+is ``"markdown"``: the notes stay out of the .pptx (a deck handed to an audience must
+not carry the presenter's script) and are written next to it instead.
+
+``strip_speaker_notes`` removes the notes from a stored .pptx without rebuilding it,
+for a download without speaker notes (Web UI, both modes).
 """
 
 from __future__ import annotations
+
+from pathlib import Path
+from typing import BinaryIO
+
+from pptx import Presentation
+from pptx.opc.constants import RELATIONSHIP_TYPE as RT
 
 from sdpm.utils.text import parse_styled_text
 
@@ -74,3 +83,28 @@ def speaker_notes_markdown(slides: list[dict], title: str | None = None) -> str:
         lines.append(notes if notes else "(no notes)")
         lines.append("")
     return "\n".join(lines)
+
+
+def strip_speaker_notes(source: str | Path | BinaryIO, target: str | Path | BinaryIO) -> int:
+    """Remove every slide's speaker notes from a built PPTX without rebuilding it.
+
+    Each slide loses its notes-slide relationship, so the saved file has no
+    ``ppt/notesSlides/`` part; the rest of the file is unchanged.
+
+    Args:
+        source: The stored .pptx (path or binary file object).
+        target: Where to save the copy without notes (path or binary file object).
+
+    Returns:
+        The number of notes slides removed.
+    """
+    prs = Presentation(source if not isinstance(source, Path) else str(source))
+    removed = 0
+    for slide in prs.slides:
+        rels = slide.part.rels
+        for r_id, rel in list(rels.items()):
+            if rel.reltype == RT.NOTES_SLIDE:
+                rels.pop(r_id)
+                removed += 1
+    prs.save(target if not isinstance(target, Path) else str(target))
+    return removed

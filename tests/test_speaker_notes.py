@@ -7,7 +7,9 @@
 touched, so composing is unchanged.
 """
 
+import io
 import json
+import zipfile
 from copy import deepcopy
 from pathlib import Path
 
@@ -15,7 +17,7 @@ import pytest
 from pptx import Presentation
 
 from sdpm.api import check_specs, generate
-from sdpm.engine.notes import plain_notes_text, speaker_notes_markdown
+from sdpm.engine.notes import plain_notes_text, speaker_notes_markdown, strip_speaker_notes
 from sdpm.engine.schema import SPEAKER_NOTES, deck_speaker_notes, validate_specs
 
 _DECK_JSON = {
@@ -170,6 +172,43 @@ def test_former_notes_mode_key_is_ignored(tmp_path: Path) -> None:
     assert _notes_in(out)[0].startswith("Welcome everyone.")
     assert "notes_path" not in result
     assert check_specs(deck)["errors"] == []
+
+
+# ── strip from a stored PPTX ─────────────────────────────────────────────────
+
+
+def _has_notes_part(data: bytes) -> bool:
+    return any(name.startswith("ppt/notesSlides/") for name in zipfile.ZipFile(io.BytesIO(data)).namelist())
+
+
+def test_strip_speaker_notes_removes_every_notes_slide(tmp_path: Path) -> None:
+    built = tmp_path / "out.pptx"
+    generate(_make_deck(tmp_path), output_path=built)
+    assert _has_notes_part(built.read_bytes())
+    stripped = tmp_path / "stripped.pptx"
+    assert strip_speaker_notes(built, stripped) == 2
+    assert _notes_in(stripped) == ["", "", ""]
+    assert not _has_notes_part(stripped.read_bytes())
+    assert len(Presentation(str(stripped)).slides) == 3
+    # The source is left as it was
+    assert _notes_in(built)[2] == "Internal: pricing is confidential."
+
+
+def test_strip_speaker_notes_with_file_objects(tmp_path: Path) -> None:
+    built = tmp_path / "out.pptx"
+    generate(_make_deck(tmp_path), output_path=built)
+    out = io.BytesIO()
+    assert strip_speaker_notes(io.BytesIO(built.read_bytes()), out) == 2
+    assert not _has_notes_part(out.getvalue())
+    assert all(not s.has_notes_slide for s in Presentation(io.BytesIO(out.getvalue())).slides)
+
+
+def test_strip_speaker_notes_on_a_deck_without_notes(tmp_path: Path) -> None:
+    built = tmp_path / "out.pptx"
+    generate(_make_deck(tmp_path, speakerNotes="markdown"), output_path=built)
+    stripped = tmp_path / "stripped.pptx"
+    assert strip_speaker_notes(str(built), str(stripped)) == 0
+    assert len(Presentation(str(stripped)).slides) == 3
 
 
 # ── markdown rendering ──────────────────────────────────────────────────────
