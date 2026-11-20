@@ -64,7 +64,7 @@ interface DeckListViewProps {
   onToggleFavorite: (deckId: string, action: "add" | "remove") => void
   onDelete: (deckId: string) => void
   onToggleVisibility?: (deckId: string, visibility: "public" | "private") => void
-  onDownload?: (deckId: string) => void
+  onDownload?: (deckId: string, withNotes: boolean) => void
   onOpenPptx?: (deckId: string) => void
   onOpenFolder?: (deckId: string) => void
   loading: boolean

@@ -38,6 +38,11 @@ beforeAll(async () => {
   write("pptx/slides/intro.json", "{}")
   write("plain/deck.json", JSON.stringify({ name: "Q" }))
   write("html/deck.json", JSON.stringify({ name: "H", outputFormat: "html", slideSize: { width: 1600, height: 900 } }))
+  write("built/deck.json", JSON.stringify({ name: "B" }))
+  write("built/output.pptx", "PK")
+  write("mdnotes/deck.json", JSON.stringify({ name: "M", speakerNotes: "markdown" }))
+  write("mdnotes/output.pptx", "PK")
+  write("mdnotes/output.notes.md", "# Speaker notes\n")
   vi.resetModules()
   GET = (await import("./route")).GET
 })
@@ -63,5 +68,17 @@ describe("GET /api/decks/[id] slideSize", () => {
     const body = await deck("html")
     expect(body.outputFormat).toBe("html")
     expect(body.slideSize).toEqual({ width: 1600, height: 900 })
+  })
+})
+
+describe("GET /api/decks/[id] speakerNotes", () => {
+  it("is markdown when output.notes.md sits beside output.pptx, pptx otherwise", async () => {
+    expect((await deck("mdnotes")).speakerNotes).toBe("markdown")
+    expect((await deck("built")).speakerNotes).toBe("pptx")
+    expect((await deck("plain")).speakerNotes).toBe("pptx")
+  })
+
+  it("is not given for an HTML deck", async () => {
+    expect((await deck("html")).speakerNotes).toBeUndefined()
   })
 })

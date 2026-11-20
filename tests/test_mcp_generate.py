@@ -106,9 +106,9 @@ def test_generate_pptx_markdown_uploads_notes_beside_the_deck(mock_storage, monk
     assert mock_storage.update_deck.call_args.kwargs["updates"]["notesS3Key"] == notes_keys[0]
     assert result["notesS3Key"] == notes_keys[0]
     assert result["notesUrl"] == "https://signed.example/notes"
-    # Superseded pptx and notes objects are both deleted
+    # Superseded pptx, notes and copy without notes are all deleted
     deleted = {c.kwargs["Key"] for c in mock_storage._s3.delete_object.call_args_list}
-    assert deleted == {"pptx/d1/old.pptx", "pptx/d1/old.notes.md"}
+    assert deleted == {"pptx/d1/old.pptx", "pptx/d1/old.notes.md", "pptx/d1/old.nonotes.pptx"}
 
 
 def test_generate_pptx_pptx_clears_notes_key_and_deletes_old_notes(mock_storage, monkeypatch):
@@ -123,7 +123,7 @@ def test_generate_pptx_pptx_clears_notes_key_and_deletes_old_notes(mock_storage,
     assert mock_storage.update_deck.call_args.kwargs["updates"]["notesS3Key"] is None
     assert "notesS3Key" not in result and "notesUrl" not in result
     deleted = {c.kwargs["Key"] for c in mock_storage._s3.delete_object.call_args_list}
-    assert "pptx/d1/old.notes.md" in deleted
+    assert deleted == {"pptx/d1/old.pptx", "pptx/d1/old.notes.md", "pptx/d1/old.nonotes.pptx"}
 
 
 def test_generate_pptx_missing_deck(mock_storage):

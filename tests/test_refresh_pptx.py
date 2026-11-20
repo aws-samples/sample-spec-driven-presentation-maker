@@ -81,6 +81,21 @@ def test_change_renders_the_affected_slide_without_measuring(tmp_path, office, p
     assert partial_builds == [{"body"}]
 
 
+def test_speaker_notes_markdown_build_reports_the_notes_file(tmp_path, office):
+    deck = _deck(tmp_path, {"cover": {**SLIDES["cover"], "notes": "Say hello."}})
+    meta = json.loads((deck / "deck.json").read_text())
+    (deck / "deck.json").write_text(json.dumps({**meta, "speakerNotes": "markdown"}))
+    with refresh_pptx(deck, ["slides/cover.json"]) as r:
+        assert r.notes_path == deck / "output.notes.md"
+        assert "Say hello." in r.notes_path.read_text(encoding="utf-8")
+
+
+def test_default_build_has_no_notes_file(tmp_path, office):
+    deck = _deck(tmp_path, {"cover": {**SLIDES["cover"], "notes": "Say hello."}})
+    with refresh_pptx(deck, ["slides/cover.json"]) as r:
+        assert r.pptx_path is not None and r.notes_path is None
+
+
 def test_a_closed_refresh_renders_nothing(tmp_path, office, partial_builds):
     r = refresh_pptx(_deck(tmp_path), ["slides/body.json"])
     r.close()

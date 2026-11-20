@@ -1189,7 +1189,7 @@ def _refresh_pptx_deck(
 
         t = time.monotonic()
         if plan["artifact"] and refresh.pptx_path is not None:
-            _refresh_pptx_artifact(deck_id, user_id, refresh.pptx_path, len(slides), result)
+            _refresh_pptx_artifact(deck_id, user_id, refresh.pptx_path, len(slides), result, refresh.notes_path)
         phase["artifact_s3"] = time.monotonic() - t
 
         if refresh.render_slugs:
@@ -1236,38 +1236,64 @@ def _delete_quietly(key: str) -> None:
         pass
 
 
-def _refresh_pptx_artifact(deck_id: str, user_id: str, pptx_path: Path, slide_count: int, result: dict) -> None:
+def _refresh_pptx_artifact(deck_id: str, user_id: str, pptx_path: Path, slide_count: int, result: dict,
+                           notes_path: Path | None = None) -> None:
     """Upload the rebuilt PPTX and point the deck record at it (same shape as
-    generate_pptx). A failure leaves the download artifact STALE, so it goes into
-    ``result["pptx_error"]``, not only the log."""
+    generate_pptx): with deck.json ``speakerNotes`` ``"markdown"`` the build wrote the
+    speaker notes to ``notes_path``, uploaded beside the PPTX (same build id) as
+    ``notesS3Key``; without it ``notesS3Key`` is cleared. A failure leaves the
+    download artifact STALE, so it goes into ``result["pptx_error"]``, not only the log."""
     import uuid
     from datetime import datetime, timezone
 
+    from shared.artifact_keys import no_notes_pptx_key
+
     key = None
+    notes_key = None
     try:
-        key = f"pptx/{deck_id}/{uuid.uuid4()}.pptx"
+        build_id = uuid.uuid4()
+        key = f"pptx/{deck_id}/{build_id}.pptx"
         _storage.upload_file(
             key=key,
             data=pptx_path.read_bytes(),
             content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         )
+        if notes_path is not None:
+            notes_key = f"pptx/{deck_id}/{build_id}.notes.md"
+            _storage.upload_file(
+                key=notes_key,
+                data=notes_path.read_bytes(),
+                content_type="text/markdown; charset=utf-8",
+            )
         old = _storage.update_deck(
             deck_id=deck_id,
             user_id=user_id,
-            updates={"pptxS3Key": key, "updatedAt": datetime.now(timezone.utc).isoformat(), "slideCount": slide_count},
+            updates={
+                "pptxS3Key": key,
+                "notesS3Key": notes_key,
+                "updatedAt": datetime.now(timezone.utc).isoformat(),
+                "slideCount": slide_count,
+            },
         )
-        # The record points at the new artifact: delete the superseded one so the
+        # The record points at the new artifacts: delete the superseded ones so the
         # auto-refresh does not pile up orphans (best effort; lifecycle rules are the backstop).
-        old_key = (old or {}).get("pptxS3Key")
-        if old_key and old_key != key:
-            _delete_quietly(old_key)
+        old_pptx = (old or {}).get("pptxS3Key")
+        for old_key, new_key in (
+            (old_pptx, key),
+            ((old or {}).get("notesS3Key"), notes_key),
+            (no_notes_pptx_key(old_pptx), no_notes_pptx_key(key)),
+        ):
+            if old_key and old_key != new_key:
+                _delete_quietly(old_key)
     except Exception as e:
         logger.warning("PPTX artifact refresh failed: %s", e)
         result["pptx_error"] = (
             f"PPTX artifact refresh failed — the downloadable PPTX is stale. Run generate_pptx to refresh it. ({e})"
         )
-        if key:  # the record update may have failed after the upload: delete the orphan
-            _delete_quietly(key)
+        # The record update may have failed after the uploads: delete the orphans
+        for orphan in (key, notes_key):
+            if orphan:
+                _delete_quietly(orphan)
 
 
 def _finish_compose_and_previews(deck_id, refresh, tmpdir: Path, epoch: int, old_keys: list[str],

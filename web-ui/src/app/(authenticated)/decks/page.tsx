@@ -232,6 +232,7 @@ export default function DecksPage() {
                     htmlUrl={ws.deck?.htmlUrl}
                     slideSize={ws.deck?.slideSize}
                     scriptWarnings={ws.deck?.scriptWarnings}
+                    speakerNotes={ws.deck?.speakerNotes}
                     isLoading={ws.waitingForPng || false}
                     scrollToSlide={ws.scrollToSlide}
                     onScrollComplete={() => ws.setScrollToSlide("")}

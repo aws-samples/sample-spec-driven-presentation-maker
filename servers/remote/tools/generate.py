@@ -25,6 +25,7 @@ import uuid
 from datetime import datetime, timezone
 from pathlib import Path, PurePosixPath
 
+from shared.artifact_keys import no_notes_pptx_key
 from storage import Storage
 
 logger = logging.getLogger("sdpm.generate")
@@ -395,9 +396,15 @@ def generate_pptx(
         updates["notesS3Key"] = notes_key
         old = storage.update_deck(deck_id=deck_id, user_id=user_id, updates=updates)
         # Delete the superseded artifacts (best effort) — every refresh
-        # uploads a new UUID key and only the newest is referenced.
-        for field, new_key in (("pptxS3Key", pptx_key), ("notesS3Key", notes_key)):
-            old_key = (old or {}).get(field)
+        # uploads a new UUID key and only the newest is referenced. The copy without
+        # speaker notes (made on the first such download) goes with its build.
+        old_pptx = (old or {}).get("pptxS3Key")
+        superseded = [
+            (old_pptx, pptx_key),
+            ((old or {}).get("notesS3Key"), notes_key),
+            (no_notes_pptx_key(old_pptx), no_notes_pptx_key(pptx_key)),
+        ]
+        for old_key, new_key in superseded:
             if old_key and old_key != new_key:
                 try:
                     storage._s3.delete_object(Bucket=storage.pptx_bucket, Key=old_key)

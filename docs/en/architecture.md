@@ -132,6 +132,9 @@ S3 (pptx bucket):
   decks/{deckId}/includes/          — code block JSON
   decks/{deckId}/compose/           — per-slide SVG compose JSON (for Web UI animation)
   previews/{deckId}/{slideId}.png   — slide previews
+  pptx/{deckId}/{build}.pptx        — built PPTX (DynamoDB pptxS3Key)
+  pptx/{deckId}/{build}.notes.md    — its speaker notes with speakerNotes "markdown" (notesS3Key)
+  pptx/{deckId}/{build}.nonotes.pptx — copy without speaker notes, made on the first such download
   html/{deckId}/{uuid}.html         — HTML deck output.html (DynamoDB htmlS3Key)
   html/{deckId}/preview/{slug}_{epoch}.html — HTML slide thumbnails (latest epoch wins)
   template-html-cache/{cacheKey}/   — template HTML conversion (theme.css, template.json,

@@ -22,6 +22,9 @@ export interface DeckSummary {
   visibility?: "public" | "private"
   /** A built PPTX exists; download it with downloadDeckPptx (the list carries no URL). */
   hasPptx?: boolean
+  /** How the stored PPTX holds its speaker notes; "markdown" = they are in a separate file,
+   *  so there is no download with notes. Missing means "pptx". */
+  speakerNotes?: "pptx" | "markdown"
 }
 
 export interface SlidePreview {
@@ -62,6 +65,8 @@ export interface DeckDetail {
   slideSize?: { width: number; height: number }
   /** HTML decks: slides whose script can send data outside the deck (static check). */
   scriptWarnings?: ScriptWarning[]
+  /** PPTX decks: how the stored PPTX holds its speaker notes (see DeckSummary.speakerNotes). */
+  speakerNotes?: "pptx" | "markdown"
 }
 
 /** How a slide script can reach outside an HTML deck (static check `script-external`). */
@@ -86,11 +91,16 @@ function startDownload(url: string): void {
 /**
  * Download a deck's built PPTX, saved as `<deck title>.pptx`.
  * Cloud: asks GET /decks/{id}/pptx for a 15-minute presigned URL; Local: the file route itself.
+ * `withNotes: false` downloads a copy without speaker notes (`?notes=without`).
  *
  * @throws Error when the deck is not readable or has no PPTX (cloud)
  */
-export async function downloadDeckPptx(deckId: string, idToken: string): Promise<void> {
-  const path = `decks/${encodeURIComponent(deckId)}/pptx`
+export async function downloadDeckPptx(
+  deckId: string,
+  idToken: string,
+  { withNotes = true }: { withNotes?: boolean } = {},
+): Promise<void> {
+  const path = `decks/${encodeURIComponent(deckId)}/pptx${withNotes ? "" : "?notes=without"}`
   if (IS_LOCAL) {
     startDownload(`/api/${path}`)
     return

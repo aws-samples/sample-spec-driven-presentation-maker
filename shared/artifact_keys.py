@@ -9,6 +9,9 @@ for every slug the key with the highest epoch is the current one::
     decks/{deck_id}/compose/{slug}_{epoch}.json   PPTX live-preview payload of a slide
     decks/{deck_id}/compose/defs_{epoch}.json     PPTX live-preview defs of the deck
                                                   (Local: compose/ in the deck directory)
+    pptx/{deck_id}/{build}.pptx                   built PPTX deck (DDB pptxS3Key)
+    pptx/{deck_id}/{build}.notes.md               its speaker notes with speakerNotes "markdown" (notesS3Key)
+    pptx/{deck_id}/{build}.nonotes.pptx           copy without speaker notes, made on first download
     html/{deck_id}/{uuid}.html                    built HTML deck (DDB htmlS3Key)
     html/{deck_id}/preview/{slug}_{epoch}.html    static per-slide thumbnail of an HTML deck
     html/{deck_id}/png/{slug}_{epoch}.png         browser-check PNG of an HTML slide (get_preview)
@@ -29,6 +32,8 @@ from typing import Callable, Iterable, Optional, Tuple
 
 from sdpm.engine.schema.slugs import SLUG, SLUG_RE
 
+PPTX_PREFIX = "pptx/"
+NO_NOTES_PPTX_SUFFIX = ".nonotes.pptx"
 HTML_PREFIX = "html/"
 HTML_CONTENT_TYPE = "text/html; charset=utf-8"
 TEMPLATE_CACHE_PREFIX = "template-html-cache/"
@@ -132,6 +137,28 @@ def superseded_compose_keys(keys: Iterable[str], prefix: str, slugs: Iterable[st
         if se and se[0] in wanted and se[1] < epoch:
             out.append(key)
     return out
+
+
+# --- PPTX decks: pptx/{deck_id}/... ---
+
+
+def no_notes_pptx_key(pptx_key: object) -> Optional[str]:
+    """Key of the copy without speaker notes of a built PPTX, beside it:
+    ``pptx/{deck_id}/{build}.pptx`` → ``pptx/{deck_id}/{build}.nonotes.pptx``.
+
+    None for anything else (not a string, outside ``pptx/``, not ``.pptx``, ``..``, or
+    already a no-notes key). The build id changes on every rebuild, so the copy of
+    a superseded build is never served for the current one.
+    """
+    if (
+        not isinstance(pptx_key, str)
+        or not pptx_key.startswith(PPTX_PREFIX)
+        or not pptx_key.endswith(".pptx")
+        or pptx_key.endswith(NO_NOTES_PPTX_SUFFIX)
+        or ".." in pptx_key
+    ):
+        return None
+    return pptx_key[: -len(".pptx")] + NO_NOTES_PPTX_SUFFIX
 
 
 # --- HTML decks: html/{deck_id}/... ---
