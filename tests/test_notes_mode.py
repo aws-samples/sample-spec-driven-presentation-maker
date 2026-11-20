@@ -145,6 +145,25 @@ def test_export_partial_build_writes_no_notes_file(tmp_path: Path) -> None:
     assert not out.with_name("iso.notes.md").exists()
 
 
+@pytest.mark.parametrize("mode", ["keep", "strip"])
+def test_full_build_without_export_deletes_a_stale_notes_file(tmp_path: Path, mode: str) -> None:
+    out = tmp_path / "out.pptx"
+    deck = _make_deck(tmp_path, notesMode="export")
+    generate(deck, output_path=out)
+    stale = out.with_name("out.notes.md")
+    assert stale.exists()
+    meta = json.loads((deck / "deck.json").read_text(encoding="utf-8"))
+    (deck / "deck.json").write_text(json.dumps({**meta, "notesMode": mode}), encoding="utf-8")
+    generate(deck, output_path=out)
+    assert not stale.exists()
+    # A partial build never touches it
+    (deck / "deck.json").write_text(json.dumps({**meta, "notesMode": "export"}), encoding="utf-8")
+    generate(deck, output_path=out)
+    (deck / "deck.json").write_text(json.dumps({**meta, "notesMode": mode}), encoding="utf-8")
+    generate(deck, output_path=out, only_slugs={"intro"})
+    assert stale.exists()
+
+
 def test_invalid_notes_mode_stops_the_build(tmp_path: Path) -> None:
     with pytest.raises(ValueError, match="notesMode"):
         generate(_make_deck(tmp_path, notesMode="remove"), output_path=tmp_path / "out.pptx")

@@ -969,11 +969,18 @@ def generate(
     # A partial build (only_slugs, e.g. iso.pptx) does not write one: it would hold
     # only the rebuilt slides and overwrite nothing useful.
     notes_path: Path | None = None
-    if config.notes_mode == "export" and only_slugs is None:
-        from sdpm.engine.notes import speaker_notes_markdown
+    if only_slugs is None:
+        if config.notes_mode == "export":
+            from sdpm.engine.notes import speaker_notes_markdown
 
-        notes_path = _notes_export_path(out)
-        notes_path.write_text(speaker_notes_markdown(config.slides, title=config.title), encoding="utf-8")
+            notes_path = _notes_export_path(out)
+            notes_path.write_text(speaker_notes_markdown(config.slides, title=config.title), encoding="utf-8")
+        else:
+            # A notes file from an earlier "export" build must not outlive the mode
+            # change: with "strip" it is the very script the deck now leaves out.
+            stale = _notes_export_path(out)
+            if stale.is_file():
+                stale.unlink()
 
     imbalance = check_layout_imbalance_data(out, config.slides)
     if imbalance and not include_checks:

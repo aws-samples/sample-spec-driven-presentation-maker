@@ -368,26 +368,41 @@ def generate_pptx(
         gen_result = api_generate(json_path=tmpdir, output_path=out)
 
         # Upload PPTX to S3
-        pptx_key = f"pptx/{deck_id}/{uuid.uuid4()}.pptx"
+        build_id = uuid.uuid4()
+        pptx_key = f"pptx/{deck_id}/{build_id}.pptx"
         storage.upload_file(
             key=pptx_key, data=out.read_bytes(),
             content_type="application/vnd.openxmlformats-officedocument.presentationml.presentation",
         )
 
+        # deck.json "notesMode": "export" — the speaker notes left out of the .pptx
+        # were written next to it; they go to S3 beside the deck (same build id) so
+        # the remote user gets them too (the temp workspace is deleted below).
+        notes_key: str | None = None
+        if gen_result.get("notes_path"):
+            notes_key = f"pptx/{deck_id}/{build_id}.notes.md"
+            storage.upload_file(
+                key=notes_key, data=Path(gen_result["notes_path"]).read_bytes(),
+                content_type="text/markdown; charset=utf-8",
+            )
+
         # Update deck record
         deck = storage.get_deck(deck_id, user_id)
         now = datetime.now(timezone.utc).isoformat()
-        old = storage.update_deck(deck_id=deck_id, user_id=user_id, updates={
-            "pptxS3Key": pptx_key, "updatedAt": now, "slideCount": len(slides),
-        })
-        # Delete the superseded artifact (best effort) — every refresh
+        updates: dict = {"pptxS3Key": pptx_key, "updatedAt": now, "slideCount": len(slides)}
+        # notesS3Key follows the build: set with "export", cleared otherwise, so a
+        # deck rebuilt with "keep" / "strip" does not keep pointing at old notes.
+        updates["notesS3Key"] = notes_key
+        old = storage.update_deck(deck_id=deck_id, user_id=user_id, updates=updates)
+        # Delete the superseded artifacts (best effort) — every refresh
         # uploads a new UUID key and only the newest is referenced.
-        old_key = (old or {}).get("pptxS3Key")
-        if old_key and old_key != pptx_key:
-            try:
-                storage._s3.delete_object(Bucket=storage.pptx_bucket, Key=old_key)
-            except Exception:
-                pass
+        for field, new_key in (("pptxS3Key", pptx_key), ("notesS3Key", notes_key)):
+            old_key = (old or {}).get(field)
+            if old_key and old_key != new_key:
+                try:
+                    storage._s3.delete_object(Bucket=storage.pptx_bucket, Key=old_key)
+                except Exception:
+                    pass
 
         # Preview: epoch-keyed WebP (background)
         slugs = [s.get("id") or f"slide_{i + 1:02d}" for i, s in enumerate(slides)]
@@ -420,6 +435,12 @@ def generate_pptx(
         "slideCount": gen_result["slide_count"],
         "slides": gen_result["slides"],
     }
+    if notes_key:
+        result["notesS3Key"] = notes_key
+        try:
+            result["notesUrl"] = storage.presign_url(notes_key)
+        except Exception as e:  # the key is still in the result and the deck record
+            logger.warning("presign of %s failed: %s", notes_key, e)
     # Structured usage event: source for per-user slide-build measurement
     # (Logs Insights: filter kind = "slides_built" | stats sum(slide_count) by user_id)
     logger.info(json.dumps({

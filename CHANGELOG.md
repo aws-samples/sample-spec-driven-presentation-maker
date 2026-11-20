@@ -23,7 +23,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   presenter's script, which imported slides often bring along in their original notes. The
   slide files keep their `notes`, so composing and `check_specs` are unchanged; an invalid
   value is a `check_specs` error and stops the build. Partial builds (`iso.pptx`) write no
-  notes file.
+  notes file; a full build in `keep` or `strip` mode deletes a notes file left by an earlier
+  `export` build. PPTX decks only. On the AWS stack the remote `generate_pptx` uploads the
+  notes beside the deck (`pptx/<deckId>/<build>.notes.md`, deck record `notesS3Key`) and
+  returns `notesS3Key` and a signed `notesUrl`.
 - **Area charts** (`chartType: "area"`, #620). An area chart takes the same categories and
   series as a bar chart; `stacked: true` stacks the areas, and series `color`, `valueAxis`,
   `categoryAxis`, `style`, `legend` and `dataLabels` work as for `bar`. `pptx_to_json`
