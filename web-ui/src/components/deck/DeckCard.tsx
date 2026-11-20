@@ -154,7 +154,7 @@ export function DeckCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-64"
+            className="w-max"
             onClick={(e) => e.stopPropagation()}
           >
             <DropdownMenuItem

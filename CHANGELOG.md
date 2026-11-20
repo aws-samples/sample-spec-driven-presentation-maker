@@ -28,9 +28,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   deck record `notesS3Key`) and returns `notesS3Key` and a signed `notesUrl`; the rebuild
   after `run_python` uploads them and updates `notesS3Key` the same way.
 - **Download PPTX with or without speaker notes** (Web UI, both modes). The deck list "⋯"
-  menu has two download items, with notes and without notes; on the AWS stack the deck
-  view's PPTX button opens a menu with the same two choices (the local "Open PPTX" button is
-  unchanged). "With notes" is unavailable for a deck built with `speakerNotes: "markdown"`,
+  menu has two download items, with speaker notes and without speaker notes; on the AWS
+  stack the deck view's PPTX button opens a menu with the same two choices (the local
+  "Open PPTX" button is unchanged). "With speaker notes" is unavailable for a deck built with `speakerNotes: "markdown"`,
   whose stored .pptx holds no notes. The copy without notes is made from the stored .pptx
   without a rebuild (`sdpm.engine.notes.strip_speaker_notes`): `GET /decks/{id}/pptx?notes=without`
   on the AWS stack, which keeps it beside the build as `pptx/<deckId>/<build>.nonotes.pptx`

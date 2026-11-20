@@ -66,8 +66,8 @@ describe("DeckCard thumbnail", () => {
 })
 
 describe("DeckCard PPTX download", () => {
-  const WITH = "Download PPTX with speaker notes: Quarterly review"
-  const WITHOUT = "Download PPTX without speaker notes: Quarterly review"
+  const WITH = "Download PPTX (with speaker notes): Quarterly review"
+  const WITHOUT = "Download PPTX (without speaker notes): Quarterly review"
 
   function openMenu() {
     fireEvent.keyDown(screen.getByLabelText("Deck actions"), { key: "Enter" })
@@ -83,8 +83,8 @@ describe("DeckCard PPTX download", () => {
     const items = openMenu()
     expect(items.withNotes.getAttribute("aria-disabled")).toBeNull()
     expect(items.withoutNotes.getAttribute("aria-disabled")).toBeNull()
-    expect(items.withNotes.textContent).toBe("Download PPTX (with notes)")
-    expect(items.withoutNotes.textContent).toBe("Download PPTX (without notes)")
+    expect(items.withNotes.textContent).toBe("Download PPTX (with speaker notes)")
+    expect(items.withoutNotes.textContent).toBe("Download PPTX (without speaker notes)")
     fireEvent.click(screen.getByRole("menuitem", { name }))
     expect(onDownload).toHaveBeenCalledWith("d1", withNotes)
     expect(onOpen).not.toHaveBeenCalled()
