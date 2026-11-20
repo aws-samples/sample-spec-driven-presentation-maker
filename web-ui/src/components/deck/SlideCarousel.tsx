@@ -2,7 +2,8 @@
 // SPDX-License-Identifier: MIT-0
 /**
  * SlideCarousel — Vertical scroll layout for slide PNG previews with spec step navigation.
- * Shows all slides stacked vertically with PPTX download and folder open links.
+ * Shows all slides stacked vertically with PPTX download (cloud: a menu with or without
+ * speaker notes) and folder open links.
  * Features a polished loading animation during PPTX generation.
  * Integrates SpecStepNav for viewing brief/outline/art-direction content.
  *
@@ -21,7 +22,7 @@
 
 import { useState, useEffect, useRef, useCallback } from "react"
 import { AnimatePresence, motion } from "motion/react"
-import { SlidePreview, fetchHtmlUrl } from "@/services/deckService"
+import { SlidePreview, downloadDeckPptx, fetchHtmlUrl } from "@/services/deckService"
 import { openInOs } from "@/services/localService"
 import type { ScriptWarning, SpecFiles } from "@/services/deckService"
 import { Download, ExternalLink, Layers, LayoutGrid, MessageSquare, Presentation, Printer, Rows3, FolderOpen, FileText } from "lucide-react"
@@ -47,6 +48,7 @@ import { ReviewToolButton } from "@/components/review/ReviewToolButton"
 import { ReviewToolHint } from "@/components/review/ReviewToolHint"
 import { ReviewCommentCard } from "@/components/review/ReviewCommentCard"
 import { ReviewKeyboard } from "@/components/review/ReviewKeyboard"
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 
 
 /**
@@ -110,11 +112,13 @@ interface SlideCarouselProps {
   slideSize?: { width: number; height: number }
   /** HTML decks (cloud): slides whose script can send data outside the deck. */
   scriptWarnings?: ScriptWarning[]
+  /** PPTX decks: how the stored PPTX holds its speaker notes; "markdown" disables the download with notes. */
+  speakerNotes?: "pptx" | "markdown"
 }
 
 const HEADER_BUTTON = "inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
 
-export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, onOpenChat, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outputFormat, htmlUrl, slideSize, scriptWarnings }: SlideCarouselProps) {
+export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLoading, onSlideClick, scrollToSlide, onScrollComplete, headerActions, onOpenChat, ownerAlias, specs, workflowPhase, onStyleSelect, onTemplateSelect, currentTemplate, idToken, outputFormat, htmlUrl, slideSize, scriptWarnings, speakerNotes }: SlideCarouselProps) {
   const t = useTranslations("carousel")
   const isHtml = outputFormat === "html"
   const slidesWithPreview = slides.filter((s) => s.previewUrl || s.composeUrl)
@@ -309,6 +313,13 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
   async function handlePptxOpen() {
     if (!deckId || !IS_LOCAL) return
     openInOs(deckId, "output.pptx").catch((err) => notifyError(t("errorOpenPptx"), err, { retry: handlePptxOpen }))
+  }
+
+  /** Cloud: download the PPTX with or without speaker notes (a fresh signed URL each time). */
+  async function handlePptxDownload(withNotes: boolean) {
+    if (!deckId || IS_LOCAL) return
+    downloadDeckPptx(deckId, idToken ?? "", { withNotes })
+      .catch((err) => notifyError(t("errorDownloadPptx"), err, { retry: () => void handlePptxDownload(withNotes) }))
   }
 
   /**
@@ -674,16 +685,25 @@ export function SlideCarousel({ slides, defsUrl, deckId, deckName, pptxUrl, isLo
                   <span className="@max-5xl:sr-only">PPTX</span>
                 </button>
               ) : (
-                <a
-                  href={pptxUrl}
-                  download
-                  className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-foreground no-underline px-3 py-1.5 rounded-md hover:bg-accent transition-colors"
-                  aria-label={t("downloadPptx")}
-                  title={t("downloadPptx")}
-                >
-                  <Download className="h-3.5 w-3.5" />
-                  <span className="@max-5xl:sr-only">PPTX</span>
-                </a>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className={HEADER_BUTTON} aria-label={t("downloadPptx")} title={t("downloadPptx")}>
+                      <Download className="h-3.5 w-3.5" />
+                      <span className="@max-5xl:sr-only">PPTX</span>
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <DropdownMenuItem
+                      disabled={speakerNotes === "markdown"}
+                      onSelect={() => void handlePptxDownload(true)}
+                    >
+                      {t("pptxWithNotes")}
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => void handlePptxDownload(false)}>
+                      {t("pptxWithoutNotes")}
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )
             )}
           </div>

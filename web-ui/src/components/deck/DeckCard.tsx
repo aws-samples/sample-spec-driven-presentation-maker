@@ -16,7 +16,9 @@
  * @param props.onOpen - Callback when card is clicked to open workspace
  * @param props.onToggleFavorite - Callback to toggle favorite status
  * @param props.onDelete - Callback to delete deck (owner only)
- * @param props.onDownload - Callback to download the PPTX; the item is disabled while `deck.hasPptx` is false
+ * @param props.onDownload - Callback to download the PPTX with or without speaker notes (two items);
+ *   both are disabled while `deck.hasPptx` is false, "with notes" also when `deck.speakerNotes` is
+ *   "markdown" (the stored PPTX holds no notes)
  */
 
 "use client"
@@ -44,8 +46,8 @@ interface DeckCardProps {
   onToggleFavorite?: (deckId: string, action: "add" | "remove") => void
   onDelete?: (deckId: string) => void
   onToggleVisibility?: (deckId: string, visibility: "public" | "private") => void
-  /** Download the built PPTX (disabled until the deck has one). */
-  onDownload?: (deckId: string) => void
+  /** Download the built PPTX, with or without speaker notes (disabled until the deck has one). */
+  onDownload?: (deckId: string, withNotes: boolean) => void
   /** Local: open output.pptx with the default app. */
   onOpenPptx?: (deckId: string) => void
   onOpenFolder?: (deckId: string) => void
@@ -152,7 +154,7 @@ export function DeckCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             align="end"
-            className="w-52"
+            className="w-64"
             onClick={(e) => e.stopPropagation()}
           >
             <DropdownMenuItem
@@ -174,14 +176,24 @@ export function DeckCard({
               </DropdownMenuItem>
             )}
             {onDownload && (
-              <DropdownMenuItem
-                disabled={!deck.hasPptx}
-                onSelect={() => onDownload(deck.deckId)}
-                aria-label={t("downloadPptxAria", { name: deck.name })}
-              >
-                <Download className="h-3.5 w-3.5" />
-                {t("downloadPptx")}
-              </DropdownMenuItem>
+              <>
+                <DropdownMenuItem
+                  disabled={!deck.hasPptx || deck.speakerNotes === "markdown"}
+                  onSelect={() => onDownload(deck.deckId, true)}
+                  aria-label={t("downloadPptxWithNotesAria", { name: deck.name })}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {t("downloadPptxWithNotes")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  disabled={!deck.hasPptx}
+                  onSelect={() => onDownload(deck.deckId, false)}
+                  aria-label={t("downloadPptxWithoutNotesAria", { name: deck.name })}
+                >
+                  <Download className="h-3.5 w-3.5" />
+                  {t("downloadPptxWithoutNotes")}
+                </DropdownMenuItem>
+              </>
             )}
             <CloudOnly>
             {isOwner && onToggleVisibility && (

@@ -7,6 +7,11 @@ import { renderWithIntl } from "@/test/renderWithIntl"
 import type { SlidePreview } from "@/services/deckService"
 
 vi.mock("@/lib/mode", () => ({ IS_LOCAL: false }))
+const { downloadDeckPptx } = vi.hoisted(() => ({ downloadDeckPptx: vi.fn() }))
+vi.mock("@/services/deckService", async (orig) => ({
+  ...(await orig<typeof import("@/services/deckService")>()),
+  downloadDeckPptx,
+}))
 
 const viewMode = { current: "grid" as "grid" | "full" }
 vi.mock("@/hooks/usePreferences", async () => {
@@ -91,6 +96,52 @@ describe("SlideCarousel — HTML decks", () => {
     cleanup()
     renderCarousel()
     expect(screen.queryByText("External access")).toBeNull()
+  })
+})
+
+describe("SlideCarousel — PPTX download (cloud)", () => {
+  beforeEach(() => {
+    viewMode.current = "grid"
+    downloadDeckPptx.mockReset()
+    downloadDeckPptx.mockResolvedValue(undefined)
+  })
+  afterEach(cleanup)
+
+  function openMenu(speakerNotes?: "pptx" | "markdown") {
+    renderCarousel({ outputFormat: "pptx", htmlUrl: null, pptxUrl: "https://cdn.example/pptx/d1/b.pptx", idToken: "tok", speakerNotes })
+    fireEvent.keyDown(screen.getByRole("button", { name: "Download PPTX" }), { key: "Enter" })
+    return {
+      withNotes: screen.getByRole("menuitem", { name: "With speaker notes" }),
+      withoutNotes: screen.getByRole("menuitem", { name: "Without speaker notes" }),
+    }
+  }
+
+  it("is a menu, not a link to the URL in the deck detail", () => {
+    renderCarousel({ outputFormat: "pptx", htmlUrl: null, pptxUrl: "https://cdn.example/pptx/d1/b.pptx", idToken: "tok" })
+    expect(document.querySelector("a[href='https://cdn.example/pptx/d1/b.pptx']")).toBeNull()
+  })
+
+  it.each([
+    ["With speaker notes", true],
+    ["Without speaker notes", false],
+  ])("%s downloads through a fresh signed URL", (name, withNotes) => {
+    openMenu("pptx")
+    fireEvent.click(screen.getByRole("menuitem", { name }))
+    expect(downloadDeckPptx).toHaveBeenCalledWith("d1", "tok", { withNotes })
+  })
+
+  it("disables \"with notes\" when the notes were built to Markdown", () => {
+    const items = openMenu("markdown")
+    expect(items.withNotes.getAttribute("aria-disabled")).toBe("true")
+    expect(items.withoutNotes.getAttribute("aria-disabled")).toBeNull()
+    fireEvent.click(items.withNotes)
+    expect(downloadDeckPptx).not.toHaveBeenCalled()
+  })
+
+  it("offers both choices when speakerNotes is not given", () => {
+    const items = openMenu()
+    expect(items.withNotes.getAttribute("aria-disabled")).toBeNull()
+    expect(items.withoutNotes.getAttribute("aria-disabled")).toBeNull()
   })
 })
 

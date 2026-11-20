@@ -138,7 +138,14 @@ describe("useDeckList — PPTX download from the list", () => {
     api.downloadDeckPptx.mockResolvedValue(undefined)
     const { result } = renderHook(() => useDeckList("token", true, null), { wrapper: intlWrapper() })
     act(() => result.current.handleDownload("someone-elses"))
-    expect(api.downloadDeckPptx).toHaveBeenCalledWith("someone-elses", "token")
+    expect(api.downloadDeckPptx).toHaveBeenCalledWith("someone-elses", "token", { withNotes: true })
+  })
+
+  it("passes the choice without speaker notes", async () => {
+    api.downloadDeckPptx.mockResolvedValue(undefined)
+    const { result } = renderHook(() => useDeckList("token", true, null), { wrapper: intlWrapper() })
+    act(() => result.current.handleDownload("d1", false))
+    expect(api.downloadDeckPptx).toHaveBeenCalledWith("d1", "token", { withNotes: false })
   })
 
   it("reports a failed download with the translated message", async () => {
