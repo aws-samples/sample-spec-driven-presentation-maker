@@ -901,8 +901,9 @@ class TestRemoteRunPythonBranching:
         storage.previous_pptx_key = "pptx/d1/old-artifact.pptx"
         out = self._run()
         assert "pptx_error" not in out
-        # Auto-refresh must not accumulate orphaned PPTX objects
-        storage._s3.delete_object.assert_called_once_with(Bucket="test-pptx", Key="pptx/d1/old-artifact.pptx")
+        # Auto-refresh must not accumulate orphaned PPTX objects (nor the build's copy without notes)
+        deleted = {c.kwargs["Key"] for c in storage._s3.delete_object.call_args_list}
+        assert deleted == {"pptx/d1/old-artifact.pptx", "pptx/d1/old-artifact.nonotes.pptx"}
 
     def test_first_artifact_deletes_nothing(self, remote_rig):
         fake_execute, storage, calls = remote_rig

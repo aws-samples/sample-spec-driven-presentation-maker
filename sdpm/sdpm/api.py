@@ -1408,6 +1408,8 @@ class PptxRefresh:
             and ``preview`` (``preview_unavailable``) — all only with measure_slides,
             for the measured slugs — and ``pptx_error`` when the full build failed.
         pptx_path: ``<deck>/output.pptx``; None when the full build failed.
+        notes_path: the Markdown speaker notes the full build wrote next to it
+            (deck.json ``speakerNotes`` ``"markdown"``); None otherwise.
         render_slugs: slides that get fresh compose and previews, in deck order.
         compose_slugs: render_slugs plus ``compose_also``, without slides whose layout
             fell back (an invalid layout name), in deck order. Reading it makes the render.
@@ -1420,6 +1422,7 @@ class PptxRefresh:
         self.plan = plan
         self.result: dict[str, Any] = {}
         self.pptx_path: Path | None = None
+        self.notes_path: Path | None = None
         self.render_slugs: list[str] = []
         self.render_error: str | None = None
         self._compose_slugs: list[str] = []
@@ -1638,6 +1641,7 @@ def refresh_pptx(
     try:
         built = generate(json_path=deck_input, output_path=str(deck / "output.pptx"), include_checks=True)
         refresh.pptx_path = Path(built.get("output_path", deck / "output.pptx"))
+        refresh.notes_path = Path(built["notes_path"]) if built.get("notes_path") else None
         build_warnings = built.get("warnings", [])
         checks = built.get("checks", {})
     except Exception as exc:
