@@ -25,7 +25,17 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   build. Partial builds (`iso.pptx`) write no notes file; a full `"pptx"` build deletes a
   notes file left by an earlier `"markdown"` build. PPTX decks only. On the AWS stack the
   remote `generate_pptx` uploads the notes beside the deck (`pptx/<deckId>/<build>.notes.md`,
-  deck record `notesS3Key`) and returns `notesS3Key` and a signed `notesUrl`.
+  deck record `notesS3Key`) and returns `notesS3Key` and a signed `notesUrl`; the rebuild
+  after `run_python` uploads them and updates `notesS3Key` the same way.
+- **Download PPTX with or without speaker notes** (Web UI, both modes). The deck list "⋯"
+  menu has two download items, with notes and without notes; on the AWS stack the deck
+  view's PPTX button opens a menu with the same two choices (the local "Open PPTX" button is
+  unchanged). "With notes" is unavailable for a deck built with `speakerNotes: "markdown"`,
+  whose stored .pptx holds no notes. The copy without notes is made from the stored .pptx
+  without a rebuild (`sdpm.engine.notes.strip_speaker_notes`): `GET /decks/{id}/pptx?notes=without`
+  on the AWS stack, which keeps it beside the build as `pptx/<deckId>/<build>.nonotes.pptx`
+  for later downloads, and `GET /api/decks/{id}/pptx?notes=without` locally. Deck list items
+  and the deck detail carry `speakerNotes` (`"pptx"` | `"markdown"`) for the stored .pptx.
 - **`deck-json-spec` guide.** Every `deck.json` field of PPTX and HTML decks in one list:
   required or optional, default, who writes it and which format it affects.
   `start_presentation` returns it as `static.deck_spec`, and the AWS stack's agent puts it in
