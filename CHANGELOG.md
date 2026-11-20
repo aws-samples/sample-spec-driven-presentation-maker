@@ -24,6 +24,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **A textbox border keeps its `lineOpacity`** (#667). The textbox builder ignored
+  `lineOpacity`, so a translucent border came out fully opaque, and a PPTX → JSON → PPTX
+  round trip lost the opacity `pptx_to_json` had read. It now writes the border alpha as
+  shapes do. Local mode and the AWS stack (SdpmRuntime).
 - **Moving between Decks, Styles and Templates no longer flashes the screen.** The rail and
   the logo were plain links, so every move reloaded the page: the whole screen was drawn
   again, the text showed in English for a moment before the chosen language, and the Cloud
