@@ -43,6 +43,8 @@ _CHARTSPACE_AFTER_SPPR = (
     "c:extLst",
 )
 _PLOTAREA_AFTER_SPPR = ("c:extLst",)
+_BARCHART_AFTER_OVERLAP = ("c:serLines", "c:axId", "c:extLst")
+_BARCHART_AFTER_GAPWIDTH = ("c:overlap", *_BARCHART_AFTER_OVERLAP)
 
 
 def _insert_in_order(parent, tag_name: str, before_tags: tuple[str, ...]):
@@ -326,15 +328,11 @@ class ChartMixin:
             x_chart = plot_area.find(qn('c:barChart'))
             if x_chart is not None:
                 # Gap width: tighter grouping
-                gap_w = x_chart.find(qn('c:gapWidth'))
-                if gap_w is None:
-                    gap_w = etree.SubElement(x_chart, qn('c:gapWidth'))
+                gap_w = _insert_in_order(x_chart, 'c:gapWidth', _BARCHART_AFTER_GAPWIDTH)
                 gap_w.set('val', str(elem.get("gapWidth") or style_gap_width or ('80' if not stacked else '60')))
                 # Overlap for clustered
                 if not stacked:
-                    overlap = x_chart.find(qn('c:overlap'))
-                    if overlap is None:
-                        overlap = etree.SubElement(x_chart, qn('c:overlap'))
+                    overlap = _insert_in_order(x_chart, 'c:overlap', _BARCHART_AFTER_OVERLAP)
                     overlap.set('val', str(elem.get("overlap", -10)))
     
         # --- Line-specific: smooth curves ---

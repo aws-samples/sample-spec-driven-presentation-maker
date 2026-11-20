@@ -35,6 +35,11 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   axis, plot area or chart space, out of schema order. PowerPoint accepts that, but strict
   readers and validators can reject the file. It is now inserted at its schema position.
   Local mode and the AWS stack (SdpmRuntime).
+- **Bar chart gap width and overlap follow the OOXML schema order** (#665). A bar chart's
+  `c:gapWidth` and `c:overlap` were appended after its axis IDs, out of schema order, for
+  clustered and stacked bars. PowerPoint accepts that, but strict readers and validators can
+  reject the file. They are now inserted before the axis IDs; their values are unchanged.
+  Local mode and the AWS stack (SdpmRuntime).
 - **A shape's `paragraphs` take the documented `list` key** (#586). `list: {"type": "disc"}`
   was ignored on shapes, so the paragraph had no bullet; it now makes a bullet, and a
   numbered `type` and `level` work as in a textbox. `bullet` still works as before. Local
