@@ -64,23 +64,6 @@ def _segments_intersect(a1, a2, b1, b2):
     return False
 
 
-def _find_first_crossing(edges):
-    """Find the first pair of crossing segments across all edges."""
-    for i in range(len(edges)):
-        pts_i = edges[i]["points"]
-        if len(pts_i) < 2 or edges[i].get("_fanout"):
-            continue
-        for j in range(i + 1, len(edges)):
-            pts_j = edges[j]["points"]
-            if len(pts_j) < 2 or edges[j].get("_fanout"):
-                continue
-            for si in range(len(pts_i) - 1):
-                for sj in range(len(pts_j) - 1):
-                    if _segments_intersect(pts_i[si], pts_i[si + 1], pts_j[sj], pts_j[sj + 1]):
-                        return (i, si, j, sj)
-    return None
-
-
 def _segments_overlap_collinear(a1, a2, b1, b2):
     """True if the two axis-aligned segments lie on the same line and overlap
     (as opposed to crossing perpendicularly)."""
