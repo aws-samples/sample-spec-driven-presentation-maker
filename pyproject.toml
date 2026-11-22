@@ -30,6 +30,7 @@ dev = [
     "pytest>=9.0.2",
     "pytest-cov>=7.1.0",
     "ruff",
+    "tiktoken>=0.12",  # scripts/context_size.py token counts
 ]
 
 [tool.ruff]
