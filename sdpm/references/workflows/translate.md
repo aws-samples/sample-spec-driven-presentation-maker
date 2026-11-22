@@ -19,6 +19,9 @@ shell access to it (CLI, or an agent whose tools include a shell).
   values. `scripts/translate_apply.py <deck>-<lang>` (`--dry-run` to preview) writes the
   filled values into the sibling's slides. How to invoke scripts depends on your
   environment — see `SKILL.md`.
+- The dictionary also holds the deck.json `title` (the PPTX document title), and apply
+  writes its translation into the sibling's deck.json. Extraction sets the sibling's
+  `language` to `--target-lang`, so pass the target language as a BCP 47 tag.
 - Fill the dictionary, never its keys, and take keys from `translation_map.json` only —
   the `texts.tsv` next to it is an escaped review copy. An empty value keeps the source text.
   Styled-text tags

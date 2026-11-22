@@ -28,6 +28,7 @@ _DECK = {
     "fonts": {"fullwidth": "Noto Sans JP", "halfwidth": "Amazon Ember"},
     "defaultTextColor": "#A1B2C3",
     "slideSize": {"width": 1920, "height": 1080, "ptPerPx": 0.5},
+    "title": "Deck",
 }
 _CANNOT = "Cannot compose: fix the listed spec problems, then call compose_slides again."
 _DESC_MAX = {"compose_slides": 2400, "message_composer": 560}

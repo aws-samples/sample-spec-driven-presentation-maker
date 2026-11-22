@@ -561,6 +561,7 @@ class TestRemoteCheckSpecs:
             "fonts": {"fullwidth": "Noto Sans JP", "halfwidth": "Amazon Ember"},
             "defaultTextColor": "#FFFFFF",
             "slideSize": {"width": 1920, "height": 1080, "ptPerPx": 0.5},
+            "title": "Deck",
         }
         storage.download_file_from_pptx_bucket.return_value = (
             b"- [intro] Claim\n"

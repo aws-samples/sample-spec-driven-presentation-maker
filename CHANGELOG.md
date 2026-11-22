@@ -49,6 +49,16 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Fixed
 
+- **Built PPTX decks carry a document title and language.** The PPTX title (`dc:title`)
+  came from `deck.json` `title`, or, without one, from the first slide's title placeholder.
+  The orchestrator did not write `title`, and a cover drawn with elements keeps no title
+  placeholder, so many decks had no document title. The orchestrator now writes `title`
+  (as the cover states it) and `language` into `deck.json` with the outline, and
+  `check_specs` warns when a PPTX deck has no `title` (a warning; it does not stop the
+  build). Translation now translates `title` along with the slides (`translate_extract.py`
+  puts it in the dictionary, `translate_apply.py` writes it back) and sets the variant's
+  `language` to `--target-lang`. Existing decks are unchanged until their `deck.json` gets a
+  `title`. Local mode and the AWS stack (SdpmRuntime, SdpmData).
 - **Moving between Decks, Styles and Templates no longer flashes the screen.** The rail and
   the logo were plain links, so every move reloaded the page: the whole screen was drawn
   again, the text showed in English for a moment before the chosen language, and the Cloud

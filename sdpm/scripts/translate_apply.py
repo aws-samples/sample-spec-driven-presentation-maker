@@ -8,8 +8,9 @@ Usage::
     uv run python3 scripts/translate_apply.py {deck_dir} [--dry-run]
 
 Reads ``{deck_dir}/translate/translation_map.json`` and rewrites each
-``{deck_dir}/slides/*.json`` in place, replacing translatable strings whose
-key exists in the dictionary (and whose value is non-empty).
+``{deck_dir}/slides/*.json`` and the deck.json ``title`` in place, replacing
+translatable strings whose key exists in the dictionary (and whose value is
+non-empty).
 
 Structural attributes (layout, type, shape, src, fontColor, fontFamily, etc.)
 are never touched. ``\x0b`` (vertical tab) is preserved because the map file
@@ -250,6 +251,28 @@ def main() -> int:
         return 1
 
     total_changes = 0
+    deck_json_path = deck / "deck.json"
+    try:
+        deck_json = json.loads(deck_json_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"Warning: failed to parse deck.json: {e}", file=sys.stderr)
+        deck_json = None
+    if isinstance(deck_json, dict) and isinstance(deck_json.get("title"), str):
+        before_title = deck_json["title"]
+        title_counter: dict[str, int] = {}
+        after_title = _translate_string(before_title, dictionary, title_counter)
+        if after_title != before_title:
+            total_changes += 1
+            if args.dry_run:
+                print("deck.json: 1 change(s)")
+                print(f"  - title {before_title!r} → {after_title!r}")
+            else:
+                deck_json["title"] = after_title
+                deck_json_path.write_text(
+                    json.dumps(deck_json, ensure_ascii=False, indent=2) + "\n",
+                    encoding="utf-8",
+                )
+
     for slide_file in sorted(slides_dir.glob("*.json")):
         try:
             data_text = slide_file.read_text(encoding="utf-8")
