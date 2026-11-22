@@ -7,13 +7,17 @@
     uv run python scripts/context_size.py --root ../base --json base.json
     uv run python scripts/context_size.py --base base.json     # add +/- columns vs base.json
 
-Items are read the way clients get them: each server's instructions and tools/list
-(name, description, inputSchema) from the real server objects, the start_* payloads from
-the real tool functions, the agent system prompts from agent/modes, and every role
-document, guide and agent prompt file. A bundle is what one session of a role holds
-before its first real step (for example, Local MCP orchestrator = instructions + all
-tool definitions + the start_presentation payload). Per-deck data (brief, outline,
-slides) and per-user data beyond the bundled defaults are not counted.
+Items are read the way clients get them: each server's instructions, tools/list (name,
+description, inputSchema) and prompts/list plus each rendered prompt from the real server
+objects, the start_* payloads from the real tool functions, the agent system prompts and
+the text the agent inserts into a conversation from agent/, the client wiring text
+(Kiro agent and ACP agent descriptions), and every role document, guide, bundled style
+and agent prompt file. A bundle is what one session of a role holds before its first
+real step (for example, Local MCP orchestrator = instructions + all tool definitions +
+the start_presentation payload). A "+ guides it names" bundle adds every guide the
+role's own texts name (an upper bound of what it reads on demand). Contributor-facing
+files (AGENTS.md, steering) are reported in a table of their own. Per-call tool results
+and per-deck data are not counted; the report lists them under "Not measured".
 
 chars and UTF-8 bytes are exact. tokens use tiktoken's o200k_base as a stable proxy;
 Claude's tokenizer is not public, so treat them as approximate. Without tiktoken the
@@ -29,6 +33,7 @@ import asyncio
 import importlib.util
 import json
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -38,8 +43,28 @@ from typing import Any
 SCRIPT = Path(__file__).resolve()
 DEFAULT_ROOT = SCRIPT.parents[1]
 
-# Files that reach a model as they are (role documents, guides, agent prompt parts).
-FILE_GLOBS = ("sdpm/references/workflows/*.md", "sdpm/references/guides/*.md", "agent/prompts/**/*.md")
+# Files that reach a model as they are (role documents, guides, bundled styles read via
+# list_styles / apply_style, agent prompt parts, the Local Web UI's ACP agent prompts).
+FILE_GLOBS = (
+    "sdpm/references/workflows/*.md", "sdpm/references/guides/*.md", "sdpm/references/examples/styles/*.html",
+    "agent/prompts/**/*.md", "servers/local/.kiro/acp-agents/prompts/*.md",
+)
+GUIDES_DIR = "sdpm/references/guides"
+# ACP agent definitions: their description is what a spawning model sees.
+ACP_AGENTS_GLOB = "servers/local/.kiro/acp-agents/*.json"
+# Files a contributor's coding agent reads in this repo; not part of any product session.
+DEV_GLOBS = ("AGENTS.md", "CLAUDE.md", ".github/copilot-instructions.md", ".kiro/steering/*.md")
+
+# What the report does not count, so nobody reads the tables as complete.
+NOT_MEASURED = (
+    "Per-call tool results: run_python output, lint and measure_slides results, check_specs, errors and hints, "
+    "and the compose reports (`<compose_result>`, `<composer_note>`, message_composer errors) on the Cloud agent "
+    "and the Local Web UI (web-ui/src/lib/local/conversation/compose-report.ts, compose-run.ts).",
+    "Deck data: brief, outline, art direction, slides, deck.json, attachments, and user styles and templates "
+    "beyond the bundled ones.",
+    "Guides that a guide names (the '+ guides it names' bundles go one level deep), and the client's own "
+    "system prompt and built-in tools.",
+)
 
 # What each role's entry tool returns that does not depend on a deck: (tool, args, picks).
 ROLES: dict[str, tuple[str, dict, tuple[str, ...]]] = {
@@ -132,7 +157,24 @@ def collect_server(root: Path, surface: str) -> dict[str, Any]:
         items[f"mcp/{surface}/instructions"] = module.mcp.instructions
     for tool in asyncio.run(module.mcp.list_tools()):
         items[f"mcp/{surface}/tool/{tool.name}"] = tool_text(tool.name, tool.description, tool.input_schema)
+    items.update(asyncio.run(_prompt_items(module.mcp, surface)))
     return {"items": items}
+
+
+async def _prompt_items(mcp: Any, surface: str) -> dict[str, str]:
+    """Each prompt as prompts/list lists it, and its body as get_prompt renders it.
+
+    Required arguments get a placeholder (``<deck_id>``); optional ones are left out, so the
+    body is the prompt's own text.
+    """
+    items: dict[str, str] = {}
+    for prompt in await mcp.list_prompts():
+        items[f"mcp/{surface}/prompt/{prompt.name}"] = prompt.model_dump_json(exclude_none=True)
+        args = {a.name: f"<{a.name}>" for a in prompt.arguments or [] if a.required}
+        rendered = await mcp.get_prompt(prompt.name, args)
+        body = "\n\n".join(m.content.text for m in rendered.messages if getattr(m.content, "text", None))
+        items[f"mcp/{surface}/prompt/{prompt.name}/body"] = body
+    return items
 
 
 def collect_payloads(root: Path) -> dict[str, Any]:
@@ -158,16 +200,28 @@ def collect_agent(root: Path) -> dict[str, Any]:
     """Per agent mode: system prompt parts, the MCP tools it allows, and its own tools."""
     _use_root(root, ("agent",))
     import composition
-    from compose_messaging import make_message_composer
+    import message_hooks
+    from compose_messaging import COMPOSER_MESSAGE_PREFIX, ComposeMessaging, make_message_composer, make_report_tool
     from modes import MODES
-    from modes.composer import make_compose_slides
+    from modes.composer import _replay_start_composing, make_compose_slides
     from tools.hearing_tool import hearing
     from tools.web_tools import web_fetch
 
     _check_root(composition, root)
     own = {"web_fetch": web_fetch, "hearing": hearing}
     composer_tools = {"compose_slides": make_compose_slides([], None), "message_composer": make_message_composer(None)}
-    items: dict[str, str] = {}
+    # Text the agent puts into a model's conversation by itself (not a tool result).
+    replay_texts = [b["text"] for m in _replay_start_composing("", [], {}) if m["role"] == "assistant"
+                    for b in m["content"] if "text" in b]
+    report_tool = make_report_tool(ComposeMessaging(), "", 1, []).tool_spec
+    items: dict[str, str] = {
+        "agent/inject/composer_message_prefix": COMPOSER_MESSAGE_PREFIX,
+        "agent/inject/composer_opening": "\n".join(replay_texts),
+        "agent/inject/tool_image_placeholder": message_hooks._PLACEHOLDER,
+        "agent/tool/report_to_orchestrator": tool_text(
+            report_tool["name"], report_tool.get("description"),
+            report_tool["inputSchema"].get("json", report_tool["inputSchema"])),
+    }
     modes: dict[str, dict] = {}
     with tempfile.TemporaryDirectory() as deck_dir:
         for mode, cfg in MODES.items():
@@ -198,12 +252,28 @@ def collect_agent(root: Path) -> dict[str, Any]:
     return {"items": items, "modes": modes}
 
 
+def collect_client(root: Path) -> dict[str, Any]:
+    """Client wiring text a model sees: the Kiro agent's description (Kiro CLI shows it as
+    the sub-agent tool's description). The rest of the generated config is a command line."""
+    _use_root(root, ("servers/local",))
+    import client_config
+
+    _check_root(client_config, root)
+    definition = client_config.kiro_agent_definition(client_config.Target(uv="uv", checkout="/sdpm"))
+    return {"items": {"client/kiro/agent-description": definition["description"]}}
+
+
 def _collect(root: Path, surface: str) -> dict[str, Any]:
     if surface in SERVERS:
         return collect_server(root, surface)
     if surface == "payloads":
         return collect_payloads(root)
+    if surface == "client":
+        return collect_client(root)
     return collect_agent(root)
+
+
+SURFACES = (*SERVERS, "payloads", "agent", "client")
 
 
 # ---------------------------------------------------------------------------
@@ -224,13 +294,53 @@ def _run_collect(root: Path, surface: str, home: str) -> dict[str, Any]:
     return json.loads(proc.stdout.strip().splitlines()[-1])
 
 
-def read_files(root: Path) -> dict[str, str]:
-    """Every role document, guide and agent prompt file, keyed by its repo path."""
+def _read_globs(root: Path, patterns: tuple[str, ...]) -> dict[str, str]:
     files: dict[str, str] = {}
-    for pattern in FILE_GLOBS:
+    for pattern in patterns:
         for path in sorted(root.glob(pattern)):
             files[path.relative_to(root).as_posix()] = path.read_text(encoding="utf-8")
     return files
+
+
+def read_files(root: Path) -> dict[str, str]:
+    """Every role document, guide, bundled style and agent prompt file, keyed by its repo
+    path, and each ACP agent's description (``<file>#description``)."""
+    files = _read_globs(root, FILE_GLOBS)
+    for path in sorted(root.glob(ACP_AGENTS_GLOB)):
+        description = json.loads(path.read_text(encoding="utf-8")).get("description")
+        if description:
+            files[f"{path.relative_to(root).as_posix()}#description"] = description
+    return files
+
+
+def read_dev_files(root: Path) -> dict[str, str]:
+    """The files a contributor's coding agent reads (AGENTS.md, steering), by repo path."""
+    return _read_globs(root, DEV_GLOBS)
+
+
+_GUIDE_CUE = re.compile(r"\bguides?\b|read_guides")
+_QUOTED_NAME = re.compile(r"[`\"]([a-z0-9-]+)[`\"]")
+
+
+def named_guides(texts: list[str], guides: set[str]) -> list[str]:
+    """Guide names the texts point at, in order of first mention.
+
+    A name counts where its paragraph speaks of guides (``guide`` or ``read_guides``), so a
+    region or pattern that happens to share a guide's name (``table``) does not. A paragraph
+    that ends with ``:`` is read together with the list after it.
+    """
+    found: list[str] = []
+    for text in texts:
+        paragraphs = re.split(r"\n\s*\n", text)
+        for i, para in enumerate(paragraphs):
+            if i and paragraphs[i - 1].rstrip().endswith(":"):
+                para = paragraphs[i - 1] + "\n" + para
+            if not _GUIDE_CUE.search(para):
+                continue
+            for name in _QUOTED_NAME.findall(para):
+                if name in guides and name not in found:
+                    found.append(name)
+    return found
 
 
 def assemble(files: dict[str, str], collected: dict[str, dict]) -> tuple[dict[str, str], dict[str, list[str]]]:
@@ -260,10 +370,19 @@ def assemble(files: dict[str, str], collected: dict[str, dict]) -> tuple[dict[st
                 mcp = [i for i in remote if allowed is None or i.rsplit("/", 1)[-1] in allowed]
                 bundles[f"{SURFACE_TITLES['agent']} / {mode}"] = ids(spec["parts"] + spec["own_tools"] + mcp)
             continue
-        base = list(collected[surface]["items"])
+        base = [i for i in collected[surface]["items"] if "/prompt/" not in i]  # prompts are user-invoked
         bundles[f"{SURFACE_TITLES[surface]} / tools only"] = ids(base)
         for role, (tool, args, picks) in ROLES.items():
             bundles[f"{SURFACE_TITLES[surface]} / {role}"] = ids(base + [payload_id(tool, args, p) for p in picks])
+    # A typical session of a role on the most used surface: its start bundle plus every guide
+    # the role's own texts name. Other surfaces add the same guides to their own start bundle.
+    guides = {Path(i).stem for i in items if i.startswith(f"{GUIDES_DIR}/")}
+    for role, (tool, args, picks) in ROLES.items():
+        start = bundles[f"{SURFACE_TITLES['local']} / {role}"]
+        # The role document and the spec it comes with; catalogues and a style's HTML are data.
+        own = [items[i] for i in ids([payload_id(tool, args, p) for p in picks if p.startswith("static.")])]
+        extra = [f"{GUIDES_DIR}/{n}.md" for n in named_guides(own, guides)]
+        bundles[f"{SURFACE_TITLES['local']} / {role} + guides it names"] = start + [g for g in extra if g not in start]
     return items, bundles
 
 
@@ -277,20 +396,35 @@ def _encoder():
         return None
 
 
-def measure(items: dict[str, str], bundles: dict[str, list[str]], encoder=None) -> dict[str, Any]:
-    """Sizes per item and per bundle (a bundle is the sum of its items)."""
+def _sizes(items: dict[str, str], encoder) -> dict[str, dict]:
     sized = {}
     for item, text in sorted(items.items()):
         tokens = len(encoder.encode(text, disallowed_special=())) if encoder else None
         sized[item] = {"chars": len(text), "bytes": len(text.encode("utf-8")), "tokens": tokens}
-    totals = {}
-    for name, members in bundles.items():
-        row: dict[str, Any] = {"items": members}
-        for unit in ("chars", "bytes", "tokens"):
-            values = [sized[m][unit] for m in members]
-            row[unit] = None if None in values else sum(values)
-        totals[name] = row
-    return {"tokenizer": "o200k_base" if encoder else None, "items": sized, "bundles": totals}
+    return sized
+
+
+def _total(sized: dict[str, dict], members: list[str]) -> dict[str, Any]:
+    row: dict[str, Any] = {"items": members}
+    for unit in ("chars", "bytes", "tokens"):
+        values = [sized[m][unit] for m in members]
+        row[unit] = None if None in values else sum(values)
+    return row
+
+
+def measure(
+    items: dict[str, str], bundles: dict[str, list[str]], encoder=None, developer: dict[str, str] | None = None,
+) -> dict[str, Any]:
+    """Sizes per item and per bundle (a bundle is the sum of its items), and the
+    developer-facing files with their total, kept apart from the product items."""
+    sized = _sizes(items, encoder)
+    dev = _sizes(developer or {}, encoder)
+    return {
+        "tokenizer": "o200k_base" if encoder else None,
+        "items": sized,
+        "bundles": {name: _total(sized, members) for name, members in bundles.items()},
+        "developer": {"items": dev, "total": _total(dev, list(dev))},
+    }
 
 
 def _num(value: int | None) -> str:
@@ -331,7 +465,7 @@ def markdown(report: dict[str, Any], base: dict[str, Any] | None = None, top: in
 
     base_bundles = base["bundles"] if base else {}
     base_items = base["items"] if base else {}
-    table("Bundle (one session at start)", report["bundles"], list(report["bundles"]), base_bundles)
+    table("Bundle (one session; at start unless '+ guides')", report["bundles"], list(report["bundles"]), base_bundles)
     largest = sorted(report["items"], key=lambda i: report["items"][i]["chars"], reverse=True)[:top]
     table(f"Largest {top} items", report["items"], largest, base_items)
     if base:
@@ -343,15 +477,26 @@ def markdown(report: dict[str, Any], base: dict[str, Any] | None = None, top: in
             table("Changed items", report["items"], changed, base_items)
         else:
             lines.extend(["No item changed size.", ""])
+
+    dev = report.get("developer", {"items": {}, "total": {}})
+    if dev["items"]:
+        base_dev = (base or {}).get("developer", {"items": {}, "total": {}})
+        lines.extend(["### Developer-facing (contributors' coding agents, not product sessions)", ""])
+        rows = {**dev["items"], "total": dev["total"]}
+        table("File", rows, [*dev["items"], "total"], {**base_dev["items"], "total": base_dev["total"]})
+
+    lines.extend(["### Not measured", ""])
+    lines.extend(f"- {line}" for line in NOT_MEASURED)
+    lines.append("")
     return "\n".join(lines)
 
 
 def report_for(root: Path) -> dict[str, Any]:
     """Collect every surface of the checkout at root and measure it."""
     with tempfile.TemporaryDirectory() as home:
-        collected = {s: _run_collect(root, s, home) for s in (*SERVERS, "payloads", "agent")}
+        collected = {s: _run_collect(root, s, home) for s in SURFACES}
     items, bundles = assemble(read_files(root), collected)
-    return measure(items, bundles, _encoder())
+    return measure(items, bundles, _encoder(), read_dev_files(root))
 
 
 def main() -> None:

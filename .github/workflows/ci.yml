@@ -29,8 +29,8 @@ jobs:
         run: cd sdpm/vendor && sha256sum -c SHA256SUMS
       - name: Test
         run: uv run pytest tests/ -v --cov=sdpm --cov-report=term
-      # Report only: what each session loads at start (instructions, tool definitions,
-      # role documents), with +/- against the base commit when it can be measured.
+      # Report only: the text each session puts in front of the model (at start, and with
+      # the guides its role names), with +/- against the base commit when it can be measured.
       - name: Context size report
         env:
           BASE_SHA: ${{ github.event.pull_request.base.sha || github.event.before }}
