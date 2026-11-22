@@ -83,6 +83,12 @@ class TestLintShape:
         ]}])
         assert not any(d["rule"] == "shape-unknown-name" for d in diags)
 
+    def test_folded_corner_is_a_known_name(self):
+        diags = lint([{"elements": [
+            {"type": "shape", "shape": "folded_corner", "x": 0, "y": 0, "width": 100, "height": 50}
+        ]}])
+        assert not any(d["rule"] == "shape-unknown-name" for d in diags)
+
     def test_missing_position(self):
         diags = lint([{"elements": [{"type": "shape", "shape": "rectangle", "width": 100}]}])
         assert any("missing 'x'" in d["message"] for d in diags)

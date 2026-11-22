@@ -81,10 +81,14 @@ def _png(path: Path, size=(400, 200)) -> Path:
 class TestShapePresets:
     @pytest.mark.parametrize("name", [
         "arrow_right", "chevron", "cylinder", "callout_oval", "flowchart_decision",
-        "star_5_point", "cloud", "left_brace", "pie_wedge",
+        "star_5_point", "cloud", "left_brace", "pie_wedge", "folded_corner",
     ])
     def test_named_preset_survives(self, tmp_path, name):
         assert _one(tmp_path, _shape(shape=name))["shape"] == name
+
+    def test_folded_corner_writes_the_ooxml_preset(self, tmp_path):
+        (sp,) = _built_shapes(tmp_path, [_shape(shape="folded_corner")])
+        assert sp._element.spPr.find(f"{_A}prstGeom").get("prst") == "foldedCorner"
 
     def test_unknown_name_passes_through_as_raw_preset(self, tmp_path):
         # Names outside the friendly map are written verbatim as prstGeom.
