@@ -14,7 +14,8 @@ Creates a derived deck ``{deck_dir}-{lang}/`` (or the path given via
 ``--output-dir``) containing copies of the source deck plus a
 ``translate/`` sub-directory with an empty dictionary template
 (``translation_map.json``) and a review-oriented TSV dump
-(``texts.tsv``).
+(``texts.tsv``). The dictionary includes the deck.json ``title``, and the
+derived deck's deck.json ``language`` is set to the target language.
 
 The original deck is untouched.
 """
@@ -145,7 +146,8 @@ def main() -> int:
     parser.add_argument(
         "--target-lang",
         required=True,
-        help="Target language code (appended to derived-deck name)",
+        help="Target language code (BCP 47, e.g. ja); appended to the derived-deck name "
+        "and written as its deck.json language",
     )
     parser.add_argument(
         "--skip-short",
@@ -183,8 +185,26 @@ def main() -> int:
 
     _copy_deck(src, dst)
 
-    # Walk slides/*.json in the derived deck and collect translatable text.
+    # The derived deck's deck.json: its document title is translatable text, and its
+    # document language is the target language.
     collected: dict[str, None] = {}
+    deck_json_path = dst / "deck.json"
+    try:
+        deck_json = json.loads(deck_json_path.read_text(encoding="utf-8"))
+    except Exception as e:
+        print(f"Warning: failed to parse deck.json: {e}", file=sys.stderr)
+        deck_json = None
+    if isinstance(deck_json, dict):
+        title = deck_json.get("title")
+        if _is_translatable_string(title, args.skip_short):
+            collected.setdefault(title, None)
+        deck_json["language"] = args.target_lang
+        deck_json_path.write_text(
+            json.dumps(deck_json, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+    # Walk slides/*.json in the derived deck and collect translatable text.
     slides_dir = dst / "slides"
     if slides_dir.is_dir():
         for slide_file in sorted(slides_dir.glob("*.json")):

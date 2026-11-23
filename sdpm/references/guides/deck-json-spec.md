@@ -38,11 +38,15 @@ The list covers PPTX and HTML decks; each field says which format it affects.
 - `outputFormat` — optional, `"pptx"` (default when absent) or `"html"`. Written by
   `init_deck_workspace` for an HTML deck. It decides which build runs and which slide format
   the composers write.
-- `title` — optional. The document title in the PPTX properties, shown by PowerPoint and read
-  by screen readers; absent uses the first slide's title text. The PPTX import writes the
-  source deck's title. PPTX decks; an HTML deck takes its title from the outline heading.
+- `title` — optional, recommended for PPTX decks. The document title in the PPTX properties,
+  shown by PowerPoint and read by screen readers. The orchestrator writes it with the outline,
+  as the cover states it; absent uses the first slide's title placeholder, which a cover drawn
+  with elements does not have, so `check_specs` warns when a PPTX deck has no `title`. The
+  PPTX import writes the source deck's title, and translation writes the translated title.
+  PPTX decks; an HTML deck takes its title from the outline heading.
 - `language` — optional. The document language as a BCP 47 tag in the PPTX properties. The
-  PPTX import writes the source deck's language. PPTX decks.
+  orchestrator writes it with the outline. The PPTX import writes the source deck's language,
+  and translation writes the target language. PPTX decks.
 - `speakerNotes` — optional, `"pptx"` (default when absent) or `"markdown"`. Where the build
   puts each slide's `notes`. `"pptx"` writes them as speaker notes. `"markdown"` leaves them
   out of the .pptx and writes them to `<output stem>.notes.md` beside it, one section per
