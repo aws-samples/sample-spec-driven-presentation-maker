@@ -155,7 +155,7 @@ Expands an external JSON file's elements array. Draw order is controlled by posi
 ```json
 {
   "type": "shape",
-  "shape": "rectangle|rounded_rectangle|oval|circle|arrow_right|arrow_left|arrow_up|arrow_down|arrow_circular|arrow_left_right|arrow_up_down|arrow_curved_right|arrow_curved_left|arrow_curved_up|arrow_curved_down|arrow_circular_left|arrow_circular_left_right|triangle|diamond|pentagon|hexagon|cross|trapezoid|parallelogram|chevron|donut|arc|block_arc|chord|pie|pie_wedge|cloud|lightning_bolt|star_5_point|no_symbol|callout_rectangle|callout_rounded_rectangle|callout_oval|flowchart_process|flowchart_decision|flowchart_terminator|left_brace|right_brace|left_bracket|right_bracket",
+  "shape": "rectangle|rounded_rectangle|oval|circle|arrow_right|arrow_left|arrow_up|arrow_down|arrow_circular|arrow_left_right|arrow_up_down|arrow_curved_right|arrow_curved_left|arrow_curved_up|arrow_curved_down|arrow_circular_left|arrow_circular_left_right|triangle|diamond|pentagon|hexagon|cross|trapezoid|parallelogram|chevron|donut|arc|block_arc|chord|pie|pie_wedge|cloud|lightning_bolt|star_5_point|no_symbol|callout_rectangle|callout_rounded_rectangle|callout_oval|flowchart_process|flowchart_decision|flowchart_terminator|left_brace|right_brace|left_bracket|right_bracket|folded_corner",
   "x": 192, "y": 216, "width": 576, "height": 162,
   "fill": "#FF9900",
   "opacity": 0.0-1.0,

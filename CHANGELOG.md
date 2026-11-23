@@ -15,6 +15,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ### Added
 
+- **`folded_corner` shape** (rebuilt from #150 by @mskt4440). A shape element can use
+  `"shape": "folded_corner"` (a note with a turned-down corner). The builder writes the
+  `foldedCorner` preset, the converter reads it back as `folded_corner`, and lint no longer
+  flags the name. Local mode and the AWS stack (SdpmRuntime).
 - **Speaker notes destination** (`deck.json` `"speakerNotes"`, #666). `"pptx"` (the
   default, unchanged behaviour) writes each slide's `notes` as speaker notes; `"markdown"`
   leaves them out of the .pptx and writes them to `<output stem>.notes.md` beside it (one
