@@ -55,6 +55,13 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   measure. CI writes the table, with +/- against the base commit, to the `python` job
   summary. Report only; nothing fails on size. Development only.
 
+### Changed
+
+- **The `import-pptx` guide is about 10% shorter.** Step 5 no longer repeats the style
+  conventions and the HTML skeleton that the `style` workflow and the scaffold it copies
+  already give; the steps and rules are unchanged (about 550 fewer tokens whenever the guide
+  is read). Local mode and the AWS stack (SdpmRuntime).
+
 ### Fixed
 
 - **Built PPTX decks carry a document title and language.** The PPTX title (`dc:title`)
