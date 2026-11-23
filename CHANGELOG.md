@@ -46,6 +46,14 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   reads an area or stacked area chart back as `area`, so an edited one is rebuilt from its
   JSON; a 100% stacked area chart still keeps its `_chartXml`. New `chart-area` guide.
   Local mode and the AWS stack (SdpmRuntime).
+- **Context size report** (#679). `scripts/context_size.py` measures the text each session
+  puts in front of the model: server instructions, tool definitions, prompts, `start_*`
+  payloads, guides, bundled styles, the agent system prompts and the text the agent inserts,
+  and client wiring text, per item and per role bundle (at start, and with the guides the role
+  names), in chars, bytes and approximate tokens (tiktoken `o200k_base`). Contributor files
+  (AGENTS.md, steering) get a table of their own, and the report lists what it does not
+  measure. CI writes the table, with +/- against the base commit, to the `python` job
+  summary. Report only; nothing fails on size. Development only.
 
 ### Fixed
 
