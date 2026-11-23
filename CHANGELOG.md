@@ -55,6 +55,17 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
   measure. CI writes the table, with +/- against the base commit, to the `python` job
   summary. Report only; nothing fails on size. Development only.
 
+### Changed
+
+- **Shorter MCP tool descriptions and server instructions.** Every tool description,
+  argument description and the server `instructions` were rewritten from what the model
+  needs to call the tool: when to use it, what each argument means, and what the tool does
+  not tell it back. Text the role documents, guides or the tool's own result already carry
+  is gone. Tool names, arguments and behaviour are unchanged. The tool list every session
+  loads is about 25% smaller (Local MCP 3,533 → 2,645 tokens; Remote MCP 3,669 → 2,799;
+  Local Web UI 3,716 → 2,900). Redeploy every MCP surface: Local MCP and the Local Web UI
+  (`sdpm update`), and the AWS stack (SdpmRuntime; the agent uses the same tools).
+
 ### Fixed
 
 - **Built PPTX decks carry a document title and language.** The PPTX title (`dc:title`)

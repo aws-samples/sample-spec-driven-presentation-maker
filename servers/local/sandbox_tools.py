@@ -114,17 +114,12 @@ def run_python(
     purpose: Annotated[str, Field(description='One line on what this code does (shown in the UI).')],
     code: Annotated[str, Field(description='Python code; no import statements.')],
     deck_id: Annotated[str, Field(description='Deck directory path.')],
-    measure_slides: Annotated[list[str] | None, Field(description='Slugs to measure for text overflow after the code ran — the ones you edited.')] = None,
+    measure_slides: Annotated[list[str] | None, Field(description='Slugs you edited: checks text overflow and previews them.')] = None,
 ) -> str:
-    """Run Python inside the deck directory — the way to read and write deck files
-    (deck.json, specs/, slides/, includes/). No import or open(); helpers:
-    read_json(path), write_json(path, data), read_text(path), write_text(path, text),
-    list_files(subdir=".") (folders end with "/"). Writes persist; output.pptx (output.html for HTML decks)
-    rebuilds and changed slides are re-rendered and previewed when deck.json, slides/,
-    includes/ or specs/outline.md changed. measure_slides measures text overflow on those
-    slugs and previews them; HTML decks get static checks plus browser layout / JS checks
-    and PNG previews when Chrome or Edge is available.
-    """
+    """Run Python in the deck directory: the only way to read and write deck files. No
+    import or open(); use read_json(path), write_json(path, data), read_text(path),
+    write_text(path, text), list_files(subdir). After a write the deck rebuilds and
+    changed slides are previewed."""
     result: dict[str, Any] = {}
     if not deck_id or not Path(deck_id).is_dir():
         result["error"] = (
@@ -300,10 +295,9 @@ def run_style_python(
     purpose: Annotated[str, Field(description='One line on what this code does (shown in the UI).')],
     code: Annotated[str, Field(description='Python code; no import statements.')],
 ) -> str:
-    """Run Python for style authoring. Helpers: read_style(name) returns an existing style's
-    HTML (bundled or user); write_style(name, html) saves to the user style store
-    (name = file stem, no .html). No import or file access; print() for output.
-    """
+    """Run Python to write a style. read_style(name) returns a style's HTML;
+    write_style(name, html) saves it to the user's styles (name without .html). No import
+    or file access; print() shows output."""
     from sandbox import check_code, make_style_runner
 
     result: dict[str, Any] = {}

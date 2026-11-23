@@ -23,45 +23,32 @@ from sdpm.config import REFERENCES_DIR as _REFERENCES_DIR
 
 
 def start_presentation() -> dict[str, Any]:
-    """Start here for anything about slides — a new deck, editing or importing a PPTX,
-    restyling a deck. Call it before any other sdpm tool.
-
-    Returns the orchestrator role document (how to run the work end to end) plus what
-    it needs first: the deck.json field reference, PPTX templates and the output directory.
-    To translate an existing deck into another language, call start_translation instead.
-    """
+    """Start here for any slide work: a new deck, editing or importing a PPTX, restyling.
+    Call it before any other sdpm tool; it returns the workflow to follow. To translate
+    a deck, call start_translation instead."""
     from sdpm.entry import start_presentation as _start
 
     return _start()
 
 
 def start_composing(
-    deck_id: Annotated[str, Field(description='Deck directory path, as given in your instruction.')] = "",
-    assigned_slugs: Annotated[list[str] | None, Field(description='The slugs you own. Other slides belong to other composers running in parallel.')] = None,
-    mode: Annotated[Literal["pptx", "html"], Field(description='Composer mode from your instruction: pptx (slide JSON) or html (slide HTML).')] = "pptx",
+    deck_id: Annotated[str, Field(description='Deck directory path from your instruction.')] = "",
+    assigned_slugs: Annotated[list[str] | None, Field(description='Slides you own; other composers write the rest in parallel.')] = None,
+    mode: Annotated[Literal["pptx", "html"], Field(description='Mode from your instruction.')] = "pptx",
 ) -> dict[str, Any]:
-    """Composer entry. You are a composer when your instruction gives you a deck_id and
-    assigned_slugs — call this first with those values and the mode.
-
-    Validates the specs, then returns the composer role document, the slide spec for the
-    mode, and everything the deck gives you: deck.json, brief, outline, a table of contents
-    of the art direction, template analysis (template_html in html mode), which slides exist,
-    and your assigned slides (plus any override-group head they inherit from, marked read-only).
-    specs_ok=false with errors means stop and report.
-    """
+    """Call this first when your instruction gives you a deck_id and assigned_slugs: you
+    are a composer. Returns the composer workflow, the deck's specs and your slides.
+    specs_ok=false: stop and report the errors."""
     from sdpm.entry import start_composing as _start
 
     return _start(deck_dir=deck_id or None, assigned_slugs=assigned_slugs, mode=mode)
 
 
 def start_style(
-    base: Annotated[str, Field(description='Existing style to use as the skeleton; a bundled default when omitted.')] = "",
+    base: Annotated[str, Field(description='Style to start from; a bundled one when empty.')] = "",
 ) -> dict[str, Any]:
-    """Call first when asked to create or edit a reusable style guide. (To restyle one
-    deck, that is apply_style inside the start_presentation workflow.)
-
-    Returns the style role document, the style catalogue, and one style's HTML to imitate.
-    """
+    """Call first to create or edit a reusable style. To restyle one deck, use
+    start_presentation."""
     from sdpm.entry import start_style as _start
 
     return _start(base=base)
@@ -69,26 +56,19 @@ def start_style(
 
 def start_translation(
     deck_id: Annotated[str, Field(description='Source deck directory path.')],
-    language: Annotated[str, Field(description='Target language code or name; becomes the -<lang> suffix of the sibling deck.')],
+    language: Annotated[str, Field(description='Target language code or name; the new deck is <deck>-<language>.')],
 ) -> dict[str, Any]:
-    """Call first when asked to translate an existing deck into another language.
-
-    Returns the translate role document, the slide JSON spec, and the source deck's shape
-    (deck.json, existing slides, the sibling deck path the variant will use).
-    """
+    """Call first to translate an existing deck into another language."""
     from sdpm.entry import start_translation as _start
 
     return _start(deck_dir=deck_id, language=language)
 
 
 def init_deck_workspace(
-    name: Annotated[str, Field(description='Presentation name, e.g. "lambda-overview".')],
-    output_format: Annotated[Literal["pptx", "html"], Field(description="html only when the user asks for an HTML / browser deck; pptx otherwise.")] = "pptx",
+    name: Annotated[str, Field(description='Short deck name, used in the folder name.')],
+    output_format: Annotated[Literal["pptx", "html"], Field(description="html only when the user asks for an HTML deck.")] = "pptx",
 ) -> dict[str, Any]:
-    """Create an empty deck workspace (deck.json, slides/, specs/). A step inside the
-    orchestrator workflow — after the brief is agreed, before apply_style — not where a
-    request starts; start_presentation is. An HTML deck also returns format_notes.
-    """
+    """Create an empty deck. Call it at the step the start_presentation workflow names."""
     from sdpm.api import init
     from sdpm.entry import format_notes
 
@@ -101,24 +81,19 @@ def init_deck_workspace(
 
 def check_specs(
     deck_id: Annotated[str, Field(description='Deck directory path.')],
-    assigned_slugs: Annotated[list[str] | None, Field(description='Slugs about to be dispatched; each must exist in the outline.')] = None,
+    assigned_slugs: Annotated[list[str] | None, Field(description='Slugs you will dispatch.')] = None,
 ) -> dict[str, Any]:
-    """Validate deck.json and specs/outline.md before dispatching composers; ok=false means
-    do not dispatch. Checks deck metadata, outline format and fields, TBD markers and the
-    assigned slugs. Composers run the same check inside start_composing.
-    """
+    """Validate deck.json and specs/outline.md. Dispatch composers only when ok is true."""
     from sdpm.api import check_specs as _check_specs
 
     return _check_specs(deck_dir=deck_id, assigned_slugs=assigned_slugs)
 
 
 def analyze_template(
-    template: Annotated[str, Field(description='Template name (e.g. "blank-dark") or path to a .pptx.')],
-    layout: Annotated[str, Field(description="A layout name, to also get that layout's placeholders.")] = "",
+    template: Annotated[str, Field(description='Template name or .pptx path.')],
+    layout: Annotated[str, Field(description="Layout name, to also get its placeholders.")] = "",
 ) -> dict[str, Any]:
-    """Layouts, theme colors, fonts and slide size of a PPTX template. slide_size.ptPerPx
-    belongs in deck.json slideSize (arch_diagram reads it).
-    """
+    """Layouts, theme colors, fonts and slide size of a PPTX template."""
     from sdpm.engine.analyzer import analyze_template as _analyze, get_layout_placeholders
     from sdpm.api import _find_template_in_dirs, get_templates_dirs
 
@@ -155,9 +130,8 @@ def _is_html_deck(deck_id: str) -> bool:
 
 
 def generate_pptx(deck_id: Annotated[str, Field(description='Deck directory path.')]) -> dict[str, Any]:
-    """Build output.pptx from the deck workspace (deck.json + slides/*.json). run_python
-    already rebuilds after edits; use this for an explicit full build.
-    """
+    """Build output.pptx. run_python already rebuilds after each edit; call this only for
+    an explicit full build."""
     if _is_html_deck(deck_id):
         return {
             "output_format": "html",
@@ -174,15 +148,14 @@ def generate_pptx(deck_id: Annotated[str, Field(description='Deck directory path
 
 
 def search_assets(
-    query: Annotated[str, Field(description='Keyword. Empty string lists the available sources instead.')] = "",
+    query: Annotated[str, Field(description='Keyword; empty lists the sources.')] = "",
     limit: Annotated[int, Field(description='Max results.')] = 20,
-    source_filter: Annotated[str, Field(description='Only this source (icon pack / image library).')] = "",
+    source_filter: Annotated[str, Field(description='Only this source.')] = "",
     type_filter: Annotated[str, Field(description='Only this asset type.')] = "",
     theme_filter: Annotated[str, Field(description='dark or light.')] = "",
 ) -> dict[str, Any]:
-    """Search icons and images by keyword. With an empty query, lists the available sources
-    (icon packs, image libraries) with counts, types and themes.
-    """
+    """Search icons and images. An empty query lists the sources with their types and
+    themes."""
     from sdpm.knowledge.assets import (
         AssetsNotInstalledError,
         invalidate_manifest_cache,
@@ -226,12 +199,9 @@ def search_assets(
 
 
 def list_styles(
-    include_all: Annotated[bool, Field(description='Include styles hidden by the pin filter.')] = False,
+    include_all: Annotated[bool, Field(description='Describe every style, not only the pinned and the user\'s own.')] = False,
 ) -> dict[str, Any]:
-    """List design styles: the user's pinned and own styles with descriptions (every
-    style when nothing is pinned), the names of the rest in other_styles; include_all
-    lists every style with its description. Names go to apply_style.
-    """
+    """List design styles to choose one for apply_style."""
     from sdpm.api import get_styles_dirs, list_styles_listing
     from sdpm.config import get_state
 
@@ -242,24 +212,18 @@ def list_styles(
 
 def apply_style(
     deck_id: Annotated[str, Field(description='Deck directory path.')],
-    style: Annotated[str, Field(description='Style name, e.g. "report".')],
-    template: Annotated[str, Field(description='Template name, with or without .pptx.')] = "",
+    style: Annotated[str, Field(description='Style name from list_styles.')],
+    template: Annotated[str, Field(description='Template name.')] = "",
 ) -> dict[str, Any]:
-    """Apply a style (and optionally a template) to a deck: writes specs/art-direction.html
-    and completes deck.json (template, defaultTextColor, fonts, slideSize). Returns what
-    was written, which fields changed and where each value came from — fix anything
-    wrong in deck.json with run_python — and style_toc, a line-numbered map of the
-    style file for reading the parts you need with run_python read_text.
-    """
+    """Apply a style, and optionally a template, to a deck: writes specs/art-direction.html
+    and fills deck.json."""
     from sdpm.api import apply_style as _apply_style
 
     return _apply_style(deck_dir=deck_id, style=style, template=template)
 
 
 def list_templates() -> dict[str, Any]:
-    """List available PPTX templates (name, source, description, fonts).
-    start_presentation already returns this list.
-    """
+    """List PPTX templates. start_presentation already returns this list."""
     from sdpm.api import get_templates_dirs, list_templates_with_metadata
     from sdpm.config import get_builtin_template_notes, get_state
 
@@ -269,7 +233,7 @@ def list_templates() -> dict[str, Any]:
 
 
 def read_guides(
-    names: Annotated[list[str], Field(description='Guide names to read.')],
+    names: Annotated[list[str], Field(description='Guide names.')],
 ) -> dict[str, Any]:
     """Read guide documents."""
     from sdpm.knowledge.reference import read_docs
@@ -279,18 +243,17 @@ def read_guides(
 
 def code_to_slide(
     deck_id: Annotated[str, Field(description='Deck directory path.')],
-    code: Annotated[str, Field(description='Source code text.')],
-    name: Annotated[str, Field(description='Basename of the includes file, without .json.')],
-    language: Annotated[str, Field(description='Language for syntax highlighting.')] = "python",
+    code: Annotated[str, Field(description='Source code.')],
+    name: Annotated[str, Field(description='File name without .json.')],
+    language: Annotated[str, Field(description='Language for highlighting.')] = "python",
     theme: Annotated[str, Field(description='dark or light.')] = "dark",
-    x: Annotated[int, Field(description='Left edge in px.')] = 0,
-    y: Annotated[int, Field(description='Top edge in px.')] = 0,
-    width: Annotated[int, Field(description='Width in px.')] = 800,
-    height: Annotated[int, Field(description='Height in px.')] = 300,
+    x: Annotated[int, Field(description='Left edge, px.')] = 0,
+    y: Annotated[int, Field(description='Top edge, px.')] = 0,
+    width: Annotated[int, Field(description='Width, px.')] = 800,
+    height: Annotated[int, Field(description='Height, px.')] = 300,
 ) -> dict[str, Any]:
-    """Render source code as a syntax-highlighted block saved to deck/includes/<name>.json.
-    Reference it from a slide as {"type": "include", "src": "includes/<name>.json"}.
-    """
+    """Save code as a syntax-highlighted block in includes/<name>.json. Put it on a slide
+    as {"type": "include", "src": "includes/<name>.json"}."""
     if _is_html_deck(deck_id):
         return {"error": "code_to_slide emits PPTX elements; in HTML decks write <pre><code> instead."}
     from sdpm.api import code_block as _code_block
@@ -311,12 +274,10 @@ def code_to_slide(
 
 def grid(
     purpose: Annotated[str, Field(description='One line on what the layout is for (shown in the UI).')],
-    spec: Annotated[str, Field(description='JSON string: {"area": {x,y,w,h}, "columns", "rows", "gap", "areas"?, "items"?} — syntax in the grid guide.')],
+    spec: Annotated[str, Field(description='JSON: area {x,y,w,h}, columns, rows, gap; optional areas, items.')],
 ) -> dict[str, Any]:
-    """Compute exact x/y/w/h for a row × column layout from a CSS-Grid style spec; use it
-    instead of hand-placing rectangular arrangements. Syntax and examples:
-    read_guides(["grid"]).
-    """
+    """Compute exact x/y/w/h for rows and columns from a CSS-Grid-like spec, instead of
+    placing boxes by hand. Syntax: read_guides(["grid"])."""
     import json
     from sdpm.engine.layout.grid import compute_grid
 
@@ -331,19 +292,17 @@ def grid(
 
 
 def arch_diagram(
-    spec: Annotated[str, Field(description='Logical-structure JSON: direction, iconSize, children (nodes/groups), connections — schema in the arch-layout-engine guide.')],
-    x: Annotated[int, Field(description='Target area left edge in px.')] = 100,
-    y: Annotated[int, Field(description='Target area top edge in px.')] = 180,
-    width: Annotated[int, Field(description='Target area width in px (diagram is scaled to fit).')] = 1720,
-    height: Annotated[int, Field(description='Target area height in px.')] = 800,
-    theme: Annotated[str, Field(description='dark or light — box-node text colors.')] = "dark",
-    pt_per_px: Annotated[float, Field(description='deck.json slideSize.ptPerPx (16:9 = 0.5, 4:3 = 0.375).')] = 0.5,
+    spec: Annotated[str, Field(description='Diagram JSON: direction, iconSize, children, connections.')],
+    x: Annotated[int, Field(description='Area left edge, px.')] = 100,
+    y: Annotated[int, Field(description='Area top edge, px.')] = 180,
+    width: Annotated[int, Field(description='Area width, px; the diagram scales to fit.')] = 1720,
+    height: Annotated[int, Field(description='Area height, px.')] = 800,
+    theme: Annotated[str, Field(description='Slide background, dark or light.')] = "dark",
+    pt_per_px: Annotated[float, Field(description='deck.json slideSize.ptPerPx.')] = 0.5,
 ) -> dict[str, Any]:
-    """Auto-layout an architecture or flow diagram: you describe groups, nodes and
-    connections; the engine places nodes, routes arrows and returns slide elements plus
-    layout metrics and warnings (0 crossings / pierces = clean). Schema and technique:
-    read_guides(["arch-layout-engine", "arch-elements"]).
-    """
+    """Lay out an architecture or flow diagram from groups, nodes and connections; returns
+    placed slide elements and layout warnings. Schema:
+    read_guides(["arch-layout-engine", "arch-elements"])."""
     import json
     from sdpm.engine.layout.render import render_architecture
 
@@ -371,7 +330,4 @@ def _guide_names() -> list[str]:
 
 # The guide catalogue is small and bundled, so it rides in the tool description
 # instead of costing a list call.
-read_guides.__doc__ = (
-    "Read guide documents — focused references to load when a slide or step calls for one. "
-    "Guides: " + ", ".join(_guide_names()) + "."
-)
+read_guides.__doc__ = "Read guides by name: " + ", ".join(_guide_names()) + "."
