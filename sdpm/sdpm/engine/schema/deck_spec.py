@@ -246,6 +246,14 @@ def validate_specs(
         except ValueError:
             errors.append('deck.json speakerNotes must be "pptx" or "markdown"')
 
+    # The PPTX build falls back to the first slide's title placeholder, which a cover
+    # drawn with elements does not keep, so the document title is often left empty.
+    if output_format != "html" and not _is_non_empty(deck_json.get("title")):
+        warnings.append(
+            "deck.json title is empty: set it to the deck title the cover shows "
+            "(the PPTX document title)"
+        )
+
     if not _is_non_empty(fonts.get("halfwidth")):
         errors.append("deck.json fonts.halfwidth is empty")
     if not _is_non_empty(fonts.get("fullwidth")):

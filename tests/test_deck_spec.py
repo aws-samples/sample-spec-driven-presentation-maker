@@ -24,6 +24,7 @@ _VALID_DECK = {
     "fonts": {"fullwidth": "Noto Sans JP", "halfwidth": "Amazon Ember"},
     "defaultTextColor": "#A1B2C3",
     "slideSize": {"width": 1920, "height": 1080, "ptPerPx": 0.5},
+    "title": "Deck",
 }
 _VALID_OUTLINE = """# Deck
 
@@ -182,6 +183,35 @@ def test_validate_specs_warns_when_outline_contains_tbd() -> None:
 def test_validate_specs_returns_validated_slugs() -> None:
     result = _validate(assigned_slugs=["intro"])
     assert result == {"ok": True, "errors": [], "warnings": [], "slugs": ["intro"]}
+
+
+_TITLE_WARNING = (
+    "deck.json title is empty: set it to the deck title the cover shows "
+    "(the PPTX document title)"
+)
+_MISSING = object()
+
+
+@pytest.mark.parametrize("title", [_MISSING, "", "   ", None, 1])
+@pytest.mark.parametrize("output_format", [None, "pptx"])
+def test_validate_specs_warns_when_a_pptx_deck_has_no_title(title: object, output_format: str | None) -> None:
+    deck = deepcopy(_VALID_DECK)
+    if title is _MISSING:
+        del deck["title"]
+    else:
+        deck["title"] = title
+    if output_format:
+        deck["outputFormat"] = output_format
+    result = _validate(deck=deck)
+    assert result["warnings"] == [_TITLE_WARNING]
+    assert result["ok"] is True  # a warning, not an error: the build still runs
+
+
+def test_validate_specs_does_not_ask_an_html_deck_for_a_title() -> None:
+    deck = deepcopy(_VALID_DECK)
+    del deck["title"]
+    deck["outputFormat"] = "html"
+    assert _validate(deck=deck)["warnings"] == []
 
 
 def test_api_check_specs_reads_tmp_deck(tmp_path: Path) -> None:

@@ -429,3 +429,77 @@ class TestSyncGradientRuns:
         node = {"text": "Hello", "_textGradientRuns": [dict(r) for r in runs]}
         self._apply_node(node, {})
         assert node["_textGradientRuns"] == runs
+
+
+# ---------------------------------------------------------------------------
+# deck.json document properties: title is translated, language is the target
+# ---------------------------------------------------------------------------
+
+
+def _set_deck_json(deck: Path, **fields: object) -> None:
+    path = deck / "deck.json"
+    data = json.loads(path.read_text(encoding="utf-8"))
+    data.update(fields)
+    path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def _deck_json(deck: Path) -> dict:
+    return json.loads((deck / "deck.json").read_text(encoding="utf-8"))
+
+
+class TestTranslateDocumentProperties:
+    def test_extract_puts_the_title_in_the_map_and_sets_the_target_language(self, tmp_path: Path) -> None:
+        deck = tmp_path / "mydeck"
+        _make_minimal_deck(deck)
+        _set_deck_json(deck, title="Deck Title Only In deck.json", language="en-US")
+        proc = _run_extract(str(deck), "--target-lang", "ja")
+        assert proc.returncode == 0, f"failed: {proc.stderr}"
+
+        derived = tmp_path / "mydeck-ja"
+        dictionary = json.loads((derived / "translate" / "translation_map.json").read_text(encoding="utf-8"))
+        assert dictionary["Deck Title Only In deck.json"] == ""
+        assert _deck_json(derived)["language"] == "ja"
+        assert _deck_json(derived)["title"] == "Deck Title Only In deck.json"  # translated by apply
+        assert _deck_json(deck)["language"] == "en-US"  # the source is untouched
+
+    def test_extract_sets_the_language_when_the_source_has_none(self, tmp_path: Path) -> None:
+        deck = tmp_path / "mydeck"
+        _make_minimal_deck(deck)
+        proc = _run_extract(str(deck), "--target-lang", "ja-JP")
+        assert proc.returncode == 0, f"failed: {proc.stderr}"
+        derived = _deck_json(tmp_path / "mydeck-ja-JP")
+        assert derived["language"] == "ja-JP"
+        assert "title" not in derived
+        assert derived["template"] == "blank-dark.pptx"  # other fields kept
+
+    def test_apply_writes_the_translated_title(self, tmp_path: Path) -> None:
+        deck = tmp_path / "mydeck"
+        _make_minimal_deck(deck)
+        _set_deck_json(deck, title="Deck Title")
+        assert _run_extract(str(deck), "--target-lang", "ja").returncode == 0
+        derived = tmp_path / "mydeck-ja"
+        map_path = derived / "translate" / "translation_map.json"
+        dictionary = json.loads(map_path.read_text(encoding="utf-8"))
+        dictionary["Deck Title"] = "デッキのタイトル"
+        map_path.write_text(json.dumps(dictionary, ensure_ascii=False), encoding="utf-8")
+
+        before = (derived / "deck.json").read_text(encoding="utf-8")
+        dry = _run_apply(str(derived), "--dry-run")
+        assert dry.returncode == 0, f"failed: {dry.stderr}"
+        assert "デッキのタイトル" in dry.stdout
+        assert (derived / "deck.json").read_text(encoding="utf-8") == before  # dry run writes nothing
+
+        proc = _run_apply(str(derived))
+        assert proc.returncode == 0, f"failed: {proc.stderr}"
+        assert _deck_json(derived)["title"] == "デッキのタイトル"
+        assert _deck_json(derived)["language"] == "ja"
+
+    def test_apply_keeps_an_untranslated_title(self, tmp_path: Path) -> None:
+        deck = tmp_path / "mydeck"
+        _make_minimal_deck(deck)
+        _set_deck_json(deck, title="Deck Title")
+        assert _run_extract(str(deck), "--target-lang", "ja").returncode == 0
+        derived = tmp_path / "mydeck-ja"
+        before = (derived / "deck.json").read_text(encoding="utf-8")
+        assert _run_apply(str(derived)).returncode == 0
+        assert (derived / "deck.json").read_text(encoding="utf-8") == before
