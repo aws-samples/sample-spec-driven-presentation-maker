@@ -310,6 +310,20 @@ def apply_guides(
     return _apply_guides(deck_dir=deck_id, structure=structure, writing=writing)
 
 
+def set_default(
+    kind: Annotated[Literal["style", "structure", "writing"], Field(description='Which kind of resource the default is for.')],
+    name: Annotated[str, Field(description='Name from the matching list tool. Empty clears the default.')],
+) -> dict[str, Any]:
+    """Set, switch or clear the default style, structure guide or writing guide — what
+    apply_style and apply_guides use when called without a name. Call it when the user
+    states a standing preference, so later decks need not name it. A name that does not
+    exist is an error and nothing is saved.
+    """
+    from sdpm.api import set_default as _set_default
+
+    return _set_default(kind=kind, name=name)
+
+
 def list_templates() -> dict[str, Any]:
     """List available PPTX templates (name, source, description, fonts).
     start_presentation already returns this list.

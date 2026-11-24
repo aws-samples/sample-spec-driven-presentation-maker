@@ -659,6 +659,47 @@ def apply_guides(
     }
 
 
+RESOURCE_KINDS = ("style", "structure", "writing")
+
+
+def set_default(kind: str, name: str) -> dict[str, Any]:
+    """Set, switch or clear the default style, structure guide or writing guide.
+
+    The default is what apply_style and apply_guides use when the caller names
+    nothing, so a user states a standing choice once instead of naming it per deck.
+    Setting, switching and clearing are the same operation, which is why there is one
+    function: passing a different name switches, passing "" clears.
+
+    Args:
+        kind: ``"style"``, ``"structure"`` or ``"writing"``.
+        name: The name to make the default, or "" to clear it.
+
+    Returns:
+        Dict with the kind, the name now in effect and any notices. A name that does
+        not exist is an error and state.json is left alone; clearing checks nothing,
+        since there is nothing to point at.
+    """
+    from sdpm.config import get_state, update_state
+
+    if kind not in RESOURCE_KINDS:
+        return {"error": f"kind must be one of {list(RESOURCE_KINDS)}, got {kind!r}"}
+
+    notices: list[str] = []
+    if name:
+        dirs = _kind_dirs(kind)
+        from sdpm.knowledge.reference import resolve_default
+
+        found, _, _ = resolve_default(kind, name, dirs)
+        if not found:
+            return _not_found(kind, name, dirs)
+        pinned = get_state().get(f"pinned_{kind}s", [])
+        if pinned and name not in pinned:
+            notices.append(f"The default {kind} {name!r} is not among the pinned ones.")
+
+    update_state(f"default_{kind}", name)
+    return {"status": "ok", "kind": kind, "default": name, "notices": notices}
+
+
 def style_toc(html: str, snippet: int = 40) -> list[dict[str, Any]]:
     """Table of contents of a style HTML: one entry per ``<style>`` block and per
     ``.slide`` element, with its 1-based opening ``line``, the ``start``–``end`` line

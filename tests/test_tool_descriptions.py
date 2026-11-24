@@ -23,7 +23,7 @@ _LOCAL = _ROOT / "servers" / "local"
 # a composer calls it on nearly every turn and must not pay a round trip to learn it.
 _DESC_MAX = {"run_python": 700, "read_guides": 700, "hearing": 600}
 _DESC_MAX_DEFAULT = 560
-_TOTAL_MAX = 17_800  # description + schema, all tools, characters (~4.5K tokens); ACP adds hearing
+_TOTAL_MAX = 18_400  # description + schema, all tools, characters (~4.6K tokens); ACP adds hearing
 
 
 _REMOTE = _ROOT / "servers" / "remote"
@@ -178,11 +178,12 @@ def _public_functions(module) -> set[str]:
 
 # The tools each server implements for its own transport (a local process or the
 # AgentCore Code Interpreter), and the documented Layer 3 differences
-# (docs/en/architecture.md): the remote's preview and optional KB search, and the one
-# contract tool it does not bind.
+# (docs/en/architecture.md): the remote's preview and optional KB search, and the
+# contract tools it does not bind. set_default writes the user's own state.json, which
+# the cloud stack has no equivalent of.
 _SANDBOX_TOOLS = {"run_python", "run_style_python"}
 _REMOTE_ONLY = {"get_preview", "search_slides"}
-_REMOTE_UNBOUND = {"start_translation"}
+_REMOTE_UNBOUND = {"start_translation", "set_default"}
 
 
 def test_both_servers_expose_the_tool_contract_and_nothing_else(local_tools, remote_tools):
