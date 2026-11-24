@@ -1064,10 +1064,13 @@ def _resolve_guides(deck_id: str, deck_data: dict, structure: str, writing: str)
     for kind, rel in _GUIDE_SPECS:
         key = f"decks/{deck_id}/{rel}"
         if not names[kind]:
-            # Only when the deck recorded one: otherwise there is nothing to remove, and
-            # every deck in a language without a guide would pay a delete per apply.
-            if deck_data.get(kind):
-                _storage.delete_object_keys([key])
+            # Unconditional, and idempotent as S3's DeleteObjects is. A copy can be
+            # present without deck.json recording it — run_python syncs everything a
+            # sandbox writes under specs/ back to S3, and a put_deck_json that fails
+            # after the upload leaves the same state. Guarding on the recorded name
+            # would make that deck keep retired rules for good, since the name it
+            # would check stays absent.
+            _storage.delete_object_keys([key])
             continue
         text = (_bundled_guide_dir(kind) / f"{names[kind]}.md").read_text(encoding="utf-8")
         _storage.upload_file(key=key, data=text.encode("utf-8"), content_type="text/markdown")

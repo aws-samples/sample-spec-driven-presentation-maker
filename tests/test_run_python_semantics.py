@@ -1137,8 +1137,9 @@ class TestRemoteGuides:
         result = json.loads(remote_server.apply_style("deck1", "custom"))
         assert "decks/deck1/specs/writing.md" not in self._uploaded(storage)
         assert result["writing"] == ""
-        # Nothing was recorded, so there is nothing to remove and no delete to pay for.
-        storage.delete_object_keys.assert_not_called()
+        # Removed unconditionally: a copy can exist without deck.json recording it,
+        # because run_python syncs whatever a sandbox wrote under specs/ back to S3.
+        storage.delete_object_keys.assert_called_once_with(["decks/deck1/specs/writing.md"])
 
     def test_translating_out_of_a_language_removes_the_recorded_copy(
         self, monkeypatch: pytest.MonkeyPatch
@@ -1176,6 +1177,8 @@ class TestRemoteGuides:
         with pytest.raises(FileNotFoundError, match="Structure not found: nope"):
             remote_server.apply_guides("deck1", structure="nope")
         storage.put_deck_json.assert_not_called()
+        storage.upload_file.assert_not_called()
+        storage.delete_object_keys.assert_not_called()
 
 
     def test_a_cloud_reviewer_can_read_the_guides_that_were_uploaded(

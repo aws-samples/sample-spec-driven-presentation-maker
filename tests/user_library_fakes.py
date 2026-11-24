@@ -57,6 +57,11 @@ class FakeS3:
     def delete_object(self, Bucket, Key):
         self._bucket(Bucket).pop(Key, None)
 
+    def delete_objects(self, Bucket, Delete):
+        # Idempotent, as S3's is: deleting a key that is not there is not an error.
+        for entry in Delete.get("Objects", []):
+            self._bucket(Bucket).pop(entry["Key"], None)
+
     def copy_object(self, Bucket, CopySource, Key):
         self._bucket(Bucket)[Key] = self._bucket(CopySource["Bucket"])[CopySource["Key"]]
 

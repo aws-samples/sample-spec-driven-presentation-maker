@@ -165,3 +165,40 @@ def test_extraction_replaces_the_source_languages_writing_guide(
     # structure the source deck was actually written against for the default.
     assert sibling_deck["structure"] == "report-first"
     assert (sibling / "specs" / "structure.md").read_text(encoding="utf-8").endswith("rules\n")
+
+
+def test_a_structure_guide_this_machine_lacks_does_not_veto_the_writing_fix(
+    deck: SimpleNamespace, tmp_path: Path
+) -> None:
+    """A user's guides live in their config, not in the deck, so a deck can record a
+    structure guide the machine running the translation does not have. apply_guides
+    rejects the whole call for a name it cannot resolve, which would leave the sibling
+    reading the source language's wording rules."""
+    import subprocess
+    import sys
+
+    deck.set_language("ja")
+    apply_guides(deck.path, structure="report-first")
+    # The deck remembers a guide that is not in any store this run can see.
+    (deck.path / "deck.json").write_text(
+        json.dumps({**deck.read_deck(), "structure": "team-house"}), encoding="utf-8"
+    )
+    (deck.path / "slides").mkdir(exist_ok=True)
+    (deck.path / "slides" / "intro.json").write_text(
+        json.dumps({"id": "intro", "elements": [{"type": "textbox", "text": "継続率の推移"}]}),
+        encoding="utf-8",
+    )
+
+    script = Path(__file__).resolve().parents[1] / "sdpm" / "scripts" / "translate_extract.py"
+    done = subprocess.run(
+        [sys.executable, str(script), str(deck.path), "--target-lang", "en"],
+        capture_output=True, text=True, env={**os.environ},
+    )
+    assert done.returncode == 0, done.stderr
+    assert "team-house" in done.stderr, "the fallback is reported, not silent"
+
+    sibling = deck.path.with_name(f"{deck.path.name}-en")
+    sibling_deck = json.loads((sibling / "deck.json").read_text(encoding="utf-8"))
+    assert not (sibling / "specs" / "writing.md").exists(), "the writing fix still happened"
+    assert "writing" not in sibling_deck
+    assert sibling_deck["structure"] == "by-audience", "fell back rather than failing"

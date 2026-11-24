@@ -150,7 +150,21 @@ def _reapply_guides(deck: Path, structure: str) -> None:
     on the language. Letting it resolve from the default would replace the structure the
     source deck was actually written against.
     """
-    from sdpm.api import apply_guides
+    from sdpm.api import apply_guides, get_structures_dirs
+    from sdpm.knowledge.reference import resolve_default
+
+    # apply_guides rejects the whole call for a name it cannot resolve, so a structure
+    # guide that is not on this machine would veto the writing fix and leave the sibling
+    # reading the source language's rules. Drop the name instead, and say so.
+    if structure:
+        found, _, _ = resolve_default("structure", structure, get_structures_dirs())
+        if not found:
+            print(
+                f"Warning: the deck's structure guide {structure!r} is not in this machine's "
+                f"store; the derived deck falls back to the default.",
+                file=sys.stderr,
+            )
+            structure = ""
 
     result = apply_guides(deck, structure=structure)
     if result.get("error"):

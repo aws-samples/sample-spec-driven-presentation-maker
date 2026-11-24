@@ -2,6 +2,7 @@
 
 from sdpm.engine.checks.correspondence import (
     correspondence_facts,
+    count_visible_characters,
     count_visible_words,
     density_limit,
 )
@@ -14,6 +15,7 @@ __all__ = [
     "check_includes",
     "check_overlay_textbox",
     "correspondence_facts",
+    "count_visible_characters",
     "count_visible_words",
     "density_limit",
 ]

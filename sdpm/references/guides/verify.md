@@ -10,7 +10,7 @@ correspondences between a slide's form and its meaning that no check reaches.
 
 ## The facts you are given
 
-`start_reviewing` hands you `facts` for a PPTX deck. Each slide reports five things.
+`start_reviewing` hands you `facts` for a PPTX deck. Each slide reports six things.
 
 | Fact | What it reports |
 |---|---|

@@ -38,15 +38,17 @@ def only_slide(result: dict) -> dict:
 # ---------------------------------------------------------------------------
 
 
-def test_every_slide_carries_all_five_facts() -> None:
+def test_every_slide_carries_every_fact() -> None:
     facts = only_slide(correspondence_facts(deck(region("body", 0, 0, 500, 300), textbox("hi", 10, 10))))
-    assert {
+    assert set(facts) == {
+        "slide",
         "visible_words",
+        "visible_characters",
         "outside_regions",
         "region_sizes_by_prefix",
         "stacked_region_groups",
         "repeated_text",
-    } <= set(facts)
+    }
 
 
 def test_the_facts_hold_no_boolean_and_no_verdict() -> None:
