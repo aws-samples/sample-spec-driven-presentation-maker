@@ -81,6 +81,21 @@ def start_translation(
     return _start(deck_dir=deck_id, language=language)
 
 
+def start_reviewing(
+    deck_id: Annotated[str, Field(description='Deck directory path.')],
+    guide: Annotated[Literal["structure", "writing", "style", "verify"], Field(description='Which guide to hold the deck against.')],
+    target: Annotated[Literal["outline", "slides"], Field(description='What to review: the outline, or the built slides.')],
+) -> dict[str, Any]:
+    """Call first when reviewing a deck against one guide. Dispatch one reviewer per
+    guide, in parallel; each holds the deck against its own guide and reports findings
+    without editing. Returns the review role document, that guide's text, the files to
+    read, and for verify on slides the measured facts a reviewer cannot obtain itself.
+    """
+    from sdpm.entry import start_reviewing as _start
+
+    return _start(deck_dir=deck_id, guide=guide, target=target)
+
+
 def init_deck_workspace(
     name: Annotated[str, Field(description='Presentation name, e.g. "lambda-overview".')],
     output_format: Annotated[Literal["pptx", "html"], Field(description="html only when the user asks for an HTML / browser deck; pptx otherwise.")] = "pptx",

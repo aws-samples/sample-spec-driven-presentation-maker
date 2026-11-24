@@ -584,3 +584,85 @@ def test_every_slide_format_guide_fits_the_tool_result_budget():
 def test_start_presentation_fits_the_tool_result_budget():
     """The orchestrator's entry comes back inline too; the styles are list_styles' part."""
     assert len(json.dumps(tools.start_presentation(), ensure_ascii=False)) <= _RESULT_BUDGET
+
+
+# ---------------------------------------------------------------------------
+# start_reviewing: one guide, one target, findings only
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def reviewable_deck(tmp_path: Path) -> str:
+    """A deck with its guides applied and one slide built."""
+    deck_dir = tools.init_deck_workspace("review")["output_dir"]
+    deck = Path(deck_dir)
+    (deck / "deck.json").write_text(
+        json.dumps({**json.loads((deck / "deck.json").read_text()), "language": "ja"}),
+        encoding="utf-8",
+    )
+    tools.apply_style(deck_dir, style="newspaper", template="blank-light")
+    (deck / "specs" / "outline.md").write_text(_OUTLINE, encoding="utf-8")
+    (deck / "slides").mkdir(exist_ok=True)
+    (deck / "slides" / "intro.json").write_text(
+        json.dumps(
+            {
+                "id": "intro",
+                "elements": [
+                    {"_comment": "region: col-1", "x": 0, "y": 0, "w": 520, "h": 400},
+                    {"_comment": "region: col-2", "x": 520, "y": 0, "w": 600, "h": 400},
+                    {"type": "textbox", "text": "継続率", "x": 10, "y": 10, "w": 200, "h": 60},
+                    {"type": "textbox", "text": "継続率", "x": 530, "y": 10, "w": 200, "h": 60},
+                ],
+            }
+        ),
+        encoding="utf-8",
+    )
+    return deck_dir
+
+
+def test_start_reviewing_returns_the_review_role(reviewable_deck: str) -> None:
+    result = tools.start_reviewing(reviewable_deck, guide="writing", target="slides")
+    workflow = result["static"]["workflow"]
+    assert "# Review" in workflow
+    assert "never edit" in workflow
+
+
+def test_start_reviewing_returns_the_guide_and_what_to_read(reviewable_deck: str) -> None:
+    result = tools.start_reviewing(reviewable_deck, guide="structure", target="outline")
+    assert "骨格" in result["guide_text"] or "backbone" in result["guide_text"].lower()
+    assert result["target_paths"] == ["specs/outline.md"]
+
+    slides = tools.start_reviewing(reviewable_deck, guide="structure", target="slides")
+    assert slides["target_paths"] == ["slides/intro.json"]
+
+
+def test_verify_on_slides_carries_the_measured_facts(reviewable_deck: str) -> None:
+    """A reviewer cannot run the checks itself: the sandbox forbids importing sdpm."""
+    result = tools.start_reviewing(reviewable_deck, guide="verify", target="slides")
+    assert "# Verify" in result["guide_text"]
+    facts = result["facts"]["slides"][0]
+    assert facts["region_sizes_by_prefix"]["col"][0]["w"] == 520
+    assert facts["repeated_text"][0]["text"] == "継続率"
+    assert result["facts"]["density_limit"] is not None
+
+
+def test_a_guide_other_than_verify_gets_no_facts(reviewable_deck: str) -> None:
+    for guide, target in (("writing", "slides"), ("style", "slides"), ("verify", "outline")):
+        result = tools.start_reviewing(reviewable_deck, guide=guide, target=target)
+        assert "facts" not in result, (guide, target)
+
+
+@pytest.mark.parametrize(
+    ("guide", "target"), [("spelling", "slides"), ("writing", "previews")]
+)
+def test_a_value_outside_the_enumeration_is_an_error(
+    reviewable_deck: str, guide: str, target: str
+) -> None:
+    result = tools.start_reviewing(reviewable_deck, guide=guide, target=target)
+    assert "must be one of" in result["error"]
+
+
+def test_a_deck_without_the_guide_says_which_call_makes_it(tmp_path: Path) -> None:
+    bare = tools.init_deck_workspace("bare")["output_dir"]
+    result = tools.start_reviewing(bare, guide="writing", target="slides")
+    assert "apply_guides" in result["error"]

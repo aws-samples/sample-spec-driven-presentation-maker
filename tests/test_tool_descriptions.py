@@ -23,7 +23,7 @@ _LOCAL = _ROOT / "servers" / "local"
 # a composer calls it on nearly every turn and must not pay a round trip to learn it.
 _DESC_MAX = {"run_python": 700, "read_guides": 700, "hearing": 600}
 _DESC_MAX_DEFAULT = 560
-_TOTAL_MAX = 18_400  # description + schema, all tools, characters (~4.6K tokens); ACP adds hearing
+_TOTAL_MAX = 19_300  # description + schema, all tools, characters (~4.8K tokens); ACP adds hearing
 
 
 _REMOTE = _ROOT / "servers" / "remote"
@@ -149,7 +149,7 @@ def test_read_guides_description_lists_the_catalogue(local_tools):
 
 def test_entry_tools_are_the_only_ones_that_start_a_request(any_server_tools):
     starters = {n for n, t in any_server_tools.items() if re.search(r"\b[Cc]all (it|this) (first|before)|[Cc]all first|Start here", t.description or "")}
-    entries = {"start_presentation", "start_composing", "start_style", "start_translation"}
+    entries = {"start_presentation", "start_composing", "start_style", "start_translation", "start_reviewing"}
     assert starters <= entries and "start_presentation" in starters, starters
 
 

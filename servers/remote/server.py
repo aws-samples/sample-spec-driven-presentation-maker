@@ -580,6 +580,30 @@ def start_composing(
 
 
 @offloaded_tool
+def start_reviewing(
+    deck_id: Annotated[str, Field(description='Deck ID.')],
+    guide: Annotated[Literal["structure", "writing", "style", "verify"], Field(description='Which guide to hold the deck against.')],
+    target: Annotated[Literal["outline", "slides"], Field(description='What to review: the outline, or the built slides.')],
+) -> str:
+    """Call first when reviewing a deck against one guide. Dispatch one reviewer per
+    guide, in parallel; each holds the deck against its own guide and reports findings
+    without editing. Returns the review role document, that guide's text, the files to
+    read, and for verify on slides the measured facts a reviewer cannot obtain itself.
+    """
+    import tempfile
+
+    from sdpm.entry import start_reviewing as _start
+
+    _check_deck_access(deck_id, action="edit_slide")
+    with tempfile.TemporaryDirectory() as tmpdir:
+        root = Path(tmpdir)
+        _materialize_deck(deck_id, root)
+        payload = _start(root, guide=guide, target=target)
+    payload["deck_id"] = deck_id
+    return json.dumps(payload, ensure_ascii=False)
+
+
+@offloaded_tool
 def start_style(
     base: Annotated[str, Field(description="Existing style to use as the skeleton; a bundled default when omitted.")] = "",
 ) -> str:

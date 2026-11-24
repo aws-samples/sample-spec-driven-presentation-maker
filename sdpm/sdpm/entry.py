@@ -60,7 +60,7 @@ def preload_references() -> None:
     global _reference_cache
     if _reference_cache is None:
         _reference_cache = {}
-    for role in ("orchestrator", "composer", "composer-html", "style", "translate"):
+    for role in ("orchestrator", "composer", "composer-html", "style", "translate", "review"):
         _workflow(role)
     for guide in ("slide-json-spec", "slide-html-spec", "deck-json-spec", *_FORMAT_NOTES.values()):
         _read_reference(_GUIDES_DIR, guide)
@@ -439,3 +439,94 @@ def start_translation(deck_dir: str | Path, language: str) -> dict[str, Any]:
             "sibling_exists": sibling.exists(),
         },
     }
+
+
+# ---------------------------------------------------------------------------
+# Review
+# ---------------------------------------------------------------------------
+
+# Which guide a reviewer holds the deck against, and where that guide's text lives.
+# A deck-relative copy for the three the deck carries; the bundled guide for verify.
+_REVIEW_GUIDES = {
+    "structure": "specs/structure.md",
+    "writing": "specs/writing.md",
+    "style": _ART_DIRECTION,
+    "verify": "",
+}
+# What a reviewer reads. The outline is one file; slides are a directory, because a
+# reviewer of slides needs every slide to judge whether they correspond.
+_REVIEW_TARGETS = ("outline", "slides")
+
+
+def start_reviewing(deck_dir: str | Path, guide: str, target: str) -> dict[str, Any]:
+    """Review entry: the role document, the guide to hold the deck against, and the
+    files to read.
+
+    One call covers one guide and one target, because a reviewer holding a deck against
+    two guides at once reports the union badly. The orchestrator dispatches one of
+    these per guide, in parallel.
+
+    ``facts`` is present only for ``guide="verify"`` with ``target="slides"``: it is
+    the measured correspondence facts, which a reviewer cannot obtain itself (the
+    sandbox forbids importing sdpm, and the existing checks run only from the build).
+    """
+    if guide not in _REVIEW_GUIDES:
+        return {"error": f"guide must be one of {sorted(_REVIEW_GUIDES)}, got {guide!r}"}
+    if target not in _REVIEW_TARGETS:
+        return {"error": f"target must be one of {list(_REVIEW_TARGETS)}, got {target!r}"}
+
+    deck_path = Path(deck_dir)
+    if not (deck_path / "deck.json").is_file():
+        return {"error": f"Not an sdpm deck (deck.json missing): {deck_path}"}
+
+    if guide == "verify":
+        guide_text = _read_reference(_GUIDES_DIR, "verify")
+    else:
+        guide_text = _read_text(deck_path / _REVIEW_GUIDES[guide])
+        if guide_text is None:
+            return {
+                "error": f"This deck has no {guide} guide ({_REVIEW_GUIDES[guide]} is missing). "
+                f"Call {'apply_style' if guide == 'style' else 'apply_guides'} first."
+            }
+
+    payload: dict[str, Any] = {
+        "static": {"workflow": _workflow("review")},
+        "deck_id": str(deck_path),
+        "guide": guide,
+        "target": target,
+        "guide_text": guide_text,
+        "target_paths": _review_target_paths(deck_path, target),
+    }
+    if guide == "verify" and target == "slides":
+        payload["facts"] = _correspondence_facts(deck_path)
+    return payload
+
+
+def _review_target_paths(deck_path: Path, target: str) -> list[str]:
+    """Deck-relative, because a reviewer reads them through run_python, which runs
+    inside the deck directory on both stacks."""
+    if target == "outline":
+        return ["specs/outline.md"]
+    slides_dir = deck_path / "slides"
+    if not slides_dir.is_dir():
+        return []
+    return [f"slides/{p.name}" for p in sorted(slides_dir.iterdir()) if p.suffix in (".json", ".html")]
+
+
+def _correspondence_facts(deck_path: Path) -> dict[str, Any]:
+    """The measured facts for every slide of the deck, as one payload."""
+    from sdpm.engine.checks import correspondence_facts
+    from sdpm.engine.schema import deck_output_format
+
+    deck_json = json.loads((deck_path / "deck.json").read_text(encoding="utf-8"))
+    slides: list[dict] = []
+    slides_dir = deck_path / "slides"
+    if deck_output_format(deck_json) == "pptx" and slides_dir.is_dir():
+        for path in sorted(slides_dir.glob("*.json")):
+            slide = json.loads(path.read_text(encoding="utf-8"))
+            slide.setdefault("id", path.stem)
+            slides.append(slide)
+    return correspondence_facts(
+        {**deck_json, "slides": slides},
+        art_direction=_read_text(deck_path / _ART_DIRECTION) or "",
+    )
