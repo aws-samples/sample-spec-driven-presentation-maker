@@ -47,7 +47,11 @@ async def main(command: str | None = None) -> None:
 
             listed = await session.list_tools()
             names = sorted(t.name for t in listed.tools)
-            for required in ("list_templates", "start_presentation", "start_composing", "run_python", "generate_pptx", "check_specs"):
+            for required in (
+                "list_templates", "start_presentation", "start_composing", "run_python",
+                "generate_pptx", "check_specs", "list_structures", "list_writings",
+                "apply_guides", "set_default", "start_reviewing",
+            ):
                 assert required in names, f"tool missing: {required} (got {names})"
 
             # Real filesystem resolution: bundled templates must be found
