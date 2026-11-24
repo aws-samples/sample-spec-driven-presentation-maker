@@ -11,7 +11,6 @@ vocabulary, the style's own density on every slide, a size budget and writing pr
 
 from __future__ import annotations
 
-import html as _html
 import json
 import re
 from pathlib import Path
@@ -19,6 +18,7 @@ from pathlib import Path
 import pytest
 
 from sdpm import api, tools
+from sdpm.engine.checks.correspondence import count_visible_words, density_limit
 from sdpm.engine.checks.font_size import _FS_TOKEN_RE
 from sdpm.knowledge.assets.style_icons import ICON_ID_RE, inline_style_icons
 from sdpm.knowledge.reference import BUNDLED_STYLES_DIR
@@ -53,7 +53,6 @@ ALL_ROLES = REQUIRED_ROLES + (
 COMPONENT_RE = re.compile(r"<!--\s*Component:\s*([a-z-]+)")
 PATTERN_RE = re.compile(r"<!--\s*Pattern:\s*([a-z-]+)(.*?)-->", re.DOTALL)
 FRAME_RE = re.compile(r"<!--\s*Frame:\s*([a-z-]+)")
-DENSITY_RE = re.compile(r"<!--\s*Density:\s*(\d+)\s*-->")
 COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
 BRAND_WORDS = ("McKinsey", "BCG", "Bain", "Accenture", "Deloitte", "Apple", "TED", "Amazon", "AWS", "Google")
 EMOJI_RE = re.compile("[\U0001F300-\U0001FAFF\U00002600-\U000027BF\U0001F000-\U0001F2FF]")
@@ -126,14 +125,12 @@ class TestStyleContract:
         # the file is the gallery sample and the composer's model: no slide may be denser
         # than the style allows its decks to be
         html = path.read_text(encoding="utf-8")
-        m = DENSITY_RE.search(html)
-        assert m, f"{path.stem}: no <!-- Density: N --> marker"
-        limit = int(m.group(1))
+        limit = density_limit(html)
+        assert limit is not None, f"{path.stem}: no <!-- Density: N --> marker"
         body = COMMENT_RE.sub("", html.split("<body", 1)[-1])
         slides = re.split(r'<div class="slide[\s"]', body)[1:]
         for i, slide in enumerate(slides, 1):
-            text = _html.unescape(re.sub(r"<[^>]+>", " ", slide))
-            words = len(re.findall(r"[\w%$€£¥+−-]+", text))
+            words = count_visible_words(slide)
             assert words <= limit, f"{path.stem}: slide {i} shows {words} words > density {limit}"
 
     def test_icons_are_catalog_references(self, path: Path) -> None:
