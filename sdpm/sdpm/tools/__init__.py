@@ -294,6 +294,22 @@ def apply_style(
     )
 
 
+def apply_guides(
+    deck_id: Annotated[str, Field(description='Deck directory path.')],
+    structure: Annotated[str, Field(description='Structure guide name from list_structures. Empty uses the default.')] = "",
+    writing: Annotated[str, Field(description="Writing guide name from list_writings. Empty uses the default, or the bundled guide for deck.json's language.")] = "",
+) -> dict[str, Any]:
+    """Write specs/structure.md and specs/writing.md for a deck without touching its
+    art direction. Use it on a deck that has none yet, or after translating one, where
+    apply_style would need a style name the deck does not carry. Returns what was
+    written, where each name came from, notices worth reading, and a line-numbered map
+    of each guide.
+    """
+    from sdpm.api import apply_guides as _apply_guides
+
+    return _apply_guides(deck_dir=deck_id, structure=structure, writing=writing)
+
+
 def list_templates() -> dict[str, Any]:
     """List available PPTX templates (name, source, description, fonts).
     start_presentation already returns this list.

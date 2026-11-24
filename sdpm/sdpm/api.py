@@ -588,6 +588,77 @@ def guide_toc(text: str, snippet: int = 40) -> list[dict[str, Any]]:
     ]
 
 
+def apply_guides(
+    deck_dir: str | Path,
+    structure: str = "",
+    writing: str = "",
+) -> dict[str, Any]:
+    """Apply a structure and writing guide to a deck, leaving its art direction alone.
+
+    A deck made before these guides existed has no style name in deck.json and the
+    user usually has no default_style, so apply_style could only ever fail for it.
+    This is the path that gives such a deck its guides, and the one translation uses:
+    it never touches specs/art-direction.html or the style-derived deck.json fields,
+    so a frozen art direction cannot be overwritten by a style picked at random.
+
+    Args:
+        deck_dir: Deck output directory path.
+        structure: Structure guide name. "" uses the default.
+        writing: Writing guide name. "" uses the default, or the bundled guide for the
+            deck's language. A guide that resolves to nothing has its copy removed.
+
+    Returns:
+        Dict with status, the two names, files written, updated (changed deck.json
+        keys), sources, notices and a line-numbered map of each guide.
+    """
+    from sdpm.utils.io import read_json, write_json
+
+    deck_path = Path(deck_dir)
+    if not deck_path.is_dir():
+        return {"error": f"Deck directory not found: {deck_dir}"}
+    deck_json_path = deck_path / "deck.json"
+    if not deck_json_path.exists():
+        return {"error": f"deck.json not found in {deck_dir}"}
+    deck_data = read_json(deck_json_path)
+
+    names, origins, notices, error = _resolve_resources(
+        {"structure": structure, "writing": writing},
+        language=deck_data.get("language", ""),
+    )
+    if error:
+        return error
+
+    merged = deepcopy(deck_data)
+    merged["structure"] = names["structure"]
+    if names["writing"]:
+        merged["writing"] = names["writing"]
+    else:
+        merged.pop("writing", None)
+
+    updated = {
+        key: merged[key]
+        for key in ("structure", "writing")
+        if merged.get(key) != deck_data.get(key) and key in merged
+    }
+    # A dropped key is not a changed value, so the comprehension cannot see it.
+    dropped_writing = "writing" in deck_data and "writing" not in merged
+
+    files = _copy_guides(deck_path, names)
+    if updated or dropped_writing:
+        write_json(deck_json_path, merged, suffix="\n")
+    files["deck.json"] = {"path": str(deck_json_path), "content": merged}
+    return {
+        "status": "ok",
+        "structure": names["structure"],
+        "writing": names["writing"],
+        "files": files,
+        "updated": updated,
+        "sources": origins,
+        "notices": notices,
+        **_guide_tocs(deck_path, names),
+    }
+
+
 def style_toc(html: str, snippet: int = 40) -> list[dict[str, Any]]:
     """Table of contents of a style HTML: one entry per ``<style>`` block and per
     ``.slide`` element, with its 1-based opening ``line``, the ``start``–``end`` line

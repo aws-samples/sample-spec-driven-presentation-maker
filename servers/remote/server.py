@@ -976,6 +976,94 @@ def apply_style(
     )
 
 
+# Only the bundled guides are available here: a user's own guides live on their machine
+# and syncing them to S3 is out of scope (REQ-7.1).
+_GUIDE_SPECS = (("structure", "specs/structure.md"), ("writing", "specs/writing.md"))
+
+
+def _bundled_guide_dir(kind: str):
+    from sdpm.knowledge.reference import BUNDLED_STRUCTURES_DIR, BUNDLED_WRITINGS_DIR
+
+    return {"structure": BUNDLED_STRUCTURES_DIR, "writing": BUNDLED_WRITINGS_DIR}[kind]
+
+
+@offloaded_tool
+def apply_guides(
+    deck_id: Annotated[str, Field(description='Deck ID.')],
+    structure: Annotated[str, Field(description='Structure guide name. Empty uses the bundled default.')] = "",
+    writing: Annotated[str, Field(description="Writing guide name. Empty uses the bundled guide for deck.json's language.")] = "",
+) -> str:
+    """Write specs/structure.md and specs/writing.md for a deck without touching its
+    art direction. Use it on a deck that has none yet, or after translating one, where
+    apply_style would need a style name the deck does not carry. Returns what was
+    written, where each name came from, notices worth reading, and a line-numbered map
+    of each guide.
+    """
+    _check_deck_access(deck_id, action="edit_slide")
+
+    from sdpm.api import guide_toc
+    from sdpm.knowledge.reference import resolve_default
+
+    deck_data = _storage.get_deck_json(deck_id)
+    language = deck_data.get("language", "")
+    names: dict[str, str] = {}
+    sources: dict[str, str] = {}
+    notices: list[str] = []
+    for kind, explicit in (("structure", structure), ("writing", writing)):
+        bundled = _bundled_guide_dir(kind)
+        name, origin, kind_notices = resolve_default(
+            kind, explicit, [bundled], language=language if kind == "writing" else ""
+        )
+        if not name and origin == "argument":
+            available = sorted(p.stem for p in bundled.glob("*.md"))
+            raise FileNotFoundError(f"{kind.capitalize()} not found: {explicit}. Available: {available}")
+        names[kind] = name
+        sources[kind] = origin
+        notices += kind_notices
+
+    merged = dict(deck_data)
+    merged["structure"] = names["structure"]
+    if names["writing"]:
+        merged["writing"] = names["writing"]
+    else:
+        merged.pop("writing", None)
+    updated = {
+        key: merged[key]
+        for key in ("structure", "writing")
+        if merged.get(key) != deck_data.get(key) and key in merged
+    }
+    # A dropped key is not a changed value, so the comprehension cannot see it.
+    dropped_writing = "writing" in deck_data and "writing" not in merged
+
+    files: dict[str, Any] = {}
+    tocs: dict[str, Any] = {}
+    for kind, rel in _GUIDE_SPECS:
+        key = f"decks/{deck_id}/{rel}"
+        if not names[kind]:
+            _storage.delete_object_keys([key])
+            continue
+        text = (_bundled_guide_dir(kind) / f"{names[kind]}.md").read_text(encoding="utf-8")
+        _storage.upload_file(key=key, data=text.encode("utf-8"), content_type="text/markdown")
+        files[rel] = {"path": rel, "bytes": len(text.encode("utf-8"))}
+        tocs[f"{kind}_toc"] = guide_toc(text)
+
+    if updated or dropped_writing:
+        _storage.put_deck_json(deck_id, merged)
+    files["deck.json"] = {"path": "deck.json", "content": merged}
+    return json.dumps(
+        {
+            "status": "ok",
+            "structure": names["structure"],
+            "writing": names["writing"],
+            "files": files,
+            "updated": updated,
+            "sources": sources,
+            "notices": notices,
+            **tocs,
+        },
+        ensure_ascii=False,
+    )
+
 # --- Reference tools (bound from the shared contract; bundled data baked into the image) ---
 
 offloaded_tool(contract.read_guides)

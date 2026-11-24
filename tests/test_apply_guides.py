@@ -1,0 +1,125 @@
+# Copyright Amazon.com, Inc. or its affiliates. All Rights Reserved.
+# SPDX-License-Identifier: MIT-0
+"""Tests for apply_guides: the guides-only path that leaves art direction alone.
+
+A deck made before these guides existed has no style name in deck.json, so
+apply_style can only fail for it. These cases pin what apply_guides must not touch.
+"""
+
+import json
+import os
+from pathlib import Path
+from types import SimpleNamespace
+
+import pytest
+
+from sdpm.api import apply_guides
+from sdpm.knowledge.reference import BUNDLED_STRUCTURES_DIR, BUNDLED_WRITINGS_DIR
+
+# The deck.json fields a style owns. apply_guides must leave every one of them alone.
+_STYLE_FIELDS = ("template", "defaultTextColor", "defaultBackground", "fonts", "slideSize")
+
+
+@pytest.fixture
+def deck(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> SimpleNamespace:
+    """A deck with a frozen art direction, plus isolated guide stores."""
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "config"))
+    config_dir = tmp_path / "config" / "sdpm"
+    config_dir.mkdir(parents=True)
+
+    structures = tmp_path / "structure"
+    structures.mkdir()
+    (structures / "report-first.md").write_text("---\ndescription: Report\n---\n\n## Pick\n\nrules\n")
+    monkeypatch.setenv("SDPM_STRUCTURES_DIR", f"{structures}{os.pathsep}{BUNDLED_STRUCTURES_DIR}")
+
+    writings = tmp_path / "writing"
+    writings.mkdir()
+    (writings / "house.md").write_text("---\ndescription: House\n---\n\n## Words\n\nrules\n")
+    monkeypatch.setenv("SDPM_WRITINGS_DIR", f"{writings}{os.pathsep}{BUNDLED_WRITINGS_DIR}")
+
+    path = tmp_path / "deck"
+    (path / "specs").mkdir(parents=True)
+    art = path / "specs" / "art-direction.html"
+    art.write_text("<style>:root { --color-text: #123456; }</style>", encoding="utf-8")
+    # No "style" key: this is what a deck from before the change looks like.
+    (path / "deck.json").write_text(
+        json.dumps(
+            {
+                "template": "blank-light.pptx",
+                "fonts": {"fullwidth": "Yu Gothic", "halfwidth": "Arial"},
+                "defaultTextColor": "#111111",
+                "slideSize": {"width": 1920, "height": 1080},
+            }
+        ),
+        encoding="utf-8",
+    )
+
+    def write_state(**keys: object) -> None:
+        from sdpm import config
+
+        (config_dir / "state.json").write_text(json.dumps(keys))
+        config.invalidate_cache()
+
+    def read_deck() -> dict:
+        return json.loads((path / "deck.json").read_text(encoding="utf-8"))
+
+    def set_language(language: str) -> None:
+        (path / "deck.json").write_text(json.dumps({**read_deck(), "language": language}), encoding="utf-8")
+
+    write_state()
+    return SimpleNamespace(
+        path=path, art=art, write_state=write_state, read_deck=read_deck, set_language=set_language
+    )
+
+
+def test_a_deck_with_no_style_name_still_gets_its_guides(deck: SimpleNamespace) -> None:
+    deck.set_language("ja")
+    result = apply_guides(deck.path)
+    assert result["status"] == "ok"
+    assert (deck.path / "specs" / "structure.md").exists()
+    assert (deck.path / "specs" / "writing.md").exists()
+
+
+def test_apply_guides_leaves_the_art_direction_untouched(deck: SimpleNamespace) -> None:
+    before_text = deck.art.read_text(encoding="utf-8")
+    before_mtime = deck.art.stat().st_mtime_ns
+    apply_guides(deck.path, structure="report-first")
+    assert deck.art.read_text(encoding="utf-8") == before_text
+    assert deck.art.stat().st_mtime_ns == before_mtime
+
+
+def test_apply_guides_leaves_the_style_derived_fields_untouched(deck: SimpleNamespace) -> None:
+    before = deck.read_deck()
+    apply_guides(deck.path, structure="report-first")
+    after = deck.read_deck()
+    assert {k: after.get(k) for k in _STYLE_FIELDS} == {k: before.get(k) for k in _STYLE_FIELDS}
+    assert "style" not in after, "apply_guides never invents a style name"
+
+
+def test_changing_only_the_structure_rewrites_deck_json(deck: SimpleNamespace) -> None:
+    apply_guides(deck.path, structure="report-first")
+    result = apply_guides(deck.path, structure="by-audience")
+    assert result["updated"] == {"structure": "by-audience"}
+    assert deck.read_deck()["structure"] == "by-audience"
+
+
+def test_translating_to_a_language_without_a_guide_removes_the_copy(deck: SimpleNamespace) -> None:
+    """REQ-5.3: a copied specs/ must not carry the source language's wording rules."""
+    deck.set_language("ja")
+    apply_guides(deck.path)
+    assert (deck.path / "specs" / "writing.md").exists()
+    assert deck.read_deck()["writing"] == "ja"
+
+    deck.set_language("en")
+    result = apply_guides(deck.path)
+    assert not (deck.path / "specs" / "writing.md").exists()
+    assert "writing" not in deck.read_deck()
+    assert result["writing"] == ""
+
+
+def test_a_named_guide_that_does_not_exist_writes_nothing(deck: SimpleNamespace) -> None:
+    result = apply_guides(deck.path, structure="nope")
+    assert result["error"].startswith("Structure not found: nope.")
+    assert not (deck.path / "specs" / "structure.md").exists()
+    assert "structure" not in deck.read_deck()
