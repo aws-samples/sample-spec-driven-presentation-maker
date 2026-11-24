@@ -601,7 +601,12 @@ class TestRemoteApplyStyle:
 
         result = json.loads(remote_server.apply_style("deck1", "custom"))
 
-        assert result["updated"] == {"defaultTextColor": "#A1B2C3", "slideSize": {}}
+        assert result["updated"] == {
+            "defaultTextColor": "#A1B2C3",
+            "slideSize": {},
+            "style": "custom",
+            "structure": "by-audience",
+        }
         storage.put_deck_json.assert_called_once()
         saved = storage.put_deck_json.call_args.args[1]
         assert saved["defaultTextColor"] == "#A1B2C3"
@@ -640,7 +645,8 @@ class TestRemoteApplyStyle:
         assert saved["template"] == template
         assert saved["fonts"] == {"fullwidth": "JP", "halfwidth": "Latin"}
         assert saved["slideSize"]["height"] == 1080
-        storage.upload_file.assert_called_once()
+        uploaded = [call.kwargs["key"] for call in storage.upload_file.call_args_list]
+        assert uploaded.count("decks/deck1/specs/art-direction.html") == 1
 
     def test_dual_theme_style_takes_text_color_from_template(
         self,
@@ -1091,3 +1097,82 @@ class TestWriteGuide:
         result = self._run('open("/etc/passwd")', monkeypatch, tmp_path)
         assert "rejected by sandbox" in result["output"]
         assert "write_guide" in result["output"], "the rejection names the way to save a guide"
+
+
+# ---------------------------------------------------------------------------
+# Remote: apply_style and apply_guides write the guides into the S3 deck
+# ---------------------------------------------------------------------------
+
+
+class TestRemoteGuides:
+    """A cloud deck gets its guides the same way a local one does, from the bundled set."""
+
+    @staticmethod
+    def _rig(monkeypatch: pytest.MonkeyPatch, **deck_json) -> MagicMock:
+        storage = MagicMock()
+        storage.download_file_from_pptx_bucket.return_value = b"<style>:root { --color-text: #A1B2C3; }</style>"
+        storage.get_deck_json.return_value = {
+            "template": "", "fonts": {"fullwidth": "", "halfwidth": ""},
+            "defaultTextColor": "", **deck_json,
+        }
+        monkeypatch.setattr(remote_server, "_storage", storage)
+        monkeypatch.setattr(remote_server, "_check_deck_access", lambda *a, **k: None)
+        monkeypatch.setattr(remote_server, "_get_user_id", lambda: "user1")
+        return storage
+
+    @staticmethod
+    def _uploaded(storage: MagicMock) -> list[str]:
+        return [call.kwargs["key"] for call in storage.upload_file.call_args_list]
+
+    def test_apply_style_uploads_both_guides(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        storage = self._rig(monkeypatch, language="ja")
+        result = json.loads(remote_server.apply_style("deck1", "custom"))
+        assert "decks/deck1/specs/structure.md" in self._uploaded(storage)
+        assert "decks/deck1/specs/writing.md" in self._uploaded(storage)
+        assert (result["structure"], result["writing"]) == ("by-audience", "ja")
+        assert result["structure_toc"] and result["writing_toc"]
+
+    def test_a_language_without_a_writing_guide_gets_none(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        storage = self._rig(monkeypatch, language="en")
+        result = json.loads(remote_server.apply_style("deck1", "custom"))
+        assert "decks/deck1/specs/writing.md" not in self._uploaded(storage)
+        assert result["writing"] == ""
+        # Nothing was recorded, so there is nothing to remove and no delete to pay for.
+        storage.delete_object_keys.assert_not_called()
+
+    def test_translating_out_of_a_language_removes_the_recorded_copy(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        storage = self._rig(monkeypatch, language="en", writing="ja")
+        json.loads(remote_server.apply_guides("deck1"))
+        storage.delete_object_keys.assert_called_once_with(["decks/deck1/specs/writing.md"])
+
+    def test_changing_only_the_structure_still_saves_deck_json(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """The write condition covers the three names, not just the style-derived five."""
+        storage = self._rig(
+            monkeypatch,
+            language="ja",
+            style="custom",
+            structure="something-else",
+            writing="ja",
+            defaultTextColor="#A1B2C3",
+            slideSize={},
+        )
+        result = json.loads(remote_server.apply_style("deck1", "custom"))
+        assert result["updated"] == {"structure": "by-audience"}
+        storage.put_deck_json.assert_called_once()
+
+    def test_apply_guides_leaves_the_art_direction_alone(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        storage = self._rig(monkeypatch, language="ja")
+        json.loads(remote_server.apply_guides("deck1"))
+        uploaded = self._uploaded(storage)
+        assert "decks/deck1/specs/structure.md" in uploaded
+        assert not any(key.endswith("art-direction.html") for key in uploaded)
+
+    def test_a_named_guide_that_does_not_exist_is_rejected(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        storage = self._rig(monkeypatch, language="ja")
+        with pytest.raises(FileNotFoundError, match="Structure not found: nope"):
+            remote_server.apply_guides("deck1", structure="nope")
+        storage.put_deck_json.assert_not_called()

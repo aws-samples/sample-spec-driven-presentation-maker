@@ -922,12 +922,15 @@ def apply_style(
     deck_id: Annotated[str, Field(description='Deck ID.')],
     style: Annotated[str, Field(description='Style name, e.g. "report".')],
     template: Annotated[str, Field(description='Template name, with or without .pptx.')] = "",
+    structure: Annotated[str, Field(description='Structure guide name. Empty uses the bundled default.')] = "",
+    writing: Annotated[str, Field(description="Writing guide name. Empty uses the bundled guide for deck.json's language.")] = "",
 ) -> str:
-    """Apply a style (and optionally a template) to a deck: writes specs/art-direction.html
-    and completes deck.json (template, defaultTextColor, fonts, slideSize). Returns what
-    was written, which fields changed and where each value came from — fix anything
-    wrong in deck.json with run_python — and style_toc, a line-numbered map of the
-    style file for reading the parts you need with run_python read_text.
+    """Apply a style, structure guide and writing guide to a deck: writes
+    specs/art-direction.html, specs/structure.md, specs/writing.md and completes
+    deck.json. Set deck.json language first, or the deck gets no writing guide.
+    Returns what was written, which fields changed, where each value came from — fix
+    anything wrong in deck.json with run_python — notices worth reading, and a
+    line-numbered map of each document for reading the parts you need with run_python.
     """
     _check_deck_access(deck_id, action="edit_slide")
     if not user_library.is_valid_style_name(style):
@@ -976,27 +979,40 @@ def apply_style(
         template_analysis,
         completed,
     )
+    merged["style"] = style
+    resolved = _resolve_guides(deck_id, deck_data, structure, writing)
+    _, dropped_writing = _merge_guide_names(deck_data, merged, resolved["names"])
+
     sources = style_field_sources(merged)
     if template:
         sources["template"] = "argument"
+    sources["style"] = "argument"
+    sources.update(resolved["sources"])
+    # _changed_style_fields covers the three names too, so it sees the guides as well.
     updated = _changed_style_fields(deck_data, merged)
 
     dest_key = f"decks/{deck_id}/specs/art-direction.html"
     _storage.upload_file(key=dest_key, data=html_bytes, content_type="text/html")
-    if updated:
+    if updated or dropped_writing:
         _storage.put_deck_json(deck_id, merged)
     return json.dumps(
         {
             "applied": style,
+            "structure": resolved["names"]["structure"],
+            "writing": resolved["names"]["writing"],
             "files": {
                 "specs/art-direction.html": {"path": "specs/art-direction.html", "bytes": len(html_bytes)},
+                **resolved["files"],
                 "deck.json": {"path": "deck.json", "content": merged},
             },
             "updated": updated,
             "sources": sources,
             "missing": missing_deck_fields(merged),
+            "notices": resolved["notices"],
             "style_toc": style_toc(html_bytes.decode("utf-8")),
-        }
+            **resolved["tocs"],
+        },
+        ensure_ascii=False,
     )
 
 
@@ -1011,24 +1027,17 @@ def _bundled_guide_dir(kind: str):
     return {"structure": BUNDLED_STRUCTURES_DIR, "writing": BUNDLED_WRITINGS_DIR}[kind]
 
 
-@offloaded_tool
-def apply_guides(
-    deck_id: Annotated[str, Field(description='Deck ID.')],
-    structure: Annotated[str, Field(description='Structure guide name. Empty uses the bundled default.')] = "",
-    writing: Annotated[str, Field(description="Writing guide name. Empty uses the bundled guide for deck.json's language.")] = "",
-) -> str:
-    """Write specs/structure.md and specs/writing.md for a deck without touching its
-    art direction. Use it on a deck that has none yet, or after translating one, where
-    apply_style would need a style name the deck does not carry. Returns what was
-    written, where each name came from, notices worth reading, and a line-numbered map
-    of each guide.
-    """
-    _check_deck_access(deck_id, action="edit_slide")
+def _resolve_guides(deck_id: str, deck_data: dict, structure: str, writing: str) -> dict[str, Any]:
+    """Resolve, upload and record the deck's two guides. Shared by apply_style and
+    apply_guides so the two cannot disagree about what ``structure=""`` means.
 
+    Returns the pieces each caller folds into its own payload: the resolved ``names``,
+    their ``sources``, any ``notices``, the uploaded ``files``, the line-numbered
+    ``tocs``, the ``updated`` deck.json keys and whether the writing key was dropped.
+    """
     from sdpm.api import guide_toc
     from sdpm.knowledge.reference import resolve_default
 
-    deck_data = _storage.get_deck_json(deck_id)
     language = deck_data.get("language", "")
     names: dict[str, str] = {}
     sources: dict[str, str] = {}
@@ -1045,7 +1054,30 @@ def apply_guides(
         sources[kind] = origin
         notices += kind_notices
 
-    merged = dict(deck_data)
+    files: dict[str, Any] = {}
+    tocs: dict[str, Any] = {}
+    for kind, rel in _GUIDE_SPECS:
+        key = f"decks/{deck_id}/{rel}"
+        if not names[kind]:
+            # Only when the deck recorded one: otherwise there is nothing to remove, and
+            # every deck in a language without a guide would pay a delete per apply.
+            if deck_data.get(kind):
+                _storage.delete_object_keys([key])
+            continue
+        text = (_bundled_guide_dir(kind) / f"{names[kind]}.md").read_text(encoding="utf-8")
+        _storage.upload_file(key=key, data=text.encode("utf-8"), content_type="text/markdown")
+        files[rel] = {"path": rel, "bytes": len(text.encode("utf-8"))}
+        tocs[f"{kind}_toc"] = guide_toc(text)
+
+    return {"names": names, "sources": sources, "notices": notices, "files": files, "tocs": tocs}
+
+
+def _merge_guide_names(deck_data: dict, merged: dict, names: dict[str, str]) -> tuple[dict, bool]:
+    """Put the resolved names into deck.json and say what changed.
+
+    A dropped key is not a changed value, so the caller cannot see it from ``updated``
+    alone — hence the second return value.
+    """
     merged["structure"] = names["structure"]
     if names["writing"]:
         merged["writing"] = names["writing"]
@@ -1056,34 +1088,41 @@ def apply_guides(
         for key in ("structure", "writing")
         if merged.get(key) != deck_data.get(key) and key in merged
     }
-    # A dropped key is not a changed value, so the comprehension cannot see it.
-    dropped_writing = "writing" in deck_data and "writing" not in merged
+    return updated, "writing" in deck_data and "writing" not in merged
 
-    files: dict[str, Any] = {}
-    tocs: dict[str, Any] = {}
-    for kind, rel in _GUIDE_SPECS:
-        key = f"decks/{deck_id}/{rel}"
-        if not names[kind]:
-            _storage.delete_object_keys([key])
-            continue
-        text = (_bundled_guide_dir(kind) / f"{names[kind]}.md").read_text(encoding="utf-8")
-        _storage.upload_file(key=key, data=text.encode("utf-8"), content_type="text/markdown")
-        files[rel] = {"path": rel, "bytes": len(text.encode("utf-8"))}
-        tocs[f"{kind}_toc"] = guide_toc(text)
+
+@offloaded_tool
+def apply_guides(
+    deck_id: Annotated[str, Field(description='Deck ID.')],
+    structure: Annotated[str, Field(description='Structure guide name. Empty uses the bundled default.')] = "",
+    writing: Annotated[str, Field(description="Writing guide name. Empty uses the bundled guide for deck.json's language.")] = "",
+) -> str:
+    """Write specs/structure.md and specs/writing.md for a deck without touching its
+    art direction. Use it on a deck that has none yet, or after translating one, where
+    apply_style would need a style name the deck does not carry. Returns what was
+    written, where each name came from, notices worth reading, and a line-numbered map
+    of each guide.
+    """
+    _check_deck_access(deck_id, action="edit_slide")
+
+    deck_data = _storage.get_deck_json(deck_id)
+    resolved = _resolve_guides(deck_id, deck_data, structure, writing)
+    merged = dict(deck_data)
+    updated, dropped_writing = _merge_guide_names(deck_data, merged, resolved["names"])
 
     if updated or dropped_writing:
         _storage.put_deck_json(deck_id, merged)
-    files["deck.json"] = {"path": "deck.json", "content": merged}
+    files = {**resolved["files"], "deck.json": {"path": "deck.json", "content": merged}}
     return json.dumps(
         {
             "status": "ok",
-            "structure": names["structure"],
-            "writing": names["writing"],
+            "structure": resolved["names"]["structure"],
+            "writing": resolved["names"]["writing"],
             "files": files,
             "updated": updated,
-            "sources": sources,
-            "notices": notices,
-            **tocs,
+            "sources": resolved["sources"],
+            "notices": resolved["notices"],
+            **resolved["tocs"],
         },
         ensure_ascii=False,
     )
