@@ -11,7 +11,7 @@ from collections.abc import Iterable
 from pathlib import Path, PureWindowsPath
 from typing import Any
 
-from sdpm.config import REFERENCES_DIR
+from sdpm.config import REFERENCES_DIR, get_state
 from sdpm.knowledge.reference.providers import FileProvider, ReferenceProvider  # noqa: F401
 
 # Package-bundled styles directory (for user-local style search fallback).
@@ -395,3 +395,80 @@ def build_styles_listing(
         payload["other_styles"] = hidden
         payload["hint"] = HIDDEN_STYLES_HINT
     return payload
+
+
+# The file extension and the bundled fallback of each resource kind. A style has no
+# bundled fallback: picking one of the eighteen would impose its rhetoric on every deck.
+_KIND_SUFFIX = {"style": ".html", "structure": ".md", "writing": ".md"}
+_BUNDLED_FALLBACK = {"structure": "by-audience"}
+
+# Writing guides are per language, so the fallback is chosen by the deck's language
+# rather than fixed. Keyed by the primary subtag of a BCP 47 tag.
+_BUNDLED_WRITING_BY_LANGUAGE = {"ja": "ja"}
+
+
+def _exists_in(name: str, dirs: Iterable[Path], suffix: str) -> bool:
+    return any((d / f"{name}{suffix}").exists() for d in dirs)
+
+
+def resolve_default(
+    kind: str,
+    explicit: str,
+    dirs: list[Path],
+    language: str = "",
+) -> tuple[str, str, list[str]]:
+    """Decide which guide or style to use, and say where the decision came from.
+
+    One place for the whole precedence chain, so ``apply_style`` and ``apply_guides``
+    cannot drift apart. Reads the pins and the ``default_<kind>`` out of ``state.json``
+    itself; see design.md for the decision table this implements.
+
+    Args:
+        kind: ``"style"``, ``"structure"`` or ``"writing"``.
+        explicit: The name the caller was given, or "" when it was given none.
+        dirs: Ordered search directories, as ``get_<kind>s_dirs()`` returns them.
+        language: The deck's BCP 47 language tag. Selects the bundled writing guide
+            and is ignored for the other kinds.
+
+    Returns:
+        ``(name, origin, notices)``. ``origin`` is ``"argument"``, ``"default"``,
+        ``"default-missing"`` or ``"unset"``. An empty ``name`` means "apply nothing",
+        except with origin ``"argument"``, where it means the name the caller asked
+        for does not exist and the caller must return an error without writing
+        anything (REQ-3.6). A style resolving to "" is likewise an error, since there
+        is no bundled style to fall back to.
+    """
+    suffix = _KIND_SUFFIX[kind]
+    if explicit:
+        # "" here is not "apply nothing" but "the caller named something absent".
+        return (explicit if _exists_in(explicit, dirs, suffix) else "", "argument", [])
+
+    if kind == "writing":
+        fallback = _BUNDLED_WRITING_BY_LANGUAGE.get(language.split("-")[0].lower(), "")
+    else:
+        fallback = _BUNDLED_FALLBACK.get(kind, "")
+
+    state = get_state()
+    configured = state.get(f"default_{kind}", "")
+    if not configured:
+        notices = []
+        if kind == "writing" and not language:
+            notices.append(
+                "deck.json has no language, so no writing guide was applied. "
+                "Set it before apply_style, or name a writing guide."
+            )
+        return (fallback, "unset", notices)
+
+    pinned = state.get(f"pinned_{kind}s", [])
+    if _exists_in(configured, dirs, suffix):
+        notices = []
+        if pinned and configured not in pinned:
+            notices.append(f"The default {kind} {configured!r} is not among the pinned ones.")
+        return (configured, "default", notices)
+
+    return (
+        fallback,
+        "default-missing",
+        [f"The default {kind} {configured!r} no longer exists."],
+    )
+
