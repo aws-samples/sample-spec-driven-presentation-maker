@@ -561,11 +561,16 @@ def apply_style(
 
 
 def _guide_tocs(deck_path: Path, names: dict[str, str]) -> dict[str, Any]:
-    """``structure_toc`` / ``writing_toc`` for whichever guides were written."""
+    """``structure_toc`` / ``writing_toc`` for whichever guides were written.
+
+    Reads what was actually written rather than what was resolved, so a guide the copy
+    step could not produce leaves out its map instead of raising after deck.json is saved.
+    """
     tocs: dict[str, Any] = {}
     for kind, rel in _GUIDE_SPEC_PATH.items():
-        if names.get(kind):
-            tocs[f"{kind}_toc"] = guide_toc((deck_path / rel).read_text(encoding="utf-8"))
+        dest = deck_path / rel
+        if names.get(kind) and dest.exists():
+            tocs[f"{kind}_toc"] = guide_toc(dest.read_text(encoding="utf-8"))
     return tocs
 
 

@@ -10,7 +10,11 @@ from __future__ import annotations
 
 import pytest
 
-from sdpm.engine.checks.correspondence import correspondence_facts, count_visible_words
+from sdpm.engine.checks.correspondence import (
+    correspondence_facts,
+    count_visible_characters,
+    count_visible_words,
+)
 
 
 def region(name: str, x: float, y: float, w: float, h: float) -> dict:
@@ -182,3 +186,22 @@ def test_an_html_deck_gets_no_facts_and_is_told_why() -> None:
     result = correspondence_facts({"outputFormat": "html", "slides": [{"id": "demo", "elements": []}]})
     assert result["slides"] == []
     assert "PPTX" in result["note"]
+
+
+def test_an_unspaced_script_is_measurable_by_characters() -> None:
+    """A Japanese slide counts a couple of words against a density of 45, so the word
+    count alone can never show it is full."""
+    japanese = "聞き手は背景をすでに知っているので、答えから始める"
+    english = "The audience already knows the background, so lead with the answer"
+
+    ja = only_slide(correspondence_facts(deck(textbox(japanese, 0, 0))))
+    en = only_slide(correspondence_facts(deck(textbox(english, 0, 0))))
+
+    assert ja["visible_words"] < en["visible_words"] / 4, "the word count collapses"
+    assert ja["visible_characters"] >= en["visible_characters"] / 3, "the character count does not"
+    assert ja["visible_characters"] == 25
+
+
+def test_the_character_count_ignores_whitespace_and_tags() -> None:
+    assert count_visible_characters("<p>two  words</p>") == 8
+    assert count_visible_characters("   ") == 0

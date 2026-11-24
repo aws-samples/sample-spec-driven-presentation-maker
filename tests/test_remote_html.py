@@ -845,7 +845,7 @@ def test_prepare_rejects_refs_outside_the_deck(tmp_path, cache_root):
 # --- tool count --------------------------------------------------------------------
 
 
-def test_remote_tool_count_unchanged():
+def test_remote_tool_count_and_what_a_knowledge_base_adds():
     """A configured knowledge base adds only search_slides."""
     import asyncio
 

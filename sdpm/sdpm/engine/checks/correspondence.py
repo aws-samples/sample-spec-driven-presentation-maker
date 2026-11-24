@@ -33,8 +33,23 @@ def count_visible_words(text: str) -> int:
 
     Tags are dropped and entities resolved first, so the same function serves a
     slide's plain text and a style's sample markup.
+
+    This counts space-delimited tokens, which is what a style's density marker is
+    calibrated against. An unspaced script counts far lower for the same amount of
+    reading, so :func:`count_visible_characters` is what carries the signal there.
     """
     return len(_WORD_RE.findall(_html.unescape(_TAG_RE.sub(" ", text))))
+
+
+def count_visible_characters(text: str) -> int:
+    """Count the visible characters a viewer sees, ignoring whitespace.
+
+    Script-independent, so it stays comparable where the word count does not: a
+    Japanese sentence and its English translation differ by an order of magnitude in
+    words and by far less in characters.
+    """
+    stripped = _html.unescape(_TAG_RE.sub(" ", text))
+    return len("".join(stripped.split()))
 
 
 def density_limit(art_direction: str) -> int | None:
@@ -174,6 +189,7 @@ def correspondence_facts(slides_data: dict, art_direction: str = "") -> dict:
         elements = [e for e in slide.get("elements") or [] if isinstance(e, dict)]
         regions = extract_regions(slide)
         slug = slide.get("id", "")
+        slide_text = " ".join(_element_text(e) for e in elements if "type" in e)
         outside = []
         for index, element in enumerate(elements):
             box = _box(element) if "type" in element else None
@@ -192,9 +208,8 @@ def correspondence_facts(slides_data: dict, art_direction: str = "") -> dict:
         facts.append(
             {
                 "slide": f"page{number:02d}({slug})" if slug else f"page{number:02d}",
-                "visible_words": count_visible_words(
-                    " ".join(_element_text(e) for e in elements if "type" in e)
-                ),
+                "visible_words": count_visible_words(slide_text),
+                "visible_characters": count_visible_characters(slide_text),
                 "outside_regions": outside,
                 "region_sizes_by_prefix": _prefix_sizes(regions),
                 "stacked_region_groups": _stacked_groups(regions),

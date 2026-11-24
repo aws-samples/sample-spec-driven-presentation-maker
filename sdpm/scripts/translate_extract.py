@@ -138,17 +138,21 @@ def _copy_deck(src: Path, dst: Path) -> None:
             shutil.copy2(entry, target)
 
 
-def _reapply_guides(deck: Path) -> None:
-    """Re-resolve the derived deck's guides for its new language.
+def _reapply_guides(deck: Path, structure: str) -> None:
+    """Re-resolve the derived deck's writing guide for its new language.
 
     _copy_deck copytrees specs/, so without this the English sibling of a Japanese deck
     would read the Japanese wording rules. apply_guides replaces specs/writing.md with
     the target language's, or removes it when that language has none; it leaves
     specs/art-direction.html alone, which the sibling reuses.
+
+    The structure guide is passed through by name because only the writing guide depends
+    on the language. Letting it resolve from the default would replace the structure the
+    source deck was actually written against.
     """
     from sdpm.api import apply_guides
 
-    result = apply_guides(deck)
+    result = apply_guides(deck, structure=structure)
     if result.get("error"):
         print(f"Warning: could not re-resolve the derived deck's guides: {result['error']}", file=sys.stderr)
         return
@@ -221,7 +225,7 @@ def main() -> int:
             json.dumps(deck_json, ensure_ascii=False, indent=2) + "\n",
             encoding="utf-8",
         )
-        _reapply_guides(dst)
+        _reapply_guides(dst, deck_json.get("structure", ""))
 
     # Walk slides/*.json in the derived deck and collect translatable text.
     slides_dir = dst / "slides"

@@ -14,7 +14,8 @@ correspondences between a slide's form and its meaning that no check reaches.
 
 | Fact | What it reports |
 |---|---|
-| `visible_words` | The words a viewer sees on that slide, beside `density_limit`, the budget the style declares |
+| `visible_words` | The space-delimited words on that slide, beside `density_limit`, the budget the style declares |
+| `visible_characters` | The visible characters on that slide, ignoring whitespace |
 | `outside_regions` | Elements extending past the region they belong to, and how far, per edge |
 | `region_sizes_by_prefix` | Regions whose names share a prefix, with the size of each |
 | `stacked_region_groups` | Each row of regions, in top-to-bottom order, with how many it holds |
@@ -31,6 +32,11 @@ Work from what the slide is trying to say.
 - **Over the density limit** means the slide is carrying more than this style draws
   well. Decide whether the surplus earns its place or belongs in the notes or on
   another slide. A slide well under the limit is not thereby good.
+  `density_limit` counts space-delimited words, so compare `visible_words` against it
+  only for a language that separates words with spaces. For Japanese and other unspaced
+  scripts the word count runs far below the limit however full the slide is: use
+  `visible_characters`, and judge it against the style's own sample slides and the
+  preview rather than against the limit.
 - **Outside its region** is usually a defect: the region is where the style expects
   that content. A deliberate bleed is the exception, and it reads as deliberate only
   when the overflow is large and even.

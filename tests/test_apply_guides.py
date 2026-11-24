@@ -138,8 +138,9 @@ def test_extraction_replaces_the_source_languages_writing_guide(
     import sys
 
     deck.set_language("ja")
-    apply_guides(deck.path)
+    apply_guides(deck.path, structure="report-first")
     assert (deck.path / "specs" / "writing.md").exists()
+    assert deck.read_deck()["structure"] == "report-first"
 
     (deck.path / "slides").mkdir(exist_ok=True)
     (deck.path / "slides" / "intro.json").write_text(
@@ -155,7 +156,12 @@ def test_extraction_replaces_the_source_languages_writing_guide(
     assert done.returncode == 0, done.stderr
 
     sibling = deck.path.with_name(f"{deck.path.name}-en")
-    assert json.loads((sibling / "deck.json").read_text(encoding="utf-8"))["language"] == "en"
+    sibling_deck = json.loads((sibling / "deck.json").read_text(encoding="utf-8"))
+    assert sibling_deck["language"] == "en"
     assert not (sibling / "specs" / "writing.md").exists(), "the ja rules did not come along"
-    assert "writing" not in json.loads((sibling / "deck.json").read_text(encoding="utf-8"))
+    assert "writing" not in sibling_deck
     assert (sibling / "specs" / "structure.md").exists(), "structure does not depend on language"
+    # Only the writing guide depends on the language: re-resolving must not swap the
+    # structure the source deck was actually written against for the default.
+    assert sibling_deck["structure"] == "report-first"
+    assert (sibling / "specs" / "structure.md").read_text(encoding="utf-8").endswith("rules\n")

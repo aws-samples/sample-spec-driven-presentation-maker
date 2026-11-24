@@ -449,7 +449,10 @@ def _check_deck_access(deck_id: str, action: str = "read") -> None:
 # checkout and has no cloud path (hand-edit sync is CLI-only for the same reason).
 
 
-_MATERIALIZE_FILES = {"deck.json", "deck.css", "specs/brief.md", "specs/outline.md", "specs/art-direction.html"}
+_MATERIALIZE_FILES = {
+    "deck.json", "deck.css", "specs/brief.md", "specs/outline.md",
+    "specs/art-direction.html", "specs/structure.md", "specs/writing.md",
+}
 _MATERIALIZE_SLIDE = re.compile(r"^slides/[A-Za-z0-9_-]+\.(?:json|html)$")
 
 
@@ -497,10 +500,12 @@ def _template_html(deck_id: str, deck_json: dict, root: Path) -> dict | None:
 
 
 def _materialize_deck(deck_id: str, target: Path) -> None:
-    """Download deck.json, deck.css, the three spec files and slides/*.json|html into ``target``.
+    """Download deck.json, deck.css, the spec files and slides/*.json|html into ``target``.
 
     Strict allowlist on the relative key (no attachments, no path segments other
-    than the ones named here), so a malformed key can never escape ``target``.
+    than the ones named here), so a malformed key can never escape ``target``. A spec
+    file a role reads has to be listed here: a reviewer handed a deck without
+    specs/structure.md cannot tell a missing guide from one that was never downloaded.
     """
     prefix = f"decks/{deck_id}/"
     for key in _storage.list_files(prefix=prefix, bucket=_storage.pptx_bucket):

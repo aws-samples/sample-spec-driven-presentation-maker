@@ -1090,7 +1090,7 @@ class TestWriteGuide:
     @pytest.mark.parametrize("name", ["../escape", "sub/dir", "..", ""])
     def test_it_refuses_a_name_that_leaves_the_store(self, name: str, monkeypatch, tmp_path: Path):
         result = self._run(f'write_guide("writing", "{name}", "y")', monkeypatch, tmp_path)
-        assert "Invalid style name" in result["output"] or "kind must be one of" in result["output"]
+        assert "Invalid guide name" in result["output"] or "kind must be one of" in result["output"]
         assert not list(tmp_path.rglob("*.md"))
 
     def test_the_sandbox_still_refuses_file_access(self, monkeypatch, tmp_path: Path):
@@ -1176,3 +1176,17 @@ class TestRemoteGuides:
         with pytest.raises(FileNotFoundError, match="Structure not found: nope"):
             remote_server.apply_guides("deck1", structure="nope")
         storage.put_deck_json.assert_not_called()
+
+
+    def test_a_cloud_reviewer_can_read_the_guides_that_were_uploaded(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """apply_guides uploads them, so _materialize_deck has to bring them back: without
+        that, start_reviewing tells the agent to call a tool that already succeeded."""
+        assert "specs/structure.md" in remote_server._MATERIALIZE_FILES
+        assert "specs/writing.md" in remote_server._MATERIALIZE_FILES
+
+        uploaded = {rel for _, rel in remote_server._GUIDE_SPECS}
+        assert uploaded <= remote_server._MATERIALIZE_FILES, (
+            "every spec file apply_guides writes must be downloadable again"
+        )

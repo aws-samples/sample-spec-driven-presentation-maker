@@ -153,7 +153,8 @@ def write_guide(kind, name, text):
     """Save a structure or writing guide to the user's own store. name = file stem."""
     if kind not in _GUIDE_KINDS:
         raise PermissionError(f"kind must be one of {list(_GUIDE_KINDS)}: {kind}")
-    name = _validate_name(name)
+    if not name or "/" in name or "\\\\" in name or ".." in name:
+        raise PermissionError(f"Invalid guide name: {name}")
     filename = name if name.endswith(".md") else name + ".md"
     dest_dir = user_config_dir / kind
     dest_dir.mkdir(parents=True, exist_ok=True)
