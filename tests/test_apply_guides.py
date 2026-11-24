@@ -123,3 +123,39 @@ def test_a_named_guide_that_does_not_exist_writes_nothing(deck: SimpleNamespace)
     assert result["error"].startswith("Structure not found: nope.")
     assert not (deck.path / "specs" / "structure.md").exists()
     assert "structure" not in deck.read_deck()
+
+
+# ---------------------------------------------------------------------------
+# Translation re-resolves the derived deck's guides
+# ---------------------------------------------------------------------------
+
+
+def test_extraction_replaces_the_source_languages_writing_guide(
+    deck: SimpleNamespace, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """_copy_deck copytrees specs/, so without this an en sibling reads the ja rules."""
+    import subprocess
+    import sys
+
+    deck.set_language("ja")
+    apply_guides(deck.path)
+    assert (deck.path / "specs" / "writing.md").exists()
+
+    (deck.path / "slides").mkdir(exist_ok=True)
+    (deck.path / "slides" / "intro.json").write_text(
+        json.dumps({"id": "intro", "elements": [{"type": "textbox", "text": "継続率の推移"}]}),
+        encoding="utf-8",
+    )
+
+    script = Path(__file__).resolve().parents[1] / "sdpm" / "scripts" / "translate_extract.py"
+    done = subprocess.run(
+        [sys.executable, str(script), str(deck.path), "--target-lang", "en"],
+        capture_output=True, text=True, env={**os.environ},
+    )
+    assert done.returncode == 0, done.stderr
+
+    sibling = deck.path.with_name(f"{deck.path.name}-en")
+    assert json.loads((sibling / "deck.json").read_text(encoding="utf-8"))["language"] == "en"
+    assert not (sibling / "specs" / "writing.md").exists(), "the ja rules did not come along"
+    assert "writing" not in json.loads((sibling / "deck.json").read_text(encoding="utf-8"))
+    assert (sibling / "specs" / "structure.md").exists(), "structure does not depend on language"
