@@ -44,9 +44,22 @@ The list covers PPTX and HTML decks; each field says which format it affects.
   with elements does not have, so `check_specs` warns when a PPTX deck has no `title`. The
   PPTX import writes the source deck's title, and translation writes the translated title.
   PPTX decks; an HTML deck takes its title from the outline heading.
-- `language` — optional. The document language as a BCP 47 tag in the PPTX properties. The
-  orchestrator writes it with the outline. The PPTX import writes the source deck's language,
-  and translation writes the target language. PPTX decks.
+- `language` — optional. The document language as a BCP 47 tag in the PPTX properties, and
+  what the writing guide is resolved from. The orchestrator writes it right after creating the
+  deck, before `apply_style`, because a deck with no language resolves to no writing guide. The
+  PPTX import writes the source deck's language, and translation writes the target language.
+  PPTX decks.
+- `style` — optional. The name of the style applied to the deck. Written by `apply_style`,
+  which also writes `specs/art-direction.html` from it. Decks made before this field existed do
+  not have it, which is why `apply_guides` exists: it writes the guides without needing a style
+  name. Both formats.
+- `structure` — optional. The name of the structure guide applied to the deck, copied to
+  `specs/structure.md`. Written by `apply_style` and `apply_guides`; always resolves to
+  something, since there is a bundled default. Both formats.
+- `writing` — optional. The name of the writing guide applied to the deck, copied to
+  `specs/writing.md`. Written by `apply_style` and `apply_guides`, and absent when the deck's
+  `language` has no writing guide — then `specs/writing.md` is absent too, and the composers
+  carry on without one. Both formats.
 - `speakerNotes` — optional, `"pptx"` (default when absent) or `"markdown"`. Where the build
   puts each slide's `notes`. `"pptx"` writes them as speaker notes. `"markdown"` leaves them
   out of the .pptx and writes them to `<output stem>.notes.md` beside it, one section per
