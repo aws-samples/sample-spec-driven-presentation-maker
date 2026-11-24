@@ -17,6 +17,10 @@ from sdpm.knowledge.reference.providers import FileProvider, ReferenceProvider  
 # Package-bundled styles directory (for user-local style search fallback).
 BUNDLED_STYLES_DIR = REFERENCES_DIR / "examples" / "styles"
 
+# Package-bundled guide directories, searched after the user's own ones.
+BUNDLED_STRUCTURES_DIR = REFERENCES_DIR / "examples" / "structure"
+BUNDLED_WRITINGS_DIR = REFERENCES_DIR / "examples" / "writing"
+
 _HTML_TITLE_RE = re.compile(r"<title>(.*?)</title>", re.IGNORECASE)
 
 

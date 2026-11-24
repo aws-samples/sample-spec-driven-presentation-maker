@@ -47,6 +47,34 @@ def get_styles_dirs() -> list[Path]:
     return _get_resource_dirs("SDPM_STYLES_DIR", "styles", BUNDLED_STYLES_DIR)
 
 
+def get_structures_dirs() -> list[Path]:
+    """Return ordered list of directories to search for structure guides.
+
+    Search order (first match wins):
+      1. $SDPM_STRUCTURES_DIR — os.pathsep-separated list (same semantics as PATH)
+      2. get_user_config_dir()/structure/ — user-local structure guides
+      3. Package-bundled references/examples/structure/ directory
+    """
+    from sdpm.config import _get_resource_dirs
+    from sdpm.knowledge.reference import BUNDLED_STRUCTURES_DIR
+
+    return _get_resource_dirs("SDPM_STRUCTURES_DIR", "structure", BUNDLED_STRUCTURES_DIR)
+
+
+def get_writings_dirs() -> list[Path]:
+    """Return ordered list of directories to search for writing guides.
+
+    Search order (first match wins):
+      1. $SDPM_WRITINGS_DIR — os.pathsep-separated list (same semantics as PATH)
+      2. get_user_config_dir()/writing/ — user-local writing guides
+      3. Package-bundled references/examples/writing/ directory
+    """
+    from sdpm.config import _get_resource_dirs
+    from sdpm.knowledge.reference import BUNDLED_WRITINGS_DIR
+
+    return _get_resource_dirs("SDPM_WRITINGS_DIR", "writing", BUNDLED_WRITINGS_DIR)
+
+
 def _list_styles_tagged(styles_dirs: list[Path]) -> list[dict]:
     """Merge styles across dirs and tag each with source ("user" | "builtin")."""
     from sdpm.config import get_user_config_dir
