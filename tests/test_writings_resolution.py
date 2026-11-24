@@ -53,3 +53,69 @@ def test_bundled_writings_dir_is_under_examples() -> None:
     """The bundled default lives beside styles, not among the technical guides."""
     assert BUNDLED_WRITINGS_DIR.parent.name == "examples"
     assert BUNDLED_WRITINGS_DIR.name == "writing"
+
+
+# ---------------------------------------------------------------------------
+# list_guides_listing / list_writings
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def isolated_writings(monkeypatch: pytest.MonkeyPatch, tmp_path: Path) -> Path:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    monkeypatch.delenv("SDPM_WRITINGS_DIR", raising=False)
+    d = tmp_path / "sdpm" / "writing"
+    d.mkdir(parents=True)
+    (d / "house.md").write_text("---\ndescription: House wording\n---\n\n# House\n")
+    return d
+
+
+def test_writings_listing_returns_the_five_fields(isolated_writings: Path) -> None:
+    from sdpm.api import get_writings_dirs, list_guides_listing
+
+    items = list_guides_listing(get_writings_dirs(), "writing", [], "")
+    assert items
+    for item in items:
+        assert set(item) >= {"name", "source", "description", "pinned", "default"}
+
+
+def test_writings_listing_keeps_the_bundled_ja_until_pins_narrow_it(isolated_writings: Path) -> None:
+    """The bundled default is listed; the shared pin filter is what removes it."""
+    from sdpm.api import get_writings_dirs, list_guides_listing
+
+    unpinned = {i["name"]: i["source"] for i in list_guides_listing(get_writings_dirs(), "writing", [], "")}
+    assert unpinned["house"] == "user"
+
+    pinned = [i["name"] for i in list_guides_listing(get_writings_dirs(), "writing", ["house"], "")]
+    assert pinned == ["house"], "ja is neither pinned nor the user's own"
+
+
+def test_a_user_guide_of_the_same_name_shadows_the_bundled_one(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+    monkeypatch.setenv("APPDATA", str(tmp_path))
+    monkeypatch.delenv("SDPM_WRITINGS_DIR", raising=False)
+    d = tmp_path / "sdpm" / "writing"
+    d.mkdir(parents=True)
+    (d / "ja.md").write_text("---\ndescription: My own Japanese rules\n---\n")
+
+    from sdpm.api import get_writings_dirs, list_guides_listing
+
+    items = {i["name"]: i for i in list_guides_listing(get_writings_dirs(), "writing", [], "")}
+    assert items["ja"]["source"] == "user"
+    assert items["ja"]["description"] == "My own Japanese rules"
+
+
+def test_list_writings_tool_marks_the_default(
+    isolated_writings: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from sdpm import config
+    from sdpm.tools import list_writings
+
+    config.invalidate_cache()
+    (isolated_writings.parent / "state.json").write_text('{"default_writing": "ja"}')
+    items = {i["name"]: i for i in list_writings()["writings"]}
+    assert items["ja"]["default"] is True
+    assert items["house"]["default"] is False

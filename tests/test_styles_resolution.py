@@ -215,6 +215,31 @@ def test_filter_styles_pins_matching_no_style_return_all() -> None:
     assert not any(s["pinned"] for s in result)
 
 
+def test_filter_styles_marks_only_the_default() -> None:
+    styles = [{"name": "a", "description": ""}, {"name": "b", "description": ""}]
+    result = filter_styles(styles, pinned_names=[], include_all=True, default_name="b")
+    assert [s["name"] for s in result if s["default"]] == ["b"]
+
+
+def test_filter_styles_marks_nothing_default_when_none_is_set() -> None:
+    styles = [{"name": "a", "description": ""}, {"name": "b", "description": ""}]
+    result = filter_styles(styles, pinned_names=[], include_all=True)
+    assert not any(s["default"] for s in result)
+
+
+def test_filter_styles_keeps_a_default_the_pins_would_hide() -> None:
+    """REQ-3.3 reads the default off this listing, so pinning must not hide it."""
+    styles = [
+        {"name": "a", "description": "", "source": "builtin"},
+        {"name": "b", "description": "", "source": "builtin"},
+        {"name": "c", "description": "", "source": "builtin"},
+    ]
+    result = filter_styles(styles, pinned_names=["a"], include_all=False, default_name="b")
+    names = [s["name"] for s in result]
+    assert names == ["a", "b"], "the default survives alongside the pins"
+    assert "c" not in names
+
+
 # ---------------------------------------------------------------------------
 # build_styles_listing
 # ---------------------------------------------------------------------------

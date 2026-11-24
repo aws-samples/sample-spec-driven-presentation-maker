@@ -115,6 +115,7 @@ def list_styles_listing(
     styles_dirs: list[Path],
     pinned_names: list[str],
     include_all: bool = False,
+    default_name: str = "",
 ) -> dict:
     """Build the ``list_styles`` tool payload from the filesystem.
 
@@ -124,7 +125,39 @@ def list_styles_listing(
     """
     from sdpm.knowledge.reference import build_styles_listing
 
-    return build_styles_listing(_list_styles_tagged(styles_dirs), pinned_names, include_all)
+    return build_styles_listing(_list_styles_tagged(styles_dirs), pinned_names, include_all, default_name)
+
+
+def _list_guides_tagged(guides_dirs: list[Path], kind: str) -> list[dict]:
+    """Merge guides across dirs and tag each with source ("user" | "builtin")."""
+    from sdpm.config import get_user_config_dir
+    from sdpm.knowledge.reference import list_guides_merged
+
+    user_dir = get_user_config_dir() / kind
+    raw = list_guides_merged(guides_dirs)
+    for g in raw:
+        g["source"] = "user" if (user_dir / f"{g['name']}.md").exists() else "builtin"
+    return raw
+
+
+def list_guides_listing(
+    guides_dirs: list[Path],
+    kind: str,
+    pinned_names: list[str],
+    default_name: str = "",
+) -> list[dict]:
+    """List guides of one kind with pin/default/source metadata.
+
+    Filesystem-based entry point for MCP Local / CLI. ``kind`` is the store's
+    directory name ("structure" or "writing"), which also decides where a user's
+    own guide lives. Shares the pin filter with styles, so a pinned set narrows
+    the listing the same way.
+    """
+    from sdpm.knowledge.reference import filter_styles
+
+    return filter_styles(
+        _list_guides_tagged(guides_dirs, kind), pinned_names, default_name=default_name
+    )
 
 
 def list_templates_with_metadata(

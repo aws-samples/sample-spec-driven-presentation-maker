@@ -73,7 +73,7 @@ def test_list_styles_one_entry_per_name_user_first(api):
     report = styles[1]
     assert report == {
         "name": "report", "description": "My report", "html": style_html("My report").decode(),
-        "source": "user", "pinned": False,
+        "source": "user", "pinned": False, "default": False,
     }
 
 

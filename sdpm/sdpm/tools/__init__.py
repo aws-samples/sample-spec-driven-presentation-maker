@@ -235,9 +235,42 @@ def list_styles(
     from sdpm.api import get_styles_dirs, list_styles_listing
     from sdpm.config import get_state
 
+    state = get_state()
     styles_dirs = get_styles_dirs()
-    pinned = get_state().get("pinned_styles", [])
-    return list_styles_listing(styles_dirs, pinned, include_all)
+    pinned = state.get("pinned_styles", [])
+    return list_styles_listing(styles_dirs, pinned, include_all, state.get("default_style", ""))
+
+
+def list_structures() -> dict[str, Any]:
+    """List structure guides, which decide a deck's backbone and how its slides are
+    built: name, where it came from, its description, whether it is pinned and whether
+    it is the default. The default is used when apply_style is called without one.
+    """
+    from sdpm.api import get_structures_dirs, list_guides_listing
+    from sdpm.config import get_state
+
+    state = get_state()
+    return {
+        "structures": list_guides_listing(
+            get_structures_dirs(), "structure", state.get("pinned_structures", []), state.get("default_structure", "")
+        )
+    }
+
+
+def list_writings() -> dict[str, Any]:
+    """List writing guides, which decide the wording of titles, body, labels and notes:
+    name, where it came from, its description, whether it is pinned and whether it is
+    the default. The default is used when apply_style is called without one.
+    """
+    from sdpm.api import get_writings_dirs, list_guides_listing
+    from sdpm.config import get_state
+
+    state = get_state()
+    return {
+        "writings": list_guides_listing(
+            get_writings_dirs(), "writing", state.get("pinned_writings", []), state.get("default_writing", "")
+        )
+    }
 
 
 def apply_style(

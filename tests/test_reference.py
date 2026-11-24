@@ -114,5 +114,7 @@ class TestRemoteListStyles:
 
         styles = remote_list_styles(storage=storage, user_id="u1", include_all=True)["styles"]
         same = [s for s in styles if s["name"] == shadowed]
-        assert same == [{"name": shadowed, "description": "Mine", "source": "user", "pinned": False}]
+        assert same == [
+            {"name": shadowed, "description": "Mine", "source": "user", "pinned": False, "default": False}
+        ]
         assert len(styles) == len(all_builtin)

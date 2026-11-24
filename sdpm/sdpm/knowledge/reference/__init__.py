@@ -270,6 +270,28 @@ def list_styles(styles_dir: Path) -> list[dict[str, str]]:
     return styles
 
 
+def list_guides_in(guides_dir: Path) -> list[dict[str, str]]:
+    """List guide documents (``.md``) in one directory, with their descriptions.
+
+    The structure and writing stores hold Markdown, so the description comes from
+    the frontmatter rather than a ``<title>``. Same shadowing rule as styles:
+    :func:`merge_style_lists` keeps the first occurrence of each name.
+    """
+    if not guides_dir.exists():
+        return []
+    guides: list[dict[str, str]] = []
+    for f in sorted(guides_dir.iterdir()):
+        if f.suffix != ".md" or f.name.startswith("."):
+            continue
+        guides.append({"name": f.stem, "description": _get_description(f)})
+    return guides
+
+
+def list_guides_merged(guides_dirs: list[Path]) -> list[dict[str, str]]:
+    """List guides across directories, the user's own first (they shadow bundled ones)."""
+    return merge_style_lists(*(list_guides_in(d) for d in guides_dirs))
+
+
 def list_styles_merged(styles_dirs: list[Path]) -> list[dict[str, str]]:
     """List styles from multiple directories, user-local first (shadows bundled).
 
@@ -302,27 +324,32 @@ def filter_styles(
     styles: list[dict],
     pinned_names: list[str],
     include_all: bool = False,
+    default_name: str = "",
 ) -> list[dict]:
-    """Add pinned/source metadata and optionally filter styles.
+    """Add pinned/default/source metadata and optionally filter a resource listing.
 
-    Pure function — no I/O. Usable by both MCP Local (filesystem) and
-    MCP Server (S3) since style retrieval is the caller's responsibility.
+    Pure function — no I/O. Reads only ``name`` and ``source``, so it serves styles,
+    structure guides and writing guides alike. Usable by both MCP Local (filesystem)
+    and MCP Server (S3) since retrieval is the caller's responsibility.
 
     Args:
-        styles: List of style dicts. Each must have ``name``. May already
+        styles: List of resource dicts. Each must have ``name``. May already
             have ``source``; defaults to ``"builtin"`` if absent.
-        pinned_names: List of pinned style names.
-        include_all: If True, return all styles. If False, return only
-            pinned + user styles (all when there are no pins, or when the
-            pins match no style and there are no user styles).
+        pinned_names: List of pinned names.
+        include_all: If True, return everything. If False, return only
+            pinned + user items (all when there are no pins, or when the
+            pins match nothing and there are no user items).
+        default_name: The name set as the default for this kind, or "" when
+            none is set. The matching item gets ``default: True``.
 
     Returns:
-        Styles with ``pinned: bool`` and ``source: "builtin"|"user"`` added.
+        Items with ``pinned: bool``, ``default: bool`` and
+        ``source: "builtin"|"user"`` added.
     """
     pin_set = set(pinned_names)
     result = []
     for s in styles:
-        enriched = {**s, "pinned": s["name"] in pin_set}
+        enriched = {**s, "pinned": s["name"] in pin_set, "default": s["name"] == default_name}
         if "source" not in enriched:
             enriched["source"] = "builtin"
         result.append(enriched)
@@ -331,7 +358,8 @@ def filter_styles(
         return result
 
     # Pins whose styles no longer exist pin nothing, so they fall back to all as well.
-    return [s for s in result if s["pinned"] or s["source"] == "user"] or result
+    # A default that is not pinned stays visible, so switching pins never hides it.
+    return [s for s in result if s["pinned"] or s["default"] or s["source"] == "user"] or result
 
 
 HIDDEN_STYLES_HINT = (
@@ -346,6 +374,7 @@ def build_styles_listing(
     styles: list[dict],
     pinned_names: list[str],
     include_all: bool = False,
+    default_name: str = "",
 ) -> dict[str, Any]:
     """Build the ``list_styles`` tool payload.
 
@@ -358,7 +387,7 @@ def build_styles_listing(
         ``{"styles": [...]}``; when styles were hidden, additionally
         ``"other_styles": [names]`` and ``"hint": str``.
     """
-    shown = filter_styles(styles, pinned_names, include_all)
+    shown = filter_styles(styles, pinned_names, include_all, default_name)
     shown_names = {s["name"] for s in shown}
     hidden = [s["name"] for s in styles if s["name"] not in shown_names]
     payload: dict[str, Any] = {"styles": shown}
