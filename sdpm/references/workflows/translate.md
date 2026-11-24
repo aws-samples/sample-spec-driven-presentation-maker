@@ -21,7 +21,11 @@ shell access to it (CLI, or an agent whose tools include a shell).
   environment — see `SKILL.md`.
 - The dictionary also holds the deck.json `title` (the PPTX document title), and apply
   writes its translation into the sibling's deck.json. Extraction sets the sibling's
-  `language` to `--target-lang`, so pass the target language as a BCP 47 tag.
+  `language` to `--target-lang`, so pass the target language as a BCP 47 tag, and then
+  re-resolves the sibling's guides for that language: the source's `specs/writing.md` is
+  replaced with the target language's, or removed when that language has none. Where the
+  sibling has `specs/writing.md`, read it before writing any translated text — the wording
+  rules of the target language, not the source's.
 - Fill the dictionary, never its keys, and take keys from `translation_map.json` only —
   the `texts.tsv` next to it is an escaped review copy. An empty value keeps the source text.
   Styled-text tags

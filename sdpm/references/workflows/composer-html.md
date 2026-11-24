@@ -32,8 +32,10 @@ brings the format back if it has left your context.
 
 - **Realise the intent.** Build what the slide's `visual` and the brief ask for; `body` says
   what the slide says. You choose the layout, dimensions and decoration and refine the wording;
-  for a Japanese deck, read `read_guides(["writing-ja"])` before writing any slide text, in
-  every pass: titles, body, labels and notes follow it.
+  where the deck has `specs/writing.md`, read it before writing any slide text, in every pass:
+  titles, body, labels and notes follow it. It is the resolved writing guide for this deck and
+  outranks the wording in the style's sample slides; some languages have no writing guide, and
+  then the file is absent and you carry on without it.
   Draw the content's structure as a form built from the style's components, with icons from
   `search_assets`; where the `visual` is only text but the `body` has a structure, draw the
   structure and say so in your summary. A card or node that names a concept carries an icon,

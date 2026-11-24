@@ -22,9 +22,11 @@ override-group head they inherit from, marked `readonly`). These are current. Wh
 read is the parts of the style your slides use and the parts of the brief's Sources your
 slides need.
 Treat `body` and `visual` as the intent to realise: choose the layout, dimensions and decoration,
-and refine wording as needed. Facts come from the brief and its sources. For a Japanese deck,
-read `read_guides(["writing-ja"])` before writing any slide text, in every pass: titles, body,
-labels and notes follow it.
+and refine wording as needed. Facts come from the brief and its sources. Where the deck has
+`specs/writing.md`, read it before writing any slide text, in every pass: titles, body, labels
+and notes follow it. It is the resolved writing guide for this deck and outranks the wording in
+the style's sample slides; some languages have no writing guide, and then the file is absent and
+you carry on without it.
 
 ## What SDPM needs you to know
 
