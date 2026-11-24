@@ -275,18 +275,23 @@ def list_writings() -> dict[str, Any]:
 
 def apply_style(
     deck_id: Annotated[str, Field(description='Deck directory path.')],
-    style: Annotated[str, Field(description='Style name, e.g. "report".')],
+    style: Annotated[str, Field(description='Style name, e.g. "report". Empty uses the default style; without one this errors.')] = "",
     template: Annotated[str, Field(description='Template name, with or without .pptx.')] = "",
+    structure: Annotated[str, Field(description='Structure guide name from list_structures. Empty uses the default.')] = "",
+    writing: Annotated[str, Field(description="Writing guide name from list_writings. Empty uses the default, or the bundled guide for deck.json's language.")] = "",
 ) -> dict[str, Any]:
-    """Apply a style (and optionally a template) to a deck: writes specs/art-direction.html
-    and completes deck.json (template, defaultTextColor, fonts, slideSize). Returns what
-    was written, which fields changed and where each value came from — fix anything
-    wrong in deck.json with run_python — and style_toc, a line-numbered map of the
-    style file for reading the parts you need with run_python read_text.
+    """Apply a style, structure guide and writing guide to a deck: writes
+    specs/art-direction.html, specs/structure.md, specs/writing.md and completes
+    deck.json. Set deck.json language first, or the deck gets no writing guide.
+    Returns what was written, which fields changed, where each value came from — fix
+    anything wrong in deck.json with run_python — notices worth reading, and a
+    line-numbered map of each document for reading the parts you need with run_python.
     """
     from sdpm.api import apply_style as _apply_style
 
-    return _apply_style(deck_dir=deck_id, style=style, template=template)
+    return _apply_style(
+        deck_dir=deck_id, style=style, template=template, structure=structure, writing=writing
+    )
 
 
 def list_templates() -> dict[str, Any]:

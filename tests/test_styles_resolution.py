@@ -8,7 +8,17 @@ from pathlib import Path
 import pytest
 
 from sdpm.api import _find_style_in_dirs, get_styles_dirs
-from sdpm.knowledge.reference import BUNDLED_STYLES_DIR, list_styles, list_styles_merged
+from sdpm.knowledge.reference import (
+    BUNDLED_STRUCTURES_DIR as _BUNDLED_STRUCTURES,
+)
+from sdpm.knowledge.reference import (
+    BUNDLED_STYLES_DIR,
+    list_styles,
+    list_styles_merged,
+)
+from sdpm.knowledge.reference import (
+    BUNDLED_WRITINGS_DIR as _BUNDLED_WRITINGS,
+)
 
 
 @pytest.fixture
@@ -434,7 +444,12 @@ def test_apply_style_without_template_updates_only_text_color(
     result = apply_style(deck, "custom")
     metadata = __import__("json").loads(deck_json.read_text(encoding="utf-8"))
 
-    assert result["updated"] == {"defaultTextColor": "#123456", "slideSize": {}}
+    assert result["updated"] == {
+        "defaultTextColor": "#123456",
+        "slideSize": {},
+        "style": "custom",
+        "structure": "by-audience",
+    }
     assert metadata["defaultTextColor"] == "#123456"
     assert metadata["fonts"] == {"fullwidth": "", "halfwidth": ""}
     assert metadata["slideSize"] == {}
@@ -488,6 +503,8 @@ def test_apply_style_with_template_fills_empty_analysis_fields(
         "defaultTextColor": "#FFFFFF",
         "fonts": {"fullwidth": "Existing JP", "halfwidth": "Analyzed Latin"},
         "slideSize": {"width": 1920, "height": 1080, "ptPerPx": 0.5},
+        "style": "custom",
+        "structure": "by-audience",
     }
     assert metadata["fonts"]["fullwidth"] == "Existing JP"
 
@@ -567,3 +584,153 @@ def test_missing_deck_fields_flags_unfilled_text_color() -> None:
     assert merge_style_metadata(single, themed, deck)["defaultTextColor"] == "#123456"
     assert missing_deck_fields(merge_style_metadata(single, analysis, deck)) == []
     assert missing_deck_fields({}) == ["template", "fonts", "defaultTextColor", "slideSize"]
+
+
+# ---------------------------------------------------------------------------
+# apply_style: resolving style, structure and writing
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def deck_with_stores(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
+    """A deck plus isolated style / structure / writing stores and an empty state.json."""
+    import json as _json
+    from types import SimpleNamespace
+
+    monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path / "config"))
+    monkeypatch.setenv("APPDATA", str(tmp_path / "config"))
+    config_dir = tmp_path / "config" / "sdpm"
+    config_dir.mkdir(parents=True)
+
+    styles = tmp_path / "styles"
+    styles.mkdir()
+    (styles / "plain.html").write_text("<style>:root { --color-text: #123456; }</style>")
+    (styles / "other.html").write_text("<style>:root { --color-text: #654321; }</style>")
+    monkeypatch.setenv("SDPM_STYLES_DIR", str(styles))
+
+    structures = tmp_path / "structure"
+    structures.mkdir()
+    (structures / "report-first.md").write_text("---\ndescription: Report\n---\n\n## Pick\n\nrules\n")
+    monkeypatch.setenv("SDPM_STRUCTURES_DIR", f"{structures}{os.pathsep}{_BUNDLED_STRUCTURES}")
+
+    writings = tmp_path / "writing"
+    writings.mkdir()
+    (writings / "house.md").write_text("---\ndescription: House\n---\n\n## Words\n\nrules\n")
+    monkeypatch.setenv("SDPM_WRITINGS_DIR", f"{writings}{os.pathsep}{_BUNDLED_WRITINGS}")
+
+    def make_deck(**deck_json: object) -> Path:
+        deck = tmp_path / "deck"
+        (deck / "specs").mkdir(parents=True, exist_ok=True)
+        base = {"template": "", "fonts": {"fullwidth": "", "halfwidth": ""}, "defaultTextColor": ""}
+        (deck / "deck.json").write_text(_json.dumps({**base, **deck_json}), encoding="utf-8")
+        return deck
+
+    def write_state(**keys: object) -> None:
+        from sdpm import config
+
+        (config_dir / "state.json").write_text(_json.dumps(keys))
+        config.invalidate_cache()
+
+    return SimpleNamespace(make_deck=make_deck, write_state=write_state, config_dir=config_dir)
+
+
+def test_apply_style_without_a_name_or_a_default_errors(deck_with_stores) -> None:
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state()
+    result = apply_style(deck_with_stores.make_deck())
+    assert result["error"].startswith("Style not found:")
+    assert "default_style" in result["error"]
+
+
+def test_apply_style_copies_both_guides_into_the_deck(deck_with_stores) -> None:
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state(default_structure="report-first", default_writing="house")
+    deck = deck_with_stores.make_deck()
+    apply_style(deck, style="plain")
+    assert (deck / "specs" / "structure.md").read_text(encoding="utf-8").endswith("rules\n")
+    assert (deck / "specs" / "writing.md").read_text(encoding="utf-8").endswith("rules\n")
+
+
+def test_apply_style_records_the_three_names_in_deck_json(deck_with_stores) -> None:
+    import json as _json
+
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state(default_structure="report-first", default_writing="house")
+    deck = deck_with_stores.make_deck()
+    apply_style(deck, style="plain")
+    written = _json.loads((deck / "deck.json").read_text(encoding="utf-8"))
+    assert (written["style"], written["structure"], written["writing"]) == (
+        "plain", "report-first", "house",
+    )
+
+
+def test_changing_only_the_structure_rewrites_deck_json(deck_with_stores) -> None:
+    """REQ-4.3: deck.json is written only when something changed, and a new structure counts."""
+    import json as _json
+
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state()
+    deck = deck_with_stores.make_deck()
+    apply_style(deck, style="plain", structure="report-first")
+    result = apply_style(deck, style="plain", structure="by-audience")
+    assert result["updated"] == {"structure": "by-audience"}
+    assert _json.loads((deck / "deck.json").read_text(encoding="utf-8"))["structure"] == "by-audience"
+
+
+def test_a_named_structure_that_does_not_exist_writes_nothing(deck_with_stores) -> None:
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state()
+    deck = deck_with_stores.make_deck()
+    result = apply_style(deck, style="plain", structure="nope")
+    assert result["error"].startswith("Structure not found: nope.")
+    assert not (deck / "specs" / "structure.md").exists()
+    assert not (deck / "specs" / "art-direction.html").exists(), "nothing is written before resolving"
+
+
+def test_apply_style_reports_where_each_name_came_from(deck_with_stores) -> None:
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state(default_structure="report-first")
+    deck = deck_with_stores.make_deck(language="ja")
+    sources = apply_style(deck, style="plain")["sources"]
+    assert (sources["style"], sources["structure"], sources["writing"]) == (
+        "argument", "default", "unset",
+    )
+
+
+def test_a_default_that_was_deleted_falls_back_with_a_notice(deck_with_stores) -> None:
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state(default_structure="deleted-one")
+    result = apply_style(deck_with_stores.make_deck(language="ja"), style="plain")
+    assert result["structure"] == "by-audience"
+    assert len(result["notices"]) == 1 and "deleted-one" in result["notices"][0]
+
+
+def test_a_deck_with_no_language_is_told_why_it_got_no_writing_guide(deck_with_stores) -> None:
+    """REQ-5.8: the orchestrator writes language before apply_style; say so when it did not."""
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state()
+    result = apply_style(deck_with_stores.make_deck(), style="plain")
+    assert result["writing"] == ""
+    assert len(result["notices"]) == 1 and "language" in result["notices"][0]
+
+
+def test_a_deck_in_a_language_without_a_bundled_guide_gets_no_writing_copy(
+    deck_with_stores,
+) -> None:
+    from sdpm.api import apply_style
+
+    deck_with_stores.write_state()
+    deck = deck_with_stores.make_deck(language="en")
+    result = apply_style(deck, style="plain")
+    assert result["writing"] == ""
+    assert not (deck / "specs" / "writing.md").exists()
+    assert "writing" not in result["files"]
+    assert result["notices"] == [], "a stated language with no bundled guide is expected"

@@ -469,6 +469,28 @@ def test_apply_style_returns_a_line_numbered_toc(tmp_path: Path):
     assert style_toc("<html><body><p>plain</p></body></html>") == []
 
 
+def test_apply_style_returns_the_same_shape_of_toc_for_the_guides(tmp_path: Path):
+    """The guides are read the same way as the style, so their maps match its shape."""
+    from sdpm.api import guide_toc
+
+    deck_dir = tools.init_deck_workspace("deck")["output_dir"]
+    result = tools.apply_style(deck_dir, style="newspaper", template="blank-light")
+
+    toc = result["structure_toc"]
+    assert toc, "the bundled structure guide has ## sections"
+    assert all({"start", "end", "text"} <= set(e) for e in toc)
+    assert all(e["start"] <= e["end"] for e in toc)
+    assert all(a["end"] + 1 == b["start"] for a, b in zip(toc, toc[1:]))
+
+    lines = (Path(deck_dir) / "specs" / "structure.md").read_text(encoding="utf-8").splitlines()
+    assert toc[-1]["end"] == len(lines)
+    assert all(lines[e["start"] - 1].startswith("## ") for e in toc)
+
+    # A deck with no language gets no writing guide, so no map for one either.
+    assert "writing_toc" not in result
+    assert guide_toc("no headings here\n") == []
+
+
 # ---------------------------------------------------------------------------
 # Size budget: the start_composing result reaches the composer inline
 # ---------------------------------------------------------------------------

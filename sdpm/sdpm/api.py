@@ -343,42 +343,146 @@ def missing_deck_fields(deck_json: dict[str, Any]) -> list[str]:
 
 
 def _changed_style_fields(before: dict[str, Any], after: dict[str, Any]) -> dict[str, Any]:
-    """Return style-managed metadata fields whose values changed."""
+    """Return style-managed metadata fields whose values changed.
+
+    The three resource names are in here because deck.json is written only when this
+    returns something: without them, re-applying the same style with a different
+    structure would leave deck.json stale (REQ-4.3).
+    """
     return {
         key: after[key]
-        for key in ("template", "defaultTextColor", "defaultBackground", "fonts", "slideSize")
+        for key in (
+            "template", "defaultTextColor", "defaultBackground", "fonts", "slideSize",
+            "style", "structure", "writing",
+        )
         if after.get(key) != before.get(key) and key in after
     }
 
 
+# What a resolved resource is copied to, inside the deck's specs/.
+_GUIDE_SPEC_PATH = {"structure": "specs/structure.md", "writing": "specs/writing.md"}
+_KIND_GLOB = {"style": "*.html", "structure": "*.md", "writing": "*.md"}
+
+
+def _kind_dirs(kind: str) -> list[Path]:
+    return {
+        "style": get_styles_dirs,
+        "structure": get_structures_dirs,
+        "writing": get_writings_dirs,
+    }[kind]()
+
+
+def _not_found(kind: str, looked_for: str, dirs: list[Path]) -> dict[str, Any]:
+    available = sorted({p.stem for d in dirs if d.is_dir() for p in d.glob(_KIND_GLOB[kind])})
+    return {"error": f"{kind.capitalize()} not found: {looked_for}. Available: {available}"}
+
+
+def _resolve_resources(
+    explicit: dict[str, str],
+    language: str = "",
+) -> tuple[dict[str, str], dict[str, str], list[str], dict[str, Any] | None]:
+    """Resolve each requested kind to a name, before anything is written.
+
+    Shared by apply_style and apply_guides so the two cannot disagree about what
+    ``structure=""`` means. Resolution happens for every kind first: a caller that
+    named a guide that does not exist gets an error and no file is touched (REQ-3.6).
+
+    Args:
+        explicit: Kind -> the name the caller gave, "" for "use the default".
+        language: The deck's BCP 47 language tag, used for the writing guide.
+
+    Returns:
+        ``(names, origins, notices, error)``. ``error`` is None when every kind
+        resolved; otherwise it is the dict to return to the caller as-is, and the
+        other three values are incomplete.
+    """
+    from sdpm.knowledge.reference import resolve_default
+
+    names: dict[str, str] = {}
+    origins: dict[str, str] = {}
+    notices: list[str] = []
+    for kind, given in explicit.items():
+        dirs = _kind_dirs(kind)
+        name, origin, kind_notices = resolve_default(
+            kind, given, dirs, language=language if kind == "writing" else ""
+        )
+        # An empty name means "apply nothing", except for these two cases, where
+        # there is nothing to fall back to: see resolve_default.
+        if not name and (origin == "argument" or kind == "style"):
+            looked_for = given or _default_description(kind, origin)
+            return {}, {}, [], _not_found(kind, looked_for, dirs)
+        names[kind] = name
+        origins[kind] = origin
+        notices += kind_notices
+    return names, origins, notices, None
+
+
+def _default_description(kind: str, origin: str) -> str:
+    if origin == "unset":
+        return f"no name given and no default_{kind} set"
+    from sdpm.config import get_state
+
+    return f"{get_state().get(f'default_{kind}', '')} (the default)"
+
+
+def _copy_guides(deck_path: Path, names: dict[str, str]) -> dict[str, Any]:
+    """Copy the resolved structure and writing guides into the deck's specs/.
+
+    A kind that resolved to nothing has its copy removed, so a deck never keeps a
+    guide that no longer applies to it (a translated deck, REQ-4.7).
+    """
+    import shutil
+
+    files: dict[str, Any] = {}
+    for kind, rel in _GUIDE_SPEC_PATH.items():
+        if kind not in names:
+            continue
+        dest = deck_path / rel
+        name = names[kind]
+        if not name:
+            dest.unlink(missing_ok=True)
+            continue
+        src = next(
+            (d / f"{name}.md" for d in _kind_dirs(kind) if (d / f"{name}.md").exists()), None
+        )
+        if src is None:  # pragma: no cover - _resolve_resources already checked
+            continue
+        dest.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(src, dest)
+        files[rel] = {"path": str(dest), "bytes": dest.stat().st_size}
+    return files
+
+
 def apply_style(
     deck_dir: str | Path,
-    style: str,
+    style: str = "",
     template: str = "",
+    structure: str = "",
+    writing: str = "",
 ) -> dict[str, Any]:
-    """Apply a named style and optional template to a deck.
+    """Apply a named style, structure guide and writing guide to a deck.
 
-    Writes specs/art-direction.html and completes deck.json (template, defaultTextColor, fonts, slideSize).
+    Writes specs/art-direction.html, specs/structure.md, specs/writing.md and completes
+    deck.json (template, defaultTextColor, fonts, slideSize, and the three names).
 
     Args:
         deck_dir: Deck output directory path.
-        style: Style name (e.g. "report").
+        style: Style name (e.g. "report"). "" uses default_style.
         template: Optional template name, with or without the .pptx extension.
+        structure: Structure guide name. "" uses default_structure.
+        writing: Writing guide name. "" uses default_writing, or the bundled guide
+            for the deck's language.
 
     Returns:
-        Dict with status, style, files (paths written; deck.json with its content),
-        updated (changed deck.json fields), sources (where each filled field came from)
-        and missing (fields neither the style nor the template could fill).
+        Dict with status, the three names, files (paths written; deck.json with its
+        content), updated (changed deck.json fields), sources (where each field and
+        each name came from), missing (fields neither the style nor the template could
+        fill), notices, and a line-numbered map of each document written.
     """
     import shutil
 
     from sdpm.utils.io import read_json, write_json
 
-    styles_dirs = get_styles_dirs()
-    src = _find_style_in_dirs(style, styles_dirs)
-    if src is None:
-        available = [p.stem for d in styles_dirs if d.is_dir() for p in d.glob("*.html")]
-        return {"error": f"Style not found: {style}. Available: {sorted(set(available))}"}
     deck_path = Path(deck_dir)
     if not deck_path.is_dir():
         return {"error": f"Deck directory not found: {deck_dir}"}
@@ -386,6 +490,17 @@ def apply_style(
     if not deck_json_path.exists():
         return {"error": f"deck.json not found in {deck_dir}"}
     deck_data = read_json(deck_json_path)
+
+    names, origins, notices, error = _resolve_resources(
+        {"style": style, "structure": structure, "writing": writing},
+        language=deck_data.get("language", ""),
+    )
+    if error:
+        return error
+
+    src = _find_style_in_dirs(names["style"], get_styles_dirs())
+    if src is None:  # pragma: no cover - _resolve_resources already checked
+        return _not_found("style", names["style"], get_styles_dirs())
 
     completed = deepcopy(deck_data)
     if template:
@@ -403,30 +518,74 @@ def apply_style(
         template_analysis,
         completed,
     )
+    merged["style"] = names["style"]
+    merged["structure"] = names["structure"]
+    if names["writing"]:
+        merged["writing"] = names["writing"]
+    else:
+        merged.pop("writing", None)
+
     sources = style_field_sources(merged)
     if template:
         sources["template"] = "argument"
+    sources.update(origins)
     updated = _changed_style_fields(deck_data, merged)
+    # A dropped key is not a changed value, so _changed_style_fields cannot see it.
+    dropped_writing = "writing" in deck_data and "writing" not in merged
 
     dest = deck_path / "specs" / "art-direction.html"
     dest.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(src, dest)
-    if updated:
+    files = {
+        "specs/art-direction.html": {"path": str(dest), "bytes": dest.stat().st_size},
+        **_copy_guides(deck_path, names),
+    }
+    if updated or dropped_writing:
         write_json(deck_json_path, merged, suffix="\n")
+    files["deck.json"] = {"path": str(deck_json_path), "content": merged}
     return {
         "status": "ok",
-        "style": style,
-        "files": {
-            "specs/art-direction.html": {"path": str(dest), "bytes": dest.stat().st_size},
-            "deck.json": {"path": str(deck_json_path), "content": merged},
-        },
+        "style": names["style"],
+        "structure": names["structure"],
+        "writing": names["writing"],
+        "files": files,
         "updated": updated,
         "sources": sources,
         "missing": missing_deck_fields(merged),
-        # A map of the style file, so the orchestrator can read the parts it needs
+        "notices": notices,
+        # A map of each document, so the orchestrator can read the parts it needs
         # (rules, message & outline) with one run_python read_text + line slice.
         "style_toc": style_toc(src.read_text(encoding="utf-8")),
+        **_guide_tocs(deck_path, names),
     }
+
+
+def _guide_tocs(deck_path: Path, names: dict[str, str]) -> dict[str, Any]:
+    """``structure_toc`` / ``writing_toc`` for whichever guides were written."""
+    tocs: dict[str, Any] = {}
+    for kind, rel in _GUIDE_SPEC_PATH.items():
+        if names.get(kind):
+            tocs[f"{kind}_toc"] = guide_toc((deck_path / rel).read_text(encoding="utf-8"))
+    return tocs
+
+
+def guide_toc(text: str, snippet: int = 40) -> list[dict[str, Any]]:
+    """Table of contents of a Markdown guide: one entry per ``##`` section, with the
+    1-based ``start``–``end`` line range it holds and its heading as ``text``.
+
+    Same shape as :func:`style_toc`, so a caller reads either map the same way. A
+    guide with no ``##`` heading yields an empty list, meaning: read the whole file.
+    """
+    lines = text.splitlines()
+    starts = [i for i, line in enumerate(lines) if line.startswith("## ")]
+    return [
+        {
+            "start": start + 1,
+            "end": (starts[n + 1] if n + 1 < len(starts) else len(lines)),
+            "text": lines[start][3:].strip()[:snippet],
+        }
+        for n, start in enumerate(starts)
+    ]
 
 
 def style_toc(html: str, snippet: int = 40) -> list[dict[str, Any]]:
