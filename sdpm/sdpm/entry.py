@@ -60,7 +60,7 @@ def preload_references() -> None:
     global _reference_cache
     if _reference_cache is None:
         _reference_cache = {}
-    for role in ("orchestrator", "composer", "composer-html", "style", "translate", "review"):
+    for role in ("orchestrator", "composer", "composer-html", "style", "translate", "review", "import-guide"):
         _workflow(role)
     for guide in ("slide-json-spec", "slide-html-spec", "deck-json-spec", *_FORMAT_NOTES.values()):
         _read_reference(_GUIDES_DIR, guide)
@@ -530,3 +530,24 @@ def _correspondence_facts(deck_path: Path) -> dict[str, Any]:
         {**deck_json, "slides": slides},
         art_direction=_read_text(deck_path / _ART_DIRECTION) or "",
     )
+
+
+# ---------------------------------------------------------------------------
+# Import a guide
+# ---------------------------------------------------------------------------
+
+
+def start_import_guide(source_path: str | Path) -> dict[str, Any]:
+    """Import entry: the role document and the file the user wants imported.
+
+    The path comes from the user; this never searches for one (REQ-10.7). The file is
+    not read here — the role reads it, because a source can be long enough to need
+    paging and the role decides how much of it to take.
+    """
+    path = Path(source_path).expanduser()
+    if not path.is_file():
+        return {"error": f"Not a file: {source_path}. Pass the path of the document to import."}
+    return {
+        "static": {"workflow": _workflow("import-guide")},
+        "source": {"path": str(path), "bytes": path.stat().st_size},
+    }

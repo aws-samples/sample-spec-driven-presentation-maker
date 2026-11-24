@@ -159,7 +159,7 @@ def test_a_client_without_mcp_apps_sees_no_app_tool(server) -> None:
 
 
 def test_the_local_server_lists_every_tool_it_registers(local) -> None:
-    assert len(_listed(local)) == 25
+    assert len(_listed(local)) == 26
 
 
 @pytest.mark.parametrize(("which", "declaration"), [

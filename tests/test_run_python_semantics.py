@@ -1034,3 +1034,60 @@ class TestListFiles:
         monkeypatch.chdir(deck_dir)
         assert module.list_files() == self._EXPECTED_ROOT
         assert module.list_files("slides") == ["title.json"]
+
+
+# ---------------------------------------------------------------------------
+# Local: write_guide, the only path the style sandbox has to the guide stores
+# ---------------------------------------------------------------------------
+
+
+class TestWriteGuide:
+    """The import role saves through run_style_python; the sandbox forbids importing sdpm."""
+
+    @staticmethod
+    def _run(code: str, monkeypatch, tmp_path: Path) -> dict:
+        monkeypatch.setenv("XDG_CONFIG_HOME", str(tmp_path))
+        monkeypatch.setenv("APPDATA", str(tmp_path))
+        from sdpm import config
+
+        config.invalidate_cache()
+        return json.loads(sandbox_tools.run_style_python(purpose="save a guide", code=code))
+
+    def test_it_writes_into_the_users_guide_store(self, monkeypatch, tmp_path: Path):
+        result = self._run(
+            'write_guide("structure", "report-first", "---\\ndescription: Report\\n---\\n")',
+            monkeypatch,
+            tmp_path,
+        )
+        saved = tmp_path / "sdpm" / "structure" / "report-first.md"
+        assert saved.read_text(encoding="utf-8").startswith("---")
+        assert result["saved_guides"] == [
+            {"kind": "structure", "filename": "report-first.md", "path": str(saved)}
+        ]
+
+    def test_it_reports_every_guide_an_import_saved(self, monkeypatch, tmp_path: Path):
+        """One import produces two guides, so the last one must not hide the first."""
+        result = self._run(
+            'write_guide("structure", "house-order", "a")\nwrite_guide("writing", "house-words", "b")',
+            monkeypatch,
+            tmp_path,
+        )
+        assert [g["kind"] for g in result["saved_guides"]] == ["structure", "writing"]
+        assert (tmp_path / "sdpm" / "writing" / "house-words.md").exists()
+
+    @pytest.mark.parametrize("kind", ["style", "styles", "template", ""])
+    def test_it_refuses_a_kind_that_is_not_a_guide(self, kind: str, monkeypatch, tmp_path: Path):
+        result = self._run(f'write_guide("{kind}", "x", "y")', monkeypatch, tmp_path)
+        assert "kind must be one of" in result["output"]
+        assert not list((tmp_path / "sdpm").glob("*/*.md"))
+
+    @pytest.mark.parametrize("name", ["../escape", "sub/dir", "..", ""])
+    def test_it_refuses_a_name_that_leaves_the_store(self, name: str, monkeypatch, tmp_path: Path):
+        result = self._run(f'write_guide("writing", "{name}", "y")', monkeypatch, tmp_path)
+        assert "Invalid style name" in result["output"] or "kind must be one of" in result["output"]
+        assert not list(tmp_path.rglob("*.md"))
+
+    def test_the_sandbox_still_refuses_file_access(self, monkeypatch, tmp_path: Path):
+        result = self._run('open("/etc/passwd")', monkeypatch, tmp_path)
+        assert "rejected by sandbox" in result["output"]
+        assert "write_guide" in result["output"], "the rejection names the way to save a guide"

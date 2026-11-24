@@ -96,6 +96,19 @@ def start_reviewing(
     return _start(deck_dir=deck_id, guide=guide, target=target)
 
 
+def start_import_guide(
+    source_path: Annotated[str, Field(description="Path of the document to import, as the user gave it.")],
+) -> dict[str, Any]:
+    """Call first when asked to import someone else's slide-making rules as a guide.
+    Returns the import role document and the source file's path and size; the role
+    reads the file, splits its rules into a structure and a writing guide, saves them
+    and reports what it could not take.
+    """
+    from sdpm.entry import start_import_guide as _start
+
+    return _start(source_path=source_path)
+
+
 def init_deck_workspace(
     name: Annotated[str, Field(description='Presentation name, e.g. "lambda-overview".')],
     output_format: Annotated[Literal["pptx", "html"], Field(description="html only when the user asks for an HTML / browser deck; pptx otherwise.")] = "pptx",

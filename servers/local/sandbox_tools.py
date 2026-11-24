@@ -300,9 +300,11 @@ def run_style_python(
     purpose: Annotated[str, Field(description='One line on what this code does (shown in the UI).')],
     code: Annotated[str, Field(description='Python code; no import statements.')],
 ) -> str:
-    """Run Python for style authoring. Helpers: read_style(name) returns an existing style's
-    HTML (bundled or user); write_style(name, html) saves to the user style store
-    (name = file stem, no .html). No import or file access; print() for output.
+    """Run Python for style authoring and guide import. Helpers: read_style(name) returns
+    an existing style's HTML (bundled or user); write_style(name, html) saves to the user
+    style store (name = file stem, no .html); write_guide(kind, name, text) saves a
+    structure or writing guide to the user's own store. No import or file access; print()
+    for output.
     """
     from sandbox import check_code, make_style_runner
 
@@ -316,6 +318,7 @@ def run_style_python(
         lines.append("Use sandbox functions instead:")
         lines.append("  read_style(name) → str       (read existing style HTML)")
         lines.append("  write_style(name, html) → None  (save to user styles)")
+        lines.append("  write_guide(kind, name, text) → None  (save a structure or writing guide)")
         result["output"] = "\n".join(lines)
         return json.dumps(result, ensure_ascii=False)
 
@@ -324,21 +327,25 @@ def run_style_python(
 
     user_styles_dir = str(get_user_config_dir() / "styles")
     styles_dirs_json = json.dumps([str(d) for d in get_styles_dirs()])
+    user_config_dir = str(get_user_config_dir())
 
     try:
         runner = make_style_runner()
         proc = subprocess.run(
-            [sys.executable, "-c", runner, user_styles_dir, styles_dirs_json],
+            [sys.executable, "-c", runner, user_styles_dir, styles_dirs_json, user_config_dir],
             input=code, capture_output=True, text=True, timeout=120,
         )
         output = proc.stdout
         stderr = proc.stderr or ""
 
         save_lines = []
+        guide_lines = []
         other_stderr = []
         for line in stderr.splitlines():
             if line.startswith("__STYLE_SAVED__"):
                 save_lines.append(line[len("__STYLE_SAVED__"):])
+            elif line.startswith("__GUIDE_SAVED__"):
+                guide_lines.append(line[len("__GUIDE_SAVED__"):])
             else:
                 other_stderr.append(line)
 
@@ -348,6 +355,9 @@ def run_style_python(
 
         if save_lines:
             result["saved"] = json.loads(save_lines[-1])
+        if guide_lines:
+            # Every guide, not just the last: an import saves a structure and a writing one.
+            result["saved_guides"] = [json.loads(line) for line in guide_lines]
 
     except subprocess.TimeoutExpired:
         result["output"] = "Error: execution timed out (120s)"

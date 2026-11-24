@@ -666,3 +666,28 @@ def test_a_deck_without_the_guide_says_which_call_makes_it(tmp_path: Path) -> No
     bare = tools.init_deck_workspace("bare")["output_dir"]
     result = tools.start_reviewing(bare, guide="writing", target="slides")
     assert "apply_guides" in result["error"]
+
+
+# ---------------------------------------------------------------------------
+# start_import_guide: someone else's rules, split into two guides
+# ---------------------------------------------------------------------------
+
+
+def test_start_import_guide_returns_the_role_and_the_source(tmp_path: Path) -> None:
+    source = tmp_path / "house-rules.md"
+    source.write_text("# House rules\n\nKeep headlines short.\n", encoding="utf-8")
+
+    result = tools.start_import_guide(str(source))
+    workflow = result["static"]["workflow"]
+    assert "# Import a guide" in workflow
+    assert "write_guide" in workflow
+    assert result["source"]["path"] == str(source)
+    assert result["source"]["bytes"] == source.stat().st_size
+
+
+def test_start_import_guide_needs_a_file_the_user_named(tmp_path: Path) -> None:
+    """REQ-10.7: the path comes from the user; nothing searches for one."""
+    result = tools.start_import_guide(str(tmp_path / "nothing-here.md"))
+    assert "Not a file" in result["error"]
+
+    assert "Not a file" in tools.start_import_guide(str(tmp_path))["error"], "a directory is not a source"

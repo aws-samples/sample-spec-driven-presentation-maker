@@ -23,7 +23,7 @@ _LOCAL = _ROOT / "servers" / "local"
 # a composer calls it on nearly every turn and must not pay a round trip to learn it.
 _DESC_MAX = {"run_python": 700, "read_guides": 700, "hearing": 600}
 _DESC_MAX_DEFAULT = 560
-_TOTAL_MAX = 19_300  # description + schema, all tools, characters (~4.8K tokens); ACP adds hearing
+_TOTAL_MAX = 19_900  # description + schema, all tools, characters (~5K tokens); ACP adds hearing
 
 
 _REMOTE = _ROOT / "servers" / "remote"
@@ -149,7 +149,8 @@ def test_read_guides_description_lists_the_catalogue(local_tools):
 
 def test_entry_tools_are_the_only_ones_that_start_a_request(any_server_tools):
     starters = {n for n, t in any_server_tools.items() if re.search(r"\b[Cc]all (it|this) (first|before)|[Cc]all first|Start here", t.description or "")}
-    entries = {"start_presentation", "start_composing", "start_style", "start_translation", "start_reviewing"}
+    entries = {"start_presentation", "start_composing", "start_style", "start_translation",
+               "start_reviewing", "start_import_guide"}
     assert starters <= entries and "start_presentation" in starters, starters
 
 
@@ -179,11 +180,11 @@ def _public_functions(module) -> set[str]:
 # The tools each server implements for its own transport (a local process or the
 # AgentCore Code Interpreter), and the documented Layer 3 differences
 # (docs/en/architecture.md): the remote's preview and optional KB search, and the
-# contract tools it does not bind. set_default writes the user's own state.json, which
-# the cloud stack has no equivalent of.
+# contract tools it does not bind. set_default and start_import_guide both work on the
+# user's own config directory, which the cloud stack has no equivalent of.
 _SANDBOX_TOOLS = {"run_python", "run_style_python"}
 _REMOTE_ONLY = {"get_preview", "search_slides"}
-_REMOTE_UNBOUND = {"start_translation", "set_default"}
+_REMOTE_UNBOUND = {"start_translation", "set_default", "start_import_guide"}
 
 
 def test_both_servers_expose_the_tool_contract_and_nothing_else(local_tools, remote_tools):

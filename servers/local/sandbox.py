@@ -113,6 +113,9 @@ from pathlib import Path
 
 user_styles_dir = Path(sys.argv[1]).resolve()
 styles_dirs = json.loads(sys.argv[2])
+user_config_dir = Path(sys.argv[3]).resolve()
+
+_GUIDE_KINDS = ("structure", "writing")
 
 def _validate_name(name):
     if not name or "/" in name or "\\\\" in name or ".." in name:
@@ -146,6 +149,18 @@ def write_style(name, html):
     # Signal save result to parent process via stderr JSON
     sys.stderr.write("__STYLE_SAVED__" + json.dumps({"title": title, "filename": filename, "path": str(dest)}) + "\\n")
 
+def write_guide(kind, name, text):
+    """Save a structure or writing guide to the user's own store. name = file stem."""
+    if kind not in _GUIDE_KINDS:
+        raise PermissionError(f"kind must be one of {list(_GUIDE_KINDS)}: {kind}")
+    name = _validate_name(name)
+    filename = name if name.endswith(".md") else name + ".md"
+    dest_dir = user_config_dir / kind
+    dest_dir.mkdir(parents=True, exist_ok=True)
+    dest = dest_dir / filename
+    dest.write_text(text, encoding="utf-8")
+    sys.stderr.write("__GUIDE_SAVED__" + json.dumps({"kind": kind, "filename": filename, "path": str(dest)}) + "\\n")
+
 _safe_builtins = {
     "print": print, "len": len, "range": range, "enumerate": enumerate,
     "sorted": sorted, "isinstance": isinstance, "type": type,
@@ -161,10 +176,15 @@ _safe_builtins = {
 
 code = sys.stdin.read()
 exec(code, {"__builtins__": _safe_builtins, "__name__": "__main__",
-     "read_style": read_style, "write_style": write_style})
+     "read_style": read_style, "write_style": write_style,
+     "write_guide": write_guide})
 '''
 
 
 def make_style_runner() -> str:
-    """Return the style runner script. Expects sys.argv[1]=user_styles_dir, sys.argv[2]=styles_dirs JSON."""
+    """Return the style runner script.
+
+    Expects sys.argv[1]=user_styles_dir, sys.argv[2]=styles_dirs JSON,
+    sys.argv[3]=user_config_dir (the root the guide stores live under).
+    """
     return _RUNNER_STYLE
