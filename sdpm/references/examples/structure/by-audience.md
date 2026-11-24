@@ -1,34 +1,52 @@
 ---
-description: "骨格と枚の組み立て — 聞き手と持ち時間から論証の順を決める"
+description: "Backbone and slide construction — ordering the argument from the audience and the time available"
 ---
 
-# 聞き手から骨格を決める
+# Choosing a backbone from the audience
 
-outline を書く前に読む。骨格は brief が持つものから決める。聞き手は誰か、持ち時間はどれだけか、聞き手がすでに知っていることは何か、終わったあとに何を信じてほしいか。この4つだけを入力にする。スタイルは骨格を決めない。同じスタイルで、相手によって順が変わる。
+Read this before writing the outline. The backbone comes from what the brief carries:
+who the audience is, how long the talk is, what they already know, and what they should
+believe afterwards. Those four are the only inputs. The style does not decide the
+backbone — the same style carries a different order for a different audience.
 
-## 骨格を決める順
+## Choosing the backbone
 
-次の問いを上から当て、最初に当てはまったものを骨格にする。括弧の中はその骨格の段で、この順に枚を並べる。
+Try these in order and take the first that applies. The stages in brackets are the
+order the slides go in.
 
-1. 聞き手が背景をすでに持っているか、持ち時間が短いか。どちらかなら **conclusion-first**（答え・理由・根拠）にする。SCQA（状況・複雑化・問い・答え）も同じ族で、問いを明示したいときに使う。
-2. 聞き手が、まだ困っていると思っていないか。そうなら **problem-solution**（問題・増幅・解決・根拠・道筋）にする。行動まで求めるなら Monroe（注意・必要・満足・想像・行動）を使う。
-3. 聞き手が、進むべき先を決めていないか。そうなら **what-is / what-could-be**（いまの姿とありうる姿を交互に置き、最後に橋を渡す）にする。
-4. 聞き手が、結論より過程を知りたいか。そうなら **起承転結**（始まり・展開・転換・結果）か failure-lesson-success にする。
-5. どれにも当てはまらず内容が広いか。そうなら **logical grouping**（主題別・時系列・影響の大きさ順のどれかで束ね、束ごとに1章）にする。
+1. Does the audience already have the background, or is the talk short? Either one
+   means **conclusion-first** (answer, reasons, evidence). SCQA (situation,
+   complication, question, answer) is the same family, for when the question is worth
+   stating outright.
+2. Does the audience not yet believe they have a problem? Then **problem-solution**
+   (problem, amplification, solution, evidence, path). When you need them to act, use
+   Monroe (attention, need, satisfaction, visualisation, action).
+3. Has the audience not settled on where to go? Then **what-is / what-could-be**
+   (alternate the present state and the possible one, then bridge at the end).
+4. Does the audience want the process more than the conclusion? Then **kishōtenketsu**
+   (opening, development, turn, result) or failure-lesson-success.
+5. Does none of these apply, and the material is broad? Then **logical grouping**
+   (bundle by theme, by time, or by magnitude of effect, one chapter per bundle).
 
-どれを選んだかは outline のどこにも書かない。並びがその段の順になっていれば足りる。
+Do not write which one you chose anywhere in the outline. The order of the slides
+carrying the stages is enough.
 
-## 枚の組み立て
+## Constructing the slides
 
-- 1枚で主張は1つにする。2つあるなら枚を割る。
-- 主張は `- [slug] title` に1文で書く。枚の中身はその1文を支えるものだけを置く。
-- 枚の並びを上から読んで、選んだ骨格の段の順になっていることを確かめる。段を飛ばした枚があれば、その段の枚を足すか骨格を選び直す。
-- ファクトだけで終わらせず、ファクトから出る解釈を述べる枚を置く。
-- 各枚の `evidence` に、brief の Sources のどれのどの部分かを書く。書けないものは `[TBD]` と書き、埋まるまで主張として扱わない。
-- 枚数は持ち時間から決める。内容の量ではなく、聞き手が追える速さで決める。
+- One claim per slide. Two claims means two slides.
+- Write the claim as one sentence in `- [slug] title`. The slide holds only what
+  supports that sentence.
+- Read the slides top to bottom and confirm they follow the stages of the backbone you
+  chose. A skipped stage means adding its slides or choosing a different backbone.
+- Do not stop at facts: include slides that state what the facts mean.
+- Every slide's `evidence` names which of the brief's Sources, and which part of it.
+  What you cannot name is `[TBD]`, and is not treated as a claim until it is filled.
+- Slide count comes from the time available — the pace the audience can follow, not the
+  volume of material.
 
-## 章の立て方
+## Forming the chapters
 
-- 章は骨格の段に対応させる。段をまたいで1章にしない。
-- 章の見出しには、その章で伝える中身を書く。
-- 章を分けるかどうかは、枚の数ではなく段の数で決める。段が1つなら章を分けない。
+- A chapter corresponds to a stage of the backbone. One chapter never spans two stages.
+- A chapter heading states what that chapter says.
+- Whether to split into chapters follows the number of stages, not the number of
+  slides. One stage means no chapter split.

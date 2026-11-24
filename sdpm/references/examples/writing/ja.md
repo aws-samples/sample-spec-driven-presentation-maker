@@ -1,5 +1,5 @@
 ---
-description: "日本語のスライドの文言 — 見出し、箇条書き、図のラベル、スピーカーノートの書き方"
+description: "Japanese writing for slides (headlines, bullets, labels, speaker notes) — read when the deck is in Japanese"
 ---
 
 # 日本語のスライドの書き方
