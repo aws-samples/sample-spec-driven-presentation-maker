@@ -88,8 +88,7 @@ def start_reviewing(
 ) -> dict[str, Any]:
     """Call first when reviewing a deck against one guide. Dispatch one reviewer per
     guide, in parallel; each holds the deck against its own guide and reports findings
-    without editing. Returns the review role document, that guide's text, the files to
-    read, and for verify on slides the measured facts a reviewer cannot obtain itself.
+    without editing.
     """
     from sdpm.entry import start_reviewing as _start
 
@@ -100,9 +99,7 @@ def start_import_guide(
     source_path: Annotated[str, Field(description="Path of the document to import, as the user gave it.")],
 ) -> dict[str, Any]:
     """Call first when asked to import someone else's slide-making rules as a guide.
-    Returns the import role document and the source file's path and size; the role
-    reads the file, splits its rules into a structure and a writing guide, saves them
-    and reports what it could not take.
+    The role splits them into a structure and a writing guide and saves both.
     """
     from sdpm.entry import start_import_guide as _start
 
@@ -274,9 +271,8 @@ def list_structures(
     include_all: Annotated[bool, Field(description='Include guides left out by the pin filter.')] = False,
 ) -> dict[str, Any]:
     """List structure guides, which decide a deck's backbone and how its slides are
-    built: name, where it came from, its description, whether it is pinned and whether
-    it is the default. The default is used when apply_style is called without one.
-    Pinned guides and the user's own come back first; other_structures names the rest.
+    built. The default is used when apply_style is called without one. Pinned guides and
+    the user's own come back first; other_structures names the rest.
     """
     from sdpm.api import get_structures_dirs, list_guides_listing
     from sdpm.config import get_state
@@ -295,11 +291,10 @@ def list_structures(
 def list_writings(
     include_all: Annotated[bool, Field(description='Include guides left out by the pin filter.')] = False,
 ) -> dict[str, Any]:
-    """List writing guides, which decide the wording of titles, body, labels and notes:
-    name, where it came from, its description, whether it is pinned and whether it is a
-    default. A writing guide belongs to a language, so defaults maps each scope — a
-    language like ja, or a translation direction like en2ja — to its guide.
-    Pinned guides and the user's own come back first; other_writings names the rest.
+    """List writing guides, which decide the wording of titles, body, labels and notes.
+    A writing guide belongs to a language, so defaults maps each scope — a language like
+    ja, or a translation direction like en2ja — to its guide. Pinned guides and the
+    user's own come back first; other_writings names the rest.
     """
     from sdpm.api import get_writings_dirs, list_guides_listing, writing_defaults
     from sdpm.config import get_state
@@ -326,9 +321,8 @@ def apply_style(
     """Apply a style, structure guide and writing guide to a deck: writes
     specs/art-direction.html, specs/structure.md, specs/writing.md and completes
     deck.json. Set deck.json language first, or the deck gets no writing guide.
-    Returns what was written, which fields changed, where each value came from — fix
-    anything wrong in deck.json with run_python — notices worth reading, and a
-    line-numbered map of each document for reading the parts you need with run_python.
+    Each document comes back with a line-numbered map, for reading the parts you need
+    with run_python.
     """
     from sdpm.api import apply_style as _apply_style
 
@@ -345,9 +339,7 @@ def apply_guides(
 ) -> dict[str, Any]:
     """Write specs/structure.md and specs/writing.md for a deck without touching its
     art direction. Use it on a deck that has none yet, or after translating one, where
-    apply_style would need a style name the deck does not carry. Returns what was
-    written, where each name came from, notices worth reading, and a line-numbered map
-    of each guide.
+    apply_style would need a style name the deck does not carry.
     """
     from sdpm.api import apply_guides as _apply_guides
 
@@ -364,8 +356,7 @@ def set_default(
     """Set, switch or clear the default style, structure guide or writing guide — what
     apply_style and apply_guides use when called without a name. Call it when the user
     states a standing preference, so later decks need not name it. A writing guide
-    belongs to a language, so it needs a scope. A name that does not exist is an error
-    and nothing is saved.
+    belongs to a language, so it needs a scope.
     """
     from sdpm.api import set_default as _set_default
 

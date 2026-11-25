@@ -592,8 +592,7 @@ def start_reviewing(
 ) -> str:
     """Call first when reviewing a deck against one guide. Dispatch one reviewer per
     guide, in parallel; each holds the deck against its own guide and reports findings
-    without editing. Returns the review role document, that guide's text, the files to
-    read, and for verify on slides the measured facts a reviewer cannot obtain itself.
+    without editing.
     """
     import tempfile
 
@@ -936,9 +935,8 @@ def apply_style(
     """Apply a style, structure guide and writing guide to a deck: writes
     specs/art-direction.html, specs/structure.md, specs/writing.md and completes
     deck.json. Set deck.json language first, or the deck gets no writing guide.
-    Returns what was written, which fields changed, where each value came from — fix
-    anything wrong in deck.json with run_python — notices worth reading, and a
-    line-numbered map of each document for reading the parts you need with run_python.
+    Each document comes back with a line-numbered map, for reading the parts you need
+    with run_python.
     """
     _check_deck_access(deck_id, action="edit_slide")
     if not user_library.is_valid_style_name(style):
@@ -1133,9 +1131,7 @@ def apply_guides(
 ) -> str:
     """Write specs/structure.md and specs/writing.md for a deck without touching its
     art direction. Use it on a deck that has none yet, or after translating one, where
-    apply_style would need a style name the deck does not carry. Returns what was
-    written, where each name came from, notices worth reading, and a line-numbered map
-    of each guide.
+    apply_style would need a style name the deck does not carry.
     """
     _check_deck_access(deck_id, action="edit_slide")
 
