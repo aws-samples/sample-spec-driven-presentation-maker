@@ -20,7 +20,9 @@ Theme detection: if the background color from analyze_template has low brightnes
 Don't rely on color alone to convey information — consider color vision diversity.
 
 **Constraints:**
-- You MUST NOT use emoji in slides because they render inconsistently across platforms — use `search-assets --type general` instead
+- You MUST draw a pictorial mark as an icon from `search-assets --type general`, not as an
+  emoji character: a catalog icon renders everywhere and takes the slide's colours. Whether
+  slide *text* may carry emoji is the deck's writing guide's call, not this guide's.
 
 ## Typography
 

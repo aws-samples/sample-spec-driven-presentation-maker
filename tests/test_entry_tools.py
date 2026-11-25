@@ -725,3 +725,25 @@ def test_both_composers_read_the_universal_rules_before_writing_text() -> None:
         doc = (workflows / f"{mode}.md").read_text(encoding="utf-8")
         assert 'read_guides(["verify"])' in doc, mode
         assert "specs/writing.md" in doc, mode
+
+
+def test_emoji_in_slide_text_is_the_writing_guides_call() -> None:
+    """A preference belongs to the guide a user can replace. An absolute prohibition in a
+    document they cannot replace would override their own guide."""
+    references = Path(__file__).resolve().parents[1] / "sdpm" / "references"
+
+    for doc in ("workflows/composer.md", "workflows/composer-html.md"):
+        text = (references / doc).read_text(encoding="utf-8")
+        assert "emoji" not in text.lower(), f"{doc} states a rule the writing guide owns"
+
+    design = (references / "guides/design-rules.md").read_text(encoding="utf-8")
+    assert "writing guide" in design, "design-rules points at who owns the text rule"
+
+    # A style's own sample slides are a different artifact, and a contract test enforces it.
+    style = (references / "workflows/style.md").read_text(encoding="utf-8")
+    assert "No emoji anywhere" in style
+
+    # The bundled writing guides carry the default and say what overriding it costs.
+    for guide in ("examples/writing/ja.md", "examples/writing/en2ja.md"):
+        text = (references / guide).read_text(encoding="utf-8")
+        assert "絵文字を使わない" in text and "フォントが無い" in text, guide

@@ -52,7 +52,7 @@ brings the format back if it has left your context.
   style: its `Frame:` comments say what repeats on every slide, its `Component:` comments the
   parts slides are built from, its `Pattern:` slides how it builds each slide type and which
   regions that divides into. Match its density and its look; its patterns show how it draws,
-  and a slide may show more than they do. Slide text is words, without emoji. Read the parts
+  and a slide may show more than they do. Read the parts
   your slides use (the `:root` tokens, the rules, the frames, and the components and patterns
   that fit your slides' `visual`) and more whenever a slide calls for it: each line of
   `art_direction_toc.toc` is a line range of the file (1-based, inclusive) with its comments,

@@ -70,7 +70,7 @@ you carry on without it.
 - Page numbers and footers are the template's: never draw them as elements.
 - Font sizes and colors come from the `:root` tokens of `specs/art-direction.html`. Off-token
   font sizes only warn at build time and off-token colors are not checked at all, so keep to
-  the tokens yourself. No emoji in slide text — the renderer has no emoji fonts.
+  the tokens yourself.
 - After writing a slide, build and measure it and look at the preview; fix overflow and
   overlap before moving to the next slug. Text overflow is only visible through measurement.
 
