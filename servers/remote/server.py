@@ -905,8 +905,7 @@ def list_styles(
 @offloaded_tool
 def list_structures() -> str:
     """List structure guides, which decide a deck's backbone and how its slides are
-    built: name, where it came from, its description, whether it is pinned and whether
-    it is the default. The default is used when apply_style is called without one.
+    built. The default is used when apply_style is called without one.
     """
     from sdpm.tools import list_structures as _list_structures
 
@@ -915,9 +914,8 @@ def list_structures() -> str:
 
 @offloaded_tool
 def list_writings() -> str:
-    """List writing guides, which decide the wording of titles, body, labels and notes:
-    name, where it came from, its description, whether it is pinned and whether it is
-    the default. The default is used when apply_style is called without one.
+    """List writing guides, which decide the wording of titles, body, labels and notes.
+    The default is used when apply_style is called without one.
     """
     from sdpm.tools import list_writings as _list_writings
 
