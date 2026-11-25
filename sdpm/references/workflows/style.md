@@ -167,7 +167,8 @@ The demo slides are read as coordinates, so the format is constrained:
 - Frame geometry must fit the largest allowed text: the title box holds two lines at
   `--fs-slide-title` (40pt → 192 px), and `--content-top` sits below it. One-line titles leave
   the second line empty; content never moves up to fill it.
-- No emoji anywhere — the PPTX renderer has no emoji fonts. Icons come from `search_assets`.
+- No emoji anywhere — a sample slide is previewed on a host that may carry no emoji
+  font, where it draws as a blank box. Icons come from `search_assets`.
 - Icons are references to the asset catalog. Draw one with
   `<svg class="icon"><use href="#<source>/<name>"/></svg>`, the id being the `search_assets`
   name, so the JSON `src` is `assets:` + the id. The file holds only these references; the
