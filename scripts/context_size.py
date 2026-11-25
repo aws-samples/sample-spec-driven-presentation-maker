@@ -47,6 +47,7 @@ DEFAULT_ROOT = SCRIPT.parents[1]
 # list_styles / apply_style, agent prompt parts, the Local Web UI's ACP agent prompts).
 FILE_GLOBS = (
     "sdpm/references/workflows/*.md", "sdpm/references/guides/*.md", "sdpm/references/examples/styles/*.html",
+    "sdpm/references/examples/structure/*.md", "sdpm/references/examples/writing/*.md",
     "agent/prompts/**/*.md", "servers/local/.kiro/acp-agents/prompts/*.md",
 )
 GUIDES_DIR = "sdpm/references/guides"
