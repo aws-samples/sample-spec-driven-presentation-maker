@@ -13,17 +13,6 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 ## [Unreleased]
 
-### Upgrading to this version
-
-**Local installs (`sdpm update`).**
-
-- The `writing-ja` guide is gone. Its rules now live in `references/examples/writing/ja.md`,
-  which a deck gets as `specs/writing.md` when a style or the guides are applied, so a
-  composer reads the deck's own copy instead of a bundled guide. The bundled role documents
-  read the copy already. You have something to do only if your own prompts named the guide:
-  `read_guides(["writing-ja"])` now raises `FileNotFoundError`, so point them at the deck's
-  `specs/writing.md` instead.
-
 ### Added
 
 - **Structure and writing guides are resource types you can replace** (`list_structures`,
@@ -117,8 +106,9 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 ### Removed
 
 - **The `writing-ja` guide** (`references/guides/writing-ja.md`). Its rules are the bundled
-  `references/examples/writing/ja.md`, which a deck carries as `specs/writing.md`. See
-  Upgrading above.
+  `references/examples/writing/ja.md`, which a deck carries as `specs/writing.md` and the
+  role documents read from there. `read_guides(["writing-ja"])` raises `FileNotFoundError`
+  now, so a prompt of your own that named the guide should read the deck's copy instead.
 - **The `design-review-guide` guide.** No role document referenced it, and its content
   split: overflow, overlap and clipped text are already measured, and "is it easy to
   understand" belongs to the structure guide.
