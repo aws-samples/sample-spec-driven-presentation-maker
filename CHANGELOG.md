@@ -19,16 +19,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 
 - The `writing-ja` guide is gone. Its rules now live in `references/examples/writing/ja.md`,
   which a deck gets as `specs/writing.md` when a style or the guides are applied, so a
-  composer reads the deck's own copy instead of a bundled guide. Nothing to do unless you
-  referenced `read_guides(["writing-ja"])` from your own prompts; point them at
+  composer reads the deck's own copy instead of a bundled guide. The bundled role documents
+  read the copy already. You have something to do only if your own prompts named the guide:
+  `read_guides(["writing-ja"])` now raises `FileNotFoundError`, so point them at the deck's
   `specs/writing.md` instead.
-- Set `language` in `deck.json` before `apply_style`, not after the outline. The writing
-  guide is resolved from it, so a deck with no language gets none; `apply_style` says so in
-  its `notices`. The orchestrator workflow does this already.
-- If you set a default writing guide by hand in `~/.config/sdpm/state.json`,
-  `default_writing` is now a table keyed by scope rather than one name:
-  `{"ja": "house-ja", "en2ja": "house-en2ja"}`. A plain string is ignored. `set_default`
-  writes it for you.
 
 ### Added
 
@@ -49,8 +43,10 @@ Under an Upgrading section, the bullets after **Local installs (`sdpm update`).*
 - **A writing guide belongs to a language, or to a translation direction.** `default_writing`
   is keyed by scope: `ja` for a Japanese deck, `en2ja` for one translated from English.
   Resolution tries the direction first, then the language, taking your own guide before the
-  bundled one. Translation re-resolves the derived deck's guide for its new direction, so an
-  English sibling stops carrying the Japanese rules.
+  bundled one. Because the language is where resolution starts, `deck.json` needs it by the
+  time `apply_style` runs — the orchestrator workflow sets it there, and `apply_style` names
+  an unresolved guide in its `notices`. Translation re-resolves the derived deck's guide for
+  its new direction, so an English sibling stops carrying the Japanese rules.
 - **Review is a role you can dispatch** (`config.json` `"review"`,
   `start_reviewing(deck_id, guide, target)`). Off by default: the guides reach the
   composers either way, which read them before writing any slide text, so review is a
